@@ -22,6 +22,7 @@ const KeywordStrings = [
     "case",
     "check",
     "concept",
+    "condrec",
     "const",
     "elif",
     "else",
@@ -40,7 +41,10 @@ const KeywordStrings = [
     "method",
     "namespace",
     "none",
+    "or",
     "provides",
+    "rec",
+    "ref",
     "return",
     "requires",
     "static",
@@ -48,7 +52,6 @@ const KeywordStrings = [
     "true",
     "type",
     "typedef",
-    "unique",
     "using",
     "var",
     "when",
@@ -66,7 +69,6 @@ const SymbolStrings = [
     "@[",
     "@{",
     "?[",
-    "?(",
     "?@[",
     "?@{",
     "{|",
@@ -76,7 +78,6 @@ const SymbolStrings = [
     "&",
     "&&",
     "@",
-    "@#",
     "!",
     "!=",
     ":",
@@ -89,7 +90,6 @@ const SymbolStrings = [
     "=>",
     "==>",
     "#",
-    "~",
     ";",
     "|",
     "||",
@@ -101,13 +101,8 @@ const SymbolStrings = [
     "?&",
     "?|",
     "?.",
-    "?@#",
-    "?<~",
-    "?<+",
     "<",
     "<=",
-    "<~",
-    "<+",
     ">",
     ">=",
     "-",
@@ -115,10 +110,13 @@ const SymbolStrings = [
     "?->"
 ].sort((a, b) => { return (a.length !== b.length) ? (b.length - a.length) : a.localeCompare(b); });
 
-const LeftScanParens = ["[", "(", "{", "@[", "@{", "?[", "?(", "?@[", "?@{", "{|"];
+const LeftScanParens = ["[", "(", "{", "@[", "@{", "?[", "?@[", "?@{", "{|"];
 const RightScanParens = ["]", ")", "}", "|}"];
 
-const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint"];
+const LeftScanParensType = [...LeftScanParens, "<"];
+const RightScanParensType = [...RightScanParens, ">"];
+
+const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint", "condrec", "rec"];
 
 const TokenStrings = {
     Clear: "[CLEAR]",
@@ -139,14 +137,16 @@ const TokenStrings = {
 
 class Token {
     readonly line: number;
+    readonly newlinepos: number;
     readonly pos: number;
     readonly span: number;
 
     readonly kind: string;
     readonly data: string | undefined;
 
-    constructor(line: number, cpos: number, span: number, kind: string, data?: string) {
+    constructor(line: number, newlinepos: number, cpos: number, span: number, kind: string, data?: string) {
         this.line = line;
+        this.newlinepos = newlinepos;
         this.pos = cpos;
         this.span = span;
 
@@ -198,6 +198,7 @@ class Lexer {
     private m_input: string;
     private m_internTable: Map<string, string>;
     private m_cline: number;
+    private m_newlinepos: number;
     private m_cpos: number;
     private m_tokens: Token[];
 
@@ -205,6 +206,7 @@ class Lexer {
         this.m_input = input;
         this.m_internTable = new Map<string, string>();
         this.m_cline = 1;
+        this.m_newlinepos = 0;
         this.m_cpos = 0;
         this.m_tokens = [];
     }
@@ -228,13 +230,13 @@ class Lexer {
     }
 
     private recordLexToken(epos: number, kind: string) {
-        this.m_tokens.push(new Token(this.m_cline, this.m_cpos, epos - this.m_cpos, kind, kind)); //set data to kind string
+        this.m_tokens.push(new Token(this.m_cline, this.m_cpos - this.m_newlinepos, this.m_cpos, epos - this.m_cpos, kind, kind)); //set data to kind string
         this.m_cpos = epos;
     }
 
     private recordLexTokenWData(epos: number, kind: string, data: string) {
         const rdata = this.m_internTable.get(data) || this.m_internTable.set(data, data).get(data);
-        this.m_tokens.push(new Token(this.m_cline, this.m_cpos, epos - this.m_cpos, kind, rdata));
+        this.m_tokens.push(new Token(this.m_cline, this.m_cpos - this.m_newlinepos, this.m_cpos, epos - this.m_cpos, kind, rdata));
         this.m_cpos = epos;
     }
 
@@ -249,6 +251,7 @@ class Lexer {
         for (let i = 0; i < m[0].length; ++i) {
             if (m[0][i] === "\n") {
                 this.m_cline++;
+                this.m_newlinepos = this.m_cpos + i;
             }
         }
 
@@ -463,7 +466,29 @@ class Parser {
         throw new ParseError(line, msg);
     }
 
-    private scanParens(): number {
+    private scanTypeParens(): number {
+        let pscount = 1;
+        for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
+            const tok = this.m_tokens[pos];
+            if (LeftScanParensType.indexOf(tok.kind) !== -1) {
+                pscount++;
+            }
+            else if (RightScanParensType.indexOf(tok.kind) !== -1) {
+                pscount--;
+            }
+            else {
+                //nop
+            }
+
+            if (pscount === 0) {
+                return pos + 1;
+            }
+        }
+
+        return this.m_epos;
+    }
+
+    private scanCodeParens(): number {
         let pscount = 1;
         for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
             const tok = this.m_tokens[pos];
@@ -1311,10 +1336,10 @@ class Parser {
 
                 ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, terms, args));
             }
-            else if (tk === "(" || tk === "?(") {
-                const isElvis = this.testToken("?(");
+            else if (tk === "(") {
                 const args = this.parseArguments(tk, ")");
 
+                xxxx;
                 ops.push(new PostfixCallLambda(sinfo, isElvis, args));
             }
             else {
@@ -1974,12 +1999,11 @@ class Parser {
         let terms: TemplateTermDecl[] = [];
         if (this.testToken("[")) {
             terms = this.parseListOf<TemplateTermDecl>("[", "]", ",", () => {
-                const isuniq = this.testAndConsumeTokenIf("unique");
                 this.ensureToken(TokenStrings.Template);
                 const templatename = this.consumeTokenAndGetValue();
                 const tconstraint = this.testAndConsumeTokenIf("where") ? this.parseTypeSignature() : this.m_penv.SpecialAnySignature;
 
-                return new TemplateTermDecl(isuniq, templatename, tconstraint);
+                return new TemplateTermDecl(templatename, tconstraint);
             })[0];
         }
         return terms;

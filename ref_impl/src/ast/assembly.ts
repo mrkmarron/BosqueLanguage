@@ -9,12 +9,10 @@ import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
 
 class TemplateTermDecl {
-    readonly isUnique: boolean;
     readonly name: string;
     readonly ttype: TypeSignature;
 
-    constructor(isUnique: boolean, name: string, ttype: TypeSignature) {
-        this.isUnique = isUnique;
+    constructor(name: string, ttype: TypeSignature) {
         this.name = name;
         this.ttype = ttype;
     }
