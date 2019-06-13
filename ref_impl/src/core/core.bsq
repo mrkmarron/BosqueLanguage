@@ -49,12 +49,12 @@ entity Int provides Some, Parsable {
 }
 
 //<summary>Primitive string value.</summary>
-entity String[unique T] provides Some {
-    method tryParseAs[unique U where Parsable](): U | None {
+entity String[T] provides Some {
+    method tryParseAs[U where Parsable](): U | None {
         return U::tryParse(this);
     }
 
-    method parseAs[unique U where Parsable](): U {
+    method parseAs[U where Parsable](): U {
         return U::tryParse(this)->as[U]();
     }
 

@@ -90,8 +90,7 @@ class TypeChecker {
 
     private checkTemplateTypes(sinfo: SourceInfo, terms: TemplateTermDecl[], binds: Map<string, ResolvedType>, optTypeRestrict?: [string, ResolvedType][]) {
         const boundsok = terms.every((t) => this.m_assembly.subtypeOf(binds.get(t.name) as ResolvedType, this.resolveAndEnsureType(sinfo, t.ttype, new Map<string, ResolvedType>())));
-        const uniqok = terms.every((t) => !t.isUnique || (binds.get(t.name) as ResolvedType).isUniqueTemplateInstantiationType());
-        this.raiseErrorIf(sinfo, !boundsok || !uniqok, "Template instantiation does not satisfy specified bounds");
+        this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
 
         if (optTypeRestrict !== undefined) {
             const restrictok = optTypeRestrict.every((r) => this.m_assembly.subtypeOf(binds.get(r[0]) as ResolvedType, r[1]));
@@ -951,7 +950,12 @@ class TypeChecker {
 
         const aoftype = ResolvedType.tryGetOOTypeInfo(oftype);
         this.raiseErrorIf(sinfo, aoftype === undefined, "Can only make string type using concept or object types");
-        this.raiseErrorIf(sinfo, aoftype instanceof ResolvedConceptAtomType && aoftype.conceptTypes.length !== 1, "Must have unique entity/concept type for string");
+
+        //do this instead of hack below
+        const cdecltry = this.m_assembly.tryGetOOMemberDeclUnique(baseType, "const", exp.name);
+        this.raiseErrorIf(exp.sinfo, cdecltry === undefined, `Constant value not defined for type '${baseType.idStr}'`);
+
+        // this.raiseErrorIf(sinfo, aoftype instanceof ResolvedConceptAtomType && aoftype.conceptTypes.length !== 1, "Must have unique entity/concept type for string");
 
         const oodecl = (aoftype instanceof ResolvedEntityAtomType) ? (aoftype as ResolvedEntityAtomType).object : (aoftype as ResolvedConceptAtomType).conceptTypes[0].concept;
         const oobinds = (aoftype instanceof ResolvedEntityAtomType) ? (aoftype as ResolvedEntityAtomType).binds : (aoftype as ResolvedConceptAtomType).conceptTypes[0].binds;

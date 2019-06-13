@@ -113,9 +113,6 @@ const SymbolStrings = [
 const LeftScanParens = ["[", "(", "{", "@[", "@{", "?[", "?@[", "?@{", "{|"];
 const RightScanParens = ["]", ")", "}", "|}"];
 
-const LeftScanParensType = [...LeftScanParens, "<"];
-const RightScanParensType = [...RightScanParens, ">"];
-
 const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint", "condrec", "rec"];
 
 const TokenStrings = {
@@ -466,14 +463,14 @@ class Parser {
         throw new ParseError(line, msg);
     }
 
-    private scanTypeParens(): number {
+    private scanMatchingParens(popen: string, pclose: string): number {
         let pscount = 1;
         for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
             const tok = this.m_tokens[pos];
-            if (LeftScanParensType.indexOf(tok.kind) !== -1) {
+            if (tok.kind === popen) {
                 pscount++;
             }
-            else if (RightScanParensType.indexOf(tok.kind) !== -1) {
+            else if (tok.kind === pclose) {
                 pscount--;
             }
             else {
@@ -731,6 +728,47 @@ class Parser {
 
     private parseTypeSignature(): TypeSignature {
         return this.parseOrCombinatorType();
+    }
+
+    private parseNominalTypeSignature(): TypeSignature {
+        const line = this.getCurrentLine();
+
+        const ltype = this.parseNominalBaseTypeReference();
+        if (!this.testToken("+")) {
+            return ltype;
+        }
+        else {
+            this.consumeToken();
+            const rtype = this.parseNominalTypeSignature();
+
+            if (!(ltype instanceof NominalTypeSignature || ltype instanceof TemplateTypeSignature)) {
+                this.raiseError(line, "Only nominal types can be used in a joined type");
+            }
+
+            if (!(rtype instanceof NominalTypeSignature || rtype instanceof TemplateTypeSignature)) {
+                this.raiseError(line, "Only nominal types can be used in a joined type");
+            }
+
+            return Parser.andOfTypeSignatures(ltype, rtype);
+        }
+    }
+
+    private parseNominalBaseTypeReference(): TypeSignature {
+        switch (this.peekToken()) {
+            case TokenStrings.Template:
+                return this.parseTemplateTypeReference();
+            case TokenStrings.Namespace:
+            case TokenStrings.Type:
+                return this.parseNominalType();
+            default:
+                {
+                    this.ensureAndConsumeToken("(");
+                    const ptype = this.parseTypeSignature();
+                    this.ensureAndConsumeToken(")");
+
+                    return ptype;
+                }
+        }
     }
 
     private parseOrCombinatorType(): TypeSignature {

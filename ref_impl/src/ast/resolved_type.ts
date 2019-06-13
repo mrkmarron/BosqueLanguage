@@ -280,22 +280,6 @@ class ResolvedType {
         return this.options.length === 0;
     }
 
-    isUniqueTemplateInstantiationType(): boolean {
-        if (this.options.length !== 1) {
-            return false;
-        }
-
-        if (this.options[0] instanceof ResolvedEntityAtomType) {
-            return true;
-        }
-        else if (this.options[0] instanceof ResolvedConceptAtomType) {
-            return (this.options[0] as ResolvedConceptAtomType).conceptTypes.length === 1;
-        }
-        else {
-            return false;
-        }
-    }
-
     isUniqueCallTargetType(): boolean {
         if (this.options.length !== 1) {
             return false;
