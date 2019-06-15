@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixCallLambda, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, TemplateTermRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -116,6 +116,8 @@ const LeftScanParens = ["[", "(", "{", "{|", "@{"];
 const RightScanParens = ["]", ")", "}", "|}"];
 
 const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
+
+const SpecialInvokeNames = ["update", "merge", "project", "difference"];
 
 const TokenStrings = {
     Clear: "[CLEAR]",
@@ -524,6 +526,16 @@ class Parser {
     private testFollows(...kinds: string[]): boolean {
         for (let i = 0; i < kinds.length; ++i) {
             if (this.m_cpos + i === this.m_epos || this.m_tokens[this.m_cpos + i].kind !== kinds[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    testFollowsFrom(pos: number, ...kinds: string[]): boolean {
+        for (let i = 0; i < kinds.length; ++i) {
+            if (pos + i === this.m_epos || this.m_tokens[pos + i].kind !== kinds[i]) {
                 return false;
             }
         }
@@ -974,7 +986,7 @@ class Parser {
 
     ////
     //Expression parsing
-    private parseArguments(lparen: string, rparen: string, idxOk: boolean): Arguments {
+    private parseArguments(lparen: string, rparen: string): Arguments {
         const argSrcInfo = this.getCurrentSrcInfo();
 
         let seenNames = new Set<string>();
@@ -997,21 +1009,6 @@ class Parser {
 
                     if (name !== "_") {
                         seenNames.add(name);
-                    }
-
-                    args.push(new NamedArgument(name, exp));
-                }
-                else if (this.testFollows(TokenStrings.Int, "=")) {
-                    if (!idxOk) {
-                        this.raiseError(this.getCurrentLine(), "Indexed arguments not allowed in this position");
-                    }
-
-                    const name = this.consumeTokenAndGetValue();
-                    this.ensureAndConsumeToken("=");
-                    const exp = this.parseExpression();
-
-                    if (seenNames.has(name)) {
-                        this.raiseError(line, "Cannot have duplicate indexed argument name");
                     }
 
                     args.push(new NamedArgument(name, exp));
@@ -1068,7 +1065,7 @@ class Parser {
 
     private parseConstructorPrimary(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
-        const args = this.parseArguments("@{", "}", false);
+        const args = this.parseArguments("@{", "}");
 
         return new ConstructorPrimaryExpression(sinfo, otype, args);
     }
@@ -1080,8 +1077,8 @@ class Parser {
         this.ensureToken(TokenStrings.Identifier);
 
         const fname = this.consumeTokenAndGetValue();
-        const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-        const args = this.parseArguments("(", ")", false);
+        const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+        const args = this.parseArguments("(", ")");
 
         return new ConstructorPrimaryWithFactoryExpression(sinfo, otype, fname, targs, args);
     }
@@ -1138,12 +1135,29 @@ class Parser {
                     this.m_penv.getCurrentFunctionScope().useLocalVar(istr);
                 }
 
-                return new AccessVariableExpression(sinfo, istr);
+                if (this.testToken("[")) {
+                    const mp = this.scanMatchingParens("[", "]");
+                    if (this.testFollowsFrom(mp, "]", "(")) {
+                        const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
+                        const args = this.parseArguments("(", ")");
+                        return new PCodeInvoke(sinfo, pragmas, args);
+                    }
+                    else {
+                        return new AccessVariableExpression(sinfo, istr);
+                    }
+                }
+                else if (this.testToken("(")) {
+                    const args = this.parseArguments("(", ")");
+                    return new PCodeInvoke(sinfo, new PragmaArguments([]), args);
+                }
+                else {
+                    return new AccessVariableExpression(sinfo, istr);
+                }
             }
             else {
                 const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
                 const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
-                const args = this.parseArguments("(", ")", false);
+                const args = this.parseArguments("(", ")");
 
                 return new CallNamespaceFunctionExpression(sinfo, ns, istr, targs, pragmas, args);
             }
@@ -1168,11 +1182,11 @@ class Parser {
             }
         }
         else if (this.testToken("[")) {
-            const args = this.parseArguments("[", "]", false);
+            const args = this.parseArguments("[", "]");
             return new ConstructorTupleExpression(sinfo, args);
         }
         else if (this.testToken("{")) {
-            const args = this.parseArguments("{", "}", false);
+            const args = this.parseArguments("{", "}");
             return new ConstructorRecordExpression(sinfo, args);
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Identifier)) {
@@ -1188,7 +1202,7 @@ class Parser {
             else {
                 const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
                 const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
-                const args = this.parseArguments("(", ")", false);
+                const args = this.parseArguments("(", ")");
 
                 return new CallNamespaceFunctionExpression(sinfo, ns, name, targs, pragmas, args);
             }
@@ -1205,9 +1219,9 @@ class Parser {
                     return new AccessStaticFieldExpression(sinfo, ttype, name);
                 }
                 else {
-                    const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                    const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
                     const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
-                    const args = this.parseArguments("(", ")", false);
+                    const args = this.parseArguments("(", ")");
 
                     return new CallStaticFunctionExpression(sinfo, ttype, name, targs, pragmas, args);
                 }
@@ -1238,36 +1252,96 @@ class Parser {
         }
     }
 
+    private handleSpecialCaseMethods(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string): PostfixOperation {
+        if (specificResolve !== undefined) {
+            this.raiseError(this.getCurrentLine(), "Cannot use specific resolve on special methods");
+        }
+
+        const line = this.getCurrentLine();
+        if (name === "project") {
+            this.ensureToken("<");
+            const terms = this.parseTemplateArguments();
+            if (terms.targs.length !== 1) {
+                this.raiseError(line, "The project method expects a single template type argument");
+            }
+
+            const type = terms.targs[0];
+            if (!(type instanceof TemplateTypeSignature || type instanceof NominalTypeSignature || type instanceof RecordTypeSignature || type instanceof TupleTypeSignature)) {
+                this.raiseError(line, "Can only project over record, tuple, or concept contraints");
+            }
+
+            return new PostfixProjectFromType(sinfo, isElvis, type);
+        }
+        else if (name === "update") {
+            if (this.testFollows("(", TokenStrings.Int)) {
+                const updates = this.parseListOf<[number, Expression]>("(", ")", ",", () => {
+                    this.ensureToken(TokenStrings.Int);
+                    const idx = Number.parseInt(this.consumeTokenAndGetValue());
+                    this.ensureAndConsumeToken("=");
+                    const value = this.parseExpression();
+
+                    return [idx, value];
+                })[0].sort((a, b) => a[0] - b[0]);
+
+                return new PostfixModifyWithIndecies(sinfo, isElvis, updates);
+            }
+            else if (this.testFollows("(", TokenStrings.Identifier)) {
+                const updates = this.parseListOf<[string, Expression]>("(", ")", ",", () => {
+                    this.ensureToken(TokenStrings.Identifier);
+                    const uname = this.consumeTokenAndGetValue();
+                    this.ensureAndConsumeToken("=");
+                    const value = this.parseExpression();
+
+                    return [uname, value];
+                })[0].sort((a, b) => a[0].localeCompare(b[0]));
+
+                return new PostfixModifyWithNames(sinfo, isElvis, updates);
+            }
+            else {
+                this.raiseError(line, "Expected list of property/field or tuple updates");
+                return (undefined as unknown) as PostfixOperation;
+            }
+        }
+        else if (name === "merge") {
+            this.ensureAndConsumeToken("(");
+            const update = this.parseExpression();
+            this.ensureAndConsumeToken(")");
+
+            return new PostfixStructuredExtend(sinfo, isElvis, update);
+        }
+        else {
+            this.raiseError(line, "'difference' operation not implemented yet");
+            return (undefined as unknown) as PostfixOperation;
+        }
+    }
+
     private parsePostfixExpression(): Expression {
         const rootinfo = this.getCurrentSrcInfo();
         let rootexp = this.parsePrimaryExpression();
 
         let ops: PostfixOperation[] = [];
         while (true) {
-            const line = this.getCurrentLine();
             const sinfo = this.getCurrentSrcInfo();
 
             const tk = this.peekToken();
-            if (tk === "[" || tk === "?[") {
-                const isElvis = this.testToken("?[");
-                this.consumeToken();
-
-                const index = Number.parseInt(this.consumeTokenAndGetValue());
-                this.ensureAndConsumeToken("]");
-
-                ops.push(new PostfixAccessFromIndex(sinfo, isElvis, index));
-            }
-            else if (tk === "." || tk === "?.") {
+           if (tk === "." || tk === "?.") {
                 const isElvis = this.testToken("?.");
                 this.consumeToken();
 
-                this.ensureToken(TokenStrings.Identifier);
-                const name = this.consumeTokenAndGetValue();
+                if (this.testToken(TokenStrings.Int)) {
+                    const index = Number.parseInt(this.consumeTokenAndGetValue());
 
-                ops.push(new PostfixAccessFromName(sinfo, isElvis, name));
+                    ops.push(new PostfixAccessFromIndex(sinfo, isElvis, index));
+                }
+                else {
+                    this.ensureToken(TokenStrings.Identifier);
+                    const name = this.consumeTokenAndGetValue();
+
+                    ops.push(new PostfixAccessFromName(sinfo, isElvis, name));
+                }
             }
-            else if (tk === "@[" || tk === "?@[") {
-                const isElvis = this.testToken("?@[");
+            else if (tk === "[" || tk === "?[") {
+                const isElvis = this.testToken("?[");
                 const indecies = this.parseListOf<number>(tk, "]", ",", () => {
                     this.ensureToken(TokenStrings.Int);
                     return Number.parseInt(this.consumeTokenAndGetValue());
@@ -1275,67 +1349,14 @@ class Parser {
 
                 ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, indecies));
             }
-            else if (tk === "@{" || tk === "?@{") {
-                const isElvis = this.testToken("?@{");
+            else if (tk === "{" || tk === "?{") {
+                const isElvis = this.testToken("?{");
                 const names = this.parseListOf<string>(tk, "}", ",", () => {
                     this.ensureToken(TokenStrings.Identifier);
                     return this.consumeTokenAndGetValue();
                 })[0].sort();
 
                 ops.push(new PostfixProjectFromNames(sinfo, isElvis, names));
-            }
-            else if (tk === "@#" || tk === "?@#") {
-                const isElvis = this.testToken("?@#");
-                this.consumeToken();
-
-                const type = this.parseTypeSignature();
-                if (!(type instanceof TemplateTypeSignature || type instanceof NominalTypeSignature || type instanceof RecordTypeSignature || type instanceof TupleTypeSignature)) {
-                    this.raiseError(line, "Can only project over record, tuple, or concept contraints");
-                }
-
-                ops.push(new PostfixProjectFromType(sinfo, isElvis, type));
-            }
-            else if (tk === "<~" || tk === "?<~") {
-                const isElvis = this.testToken("?<~");
-                this.consumeToken();
-
-                if (this.testFollows("(", TokenStrings.Int)) {
-                    const updates = this.parseListOf<[number, Expression]>("(", ")", ",", () => {
-                        this.ensureToken(TokenStrings.Int);
-                        const idx = Number.parseInt(this.consumeTokenAndGetValue());
-                        this.ensureAndConsumeToken("=");
-                        const value = this.parseExpression();
-
-                        return [idx, value];
-                    })[0].sort((a, b) => a[0] - b[0]);
-
-                    ops.push(new PostfixModifyWithIndecies(sinfo, isElvis, updates));
-                }
-                else if (this.testFollows("(", TokenStrings.Identifier)) {
-                    const updates = this.parseListOf<[string, Expression]>("(", ")", ",", () => {
-                        this.ensureToken(TokenStrings.Identifier);
-                        const name = this.consumeTokenAndGetValue();
-                        this.ensureAndConsumeToken("=");
-                        const value = this.parseExpression();
-
-                        return [name, value];
-                    })[0].sort((a, b) => a[0].localeCompare(b[0]));
-
-                    ops.push(new PostfixModifyWithNames(sinfo, isElvis, updates));
-                }
-                else {
-                    this.raiseError(line, "Expected list of property/field or tuple updates");
-                }
-            }
-            else if (tk === "<+" || tk === "?<+") {
-                const isElvis = this.testToken("?<+");
-                this.consumeToken();
-
-                this.ensureAndConsumeToken("(");
-                const update = this.parseExpression();
-                this.ensureAndConsumeToken(")");
-
-                ops.push(new PostfixStructuredExtend(sinfo, isElvis, update));
             }
             else if (tk === "->" || tk === "?->") {
                 const isElvis = this.testToken("?->");
@@ -1350,16 +1371,16 @@ class Parser {
                 this.ensureToken(TokenStrings.Identifier);
                 const name = this.consumeTokenAndGetValue();
 
-                const terms = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                const args = this.parseArguments("(", ")");
+               if (SpecialInvokeNames.includes(name)) {
+                   this.handleSpecialCaseMethods(sinfo, isElvis, specificResolve, name);
+               }
+               else {
+                   const terms = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                   const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
+                   const args = this.parseArguments("(", ")");
 
-                ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, terms, args));
-            }
-            else if (tk === "(" || tk === "?(") {
-                const isElvis = this.testToken("?(");
-                const args = this.parseArguments(tk, ")");
-
-                ops.push(new PostfixCallLambda(sinfo, isElvis, args));
+                   ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, terms, pragmas, args));
+               }
             }
             else {
                 if (ops.length === 0) {
@@ -1393,6 +1414,10 @@ class Parser {
         if (this.testToken("+") || this.testToken("-") || this.testToken("!")) {
             const op = this.consumeTokenAndGetValue();
             return new PrefixOp(sinfo, op, this.parsePrefixExpression());
+        }
+        else if(this.testToken("ref")) {
+            this.consumeToken();
+            return new RefOpExpression(sinfo, this.parsePrefixExpression());
         }
         else {
             return this.parseStatementExpression();
@@ -1518,13 +1543,47 @@ class Parser {
         }
     }
 
+    private parseExpOrExpression(): Expression {
+        const sinfo = this.getCurrentSrcInfo();
+        const texp = this.parseSelectExpression();
+
+        if (this.testAndConsumeTokenIf("or")) {
+            if (!this.testToken("return") && !this.testToken("yield")) {
+                this.raiseError(this.getCurrentLine(), "Expected 'return' or 'yield");
+            }
+
+            const action = this.consumeTokenAndGetValue();
+            let value: undefined | Expression = undefined;
+            let cond: undefined | Expression = undefined;
+
+            if (!this.testToken(";")) {
+                if (this.testToken("when")) {
+                    this.consumeToken();
+                    cond = this.parseExpression();
+                }
+                else {
+                    value = this.parseExpression();
+                    if (this.testToken("when")) {
+                        this.consumeToken();
+                        cond = this.parseExpression();
+                    }
+                }
+            }
+
+            return new this.parseExpOrExpression(sinfo, action, value, cond);
+        }
+        else {
+            return texp;
+        }
+    }
+
     private parseBlockStatementExpression(): Expression {
         const sinfo = this.getCurrentSrcInfo();
 
         this.m_penv.getCurrentFunctionScope().pushLocalScope();
         let stmts: Statement[] = [];
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("{|", "|}"));
 
             this.consumeToken();
             while (!this.testAndConsumeTokenIf("|}")) {
@@ -1596,22 +1655,22 @@ class Parser {
     }
 
     private parseExpression(): Expression {
-        return this.parseSelectExpression();
+        return this.parseExpOrExpression();
     }
 
     ////
     //Statement parsing
 
     parseStructuredAssignment(sinfo: SourceInfo, vars: "var" | "var!" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
-        if (this.testToken("@[")) {
-            const [assigns, isOpen] = this.parseListOf<StructuredAssignment>("@[", "]", ",", () => {
+        if (this.testToken("[")) {
+            const [assigns, isOpen] = this.parseListOf<StructuredAssignment>("[", "]", ",", () => {
                 return this.parseStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
             }, "...");
 
             return new TupleStructuredAssignment(assigns, isOpen);
         }
-        else if (this.testToken("@{")) {
-            const [assigns, isOpen] = this.parseListOf<[string, StructuredAssignment]>("@{", "}", ",", () => {
+        else if (this.testToken("{")) {
+            const [assigns, isOpen] = this.parseListOf<[string, StructuredAssignment]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
                 const name = this.consumeTokenAndGetValue();
 
@@ -1729,7 +1788,7 @@ class Parser {
             this.consumeToken();
             const isConst = !this.testAndConsumeTokenIf("!");
 
-            if (this.testToken("@[") || this.testToken("@{")) {
+            if (this.testToken("[") || this.testToken("{")) {
                 let decls = new Set<string>();
                 const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "var" : "var!", false, decls);
                 decls.forEach((dv) => {
@@ -1777,7 +1836,7 @@ class Parser {
             this.ensureAndConsumeToken(";");
             return new VariableAssignmentStatement(sinfo, name, exp);
         }
-        else if (tk === "@[" || tk === "@{") {
+        else if (tk === "[" || tk === "{") {
             let decls = new Set<string>();
             const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
             decls.forEach((dv) => {
@@ -1856,7 +1915,7 @@ class Parser {
         this.m_penv.getCurrentFunctionScope().pushLocalScope();
         let stmts: Statement[] = [];
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("{", "}"));
 
             this.consumeToken();
             while (!this.testAndConsumeTokenIf("}")) {
@@ -1864,6 +1923,10 @@ class Parser {
             }
 
             this.m_penv.getCurrentFunctionScope().popLocalScope();
+
+            if (stmts.length === 0) {
+                this.raiseError(this.getCurrentLine(), "No empty blocks");
+            }
 
             this.clearRecover();
             return new BlockStatement(sinfo, stmts);
@@ -1994,6 +2057,13 @@ class Parser {
             this.consumeToken();
             this.ensureToken(TokenStrings.Identifier);
             return new BodyImplementation(bodyid, file, this.consumeTokenAndGetValue());
+        }
+        else if (this.testFollows("{", TokenStrings.Identifier, "=")) {
+            //This is ambigious with the record constructor {p=exp ...} and the statement block {x=exp; ...}
+            //However it is illegal to set a variable before declaration -- and updating a ref var as the first action doesn't make sense either
+            //So we treat this as an expression
+
+            return new BodyImplementation(bodyid, file, this.parseExpression());
         }
         else if (this.testToken("{")) {
             return new BodyImplementation(bodyid, file, this.parseBlockStatement());

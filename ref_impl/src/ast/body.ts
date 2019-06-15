@@ -132,8 +132,9 @@ enum ExpressionTag {
     ConstructorPrimaryWithFactoryExpression = "ConstructorPrimaryWithFactoryExpression",
     ConstructorTupleExpression = "ConstructorTupleExpression",
     ConstructorRecordExpression = "ConstructorRecordExpression",
-    ConstructorLambdaExpression = "ConstructorLambdaExpression",
+    ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
+    PCodeInvoke = "PCodeInvoke",
     CallNamespaceFunctionExpression = "CallNamespaceFunctionExpression",
     CallStaticFunctionExpression = "CallStaticFunctionExpression",
 
@@ -304,7 +305,7 @@ class ConstructorRecordExpression extends Expression {
     }
 }
 
-class ConstructorLambdaExpression extends Expression {
+class ConstructorPCodeExpression extends Expression {
     readonly isAuto: boolean;
     readonly invoke: InvokeDecl;
 
@@ -312,6 +313,15 @@ class ConstructorLambdaExpression extends Expression {
         super(ExpressionTag.ConstructorLambdaExpression, sinfo);
         this.isAuto = isAuto;
         this.invoke = invoke;
+    }
+}
+
+class PCodeInvoke extends Expression {
+    readonly args: Arguments;
+
+    constructor(sinfo: SourceInfo, isElvis: boolean, args: Arguments) {
+        super(sinfo, isElvis, PostfixOpTag.PostfixCallLambda);
+        this.args = args;
     }
 }
 
@@ -360,8 +370,7 @@ enum PostfixOpTag {
     //    PostfixDifferenceWithNames,
     //    PostfixDifferenceWithType,
 
-    PostfixInvoke = "PostfixInvoke",
-    PostfixCallLambda = "PostfixCallLambda"
+    PostfixInvoke = "PostfixInvoke"
 }
 
 abstract class PostfixOperation {
@@ -471,15 +480,6 @@ class PostfixInvoke extends PostfixOperation {
         this.specificResolve = specificResolve;
         this.name = name;
         this.terms = terms;
-        this.args = args;
-    }
-}
-
-class PostfixCallLambda extends PostfixOperation {
-    readonly args: Arguments;
-
-    constructor(sinfo: SourceInfo, isElvis: boolean, args: Arguments) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixCallLambda);
         this.args = args;
     }
 }
