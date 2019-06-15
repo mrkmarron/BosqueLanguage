@@ -213,7 +213,7 @@ entity HashSet[T where Indexable] provides Set[T] {
     override method empty(): Bool # hashset_empty
     override method size(): Int # hashset_size
     override method count(p: Predicate[T]): Int # hashset_count
-    override method {when T Indexable} has(v: T): Bool # hashset_has
+    override method has(v: T): Bool # hashset_has
     override method any(p: Predicate[T]): Bool # hashset_any
     override method all(p: Predicate[T]): Bool # hashset_all
     override method find(p: Predicate[T]): T # hashset_find
@@ -225,7 +225,7 @@ entity HashSet[T where Indexable] provides Set[T] {
     override method skipMap[U](f: Transform[T, U?]): List[U] # hashset_skipMap
     override method flatMap[U](f: Transform[T, Collection[U]]): List[U] # hashset_flatMap
     override method transform(f: Transform[T, T]): List[T] # hashset_transform
-    override method {when T Indexable} project[U](map: Map[T, U]): List[U] # hashset_project
+    override method project[U](map: Map[T, U]): List[U] # hashset_project
     override method {when T Int} min(default?: Int): Int # hashset_min
     override method {when T Int} max(default?: Int): Int # hashset_max
     override method {when T Int} sum(): Int # hashset_sum
@@ -354,8 +354,8 @@ entity HashMap[K where Indexable, V] provides Map[K, V] {
     override method defaultFind(p: Predicate[[K, V]], default: [K, V]): [K, V] # hashmap_defaultfind
     override method filter(p: Predicate[[K, V]]): Map[K, V] # hashmap_filter
     override method ofType[U where K, W where V](): Map[U, W] # hashmap_oftype
-    override method map[U where Indexable, W](f: Transform[[K, V], [ U, W ]]): List[[ U, W ]] # hashmap_map
-    override method skipMap[U](f: Transform[[K, V], [ U, W ]?]): List[[ U, W ]] # hashmap_skipMap
+    override method map[U where Indexable, W](f: Transform[[K, V], [U, W]]): List[[U, W]] # hashmap_map
+    override method skipMap[U](f: Transform[[K, V], [U, W]?]): List[[U, W]] # hashmap_skipMap
     override method transform(f: Transform[[K, V], [K, V]]): List[[K, V]] # hashmap_transform
     override method subsetOf(other: Collection[K] | Map[K, V]): Bool # hashmap_subsetof
     override method overlapWith(other: Collection[K] | Map[K, V]): Bool # hashmap_overlapwith

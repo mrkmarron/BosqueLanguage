@@ -49,6 +49,16 @@ class TemplateArguments {
     }
 }
 
+class PragmaArguments {
+    readonly recursive: "yes" | "no" | "cond";
+    readonly pragmas: [TypeSignature, string][];
+
+    constructor(rec: "yes" | "no" | "cond", pragmas: [TypeSignature, string][]) {
+        this.recursive = rec;
+        this.pragmas = pragmas;
+    }
+}
+
 class CondBranchEntry<T> {
     readonly cond: Expression;
     readonly action: T;
@@ -134,7 +144,7 @@ enum ExpressionTag {
     ConstructorRecordExpression = "ConstructorRecordExpression",
     ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
-    PCodeInvoke = "PCodeInvoke",
+    PCodeInvokeExpression = "PCodeInvokeExpression",
     CallNamespaceFunctionExpression = "CallNamespaceFunctionExpression",
     CallStaticFunctionExpression = "CallStaticFunctionExpression",
 
@@ -310,17 +320,19 @@ class ConstructorPCodeExpression extends Expression {
     readonly invoke: InvokeDecl;
 
     constructor(sinfo: SourceInfo, isAuto: boolean, invoke: InvokeDecl) {
-        super(ExpressionTag.ConstructorLambdaExpression, sinfo);
+        super(ExpressionTag.ConstructorPCodeExpression, sinfo);
         this.isAuto = isAuto;
         this.invoke = invoke;
     }
 }
 
-class PCodeInvoke extends Expression {
+class PCodeInvokeExpression extends Expression {
+    readonly pragmas: PragmaArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, args: Arguments) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixCallLambda);
+    constructor(sinfo: SourceInfo, pragmas: PragmaArguments, args: Arguments) {
+        super(ExpressionTag.PCodeInvokeExpression, sinfo);
+        this.pragmas = pragmas;
         this.args = args;
     }
 }
@@ -328,13 +340,15 @@ class PCodeInvoke extends Expression {
 class CallNamespaceFunctionExpression extends Expression {
     readonly ns: string;
     readonly name: string;
+    readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
         super(ExpressionTag.CallNamespaceFunctionExpression, sinfo);
         this.ns = ns;
         this.name = name;
+        this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
     }
@@ -343,13 +357,15 @@ class CallNamespaceFunctionExpression extends Expression {
 class CallStaticFunctionExpression extends Expression {
     readonly ttype: TypeSignature;
     readonly name: string;
+    readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
         super(ExpressionTag.CallStaticFunctionExpression, sinfo);
         this.ttype = ttype;
         this.name = name;
+        this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
     }
@@ -472,13 +488,15 @@ class PostfixStructuredExtend extends PostfixOperation {
 class PostfixInvoke extends PostfixOperation {
     readonly specificResolve: TypeSignature | undefined;
     readonly name: string;
+    readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
         super(sinfo, isElvis, PostfixOpTag.PostfixInvoke);
         this.specificResolve = specificResolve;
         this.name = name;
+        this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
     }
@@ -859,14 +877,14 @@ class BodyImplementation {
 }
 
 export {
-    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, CondBranchEntry, IfElse,
+    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
-    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorLambdaExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
+    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
-    PostfixInvoke, PostfixCallLambda,
+    PostfixInvoke, PCodeInvokeExpression,
     PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
