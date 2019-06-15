@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorLambdaExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixCallLambda, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixCallLambda, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, TemplateTermRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -15,6 +15,8 @@ const KeywordStrings = [
     "abstract",
     "override",
     "entrypoint",
+    "recursive?",
+    "recursive",
 
     "_debug",
     "abort",
@@ -40,7 +42,9 @@ const KeywordStrings = [
     "method",
     "namespace",
     "none",
+    "or",
     "provides",
+    "ref",
     "return",
     "requires",
     "static",
@@ -63,20 +67,16 @@ const SymbolStrings = [
     "]",
     ")",
     "}",
-    "@[",
-    "@{",
     "?[",
-    "?(",
-    "?@[",
-    "?@{",
+    "?{",
     "{|",
     "|}",
+    "@{",
 
     "#",
     "&",
     "&&",
     "@",
-    "@#",
     "!",
     "!=",
     ":",
@@ -101,9 +101,6 @@ const SymbolStrings = [
     "?&",
     "?|",
     "?.",
-    "?@#",
-    "?<~",
-    "?<+",
     "<",
     "<=",
     "<~",
@@ -115,10 +112,10 @@ const SymbolStrings = [
     "?->"
 ].sort((a, b) => { return (a.length !== b.length) ? (b.length - a.length) : a.localeCompare(b); });
 
-const LeftScanParens = ["[", "(", "{", "@[", "@{", "?[", "?(", "?@[", "?@{", "{|"];
+const LeftScanParens = ["[", "(", "{", "{|", "@{"];
 const RightScanParens = ["]", ")", "}", "|}"];
 
-const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint"];
+const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
 
 const TokenStrings = {
     Clear: "[CLEAR]",
@@ -139,14 +136,16 @@ const TokenStrings = {
 
 class Token {
     readonly line: number;
+    readonly column: number;
     readonly pos: number;
     readonly span: number;
 
     readonly kind: string;
     readonly data: string | undefined;
 
-    constructor(line: number, cpos: number, span: number, kind: string, data?: string) {
+    constructor(line: number, column: number, cpos: number, span: number, kind: string, data?: string) {
         this.line = line;
+        this.column = column;
         this.pos = cpos;
         this.span = span;
 
@@ -198,6 +197,7 @@ class Lexer {
     private m_input: string;
     private m_internTable: Map<string, string>;
     private m_cline: number;
+    private m_linestart: number;
     private m_cpos: number;
     private m_tokens: Token[];
 
@@ -205,6 +205,7 @@ class Lexer {
         this.m_input = input;
         this.m_internTable = new Map<string, string>();
         this.m_cline = 1;
+        this.m_linestart = 0;
         this.m_cpos = 0;
         this.m_tokens = [];
     }
@@ -228,13 +229,13 @@ class Lexer {
     }
 
     private recordLexToken(epos: number, kind: string) {
-        this.m_tokens.push(new Token(this.m_cline, this.m_cpos, epos - this.m_cpos, kind, kind)); //set data to kind string
+        this.m_tokens.push(new Token(this.m_cline, this.m_cpos - this.m_linestart, this.m_cpos, epos - this.m_cpos, kind, kind)); //set data to kind string
         this.m_cpos = epos;
     }
 
     private recordLexTokenWData(epos: number, kind: string, data: string) {
         const rdata = this.m_internTable.get(data) || this.m_internTable.set(data, data).get(data);
-        this.m_tokens.push(new Token(this.m_cline, this.m_cpos, epos - this.m_cpos, kind, rdata));
+        this.m_tokens.push(new Token(this.m_cline, this.m_cpos - this.m_linestart, this.m_cpos, epos - this.m_cpos, kind, rdata));
         this.m_cpos = epos;
     }
 
@@ -249,6 +250,7 @@ class Lexer {
         for (let i = 0; i < m[0].length; ++i) {
             if (m[0][i] === "\n") {
                 this.m_cline++;
+                this.m_linestart = this.m_cpos + i + 1;
             }
         }
 
@@ -463,7 +465,29 @@ class Parser {
         throw new ParseError(line, msg);
     }
 
-    private scanParens(): number {
+    private scanMatchingParens(lp: string, rp: string): number {
+        let pscount = 1;
+        for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
+            const tok = this.m_tokens[pos];
+            if (tok.kind === lp) {
+                pscount++;
+            }
+            else if (tok.kind === rp) {
+                pscount--;
+            }
+            else {
+                //nop
+            }
+
+            if (pscount === 0) {
+                return pos + 1;
+            }
+        }
+
+        return this.m_epos;
+    }
+
+    private scanCodeParens(): number {
         let pscount = 1;
         for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
             const tok = this.m_tokens[pos];
@@ -600,7 +624,7 @@ class Parser {
 
     ////
     //Misc parsing
-    private parseInvokableCommon(isLambda: boolean, isMember: boolean, noBody: boolean, terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], optSelfType?: TypeSignature): InvokeDecl {
+    private parseInvokableCommon(ispcode: boolean, isMember: boolean, noBody: boolean, isrecursive: boolean, terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], optSelfType?: TypeSignature): InvokeDecl {
         const sinfo = this.getCurrentSrcInfo();
         const srcFile = this.m_penv.getCurrentFile();
         const line = this.getCurrentLine();
@@ -626,7 +650,7 @@ class Parser {
                 argtype = this.parseTypeSignature();
             }
             else {
-                if (!isLambda) {
+                if (!ispcode) {
                     this.raiseError(line, "Auto typing is not supported for this");
                 }
             }
@@ -656,7 +680,7 @@ class Parser {
             resultType = this.parseTypeSignature();
         }
         else {
-            if (!isLambda) {
+            if (!ispcode) {
                 this.raiseError(line, "Auto typing is not supported for this");
             }
         }
@@ -670,7 +694,7 @@ class Parser {
             this.ensureAndConsumeToken(";");
         }
         else {
-            if (isLambda) {
+            if (ispcode) {
                 this.ensureAndConsumeToken("=>");
             }
             else {
@@ -690,14 +714,14 @@ class Parser {
             }
         }
 
-        if (isLambda) {
-            return InvokeDecl.createLambdaInvokeDecl(sinfo, srcFile, fparams, restName, restType, resultType, captured, body as BodyImplementation);
+        if (ispcode) {
+            return InvokeDecl.createPCodeInvokeDecl(sinfo, srcFile, isrecursive, fparams, restName, restType, resultType, captured, body as BodyImplementation);
         }
         else if (isMember) {
-            return InvokeDecl.createMemberInvokeDecl(sinfo, srcFile, terms, termRestrictions, fparams, restName, restType, resultType, preconds, postconds, body);
+            return InvokeDecl.createMemberInvokeDecl(sinfo, srcFile, terms, termRestrictions, isrecursive, fparams, restName, restType, resultType, preconds, postconds, body);
         }
         else {
-            return InvokeDecl.createStaticInvokeDecl(sinfo, srcFile, terms, termRestrictions, fparams, restName, restType, resultType, preconds, postconds, body);
+            return InvokeDecl.createStaticInvokeDecl(sinfo, srcFile, terms, termRestrictions, isrecursive, fparams, restName, restType, resultType, preconds, postconds, body);
         }
     }
 
@@ -767,7 +791,7 @@ class Parser {
             case "{":
                 return this.parseRecordType();
             case "fn":
-                return this.parseFunctionType();
+                return this.parsePCodeType();
             default:
                 {
                     this.ensureAndConsumeToken("(");
@@ -798,14 +822,14 @@ class Parser {
             this.raiseError(line, "Could not resolve namespace");
         }
 
-        if (!this.testToken("[")) {
+        if (!this.testToken("<")) {
             return new NominalTypeSignature(ns as string, tname);
         }
         else {
             let terms: TypeSignature[] = [];
             try {
-                this.setRecover(this.scanParens());
-                terms = this.parseListOf<TypeSignature>("[", "]", ",", () => {
+                this.setRecover(this.scanMatchingParens("<", ">"));
+                terms = this.parseListOf<TypeSignature>("<", ">", ",", () => {
                     return this.parseTypeSignature();
                 })[0];
 
@@ -825,7 +849,7 @@ class Parser {
         let isOpen = false;
 
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("[", "]"));
             [entries, isOpen] = this.parseListOf<[TypeSignature, boolean]>("[", "]", ",", () => {
                 const isopt = this.testAndConsumeTokenIf("?");
                 if (isopt) {
@@ -856,7 +880,7 @@ class Parser {
         let isOpen = false;
 
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("{", "}"));
             [entries, isOpen] = this.parseListOf<[string, TypeSignature, boolean]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
 
@@ -877,11 +901,11 @@ class Parser {
         }
     }
 
-    private parseFunctionType(): TypeSignature {
+    private parsePCodeType(): TypeSignature {
         this.ensureAndConsumeToken("fn");
 
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("(", ")"));
 
             let fparams: FunctionParameter[] = [];
             let restName = undefined;
@@ -950,14 +974,14 @@ class Parser {
 
     ////
     //Expression parsing
-    private parseArguments(lparen: string, rparen: string): Arguments {
+    private parseArguments(lparen: string, rparen: string, idxOk: boolean): Arguments {
         const argSrcInfo = this.getCurrentSrcInfo();
 
         let seenNames = new Set<string>();
         let args: InvokeArgument[] = [];
 
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens(lparen, rparen));
 
             this.ensureAndConsumeToken(lparen);
             while (!this.testAndConsumeTokenIf(rparen)) {
@@ -973,6 +997,21 @@ class Parser {
 
                     if (name !== "_") {
                         seenNames.add(name);
+                    }
+
+                    args.push(new NamedArgument(name, exp));
+                }
+                else if (this.testFollows(TokenStrings.Int, "=")) {
+                    if (!idxOk) {
+                        this.raiseError(this.getCurrentLine(), "Indexed arguments not allowed in this position");
+                    }
+
+                    const name = this.consumeTokenAndGetValue();
+                    this.ensureAndConsumeToken("=");
+                    const exp = this.parseExpression();
+
+                    if (seenNames.has(name)) {
+                        this.raiseError(line, "Cannot have duplicate indexed argument name");
                     }
 
                     args.push(new NamedArgument(name, exp));
@@ -1003,18 +1042,18 @@ class Parser {
 
     private parseTemplateArguments(): TemplateArguments {
         try {
-            this.setRecover(this.scanParens());
+            this.setRecover(this.scanMatchingParens("<", ">"));
             let targs: TypeSignature[] = [];
 
-            this.ensureAndConsumeToken("[");
-            while (!this.testAndConsumeTokenIf("]")) {
+            this.ensureAndConsumeToken("<");
+            while (!this.testAndConsumeTokenIf(">")) {
                 targs.push(this.parseTypeSignature());
 
                 if (this.testAndConsumeTokenIf(",")) {
-                    this.ensureNotToken("]");
+                    this.ensureNotToken(">");
                 }
                 else {
-                    this.ensureToken("]");
+                    this.ensureToken(">");
                 }
             }
 
@@ -1029,7 +1068,7 @@ class Parser {
 
     private parseConstructorPrimary(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
-        const args = this.parseArguments("@{", "}");
+        const args = this.parseArguments("@{", "}", false);
 
         return new ConstructorPrimaryExpression(sinfo, otype, args);
     }
@@ -1042,17 +1081,19 @@ class Parser {
 
         const fname = this.consumeTokenAndGetValue();
         const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-        const args = this.parseArguments("(", ")");
+        const args = this.parseArguments("(", ")", false);
 
         return new ConstructorPrimaryWithFactoryExpression(sinfo, otype, fname, targs, args);
     }
 
-    private parseLambdaConstructor(): Expression {
+    private parsePCodeTerm(): Expression {
         const line = this.getCurrentLine();
         const sinfo = this.getCurrentSrcInfo();
 
+        const isrecursive = this.testAndConsumeTokenIf("recursive");
+
         this.ensureAndConsumeToken("fn");
-        const sig = this.parseInvokableCommon(true, false, false, [], []);
+        const sig = this.parseInvokableCommon(true, false, false, isrecursive, [], []);
         const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || sig.resultType instanceof AutoTypeSignature;
         const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && sig.resultType instanceof AutoTypeSignature;
         if (someAuto && !allAuto) {
@@ -1063,7 +1104,7 @@ class Parser {
             this.m_penv.getCurrentFunctionScope().useLocalVar(v);
         });
 
-        return new ConstructorLambdaExpression(sinfo, allAuto, sig);
+        return new ConstructorPCodeTerm(sinfo, allAuto, sig);
     }
 
     private parsePrimaryExpression(): Expression {
@@ -1087,19 +1128,6 @@ class Parser {
             const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
             return new LiteralStringExpression(sinfo, sstr);
         }
-        else if (tk === TokenStrings.TypedString) {
-            const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-
-            if (this.testAndConsumeTokenIf("#")) {
-                const tsig = this.parseTypeSignature();
-                return new LiteralTypedStringExpression(sinfo, sstr, tsig);
-            }
-            else {
-                this.ensureAndConsumeToken("@");
-                const tsig = this.parseTypeSignature();
-                return new LiteralTypedStringConstructorExpression(sinfo, sstr, tsig);
-            }
-        }
         else if (tk === TokenStrings.Identifier) {
             const istr = this.consumeTokenAndGetValue();
 
@@ -1113,18 +1141,19 @@ class Parser {
                 return new AccessVariableExpression(sinfo, istr);
             }
             else {
-                const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                const args = this.parseArguments("(", ")");
+                const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
+                const args = this.parseArguments("(", ")", false);
 
-                return new CallNamespaceFunctionExpression(sinfo, ns, istr, targs, args);
+                return new CallNamespaceFunctionExpression(sinfo, ns, istr, targs, pragmas, args);
             }
         }
-        else if (tk === "fn") {
-            return this.parseLambdaConstructor();
+        else if (tk === "fn" || this.testFollows("recursive", "fn")) {
+            return this.parsePCodeTerm();
         }
         else if (tk === "(") {
             try {
-                this.setRecover(this.scanParens());
+                this.setRecover(this.scanMatchingParens("(", ")"));
 
                 this.consumeToken();
                 const exp = this.parseExpression();
@@ -1138,12 +1167,12 @@ class Parser {
                 return new InvalidExpression(sinfo);
             }
         }
-        else if (this.testToken("@[")) {
-            const args = this.parseArguments("@[", "]");
+        else if (this.testToken("[")) {
+            const args = this.parseArguments("[", "]", false);
             return new ConstructorTupleExpression(sinfo, args);
         }
-        else if (this.testToken("@{")) {
-            const args = this.parseArguments("@{", "}");
+        else if (this.testToken("{")) {
+            const args = this.parseArguments("{", "}", false);
             return new ConstructorRecordExpression(sinfo, args);
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Identifier)) {
@@ -1152,15 +1181,16 @@ class Parser {
             this.consumeToken();
             const name = this.consumeTokenAndGetValue();
 
-            if (!this.testToken("[") && !this.testToken("(")) {
+            if (!this.testToken("<") && !this.testToken("[") && !this.testToken("(")) {
                 //just a constant access
                 return new AccessNamespaceConstantExpression(sinfo, ns, name);
             }
             else {
-                const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                const args = this.parseArguments("(", ")");
+                const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
+                const args = this.parseArguments("(", ")", false);
 
-                return new CallNamespaceFunctionExpression(sinfo, ns, name, targs, args);
+                return new CallNamespaceFunctionExpression(sinfo, ns, name, targs, pragmas, args);
             }
         }
         else {
@@ -1170,15 +1200,29 @@ class Parser {
             if (this.testFollows("::", TokenStrings.Identifier)) {
                 this.consumeToken();
                 const name = this.consumeTokenAndGetValue();
-                if (!this.testToken("[") && !this.testToken("(")) {
+                if (!this.testToken("<") && !this.testToken("[") && !this.testToken("(")) {
                     //just a static access
                     return new AccessStaticFieldExpression(sinfo, ttype, name);
                 }
                 else {
                     const targs = this.testToken("[") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                    const args = this.parseArguments("(", ")");
+                    const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments([]);
+                    const args = this.parseArguments("(", ")", false);
 
-                    return new CallStaticFunctionExpression(sinfo, ttype, name, targs, args);
+                    return new CallStaticFunctionExpression(sinfo, ttype, name, targs, pragmas, args);
+                }
+            }
+            else if (this.testFollows("#", TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
+                if (this.testAndConsumeTokenIf("#")) {
+                    const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
+                    const tsig = this.parseTypeSignature();
+                    return new LiteralTypedStringExpression(sinfo, sstr, tsig);
+                }
+                else {
+                    this.ensureAndConsumeToken("@");
+                    const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
+                    const tsig = this.parseTypeSignature();
+                    return new LiteralTypedStringConstructorExpression(sinfo, sstr, tsig);
                 }
             }
             else if (this.testFollows("@", TokenStrings.Identifier)) {
