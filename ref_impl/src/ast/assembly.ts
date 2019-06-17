@@ -98,15 +98,17 @@ class StaticMemberDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
+    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly name: string;
 
     readonly declaredType: TypeSignature;
     readonly value: Expression | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
+        this.pragmas = pragmas;
         this.attributes = attributes;
         this.name = name;
         this.declaredType = dtype;
@@ -145,15 +147,17 @@ class MemberFieldDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
+    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly name: string;
 
     readonly declaredType: TypeSignature;
     readonly value: Expression | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], name: string, dtype: TypeSignature, value: Expression | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: Expression | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
+        this.pragmas = pragmas;
         this.attributes = attributes;
         this.name = name;
         this.declaredType = dtype;
@@ -190,6 +194,7 @@ class MemberMethodDecl implements OOMemberDecl {
 class OOPTypeDecl {
     readonly srcFile: string;
 
+    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly ns: string;
     readonly name: string;
@@ -205,11 +210,12 @@ class OOPTypeDecl {
     readonly memberFields: Map<string, MemberFieldDecl>;
     readonly memberMethods: Map<string, MemberMethodDecl>;
 
-    constructor(srcFile: string, attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         this.srcFile = srcFile;
+        this.pragmas = pragmas;
         this.attributes = attributes;
         this.ns = ns;
         this.name = name;
@@ -244,11 +250,11 @@ class OOPTypeDecl {
 }
 
 class ConceptTypeDecl extends OOPTypeDecl {
-    constructor(srcFile: string, attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
-        super(srcFile, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+        super(srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
     }
 }
 
@@ -256,12 +262,12 @@ class EntityTypeDecl extends OOPTypeDecl {
     readonly isEnum: boolean;
     readonly isKey: boolean;
 
-    constructor(srcFile: string, attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
         isEnum: boolean, isKey: boolean) {
-        super(srcFile, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+        super(srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
         this.isEnum = isEnum;
         this.isKey = isKey;
     }
@@ -271,6 +277,7 @@ class NamespaceConstDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
+    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly ns: string;
     readonly name: string;
@@ -278,10 +285,11 @@ class NamespaceConstDecl {
     readonly declaredType: TypeSignature;
     readonly value: Expression;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
 
+        this.pragmas = pragmas;
         this.attributes = attributes;
         this.ns = ns;
         this.name = name;

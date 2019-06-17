@@ -152,6 +152,8 @@ enum ExpressionTag {
 
     PrefixOpExpression = "PrefixOpExpression",
 
+    RefOpExpression = "RefOpExpression",
+
     BinOpExpression = "BinOpExpression",
     BinCmpExpression = "BinCmpExpression",
     BinEqExpression = "BinEqExpression",
@@ -160,6 +162,8 @@ enum ExpressionTag {
     NonecheckExpression = "NonecheckExpression",
     CoalesceExpression = "CoalesceExpression",
     SelectExpression = "SelectExpression",
+
+    ExpOrExpression = "ExpOrExpression",
 
     BlockStatementExpression = "BlockStatementExpression",
     IfExpression = "IfExpression",
@@ -513,6 +517,15 @@ class PrefixOp extends Expression {
     }
 }
 
+class RefOpExpression extends Expression {
+    readonly exp: Expression;
+
+    constructor(sinfo: SourceInfo, exp: Expression) {
+        super(ExpressionTag.RefOpExpression, sinfo);
+        this.exp = exp;
+    }
+}
+
 class BinOpExpression extends Expression {
     readonly lhs: Expression;
     readonly op: string; //+, -, *, /, %
@@ -597,6 +610,21 @@ class SelectExpression extends Expression {
         this.test = test;
         this.option1 = option1;
         this.option2 = option2;
+    }
+}
+
+class ExpOrExpression extends Expression {
+    readonly exp: Expression;
+    readonly action: string;
+    readonly result: Expression | undefined;
+    readonly cond: Expression | undefined;
+
+    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression | undefined, cond: Expression | undefined) {
+        super(ExpressionTag.SelectExpression, sinfo);
+        this.exp = exp;
+        this.action = action;
+        this.result = result;
+        this.cond = cond;
     }
 }
 
@@ -885,8 +913,8 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
-    PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
-    NonecheckExpression, CoalesceExpression, SelectExpression,
+    PrefixOp, RefOpExpression, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
+    NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
     StatementTag, Statement, InvalidStatement, EmptyStatement,
     VariableDeclarationStatement, VariableAssignmentStatement,
