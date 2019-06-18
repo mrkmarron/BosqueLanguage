@@ -173,16 +173,19 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
 class ResolvedFunctionAtomTypeParam {
     readonly name: string;
     readonly isOptional: boolean;
+    readonly isRef: boolean;
     readonly type: ResolvedType;
 
-    constructor(name: string, isOptional: boolean, type: ResolvedType) {
+    constructor(name: string, isOptional: boolean, isRef: boolean, type: ResolvedType) {
         this.name = name;
         this.isOptional = isOptional;
+        this.isRef = isRef;
         this.type = type;
     }
 }
 
 class ResolvedFunctionAtomType extends ResolvedAtomType {
+    readonly recursive: "yes" | "no" | "cond";
     readonly params: ResolvedFunctionAtomTypeParam[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: ResolvedType | undefined;
@@ -190,8 +193,9 @@ class ResolvedFunctionAtomType extends ResolvedAtomType {
 
     readonly allParamNames: Set<string>;
 
-    constructor(rstr: string, params: ResolvedFunctionAtomTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType, allParamNames: Set<string>) {
+    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionAtomTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType, allParamNames: Set<string>) {
         super(rstr);
+        this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
@@ -200,22 +204,30 @@ class ResolvedFunctionAtomType extends ResolvedAtomType {
         this.allParamNames = new Set<string>();
     }
 
-    static create(params: ResolvedFunctionAtomTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionAtomType {
+    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionAtomTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionAtomType {
         let cvalues: string[] = [];
         let allNames = new Set<string>();
         params.forEach((param) => {
             if (param.name !== "_") {
                 allNames.add(param.name);
             }
-            cvalues.push(param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
+            cvalues.push((param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
         });
         let cvalue = cvalues.join(", ");
+
+        let recstr = "";
+        if (recursive === "yes") {
+            recstr = "recursive ";
+        }
+        if (recursive === "cond") {
+            recstr = "recursive? ";
+        }
 
         if (optRestParamName !== undefined && optRestParamType !== undefined) {
             cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.idStr));
         }
 
-        return new ResolvedFunctionAtomType("(" + cvalue + ") -> " + resultType.idStr, params, optRestParamName, optRestParamType, resultType, allNames);
+        return new ResolvedFunctionAtomType(recstr + "(" + cvalue + ") -> " + resultType.idStr, recursive, params, optRestParamName, optRestParamType, resultType, allNames);
     }
 }
 
@@ -278,22 +290,6 @@ class ResolvedType {
 
     isEmptyType(): boolean {
         return this.options.length === 0;
-    }
-
-    isUniqueTemplateInstantiationType(): boolean {
-        if (this.options.length !== 1) {
-            return false;
-        }
-
-        if (this.options[0] instanceof ResolvedEntityAtomType) {
-            return true;
-        }
-        else if (this.options[0] instanceof ResolvedConceptAtomType) {
-            return (this.options[0] as ResolvedConceptAtomType).conceptTypes.length === 1;
-        }
-        else {
-            return false;
-        }
     }
 
     isUniqueCallTargetType(): boolean {

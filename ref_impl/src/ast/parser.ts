@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, RefOpExpression, ExpOrExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, TemplateTermRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -645,15 +645,19 @@ class Parser {
 
         let fparams: FunctionParameter[] = [];
         if (isMember) {
-            fparams.push(new FunctionParameter("this", optSelfType as TypeSignature, false));
+            fparams.push(new FunctionParameter("this", optSelfType as TypeSignature, false, false));
         }
 
         let restName = undefined;
         let restType = undefined;
         let resultType = this.m_penv.SpecialAutoSignature;
 
-        const params = this.parseListOf<[string, TypeSignature, boolean, boolean]>("(", ")", ",", () => {
+        const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean]>("(", ")", ",", () => {
             const isrest = this.testAndConsumeTokenIf("...");
+            const isref = this.testAndConsumeTokenIf("ref");
+            if (isref && (isrest || ispcode)) {
+                this.raiseError(line, "Cannot use ref parameters here");
+            }
 
             this.ensureToken(TokenStrings.Identifier);
             const pname = this.consumeTokenAndGetValue();
@@ -669,12 +673,12 @@ class Parser {
                 }
             }
 
-            return [pname, argtype, isopt, isrest];
+            return [pname, argtype, isopt, isrest, isref];
         })[0];
 
         for (let i = 0; i < params.length; i++) {
             if (!params[i][3]) {
-                fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2]));
+                fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], params[i][4]));
             }
             else {
                 if (i + 1 !== params.length) {
@@ -805,6 +809,8 @@ class Parser {
             case "{":
                 return this.parseRecordType();
             case "fn":
+            case "recursive?":
+            case "recursive":
                 return this.parsePCodeType();
             default:
                 {
@@ -916,6 +922,14 @@ class Parser {
     }
 
     private parsePCodeType(): TypeSignature {
+        let recursive: "yes" | "no" | "cond" = "no";
+        if (this.testAndConsumeTokenIf("recursive?")) {
+            recursive = "cond";
+        }
+        if (this.testAndConsumeTokenIf("recursive")) {
+            recursive = "yes";
+        }
+
         this.ensureAndConsumeToken("fn");
 
         try {
@@ -940,7 +954,7 @@ class Parser {
 
             for (let i = 0; i < params.length; i++) {
                 if (!params[i][3]) {
-                    fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2]));
+                    fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], false));
                 }
                 else {
                     if (i + 1 !== params.length) {
@@ -960,7 +974,7 @@ class Parser {
             const resultType = this.parseTypeSignature();
 
             this.clearRecover();
-            return new FunctionTypeSignature(fparams, restName, restType, resultType);
+            return new FunctionTypeSignature(recursive, fparams, restName, restType, resultType);
         }
         catch (ex) {
             this.processRecover();
@@ -1000,6 +1014,8 @@ class Parser {
             this.ensureAndConsumeToken(lparen);
             while (!this.testAndConsumeTokenIf(rparen)) {
                 const line = this.getCurrentLine();
+                const isref = this.testAndConsumeTokenIf("ref");
+
                 if (this.testFollows(TokenStrings.Identifier, "=")) {
                     const name = this.consumeTokenAndGetValue();
                     this.ensureAndConsumeToken("=");
@@ -1013,13 +1029,13 @@ class Parser {
                         seenNames.add(name);
                     }
 
-                    args.push(new NamedArgument(name, exp));
+                    args.push(new NamedArgument(isref, name, exp));
                 }
                 else {
                     const isSpread = this.testAndConsumeTokenIf("...");
                     const exp = this.parseExpression();
 
-                    args.push(new PositionalArgument(isSpread, exp));
+                    args.push(new PositionalArgument(isref, isSpread, exp));
                 }
 
                 if (this.testAndConsumeTokenIf(",")) {
@@ -1035,7 +1051,7 @@ class Parser {
         }
         catch (ex) {
             this.processRecover();
-            return new Arguments([new PositionalArgument(false, new InvalidExpression(argSrcInfo))]);
+            return new Arguments([new PositionalArgument(false, false, new InvalidExpression(argSrcInfo))]);
         }
     }
 
@@ -1459,10 +1475,6 @@ class Parser {
         if (this.testToken("+") || this.testToken("-") || this.testToken("!")) {
             const op = this.consumeTokenAndGetValue();
             return new PrefixOp(sinfo, op, this.parsePrefixExpression());
-        }
-        else if (this.testToken("ref")) {
-            this.consumeToken();
-            return new RefOpExpression(sinfo, this.parsePrefixExpression());
         }
         else {
             return this.parseStatementExpression();

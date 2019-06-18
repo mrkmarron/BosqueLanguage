@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { Value, ValueOps, ListValue, FloatValue, RegexValue, LambdaValue, CollectionValue, MapValue, TupleValue } from "./value";
-import { raiseRuntimeErrorIf, NotImplementedRuntimeError } from "./interpreter_environment";
+import { raiseRuntimeErrorIf } from "./interpreter_environment";
 import { MIRAssembly, MIRInvokeDecl, MIRType, MIREntityType, MIREntityTypeDecl, MIRTupleTypeEntry, MIRTupleType } from "../compiler/mir_assembly";
 
 function validateListStartEnd(lvals: Value[], start: Value, end: Value): [number, number] {
@@ -430,9 +430,6 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
             return createListOf(inv.resultType, res);
         }
     })
-    .set("list_ziptuple", (ep: InterpreterEntryPoint, inv: MIRInvokeDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
-        throw new NotImplementedRuntimeError("list_ziptuple");
-    })
     .set("list_concat", (ep: InterpreterEntryPoint, inv: MIRInvokeDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = (args.get("this") as ListValue).values.map((v) => ValueOps.getContainerContentsEnumeration(v as CollectionValue));
         return createListOf(inv.resultType, ([] as Value[]).concat(...avals));
@@ -454,11 +451,11 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
     })
     .set("math_acos", (ep: InterpreterEntryPoint, inv: MIRInvokeDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const x = args.get("x") as FloatValue;
-        return new FloatValue(Math.acos(x.value));    
+        return new FloatValue(Math.acos(x.value));
     })
     .set("math_asin", (ep: InterpreterEntryPoint, inv: MIRInvokeDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const x = args.get("x") as FloatValue;
-        return new FloatValue(Math.asin(x.value));    
+        return new FloatValue(Math.asin(x.value));
     })
     .set("math_atan", (ep: InterpreterEntryPoint, inv: MIRInvokeDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const x = args.get("x") as FloatValue;

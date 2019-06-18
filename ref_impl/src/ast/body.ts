@@ -9,17 +9,19 @@ import { InvokeDecl } from "./assembly";
 
 class InvokeArgument {
     readonly value: Expression;
+    readonly isRef: boolean;
 
-    constructor(value: Expression) {
+    constructor(value: Expression, isRef: boolean) {
         this.value = value;
+        this.isRef = isRef;
     }
 }
 
 class NamedArgument extends InvokeArgument {
     readonly name: string;
 
-    constructor(name: string, value: Expression) {
-        super(value);
+    constructor(isRef: boolean, name: string, value: Expression) {
+        super(value, isRef);
         this.name = name;
     }
 }
@@ -27,8 +29,8 @@ class NamedArgument extends InvokeArgument {
 class PositionalArgument extends InvokeArgument {
     readonly isSpread: boolean;
 
-    constructor(isSpread: boolean, value: Expression) {
-        super(value);
+    constructor(isRef: boolean, isSpread: boolean, value: Expression) {
+        super(value, isRef);
         this.isSpread = isSpread;
     }
 }
@@ -152,8 +154,6 @@ enum ExpressionTag {
 
     PrefixOpExpression = "PrefixOpExpression",
 
-    RefOpExpression = "RefOpExpression",
-
     BinOpExpression = "BinOpExpression",
     BinCmpExpression = "BinCmpExpression",
     BinEqExpression = "BinEqExpression",
@@ -169,8 +169,7 @@ enum ExpressionTag {
     IfExpression = "IfExpression",
     MatchExpression = "MatchExpression",
     //    ProroguedExpression,
-
-    //    LazyExpression
+    //    MLExpression
 }
 
 abstract class Expression {
@@ -513,15 +512,6 @@ class PrefixOp extends Expression {
     constructor(sinfo: SourceInfo, op: string, exp: Expression) {
         super(ExpressionTag.PrefixOpExpression, sinfo);
         this.op = op;
-        this.exp = exp;
-    }
-}
-
-class RefOpExpression extends Expression {
-    readonly exp: Expression;
-
-    constructor(sinfo: SourceInfo, exp: Expression) {
-        super(ExpressionTag.RefOpExpression, sinfo);
         this.exp = exp;
     }
 }
@@ -913,7 +903,7 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
-    PrefixOp, RefOpExpression, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
+    PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
     StatementTag, Statement, InvalidStatement, EmptyStatement,

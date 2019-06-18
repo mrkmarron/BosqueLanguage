@@ -53,15 +53,6 @@ class MIRKeyGenerator {
         }
     }
 
-    static generateLambdaKey(file: string, line: number, column: number, cpos: number, binds: Map<string, ResolvedType>): MIRLambdaKey {
-        if (binds.size === 0) {
-            return `${file}\$${line}\$${column}\$${cpos}`;
-        }
-        else {
-            return `${file}\$${line}\$${column}\$${cpos}\$${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
-        }
-    }
-
     static generateFunctionKey(ns: string, name: string, binds: Map<string, ResolvedType>): MIRFunctionKey {
         if (binds.size === 0) {
             return `${ns}::${name}`;

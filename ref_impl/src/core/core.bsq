@@ -8,11 +8,11 @@ namespace NSCore;
 
 //<summary>The special concept which all values are instances of.</summary>
 concept Any {
-    method is[T](): Bool # any_istype
-    method as[T](): T # any_as
+    method is<T>(): Bool # any_istype
+    method as<T>(): T # any_as
 
-    method tryAs[T](): T? # any_tryas
-    method defaultAs[T](default: T): T # any_defaultas
+    method tryAs<T>(): T? # any_tryas
+    method defaultAs<T>(default: T): T # any_defaultas
 
     method isNone(): Bool # any_isnone
     method isSome(): Bool # any_issome
@@ -52,13 +52,13 @@ entity Int provides Some, Parsable {
 }
 
 //<summary>Primitive string value.</summary>
-entity String[T] provides Some {
-    method tryParseAs[U where Parsable](): U | None {
+entity String<T> provides Some {
+    method tryParseAs<U where Parsable>(): U | None {
         return U::tryParse(this);
     }
 
-    method parseAs[U where Parsable](): U {
-        return U::tryParse(this)->as[U]();
+    method parseAs<U where Parsable>(): U {
+        return U::tryParse(this)->as<U>();
     }
 
     method toUntyped(): String # string_tountyped
@@ -71,16 +71,16 @@ entity String[T] provides Some {
 
     method replace(str: String, with: String): String # string_replace
     method trim(): String # string_trim
-    method split(token: String): List[String] # string_split
+    method split(token: String): List<String> # string_split
 
     // Useful string methods
     method reverse(): String # string_reverse
     method upperCase(): String # string_upperCase
     method lowerCase(): String # string_lowerCase
 
-    static concat(...args: List[String]): String # string_concat
+    static concat(...args: List<String>): String # string_concat
 
-    //static interpolate(fmt: String, ...args: List[String]): String # string_interpolate
+    //static interpolate(fmt: String, ...args: List<String>): String # string_interpolate
 }
 
 //<summary>Provide JSON support for (POD).</summary>
@@ -107,9 +107,9 @@ entity Float provides Some, Parsable {
     method square(): Float # float_square
     method sqrt(): Float # float_sqrt
 
-    static add(...args: List[Float]): Float # float_add
+    static add(...args: List<Float>): Float # float_add
     static sub(v1: Float, v2: Float): Float # float_sub
-    static mult(...args: List[Float]): Float # float_mult
+    static mult(...args: List<Float>): Float # float_mult
     static div(v1: Float, v2: Float): Float # float_div
 }
 
@@ -170,20 +170,20 @@ concept CustomKey provides Some {
 typedef KeyType = None | Bool | Int | String | GUID | Enum | Tuple | Record | CustomKey;
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Keyed[T where KeyType] provides Some {
+concept Keyed<T where KeyType> provides Some {
     field key: T;
 }
 
 //<summary>Types that can be used in equality operations or in key based containers.</summary>
-typedef Indexable = KeyType | Keyed[KeyType];
+typedef Indexable = KeyType | Keyed<KeyType>;
 
 //<summary>A lightweight tagging class for values.</summary>
-entity Tagged[T where KeyType, U] provides Some, Keyed[T] {
+entity Tagged<T where KeyType, U> provides Some, Keyed<T> {
     field value: U;
 }
 
 //<summary>Shorthand for predicate function types.</summary>
-typedef Predicate[T] = fn(_: T) -> Bool;
+typedef Predicate<T> = fn(_: T) -> Bool;
 
 //<summary>Shorthand for transform function types.</summary>
-typedef Transform[T, U] = fn(_: T) -> U;
+typedef Transform<T, U> = fn(_: T) -> U;

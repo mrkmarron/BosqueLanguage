@@ -74,7 +74,7 @@ class InvokeDecl {
     }
 
     generateSig(): TypeSignature {
-        return new FunctionTypeSignature([...this.params], this.optRestName, this.optRestType, this.resultType);
+        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultType);
     }
 
     static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, captureSet: Set<string>, body: BodyImplementation) {
@@ -472,7 +472,7 @@ class Assembly {
     }
 
     private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
-        const params = t.params.map((param) => new ResolvedFunctionAtomTypeParam(param.name, param.isOptional, this.normalizeType(param.type, binds)));
+        const params = t.params.map((param) => new ResolvedFunctionAtomTypeParam(param.name, param.isOptional, param.isRef, this.normalizeType(param.type, binds)));
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeType(t.optRestParamType, binds) : undefined;
         const resType = this.normalizeType(t.resultType, binds);
 
@@ -480,7 +480,7 @@ class Assembly {
             return ResolvedType.createEmpty();
         }
 
-        return ResolvedType.createSingle(ResolvedFunctionAtomType.create(params, t.optRestParamName, optRestParamType, resType));
+        return ResolvedType.createSingle(ResolvedFunctionAtomType.create(t.recursive, params, t.optRestParamName, optRestParamType, resType));
     }
 
     private normalizeType_Intersection(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -669,23 +669,25 @@ class Assembly {
     }
 
     private atomSubtypeOf_FunctionFunction(t1: ResolvedFunctionAtomType, t2: ResolvedFunctionAtomType): boolean {
-        if (t2.params.length !== t1.params.length) {
-            return false; //need to have the same number of parameters
-        }
-
-        if ((t2.optRestParamType !== undefined) !== (t1.optRestParamType !== undefined)) {
-            return false; //should both have rest or not
+        if (t2.optRestParamType !== undefined && t1.optRestParamType === undefined) {
+            return false;
         }
 
         if (t2.optRestParamType !== undefined && !this.subtypeOf(t2.optRestParamType, t1.optRestParamType as ResolvedType)) {
-            return false; //variance
+            return false;
         }
 
         for (let i = 0; i < t2.params.length; ++i) {
             const t2p = t2.params[i];
-            const t1p = t1.params[i];
-            if ((t2p.isOptional !== t1p.isOptional) || !this.subtypeOf(t2p.type, t1p.type)) {
-                return false;
+
+            if (i >= t1.params.length) {
+                return false; //don't let explicit-params cross into rest-params
+            }
+            else {
+                const t1p = t1.params[i];
+                if ((t2p.isOptional && !t1p.isOptional) || !this.subtypeOf(t2p.type, t1p.type)) {
+                    return false;
+                }
             }
 
             //check that if t2p is named then t1p has the same name
@@ -694,6 +696,11 @@ class Assembly {
                     return false;
                 }
             }
+        }
+
+        //t1 has a required parameter that is not required in t2
+        if (t1.params.length > t2.params.length && t1.params.slice(t2.params.length).some((param) => !param.isOptional)) {
+            return false;
         }
 
         //co-variant is cool
@@ -1076,7 +1083,7 @@ class Assembly {
         }
     }
 
-    computeUnifiedFunctionType(funcs: ResolvedAtomType[], rootSig?: ResolvedFunctionAtomType): ResolvedFunctionAtomType | undefined {
+    computeUnifiedFunctionType(funcs: ResolvedAtomType[], rootSig: ResolvedFunctionAtomType): ResolvedFunctionAtomType | undefined {
         if (funcs.length === 0) {
             return undefined;
         }
@@ -1090,61 +1097,11 @@ class Assembly {
         if (fatoms.length === 1) {
             return fatoms[0];
         }
-        else if (rootSig !== undefined) {
+        else {
             if (funcs.some((ft) => !this.atomSubtypeOf_FunctionFunction(ft as ResolvedFunctionAtomType, rootSig))) {
                 return undefined;
             }
             return rootSig;
-        }
-        else {
-            //compute an approximate function type that we use for emit generation
-            const ftypes = funcs.map((ft) => ft as ResolvedFunctionAtomType);
-
-            let params: ResolvedFunctionAtomTypeParam[] = [];
-            const minp = Math.min(...ftypes.map((ft) => ft.params.length));
-            for (let i = 0; i < minp; ++i) {
-                const allreq = ftypes.every((ft) => !ft.params[i].isOptional);
-
-                let uniq = "_";
-                let uniqok = true;
-                ftypes.forEach((ft) => {
-                    if (ft.params[i].name !== "_") {
-                        uniqok = uniqok && (uniq === "_" || uniq === ft.params[i].name);
-                        uniq = ft.params[i].name;
-                    }
-                });
-                if (!uniqok) {
-                    return undefined; //need to have same names in same positions in sig
-                }
-
-                //don't care about exact type since we will check the real options at call site
-                params.push(new ResolvedFunctionAtomTypeParam(uniq, allreq, this.getSpecialAnyType()));
-            }
-
-            const allRest = ftypes.every((ft) => ft.optRestParamName !== undefined);
-            const allFixed = ftypes.every((ft) => ft.optRestParamName === undefined);
-            if (!allRest && !allFixed) {
-                return undefined; //must all agree on rest vs fixed params
-            }
-
-            let restname = allRest ? "_" : undefined;
-            let resttype: ResolvedType | undefined =  ftypes[0].optRestParamType;
-            if (allRest) {
-                let restok = true;
-                ftypes.forEach((ft) => {
-                    if (ft.optRestParamName !== "_") {
-                        restok = restok && (restname === "_");
-                        restok = restok && ((ft.optRestParamType as ResolvedType).idStr === (ft.optRestParamType as ResolvedType).idStr);
-
-                        restname = ft.optRestParamName;
-                    }
-                });
-                if (!restok) {
-                    return undefined; //must agree on rest name and type
-                }
-            }
-
-            return ResolvedFunctionAtomType.create(params, restname, resttype, this.getSpecialAnyType());
         }
     }
 
