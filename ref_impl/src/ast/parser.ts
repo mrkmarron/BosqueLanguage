@@ -69,8 +69,6 @@ const SymbolStrings = [
     "]",
     ")",
     "}",
-    "?[",
-    "?{",
     "{|",
     "|}",
     "@{",
@@ -1394,30 +1392,29 @@ class Parser {
 
                     ops.push(new PostfixAccessFromIndex(sinfo, isElvis, index));
                 }
-                else {
-                    this.ensureToken(TokenStrings.Identifier);
+                else if (this.testToken("[")) {
+                    const indecies = this.parseListOf<number>(tk, "]", ",", () => {
+                        this.ensureToken(TokenStrings.Int);
+                        return Number.parseInt(this.consumeTokenAndGetValue());
+                    })[0].sort();
+
+                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, indecies));
+                }
+                else if (this.testToken(TokenStrings.Identifier)) {
                     const name = this.consumeTokenAndGetValue();
 
                     ops.push(new PostfixAccessFromName(sinfo, isElvis, name));
                 }
-            }
-            else if (tk === "[" || tk === "?[") {
-                const isElvis = this.testToken("?[");
-                const indecies = this.parseListOf<number>(tk, "]", ",", () => {
-                    this.ensureToken(TokenStrings.Int);
-                    return Number.parseInt(this.consumeTokenAndGetValue());
-                })[0].sort();
+                else {
+                    this.ensureToken("{");
 
-                ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, indecies));
-            }
-            else if (tk === "{" || tk === "?{") {
-                const isElvis = this.testToken("?{");
-                const names = this.parseListOf<string>(tk, "}", ",", () => {
-                    this.ensureToken(TokenStrings.Identifier);
-                    return this.consumeTokenAndGetValue();
-                })[0].sort();
+                    const names = this.parseListOf<string>(tk, "}", ",", () => {
+                        this.ensureToken(TokenStrings.Identifier);
+                        return this.consumeTokenAndGetValue();
+                    })[0].sort();
 
-                ops.push(new PostfixProjectFromNames(sinfo, isElvis, names));
+                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, names));
+                }
             }
             else if (tk === "->" || tk === "?->") {
                 const isElvis = this.testToken("?->");
