@@ -150,10 +150,6 @@ concept Tuple provides Some {
 concept Record provides Some {
 }
 
-//<summary>All actual functions implicitly provide this concept.</summary>
-concept Function provides Some {
-}
-
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {
 }
