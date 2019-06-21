@@ -1193,26 +1193,43 @@ class Assembly {
         return res;
     }
 
-    private functionSubtypeOf(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
-        if (t2.optRestParamType !== undefined && t1.optRestParamType === undefined) {
-            return false;
+    private functionSubtypeOf_helper(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
+        if (t2.params.length !== t1.params.length) {
+            return false; //need to have the same number of parameters
+        }
+
+        if ((t2.optRestParamType !== undefined) !== (t1.optRestParamType !== undefined)) {
+            return false; //should both have rest or not
         }
 
         if (t2.optRestParamType !== undefined && !this.subtypeOf(t2.optRestParamType, t1.optRestParamType as ResolvedType)) {
-            return false;
+            return false; //variance
         }
 
         for (let i = 0; i < t2.params.length; ++i) {
             const t2p = t2.params[i];
-
-            if (i >= t1.params.length) {
-                return false; //don't let explicit-params cross into rest-params
+            const t1p = t1.params[i];
+            if ((t2p.isOptional !== t1p.isOptional) || (t2p.isRef !== t1p.isRef)) {
+                return false;
             }
-            else {
-                const t1p = t1.params[i];
-                if ((t2p.isOptional && !t1p.isOptional) || !this.subtypeOf(t2p.type, t1p.type)) {
+
+            if (t2p instanceof ResolvedFunctionType && t1p instanceof ResolvedFunctionType) {
+                if (!this.functionSubtypeOf(t2p.type as ResolvedFunctionType, t1p.type as ResolvedFunctionType)) {
                     return false;
                 }
+            }
+            else if (t2p instanceof ResolvedType && t1p instanceof ResolvedType && (t2p.isRef || t1p.isRef)) {
+                if (t2p.type.idStr !== t1p.type.idStr) {
+                    return false;
+                }
+            }
+            else if (t2p instanceof ResolvedType && t1p instanceof ResolvedType) {
+                if (!this.subtypeOf(t2p.type as ResolvedType, t1p.type as ResolvedType)) {
+                    return false;
+                }
+            }
+            else {
+                return false;
             }
 
             //check that if t2p is named then t1p has the same name
@@ -1223,13 +1240,26 @@ class Assembly {
             }
         }
 
-        //t1 has a required parameter that is not required in t2
-        if (t1.params.length > t2.params.length && t1.params.slice(t2.params.length).some((param) => !param.isOptional)) {
-            return false;
-        }
-
         //co-variant is cool
         return this.subtypeOf(t1.resultType, t2.resultType);
+    }
+
+    functionSubtypeOf(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
+        let memores = this.m_subtypeRelationMemo.get(t1.idStr);
+        if (memores === undefined) {
+            this.m_subtypeRelationMemo.set(t1.idStr, new Map<string, boolean>());
+            memores = this.m_subtypeRelationMemo.get(t1.idStr) as Map<string, boolean>;
+        }
+
+        let memoval = memores.get(t2.idStr);
+        if (memoval !== undefined) {
+            return memoval;
+        }
+
+        const res = this.functionSubtypeOf_helper(t1, t2);
+
+        memores.set(t2.idStr, res);
+        return res;
     }
 }
 
