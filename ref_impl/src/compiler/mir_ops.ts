@@ -10,10 +10,10 @@ type MIRTypeKey = string; //ns::name#binds
 type MIRGlobalKey = string; //ns::global
 type MIRConstKey = string; //ns::name::const#binds
 type MIRFieldKey = string; //ns::name::field#binds
-type MIRLambdaKey = string; //enclosingkey$line$column#binds
+type MIRPCodeKey = string; //fresh
 type MIRFunctionKey = string; //ns::func#binds
-type MIRStaticKey = string; //ns::name::static#binds
-type MIRMethodKey = string; //ns::name::method#binds
+type MIRStaticKey = string; //ns::name::static#binds%PCODE
+type MIRMethodKey = string; //ns::name::method#binds%PCODE
 
 type MIRResolvedTypeKey = string; //idstr
 type MIRVirtualMethodKey = string; //method#binds
@@ -43,12 +43,6 @@ class MIRTempRegister extends MIRRegisterArgument {
     constructor(regID: number, forcename?: string) {
         super(forcename || `#tmp_${regID}`);
         this.regID = regID;
-    }
-}
-
-class MIRVarCaptured extends MIRRegisterArgument {
-    constructor(name: string) {
-        super(name);
     }
 }
 
@@ -142,7 +136,6 @@ enum MIROpTag {
     AccessNamespaceConstant = "AccessNamespaceConstant",
     AccessConstField = " AccessConstField",
     LoadFieldDefaultValue = "LoadFieldDefaultValue",
-    AccessCapturedVariable = "AccessCapturedVariable",
     AccessArgVariable = "AccessArgVariable",
     AccessLocalVariable = "AccessLocalVariable",
 
@@ -324,21 +317,6 @@ class MIRLoadFieldDefaultValue extends MIRValueOp {
 
     stringify(): string {
         return `${this.trgt.stringify()} = default(${this.fkey})`;
-    }
-}
-
-class MIRAccessCapturedVariable extends MIRValueOp {
-    readonly name: MIRVarCaptured;
-
-    constructor(sinfo: SourceInfo, name: MIRVarCaptured, trgt: MIRTempRegister) {
-        super(MIROpTag.AccessCapturedVariable, sinfo, trgt);
-        this.name = name;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.name.stringify()}`;
     }
 }
 
@@ -1307,10 +1285,10 @@ class MIRBody {
 
 export {
     MIRTypeKey, MIRGlobalKey, MIRConstKey, MIRFieldKey, MIRLambdaKey, MIRFunctionKey, MIRStaticKey, MIRMethodKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVarCaptured, MIRVarParameter, MIRVarLocal, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVarParameter, MIRVarLocal, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstTypedString,
-    MIRAccessNamespaceConstant, MIRAccessConstField, MIRLoadFieldDefaultValue, MIRAccessCapturedVariable, MIRAccessArgVariable, MIRAccessLocalVariable,
+    MIRAccessNamespaceConstant, MIRAccessConstField, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
     MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorLambda,
     MIRCallNamespaceFunction, MIRCallStaticFunction,
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeKnownTarget, MIRInvokeVirtualTarget, MIRCallLambda,

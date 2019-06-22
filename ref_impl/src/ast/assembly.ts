@@ -1213,18 +1213,14 @@ class Assembly {
                 return false;
             }
 
+            //We want the argument types to be the same for all cases -- no clear reason to overload to more general types
             if (t2p instanceof ResolvedFunctionType && t1p instanceof ResolvedFunctionType) {
-                if (!this.functionSubtypeOf(t2p.type as ResolvedFunctionType, t1p.type as ResolvedFunctionType)) {
-                    return false;
-                }
-            }
-            else if (t2p instanceof ResolvedType && t1p instanceof ResolvedType && (t2p.isRef || t1p.isRef)) {
                 if (t2p.type.idStr !== t1p.type.idStr) {
                     return false;
                 }
             }
             else if (t2p instanceof ResolvedType && t1p instanceof ResolvedType) {
-                if (!this.subtypeOf(t2p.type as ResolvedType, t1p.type as ResolvedType)) {
+                if (t2p.type.idStr !== t1p.type.idStr) {
                     return false;
                 }
             }
@@ -1240,7 +1236,7 @@ class Assembly {
             }
         }
 
-        //co-variant is cool
+        //co-variant is cool on the return type -- useful if we have a known target in overload
         return this.subtypeOf(t1.resultType, t2.resultType);
     }
 
