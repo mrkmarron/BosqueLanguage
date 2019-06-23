@@ -7,13 +7,10 @@ import { SourceInfo } from "../ast/parser";
 import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
 
 type MIRTypeKey = string; //ns::name#binds
-type MIRGlobalKey = string; //ns::global
-type MIRConstKey = string; //ns::name::const#binds
+type MIRConstantKey = string; //ns::[type]::const#binds
 type MIRFieldKey = string; //ns::name::field#binds
 type MIRPCodeKey = string; //fresh
-type MIRFunctionKey = string; //ns::func#binds
-type MIRStaticKey = string; //ns::name::static#binds%PCODE
-type MIRMethodKey = string; //ns::name::method#binds%PCODE
+type MIRInvokeKey = string; //ns::[type]::func#binds%code
 
 type MIRResolvedTypeKey = string; //idstr
 type MIRVirtualMethodKey = string; //method#binds
@@ -130,26 +127,21 @@ class MIRConstantString extends MIRConstantArgument {
 //
 
 enum MIROpTag {
-    LoadConst = "LoadConst",
-    LoadConstTypedString = "LoadConstTypedString",
+    MIRLoadConst = "MIRLoadConst",
+    MIRLoadConstTypedString = "MIRLoadConstTypedString",
 
-    AccessNamespaceConstant = "AccessNamespaceConstant",
-    AccessConstField = " AccessConstField",
-    LoadFieldDefaultValue = "LoadFieldDefaultValue",
-    AccessArgVariable = "AccessArgVariable",
-    AccessLocalVariable = "AccessLocalVariable",
+    MIRAccessConstantValue = "MIRAccessConstantValue",
+    MIRLoadFieldDefaultValue = "MIRLoadFieldDefaultValue",
+    MIRAccessArgVariable = "MIRAccessArgVariable",
+    MIRAccessLocalVariable = "MIRAccessLocalVariable",
 
-    ConstructorPrimary = "ConstructorPrimary",
-    ConstructorPrimaryCollectionEmpty = "ConstructorPrimaryCollectionEmpty",
-    ConstructorPrimaryCollectionSingletons = "ConstructorPrimaryCollectionSingletons",
-    ConstructorPrimaryCollectionCopies = "ConstructorPrimaryCollectionCopies",
-    ConstructorPrimaryCollectionMixed = "ConstructorPrimaryCollectionMixed",
-    ConstructorTuple = "ConstructorTuple",
-    ConstructorRecord = "ConstructorRecord",
-    ConstructorLambda = "ConstructorLambda",
-
-    CallNamespaceFunction = "CallNamespaceFunction",
-    CallStaticFunction = "CallStaticFunction",
+    MIRConstructorPrimary = "MIRConstructorPrimary",
+    MIRConstructorPrimaryCollectionEmpty = "MIRConstructorPrimaryCollectionEmpty",
+    MIRConstructorPrimaryCollectionSingletons = "MIRConstructorPrimaryCollectionSingletons",
+    MIRConstructorPrimaryCollectionCopies = "MIRConstructorPrimaryCollectionCopies",
+    MIRConstructorPrimaryCollectionMixed = "MIRConstructorPrimaryCollectionMixed",
+    MIRConstructorTuple = "MIRConstructorTuple",
+    MIRConstructorRecord = "MIRConstructorRecord",
 
     MIRAccessFromIndex = "MIRAccessFromIndex",
     MIRProjectFromIndecies = "MIRProjectFromIndecies",
@@ -166,9 +158,9 @@ enum MIROpTag {
     MIRStructuredExtendTuple = "MIRStructuredExtendTuple",
     MIRStructuredExtendRecord = "MIRStructuredExtendRecord",
     MIRStructuredExtendObject = "MIRStructuredExtendObject",
-    MIRInvokeKnownTarget = "MIRInvokeKnownTarget",
+
+    MIRInvokeFixedFunction = "MIRInvokeFixedFunction",
     MIRInvokeVirtualTarget = "MIRInvokeVirtualTarget",
-    MIRCallLambda = "MIRCallLambda",
 
     MIRPrefixOp = "MIRPrefixOp",
 
@@ -1284,7 +1276,7 @@ class MIRBody {
 }
 
 export {
-    MIRTypeKey, MIRGlobalKey, MIRConstKey, MIRFieldKey, MIRLambdaKey, MIRFunctionKey, MIRStaticKey, MIRMethodKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
+    MIRTypeKey, MIRConstantKey, MIRFieldKey, MIRPCodeKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVarParameter, MIRVarLocal, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstTypedString,
