@@ -264,16 +264,11 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, arg, update, trgt));
     }
 
-    emitInvokeKnownTarget(sinfo: SourceInfo, mkey: MIRMethodKey, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRInvokeKnownTarget(sinfo, mkey, args, trgt));
-    }
-
-    emitInvokeVirtualTarget(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    emitInvokeVirtualTarget(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: string[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRInvokeVirtualTarget(sinfo, vresolve, args, trgt));
-    }
 
-    emitCallLambda(sinfo: SourceInfo, lambda: MIRArgument, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRCallLambda(sinfo, lambda, args, trgt));
+        //do structured assign on any ref variables
+        xxxx;
     }
 
     emitPrefixOp(sinfo: SourceInfo, op: string, arg: MIRArgument, trgt: MIRTempRegister) {
@@ -522,7 +517,7 @@ class MIREmitter {
     }
 
     registerStaticCall(containingType: OOPTypeDecl, f: StaticFunctionDecl, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[] | undefined, cinfo: ResolvedType[]): MIRInvokeKey {
-        const key = MIRKeyGenerator.generateInvokeKey(containingType, name, binds, pcodes);
+        const key = MIRKeyGenerator.generateInvokeKey(containingType, name, binds, pcodes, cinfo);
         if (this.masm.staticDecls.has(key) || this.pendingOOStaticProcessing.findIndex((sp) => sp[0] === key) !== -1) {
             return key;
         }
@@ -531,24 +526,26 @@ class MIREmitter {
         return key;
     }
 
-    registerMethodCall(containingType: OOPTypeDecl, m: MemberMethodDecl, cbinds: Map<string, ResolvedType>, name: string, binds: Map<string, ResolvedType>) {
-        const vkey = MIRKeyGenerator.generateVirtualMethodKey(name, binds);
-        const key = MIRKeyGenerator.generateMethodKey(containingType, name, binds);
+    registerMethodCall(containingType: OOPTypeDecl, m: MemberMethodDecl, cbinds: Map<string, ResolvedType>, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[] | undefined, cinfo: ResolvedType[]): MIRInvokeKey {
+        const vkey = MIRKeyGenerator.generateVirtualMethodKey(name, binds, pcodes, cinfo);
+        const key = MIRKeyGenerator.generateInvokeKey(containingType, name, binds, pcodes, cinfo);
         if (this.masm.methodDecls.has(key) || this.pendingOOMethodProcessing.findIndex((mp) => mp[0] === key) !== -1) {
-            return;
+            return key;
         }
 
         this.pendingOOMethodProcessing.push([vkey, key, containingType, cbinds, m, binds]);
+        return key;
     }
 
-    registerVirtualMethodCall(containingType: OOPTypeDecl, cbinds: Map<string, ResolvedType>, name: string, binds: Map<string, ResolvedType>) {
-        const key = MIRKeyGenerator.generateVirtualMethodKey(name, binds);
+    registerVirtualMethodCall(containingType: OOPTypeDecl, cbinds: Map<string, ResolvedType>, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[] | undefined, cinfo: ResolvedType[]): MIRInvokeKey {
+        const key = MIRKeyGenerator.generateVirtualMethodKey(name, binds, pcodes, cinfo);
         const tkey = MIRKeyGenerator.generateTypeKey(containingType, binds);
         if (this.allVInvokes.findIndex((vi) => vi[0] === key && vi[1] === tkey) !== -1) {
-            return;
+            return key;
         }
 
-        this.allVInvokes.push([key, tkey, containingType, cbinds, name, binds]);
+        this.allVInvokes.push([key, tkey, containingType, cbinds, name, binds, pcodes, cinfo]);
+        return key;
     }
 
     registerLambda(lkey: MIRLambdaKey, capturedMap: Map<string, ResolvedType>, invoke: InvokeDecl, binds: Map<string, ResolvedType>, rsig: ResolvedFunctionAtomType) {

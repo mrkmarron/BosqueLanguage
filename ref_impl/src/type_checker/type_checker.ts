@@ -128,6 +128,24 @@ class TypeChecker {
         this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, invokeBinds);
     }
 
+    private checkRecursion(sinfo: SourceInfo, fsig: ResolvedFunctionType, pcodes: PCode[], crec: "yes" | "no" | "cond") {
+        if ((fsig.recursive === "no" && crec === "no") || (fsig.recursive === "yes" && crec === "yes")) {
+            return;
+        }
+
+        let sigr = fsig.recursive;
+        if (sigr === "cond") {
+            sigr = pcodes.some((pc) => pc.code.recursive === "yes") ? "yes" : "no";
+        }
+
+        let callr = crec;
+        if (callr === "cond") {
+            callr = pcodes.some((pc) => pc.code.recursive === "yes") ? "yes" : "no";
+        }
+
+        this.raiseErrorIf(sinfo, (sigr === "yes" && callr === "no") || (sigr === "no" && callr === "yes"), "Mismatched recursive annotations on call");
+    }
+
     private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): boolean {
         return lhs.options.some((lhsopt) => {
             const lhst = ResolvedType.createSingle(lhsopt);
@@ -1210,6 +1228,8 @@ class TypeChecker {
         const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
         const rargs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
 
+        this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, rargs.pcodes, exp.pragmas.recursive);
+
         const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
         if (this.m_emitEnabled) {
             this.m_emitter.registerTypeInstantiation(oodecl, oobinds);
@@ -1251,6 +1271,8 @@ class TypeChecker {
         const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
         const margs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
 
+        this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
+
         if (this.m_emitEnabled) {
             const ckey = this.m_emitter.registerFunctionCall(exp.ns, exp.name, fdecl, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
@@ -1277,6 +1299,8 @@ class TypeChecker {
 
         const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
         const margs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
+
+        this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
 
         if (this.m_emitEnabled) {
             this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
@@ -1526,7 +1550,7 @@ class TypeChecker {
         }
     }
 
-    private checkInvoke(env: TypeEnvironment, op: PostfixInvoke, arg: MIRTempRegister, trgt: MIRTempRegister, optArgVar?: string): TypeEnvironment[] {
+    private checkInvoke(env: TypeEnvironment, op: PostfixInvoke, arg: MIRTempRegister, trgt: MIRTempRegister, optArgVar: string | undefined, refok: boolean): TypeEnvironment[] {
         const texp = env.getExpressionResult().etype;
 
         if (op.specificResolve !== undefined || (texp.isUniqueCallTargetType() && this.m_assembly.tryGetOOMemberDeclUnique(texp, "method", op.name))) {
@@ -1542,17 +1566,22 @@ class TypeChecker {
             const binds = this.m_assembly.resolveBindsForCall((mdecl.decl as MemberMethodDecl).invoke.terms, op.terms.targs, mdecl.binds, env.terms);
             this.raiseErrorIf(op.sinfo, binds === undefined, "Call bindings could not be resolved");
 
-            const fsig = this.resolveAndEnsureType(op.sinfo, (mdecl.decl as MemberMethodDecl).invoke.generateSig(), binds as Map<string, ResolvedType>);
-            const eargs = this.checkArgumentsEvaluationWSig(env, ResolvedType.tryGetUniqueFunctionTypeAtom(fsig) as ResolvedFunctionAtomType, op.args, [resolveType, arg]);
-            const margs = this.checkArgumentsSignature(op.sinfo, env, ResolvedType.tryGetUniqueFunctionTypeAtom(fsig) as ResolvedFunctionAtomType, eargs);
+            const fsig = this.m_assembly.normalizeTypeFunction((mdecl.decl as MemberMethodDecl).invoke.generateSig(), binds as Map<string, ResolvedType>);
+            this.raiseErrorIf(op.sinfo, fsig === undefined, "Invalid function signature");
+
+            const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, op.args, [resolveType, arg], refok);
+            const margs = this.checkArgumentsSignature(op.sinfo, env, fsig as ResolvedFunctionType, eargs);
+
+            this.checkRecursion(op.sinfo, fsig as ResolvedFunctionType, margs.pcodes, op.pragmas.recursive);
+
             if (this.m_emitEnabled) {
                 this.m_emitter.registerTypeInstantiation(mdecl.contiainingType, mdecl.binds);
-                this.m_emitter.registerMethodCall(mdecl.contiainingType, mdecl.decl as MemberMethodDecl, mdecl.binds, (mdecl.decl as MemberMethodDecl).name, binds as Map<string, ResolvedType>);
+                const mkey = this.m_emitter.registerMethodCall(mdecl.contiainingType, mdecl.decl as MemberMethodDecl, mdecl.binds, (mdecl.decl as MemberMethodDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
-                this.m_emitter.bodyEmitter.emitInvokeKnownTarget(op.sinfo, MIRKeyGenerator.generateMethodKey(mdecl.contiainingType, (mdecl.decl as MemberMethodDecl).name, binds as Map<string, ResolvedType>), margs, trgt);
+                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(op.sinfo, mkey, margs.args, margs.refs, trgt);
             }
 
-            return [env.setExpressionResult(this.m_assembly, (ResolvedType.tryGetUniqueFunctionTypeAtom(fsig) as ResolvedFunctionAtomType).resultType)];
+            return [env.setExpressionResult(this.m_assembly, (fsig as ResolvedFunctionType).resultType)];
         }
         else {
             const vinfo = this.m_assembly.tryGetOOMemberDeclOptions(texp, "method", op.name);
@@ -1561,41 +1590,43 @@ class TypeChecker {
             const vopts = (vinfo.decls as OOMemberLookupInfo[]).map((opt) => {
                 const mdecl = (opt.decl as MemberMethodDecl);
                 const binds = this.m_assembly.resolveBindsForCall(mdecl.invoke.terms, op.terms.targs, opt.binds, env.terms) as Map<string, ResolvedType>;
-                return ResolvedType.tryGetUniqueFunctionTypeAtom(this.resolveAndEnsureType(op.sinfo, mdecl.invoke.generateSig(), binds)) as ResolvedFunctionAtomType;
+                return this.m_assembly.normalizeTypeFunction(mdecl.invoke.generateSig(), binds) as ResolvedFunctionType;
             });
 
             const rootdecl = (vinfo.root as OOMemberLookupInfo).contiainingType.memberMethods.get(op.name) as MemberMethodDecl;
             const rootbinds = this.m_assembly.resolveBindsForCall(rootdecl.invoke.terms, op.terms.targs, (vinfo.root as OOMemberLookupInfo).binds, env.terms) as Map<string, ResolvedType>;
-            const rootsig = ResolvedType.tryGetUniqueFunctionAtom(this.resolveAndEnsureType(op.sinfo, rootdecl.invoke.generateSig(), rootbinds)) as ResolvedFunctionAtomType;
+            const rootsig = this.m_assembly.normalizeTypeFunction(rootdecl.invoke.generateSig(), rootbinds) as ResolvedFunctionType;
 
             const lsigtry = this.m_assembly.computeUnifiedFunctionType(vopts, rootsig);
             this.raiseErrorIf(op.sinfo, lsigtry === undefined, "Ambigious signature for invoke");
 
-            const lsig = lsigtry as ResolvedFunctionAtomType;
-            const eargs = this.checkArgumentsEvaluationWSig(env, lsig, op.args, [texp, arg]);
+            const lsig = lsigtry as ResolvedFunctionType;
+            const eargs = this.checkArgumentsEvaluationWSig(env, lsig, op.args, [texp, arg], refok);
             const margs = this.checkArgumentsSignature(op.sinfo, env, lsig, eargs);
+
+            this.checkRecursion(op.sinfo, lsig as ResolvedFunctionType, margs.pcodes, op.pragmas.recursive);
 
             if (this.m_emitEnabled) {
                 let cbindsonly = this.m_assembly.resolveBindsForCall(rootdecl.invoke.terms, op.terms.targs, new Map<string, ResolvedType>(), env.terms) as Map<string, ResolvedType>;
 
                 if (op.name === "isNone") {
-                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()).trkey, margs[0]);
+                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()).trkey, margs.args[0]);
                 }
                 else if (op.name === "isSome") {
-                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeType()).trkey, margs[0]);
+                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeType()).trkey, margs.args[0]);
                 }
                 else if (op.name === "is" || op.name === "as" || op.name === "tryAs" || op.name === "defaultAs") {
                     const ttype = rootbinds.get("T") as ResolvedType;
                     const mt = this.m_emitter.registerResolvedTypeReference(ttype);
 
                     if (op.name === "is") {
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, mt.trkey, margs[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, mt.trkey, margs.args[0]);
                     }
                     else if (op.name === "as") {
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Las_done");
                         const failblck = this.m_emitter.bodyEmitter.createNewBlock("Las_fail");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, failblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(failblck);
@@ -1603,15 +1634,15 @@ class TypeChecker {
                         this.m_emitter.bodyEmitter.emitDirectJump(op.sinfo, "exit");
 
                         this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
-                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs[0], trgt);
+                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs.args[0], trgt);
                     }
                     else if (op.name === "tryAs") {
-                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs[0], trgt);
+                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs.args[0], trgt);
 
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_done");
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
@@ -1621,24 +1652,25 @@ class TypeChecker {
                         this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
                     }
                     else {
-                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs[0], trgt);
+                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs.args[0], trgt);
 
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Ldefaultas_done");
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ldefaultas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
                         this.m_emitter.bodyEmitter.emitLoadConstNone(op.sinfo, trgt);
-                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs[1], trgt);
+                        this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs.args[1], trgt);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
                     }
                 }
                 else {
-                    this.m_emitter.registerVirtualMethodCall((vinfo.root as OOMemberLookupInfo).contiainingType, (vinfo.root as OOMemberLookupInfo).binds, op.name, cbindsonly);
-                    this.m_emitter.bodyEmitter.emitInvokeVirtualTarget(op.sinfo, MIRKeyGenerator.generateVirtualMethodKey(op.name, rootbinds), margs, trgt);
+                    const vkey = this.m_emitter.registerVirtualMethodCall((vinfo.root as OOMemberLookupInfo).contiainingType, (vinfo.root as OOMemberLookupInfo).binds, op.name, cbindsonly, margs.pcodes, margs.cinfo);
+
+                    this.m_emitter.bodyEmitter.emitInvokeVirtualTarget(op.sinfo, vkey, margs.args, margs.refs, trgt);
                 }
             }
 

@@ -1137,9 +1137,10 @@ class Parser {
 
         const fname = this.consumeTokenAndGetValue();
         const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+        const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
         const args = this.parseArguments("(", ")");
 
-        return new ConstructorPrimaryWithFactoryExpression(sinfo, otype, fname, targs, args);
+        return new ConstructorPrimaryWithFactoryExpression(sinfo, otype, fname, pragmas, targs, args);
     }
 
     private parsePCodeTerm(): Expression {
