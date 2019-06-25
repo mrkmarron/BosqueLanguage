@@ -94,6 +94,10 @@ class MIRKeyGenerator {
             return `${vname}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
         }
     }
+
+    static generatePCodeKey(inv: InvokeDecl): MIRMethodKey {
+        xxxx;
+    }
 }
 
 class MIRBodyEmitter {

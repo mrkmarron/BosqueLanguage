@@ -332,11 +332,13 @@ class ConstructorPCodeExpression extends Expression {
 }
 
 class PCodeInvokeExpression extends Expression {
+    readonly pcode: string;
     readonly pragmas: PragmaArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, pcode: string, pragmas: PragmaArguments, args: Arguments) {
         super(ExpressionTag.PCodeInvokeExpression, sinfo);
+        this.pcode = pcode;
         this.pragmas = pragmas;
         this.args = args;
     }

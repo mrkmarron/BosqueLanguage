@@ -7,9 +7,9 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRTypeKey, MIRFunctionKey, MIRLambdaKey, MIRStaticKey, MIRMethodKey, MIRVirtualMethodKey, MIRGlobalKey, MIRConstKey, MIRRegisterArgument, MIRVarLocal, MIRVarParameter } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRTypeKey, MIRVirtualMethodKey, MIRRegisterArgument, MIRVarLocal, MIRVarParameter } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRFunctionDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIREntityType, MIRStaticDecl, MIRGlobalDecl, MIRConstDecl, MIRMethodDecl, MIROOTypeDecl } from "../compiler/mir_assembly";
 
@@ -1312,6 +1312,25 @@ class TypeChecker {
         return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];
     }
 
+    private checkPCodeInvokeExpression(env: TypeEnvironment, exp: PCodeInvokeExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+        const pco = env.lookupPCode(exp.pcode);
+        this.raiseErrorIf(exp.sinfo, pco === undefined, "Code name not defined");
+        const pcode = (pco as { pcode: PCode, captured: string[] }).pcode;
+        const captured = (pco as { pcode: PCode, captured: string[] }).captured;
+
+        const cargs = [...exp.args.argList, ...captured.map((cv) => new PositionalArgument(false, false, new AccessVariableExpression(exp.sinfo, cv)))];
+        const eargs = this.checkArgumentsEvaluationWSig(env, pcode.ftype, new Arguments(cargs), undefined, false);
+        const margs = this.checkArgumentsSignature(exp.sinfo, env, pcode.ftype, eargs);
+
+        this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.pragmas.recursive);
+
+        if (this.m_emitEnabled) {
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, [], trgt);
+        }
+
+        return [env.setExpressionResult(this.m_assembly, (pcode as PCode).ftype.resultType)];
+    }
+
     private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
         const texp = env.getExpressionResult().etype;
 
@@ -1740,34 +1759,6 @@ class TypeChecker {
         }
     }
 
-    private checkCallLambda(env: TypeEnvironment, op: PostfixCallLambda, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
-        const texp = env.getExpressionResult().etype;
-
-        this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialFunctionConceptType()), "Ambigious signature for invoke");
-
-        texp.options.forEach((fopt) => {
-            this.raiseErrorIf(op.sinfo, !(fopt instanceof ResolvedFunctionAtomType), "Non-function type at lambda invocation site");
-            const optsig = fopt as ResolvedFunctionAtomType;
-            const optargs = this.checkArgumentsEvaluationWSig(env, optsig, op.args, undefined, true);
-            this.checkArgumentsSignature(op.sinfo, env, optsig, optargs, true);
-        });
-
-        const lsigtry = this.m_assembly.computeUnifiedFunctionType(texp.options);
-        this.raiseErrorIf(op.sinfo, lsigtry === undefined, "Ambigious signature for call");
-
-        const lsig = lsigtry as ResolvedFunctionAtomType;
-
-        const eargs = this.checkArgumentsEvaluationWSig(env, lsig, op.args, undefined);
-        const margs = this.checkArgumentsSignature(op.sinfo, env, lsig, eargs);
-
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitCallLambda(op.sinfo, arg, margs, trgt);
-        }
-
-        const returnOpts = texp.options.map((sopt) => (sopt as ResolvedFunctionAtomType).resultType);
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(returnOpts))];
-    }
-
     private checkElvisAction(sinfo: SourceInfo, env: TypeEnvironment[], elvisEnabled: boolean, etrgt: MIRTempRegister, noneblck: string): [TypeEnvironment[], TypeEnvironment[]] {
         const [enone, esome] = TypeEnvironment.convertToNoneSomeFlowsOnExpressionResult(this.m_assembly, env);
         this.raiseErrorIf(sinfo, enone.length === 0 && elvisEnabled, "None value is not possible -- will never return none and elvis access is redundant");
@@ -1782,7 +1773,7 @@ class TypeChecker {
         return elvisEnabled ? [esome, enone] : [[...esome, ...enone], []];
     }
 
-    private checkPostfixExpression(env: TypeEnvironment, exp: PostfixOp, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkPostfixExpression(env: TypeEnvironment, exp: PostfixOp, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
         const hasNoneCheck = exp.ops.some((op) => op.isElvis);
         const noneblck = hasNoneCheck && this.m_emitEnabled ? this.m_emitter.bodyEmitter.createNewBlock("Lelvis_none") : "[DISABLED]";
         const doneblck = hasNoneCheck && this.m_emitEnabled ? this.m_emitter.bodyEmitter.createNewBlock("Lelvis_done") : "[DISABLED]";
@@ -1793,7 +1784,7 @@ class TypeChecker {
         if (exp.rootExp instanceof AccessVariableExpression && exp.ops.length === 1 && exp.ops[0] instanceof PostfixInvoke) {
             const [fflow, scflow] = this.checkElvisAction(exp.sinfo, eenv, exp.ops[0].isElvis, etgrt, noneblck);
 
-            const res = this.checkInvoke(TypeEnvironment.join(this.m_assembly, ...fflow), exp.ops[0] as PostfixInvoke, etgrt, trgt, exp.rootExp.name);
+            const res = this.checkInvoke(TypeEnvironment.join(this.m_assembly, ...fflow), exp.ops[0] as PostfixInvoke, etgrt, trgt, exp.rootExp.name, refok);
 
             if (hasNoneCheck && this.m_emitEnabled) {
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
@@ -1841,12 +1832,9 @@ class TypeChecker {
                     case PostfixOpTag.PostfixStructuredExtend:
                         cenv = this.checkStructuredExtend(nflow, exp.ops[i] as PostfixStructuredExtend, etgrt, ntgrt);
                         break;
-                    case PostfixOpTag.PostfixInvoke:
-                        cenv = this.checkInvoke(nflow, exp.ops[i] as PostfixInvoke, etgrt, ntgrt);
-                        break;
                     default:
-                        this.raiseErrorIf(exp.sinfo, exp.ops[i].op !== PostfixOpTag.PostfixCallLambda, "Unknown postfix op");
-                        cenv = this.checkCallLambda(nflow, exp.ops[i] as PostfixCallLambda, etgrt, ntgrt);
+                        this.raiseErrorIf(exp.sinfo, exp.ops[i].op !== PostfixOpTag.PostfixInvoke, "Unknown postfix op");
+                        cenv = this.checkInvoke(nflow, exp.ops[i] as PostfixInvoke, etgrt, ntgrt, undefined, refok);
                         break;
                 }
 
@@ -2190,8 +2178,112 @@ class TypeChecker {
         return [env.setExpressionResult(this.m_assembly, rtype)];
     }
 
+    private checkOrExpression(env: TypeEnvironment, exp: ExpOrExpression, trgt: MIRTempRegister, extraok: { refok: boolean, orok: boolean }): TypeEnvironment[] {
+        this.raiseErrorIf(exp.sinfo, !extraok.orok, "Or expression is not valid in this position");
+
+        const scblck = this.m_emitter.bodyEmitter.createNewBlock("Lorcheck_return");
+        const regularblck = this.m_emitter.bodyEmitter.createNewBlock("Lorcheck_regular");
+
+        let normalexps: TypeEnvironment[] = [];
+        let terminaltype: ResolvedType = this.m_assembly.getSpecialNoneType();
+        let terminalexps: TypeEnvironment[] = [];
+
+        let evalue = this.checkExpressionMultiFlow(env, exp.exp, trgt, {refok: extraok.refok, orok: false});
+        if (exp.cond !== undefined || exp.result !== undefined) {
+            evalue = evalue.map((ev) => ev.pushLocalScope().addVar("_value_", true, ev.getExpressionResult().etype, true, ev.getExpressionResult().etype));
+            if (this.m_emitEnabled) {
+                const vtype = TypeEnvironment.join(this.m_assembly, ...evalue).getExpressionResult().etype;
+                this.m_emitter.bodyEmitter.localLifetimeStart(exp.sinfo, "_value_", this.m_emitter.registerResolvedTypeReference(vtype).trkey);
+                this.m_emitter.bodyEmitter.emitVarStore(exp.sinfo, trgt, "_value_");
+            }
+        }
+
+        if (exp.cond === undefined) {
+            let [enone, esome] = TypeEnvironment.convertToNoneSomeFlowsOnExpressionResult(this.m_assembly, evalue);
+            this.raiseErrorIf(exp.sinfo, enone.length === 0, "Value is never equal to none");
+            this.raiseErrorIf(exp.sinfo, esome.length === 0, "Value is always equal to none");
+
+            if (exp.exp instanceof AccessVariableExpression) {
+                const vname = (exp.exp as AccessVariableExpression).name;
+                enone = enone.map((opt) => opt.assumeVar(vname, (opt.expressionResult as ExpressionReturnResult).etype));
+                esome = esome.map((opt) => opt.assumeVar(vname, (opt.expressionResult as ExpressionReturnResult).etype));
+            }
+
+            terminaltype = TypeEnvironment.join(this.m_assembly, ...enone).getExpressionResult().etype;
+
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.emitNoneJump(exp.sinfo, trgt, scblck, regularblck);
+                this.m_emitter.bodyEmitter.setActiveBlock(scblck);
+            }
+
+            normalexps = esome;
+            terminalexps = enone;
+        }
+        else {
+            const okType = this.m_assembly.typeUnion([this.m_assembly.getSpecialNoneType(), this.m_assembly.getSpecialBoolType()]);
+
+            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
+            const tvalue = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...evalue), exp.cond, treg);
+
+            this.raiseErrorIf(exp.sinfo, tvalue.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
+
+            const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, tvalue);
+            this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || falseflow.length === 0, "Expression is always true/false expression test is redundant");
+
+            terminaltype = TypeEnvironment.join(this.m_assembly, ...evalue).getExpressionResult().etype;
+
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, scblck, regularblck);
+                this.m_emitter.bodyEmitter.setActiveBlock(scblck);
+            }
+
+            normalexps = falseflow.map((ev) => ev.popLocalScope());
+            terminalexps = trueflow.map((ev) => ev.popLocalScope());
+        }
+
+        let rreg = trgt;
+        if (exp.result !== undefined) {
+            const tenv = TypeEnvironment.join(this.m_assembly, ...terminalexps);
+            const rvalue = this.checkExpression(tenv, exp.result, rreg);
+            terminaltype = rvalue.getExpressionResult().etype;
+        }
+
+        if (exp.cond !== undefined || exp.result !== undefined) {
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.localLifetimeEnd(exp.sinfo, "_value_");
+            }
+        }
+
+        if (exp.action === "return") {
+            this.raiseErrorIf(exp.sinfo, env.isInYieldBlock(), "Cannot use return statment inside an expression block");
+
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, rreg);
+                this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "exit");
+
+                this.m_emitter.bodyEmitter.setActiveBlock(regularblck);
+            }
+
+            return [...normalexps, env.setReturn(this.m_assembly, terminaltype)];
+        }
+        else {
+            this.raiseErrorIf(exp.sinfo, !env.isInYieldBlock(), "Cannot use yield statment unless inside and expression block");
+
+            if (this.m_emitEnabled) {
+                const yinfo = env.getYieldTargetInfo();
+                this.m_emitter.bodyEmitter.emitRegAssign(exp.sinfo, rreg, yinfo[0]);
+                this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, yinfo[1]);
+
+                this.m_emitter.bodyEmitter.setActiveBlock(regularblck);
+            }
+
+            return [...normalexps, env.setYield(this.m_assembly, terminaltype)];
+        }
+    }
+
     private checkBlockExpression(env: TypeEnvironment, exp: BlockStatementExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        let cenv = env.pushLocalScope().pushYieldTarget(trgt);
+        const yblck = this.m_emitter.bodyEmitter.createNewBlock("Lyield");
+        let cenv = env.pushLocalScope().pushYieldTarget(trgt, yblck);
 
         for (let i = 0; i < exp.ops.length; ++i) {
             if (!cenv.hasNormalFlow()) {
@@ -2202,6 +2294,8 @@ class TypeChecker {
         }
 
         if (this.m_emitEnabled && cenv.hasNormalFlow()) {
+            this.m_emitter.bodyEmitter.setActiveBlock(yblck);
+
             const deadvars = cenv.getCurrentFrameNames();
             for (let i = 0; i < deadvars.length; ++i) {
                 this.m_emitter.bodyEmitter.localLifetimeEnd(exp.sinfo, deadvars[i]);
@@ -2318,14 +2412,14 @@ class TypeChecker {
         return results;
     }
 
-    private checkExpression(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, refok?: boolean): TypeEnvironment {
-        const res = this.checkExpressionMultiFlow(env, exp, trgt, refok);
+    private checkExpression(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, extraok?: { refok: boolean, orok: boolean }): TypeEnvironment {
+        const res = this.checkExpressionMultiFlow(env, exp, trgt, extraok);
         this.raiseErrorIf(exp.sinfo, res.length === 0, "No feasible flow for expression");
 
         return TypeEnvironment.join(this.m_assembly, ...res);
     }
 
-    private checkExpressionMultiFlow(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, refok?: boolean): TypeEnvironment[] {
+    private checkExpressionMultiFlow(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, extraok?: { refok: boolean, orok: boolean }): TypeEnvironment[] {
         switch (exp.tag) {
             case ExpressionTag.LiteralNoneExpression:
                 return this.checkLiteralNoneExpression(env, exp as LiteralNoneExpression, trgt);
@@ -2348,19 +2442,19 @@ class TypeChecker {
             case ExpressionTag.ConstructorPrimaryExpression:
                 return this.checkConstructorPrimary(env, exp as ConstructorPrimaryExpression, trgt);
             case ExpressionTag.ConstructorPrimaryWithFactoryExpression:
-                return this.checkConstructorPrimaryWithFactory(env, exp as ConstructorPrimaryWithFactoryExpression, trgt, refok || false);
+                return this.checkConstructorPrimaryWithFactory(env, exp as ConstructorPrimaryWithFactoryExpression, trgt, (extraok && extraok.refok) || false);
             case ExpressionTag.ConstructorTupleExpression:
                 return this.checkTupleConstructor(env, exp as ConstructorTupleExpression, trgt);
             case ExpressionTag.ConstructorRecordExpression:
                 return this.checkRecordConstructor(env, exp as ConstructorRecordExpression, trgt);
-            case ExpressionTag.ConstructorLambdaExpression:
-                return this.checkLambdaConstructor(env, exp as ConstructorLambdaExpression, trgt, inferType);
             case ExpressionTag.CallNamespaceFunctionExpression:
-                return this.checkCallNamespaceFunctionExpression(env, exp as CallNamespaceFunctionExpression, trgt);
+                return this.checkCallNamespaceFunctionExpression(env, exp as CallNamespaceFunctionExpression, trgt, (extraok && extraok.refok) || false);
             case ExpressionTag.CallStaticFunctionExpression:
-                return this.checkCallStaticFunctionExpression(env, exp as CallStaticFunctionExpression, trgt);
+                return this.checkCallStaticFunctionExpression(env, exp as CallStaticFunctionExpression, trgt, (extraok && extraok.refok) || false);
+            case ExpressionTag.PCodeInvokeExpression:
+                return this.checkPCodeInvokeExpression(env, exp as PCodeInvokeExpression, trgt);
             case ExpressionTag.PostfixOpExpression:
-                return this.checkPostfixExpression(env, exp as PostfixOp, trgt);
+                return this.checkPostfixExpression(env, exp as PostfixOp, trgt, (extraok && extraok.refok) || false);
             case ExpressionTag.PrefixOpExpression:
                 return this.checkPrefixOp(env, exp as PrefixOp, trgt);
             case ExpressionTag.BinOpExpression:
@@ -2377,6 +2471,8 @@ class TypeChecker {
                 return this.checkCoalesce(env, exp as CoalesceExpression, trgt);
             case ExpressionTag.SelectExpression:
                 return this.checkSelect(env, exp as SelectExpression, trgt);
+            case ExpressionTag.ExpOrExpression:
+                return this.checkOrExpression(env, exp as ExpOrExpression, trgt, extraok || { refok: false, orok: false });
             case ExpressionTag.BlockStatementExpression:
                 return this.checkBlockExpression(env, exp as BlockStatementExpression, trgt);
             case ExpressionTag.IfExpression:
@@ -2391,11 +2487,11 @@ class TypeChecker {
         this.raiseErrorIf(stmt.sinfo, env.isVarNameDefined(stmt.name), "Cannot shadow previous definition");
 
         const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const venv = stmt.exp !== undefined ? this.checkExpression(env, stmt.exp, etreg) : undefined;
+        const venv = stmt.exp !== undefined ? this.checkExpression(env, stmt.exp, etreg, { refok: true, orok: true }) : undefined;
         this.raiseErrorIf(stmt.sinfo, venv === undefined && stmt.isConst, "Must define const var at declaration site");
         this.raiseErrorIf(stmt.sinfo, venv === undefined && stmt.vtype instanceof AutoTypeSignature, "Must define auto typed var at declaration site");
 
-        const vtype = (stmt.vtype instanceof AutoTypeSignature) ? (venv as TypeEnvironment).getExpressionResult().etype : this.resolveAndEnsureType(stmt.sinfo, stmt.vtype, env.terms);
+        const vtype = (stmt.vtype instanceof AutoTypeSignature) ? (venv as TypeEnvironment).getExpressionResult().etype : this.resolveAndEnsureTypeOnly(stmt.sinfo, stmt.vtype, env.terms);
         this.raiseErrorIf(stmt.sinfo, venv !== undefined && !this.m_assembly.subtypeOf(venv.getExpressionResult().etype, vtype), "Expression is not of declared type");
 
         if (this.m_emitEnabled) {
@@ -2416,7 +2512,7 @@ class TypeChecker {
         this.raiseErrorIf(stmt.sinfo, (vinfo as VarInfo).isConst, "Variable defined as const");
 
         const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const venv = this.checkExpression(env, stmt.exp, etreg);
+        const venv = this.checkExpression(env, stmt.exp, etreg, { refok: true, orok: true });
         this.raiseErrorIf(stmt.sinfo, !this.m_assembly.subtypeOf(venv.getExpressionResult().etype, (vinfo as VarInfo).declaredType), "Assign value is not subtype of declared variable type");
 
         if (this.m_emitEnabled) {
@@ -2430,7 +2526,7 @@ class TypeChecker {
         if (assign instanceof IgnoreTermStructuredAssignment) {
             this.raiseErrorIf(sinfo, isopt && !assign.isOptional, "Missing value for required entry");
 
-            const itype = this.resolveAndEnsureType(sinfo, assign.termType, env.terms);
+            const itype = this.resolveAndEnsureTypeOnly(sinfo, assign.termType, env.terms);
             this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(expt, itype), "Ignore type is not a subtype of declared type");
         }
         else if (assign instanceof ConstValueStructuredAssignment) {
@@ -2444,8 +2540,8 @@ class TypeChecker {
             const vtype = (assign.vtype instanceof AutoTypeSignature)
                 ? expt
                 : (assign.isOptional
-                    ? this.m_assembly.typeUnion([this.m_assembly.getSpecialNoneType(), this.resolveAndEnsureType(sinfo, assign.vtype, env.terms)])
-                    : this.resolveAndEnsureType(sinfo, assign.vtype, env.terms));
+                    ? this.m_assembly.typeUnion([this.m_assembly.getSpecialNoneType(), this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms)])
+                    : this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms));
 
             this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(expt, vtype), "Expression is not of declared type");
 
@@ -2548,7 +2644,7 @@ class TypeChecker {
 
     private checkStructuredVariableAssignmentStatement(env: TypeEnvironment, stmt: StructuredVariableAssignmentStatement): TypeEnvironment {
         const expreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const eenv = this.checkExpression(env, stmt.exp, expreg);
+        const eenv = this.checkExpression(env, stmt.exp, expreg, { refok: true, orok: true });
 
         let allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][] = [];
         let allAssigned: [string, (string|number)[], ResolvedType][] = [];
@@ -2638,7 +2734,7 @@ class TypeChecker {
 
     private checkStructuredMatch(sinfo: SourceInfo, env: TypeEnvironment, cpath: (string|number)[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][], allAssigned: [string, (string|number)[], ResolvedType][], allEqChecks: [(string|number)[], Expression][]): [ResolvedType, boolean] {
         if (assign instanceof IgnoreTermStructuredAssignment) {
-            return [this.resolveAndEnsureType(sinfo, assign.termType, env.terms), assign.isOptional];
+            return [this.resolveAndEnsureTypeOnly(sinfo, assign.termType, env.terms), assign.isOptional];
         }
         else if (assign instanceof ConstValueStructuredAssignment) {
             allEqChecks.push([[...cpath], assign.constValue]);
@@ -2656,11 +2752,11 @@ class TypeChecker {
             this.raiseErrorIf(sinfo, allDeclared.find((decl) => decl[1] === assign.vname) !== undefined || allAssigned.find((asgn) => asgn[0] === assign.vname) !== undefined, "Duplicate variables used in structured assign");
 
             const vtype = (assign.isOptional
-                    ? this.m_assembly.typeUnion([this.m_assembly.getSpecialNoneType(), this.resolveAndEnsureType(sinfo, assign.vtype, env.terms)])
-                    : this.resolveAndEnsureType(sinfo, assign.vtype, env.terms));
+                    ? this.m_assembly.typeUnion([this.m_assembly.getSpecialNoneType(), this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms)])
+                    : this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms));
 
             allDeclared.push([assign.isConst, assign.vname, vtype, [...cpath], vtype]);
-            return [this.resolveAndEnsureType(sinfo, assign.vtype, env.terms), assign.isOptional];
+            return [this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms), assign.isOptional];
         }
         else if (assign instanceof VariableAssignmentStructuredAssignment) {
             this.raiseErrorIf(sinfo, allDeclared.find((decl) => decl[1] === assign.vname) !== undefined || allAssigned.find((asgn) => asgn[0] === assign.vname) !== undefined, "Duplicate variables used in structured assign");
@@ -2719,7 +2815,7 @@ class TypeChecker {
             opts = [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)];
         }
         else if (guard instanceof TypeMatchGuard) {
-            const tmatch = this.resolveAndEnsureType(sinfo, guard.oftype, env.terms);
+            const tmatch = this.resolveAndEnsureTypeOnly(sinfo, guard.oftype, env.terms);
 
             if (this.m_emitEnabled) {
                 const mt = this.m_emitter.registerResolvedTypeReference(tmatch);
@@ -2902,7 +2998,7 @@ class TypeChecker {
 
     private checkReturnStatement(env: TypeEnvironment, stmt: ReturnStatement): TypeEnvironment {
         const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const venv = this.checkExpression(env, stmt.value, etreg);
+        const venv = this.checkExpression(env, stmt.value, etreg, { refok: true, orok: false });
 
         this.raiseErrorIf(stmt.sinfo, env.isInYieldBlock(), "Cannot use return statment inside an expression block");
 
@@ -2916,9 +3012,13 @@ class TypeChecker {
 
     private checkYieldStatement(env: TypeEnvironment, stmt: YieldStatement): TypeEnvironment {
         const yinfo = env.getYieldTargetInfo();
-        const venv = this.checkExpression(env, stmt.value, yinfo);
+        const venv = this.checkExpression(env, stmt.value, yinfo[0], { refok: true, orok: false });
 
         this.raiseErrorIf(stmt.sinfo, !env.isInYieldBlock(), "Cannot use yield statment outside expression blocks");
+
+        if (this.m_emitEnabled) {
+            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, yinfo[1]);
+        }
 
         return env.setYield(this.m_assembly, venv.getExpressionResult().etype);
     }

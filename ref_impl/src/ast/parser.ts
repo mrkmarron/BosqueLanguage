@@ -1200,7 +1200,7 @@ class Parser {
                     if (this.testFollowsFrom(mp, "]", "(")) {
                         const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
                         const args = this.parseArguments("(", ")");
-                        return new PCodeInvokeExpression(sinfo, pragmas, args);
+                        return new PCodeInvokeExpression(sinfo, istr, pragmas, args);
                     }
                     else {
                         return new AccessVariableExpression(sinfo, istr);
@@ -1208,7 +1208,7 @@ class Parser {
                 }
                 else if (this.testToken("(")) {
                     const args = this.parseArguments("(", ")");
-                    return new PCodeInvokeExpression(sinfo, new PragmaArguments("no", []), args);
+                    return new PCodeInvokeExpression(sinfo, istr, new PragmaArguments("no", []), args);
                 }
                 else {
                     return new AccessVariableExpression(sinfo, istr);
