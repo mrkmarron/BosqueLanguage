@@ -1099,7 +1099,7 @@ class TypeChecker {
 
             const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
-            this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], undefined, []);
+            this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
             this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, trgt);
         }
@@ -1117,7 +1117,7 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(...aoftype.oftype);
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-            const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], undefined, []);
+            const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
             this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, tmpr);
@@ -1138,7 +1138,7 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             this.m_emitter.registerPendingGlobalProcessing(cdecl);
-            this.m_emitter.bodyEmitter.emitAccessNamespaceConstant(exp.sinfo, MIRKeyGenerator.generateGlobalKey(exp.ns, exp.name), trgt);
+            this.m_emitter.bodyEmitter.emitAccessConstant(exp.sinfo, MIRKeyGenerator.generateGlobalKey(exp.ns, exp.name), trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, rtype)];
@@ -1156,7 +1156,7 @@ class TypeChecker {
         if (this.m_emitEnabled) {
             this.m_emitter.registerTypeInstantiation(cdecl.contiainingType, cdecl.binds);
             this.m_emitter.registerPendingConstProcessing(cdecl.contiainingType, cdecl.decl as StaticMemberDecl, cdecl.binds);
-            this.m_emitter.bodyEmitter.emitAccessConstField(exp.sinfo, MIRKeyGenerator.generateConstKey(cdecl.contiainingType, cdecl.binds, exp.name), trgt);
+            this.m_emitter.bodyEmitter.emitAccessConstant(exp.sinfo, MIRKeyGenerator.generateConstKey(cdecl.contiainingType, cdecl.binds, exp.name), trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, rtype)];
