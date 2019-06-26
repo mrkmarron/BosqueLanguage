@@ -4,67 +4,65 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo } from "../ast/parser";
-import { MIRBody, MIRResolvedTypeKey, MIRTypeKey, MIRStaticKey, MIRConstKey, MIRFieldKey, MIRMethodKey, MIRVirtualMethodKey, MIRGlobalKey, MIRFunctionKey, MIRLambdaKey } from "./mir_ops";
+import { MIRBody, MIRResolvedTypeKey, MIRTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey } from "./mir_ops";
 
 class MIRFunctionParameter {
     readonly name: string;
     readonly type: MIRType;
-    readonly isOptional: boolean;
 
-    constructor(name: string, type: MIRType, isOpt: boolean) {
+    constructor(name: string, type: MIRType) {
         this.name = name;
         this.type = type;
-        this.isOptional = isOpt;
+    }
+}
+
+class MIRConstantDecl {
+    readonly key: MIRConstantKey;
+
+    readonly sourceLocation: SourceInfo;
+    readonly srcFile: string;
+
+    readonly declaredType: MIRType;
+    readonly value: MIRBody;
+
+    constructor(key: MIRConstantKey, sinfo: SourceInfo, srcFile: string, declaredType: MIRType, value: MIRBody) {
+        this.key = key;
+        this.sourceLocation = sinfo;
+        this.srcFile = srcFile;
+
+        this.declaredType = declaredType;
+        this.value = value;
     }
 }
 
 class MIRInvokeDecl {
+    readonly iname: string;
+    readonly key: MIRInvokeKey;
+
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly terms: Map<string, MIRType>;
-
     readonly params: MIRFunctionParameter[];
-    readonly optRestName: string | undefined;
-    readonly optRestType: MIREntityType | undefined;
     readonly resultType: MIRType;
 
     readonly preconditions: MIRBody[];
     readonly postconditions: MIRBody[];
 
-    readonly isLambda: boolean;
-    readonly captured: Map<string, MIRType>;
-    readonly body: MIRBody | undefined;
+    readonly body: MIRBody;
 
-    constructor(sinfo: SourceInfo, srcFile: string, terms: Map<string, MIRType>, params: MIRFunctionParameter[], optRestName: string | undefined, optRestType: MIREntityType | undefined, resultType: MIRType, preconds: MIRBody[], postconds: MIRBody[], isLambda: boolean, captured: Map<string, MIRType>, body: MIRBody | undefined) {
+    constructor(iname: string, key: MIRInvokeKey, sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRType, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
+        this.iname = iname;
+        this.key = key;
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
-        this.terms = terms;
-
         this.params = params;
-        this.optRestName = optRestName;
-        this.optRestType = optRestType;
         this.resultType = resultType;
 
         this.preconditions = preconds;
         this.postconditions = postconds;
 
-        this.isLambda = isLambda;
-        this.captured = captured;
         this.body = body;
-    }
-
-    static createLambdaInvokeDecl(sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], optRestName: string | undefined, optRestType: MIREntityType | undefined, resultType: MIRType, captured: Map<string, MIRType>, body: MIRBody) {
-        return new MIRInvokeDecl(sinfo, srcFile, new Map<string, MIRType>(), params, optRestName, optRestType, resultType, [], [], true, captured, body);
-    }
-
-    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, terms: Map<string, MIRType>, params: MIRFunctionParameter[], optRestName: string | undefined, optRestType: MIREntityType | undefined, resultType: MIRType, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody | undefined) {
-        return new MIRInvokeDecl(sinfo, srcFile, terms, params, optRestName, optRestType, resultType, preconds, postconds, false, new Map<string, MIRType>(), body);
-    }
-
-    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, terms: Map<string, MIRType>, params: MIRFunctionParameter[], optRestName: string | undefined, optRestType: MIREntityType | undefined, resultType: MIRType, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody | undefined) {
-        return new MIRInvokeDecl(sinfo, srcFile, terms, params, optRestName, optRestType, resultType, preconds, postconds, false, new Map<string, MIRType>(), body);
     }
 }
 
@@ -86,32 +84,6 @@ abstract class MIROOMemberDecl {
     }
 }
 
-class MIRConstDecl extends MIROOMemberDecl {
-    readonly ckey: MIRConstKey;
-    readonly declaredType: MIRType;
-    readonly value: MIRBody | undefined;
-
-    constructor(srcInfo: SourceInfo, srcFile: string, ckey: MIRConstKey, attributes: string[], name: string, enclosingType: MIRTypeKey, dtype: MIRType, value: MIRBody | undefined) {
-        super(srcInfo, srcFile, attributes, name, enclosingType);
-
-        this.ckey = ckey;
-        this.declaredType = dtype;
-        this.value = value;
-    }
-}
-
-class MIRStaticDecl extends MIROOMemberDecl {
-    readonly sfkey: MIRStaticKey;
-    readonly invoke: MIRInvokeDecl;
-
-    constructor(sinfo: SourceInfo, srcFile: string, sfkey: MIRStaticKey, attributes: string[], name: string, enclosingType: MIRTypeKey, invoke: MIRInvokeDecl) {
-        super(sinfo, srcFile, attributes, name, enclosingType);
-
-        this.sfkey = sfkey;
-        this.invoke = invoke;
-    }
-}
-
 class MIRFieldDecl extends MIROOMemberDecl {
     readonly fkey: MIRFieldKey;
     readonly declaredType: MIRType;
@@ -128,14 +100,12 @@ class MIRFieldDecl extends MIROOMemberDecl {
 
 class MIRMethodDecl extends MIROOMemberDecl {
     readonly vkey: MIRVirtualMethodKey;
-    readonly mkey: MIRMethodKey;
     readonly invoke: MIRInvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, vkey: MIRVirtualMethodKey, mkey: MIRMethodKey, attributes: string[], name: string, enclosingType: MIRTypeKey, invoke: MIRInvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, vkey: MIRVirtualMethodKey, attributes: string[], name: string, enclosingType: MIRTypeKey, invoke: MIRInvokeDecl) {
         super(sinfo, srcFile, attributes, name, enclosingType);
 
         this.vkey = vkey;
-        this.mkey = mkey;
         this.invoke = invoke;
     }
 }
@@ -198,50 +168,6 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
 
         this.isEnum = isEnum;
         this.isKey = isKey;
-    }
-}
-
-abstract class MIRNSMemberDecl {
-    readonly sourceLocation: SourceInfo;
-    readonly srcFile: string;
-
-    readonly attributes: string[];
-    readonly ns: string;
-    readonly name: string;
-
-    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string) {
-        this.sourceLocation = srcInfo;
-        this.srcFile = srcFile;
-
-        this.attributes = attributes;
-        this.ns = ns;
-        this.name = name;
-    }
-}
-
-class MIRGlobalDecl extends MIRNSMemberDecl {
-    readonly gkey: MIRGlobalKey;
-    readonly declaredType: MIRType;
-    readonly value: MIRBody;
-
-    constructor(srcInfo: SourceInfo, srcFile: string, gkey: MIRGlobalKey, attributes: string[], ns: string, name: string, dtype: MIRType, value: MIRBody) {
-        super(srcInfo, srcFile, attributes, ns, name);
-
-        this.gkey = gkey;
-        this.declaredType = dtype;
-        this.value = value;
-    }
-}
-
-class MIRFunctionDecl extends MIRNSMemberDecl {
-    readonly fkey: MIRFunctionKey;
-    readonly invoke: MIRInvokeDecl;
-
-    constructor(sinfo: SourceInfo, srcFile: string, fkey: MIRGlobalKey, attributes: string[], ns: string, name: string, invoke: MIRInvokeDecl) {
-        super(sinfo, srcFile, attributes, ns, name);
-
-        this.fkey = fkey;
-        this.invoke = invoke;
     }
 }
 
@@ -356,55 +282,6 @@ class MIRRecordType extends MIRStructuralType {
     }
 }
 
-class MIRFunctionTypeParam {
-    readonly name: string;
-    readonly isOptional: boolean;
-    readonly type: MIRType;
-
-    constructor(name: string, isOptional: boolean, type: MIRType) {
-        this.name = name;
-        this.isOptional = isOptional;
-        this.type = type;
-    }
-}
-
-class MIRFunctionType extends MIRStructuralType {
-    readonly params: MIRFunctionTypeParam[];
-    readonly optRestParamName: string | undefined;
-    readonly optRestParamType: MIRType | undefined;
-    readonly resultType: MIRType;
-
-    readonly allParamNames: Set<string>;
-
-    constructor(rstr: string, params: MIRFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: MIRType | undefined, resultType: MIRType, allParamNames: Set<string>) {
-        super(rstr);
-        this.params = params;
-        this.optRestParamName = optRestParamName;
-        this.optRestParamType = optRestParamType;
-        this.resultType = resultType;
-
-        this.allParamNames = new Set<string>();
-    }
-
-    static create(params: MIRFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: MIRType | undefined, resultType: MIRType): MIRFunctionType {
-        let cvalues: string[] = [];
-        let allNames = new Set<string>();
-        params.forEach((param) => {
-            if (param.name !== "_") {
-                allNames.add(param.name);
-            }
-            cvalues.push(param.name + (param.isOptional ? "?: " : ": ") + param.type.trkey);
-        });
-        let cvalue = cvalues.join(", ");
-
-        if (optRestParamName !== undefined && optRestParamType !== undefined) {
-            cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.trkey));
-        }
-
-        return new MIRFunctionType("(" + cvalue + ") -> " + resultType.trkey, params, optRestParamName, optRestParamType, resultType, allNames);
-    }
-}
-
 class MIRType {
     readonly trkey: MIRResolvedTypeKey;
     readonly options: MIRTypeOption[];
@@ -434,13 +311,8 @@ class MIRAssembly {
     readonly srcFiles: { relativePath: string, contents: string }[];
     readonly srcHash: string;
 
-    readonly globalDecls: Map<MIRGlobalKey, MIRGlobalDecl> = new Map<MIRGlobalKey, MIRGlobalDecl>();
-    readonly constDecls: Map<MIRConstKey, MIRConstDecl> = new Map<MIRConstKey, MIRConstDecl>();
-
-    readonly functionDecls: Map<MIRFunctionKey, MIRFunctionDecl> = new Map<MIRFunctionKey, MIRFunctionDecl>();
-    readonly staticDecls: Map<MIRStaticKey, MIRStaticDecl> = new Map<MIRStaticKey, MIRStaticDecl>();
-    readonly methodDecls: Map<MIRMethodKey, MIRMethodDecl> = new Map<MIRMethodKey, MIRMethodDecl>();
-    readonly lambdaDecls: Map<MIRLambdaKey, MIRInvokeDecl> = new Map<MIRLambdaKey, MIRInvokeDecl>();
+    readonly constantDecls: Map<MIRConstantKey, MIRConstantDecl> = new Map<MIRConstantKey, MIRConstantDecl>();
+    readonly invokeDecls: Map<MIRInvokeKey, MIRInvokeDecl> = new Map<MIRInvokeKey, MIRInvokeDecl>();
 
     readonly memberFields: Map<MIRFieldKey, MIRFieldDecl> = new Map<MIRFieldKey, MIRFieldDecl>();
 
@@ -548,51 +420,6 @@ class MIRAssembly {
         }
 
         return true;
-    }
-
-    private atomSubtypeOf_FunctionFunction(t1: MIRFunctionType, t2: MIRFunctionType): boolean {
-        //Then this is definitely not ok
-        if (t2.optRestParamType !== undefined && t1.optRestParamType === undefined) {
-            return false;
-        }
-
-        if (t2.optRestParamType !== undefined && !this.subtypeOf(t2.optRestParamType, t1.optRestParamType as MIRType)) {
-            return false;
-        }
-
-        for (let i = 0; i < t2.params.length; ++i) {
-            const t2p = t2.params[i];
-
-            if (i >= t1.params.length) {
-                if (t1.optRestParamType !== undefined) {
-                    return false;
-                }
-                else {
-                    //TODO: we should type check that the type is assignable to the rest option
-                }
-            }
-            else {
-                const t1p = t1.params[i];
-                if ((t2p.isOptional && !t1p.isOptional) || !this.subtypeOf(t2p.type, t1p.type)) {
-                    return false;
-                }
-            }
-
-            //check that if t2p is named then t1p has the same name
-            if (t2.params[i].name !== "_") {
-                if (t1.params.length <= i || t2.params[i].name === t1.params[i].name) {
-                    return false;
-                }
-            }
-        }
-
-        //t1 has a required parameter that is not required in t2
-        if (t1.params.length > t2.params.length && t1.params.slice(t2.params.length).some((param) => !param.isOptional)) {
-            return false;
-        }
-
-        //co-variant is cool
-        return this.subtypeOf(t1.resultType, t2.resultType);
     }
 
     private atomSubtypeOf(t1: MIRTypeOption, t2: MIRTypeOption): boolean {
@@ -725,11 +552,10 @@ class MIRAssembly {
 }
 
 export {
-    MIRFunctionParameter, MIRInvokeDecl,
+    MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl,
     MIROOMemberDecl, MIRConstDecl, MIRStaticDecl, MIRFieldDecl, MIRMethodDecl,
     MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl,
-    MIRNSMemberDecl, MIRGlobalDecl, MIRFunctionDecl,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
-    MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRFunctionTypeParam, MIRFunctionType,
+    MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,
     PackageConfig, MIRAssembly
 };
