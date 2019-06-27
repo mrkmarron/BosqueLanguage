@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { Value, ValueOps, ListValue, FloatValue, RegexValue, LambdaValue, CollectionValue, MapValue, TupleValue } from "./value";
+import { Value, ValueOps, ListValue, FloatValue, RegexValue, CollectionValue, MapValue, TupleValue } from "./value";
 import { raiseRuntimeErrorIf } from "./interpreter_environment";
 import { MIRAssembly, MIRInvokeDecl, MIRType, MIREntityType, MIREntityTypeDecl, MIRTupleTypeEntry, MIRTupleType } from "../compiler/mir_assembly";
 

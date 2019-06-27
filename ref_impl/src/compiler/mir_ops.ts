@@ -6,12 +6,11 @@
 import { SourceInfo } from "../ast/parser";
 import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
 
-type MIRTypeKey = string; //ns::name#binds
 type MIRConstantKey = string; //ns::[type]::const#binds
 type MIRFieldKey = string; //ns::name::field#binds
-type MIRPCodeKey = string; //fresh
 type MIRInvokeKey = string; //ns::[type]::func#binds%code
 
+type MIRNominalTypeKey = string; //ns::name#binds
 type MIRResolvedTypeKey = string; //idstr
 type MIRVirtualMethodKey = string; //method#binds
 
@@ -121,10 +120,6 @@ class MIRConstantString extends MIRConstantArgument {
         return this.value;
     }
 }
-
-//
-//TODO: enum here for copy prop etc.
-//
 
 enum MIROpTag {
     MIRLoadConst = "MIRLoadConst",
@@ -251,10 +246,10 @@ class MIRLoadConst extends MIRValueOp {
 
 class MIRLoadConstTypedString extends MIRValueOp {
     readonly ivalue: string;
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
     readonly tskey: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRTypeKey, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         super(MIROpTag.MIRLoadConstTypedString, sinfo, trgt);
         this.ivalue = ivalue;
         this.tkey = tkey;
@@ -329,10 +324,10 @@ class MIRAccessLocalVariable extends MIRValueOp {
 }
 
 class MIRConstructorPrimary extends MIRValueOp {
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
     args: MIRArgument[];
 
-    constructor(sinfo: SourceInfo, tkey: MIRTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimary, sinfo, trgt);
         this.tkey = tkey;
         this.args = args;
@@ -346,9 +341,9 @@ class MIRConstructorPrimary extends MIRValueOp {
 }
 
 class MIRConstructorPrimaryCollectionEmpty extends MIRValueOp {
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
 
-    constructor(sinfo: SourceInfo, tkey: MIRTypeKey, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimaryCollectionEmpty, sinfo, trgt);
         this.tkey = tkey;
     }
@@ -361,10 +356,10 @@ class MIRConstructorPrimaryCollectionEmpty extends MIRValueOp {
 }
 
 class MIRConstructorPrimaryCollectionSingletons extends MIRValueOp {
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
     args: MIRArgument[];
 
-    constructor(sinfo: SourceInfo, tkey: MIRTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimaryCollectionSingletons, sinfo, trgt);
         this.tkey = tkey;
         this.args = args;
@@ -378,10 +373,10 @@ class MIRConstructorPrimaryCollectionSingletons extends MIRValueOp {
 }
 
 class MIRConstructorPrimaryCollectionCopies extends MIRValueOp {
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
     args: MIRArgument[];
 
-    constructor(sinfo: SourceInfo, tkey: MIRTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimaryCollectionCopies, sinfo, trgt);
         this.tkey = tkey;
         this.args = args;
@@ -395,10 +390,10 @@ class MIRConstructorPrimaryCollectionCopies extends MIRValueOp {
 }
 
 class MIRConstructorPrimaryCollectionMixed extends MIRValueOp {
-    readonly tkey: MIRTypeKey;
+    readonly tkey: MIRNominalTypeKey;
     args: [boolean, MIRArgument][];
 
-    constructor(sinfo: SourceInfo, tkey: MIRTypeKey, args: [boolean, MIRArgument][], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: [boolean, MIRArgument][], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimaryCollectionMixed, sinfo, trgt);
         this.tkey = tkey;
         this.args = args;
@@ -579,9 +574,9 @@ class MIRProjectFromTypeRecord extends MIRValueOp {
 
 class MIRProjectFromTypeConcept extends MIRValueOp {
     arg: MIRArgument;
-    readonly ctypes: MIRTypeKey[];
+    readonly ctypes: MIRNominalTypeKey[];
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, ctypes: MIRTypeKey[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, arg: MIRArgument, ctypes: MIRNominalTypeKey[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRProjectFromTypeConcept, sinfo, trgt);
         this.arg = arg;
         this.ctypes = ctypes;
@@ -1143,9 +1138,9 @@ class MIRBody {
     readonly file: string;
     readonly sinfo: SourceInfo;
 
-    body: string | Map<string, MIRBasicBlock>;
+    body: Map<string, MIRBasicBlock>;
 
-    constructor(file: string, sinfo: SourceInfo, body: string | Map<string, MIRBasicBlock>) {
+    constructor(file: string, sinfo: SourceInfo, body: Map<string, MIRBasicBlock>) {
         this.file = file;
         this.sinfo = sinfo;
         this.body = body;
@@ -1205,7 +1200,7 @@ class MIRBody {
 }
 
 export {
-    MIRTypeKey, MIRConstantKey, MIRFieldKey, MIRPCodeKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
+    MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVarParameter, MIRVarLocal, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstTypedString,

@@ -776,7 +776,7 @@ class Parser {
         const line = this.getCurrentLine();
 
         const ltype = this.parseBaseTypeReference();
-        if (!this.testToken("+")) {
+        if (!this.testToken("&")) {
             return ltype;
         }
         else {

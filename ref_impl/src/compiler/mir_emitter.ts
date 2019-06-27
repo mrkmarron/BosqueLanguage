@@ -555,6 +555,51 @@ class MIREmitter {
         this.pendingLambdaProcessing.push([lkey, invoke, capturedMap, binds, rsig]);
     }
 
+    private closeConceptDecl(cpt: MIRConceptTypeDecl) {
+        cpt.provides.forEach((tkey) => {
+            const ccdecl = this.conceptMap.get(tkey) as MIRConceptTypeDecl;
+            this.closeConceptDecl(ccdecl);
+
+            ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
+            ccdecl.fieldMap.forEach((fd, name) => cpt.fieldMap.set(name, fd));
+            ccdecl.vcallMap.forEach((vcall, vcname) => cpt.vcallMap.set(vcname, vcall));
+        });
+
+        cpt.memberFields.forEach((fd) => {
+            if (fd.attributes.indexOf("abstract") === -1) {
+                cpt.fieldMap.set(fd.name, fd);
+            }
+        });
+
+        cpt.memberMethods.forEach((vm) => {
+            if (vm.attributes.indexOf("abstract") === -1) {
+                cpt.vcallMap.set(vm.vkey, vm);
+            }
+        });
+    }
+
+    private closeEntityDecl(entity: MIREntityTypeDecl) {
+        entity.provides.forEach((tkey) => {
+            const ccdecl = this.conceptMap.get(tkey) as MIRConceptTypeDecl;
+            this.closeConceptDecl(ccdecl);
+
+            ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));
+            ccdecl.fieldMap.forEach((fd, name) => entity.fieldMap.set(name, fd));
+            ccdecl.vcallMap.forEach((vcall, vcname) => entity.vcallMap.set(vcname, vcall));
+        });
+
+        entity.memberFields.forEach((fd) => {
+            entity.fieldMap.set(fd.name, fd);
+        });
+
+        entity.memberMethods.forEach((vm) => {
+            entity.vcallMap.set(vm.vkey, vm);
+        });
+
+        entity.fieldMap.forEach((v, f) => entity.fieldLayout.push(f));
+        entity.fieldLayout.sort();
+    }
+
     static generateMASM(pckge: PackageConfig, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
         ////////////////
         //Parse the contents and generate the assembly
