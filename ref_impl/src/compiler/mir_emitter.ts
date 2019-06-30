@@ -4,10 +4,10 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRTypeKey, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVarParameter, MIRVarLocal, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRParameterStore, MIRInvokeVirtualFunction } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
-import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIRFunctionType, MIRFunctionParameter, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType } from "./mir_assembly";
+import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIRFunctionParameter, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType } from "./mir_assembly";
 
 import * as Crypto from "crypto";
 import { TypeChecker } from "../type_checker/type_checker";
@@ -40,7 +40,7 @@ class MIRKeyGenerator {
         return "[" + pcodes.map((pc) => `${pc.code.srcFile}%${pc.code.sourceLocation.line}%${pc.code.sourceLocation.column}`).join(",") + "]";
     }
 
-    static generateTypeKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>): MIRTypeKey {
+    static generateTypeKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>): MIRResolvedTypeKey {
         return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
     }
 
@@ -49,11 +49,11 @@ class MIRKeyGenerator {
     }
 
     static generateConstKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): MIRConstantKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
+        return `${MIRKeyGenerator.generateTypeKey(t, binds)}::${name}`;
     }
 
     static generateFieldKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): MIRFieldKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
+        return `${MIRKeyGenerator.generateTypeKey(t, binds)}.${name}`;
     }
 
     static generateFunctionKey(ns: string, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
@@ -90,7 +90,7 @@ class MIRBodyEmitter {
         this.m_blockMap.set("entry", new MIRBasicBlock("entry", []));
         this.m_blockMap.set("exit", new MIRBasicBlock("exit", []));
 
-        (this.m_blockMap.get("exit") as MIRBasicBlock).ops.push(new MIRVarStore(new SourceInfo(-1, 0, 0, 0), new MIRVarLocal("_ir_ret_"), new MIRVarLocal("_return_")));
+        (this.m_blockMap.get("exit") as MIRBasicBlock).ops.push(new MIRVarStore(new SourceInfo(-1, 0, 0, 0), new MIRVariable("__ir_ret__"), new MIRVariable("_return_")));
 
         this.m_currentBlock = (this.m_blockMap.get("entry") as MIRBasicBlock).ops;
     }
@@ -350,12 +350,12 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    getBody(file: string, sinfo: SourceInfo, args: string[], captured: string[]): MIRBody {
+    getBody(file: string, sinfo: SourceInfo, args: string[]): MIRBody {
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);
-        convertBodyToSSA(ibody, args, captured);
+        convertBodyToSSA(ibody, args);
 
         return ibody;
     }

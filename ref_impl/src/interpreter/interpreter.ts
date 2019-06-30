@@ -4,9 +4,9 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { Value, TypedStringValue, EntityValueSimple, ValueOps, ListValue, HashSetValue, HashMapValue, TupleValue, RecordValue } from "./value";
-import { Environment, PrePostError, raiseRuntimeError, FunctionScope, InvariantError, NotImplementedRuntimeError } from "./interpreter_environment";
+import { Environment, PrePostError, raiseRuntimeError, FunctionScope, InvariantError, NotImplementedRuntimeError, raiseRuntimeErrorIf } from "./interpreter_environment";
 import { MIRAssembly, MIRTupleType, MIRTupleTypeEntry, MIRRecordTypeEntry, MIRRecordType, MIREntityType, MIREntityTypeDecl, MIRFieldDecl, MIROOTypeDecl, MIRType, MIRConceptTypeDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRConstantDecl } from "../compiler/mir_assembly";
-import { MIRBody, MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRTempRegister, MIRRegisterArgument, MIRConstantTrue, MIRConstantString, MIRConstantInt, MIRConstantNone, MIRConstantFalse, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRAccessFromField, MIRProjectFromProperties, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRJump, MIRJumpCond, MIRJumpNone, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRTruthyConvert, MIRDebug, MIRPhi, MIRVarLocal, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue } from "../compiler/mir_ops";
+import { MIRBody, MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRTempRegister, MIRRegisterArgument, MIRConstantTrue, MIRConstantString, MIRConstantInt, MIRConstantNone, MIRConstantFalse, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRAccessFromField, MIRProjectFromProperties, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRJump, MIRJumpCond, MIRJumpNone, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRTruthyConvert, MIRDebug, MIRPhi, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRVariable } from "../compiler/mir_ops";
 
 import * as assert from "assert";
 import { BuiltinCalls, BuiltinCallSig } from "./builtins";
@@ -528,65 +528,31 @@ class Interpreter {
                 fscope.assignTmpReg(so.trgt.regID, evalue);
                 break;
             }
-            
-            case MIROpTag.CallNamespaceFunction: {
-                const fc = op as MIRCallNamespaceFunction;
-                const fdecl = this.m_env.assembly.functionDecls.get(fc.fkey) as MIRFunctionDecl;
+            case MIROpTag.MIRInvokeFixedFunction: {
+                const fc = op as MIRInvokeFixedFunction;
+                const idecl = (this.m_env.assembly.invokeDecls.get(fc.mkey) || this.m_env.assembly.primitiveInvokeDecls.get(fc.mkey)) as MIRInvokeDecl;
                 let args = new Map<string, Value>();
-                for (let i = 0; i < fdecl.invoke.params.length; ++i) {
-                    args.set(fdecl.invoke.params[i].name, this.getArgValue(fscope, fc.args[i]));
+                for (let i = 0; i < idecl.params.length; ++i) {
+                    args.set(idecl.params[i].name, this.getArgValue(fscope, fc.args[i]));
                 }
-                if (fdecl.invoke.optRestName !== undefined) {
-                    args.set(fdecl.invoke.optRestName, this.getArgValue(fscope, fc.args[fdecl.invoke.params.length]));
-                }
-                fscope.assignTmpReg(fc.trgt.regID, this.evaluateMirBody(fdecl.invoke, args));
-                break;
-            }
-            case MIROpTag.CallStaticFunction: {
-                const fc = op as MIRCallStaticFunction;
-                const fdecl = this.m_env.assembly.staticDecls.get(fc.skey) as MIRStaticDecl;
-                let args = new Map<string, Value>();
-                for (let i = 0; i < fdecl.invoke.params.length; ++i) {
-                    args.set(fdecl.invoke.params[i].name, this.getArgValue(fscope, fc.args[i]));
-                }
-                if (fdecl.invoke.optRestName !== undefined) {
-                    args.set(fdecl.invoke.optRestName, this.getArgValue(fscope, fc.args[fdecl.invoke.params.length]));
-                }
-                fscope.assignTmpReg(fc.trgt.regID, this.evaluateMirBody(fdecl.invoke, args));
-                break;
-            }
-            case MIROpTag.MIRInvokeKnownTarget: {
-                const invk = op as MIRInvokeKnownTarget;
-                const fdecl = this.m_env.assembly.methodDecls.get(invk.mkey) as MIRMethodDecl;
-                let args = new Map<string, Value>();
-                for (let i = 0; i < fdecl.invoke.params.length; ++i) {
-                    args.set(fdecl.invoke.params[i].name, this.getArgValue(fscope, invk.args[i]));
-                }
-                if (fdecl.invoke.optRestName !== undefined) {
-                    args.set(fdecl.invoke.optRestName, this.getArgValue(fscope, invk.args[fdecl.invoke.params.length]));
-                }
-                fscope.assignTmpReg(invk.trgt.regID, this.evaluateMirBody(fdecl.invoke, args));
+                fscope.assignTmpReg(fc.trgt.regID, this.evaluateMirBody(idecl, args));
                 break;
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
-                const invk = op as MIRInvokeVirtualTarget;
+                const invk = op as MIRInvokeVirtualFunction;
                 const tvalue = this.getArgValue(fscope, invk.args[0]);
-                const ttype = ValueOps.getValueType(tvalue).options[0] as MIREntityType;
+                const ttype = this.m_env.assembly.entityDecls.get(ValueOps.getValueType(tvalue).trkey) as MIREntityTypeDecl;
 
-                const edecl = this.m_env.assembly.entityMap.get(ttype.ekey) as MIREntityTypeDecl;
-                const fdecl = edecl.vcallMap.get(invk.vresolve) as MIRMethodDecl;
+                const fkey = ttype.vcallMap.get(invk.vresolve) as MIRInvokeKey;
+                const idecl = (this.m_env.assembly.invokeDecls.get(fkey) || this.m_env.assembly.primitiveInvokeDecls.get(fkey)) as MIRInvokeDecl;
 
                 let args = new Map<string, Value>();
-                for (let i = 0; i < fdecl.invoke.params.length; ++i) {
-                    args.set(fdecl.invoke.params[i].name, this.getArgValue(fscope, invk.args[i]));
+                for (let i = 0; i < idecl.params.length; ++i) {
+                    args.set(idecl.params[i].name, this.getArgValue(fscope, invk.args[i]));
                 }
-                if (fdecl.invoke.optRestName !== undefined) {
-                    args.set(fdecl.invoke.optRestName, this.getArgValue(fscope, invk.args[fdecl.invoke.params.length]));
-                }
-                fscope.assignTmpReg(invk.trgt.regID, this.evaluateMirBody(fdecl.invoke, args));
+                fscope.assignTmpReg(invk.trgt.regID, this.evaluateMirBody(idecl, args));
                 break;
             }
-
             case MIROpTag.MIRPrefixOp: {
                 const pfx = op as MIRPrefixOp;
                 const pvalue = this.getArgValue(fscope, pfx.arg);
@@ -659,8 +625,7 @@ class Interpreter {
             case MIROpTag.MIRIsTypeOf: {
                 const tog = op as MIRIsTypeOf;
                 const argv = this.getArgValue(fscope, tog.arg);
-                const istype = this.m_env.assembly.typeMap.get(tog.oftype) as MIRType;
-                fscope.assignTmpReg(tog.trgt.regID, this.m_env.assembly.subtypeOf(ValueOps.getValueType(argv), istype));
+                fscope.assignTmpReg(tog.trgt.regID, this.m_env.assembly.subtypeOf(ValueOps.getValueType(argv).trkey, tog.oftype));
                 break;
             }
             case MIROpTag.MIRRegAssign: {
@@ -735,7 +700,7 @@ class Interpreter {
                     fscope.assignTmpReg(pop.trgt.regID, this.getArgValue(fscope, uvar));
                 }
                 else {
-                    assert(pop.trgt instanceof MIRVarLocal);
+                    assert(pop.trgt instanceof MIRVariable);
 
                     fscope.assignVar(pop.trgt.nameID, this.getArgValue(fscope, uvar));
                 }
@@ -775,14 +740,16 @@ class Interpreter {
     }
 
     evaluateRootNamespaceCall(ns: string, func: string, cargs: Value[]): Value {
-        const fdecl = this.m_env.assembly.functionDecls.get(`${ns}::${func}`) as MIRFunctionDecl;
+        const idecl = (this.m_env.assembly.invokeDecls.get(`${ns}::${func}`) || this.m_env.assembly.primitiveInvokeDecls.get(`${ns}::${func}`)) as MIRInvokeDecl;
+        raiseRuntimeErrorIf(idecl === undefined);
+        raiseRuntimeErrorIf(idecl.params.length !== cargs.length);
 
         let args = new Map<string, Value>();
-        for (let i = 0; i < fdecl.invoke.params.length; ++i) {
-            args.set(fdecl.invoke.params[i].name, cargs[i]);
+        for (let i = 0; i < idecl.params.length; ++i) {
+            args.set(idecl.params[i].name, cargs[i]);
         }
 
-        return this.evaluateMirBody(fdecl.invoke, args);
+        return this.evaluateMirBody(idecl, args);
     }
 }
 

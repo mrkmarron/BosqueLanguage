@@ -42,13 +42,7 @@ class MIRTempRegister extends MIRRegisterArgument {
     }
 }
 
-class MIRVarParameter extends MIRRegisterArgument {
-    constructor(name: string) {
-        super(name);
-    }
-}
-
-class MIRVarLocal extends MIRRegisterArgument {
+class MIRVariable extends MIRRegisterArgument {
     readonly lname: string;
 
     constructor(name: string, forcename?: string) {
@@ -171,7 +165,6 @@ enum MIROpTag {
     MIRTruthyConvert = "MIRTruthyConvert",
     MIRLogicStore = "MIRLogicStore",
     MIRVarStore = "MIRVarStore",
-    MIRParameterStore = "MIRParameterStore",
     MIRReturnAssign = "MIRReturnAssign",
 
     MIRAbort = "MIRAbort",
@@ -294,9 +287,9 @@ class MIRLoadFieldDefaultValue extends MIRValueOp {
 }
 
 class MIRAccessArgVariable extends MIRValueOp {
-    readonly name: MIRVarParameter;
+    readonly name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, name: MIRVarParameter, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, name: MIRVariable, trgt: MIRTempRegister) {
         super(MIROpTag.MIRAccessArgVariable, sinfo, trgt);
         this.name = name;
     }
@@ -309,9 +302,9 @@ class MIRAccessArgVariable extends MIRValueOp {
 }
 
 class MIRAccessLocalVariable extends MIRValueOp {
-    name: MIRVarLocal;
+    name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, name: MIRVarLocal, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, name: MIRVariable, trgt: MIRTempRegister) {
         super(MIROpTag.MIRAccessLocalVariable, sinfo, trgt);
         this.name = name;
     }
@@ -906,28 +899,10 @@ class MIRLogicStore extends MIRFlowOp {
 
 class MIRVarStore extends MIRFlowOp {
     src: MIRArgument;
-    name: MIRVarLocal;
+    name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRVarLocal) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRVariable) {
         super(MIROpTag.MIRVarStore, sinfo);
-        this.src = src;
-        this.name = name;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.name.stringify()} = ${this.src.stringify()}`;
-    }
-}
-
-class MIRParameterStore extends MIRFlowOp {
-    src: MIRArgument;
-    name: MIRVarParameter;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRVarParameter) {
-        super(MIROpTag.MIRParameterStore, sinfo);
         this.src = src;
         this.name = name;
     }
@@ -942,12 +917,12 @@ class MIRParameterStore extends MIRFlowOp {
 
 class MIRReturnAssign extends MIRFlowOp {
     src: MIRArgument;
-    name: MIRVarLocal;
+    name: MIRVariable;
 
     constructor(sinfo: SourceInfo, src: MIRArgument) {
         super(MIROpTag.MIRReturnAssign, sinfo);
         this.src = src;
-        this.name = new MIRVarLocal("_ir_ret_");
+        this.name = new MIRVariable("__ir_ret__");
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
@@ -1089,9 +1064,9 @@ class MIRJumpNone extends MIRJumpOp {
 
 class MIRPhi extends MIRFlowOp {
     src: Map<string, MIRRegisterArgument>;
-    trgt: MIRTempRegister | MIRVarLocal;
+    trgt: MIRRegisterArgument;
 
-    constructor(sinfo: SourceInfo, src: Map<string, MIRRegisterArgument>, trgt: MIRTempRegister | MIRVarLocal) {
+    constructor(sinfo: SourceInfo, src: Map<string, MIRRegisterArgument>, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRPhi, sinfo);
         this.src = src;
         this.trgt = trgt;
@@ -1201,7 +1176,7 @@ class MIRBody {
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVarParameter, MIRVarLocal, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstTypedString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
@@ -1210,7 +1185,7 @@ export {
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
     MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
-    MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRParameterStore, MIRReturnAssign,
+    MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign,
     MIRAbort, MIRDebug,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRPhi,

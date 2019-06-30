@@ -9,9 +9,9 @@ import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } 
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRTypeKey, MIRVirtualMethodKey, MIRRegisterArgument, MIRVarLocal, MIRVarParameter } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRFunctionDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIREntityType, MIRStaticDecl, MIRGlobalDecl, MIRConstDecl, MIRMethodDecl, MIROOTypeDecl } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIREntityType, MIROOTypeDecl } from "../compiler/mir_assembly";
 
 class TypeError extends Error {
     readonly file: string;
@@ -574,14 +574,14 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, vinfo.declaredType instanceof ResolvedFunctionType, "Cannot capture function typed argument");
 
             if (scope === "local") {
-                captured.set(v, new MIRVarLocal(v));
+                captured.set(v, new MIRVariable(v));
             }
             else if (scope === "arg") {
-                captured.set(v, new MIRVarParameter(v));
+                captured.set(v, new MIRVariable(v));
             }
             else {
                 //captured get remapped to parameters during de-functionalization
-                captured.set(v, new MIRVarParameter(v));
+                captured.set(v, new MIRVariable(v));
             }
             capturedMap.set(v, vinfo.flowType);
         });
@@ -1022,12 +1022,7 @@ class TypeChecker {
             const cnames = [...allcaptured].sort();
             if (this.m_emitEnabled) {
                 for (let i = 0; i < cnames.length; ++i) {
-                    if (env.lookupVarScope(cnames[i]) === "local") {
-                        margs.push(new MIRVarLocal(cnames[i]));
-                    }
-                    else {
-                        margs.push(new MIRVarParameter(cnames[i]));
-                    }
+                    margs.push(new MIRVariable(cnames[i]));
                 }
             }
         }

@@ -104,7 +104,12 @@ class FunctionScope {
     }
 
     assignVar(name: string, value: Value) {
-        this.m_locals.set(name, value);
+        if (this.m_locals.has(name)) {
+            this.m_locals.set(name, value);
+        }
+        else {
+            this.m_args.set(name, value);
+        }
     }
 
     clearVar(name: string) {
