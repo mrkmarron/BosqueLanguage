@@ -531,7 +531,7 @@ class MIRAssembly {
 }
 
 export {
-    MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRFieldDecl,
+    MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
     MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
     MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,
