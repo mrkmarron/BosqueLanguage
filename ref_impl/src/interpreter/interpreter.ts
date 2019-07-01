@@ -254,7 +254,7 @@ class Interpreter {
             case MIROpTag.MIRConstructorPrimary: {
                 const cp = op as MIRConstructorPrimary;
                 const ctype = this.m_env.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
-                const fvals = cp.args.map<[string, Value]>((arg, i) => [ctype.fields[i][0], this.getArgValue(fscope, arg)]);
+                const fvals = cp.args.map<[string, Value]>((arg, i) => [ctype.fields[i].name, this.getArgValue(fscope, arg)]);
                 const evalue = new EntityValueSimple(MIREntityType.create(cp.tkey), fvals);
                 if (this.m_doInvariantCheck) {
                     this.checkInvariants(ctype, evalue);
@@ -410,7 +410,7 @@ class Interpreter {
                 const pc = op as MIRProjectFromTypeConcept;
                 const arg = this.getArgValue(fscope, pc.arg) as EntityValueSimple;
                 const projectfields = new Set<string>();
-                pc.ctypes.map((ckey) => this.m_env.assembly.conceptDecls.get(ckey) as MIRConceptTypeDecl).forEach((cdecl) => cdecl.fields.forEach((v, k) => projectfields.add(v[0])));
+                pc.ctypes.map((ckey) => this.m_env.assembly.conceptDecls.get(ckey) as MIRConceptTypeDecl).forEach((cdecl) => cdecl.fields.forEach((v, k) => projectfields.add(v.name)));
 
                 let rentries: MIRRecordTypeEntry[] = [];
                 let rvalues: [string, Value][] = [];

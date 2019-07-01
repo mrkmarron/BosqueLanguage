@@ -2409,6 +2409,7 @@ class Parser {
         const pragmas = this.parseDeclPragmas();
         const attributes = this.parseAttributes();
 
+        const sinfo = this.getCurrentSrcInfo();
         this.ensureAndConsumeToken("concept");
         this.ensureToken(TokenStrings.Type);
 
@@ -2436,7 +2437,7 @@ class Parser {
             }
 
             this.clearRecover();
-            currentDecl.concepts.set(cname, new ConceptTypeDecl(this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+            currentDecl.concepts.set(cname, new ConceptTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
             this.m_penv.assembly.addConceptDecl(currentDecl.ns + "::" + cname, currentDecl.concepts.get(cname) as ConceptTypeDecl);
         }
         catch (ex) {
@@ -2451,6 +2452,7 @@ class Parser {
         const pragmas = this.parseDeclPragmas();
         const attributes = this.parseAttributes();
 
+        const sinfo = this.getCurrentSrcInfo();
         this.ensureAndConsumeToken("entity");
         this.ensureToken(TokenStrings.Type);
 
@@ -2478,7 +2480,7 @@ class Parser {
             }
 
             this.clearRecover();
-            currentDecl.concepts.set(cname, new EntityTypeDecl(this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods, false, false));
+            currentDecl.concepts.set(cname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods, false, false));
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + cname, currentDecl.concepts.get(cname) as EntityTypeDecl);
         }
         catch (ex) {

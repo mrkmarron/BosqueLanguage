@@ -9,9 +9,9 @@ import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } 
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIREntityType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRPCode, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRTupleType, MIRTupleTypeEntry } from "../compiler/mir_assembly";
 
 class TypeError extends Error {
     readonly file: string;
@@ -98,8 +98,10 @@ class TypeChecker {
         }
     }
 
-    private checkInvokeDecl(sinfo: SourceInfo, invoke: InvokeDecl, invokeBinds: Map<string, ResolvedType>) {
+    private checkInvokeDecl(sinfo: SourceInfo, invoke: InvokeDecl, invokeBinds: Map<string, ResolvedType>, pcodes: PCode[]) {
         this.raiseErrorIf(sinfo, invoke.optRestType !== undefined && invoke.params.some((param) => param.isOptional), "Cannot have optional and rest parameters in an invocation signature");
+
+        this.raiseErrorIf(sinfo, invoke.recursive === "no" && pcodes.some((pc) => pc.code.recursive === "yes"), "Recursive decl does not match use");
 
         const allNames = new Set<string>();
         if (invoke.optRestName !== undefined && invoke.optRestName !== "_") {
@@ -3214,8 +3216,8 @@ class TypeChecker {
         try {
             this.m_file = tdecl.srcFile;
 
-            let terms = new Map<string, MIRType>();
-            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
+            let terms = new Map<string, MIRResolvedTypeKey>();
+            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType).trkey));
 
             const provides = tdecl.provides.map((provide) => {
                 const ptype = this.resolveAndEnsureTypeOnly(new SourceInfo(0, 0, 0, 0), provide, binds);
@@ -3227,37 +3229,41 @@ class TypeChecker {
 
             const invariants = tdecl.invariants.map((inv) => {
                 const thistype = ResolvedType.createSingle(tdecl instanceof EntityTypeDecl ? ResolvedEntityAtomType.create(tdecl, binds) : ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(tdecl as ConceptTypeDecl, binds)]));
-                const invenv = TypeEnvironment.createInitialEnvForCall(binds, new Map<string, VarInfo>().set("this", new VarInfo(thistype, true, true, thistype)));
+                const invenv = TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>().set("this", new VarInfo(thistype, true, true, thistype)));
                 return this.checkExpressionAsBody(invenv, inv, this.m_assembly.getSpecialBoolType());
             });
 
             //
-            //TODO: we need to check inheritance and provies rules here -- diamonds, virtual/abstract/override use, etc.
+            //TODO: we need to check inheritance and provides rules here -- diamonds, virtual/abstract/override use, etc.
             //
 
             const fields: MIRFieldDecl[] = [];
             tdecl.memberFields.forEach((f) => {
                 const fkey = MIRKeyGenerator.generateFieldKey(tdecl, binds, f.name);
-                const ckey = MIRKeyGenerator.generateTypeKey(tdecl, binds);
+                const fpragmas = this.processPragmas(f.sourceLocation, f.pragmas);
                 const dtypeResolved = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
                 const dtype = this.m_emitter.registerResolvedTypeReference(dtypeResolved);
                 let value = undefined;
                 if (f.value !== undefined) {
-                    value = this.checkExpressionAsBody(TypeEnvironment.createInitialEnvForCall(binds, new Map<string, VarInfo>()), f.value, dtypeResolved);
+                    value = this.checkExpressionAsBody(TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>()), f.value, dtypeResolved);
                 }
 
-                const mfield = new MIRFieldDecl(f.sourceLocation, f.srcFile, fkey, f.attributes, f.name, ckey, dtype, value);
+                const fname = `${tdecl.ns}::${tdecl.name}.${f.name}`;
+                const mfield = new MIRFieldDecl(fname, f.sourceLocation, f.srcFile, fkey, fpragmas, f.name, dtype.trkey, value);
                 fields.push(mfield);
-                this.m_emitter.masm.memberFields.set(fkey, mfield);
+                this.m_emitter.masm.fieldDecls.set(fkey, mfield);
             });
 
+            const ooname = `${tdecl.ns}::${tdecl.name}`;
+            const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
+
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(tkey, tdecl.srcFile, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), invariants, fields, (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
-                this.m_emitter.masm.entityMap.set(tkey, mirentity);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
+                this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(tkey, tdecl.srcFile, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), invariants, fields);
-                this.m_emitter.masm.conceptMap.set(tkey, mirconcept);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields);
+                this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
         catch (ex) {
@@ -3292,7 +3298,7 @@ class TypeChecker {
             const enclosingType = MIRKeyGenerator.generateTypeKey(containingDecl, binds);
             const ddecltype = this.resolveAndEnsureTypeOnly(cdecl.sourceLocation, cdecl.declaredType, binds);
             const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
-            const vbody = this.checkExpressionAsBody(TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>()), cdecl.value, ddecltype);
+            const vbody = this.checkExpressionAsBody(TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>()), cdecl.value as Expression, ddecltype);
 
             const mirconst = new MIRConstantDecl(`${enclosingType}::${cdecl.name}`, ckey, pragmas, cdecl.sourceLocation, cdecl.srcFile, dtype.trkey, vbody);
             this.m_emitter.masm.constantDecls.set(ckey, mirconst);
@@ -3303,18 +3309,25 @@ class TypeChecker {
         }
     }
 
-    private processInvokeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
-        this.checkInvokeDecl(sinfo, invoke, binds);
+    private processInvokeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, rcvr: ResolvedType | undefined, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+        this.checkInvokeDecl(sinfo, invoke, binds, pcodes);
 
         let terms = new Map<string, MIRType>();
         invoke.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
 
+        const recursive = invoke.recursive === "yes" || (invoke.recursive === "cond" && pcodes.some((pc) => pc.code.recursive === "yes"));
         const pragmas = this.processPragmas(invoke.sourceLocation, invoke.pragmas);
 
         let cargs = new Map<string, VarInfo>();
         let fargs = new Map<string, { pcode: PCode, captured: string[] }>();
         let argsNames: string[] = [];
         let params: MIRFunctionParameter[] = [];
+
+        if (rcvr !== undefined) {
+            const mtype = this.m_emitter.registerResolvedTypeReference(rcvr);
+            params.push(new MIRFunctionParameter("this", mtype.trkey));
+        }
+
         invoke.params.forEach((p) => {
             const pdecltype = this.m_assembly.normalizeTypeGeneral(p.type, binds);
             if (pdecltype instanceof ResolvedFunctionType) {
@@ -3323,7 +3336,7 @@ class TypeChecker {
             }
             else {
                 const ptype = p.isOptional ? this.m_assembly.typeUnion([pdecltype, this.m_assembly.getSpecialNoneType()]) : pdecltype;
-                cargs.set(p.name, new VarInfo(ptype, true, true, ptype));
+                cargs.set(p.name, new VarInfo(ptype, !p.isRef, true, ptype));
                 argsNames.push(p.name);
 
                 const mtype = this.m_emitter.registerResolvedTypeReference(ptype);
@@ -3347,17 +3360,19 @@ class TypeChecker {
             params.push(new MIRFunctionParameter(pargs[i][0], ctype.trkey));
         }
 
-xxxx; //update this to handle ref parameter multi return
-
         const resolvedResult = this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, binds);
-        const resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
+        let resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
+        if (invoke.params.some((p) => p.isRef)) {
+            const pout = invoke.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(this.resolveAndEnsureTypeOnly(sinfo, p.type, binds)));
+            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt.trkey, false))).trkey);
+        }
 
         const env = TypeEnvironment.createInitialEnvForCall(binds, fargs, cargs);
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
             let mpc = new Map<string, MIRPCode>();
             fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured] }));
 
-            return new MIRInvokePrimitiveDecl(iname, ikey, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
+            return new MIRInvokePrimitiveDecl(iname, ikey, recursive, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
         }
         else {
             const preargs = new Map<string, VarInfo>(cargs);
@@ -3375,19 +3390,22 @@ xxxx; //update this to handle ref parameter multi return
             const mirbody = this.checkBody(env, invoke.body as BodyImplementation, argsNames, resolvedResult);
             this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
 
-            return new MIRInvokeBodyDecl(iname, ikey, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, preconds, postconds, mirbody);
+            return new MIRInvokeBodyDecl(iname, ikey, recursive, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, preconds, postconds, mirbody as MIRBody);
         }
     }
 
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = f.srcFile;
-            const invinfo = this.processInvokeInfo(f.sourceLocation, f.invoke, binds);
+            const iname = `${f.ns}::${f.name}`;
+            const invinfo = this.processInvokeInfo(iname, fkey, f.sourceLocation, f.invoke, undefined, binds, pcodes, cargs);
 
-            const invoke = MIRInvokeDecl.createStaticInvokeDecl(f.sourceLocation, f.srcFile, invinfo.terms, invinfo.params, invinfo.orname, invinfo.ortype, invinfo.rtype, invinfo.preconds, invinfo.postconds, invinfo.mbody);
-
-            const mirfunc = new MIRFunctionDecl(f.sourceLocation, f.srcFile, fkey, f.attributes, f.ns, f.name, invoke);
-            this.m_emitter.masm.functionDecls.set(fkey, mirfunc);
+            if (invinfo instanceof MIRInvokePrimitiveDecl) {
+                this.m_emitter.masm.primitiveInvokeDecls.set(fkey, invinfo);
+            }
+            else {
+                this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
+            }
         }
         catch (ex) {
             this.m_emitEnabled = false;
@@ -3395,71 +3413,18 @@ xxxx; //update this to handle ref parameter multi return
         }
     }
 
-    processLambdaFunction(lkey: MIRLambdaKey, invoke: InvokeDecl, captured: Map<string, ResolvedType>, binds: Map<string, ResolvedType>, rsig: ResolvedFunctionAtomType) {
+    processLambdaFunction(lkey: MIRInvokeKey, invoke: InvokeDecl, binds: Map<string, ResolvedType>, cargs: [string, ResolvedType][]) {
         try {
             this.m_file = invoke.srcFile;
-            let captureEnv = new Map<string, VarInfo>();
-            let captureNames: string[] = [];
-            let captureInfo = new Map<string, MIRType>();
-            captured.forEach((v, k) => {
-                captureEnv.set(k, new VarInfo(v, true, true, v));
-                captureNames.push(k);
+            const iname = `fn::${invoke.sourceLocation.line}`;
+            const invinfo = this.processInvokeInfo(iname, lkey, invoke.sourceLocation, invoke, undefined, binds, [], cargs);
 
-                const ci = this.m_emitter.registerResolvedTypeReference(v);
-                captureInfo.set(k, ci);
-            });
-
-            this.raiseErrorIf(invoke.sourceLocation, invoke.optRestType !== undefined && invoke.params.some((param) => param.isOptional), "Cannot have optional and rest parameters in an invocation signature");
-            const allNames = new Set<string>();
-            if (invoke.optRestName !== undefined && invoke.optRestName !== "_") {
-                allNames.add(invoke.optRestName);
+            if (invinfo instanceof MIRInvokePrimitiveDecl) {
+                this.m_emitter.masm.primitiveInvokeDecls.set(lkey, invinfo);
             }
-            for (let i = 0; i < invoke.params.length; ++i) {
-                if (invoke.params[i].name !== "_") {
-                    this.raiseErrorIf(invoke.sourceLocation, allNames.has(invoke.params[i].name), `Duplicate name in invocation signature paramaters "${invoke.params[i].name}"`);
-                    allNames.add(invoke.params[i].name);
-                }
+            else {
+                this.m_emitter.masm.invokeDecls.set(lkey, invinfo as MIRInvokeBodyDecl);
             }
-
-            const firstOptIndex = invoke.params.findIndex((param) => param.isOptional);
-            if (firstOptIndex !== -1) {
-                for (let i = firstOptIndex; i < invoke.params.length; ++i) {
-                    this.raiseErrorIf(invoke.sourceLocation, !invoke.params[i].isOptional, "Cannot have required paramaters following optional parameters");
-                }
-            }
-
-            let cargs = new Map<string, VarInfo>();
-            let argsNames: string[] = [];
-            let params: MIRFunctionParameter[] = [];
-            for (let i = 0; i < invoke.params.length; ++i) {
-                const pdecltype = rsig.params[i].type;
-                const ptype = invoke.params[i].isOptional ? this.m_assembly.typeUnion([pdecltype, this.m_assembly.getSpecialNoneType()]) : pdecltype;
-                cargs.set(invoke.params[i].name, new VarInfo(ptype, true, true, ptype));
-                argsNames.push(invoke.params[i].name);
-
-                const mtype = this.m_emitter.registerResolvedTypeReference(pdecltype);
-                params.push(new MIRFunctionParameter(invoke.params[i].name, mtype, invoke.params[i].isOptional));
-            }
-
-            let optRestName: string | undefined = undefined;
-            let optRestType: MIREntityType | undefined = undefined;
-            if (invoke.optRestType !== undefined) {
-                const rtype = rsig.optRestParamType as ResolvedType;
-                cargs.set(invoke.optRestName as string, new VarInfo(rtype, true, true, rtype));
-                argsNames.push(invoke.optRestName as string);
-
-                optRestName = invoke.optRestName as string;
-                optRestType = this.m_emitter.registerResolvedTypeReference(rtype).options[0] as MIREntityType;
-            }
-
-            const resolvedResult = rsig.resultType as ResolvedType;
-            const resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
-
-            const env = TypeEnvironment.createInitialEnvForCall(binds, cargs, captureEnv);
-            const mbody = this.checkBody(env, invoke.body as BodyImplementation, argsNames, captureNames, resolvedResult);
-
-            const mirlambda = MIRInvokeDecl.createLambdaInvokeDecl(invoke.sourceLocation, invoke.srcFile, params, optRestName, optRestType, resultType, captureInfo, mbody as MIRBody);
-            this.m_emitter.masm.lambdaDecls.set(lkey, mirlambda);
         }
         catch (ex) {
             this.m_emitEnabled = false;
@@ -3467,15 +3432,18 @@ xxxx; //update this to handle ref parameter multi return
         }
     }
 
-    processStaticFunction(skey: MIRStaticKey, ctype: OOPTypeDecl, sfdecl: StaticFunctionDecl, binds: Map<string, ResolvedType>) {
+    processStaticFunction(skey: MIRInvokeKey, ctype: OOPTypeDecl, sfdecl: StaticFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = sfdecl.srcFile;
-            const invinfo = this.processInvokeInfo(sfdecl.sourceLocation, sfdecl.invoke, binds);
-            const invoke = MIRInvokeDecl.createStaticInvokeDecl(sfdecl.sourceLocation, sfdecl.srcFile, invinfo.terms, invinfo.params, invinfo.orname, invinfo.ortype, invinfo.rtype, invinfo.preconds, invinfo.postconds, invinfo.mbody);
+            const iname = `${ctype.ns}::${ctype.name}::${sfdecl.name}`;
+            const invinfo = this.processInvokeInfo(iname, skey, sfdecl.sourceLocation, sfdecl.invoke, undefined, binds, pcodes, cargs);
 
-            const enckey = MIRKeyGenerator.generateTypeKey(ctype, binds);
-            const mirfunc = new MIRStaticDecl(sfdecl.sourceLocation, sfdecl.srcFile, skey, sfdecl.attributes, sfdecl.name, enckey, invoke);
-            this.m_emitter.masm.staticDecls.set(skey, mirfunc);
+            if (invinfo instanceof MIRInvokePrimitiveDecl) {
+                this.m_emitter.masm.primitiveInvokeDecls.set(skey, invinfo);
+            }
+            else {
+                this.m_emitter.masm.invokeDecls.set(skey, invinfo as MIRInvokeBodyDecl);
+            }
         }
         catch (ex) {
             this.m_emitEnabled = false;
@@ -3483,22 +3451,27 @@ xxxx; //update this to handle ref parameter multi return
         }
     }
 
-    processMethodFunction(vkey: MIRVirtualMethodKey, mkey: MIRMethodKey, ctype: OOPTypeDecl, cbinds: Map<string, ResolvedType>, mdecl: MemberMethodDecl, binds: Map<string, ResolvedType>) {
+    processMethodFunction(vkey: MIRVirtualMethodKey, mkey: MIRInvokeKey, ctype: OOPTypeDecl, cbinds: Map<string, ResolvedType>, mdecl: MemberMethodDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
-            if (this.m_emitter.masm.methodDecls.has(mkey)) {
-                return;
+            this.m_file = mdecl.srcFile;
+            const iname = `${ctype.ns}::${ctype.name}->${mdecl.name}`;
+            const rcvr = this.resolveAndEnsureTypeOnly(mdecl.sourceLocation, ctype, cbinds);
+            const invinfo = this.processInvokeInfo(iname, mkey, mdecl.sourceLocation, mdecl.invoke, rcvr, binds, pcodes, cargs);
+
+            if (invinfo instanceof MIRInvokePrimitiveDecl) {
+                this.m_emitter.masm.primitiveInvokeDecls.set(mkey, invinfo);
+            }
+            else {
+                this.m_emitter.masm.invokeDecls.set(mkey, invinfo as MIRInvokeBodyDecl);
             }
 
-            this.m_file = mdecl.srcFile;
-            const invinfo = this.processInvokeInfo(mdecl.sourceLocation, mdecl.invoke, binds);
-            const invoke = MIRInvokeDecl.createMemberInvokeDecl(mdecl.sourceLocation, mdecl.srcFile, invinfo.terms, invinfo.params, invinfo.orname, invinfo.ortype, invinfo.rtype, invinfo.preconds, invinfo.postconds, invinfo.mbody);
-
-            const enckey = MIRKeyGenerator.generateTypeKey(ctype, cbinds);
-            const mirfunc = new MIRMethodDecl(mdecl.sourceLocation, mdecl.srcFile, vkey, mkey, mdecl.attributes, mdecl.name, enckey, invoke);
-            this.m_emitter.masm.methodDecls.set(mkey, mirfunc);
-
-            const tdecl = (this.m_emitter.masm.entityMap.get(enckey) || this.m_emitter.masm.conceptMap.get(enckey)) as MIROOTypeDecl;
-            tdecl.memberMethods.push(mirfunc);
+            const tkey = MIRKeyGenerator.generateTypeKey(ctype, cbinds);
+            if (ctype instanceof EntityTypeDecl) {
+                (this.m_emitter.masm.entityDecls.get(tkey) as MIROOTypeDecl).vcallMap.set(vkey, mkey);
+            }
+            else {
+                (this.m_emitter.masm.conceptDecls.get(tkey) as MIROOTypeDecl).vcallMap.set(vkey, mkey);
+            }
         }
         catch (ex) {
             this.m_emitEnabled = false;

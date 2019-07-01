@@ -48,18 +48,20 @@ abstract class MIRInvokeDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
+    readonly recursive: boolean;
     readonly pragmas: [MIRNominalTypeKey, string][];
 
     readonly params: MIRFunctionParameter[];
     readonly resultType: MIRResolvedTypeKey;
 
-    constructor(iname: string, key: MIRInvokeKey, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey) {
         this.iname = iname;
         this.key = key;
 
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
+        this.recursive = recursive;
         this.pragmas = pragmas;
 
         this.params = params;
@@ -73,8 +75,8 @@ class MIRInvokeBodyDecl extends MIRInvokeDecl {
 
     readonly body: MIRBody;
 
-    constructor(iname: string, key: MIRInvokeKey, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
-        super(iname, key, pragmas, sinfo, srcFile, params, resultType);
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
+        super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.preconditions = preconds;
         this.postconditions = postconds;
@@ -92,8 +94,8 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     readonly implkey: string;
     readonly pcodes: Map<string, MIRPCode>;
 
-    constructor(iname: string, key: MIRInvokeKey, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
-        super(iname, key, pragmas, sinfo, srcFile, params, resultType);
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
+        super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.implkey = implkey;
         this.pcodes = pcodes;
@@ -143,14 +145,11 @@ class MIROOTypeDecl {
     readonly terms: Map<string, MIRNominalTypeKey>;
     readonly provides: MIRNominalTypeKey[];
 
-    readonly isCollectionEntityType: boolean;
-    readonly isMapEntityType: boolean;
-
     readonly invariants: MIRBody[] = [];
-    readonly fields: [string, MIRFieldKey][] = [];
+    readonly fields: MIRFieldDecl[] = [];
     readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], isCollectionEntityType: boolean, isMapEntityType: boolean) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         this.ooname = ooname;
         this.tkey = tkey;
 
@@ -164,14 +163,14 @@ class MIROOTypeDecl {
         this.terms = terms;
         this.provides = provides;
 
-        this.isCollectionEntityType = isCollectionEntityType;
-        this.isMapEntityType = isMapEntityType;
+        this.invariants = invariants;
+        this.fields = fields;
     }
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[]) {
-        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, false, false);
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
+        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
     }
 }
 
@@ -179,11 +178,17 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly isEnum: boolean;
     readonly isKey: boolean;
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
-        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, isCollectionEntityType, isMapEntityType);
+    readonly isCollectionEntityType: boolean;
+    readonly isMapEntityType: boolean;
+
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
+        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
 
         this.isEnum = isEnum;
         this.isKey = isKey;
+
+        this.isCollectionEntityType = isCollectionEntityType;
+        this.isMapEntityType = isMapEntityType;
     }
 }
 

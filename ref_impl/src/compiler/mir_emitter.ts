@@ -375,8 +375,8 @@ class MIREmitter {
     private readonly pendingFunctionProcessing: [MIRInvokeKey, NamespaceFunctionDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly pendingLambdaProcessing: [MIRInvokeKey, InvokeDecl, Map<string, ResolvedType>, Map<string, ResolvedType>, ResolvedFunctionType, PCode[], [string, ResolvedType][]][] = [];
 
-    private readonly entityInstantiationInfo: [MIRTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
-    private readonly allVInvokes: [MIRVirtualMethodKey, MIRTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], ResolvedType[]][] = [];
+    private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
+    private readonly allVInvokes: [MIRVirtualMethodKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], ResolvedType[]][] = [];
 
     private constructor(masm: MIRAssembly) {
         this.masm = masm;
@@ -386,12 +386,12 @@ class MIREmitter {
         this.bodyEmitter.initialize();
     }
 
-    getVCallInstantiations(assembly: Assembly): [MIRVirtualMethodKey, MIRTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], ResolvedType[]][] | undefined {
+    getVCallInstantiations(assembly: Assembly): [MIRVirtualMethodKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], ResolvedType[]][] | undefined {
         if (this.allVInvokes.length === 0) {
             return undefined;
         }
 
-        let resvi = new Map<string, [MIRVirtualMethodKey, MIRMethodKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>]>();
+        let resvi = new Map<string, [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>]>();
         for (let i = 0; i < this.allVInvokes.length; ++i) {
             const vinv = this.allVInvokes[i];
 
@@ -626,7 +626,7 @@ class MIREmitter {
         nslist.forEach((nsentry) => {
             nsentry.functions.forEach((f) => {
                 if (f.attributes.indexOf("entrypoint") !== -1) {
-                    emitter.registerFunctionCall(f.ns, f.name, f, new Map<string, ResolvedType>());
+                    emitter.registerFunctionCall(f.ns, f.name, f, new Map<string, ResolvedType>(), [], []);
                 }
             });
         });
@@ -642,23 +642,23 @@ class MIREmitter {
                     emitter.pendingOOStaticProcessing.length !== 0 || emitter.pendingOOMethodProcessing.length !== 0) {
 
                     while (emitter.pendingOOProcessing.length !== 0) {
-                        const tt = emitter.pendingOOProcessing.pop() as [MIRTypeKey, OOPTypeDecl, Map<string, ResolvedType>];
+                        const tt = emitter.pendingOOProcessing.pop() as [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>];
                         checker.processOOType(...tt);
                     }
 
                     while (emitter.pendingGlobalProcessing.length !== 0 || emitter.pendingConstProcessing.length !== 0) {
                         if (emitter.pendingGlobalProcessing.length !== 0) {
-                            const pg = emitter.pendingGlobalProcessing.pop() as [MIRGlobalKey, NamespaceConstDecl];
+                            const pg = emitter.pendingGlobalProcessing.pop() as [MIRConstantKey, NamespaceConstDecl];
                             checker.processGlobal(...pg);
                         }
                         if (emitter.pendingConstProcessing.length !== 0) {
-                            const pc = emitter.pendingConstProcessing.pop() as [MIRConstKey, OOPTypeDecl, StaticMemberDecl, Map<string, ResolvedType>];
+                            const pc = emitter.pendingConstProcessing.pop() as [MIRConstantKey, OOPTypeDecl, StaticMemberDecl, Map<string, ResolvedType>];
                             checker.processConst(...pc);
                         }
                     }
 
                     if (emitter.pendingFunctionProcessing.length !== 0) {
-                        const pf = emitter.pendingFunctionProcessing.pop() as [MIRInvokeKey, NamespaceFunctionDecl, Map<string, ResolvedType>, PCode[], ResolvedType[]];
+                        const pf = emitter.pendingFunctionProcessing.pop() as [MIRInvokeKey, NamespaceFunctionDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]];
                         checker.processNamespaceFunction(...pf);
                     }
                     else if (emitter.pendingLambdaProcessing.length !== 0) {
@@ -666,11 +666,11 @@ class MIREmitter {
                         checker.processLambdaFunction(...lf);
                     }
                     else if (emitter.pendingOOStaticProcessing.length !== 0) {
-                        const sf = emitter.pendingOOStaticProcessing.pop() as [MIRStaticKey, OOPTypeDecl, StaticFunctionDecl, Map<string, ResolvedType>];
+                        const sf = emitter.pendingOOStaticProcessing.pop() as [MIRInvokeKey, OOPTypeDecl, StaticFunctionDecl, Map<string, ResolvedType>];
                         checker.processStaticFunction(...sf);
                     }
                     else if (emitter.pendingOOMethodProcessing.length !== 0) {
-                        const mf = emitter.pendingOOMethodProcessing.pop() as [MIRVirtualMethodKey, MIRMethodKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>];
+                        const mf = emitter.pendingOOMethodProcessing.pop() as [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]];
                         checker.processMethodFunction(...mf);
                     }
                     else {
