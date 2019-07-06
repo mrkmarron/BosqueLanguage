@@ -3452,9 +3452,14 @@ class TypeChecker {
     }
 
     processMethodFunction(vkey: MIRVirtualMethodKey, mkey: MIRInvokeKey, ctype: OOPTypeDecl, cbinds: Map<string, ResolvedType>, mdecl: MemberMethodDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
+        if (this.m_emitter.masm.primitiveInvokeDecls.has(mkey) || this.m_emitter.masm.invokeDecls.has(mkey)) {
+            return;
+        }
+
         try {
             this.m_file = mdecl.srcFile;
             const iname = `${ctype.ns}::${ctype.name}->${mdecl.name}`;
+
             const rcvr = this.resolveAndEnsureTypeOnly(mdecl.sourceLocation, ctype, cbinds);
             const invinfo = this.processInvokeInfo(iname, mkey, mdecl.sourceLocation, mdecl.invoke, rcvr, binds, pcodes, cargs);
 
