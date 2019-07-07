@@ -92,12 +92,14 @@ type MIRPCode = {
 
 class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     readonly implkey: string;
+    readonly binds: Map<string, MIRResolvedTypeKey>;
     readonly pcodes: Map<string, MIRPCode>;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, binds: Map<string, MIRResolvedTypeKey>,  params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
         super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.implkey = implkey;
+        this.binds = binds;
         this.pcodes = pcodes;
     }
 }

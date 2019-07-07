@@ -3372,7 +3372,10 @@ class TypeChecker {
             let mpc = new Map<string, MIRPCode>();
             fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured] }));
 
-            return new MIRInvokePrimitiveDecl(iname, ikey, recursive, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
+            let mbinds = new Map<string, MIRResolvedTypeKey>();
+            binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
+
+            return new MIRInvokePrimitiveDecl(iname, ikey, recursive, pragmas, sinfo, invoke.srcFile, mbinds, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
         }
         else {
             const preargs = new Map<string, VarInfo>(cargs);

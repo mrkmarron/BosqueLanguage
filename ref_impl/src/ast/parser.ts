@@ -71,7 +71,6 @@ const SymbolStrings = [
     "}",
     "{|",
     "|}",
-    "@{",
 
     "#",
     "&",
@@ -112,7 +111,7 @@ const SymbolStrings = [
     "?->"
 ].sort((a, b) => { return (a.length !== b.length) ? (b.length - a.length) : a.localeCompare(b); });
 
-const LeftScanParens = ["[", "(", "{", "{|", "@{"];
+const LeftScanParens = ["[", "(", "{", "{|"];
 const RightScanParens = ["]", ")", "}", "|}"];
 
 const AttributeStrings = ["hidden", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
@@ -1124,7 +1123,7 @@ class Parser {
 
     private parseConstructorPrimary(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
-        const args = this.parseArguments("@{", "}");
+        const args = this.parseArguments("{", "}");
 
         return new ConstructorPrimaryExpression(sinfo, otype, args);
     }
@@ -1302,7 +1301,7 @@ class Parser {
             else if (this.testFollows("@", TokenStrings.Identifier)) {
                 return this.parseConstructorPrimaryWithFactory(ttype);
             }
-            else if (this.testToken("@{")) {
+            else if (this.testToken("{")) {
                 return this.parseConstructorPrimary(ttype);
             }
             else {

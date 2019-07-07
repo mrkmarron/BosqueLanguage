@@ -155,7 +155,9 @@ function runAll() {
 
     runner.addSet(Regressions.testRegression);
 
-    Apps.tests.forEach((test) => runner.addSet(test));
+    //
+    //Apps.tests.forEach((test) => runner.addSet(test));
+    //
 
     runner.run();
 }

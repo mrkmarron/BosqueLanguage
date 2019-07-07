@@ -7,7 +7,7 @@ import { SourceInfo, Parser } from "../ast/parser";
 import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
-import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType } from "./mir_assembly";
+import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl } from "./mir_assembly";
 
 import * as Crypto from "crypto";
 import { TypeChecker } from "../type_checker/type_checker";
@@ -376,7 +376,7 @@ class MIREmitter {
     private readonly pendingPCodeProcessing: [MIRInvokeKey, InvokeDecl, Map<string, ResolvedType>, [string, ResolvedType][]][] = [];
 
     private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
-    private readonly allVInvokes: [MIRVirtualMethodKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
+    private readonly allVInvokes: [MIRVirtualMethodKey, MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
 
     private constructor(masm: MIRAssembly) {
         this.masm = masm;
@@ -395,7 +395,7 @@ class MIREmitter {
         for (let i = 0; i < this.allVInvokes.length; ++i) {
             const vinv = this.allVInvokes[i];
 
-            const vcpt = ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(vinv[1] as ConceptTypeDecl, vinv[2])]));
+            const vcpt = ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(vinv[2] as ConceptTypeDecl, vinv[3])]));
             const impls = this.entityInstantiationInfo.filter((iinfo) => {
                 if (iinfo[1] instanceof EntityTypeDecl) {
                     const etype = ResolvedType.createSingle(ResolvedEntityAtomType.create(iinfo[1] as EntityTypeDecl, iinfo[2]));
@@ -412,14 +412,14 @@ class MIREmitter {
                 const impl = impls[j];
                 const itype = ResolvedType.createSingle(ResolvedEntityAtomType.create(impl[1] as EntityTypeDecl, impl[2]));
 
-                const mcreate = assembly.tryGetOOMemberDeclUnique(itype, "method", vinv[3]);
+                const mcreate = assembly.tryGetOOMemberDeclUnique(itype, "method", vinv[4]);
                 if (mcreate !== undefined) {
                     const binds = new Map<string, ResolvedType>(mcreate.binds);
-                    vinv[4].forEach((v, k) => binds.set(k, v));
+                    vinv[5].forEach((v, k) => binds.set(k, v));
 
-                    const mkey = MIRKeyGenerator.generateMethodKey(mcreate.contiainingType, (mcreate.decl as MemberMethodDecl).name, mcreate.binds, vinv[5]);
+                    const mkey = MIRKeyGenerator.generateMethodKey(mcreate.contiainingType, (mcreate.decl as MemberMethodDecl).name, mcreate.binds, vinv[6]);
                     if (!resvi.has(mkey)) {
-                        resvi.set(mkey, [vinv[0], mkey, mcreate.contiainingType, mcreate.binds, mcreate.decl as MemberMethodDecl, binds as Map<string, ResolvedType>, vinv[5], vinv[6]]);
+                        resvi.set(mkey, [vinv[0], mkey, mcreate.contiainingType, mcreate.binds, mcreate.decl as MemberMethodDecl, binds as Map<string, ResolvedType>, vinv[6], vinv[7]]);
                     }
                 }
             }
@@ -543,47 +543,46 @@ class MIREmitter {
 
     private closeConceptDecl(cpt: MIRConceptTypeDecl) {
         cpt.provides.forEach((tkey) => {
-            const ccdecl = this.conceptMap.get(tkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
-            ccdecl.fieldMap.forEach((fd, name) => cpt.fieldMap.set(name, fd));
-            ccdecl.vcallMap.forEach((vcall, vcname) => cpt.vcallMap.set(vcname, vcall));
-        });
 
-        cpt.memberFields.forEach((fd) => {
-            if (fd.attributes.indexOf("abstract") === -1) {
-                cpt.fieldMap.set(fd.name, fd);
-            }
-        });
+            ccdecl.fields.forEach((fd) => {
+                if (cpt.fields.findIndex((ff) => ff.name === fd.name) === -1) {
+                    cpt.fields.push(fd);
+                }
+            });
 
-        cpt.memberMethods.forEach((vm) => {
-            if (vm.attributes.indexOf("abstract") === -1) {
-                cpt.vcallMap.set(vm.vkey, vm);
-            }
+            ccdecl.vcallMap.forEach((vcall, vcname) => {
+                if (!cpt.vcallMap.has(vcname)) {
+                    cpt.vcallMap.set(vcname, vcall);
+                }
+            });
         });
     }
 
     private closeEntityDecl(entity: MIREntityTypeDecl) {
         entity.provides.forEach((tkey) => {
-            const ccdecl = this.conceptMap.get(tkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));
-            ccdecl.fieldMap.forEach((fd, name) => entity.fieldMap.set(name, fd));
-            ccdecl.vcallMap.forEach((vcall, vcname) => entity.vcallMap.set(vcname, vcall));
+
+            ccdecl.fields.forEach((fd) => {
+                if (entity.fields.findIndex((ff) => ff.name === fd.name) === -1) {
+                    entity.fields.push(fd);
+                }
+            });
+
+            ccdecl.vcallMap.forEach((vcall, vcname) => {
+                if (!entity.vcallMap.has(vcname)) {
+                    entity.vcallMap.set(vcname, vcall);
+                }
+            });
         });
 
-        entity.memberFields.forEach((fd) => {
-            entity.fieldMap.set(fd.name, fd);
-        });
-
-        entity.memberMethods.forEach((vm) => {
-            entity.vcallMap.set(vm.vkey, vm);
-        });
-
-        entity.fieldMap.forEach((v, f) => entity.fieldLayout.push(f));
-        entity.fieldLayout.sort();
+        entity.fields.sort((f1, f2) => f1.name.localeCompare(f2.name));
     }
 
     static generateMASM(pckge: PackageConfig, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {

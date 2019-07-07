@@ -344,7 +344,7 @@ class MIRConstructorPrimaryCollectionEmpty extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return []; }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}@{}`;
+        return `${this.trgt.stringify()} = ${this.tkey}{}`;
     }
 }
 
@@ -361,7 +361,7 @@ class MIRConstructorPrimaryCollectionSingletons extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}@{${this.args.map((arg) => arg.stringify()).join(", ")}}`;
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg.stringify()).join(", ")}}`;
     }
 }
 
@@ -378,7 +378,7 @@ class MIRConstructorPrimaryCollectionCopies extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}@{${this.args.map((arg) => `expand(${arg.stringify()})`).join(", ")}`;
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => `expand(${arg.stringify()})`).join(", ")}`;
     }
 }
 
@@ -395,7 +395,7 @@ class MIRConstructorPrimaryCollectionMixed extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.args.map((tv) => tv[1])); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}@{${this.args.map((arg) => arg[0] ? `expand(${arg[1].stringify()})` : arg[1].stringify()).join(", ")}`;
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg[0] ? `expand(${arg[1].stringify()})` : arg[1].stringify()).join(", ")}`;
     }
 }
 
@@ -410,7 +410,7 @@ class MIRConstructorTuple extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = @[${this.args.map((arg) => arg.stringify()).join(", ")}]`;
+        return `${this.trgt.stringify()} = [${this.args.map((arg) => arg.stringify()).join(", ")}]`;
     }
 }
 
@@ -425,7 +425,7 @@ class MIRConstructorRecord extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.args.map((tv) => tv[1])); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = @{${this.args.map((arg) => `${arg[0]}=${arg[1].stringify()}`).join(", ")}}`;
+        return `${this.trgt.stringify()} = {${this.args.map((arg) => `${arg[0]}=${arg[1].stringify()}`).join(", ")}}`;
     }
 }
 
@@ -493,7 +493,7 @@ class MIRProjectFromProperties extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.arg.stringify()}@{${this.properties.join(", ")}}`;
+        return `${this.trgt.stringify()} = ${this.arg.stringify()}{${this.properties.join(", ")}}`;
     }
 }
 
@@ -527,7 +527,7 @@ class MIRProjectFromFields extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.arg.stringify()}@{${this.fields.join(", ")}}`;
+        return `${this.trgt.stringify()} = ${this.arg.stringify()}{${this.fields.join(", ")}}`;
     }
 }
 
