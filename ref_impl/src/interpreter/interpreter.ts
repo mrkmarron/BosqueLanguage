@@ -742,11 +742,11 @@ class Interpreter {
     evaluateRootNamespaceCall(ns: string, func: string, cargs: Value[]): Value {
         const idecl = (this.m_env.assembly.invokeDecls.get(`${ns}::${func}`) || this.m_env.assembly.primitiveInvokeDecls.get(`${ns}::${func}`)) as MIRInvokeDecl;
         raiseRuntimeErrorIf(idecl === undefined);
-        raiseRuntimeErrorIf(idecl.params.length !== cargs.length);
+        raiseRuntimeErrorIf(idecl.params.length < cargs.length);
 
         let args = new Map<string, Value>();
         for (let i = 0; i < idecl.params.length; ++i) {
-            args.set(idecl.params[i].name, cargs[i]);
+            args.set(idecl.params[i].name, i < cargs.length ? cargs[i] : undefined);
         }
 
         return this.evaluateMirBody(idecl, args);

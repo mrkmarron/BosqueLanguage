@@ -1388,7 +1388,7 @@ class Parser {
             const sinfo = this.getCurrentSrcInfo();
 
             const tk = this.peekToken();
-           if (tk === "." || tk === "?.") {
+            if (tk === "." || tk === "?.") {
                 const isElvis = this.testToken("?.");
                 this.consumeToken();
 
@@ -1434,16 +1434,16 @@ class Parser {
                 this.ensureToken(TokenStrings.Identifier);
                 const name = this.consumeTokenAndGetValue();
 
-               if (SpecialInvokeNames.includes(name)) {
-                   this.handleSpecialCaseMethods(sinfo, isElvis, specificResolve, name);
-               }
-               else {
-                   const terms = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                   const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
-                   const args = this.parseArguments("(", ")");
+                if (SpecialInvokeNames.includes(name)) {
+                    ops.push(this.handleSpecialCaseMethods(sinfo, isElvis, specificResolve, name));
+                }
+                else {
+                    const terms = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                    const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
+                    const args = this.parseArguments("(", ")");
 
-                   ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, terms, pragmas, args));
-               }
+                    ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, terms, pragmas, args));
+                }
             }
             else {
                 if (ops.length === 0) {

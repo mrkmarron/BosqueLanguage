@@ -561,7 +561,7 @@ class Assembly {
     }
 
     private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedFunctionType | undefined {
-        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, param.isOptional, param.isRef, this.normalizeTypeOnly(param.type, binds)));
+        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, param.isOptional, param.isRef, this.normalizeTypeGeneral(param.type, binds)));
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeTypeOnly(t.optRestParamType, binds) : undefined;
         const resType = this.normalizeTypeOnly(t.resultType, binds);
 
@@ -1216,12 +1216,12 @@ class Assembly {
             }
 
             //We want the argument types to be the same for all cases -- no clear reason to overload to more general types
-            if (t2p instanceof ResolvedFunctionType && t1p instanceof ResolvedFunctionType) {
+            if (t2p.type instanceof ResolvedFunctionType && t1p.type instanceof ResolvedFunctionType) {
                 if (t2p.type.idStr !== t1p.type.idStr) {
                     return false;
                 }
             }
-            else if (t2p instanceof ResolvedType && t1p instanceof ResolvedType) {
+            else if (t2p.type instanceof ResolvedType && t1p.type instanceof ResolvedType) {
                 if (t2p.type.idStr !== t1p.type.idStr) {
                     return false;
                 }

@@ -373,7 +373,7 @@ class MIREmitter {
     private readonly pendingOOStaticProcessing: [MIRInvokeKey, OOPTypeDecl, StaticFunctionDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly pendingOOMethodProcessing: [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly pendingFunctionProcessing: [MIRInvokeKey, NamespaceFunctionDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
-    private readonly pendingPCodeProcessing: [MIRInvokeKey, InvokeDecl, Map<string, ResolvedType>, [string, ResolvedType][]][] = [];
+    private readonly pendingPCodeProcessing: [MIRInvokeKey, InvokeDecl, ResolvedFunctionType, Map<string, ResolvedType>, [string, ResolvedType][]][] = [];
 
     private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
     private readonly allVInvokes: [MIRVirtualMethodKey, MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
@@ -473,6 +473,8 @@ class MIREmitter {
                 rt = MIRRecordType.create((sopt as ResolvedRecordAtomType).isOpen, tatoms);
             }
 
+            this.masm.typeOptionMap.set(rt.trkey, rt);
+
             const ft = MIRType.create([(rt as MIRTypeOption).trkey]);
             this.masm.typeMap.set(ft.trkey, ft);
             return ft;
@@ -538,6 +540,16 @@ class MIREmitter {
         }
 
         this.allVInvokes.push([key, tkey, containingType, cbinds, name, binds, pcodes, cinfo]);
+        return key;
+    }
+
+    registerPCode(idecl: InvokeDecl, fsig: ResolvedFunctionType, binds: Map<string, ResolvedType>, cinfo: [string, ResolvedType][]): MIRInvokeKey {
+        const key = MIRKeyGenerator.generatePCodeKey(idecl);
+        if (this.masm.invokeDecls.has(key) || this.masm.primitiveInvokeDecls.has(key) || this.pendingPCodeProcessing.findIndex((fp) => fp[0] === key) !== -1) {
+            return key;
+        }
+
+        this.pendingPCodeProcessing.push([key, idecl, fsig, binds, cinfo]);
         return key;
     }
 
@@ -662,7 +674,7 @@ class MIREmitter {
                         checker.processNamespaceFunction(...pf);
                     }
                     else if (emitter.pendingPCodeProcessing.length !== 0) {
-                        const lf = emitter.pendingPCodeProcessing.pop() as [MIRInvokeKey, InvokeDecl, Map<string, ResolvedType>, [string, ResolvedType][]];
+                        const lf = emitter.pendingPCodeProcessing.pop() as [MIRInvokeKey, InvokeDecl, ResolvedFunctionType, Map<string, ResolvedType>, [string, ResolvedType][]];
                         checker.processLambdaFunction(...lf);
                     }
                     else if (emitter.pendingOOStaticProcessing.length !== 0) {

@@ -131,6 +131,31 @@ class TypeChecker {
         this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, invokeBinds);
     }
 
+    private checkPCodeDecl(sinfo: SourceInfo, fsig: ResolvedFunctionType) {
+        this.raiseErrorIf(sinfo, fsig.optRestParamType !== undefined && fsig.params.some((param) => param.isOptional), "Cannot have optional and rest parameters in an invocation signature");
+        this.raiseErrorIf(sinfo, fsig.recursive !== "no", "Recursive decl does not match use");
+
+        const allNames = new Set<string>();
+        if (fsig.optRestParamName !== undefined && fsig.optRestParamName !== "_") {
+            allNames.add(fsig.optRestParamName);
+        }
+        for (let i = 0; i < fsig.params.length; ++i) {
+            if (fsig.params[i].name !== "_") {
+                this.raiseErrorIf(sinfo, allNames.has(fsig.params[i].name), `Duplicate name in invocation signature paramaters "${fsig.params[i].name}"`);
+                allNames.add(fsig.params[i].name);
+            }
+        }
+
+        const firstOptIndex = fsig.params.findIndex((param) => param.isOptional);
+        if (firstOptIndex === -1) {
+            return;
+        }
+
+        for (let i = firstOptIndex; i < fsig.params.length; ++i) {
+            this.raiseErrorIf(sinfo, !fsig.params[i].isOptional, "Cannot have required paramaters following optional parameters");
+        }
+    }
+
     private checkRecursion(sinfo: SourceInfo, fsig: ResolvedFunctionType, pcodes: PCode[], crec: "yes" | "no" | "cond") {
         if ((fsig.recursive === "no" && crec === "no") || (fsig.recursive === "yes" && crec === "yes")) {
             return;
@@ -579,6 +604,8 @@ class TypeChecker {
             capturedMap.set(v, vinfo.flowType);
         });
 
+        this.m_emitter.registerPCode(exp.invoke, ltypetry as ResolvedFunctionType, env.terms, [...capturedMap].sort((a, b) => a[0].localeCompare(b[0])));
+
         return {code: exp.invoke, captured: capturedMap, ftype: ltypetry as ResolvedFunctionType};
     }
 
@@ -611,7 +638,7 @@ class TypeChecker {
                     eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
                 }
                 else {
-                    this.raiseErrorIf(arg.value.sinfo, !(arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
+                    this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
 
                     eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
                 }
@@ -3004,6 +3031,8 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, yinfo[1]);
+
+            this.m_emitter.bodyEmitter.setActiveBlock(yinfo[1]);
         }
 
         return env.setYield(this.m_assembly, venv.getExpressionResult().etype);
@@ -3309,7 +3338,7 @@ class TypeChecker {
         }
     }
 
-    private processInvokeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, rcvr: ResolvedType | undefined, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+    private processInvokeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
         this.checkInvokeDecl(sinfo, invoke, binds, pcodes);
 
         let terms = new Map<string, MIRType>();
@@ -3322,11 +3351,6 @@ class TypeChecker {
         let fargs = new Map<string, { pcode: PCode, captured: string[] }>();
         let argsNames: string[] = [];
         let params: MIRFunctionParameter[] = [];
-
-        if (rcvr !== undefined) {
-            const mtype = this.m_emitter.registerResolvedTypeReference(rcvr);
-            params.push(new MIRFunctionParameter("this", mtype.trkey));
-        }
 
         invoke.params.forEach((p) => {
             const pdecltype = this.m_assembly.normalizeTypeGeneral(p.type, binds);
@@ -3397,11 +3421,59 @@ class TypeChecker {
         }
     }
 
+    private processPCodeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, pci: InvokeDecl, binds: Map<string, ResolvedType>, fsig: ResolvedFunctionType, pargs: [string, ResolvedType][]): MIRInvokeDecl {
+        this.checkPCodeDecl(sinfo, fsig);
+
+        const pragmas = this.processPragmas(pci.sourceLocation, pci.pragmas);
+
+        let cargs = new Map<string, VarInfo>();
+        let fargs = new Map<string, { pcode: PCode, captured: string[] }>();
+        let argsNames: string[] = [];
+        let params: MIRFunctionParameter[] = [];
+
+        for (let i = 0; i < pci.params.length; ++i) {
+            const p = fsig.params[i];
+            const ptype = p.isOptional ? this.m_assembly.typeUnion([p.type as ResolvedType, this.m_assembly.getSpecialNoneType()]) : p.type as ResolvedType;
+            cargs.set(pci.params[i].name, new VarInfo(ptype, !p.isRef, true, ptype));
+            argsNames.push(pci.params[i].name);
+
+            const mtype = this.m_emitter.registerResolvedTypeReference(ptype);
+            params.push(new MIRFunctionParameter(pci.params[i].name, mtype.trkey));
+        }
+
+        if (fsig.optRestParamType !== undefined) {
+            cargs.set(pci.optRestName as string, new VarInfo(fsig.optRestParamType, true, true, fsig.optRestParamType));
+            argsNames.push(pci.optRestName as string);
+
+            const resttype = this.m_emitter.registerResolvedTypeReference(fsig.optRestParamType);
+            params.push(new MIRFunctionParameter(pci.optRestName as string, resttype.trkey));
+        }
+
+        for (let i = 0; i < pargs.length; ++i) {
+            argsNames.push(pargs[i][0]);
+
+            const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
+            params.push(new MIRFunctionParameter(pargs[i][0], ctype.trkey));
+        }
+
+        let resultType = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
+        if (fsig.params.some((p) => p.isRef)) {
+            const pout = fsig.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(p.type as ResolvedType));
+            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt.trkey, false))).trkey);
+        }
+
+        const env = TypeEnvironment.createInitialEnvForCall(binds, fargs, cargs);
+        const mirbody = this.checkBody(env, pci.body as BodyImplementation, argsNames, fsig.resultType);
+        this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
+
+        return new MIRInvokeBodyDecl(iname, ikey, false, pragmas, sinfo, pci.srcFile, params, resultType.trkey, [], [], mirbody as MIRBody);
+    }
+
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = f.srcFile;
             const iname = `${f.ns}::${f.name}`;
-            const invinfo = this.processInvokeInfo(iname, fkey, f.sourceLocation, f.invoke, undefined, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(iname, fkey, f.sourceLocation, f.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(fkey, invinfo);
@@ -3416,11 +3488,11 @@ class TypeChecker {
         }
     }
 
-    processLambdaFunction(lkey: MIRInvokeKey, invoke: InvokeDecl, binds: Map<string, ResolvedType>, cargs: [string, ResolvedType][]) {
+    processLambdaFunction(lkey: MIRInvokeKey, invoke: InvokeDecl, sigt: ResolvedFunctionType, binds: Map<string, ResolvedType>, cargs: [string, ResolvedType][]) {
         try {
             this.m_file = invoke.srcFile;
             const iname = `fn::${invoke.sourceLocation.line}`;
-            const invinfo = this.processInvokeInfo(iname, lkey, invoke.sourceLocation, invoke, undefined, binds, [], cargs);
+            const invinfo = this.processPCodeInfo(iname, lkey, invoke.sourceLocation, invoke, binds, sigt, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(lkey, invinfo);
@@ -3439,7 +3511,7 @@ class TypeChecker {
         try {
             this.m_file = sfdecl.srcFile;
             const iname = `${ctype.ns}::${ctype.name}::${sfdecl.name}`;
-            const invinfo = this.processInvokeInfo(iname, skey, sfdecl.sourceLocation, sfdecl.invoke, undefined, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(iname, skey, sfdecl.sourceLocation, sfdecl.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(skey, invinfo);
@@ -3462,9 +3534,7 @@ class TypeChecker {
         try {
             this.m_file = mdecl.srcFile;
             const iname = `${ctype.ns}::${ctype.name}->${mdecl.name}`;
-
-            const rcvr = this.resolveAndEnsureTypeOnly(mdecl.sourceLocation, ctype, cbinds);
-            const invinfo = this.processInvokeInfo(iname, mkey, mdecl.sourceLocation, mdecl.invoke, rcvr, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(iname, mkey, mdecl.sourceLocation, mdecl.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(mkey, invinfo);

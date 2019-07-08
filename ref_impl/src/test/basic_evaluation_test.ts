@@ -247,7 +247,7 @@ entrypoint function getFieldBailout(arg?: {f: Int}): Int? {
 }
 
 entrypoint function projectIndecies(): [Int] {
-    return [ 1, 2 ].1;
+    return [ 1, 2 ].[1];
 }
 
 entrypoint function projectIndeciesOpt(): [Int, Int?] {
@@ -801,14 +801,6 @@ entrypoint function createMapExpando(): Map<Int, Bool> {
     return HashMap<Int, Bool>{ [ 1, true ], ...HashMap<Int, Bool>{ [ 1, false ], [ 2, true ] }, [ 5, true ] };
 }
 
-entrypoint function invokee3func(): Int {
-    return E3{}->func(3);
-}
-
-entrypoint function invokee4func(): Bool {
-    return E4<Int>{}->func(3);
-}
-
 entrypoint function invokee3m1(): Int {
     return E3{}->m1(3);
 }
@@ -978,7 +970,7 @@ const expression_tests: TestInfo[] = [
     { name: "emptyRecord", input: ["emptyRecord"], expected: "{}" },
     { name: "oneRecord", input: ["oneRecord"], expected: "{ f=1 }" },
     { name: "fourRecord", input: ["fourRecord"], expected: "{ f=1, g=2, h=none, k=true }" },
-    { name: "nestedTuples", input: ["nestedTuples"], expected: "[ 1, @[ none, [] ] ]" },
+    { name: "nestedTuples", input: ["nestedTuples"], expected: "[ 1, [ none, [] ] ]" },
     { name: "nestedRecords", input: ["nestedRecords"], expected: "{ f=1, g={ f=2, h={} } }" },
     { name: "nestedTupleRecord", input: ["nestedTupleRecord"], expected: "[ 1, { f=1 } ]" },
     { name: "nestedRecordTuple", input: ["nestedRecordTuple"], expected: "{ f=1, g=[ 1 ] }" },
@@ -1142,8 +1134,6 @@ const expression_tests: TestInfo[] = [
     { name: "createMapOverlap", input: ["createMapOverlap"], expected: "NSCore::HashMap<K=NSCore::Int, V=NSCore::Bool>{ [ 1, true ], [ 2, true ] }" },
     { name: "createMapExpando", input: ["createMapExpando"], expected: "NSCore::HashMap<K=NSCore::Int, V=NSCore::Bool>{ [ 1, false ], [ 2, true ], [ 5, true ] }" },
 
-    { name: "invokee3func", input: ["invokee3func"], expected: "4" },
-    { name: "invokee4func", input: ["invokee4func"], expected: "false" },
     { name: "invokee3m1", input: ["invokee3m1"], expected: "4" },
     { name: "invokee3ii", input: ["invokee3ii"], expected: "3" },
     { name: "invokee3m3", input: ["invokee3m3"], expected: "0" },
