@@ -131,7 +131,7 @@ function restArgListSimple(...arg: List<Int>): List<Int> {
     return arg;
 }
 
-function restArgSetSimple[T](...arg: HashSet<T>): HashSet<T> {
+function restArgSetSimple<T>(...arg: HashSet<T>): HashSet<T> {
     return arg;
 }
 
@@ -174,7 +174,7 @@ entrypoint function literalHello(): String {
     return "hello";
 }
 
-entrypoint function literalFooString(): String[Foo] {
+entrypoint function literalFooString(): String<Foo> {
     return Foo#'hello';
 }
 
@@ -251,23 +251,23 @@ entrypoint function projectIndecies(): [Int] {
 }
 
 entrypoint function projectIndeciesOpt(): [Int, Int?] {
-    return [ 1, 2 ][1, 5];
+    return [ 1, 2 ].[1, 5];
 }
 
 entrypoint function projectIndeciesBailout(arg?: [Int]): [Int]? {
-    return arg?[0];
+    return arg?.[0];
 }
 
 entrypoint function projectProperties(): {f: Int} {
-    return { f=1, g=2 }{f};
+    return { f=1, g=2 }.{f};
 }
 
 entrypoint function projectPropertiesOpt(): {f: Int, h: None} {
-    return { f=1, g=2 }{f, h};
+    return { f=1, g=2 }.{f, h};
 }
 
 entrypoint function projectPropertiesBailout(arg?: {f: Int}): {f: Int}? {
-    return arg?{f};
+    return arg?.{f};
 }
 
 entrypoint function projectTupleType(): [Bool] {
@@ -709,11 +709,11 @@ entrypoint function createObjFactoryTemplate(): E1 {
     return E1@creat<String>("ok");
 }
 
-entrypoint function createObjTFactory(): E2[Int] {
+entrypoint function createObjTFactory(): E2<Int> {
     return E2<Int>@create(3);
 }
 
-entrypoint function createObjTFactoryTemplate(): E2[Int] {
+entrypoint function createObjTFactoryTemplate(): E2<Int> {
     return E2<Int>@creat<String>(3, "ok");
 }
 
@@ -726,7 +726,7 @@ entrypoint function getObjFieldX(): Any {
 }
 
 entrypoint function getObjFields(): {f: Int, x: Any} {
-    return E1@create(3){f, x};
+    return E1@create(3).{f, x};
 }
 
 entrypoint function projectObjType(): {x: Any, y:Int} {
@@ -750,7 +750,7 @@ entrypoint function restCallSimpleArgsSet(): Set<Int> {
 }
 
 entrypoint function restCallOverlapArgsSet(): Set<Int> {
-    return restArgSetSimple[Int](2, ...List<Int>{ 1, 2, 3 });
+    return restArgSetSimple<Int>(2, ...List<Int>{ 1, 2, 3 });
 }
 
 entrypoint function restCallSimpleArgsMap(): Map<Int, Bool> {
@@ -798,7 +798,7 @@ entrypoint function createMapOverlap(): Map<Int, Bool> {
 }
 
 entrypoint function createMapExpando(): Map<Int, Bool> {
-    return HashMap<Int, Bool>{ @[ 1, true ], ...HashMap<Int, Bool>{ [ 1, false ], [ 2, true ] }, [ 5, true ] };
+    return HashMap<Int, Bool>{ [ 1, true ], ...HashMap<Int, Bool>{ [ 1, false ], [ 2, true ] }, [ 5, true ] };
 }
 
 entrypoint function invokee3func(): Int {

@@ -85,8 +85,8 @@ entity String<T> provides Some {
 
 //<summary>Provide JSON support for (POD).</summary>
 concept JSON provides Some {
-    function stringify<T where Tuple | Record>(data: T): string<T> # json_tryparse
-    function tryParse<T where Tuple | Record>(str: string): T? # json_tryparse
+    static stringify<T where Tuple | Record>(data: T): String<T> # json_tryparse
+    static tryParse<T where Tuple | Record>(str: String): T? # json_tryparse
 }
 
 //<summary>Primitive GUID value.</summary>
@@ -97,8 +97,8 @@ entity GUID provides Some {
 entity Float provides Some, Parsable {
     override static tryParse(str: String): Float # float_tryparse
 
-    const e: Float = '2.718281828459045'@Float;
-    const pi: Float = '3.141592653589793'@Float;
+    const e: Float = Float@'2.718281828459045';
+    const pi: Float = Float@'3.141592653589793';
 
     method isNan(): Bool # float_isnan
     method isInfinity(): Bool # float_isinfinity

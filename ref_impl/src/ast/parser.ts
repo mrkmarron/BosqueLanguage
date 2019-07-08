@@ -336,8 +336,13 @@ class Lexer {
         }
     }
 
-    private static readonly _s_nameRe = /\w+/y;
+    private static readonly _s_nameRe = /(\w+)|(recursive\?)/y;
     private tryLexName() {
+        if (this.m_input.startsWith("recursive?", this.m_cpos)) {
+            this.recordLexToken(this.m_cpos + "recursive?".length, "recursive?");
+            return true;
+        }
+
         Lexer._s_nameRe.lastIndex = this.m_cpos;
         const m = Lexer._s_nameRe.exec(this.m_input);
         if (m === null) {
@@ -1288,14 +1293,12 @@ class Parser {
             else if (this.testFollows("#", TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
                 if (this.testAndConsumeTokenIf("#")) {
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-                    const tsig = this.parseTypeSignature();
-                    return new LiteralTypedStringExpression(sinfo, sstr, tsig);
+                    return new LiteralTypedStringExpression(sinfo, sstr, ttype);
                 }
                 else {
                     this.ensureAndConsumeToken("@");
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-                    const tsig = this.parseTypeSignature();
-                    return new LiteralTypedStringConstructorExpression(sinfo, sstr, tsig);
+                    return new LiteralTypedStringConstructorExpression(sinfo, sstr, ttype);
                 }
             }
             else if (this.testFollows("@", TokenStrings.Identifier)) {
@@ -1329,6 +1332,8 @@ class Parser {
                 this.raiseError(line, "Can only project over record, tuple, or concept contraints");
             }
 
+            this.ensureAndConsumeToken("(");
+            this.ensureAndConsumeToken(")");
             return new PostfixProjectFromType(sinfo, isElvis, type);
         }
         else if (name === "update") {
@@ -1393,7 +1398,7 @@ class Parser {
                     ops.push(new PostfixAccessFromIndex(sinfo, isElvis, index));
                 }
                 else if (this.testToken("[")) {
-                    const indecies = this.parseListOf<number>(tk, "]", ",", () => {
+                    const indecies = this.parseListOf<number>("[", "]", ",", () => {
                         this.ensureToken(TokenStrings.Int);
                         return Number.parseInt(this.consumeTokenAndGetValue());
                     })[0].sort();
@@ -1408,7 +1413,7 @@ class Parser {
                 else {
                     this.ensureToken("{");
 
-                    const names = this.parseListOf<string>(tk, "}", ",", () => {
+                    const names = this.parseListOf<string>("{", "}", ",", () => {
                         this.ensureToken(TokenStrings.Identifier);
                         return this.consumeTokenAndGetValue();
                     })[0].sort();

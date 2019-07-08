@@ -7,7 +7,9 @@ import * as BasicExpresion from "./basic_evaluation_test";
 import * as Libraries from "./library_tests";
 import * as Regressions from "./regression_tests";
 
-import * as Apps from "./app_tests";
+//
+//import * as Apps from "./app_tests";
+//
 
 import * as FS from "fs";
 import chalk from "chalk";

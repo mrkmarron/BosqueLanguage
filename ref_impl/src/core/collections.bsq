@@ -118,10 +118,10 @@ entity List<T> provides Collection<T> {
     method last(): T # list_last
 
     //<summary>Find the last element in the list that match the predicate -- error if list is empty.</summary>
-    method recursive? findLast(p: Predicate<T>): T # list_findLast
+    recursive? method findLast(p: Predicate<T>): T # list_findLast
 
     //<summary>Find the last element in the list that match the predicate -- return none if list is empty.</summary>
-    method recursive? tryFindLast(p: Predicate<T>): T # list_tryFindLast
+    recursive? method tryFindLast(p: Predicate<T>): T # list_tryFindLast
 
     //<summary>Get an element at uniform from the list using the rnd value -- error if list is empty.</summary>
     method uniform(rnd: Int): T # list_uniform
@@ -133,10 +133,10 @@ entity List<T> provides Collection<T> {
     method {when T Indexable} indexOfLast(v: T, start?: Int, end?: Int): Int # list_indexoflast
 
     //<summary>Find the first index containing an element satisfying p in the list [start, end) -- return -1 if no such index.</summary>
-    method recursive? findIndexOf(p: Predicate<T>, start?: Int, end?: Int): Int # list_findindexof
+    recursive? method findIndexOf(p: Predicate<T>, start?: Int, end?: Int): Int # list_findindexof
 
     //<summary>Find the last index containing an element satisfying p in the list [start, end) -- return -1 if no such index.</summary>
-    method recursive? findIndexOfLast(p: Predicate<T>, start?: Int, end?: Int): Int # list_findindexoflast
+    recursive? method findIndexOfLast(p: Predicate<T>, start?: Int, end?: Int): Int # list_findindexoflast
 
     //<summary>Get a sublist from the list [start, end).</summary>
     method sublist(start?: Int, end?: Int): List<T> # list_sublist
