@@ -1161,7 +1161,8 @@ const expression_tests: TestInfo[] = [
     { name: "ematch_0", input: ["ematch_0"], expected: "0" },
     { name: "ematch_n1", input: ["ematch_n1"], expected: "-1" },
     { name: "ematch_11", input: ["ematch_11"], expected: "11" },
-    { name: "ematch_11", input: ["ematch_11"], expected: "11" }
+    { name: "ematch_11", input: ["ematch_11"], expected: "11" },
+    { name: "ematch_11alt", input: ["ematch_11alt"], expected: "11" }
 ];
 
 function expression_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
@@ -1427,7 +1428,7 @@ function switchCaseBindTypes(x: Any): Int {
         case [3, _:Int, var y: Int] => { return y; }
         case [3, _:Int, var y: Int, ...] => { return y; }
         case {f=1, g=var y: Int} => { return y; }
-        case var @{f=2, g=y: Int} => { return y; }
+        case var {f=2, g=y: Int} => { return y; }
         case {f=3, g=z} => { return z; }
         case var y: Int => { return y; }
         case _ => { ; }
@@ -1623,7 +1624,7 @@ entrypoint function switchCaseEx_false(): Any {
 }
 
 entrypoint function switchCaseEx_error(): Any {
-    return switchCaseEx(@{});
+    return switchCaseEx({});
 }
 
 entrypoint function abortOk(): Int {

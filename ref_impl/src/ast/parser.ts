@@ -1883,18 +1883,6 @@ class Parser {
                 return new VariableDeclarationStatement(sinfo, name, isConst, vtype, exp);
             }
         }
-        else if (tk === TokenStrings.Identifier) {
-            const name = this.consumeTokenAndGetValue();
-            if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
-                this.raiseError(line, "Variable is not defined in scope");
-            }
-
-            this.ensureAndConsumeToken("=");
-            const exp = this.parseExpression();
-
-            this.ensureAndConsumeToken(";");
-            return new VariableAssignmentStatement(sinfo, name, exp);
-        }
         else if (tk === "[" || tk === "{") {
             let decls = new Set<string>();
             const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
@@ -1910,6 +1898,18 @@ class Parser {
             this.ensureAndConsumeToken(";");
 
             return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
+        }
+        else if (tk === TokenStrings.Identifier) {
+            const name = this.consumeTokenAndGetValue();
+            if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
+                this.raiseError(line, "Variable is not defined in scope");
+            }
+
+            this.ensureAndConsumeToken("=");
+            const exp = this.parseExpression();
+
+            this.ensureAndConsumeToken(";");
+            return new VariableAssignmentStatement(sinfo, name, exp);
         }
         else if (tk === "return") {
             this.consumeToken();
@@ -2095,19 +2095,14 @@ class Parser {
     }
 
     private parseStatement(): Statement {
-        if (this.testToken("{")) {
-            return this.parseBlockStatement();
+        if (this.testToken("if")) {
+            return this.parseIfElseStatement();
+        }
+        else if (this.testToken("switch")) {
+            return this.parseMatchStatement();
         }
         else {
-            if (this.testToken("if")) {
-                return this.parseIfElseStatement();
-            }
-            else if (this.testToken("switch")) {
-                return this.parseMatchStatement();
-            }
-            else {
-                return this.parseLineStatement();
-            }
+            return this.parseLineStatement();
         }
     }
 

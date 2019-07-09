@@ -470,7 +470,7 @@ class MIRAssembly {
         }
         else {
             const t1opt = this.typeOptionMap.get(t1) as MIRTypeOption;
-            const t2opt = this.typeOptionMap.get(t1) as MIRTypeOption;
+            const t2opt = this.typeOptionMap.get(t2) as MIRTypeOption;
 
             if (t1opt instanceof MIRConceptType && t2opt instanceof MIRConceptType) {
                 res = this.atomSubtypeOf_ConceptConcept(t1, t2);
