@@ -33,10 +33,10 @@ function appTestGenerator(app: string, expected: string): TestSet {
 }
 
 const applist = [
-    {app: "angles", expected: "NSMain::Angle@{ degrees=221, primes=1, seconds=0 }"},
+    {app: "angles", expected: "NSMain::Angle{ degrees=221, primes=1, seconds=0 }"},
     {app: "max", expected: "20"},
     {app: "nbody", expected: "-0.16907302171469984"},
-    {app: "tictactoe", expected: "NSMain::Game@{ board=NSMain::Board@{ cells=NSCore::List[T=NSCore::None|NSCore::String[NSMain::PlayerMark]]@{ none, 'o'#NSMain::PlayerMark, 'o'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, none, none, none } }, winner='x'#NSMain::PlayerMark }"},
+    {app: "tictactoe", expected: "NSMain::Game{ board=NSMain::Board{ cells=NSCore::List<T=NSCore::None|NSCore::String<NSMain::PlayerMark>>{ none, 'o'#NSMain::PlayerMark, 'o'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, 'x'#NSMain::PlayerMark, none, none, none } }, winner='x'#NSMain::PlayerMark }"},
 ];
 
 const tests = applist.map((entry) => appTestGenerator(entry.app, entry.expected));

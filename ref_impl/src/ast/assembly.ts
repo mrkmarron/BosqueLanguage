@@ -416,13 +416,13 @@ class Assembly {
         return binds.has(t.name) ? binds.get(t.name) as ResolvedType : ResolvedType.createEmpty();
     }
 
-    private normalizeType_Nominal(t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+    private normalizeType_Nominal(t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedType | ResolvedFunctionType {
         const [aliasResolvedType, aliasResolvedBinds] = this.lookupTypeDef(t, binds);
         if (aliasResolvedType === undefined) {
             return ResolvedType.createEmpty();
         }
         else if (!(aliasResolvedType instanceof NominalTypeSignature)) {
-            return this.normalizeTypeOnly(aliasResolvedType, aliasResolvedBinds);
+            return this.normalizeTypeGeneral(aliasResolvedType, aliasResolvedBinds);
         }
         else {
             const fconcept = this.tryGetConceptTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
@@ -983,26 +983,12 @@ class Assembly {
     }
 
     normalizeTypeOnly(t: TypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
-        if (t instanceof ParseErrorTypeSignature || t instanceof AutoTypeSignature) {
+        const res = this.normalizeTypeGeneral(t, binds);
+        if (res instanceof ResolvedFunctionType) {
             return ResolvedType.createEmpty();
         }
-        else if (t instanceof TemplateTypeSignature) {
-            return this.normalizeType_Template(t as TemplateTypeSignature, binds);
-        }
-        else if (t instanceof NominalTypeSignature) {
-            return this.normalizeType_Nominal(t as NominalTypeSignature, binds);
-        }
-        else if (t instanceof TupleTypeSignature) {
-            return this.normalizeType_Tuple(t as TupleTypeSignature, binds);
-        }
-        else if (t instanceof RecordTypeSignature) {
-            return this.normalizeType_Record(t as RecordTypeSignature, binds);
-        }
-        else if (t instanceof IntersectionTypeSignature) {
-            return this.normalizeType_Intersection(t as IntersectionTypeSignature, binds);
-        }
         else {
-            return this.normalizeType_Union(t as UnionTypeSignature, binds);
+            return res;
         }
     }
 
@@ -1022,8 +1008,23 @@ class Assembly {
         else if (t instanceof FunctionTypeSignature) {
             return this.normalizeTypeFunction(t, binds) || ResolvedType.createEmpty();
         }
+        else if (t instanceof TemplateTypeSignature) {
+            return this.normalizeType_Template(t as TemplateTypeSignature, binds);
+        }
+        else if (t instanceof NominalTypeSignature) {
+            return this.normalizeType_Nominal(t as NominalTypeSignature, binds);
+        }
+        else if (t instanceof TupleTypeSignature) {
+            return this.normalizeType_Tuple(t as TupleTypeSignature, binds);
+        }
+        else if (t instanceof RecordTypeSignature) {
+            return this.normalizeType_Record(t as RecordTypeSignature, binds);
+        }
+        else if (t instanceof IntersectionTypeSignature) {
+            return this.normalizeType_Intersection(t as IntersectionTypeSignature, binds);
+        }
         else {
-            return this.normalizeTypeOnly(t, binds);
+            return this.normalizeType_Union(t as UnionTypeSignature, binds);
         }
     }
 

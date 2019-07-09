@@ -61,7 +61,7 @@ class Interpreter {
     private checkPreConds(file: string, conds: MIRBody[], args: Map<string, Value>) {
         if (this.m_doPrePostCheck && conds.length !== 0) {
             const cok = conds.every((cond) => {
-                const cres = this.evaluateNakedMIRBody(file, cond, args);
+                const cres = this.evaluateNakedMIRBody(file, cond, new Map<string, Value>(args));
                 return typeof (cres) === "boolean" && cres;
             });
 
@@ -73,9 +73,8 @@ class Interpreter {
 
     private checkPostConds(file: string, conds: MIRBody[], args: Map<string, Value>, result: Value) {
         if (this.m_doPrePostCheck && conds.length !== 0) {
-            const argswres = new Map<string, Value>(args).set("_return_", result);
             const cok = conds.every((cond) => {
-                const cres = this.evaluateNakedMIRBody(file, cond, argswres);
+                const cres = this.evaluateNakedMIRBody(file, cond, new Map<string, Value>(args).set("_return_", result));
                 return typeof (cres) === "boolean" && cres;
             });
 
@@ -87,9 +86,8 @@ class Interpreter {
 
     private checkInvariants(entity: MIREntityTypeDecl, evalue: EntityValueSimple) {
         if (this.m_doPrePostCheck && entity.invariants.length !== 0) {
-            const args = new Map<string, Value>().set("this", evalue);
             const cok = entity.invariants.every((cond) => {
-                const cres = this.evaluateNakedMIRBody(entity.srcFile, cond, args);
+                const cres = this.evaluateNakedMIRBody(entity.srcFile, cond, new Map<string, Value>().set("this", evalue));
                 return typeof (cres) === "boolean" && cres;
             });
 

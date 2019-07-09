@@ -3378,6 +3378,7 @@ class TypeChecker {
         }
 
         for (let i = 0; i < pargs.length; ++i) {
+            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, pargs[i][1]));
             argsNames.push(pargs[i][0]);
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
@@ -3450,6 +3451,7 @@ class TypeChecker {
         }
 
         for (let i = 0; i < pargs.length; ++i) {
+            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, pargs[i][1]));
             argsNames.push(pargs[i][0]);
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
