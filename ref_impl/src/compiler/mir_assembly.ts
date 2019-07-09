@@ -23,12 +23,12 @@ class MIRConstantDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [MIRNominalTypeKey, string][];
+    readonly pragmas: [MIRType, string][];
 
     readonly declaredType: MIRResolvedTypeKey;
     readonly value: MIRBody;
 
-    constructor(cname: string, key: MIRConstantKey, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey, value: MIRBody) {
+    constructor(cname: string, key: MIRConstantKey, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey, value: MIRBody) {
         this.cname = cname;
         this.key = key;
         this.sourceLocation = sinfo;
@@ -49,12 +49,12 @@ abstract class MIRInvokeDecl {
     readonly srcFile: string;
 
     readonly recursive: boolean;
-    readonly pragmas: [MIRNominalTypeKey, string][];
+    readonly pragmas: [MIRType, string][];
 
     readonly params: MIRFunctionParameter[];
     readonly resultType: MIRResolvedTypeKey;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey) {
         this.iname = iname;
         this.key = key;
 
@@ -75,7 +75,7 @@ class MIRInvokeBodyDecl extends MIRInvokeDecl {
 
     readonly body: MIRBody;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
         super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.preconditions = preconds;
@@ -95,7 +95,7 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     readonly binds: Map<string, MIRResolvedTypeKey>;
     readonly pcodes: Map<string, MIRPCode>;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRNominalTypeKey, string][], sinfo: SourceInfo, srcFile: string, binds: Map<string, MIRResolvedTypeKey>,  params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, binds: Map<string, MIRResolvedTypeKey>,  params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, implkey: string, pcodes: Map<string, MIRPCode>) {
         super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.implkey = implkey;
@@ -111,14 +111,14 @@ class MIRFieldDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [MIRNominalTypeKey, string][];
+    readonly pragmas: [MIRType, string][];
 
     readonly name: string;
 
     readonly declaredType: MIRResolvedTypeKey;
     readonly value: MIRBody | undefined;
 
-    constructor(fname: string, srcInfo: SourceInfo, srcFile: string, fkey: MIRFieldKey, pragmas: [MIRNominalTypeKey, string][], name: string, dtype: MIRResolvedTypeKey, value: MIRBody | undefined) {
+    constructor(fname: string, srcInfo: SourceInfo, srcFile: string, fkey: MIRFieldKey, pragmas: [MIRType, string][], name: string, dtype: MIRResolvedTypeKey, value: MIRBody | undefined) {
         this.fname = fname;
         this.fkey = fkey;
 
@@ -140,18 +140,18 @@ class MIROOTypeDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [MIRNominalTypeKey, string][];
+    readonly pragmas: [MIRType, string][];
 
     readonly ns: string;
     readonly name: string;
-    readonly terms: Map<string, MIRNominalTypeKey>;
-    readonly provides: MIRNominalTypeKey[];
+    readonly terms: Map<string, MIRType>;
+    readonly provides: MIRType[];
 
     readonly invariants: MIRBody[] = [];
     readonly fields: MIRFieldDecl[] = [];
     readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         this.ooname = ooname;
         this.tkey = tkey;
 
@@ -171,7 +171,7 @@ class MIROOTypeDecl {
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
     }
 }
@@ -183,7 +183,7 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly isCollectionEntityType: boolean;
     readonly isMapEntityType: boolean;
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRNominalTypeKey, string][], ns: string, name: string, terms: Map<string, MIRResolvedTypeKey>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
         super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
 
         this.isEnum = isEnum;
@@ -242,10 +242,10 @@ abstract class MIRStructuralType extends MIRTypeOption {
 }
 
 class MIRTupleTypeEntry {
-    readonly type: MIRResolvedTypeKey;
+    readonly type: MIRType;
     readonly isOptional: boolean;
 
-    constructor(type: MIRResolvedTypeKey, isOpt: boolean) {
+    constructor(type: MIRType, isOpt: boolean) {
         this.isOptional = isOpt;
         this.type = type;
     }
@@ -262,7 +262,7 @@ class MIRTupleType extends MIRStructuralType {
     }
 
     static create(isOpen: boolean, entries: MIRTupleTypeEntry[]): MIRTupleType {
-        let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type).join(", ");
+        let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.trkey).join(", ");
         if (isOpen) {
             cvalue += (entries.length !== 0 ? ", " : "") + "...";
         }
@@ -273,10 +273,10 @@ class MIRTupleType extends MIRStructuralType {
 
 class MIRRecordTypeEntry {
     readonly name: string;
-    readonly type: MIRResolvedTypeKey;
+    readonly type: MIRType;
     readonly isOptional: boolean;
 
-    constructor(name: string, type: MIRResolvedTypeKey, isOpt: boolean) {
+    constructor(name: string, type: MIRType, isOpt: boolean) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
@@ -296,7 +296,7 @@ class MIRRecordType extends MIRStructuralType {
     static create(isOpen: boolean, entries: MIRRecordTypeEntry[]): MIRRecordType {
         const rentries = [...entries].sort((a, b) => a.name.localeCompare(b.name));
 
-        let cvalue = rentries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type).join(", ");
+        let cvalue = rentries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.trkey).join(", ");
         if (isOpen) {
             cvalue += (rentries.length !== 0 ? ", " : "") + "...";
         }
@@ -307,19 +307,19 @@ class MIRRecordType extends MIRStructuralType {
 
 class MIRType {
     readonly trkey: MIRResolvedTypeKey;
-    readonly options: MIRResolvedTypeKey[];
+    readonly options: MIRTypeOption[];
 
-    private constructor(trkey: MIRResolvedTypeKey, options: MIRResolvedTypeKey[]) {
+    private constructor(trkey: MIRResolvedTypeKey, options: MIRTypeOption[]) {
         this.trkey = trkey;
         this.options = options;
     }
 
-    static createSingle(option: MIRResolvedTypeKey): MIRType {
-        return new MIRType(option, [option]);
+    static createSingle(option: MIRTypeOption): MIRType {
+        return new MIRType(option.trkey, [option]);
     }
 
-    static create(options: MIRResolvedTypeKey[]): MIRType {
-        const trkey = [...options].sort().join(" | ");
+    static create(options: MIRTypeOption[]): MIRType {
+        const trkey = [...options].sort().map((tk) => tk.trkey).join(" | ");
         return new MIRType(trkey, options);
     }
 }
@@ -343,65 +343,62 @@ class MIRAssembly {
     readonly conceptDecls: Map<MIRNominalTypeKey, MIRConceptTypeDecl> = new Map<MIRNominalTypeKey, MIRConceptTypeDecl>();
     readonly entityDecls: Map<MIRNominalTypeKey, MIREntityTypeDecl> = new Map<MIRNominalTypeKey, MIREntityTypeDecl>();
 
-    readonly typeOptionMap: Map<MIRResolvedTypeKey, MIRTypeOption> = new Map<MIRResolvedTypeKey, MIRTypeOption>();
     readonly typeMap: Map<MIRResolvedTypeKey, MIRType> = new Map<MIRResolvedTypeKey, MIRType>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
 
-    private atomSubtypeOf_EntityEntity(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        const t1e = this.entityDecls.get(t1) as MIREntityTypeDecl;
-        const t2e = this.entityDecls.get(t2) as MIREntityTypeDecl;
+    private atomSubtypeOf_EntityEntity(t1: MIREntityType, t2: MIREntityType): boolean {
+        const t1e = this.entityDecls.get(t1.ekey) as MIREntityTypeDecl;
+        const t2e = this.entityDecls.get(t2.ekey) as MIREntityTypeDecl;
         if (t1e.ns !== t2e.ns || t1e.name !== t2e.name) {
             return false;
         }
 
         let allBindsOk = true;
-        t1e.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, t2e.terms.get(k) as MIRResolvedTypeKey); });
+        t1e.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, t2e.terms.get(k) as MIRType); });
         return allBindsOk;
     }
 
-    private atomSubtypeOf_EntityConcept(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        const t1e = this.entityDecls.get(t1) as MIREntityTypeDecl;
-        return t1e.provides.some((provide) => this.subtypeOf(provide, t2));
+    private atomSubtypeOf_EntityConcept(t1: MIREntityType, t2: MIRConceptType): boolean {
+        const t1e = this.entityDecls.get(t1.ekey) as MIREntityTypeDecl;
+        const mcc = MIRType.createSingle(t2);
+        return t1e.provides.some((provide) => this.subtypeOf(provide, mcc));
     }
 
-    private atomSubtypeOf_ConceptConcept(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        return (this.typeOptionMap.get(t1) as MIRConceptType).ckeys.every((c1t) => {
-            return (this.typeOptionMap.get(t2) as MIRConceptType).ckeys.some((c2t) => {
+    private atomSubtypeOf_ConceptConcept(t1: MIRConceptType, t2: MIRConceptType): boolean {
+        return t1.ckeys.every((c1t) => {
+            return t2.ckeys.some((c2t) => {
                 const c1 = this.conceptDecls.get(c1t) as MIRConceptTypeDecl;
                 const c2 = this.conceptDecls.get(c2t) as MIRConceptTypeDecl;
 
                 if (c1.ns === c2.ns && c1.name === c2.name) {
                     let allBindsOk = true;
-                    c1.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, c2.terms.get(k) as MIRResolvedTypeKey); });
+                    c1.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, c2.terms.get(k) as MIRType); });
                     return allBindsOk;
                 }
 
-                return c1.provides.some((provide) => this.subtypeOf(provide, c2t));
+                return c1.provides.some((provide) => this.subtypeOf(provide, this.typeMap.get(c2t) as MIRType));
             });
         });
     }
 
-    private atomSubtypeOf_TupleTuple(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        const t1opt = this.typeOptionMap.get(t1) as MIRTupleType;
-        const t2opt = this.typeOptionMap.get(t1) as MIRTupleType;
-
+    private atomSubtypeOf_TupleTuple(t1: MIRTupleType, t2: MIRTupleType): boolean {
         //Then this is definitely not ok
-        if (t1opt.isOpen && !t2opt.isOpen) {
+        if (t1.isOpen && !t2.isOpen) {
             return false;
         }
 
-        for (let i = 0; i < t1opt.entries.length; ++i) {
-            const t1e = t1opt.entries[i];
+        for (let i = 0; i < t1.entries.length; ++i) {
+            const t1e = t1.entries[i];
 
-            if (i >= t2opt.entries.length) {
-                if (!t2opt.isOpen) {
+            if (i >= t2.entries.length) {
+                if (!t2.isOpen) {
                     return false;
                 }
             }
             else {
-                const t2e = t2opt.entries[i];
+                const t2e = t2.entries[i];
                 if ((t1e.isOptional && !t2e.isOptional) || !this.subtypeOf(t1e.type, t2e.type)) {
                     return false;
                 }
@@ -409,27 +406,24 @@ class MIRAssembly {
         }
 
         //t2 has a required entry that is not required in t1
-        if (t2opt.entries.length > t1opt.entries.length && t2opt.entries.slice(t1opt.entries.length).some((entry) => !entry.isOptional)) {
+        if (t2.entries.length > t1.entries.length && t2.entries.slice(t1.entries.length).some((entry) => !entry.isOptional)) {
             return false;
         }
 
         return true;
     }
 
-    private atomSubtypeOf_RecordRecord(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        const t1opt = this.typeOptionMap.get(t1) as MIRRecordType;
-        const t2opt = this.typeOptionMap.get(t1) as MIRRecordType;
-
+    private atomSubtypeOf_RecordRecord(t1: MIRRecordType, t2: MIRRecordType): boolean {
         //Then this is definitely not ok
-        if (t1opt.isOpen && !t2opt.isOpen) {
+        if (t1.isOpen && !t2.isOpen) {
             return false;
         }
 
         let badEntry = false;
-        t1opt.entries.forEach((entry) => {
-            const t2e = t2opt.entries.find((e) => e.name === entry.name);
+        t1.entries.forEach((entry) => {
+            const t2e = t2.entries.find((e) => e.name === entry.name);
             if (t2e === undefined) {
-                if (!t2opt.isOpen) {
+                if (!t2.isOpen) {
                     badEntry = badEntry || true;
                 }
             }
@@ -440,8 +434,8 @@ class MIRAssembly {
             }
         });
 
-        t2opt.entries.forEach((entry) => {
-            badEntry = badEntry || (t1opt.entries.find((e) => e.name === entry.name) === undefined && !entry.isOptional);
+        t2.entries.forEach((entry) => {
+            badEntry = badEntry || (t1.entries.find((e) => e.name === entry.name) === undefined && !entry.isOptional);
         });
 
         if (badEntry) {
@@ -451,55 +445,52 @@ class MIRAssembly {
         return true;
     }
 
-    private atomSubtypeOf(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        let memores = this.m_atomSubtypeRelationMemo.get(t1);
+    private atomSubtypeOf(t1: MIRTypeOption, t2: MIRTypeOption): boolean {
+        let memores = this.m_atomSubtypeRelationMemo.get(t1.trkey);
         if (memores === undefined) {
-            this.m_atomSubtypeRelationMemo.set(t1, new Map<string, boolean>());
-            memores = this.m_atomSubtypeRelationMemo.get(t1) as Map<string, boolean>;
+            this.m_atomSubtypeRelationMemo.set(t1.trkey, new Map<string, boolean>());
+            memores = this.m_atomSubtypeRelationMemo.get(t1.trkey) as Map<string, boolean>;
         }
 
-        let memoval = memores.get(t2);
+        let memoval = memores.get(t2.trkey);
         if (memoval !== undefined) {
             return memoval;
         }
 
         let res = false;
 
-        if (t1 === t2) {
+        if (t1.trkey === t2.trkey) {
             res = true;
         }
         else {
-            const t1opt = this.typeOptionMap.get(t1) as MIRTypeOption;
-            const t2opt = this.typeOptionMap.get(t2) as MIRTypeOption;
-
-            if (t1opt instanceof MIRConceptType && t2opt instanceof MIRConceptType) {
+            if (t1 instanceof MIRConceptType && t2 instanceof MIRConceptType) {
                 res = this.atomSubtypeOf_ConceptConcept(t1, t2);
             }
-            else if (t1opt instanceof MIRConceptType) {
+            else if (t1 instanceof MIRConceptType) {
                 //res stays false
             }
-            else if (t2opt instanceof MIRConceptType) {
-                if (t1opt instanceof MIREntityType) {
+            else if (t2 instanceof MIRConceptType) {
+                if (t1 instanceof MIREntityType) {
                     res = this.atomSubtypeOf_EntityConcept(t1, t2);
                 }
-                else if (t1opt instanceof MIRTupleType) {
-                    res = this.atomSubtypeOf_ConceptConcept("NSCore::Tuple", t2);
+                else if (t1 instanceof MIRTupleType) {
+                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Tuple"]), t2);
                 }
-                else if (t1opt instanceof MIRRecordType) {
-                    res = this.atomSubtypeOf_ConceptConcept("NSCore::Record", t2);
+                else if (t1 instanceof MIRRecordType) {
+                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Record"]), t2);
                 }
                 else {
-                    res = this.atomSubtypeOf_ConceptConcept("NSCore::Function", t2);
+                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Function"]), t2);
                 }
             }
             else {
-                if (t1opt instanceof MIREntityType && t2opt instanceof MIREntityType) {
+                if (t1 instanceof MIREntityType && t2 instanceof MIREntityType) {
                     res = this.atomSubtypeOf_EntityEntity(t1, t2);
                 }
-                else if (t1opt instanceof MIRTupleType && t2opt instanceof MIRTupleType) {
+                else if (t1 instanceof MIRTupleType && t2 instanceof MIRTupleType) {
                     res = this.atomSubtypeOf_TupleTuple(t1, t2);
                 }
-                else if (t1opt instanceof MIRRecordType && t2opt instanceof MIRRecordType) {
+                else if (t1 instanceof MIRRecordType && t2 instanceof MIRRecordType) {
                     res = this.atomSubtypeOf_RecordRecord(t1, t2);
                 }
                 else {
@@ -508,7 +499,7 @@ class MIRAssembly {
             }
         }
 
-        memores.set(t2, res);
+        memores.set(t2.trkey, res);
         return res;
     }
 
@@ -518,21 +509,21 @@ class MIRAssembly {
         this.srcHash = srcHash;
     }
 
-    subtypeOf(t1: MIRResolvedTypeKey, t2: MIRResolvedTypeKey): boolean {
-        let memores = this.m_subtypeRelationMemo.get(t1);
+    subtypeOf(t1: MIRType, t2: MIRType): boolean {
+        let memores = this.m_subtypeRelationMemo.get(t1.trkey);
         if (memores === undefined) {
-            this.m_subtypeRelationMemo.set(t1, new Map<string, boolean>());
-            memores = this.m_subtypeRelationMemo.get(t1) as Map<string, boolean>;
+            this.m_subtypeRelationMemo.set(t1.trkey, new Map<string, boolean>());
+            memores = this.m_subtypeRelationMemo.get(t1.trkey) as Map<string, boolean>;
         }
 
-        let memoval = memores.get(t2);
+        let memoval = memores.get(t2.trkey);
         if (memoval !== undefined) {
             return memoval;
         }
 
-        const res = (this.typeMap.get(t1) as MIRType).options.every((t1opt) => (this.typeMap.get(t2) as MIRType).options.some((t2opt) => this.atomSubtypeOf(t1opt, t2opt)));
+        const res = (t1.trkey === t2.trkey) || t1.options.every((t1opt) => t2.options.some((t2opt) => this.atomSubtypeOf(t1opt, t2opt)));
 
-        memores.set(t2, res);
+        memores.set(t2.trkey, res);
         return res;
     }
 }

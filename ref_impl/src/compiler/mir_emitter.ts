@@ -444,7 +444,7 @@ class MIREmitter {
     registerResolvedTypeReference(t: ResolvedType): MIRType {
         if (t.options.length > 1) {
             const oopts = t.options.map((opt) => this.registerResolvedTypeReference(ResolvedType.createSingle(opt)).options);
-            const ft = MIRType.create(([] as MIRResolvedTypeKey[]).concat(...oopts));
+            const ft = MIRType.create(([] as MIRTypeOption[]).concat(...oopts));
 
             this.masm.typeMap.set(ft.trkey, ft);
             return ft;
@@ -465,17 +465,15 @@ class MIREmitter {
                 rt = MIRConceptType.create(natoms);
             }
             else if (sopt instanceof ResolvedTupleAtomType) {
-                const tatoms = sopt.types.map((entry) => new MIRTupleTypeEntry(this.registerResolvedTypeReference(entry.type).trkey, entry.isOptional));
+                const tatoms = sopt.types.map((entry) => new MIRTupleTypeEntry(this.registerResolvedTypeReference(entry.type), entry.isOptional));
                 rt = MIRTupleType.create(sopt.isOpen, tatoms);
             }
             else {
-                const tatoms = (sopt as ResolvedRecordAtomType).entries.map((entry) => new MIRRecordTypeEntry(entry.name, this.registerResolvedTypeReference(entry.type).trkey, entry.isOptional));
+                const tatoms = (sopt as ResolvedRecordAtomType).entries.map((entry) => new MIRRecordTypeEntry(entry.name, this.registerResolvedTypeReference(entry.type), entry.isOptional));
                 rt = MIRRecordType.create((sopt as ResolvedRecordAtomType).isOpen, tatoms);
             }
 
-            this.masm.typeOptionMap.set(rt.trkey, rt);
-
-            const ft = MIRType.create([(rt as MIRTypeOption).trkey]);
+            const ft = MIRType.create([(rt as MIRTypeOption)]);
             this.masm.typeMap.set(ft.trkey, ft);
             return ft;
         }
@@ -555,7 +553,7 @@ class MIREmitter {
 
     private closeConceptDecl(cpt: MIRConceptTypeDecl) {
         cpt.provides.forEach((tkey) => {
-            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey.trkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
@@ -576,7 +574,7 @@ class MIREmitter {
 
     private closeEntityDecl(entity: MIREntityTypeDecl) {
         entity.provides.forEach((tkey) => {
-            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey.trkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));

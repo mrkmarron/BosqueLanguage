@@ -5,7 +5,7 @@
 
 import { Value, ValueOps, ListValue, FloatValue, RegexValue, CollectionValue, MapValue, TupleValue } from "./value";
 import { raiseRuntimeErrorIf } from "./interpreter_environment";
-import { MIRAssembly, MIRInvokePrimitiveDecl, MIREntityType, MIREntityTypeDecl, MIRTupleTypeEntry, MIRTupleType, MIRPCode } from "../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokePrimitiveDecl, MIREntityType, MIREntityTypeDecl, MIRTupleTypeEntry, MIRTupleType, MIRPCode, MIRType } from "../compiler/mir_assembly";
 import { MIRInvokeKey, MIRResolvedTypeKey } from "../compiler/mir_ops";
 
 function validateListStartEnd(lvals: Value[], start: Value, end: Value): [number, number] {
@@ -19,8 +19,8 @@ function validateListStartEnd(lvals: Value[], start: Value, end: Value): [number
     return [rstart, rend];
 }
 
-function createListOf(masm: MIRAssembly, tkey: MIRResolvedTypeKey, values: Value[]): Value {
-    return new ListValue(masm.typeOptionMap.get(tkey) as MIREntityType, values);
+function createListOf(masm: MIRAssembly, oft: MIRType, values: Value[]): Value {
+    return new ListValue(oft.options[0] as MIREntityType, values);
 }
 
 type InterpreterEntryPoint = (call: MIRInvokeKey, args: Value[]) => Value;
@@ -85,7 +85,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
     })
     .set("string_split", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const splits = ValueOps.convertToBasicString(args.get("this")).split(ValueOps.convertToBasicString(args.get("with")));
-        return createListOf(masm, inv.resultType, splits);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, splits);
     })
     .set("string_reverse", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const val = ValueOps.convertToBasicString(args.get("this"));
@@ -167,7 +167,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         for (let i = 0; i < size; ++i) {
             vals.push(init);
         }
-        return createListOf(masm, inv.resultType, vals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, vals);
     })
     .set("list_empty", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         return (args.get("this") as ListValue).values.length === 0;
@@ -233,36 +233,36 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         const pcode = (inv as MIRInvokePrimitiveDecl).pcodes.get("p") as MIRPCode;
         const cargs = pcode.cargs.map((carg) => args.get(carg) as Value);
         const nvals = (args.get("this") as ListValue).values.filter((v) => ValueOps.convertBoolOrNoneToBool(ep(pcode.code, [v, ...cargs])));
-        return createListOf(masm, inv.resultType, nvals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_ofType", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const ttype = inv.binds.get("U") as MIRResolvedTypeKey;
-        const nvals = (args.get("this") as ListValue).values.filter((v) => masm.subtypeOf(ValueOps.getValueType(v).trkey, ttype));
-        return createListOf(masm, inv.resultType, nvals);
+        const nvals = (args.get("this") as ListValue).values.filter((v) => masm.subtypeOf(ValueOps.getValueType(v), masm.typeMap.get(ttype) as MIRType));
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_map", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const pcode = (inv as MIRInvokePrimitiveDecl).pcodes.get("f") as MIRPCode;
         const cargs = pcode.cargs.map((carg) => args.get(carg) as Value);
         const nvals = (args.get("this") as ListValue).values.map((v) => ep(pcode.code, [v, ...cargs]));
-        return createListOf(masm, inv.resultType, nvals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_skipMap", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const pcode = (inv as MIRInvokePrimitiveDecl).pcodes.get("f") as MIRPCode;
         const cargs = pcode.cargs.map((carg) => args.get(carg) as Value);
         const nvals = (args.get("this") as ListValue).values.map((v) => ep(pcode.code, [v, ...cargs])).filter((v) => v !== undefined);
-        return createListOf(masm, inv.resultType, nvals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_flatMap", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const pcode = (inv as MIRInvokePrimitiveDecl).pcodes.get("f") as MIRPCode;
         const cargs = pcode.cargs.map((carg) => args.get(carg) as Value);
         const nvals = (args.get("this") as ListValue).values.map((v) => ValueOps.getContainerContentsEnumeration(ep(pcode.code, [v, ...cargs]) as CollectionValue));
-        return createListOf(masm, inv.resultType, ([] as Value[]).concat(...nvals));
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, ([] as Value[]).concat(...nvals));
     })
     .set("list_transform", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const pcode = (inv as MIRInvokePrimitiveDecl).pcodes.get("f") as MIRPCode;
         const cargs = pcode.cargs.map((carg) => args.get(carg) as Value);
         const nvals = (args.get("this") as ListValue).values.map((v) => ep(pcode.code, [v, ...cargs]));
-        return createListOf(masm, inv.resultType, nvals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_project", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const map = args.get("map") as MapValue;
@@ -271,7 +271,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
             raiseRuntimeErrorIf(pv === null);
             return pv as Value;
         });
-        return createListOf(masm, inv.resultType, nvals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, nvals);
     })
     .set("list_pairs", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = (args.get("this") as ListValue).values;
@@ -281,13 +281,13 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         for (let i = 0; i < avals.length; ++i) {
             for (let j = i + (skipIdentity ? 1 : 0); j < avals.length; ++j) {
                 const values = [avals[i], avals[j]];
-                const types = values.map<MIRTupleTypeEntry>((v) => new MIRTupleTypeEntry(ValueOps.getValueType(v).trkey, false));
+                const types = values.map<MIRTupleTypeEntry>((v) => new MIRTupleTypeEntry(ValueOps.getValueType(v), false));
 
                 res.push(new TupleValue(MIRTupleType.create(false, types), values));
             }
         }
 
-        return createListOf(masm, inv.resultType, res);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, res);
     })
     .set("list_min", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const dmin = args.get("default");
@@ -403,20 +403,20 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         const avals = (args.get("this") as ListValue).values;
         const [start, end] = validateListStartEnd(avals, args.get("start"), args.get("end"));
 
-        return createListOf(masm, inv.resultType, avals.slice(start, end));
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, avals.slice(start, end));
     })
     .set("list_reverse", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = [...(args.get("this") as ListValue).values].reverse();
-        return createListOf(masm, inv.resultType, avals);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, avals);
     })
     .set("list_zip", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = (args.get("this") as ListValue).values;
         const maxidx = avals.map((v) => (v as ListValue).values.length).reduce((acc, v) => Math.min(acc, v), 0);
 
-        const subltype = (masm.entityDecls.get(inv.resultType) as MIREntityTypeDecl).terms.get("T") as MIRResolvedTypeKey;
+        const subltype = (masm.entityDecls.get(inv.resultType) as MIREntityTypeDecl).terms.get("T") as MIRType;
 
         if (maxidx === 0) {
-            return createListOf(masm, inv.resultType, []);
+            return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, []);
         }
         else {
             let res: Value[] = [];
@@ -424,7 +424,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
                 const tres = avals.map((av) => (av as ListValue).values[i]);
                 res.push(createListOf(masm, subltype, tres));
             }
-            return createListOf(masm, inv.resultType, res);
+            return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, res);
         }
     })
     .set("list_zipwith", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
@@ -434,7 +434,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         const maxidx = avals.map((v) => (v as ListValue).values.length).reduce((acc, v) => Math.min(acc, v), 0);
 
         if (maxidx === 0) {
-            return createListOf(masm, inv.resultType, []);
+            return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, []);
         }
         else {
             let res: Value[] = [];
@@ -443,23 +443,23 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
                 const tval = ep(pcode.code, [...targs, ...cargs]);
                 res.push(tval);
             }
-            return createListOf(masm, inv.resultType, res);
+            return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, res);
         }
     })
     .set("list_concat", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = (args.get("this") as ListValue).values.map((v) => ValueOps.getContainerContentsEnumeration(v as CollectionValue));
-        return createListOf(masm, inv.resultType, ([] as Value[]).concat(...avals));
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, ([] as Value[]).concat(...avals));
     })
     .set("list_set", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const idx = args.get("idx") as number;
         const avals = (args.get("this") as ListValue).values;
 
-        return createListOf(masm, inv.resultType, [...avals.slice(0, idx), args.get("v"), ...avals.slice(idx + 1)]);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, [...avals.slice(0, idx), args.get("v"), ...avals.slice(idx + 1)]);
     })
     .set("list_fill", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const avals = (args.get("this") as ListValue).values.map(() => args.get("v"));
 
-        return createListOf(masm, inv.resultType, [...avals]);
+        return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, [...avals]);
     })
     .set("math_abs", (ep: InterpreterEntryPoint, inv: MIRInvokePrimitiveDecl, masm: MIRAssembly, args: Map<string, Value>): Value => {
         const n = args.get("n") as FloatValue;

@@ -393,33 +393,33 @@ class ValueOps {
 
     static getValueType(v: Value): MIRType {
         switch (typeof (v)) {
-            case "undefined": return MIRType.createSingle("NSCore::None");
-            case "boolean": return MIRType.createSingle("NSCore::Bool");
-            case "number": return MIRType.createSingle("NSCore::Int");
-            case "string": return MIRType.createSingle("NSCore::String<T=NSCore::Any>");
+            case "undefined": return MIRType.createSingle(MIREntityType.create("NSCore::None"));
+            case "boolean": return MIRType.createSingle(MIREntityType.create("NSCore::Bool"));
+            case "number": return MIRType.createSingle(MIREntityType.create("NSCore::Int"));
+            case "string": return MIRType.createSingle(MIREntityType.create("NSCore::String<T=NSCore::Any>"));
             default: {
                 if (v instanceof FloatValue) {
-                    return MIRType.createSingle("NSCore::Float");
+                    return MIRType.createSingle(MIREntityType.create("NSCore::Float"));
                 }
                 else if (v instanceof TypedStringValue) {
                     return v.stype;
                 }
                 else if (v instanceof RegexValue) {
-                    return MIRType.createSingle("NSCore::Regex");
+                    return MIRType.createSingle(MIREntityType.create("NSCore::Regex"));
                 }
                 else if (v instanceof GUIDValue) {
-                    return MIRType.createSingle("NSCore::GUID");
+                    return MIRType.createSingle(MIREntityType.create("NSCore::GUID"));
                 }
                 else if (v instanceof TupleValue) {
-                    return MIRType.createSingle(v.ttype.trkey);
+                    return MIRType.createSingle(v.ttype);
                 }
                 else if (v instanceof RecordValue) {
-                    return MIRType.createSingle(v.rtype.trkey);
+                    return MIRType.createSingle(v.rtype);
                 }
                 else {
                     assert(v instanceof EntityValue);
 
-                    return MIRType.createSingle((v as EntityValue).etype.trkey);
+                    return MIRType.createSingle((v as EntityValue).etype);
                 }
             }
         }

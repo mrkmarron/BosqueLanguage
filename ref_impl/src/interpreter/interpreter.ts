@@ -292,7 +292,7 @@ class Interpreter {
                 let tvalues: Value[] = [];
                 for (let i = 0; i < tc.args.length; ++i) {
                     const v = this.getArgValue(fscope, tc.args[i]);
-                    tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(v).trkey, false));
+                    tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(v), false));
                     tvalues.push(v);
                 }
                 fscope.assignTmpReg(tc.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
@@ -305,7 +305,7 @@ class Interpreter {
                 for (let i = 0; i < tc.args.length; ++i) {
                     const f = tc.args[i][0];
                     const v = this.getArgValue(fscope, tc.args[i][1]);
-                    tentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(v).trkey, false));
+                    tentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(v), false));
                     tvalues.push([f, v]);
                 }
                 fscope.assignTmpReg(tc.trgt.regID, new RecordValue(MIRRecordType.create(false, tentries), tvalues));
@@ -322,7 +322,7 @@ class Interpreter {
                 let tentries: MIRTupleTypeEntry[] = [];
                 let tvalues: Value[] = [];
                 for (let i = 0; i < pi.indecies.length; ++i) {
-                    tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(arg.values[pi.indecies[i]]).trkey, false));
+                    tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(arg.values[pi.indecies[i]]), false));
                     tvalues.push(arg.values[pi.indecies[i]]);
                 }
                 fscope.assignTmpReg(pi.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
@@ -342,7 +342,7 @@ class Interpreter {
                 let rvalues: [string, Value][] = [];
                 for (let i = 0; i < pi.properties.length; ++i) {
                     const pidx = arg.values.findIndex((av) => av[0] === pi.properties[i]);
-                    rentries.push(new MIRRecordTypeEntry(pi.properties[i], ValueOps.getValueType(pidx !== -1 ? arg.values[pidx][1] : undefined).trkey, false));
+                    rentries.push(new MIRRecordTypeEntry(pi.properties[i], ValueOps.getValueType(pidx !== -1 ? arg.values[pidx][1] : undefined), false));
                     rvalues.push(pidx !== -1 ? arg.values[pidx] : [pi.properties[i], undefined]);
                 }
                 fscope.assignTmpReg(pi.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
@@ -361,7 +361,7 @@ class Interpreter {
                 let rvalues: [string, Value][] = [];
                 for (let i = 0; i < pf.fields.length; ++i) {
                     const fidx = arg.fields.findIndex((av) => av[0] === pf.fields[i]);
-                    rentries.push(new MIRRecordTypeEntry(pf.fields[i], ValueOps.getValueType(fidx !== -1 ? arg.fields[fidx][1] : undefined).trkey, false));
+                    rentries.push(new MIRRecordTypeEntry(pf.fields[i], ValueOps.getValueType(fidx !== -1 ? arg.fields[fidx][1] : undefined), false));
                     rvalues.push(fidx !== -1 ? arg.fields[fidx] : [pf.fields[i], undefined]);
                 }
                 fscope.assignTmpReg(pf.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
@@ -369,7 +369,7 @@ class Interpreter {
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 const pt = op as MIRProjectFromTypeTuple;
-                const projectType = this.m_env.assembly.typeOptionMap.get(pt.ptype) as MIRTupleType;
+                const projectType = (this.m_env.assembly.typeMap.get(pt.ptype) as MIRType).options[0] as MIRTupleType;
                 const arg = this.getArgValue(fscope, pt.arg) as TupleValue;
                 if (projectType.isOpen) {
                     fscope.assignTmpReg(pt.trgt.regID, new TupleValue(arg.ttype, [...arg.values]));
@@ -387,7 +387,7 @@ class Interpreter {
             }
             case MIROpTag.MIRProjectFromTypeRecord: {
                 const pr = op as MIRProjectFromTypeRecord;
-                const projectType = this.m_env.assembly.typeOptionMap.get(pr.ptype) as MIRRecordType;
+                const projectType = (this.m_env.assembly.typeMap.get(pr.ptype) as MIRType).options[0] as MIRRecordType;
                 const arg = this.getArgValue(fscope, pr.arg) as RecordValue;
                 if (projectType.isOpen) {
                     fscope.assignTmpReg(pr.trgt.regID, new RecordValue(arg.rtype, [...arg.values]));
@@ -416,7 +416,7 @@ class Interpreter {
                 let rvalues: [string, Value][] = [];
                 [...projectfields].sort().forEach((f) => {
                     const pv = (arg.fields.find((kv) => kv[0] === f) as [string, Value])[1];
-                    rentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(pv).trkey, false));
+                    rentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(pv), false));
                     rvalues.push([f, pv]);
                 });
                 fscope.assignTmpReg(pc.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
@@ -432,12 +432,12 @@ class Interpreter {
                     if (update[0] >= tentries.length) {
                         let extendCount = (update[0] - tentries.length) + 1;
                         for (let j = 0; j < extendCount; ++j) {
-                            tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(undefined).trkey, false));
+                            tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(undefined), false));
                             tvalues.push(undefined);
                         }
                     }
                     const uarg = this.getArgValue(fscope, update[1]);
-                    tentries[update[0]] = new MIRTupleTypeEntry(ValueOps.getValueType(uarg).trkey, false);
+                    tentries[update[0]] = new MIRTupleTypeEntry(ValueOps.getValueType(uarg), false);
                     tvalues[update[0]] = uarg;
                 }
                 fscope.assignTmpReg(mi.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
@@ -453,11 +453,11 @@ class Interpreter {
                     const pvalue = this.getArgValue(fscope, mp.updates[i][1]);
                     const pidx = rentries.findIndex((entry) => entry.name === pname);
                     if (pidx !== -1) {
-                        rentries[pidx] = new MIRRecordTypeEntry(pname, ValueOps.getValueType(pvalue).trkey, false);
+                        rentries[pidx] = new MIRRecordTypeEntry(pname, ValueOps.getValueType(pvalue), false);
                         rvalues[pidx] = [pname, pvalue];
                     }
                     else {
-                        rentries.push(new MIRRecordTypeEntry(pname, ValueOps.getValueType(pvalue).trkey, false));
+                        rentries.push(new MIRRecordTypeEntry(pname, ValueOps.getValueType(pvalue), false));
                         rvalues.push([pname, pvalue]);
                     }
                 }
@@ -625,7 +625,7 @@ class Interpreter {
             case MIROpTag.MIRIsTypeOf: {
                 const tog = op as MIRIsTypeOf;
                 const argv = this.getArgValue(fscope, tog.arg);
-                fscope.assignTmpReg(tog.trgt.regID, this.m_env.assembly.subtypeOf(ValueOps.getValueType(argv).trkey, tog.oftype));
+                fscope.assignTmpReg(tog.trgt.regID, this.m_env.assembly.subtypeOf(ValueOps.getValueType(argv), this.m_env.assembly.typeMap.get(tog.oftype) as MIRType));
                 break;
             }
             case MIROpTag.MIRRegAssign: {

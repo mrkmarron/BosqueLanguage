@@ -3231,13 +3231,13 @@ class TypeChecker {
         }
     }
 
-    private processPragmas(sinfo: SourceInfo, pragmas: [TypeSignature, string][]): [MIRNominalTypeKey, string][] {
+    private processPragmas(sinfo: SourceInfo, pragmas: [TypeSignature, string][]): [MIRType, string][] {
         const emptybinds = new Map<string, ResolvedType>();
 
         return pragmas.map((prg) => {
             const ptype = this.resolveAndEnsureTypeOnly(sinfo, prg[0], emptybinds);
             const pkey = this.m_emitter.registerResolvedTypeReference(ptype);
-            return [pkey.trkey, prg[1]] as [string, string];
+            return [pkey, prg[1]] as [MIRType, string];
         });
     }
 
@@ -3245,15 +3245,15 @@ class TypeChecker {
         try {
             this.m_file = tdecl.srcFile;
 
-            let terms = new Map<string, MIRResolvedTypeKey>();
-            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType).trkey));
+            let terms = new Map<string, MIRType>();
+            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
 
             const provides = tdecl.provides.map((provide) => {
                 const ptype = this.resolveAndEnsureTypeOnly(new SourceInfo(0, 0, 0, 0), provide, binds);
                 const cpt = ((ptype.options[0]) as ResolvedConceptAtomType).conceptTypes[0];
 
                 this.m_emitter.registerTypeInstantiation(cpt.concept, cpt.binds);
-                return MIRKeyGenerator.generateTypeKey(cpt.concept, cpt.binds);
+                return this.m_emitter.registerResolvedTypeReference(ptype);
             });
 
             const invariants = tdecl.invariants.map((inv) => {
@@ -3388,7 +3388,7 @@ class TypeChecker {
         let resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
         if (invoke.params.some((p) => p.isRef)) {
             const pout = invoke.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(this.resolveAndEnsureTypeOnly(sinfo, p.type, binds)));
-            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt.trkey, false))).trkey);
+            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
         }
 
         const env = TypeEnvironment.createInitialEnvForCall(binds, fargs, cargs);
@@ -3459,7 +3459,7 @@ class TypeChecker {
         let resultType = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
         if (fsig.params.some((p) => p.isRef)) {
             const pout = fsig.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(p.type as ResolvedType));
-            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt.trkey, false))).trkey);
+            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
         }
 
         const env = TypeEnvironment.createInitialEnvForCall(binds, fargs, cargs);
