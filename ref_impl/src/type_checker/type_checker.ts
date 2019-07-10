@@ -1040,8 +1040,9 @@ class TypeChecker {
 
             const cnames = [...allcaptured].sort();
                 for (let i = 0; i < cnames.length; ++i) {
-                    margs.push(new MIRVariable(cnames[i]));
-                    cinfo.push([this.m_emitter.bodyEmitter.generateCapturedVarName(cnames[i]), (env.lookupVar(cnames[i]) as VarInfo).flowType]);
+                    const vinfo = (env.lookupVar(cnames[i]) as VarInfo);
+                    margs.push(new MIRVariable(vinfo.isCaptured ? this.m_emitter.bodyEmitter.generateCapturedVarName(cnames[i]) : cnames[i]));
+                    cinfo.push([cnames[i], vinfo.flowType]);
             }
         }
 
@@ -3384,10 +3385,10 @@ class TypeChecker {
 
         for (let i = 0; i < pargs.length; ++i) {
             cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
-            argsNames.push(pargs[i][0]);
+            argsNames.push(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]));
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
-            params.push(new MIRFunctionParameter(pargs[i][0], ctype.trkey));
+            params.push(new MIRFunctionParameter(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]), ctype.trkey));
         }
 
         const resolvedResult = this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, binds);
@@ -3457,10 +3458,10 @@ class TypeChecker {
 
         for (let i = 0; i < pargs.length; ++i) {
             cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
-            argsNames.push(pargs[i][0]);
+            argsNames.push(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]));
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
-            params.push(new MIRFunctionParameter(pargs[i][0], ctype.trkey));
+            params.push(new MIRFunctionParameter(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]), ctype.trkey));
         }
 
         let resultType = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
