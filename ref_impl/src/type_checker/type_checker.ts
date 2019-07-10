@@ -1041,7 +1041,7 @@ class TypeChecker {
             const cnames = [...allcaptured].sort();
                 for (let i = 0; i < cnames.length; ++i) {
                     margs.push(new MIRVariable(cnames[i]));
-                    cinfo.push([cnames[i], (env.lookupVar(cnames[i]) as VarInfo).flowType]);
+                    cinfo.push([this.m_emitter.bodyEmitter.generateCapturedVarName(cnames[i]), (env.lookupVar(cnames[i]) as VarInfo).flowType]);
             }
         }
 
@@ -1183,7 +1183,12 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitAccessLocalVariable(exp.sinfo, exp.name, trgt);
             }
             else {
-                this.m_emitter.bodyEmitter.emitAccessArgVariable(exp.sinfo, exp.name, trgt);
+                if ((env.lookupVar(exp.name) as VarInfo).isCaptured) {
+                    this.m_emitter.bodyEmitter.emitAccessArgVariable(exp.sinfo, this.m_emitter.bodyEmitter.generateCapturedVarName(exp.name), trgt);
+                }
+                else {
+                    this.m_emitter.bodyEmitter.emitAccessArgVariable(exp.sinfo, exp.name, trgt);
+                }
             }
         }
 
@@ -3258,7 +3263,7 @@ class TypeChecker {
 
             const invariants = tdecl.invariants.map((inv) => {
                 const thistype = ResolvedType.createSingle(tdecl instanceof EntityTypeDecl ? ResolvedEntityAtomType.create(tdecl, binds) : ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(tdecl as ConceptTypeDecl, binds)]));
-                const invenv = TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>().set("this", new VarInfo(thistype, true, true, thistype)));
+                const invenv = TypeEnvironment.createInitialEnvForCall(binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>().set("this", new VarInfo(thistype, true, false, true, thistype)));
                 return this.checkExpressionAsBody(invenv, inv, this.m_assembly.getSpecialBoolType());
             });
 
@@ -3360,7 +3365,7 @@ class TypeChecker {
             }
             else {
                 const ptype = p.isOptional ? this.m_assembly.typeUnion([pdecltype, this.m_assembly.getSpecialNoneType()]) : pdecltype;
-                cargs.set(p.name, new VarInfo(ptype, !p.isRef, true, ptype));
+                cargs.set(p.name, new VarInfo(ptype, !p.isRef, false, true, ptype));
                 argsNames.push(p.name);
 
                 const mtype = this.m_emitter.registerResolvedTypeReference(ptype);
@@ -3370,7 +3375,7 @@ class TypeChecker {
 
         if (invoke.optRestType !== undefined) {
             const rtype = this.resolveAndEnsureTypeOnly(sinfo, invoke.optRestType, binds);
-            cargs.set(invoke.optRestName as string, new VarInfo(rtype, true, true, rtype));
+            cargs.set(invoke.optRestName as string, new VarInfo(rtype, true, false, true, rtype));
             argsNames.push(invoke.optRestName as string);
 
             const resttype = this.m_emitter.registerResolvedTypeReference(rtype);
@@ -3378,7 +3383,7 @@ class TypeChecker {
         }
 
         for (let i = 0; i < pargs.length; ++i) {
-            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, pargs[i][1]));
+            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
             argsNames.push(pargs[i][0]);
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
@@ -3395,7 +3400,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(binds, fargs, cargs);
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
             let mpc = new Map<string, MIRPCode>();
-            fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured] }));
+            fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.bodyEmitter.generateCapturedVarName(cname)) }));
 
             let mbinds = new Map<string, MIRResolvedTypeKey>();
             binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
@@ -3409,7 +3414,7 @@ class TypeChecker {
                 return this.checkExpressionAsBody(preenv, pre, this.m_assembly.getSpecialBoolType());
             });
 
-            const postargs = new Map<string, VarInfo>(cargs).set("_return_", new VarInfo(resolvedResult, true, true, resolvedResult));
+            const postargs = new Map<string, VarInfo>(cargs).set("_return_", new VarInfo(resolvedResult, true, false, true, resolvedResult));
             const postconds = invoke.postconditions.map((post) => {
                 const postenv = TypeEnvironment.createInitialEnvForCall(binds, fargs, postargs);
                 return this.checkExpressionAsBody(postenv, post, this.m_assembly.getSpecialBoolType());
@@ -3435,7 +3440,7 @@ class TypeChecker {
         for (let i = 0; i < pci.params.length; ++i) {
             const p = fsig.params[i];
             const ptype = p.isOptional ? this.m_assembly.typeUnion([p.type as ResolvedType, this.m_assembly.getSpecialNoneType()]) : p.type as ResolvedType;
-            cargs.set(pci.params[i].name, new VarInfo(ptype, !p.isRef, true, ptype));
+            cargs.set(pci.params[i].name, new VarInfo(ptype, !p.isRef, false, true, ptype));
             argsNames.push(pci.params[i].name);
 
             const mtype = this.m_emitter.registerResolvedTypeReference(ptype);
@@ -3443,7 +3448,7 @@ class TypeChecker {
         }
 
         if (fsig.optRestParamType !== undefined) {
-            cargs.set(pci.optRestName as string, new VarInfo(fsig.optRestParamType, true, true, fsig.optRestParamType));
+            cargs.set(pci.optRestName as string, new VarInfo(fsig.optRestParamType, true, false, true, fsig.optRestParamType));
             argsNames.push(pci.optRestName as string);
 
             const resttype = this.m_emitter.registerResolvedTypeReference(fsig.optRestParamType);
@@ -3451,7 +3456,7 @@ class TypeChecker {
         }
 
         for (let i = 0; i < pargs.length; ++i) {
-            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, pargs[i][1]));
+            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
             argsNames.push(pargs[i][0]);
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);

@@ -27,7 +27,7 @@ class ResolvedConceptAtomTypeEntry {
     static create(concept: ConceptTypeDecl, binds: Map<string, ResolvedType>): ResolvedConceptAtomTypeEntry {
         let name = concept.ns + "::" + concept.name;
         if (concept.terms.length !== 0) {
-            name += "[" + concept.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + "]";
+            name += "<" + concept.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + ">";
         }
 
         return new ResolvedConceptAtomTypeEntry(name, concept, binds);
@@ -63,7 +63,7 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
     static create(object: EntityTypeDecl, binds: Map<string, ResolvedType>): ResolvedEntityAtomType {
         let name = object.ns + "::" + object.name;
         if (object.terms.length !== 0) {
-            name += "[" + object.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + "]";
+            name += "<" + object.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + ">";
         }
 
         return new ResolvedEntityAtomType(name, object, binds);

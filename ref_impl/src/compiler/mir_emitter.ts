@@ -99,6 +99,10 @@ class MIRBodyEmitter {
         return new MIRTempRegister(this.m_tmpIDCtr++);
     }
 
+    generateCapturedVarName(name: string): string {
+        return "__c_" + name;
+    }
+
     createNewBlock(pfx: string): string {
         const name = `${pfx}_${this.m_blockMap.size}`;
         this.m_blockMap.set(name, new MIRBasicBlock(name, []));

@@ -54,28 +54,30 @@ class FlowTypeTruthOps {
 class VarInfo {
     readonly declaredType: ResolvedType;
     readonly isConst: boolean;
+    readonly isCaptured: boolean;
     readonly mustDefined: boolean;
     readonly flowType: ResolvedType;
 
-    constructor(dtype: ResolvedType, isConst: boolean, mustDefined: boolean, ftype: ResolvedType) {
+    constructor(dtype: ResolvedType, isConst: boolean, isCaptured: boolean, mustDefined: boolean, ftype: ResolvedType) {
         this.declaredType = dtype;
         this.flowType = ftype;
         this.isConst = isConst;
+        this.isCaptured = isCaptured;
         this.mustDefined = mustDefined;
     }
 
     assign(ftype: ResolvedType): VarInfo {
         assert(!this.isConst);
-        return new VarInfo(this.declaredType, this.isConst, true, ftype);
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
     }
 
     infer(ftype: ResolvedType): VarInfo {
-        return new VarInfo(this.declaredType, this.isConst, true, ftype);
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
     }
 
     static join(assembly: Assembly, ...values: VarInfo[]): VarInfo {
         assert(values.length !== 0);
-        return new VarInfo(values[0].declaredType, values[0].isConst, values.every((vi) => vi.mustDefined), assembly.typeUnion(values.map((vi) => vi.flowType)));
+        return new VarInfo(values[0].declaredType, values[0].isConst, values[0].isCaptured, values.every((vi) => vi.mustDefined), assembly.typeUnion(values.map((vi) => vi.flowType)));
     }
 }
 
@@ -246,7 +248,7 @@ class TypeEnvironment {
 
     addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, ftype: ResolvedType): TypeEnvironment {
         let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
-        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, isDefined, ftype));
+        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, false, isDefined, ftype));
         return new TypeEnvironment(this.terms, this.pcodes, this.args, localcopy, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
