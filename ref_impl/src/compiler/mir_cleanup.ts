@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIRBody, MIRArgument, MIROpTag, MIRTempRegister, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJumpCond, MIRJumpNone, MIRBasicBlock, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRInvokeVirtualFunction, MIRInvokeFixedFunction } from "./mir_ops";
+import { MIROp, MIRBody, MIRArgument, MIROpTag, MIRTempRegister, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJumpCond, MIRJumpNone, MIRBasicBlock, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRRegisterArgument } from "./mir_ops";
 
 //
 //Implement cleanup passes for the MIR after translation from the AST representation:
@@ -16,6 +16,21 @@ import { MIROp, MIRBody, MIRArgument, MIROpTag, MIRTempRegister, MIRLoadConst, M
 function propagateTmpAssign_Bind(treg: MIRTempRegister, arg: MIRArgument, propMap: Map<number, MIRArgument>) {
     assert(!propMap.has(treg.regID));
     propMap.set(treg.regID, arg);
+}
+
+function propagateTmpAssign_Kill(arg: MIRRegisterArgument, propMap: Map<number, MIRArgument>) {
+    let killset = new Set<number>();
+    propMap.forEach((v, k) => {
+        if (v instanceof MIRRegisterArgument && v.nameID === arg.nameID) {
+            killset.add(k);
+        }
+    });
+
+    killset.forEach((k) => propMap.delete(k));
+
+    if (arg instanceof MIRTempRegister) {
+        propMap.delete(arg.regID);
+    }
 }
 
 function propagateTmpAssign_Remap(arg: MIRArgument, propMap: Map<number, MIRArgument>): MIRArgument {
@@ -31,9 +46,13 @@ function propagateTmpAssign_RemapStructuredArgs<T>(args: T[], remap: (arg: T) =>
 }
 
 function propagateTmpAssignForOp(op: MIROp, propMap: Map<number, MIRArgument>) {
+    const ks = op.getModVars();
+    ks.forEach((kv) => propagateTmpAssign_Kill(kv, propMap));
+
     switch (op.tag) {
         case MIROpTag.MIRLoadConst: {
             const lc = op as MIRLoadConst;
+            propagateTmpAssign_Kill(lc.trgt, propMap);
             propagateTmpAssign_Bind(lc.trgt, lc.src, propMap);
             break;
         }

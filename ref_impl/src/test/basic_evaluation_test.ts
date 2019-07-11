@@ -1855,7 +1855,7 @@ const statement_tests: TestInfo[] = [
     { name: "pthread3", input: ["pthread3"], expected: "9" },
 
     { name: "returnor1", input: ["returnor1"], expected: "5" },
-    { name: "returnor11", input: ["returnor1"], expected: "none" },
+    { name: "returnor11", input: ["returnor11"], expected: "none" },
     { name: "returnor2", input: ["returnor2"], expected: "1" },
     { name: "returnor3", input: ["returnor3"], expected: "5" },
     { name: "returnor4", input: ["returnor4"], expected: "4" },

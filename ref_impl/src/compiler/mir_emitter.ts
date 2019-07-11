@@ -249,7 +249,7 @@ class MIRBodyEmitter {
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
                 this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, i + 1, ri));
-                this.m_currentBlock.push(new MIRVarStore(sinfo, rr, new MIRVariable(refs[i])));
+                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i])));
             }
 
             this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, 0, trgt));
@@ -267,7 +267,7 @@ class MIRBodyEmitter {
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
                 this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, i + 1, ri));
-                this.m_currentBlock.push(new MIRVarStore(sinfo, rr, new MIRVariable(refs[i])));
+                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i])));
             }
 
             this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, 0, trgt));
