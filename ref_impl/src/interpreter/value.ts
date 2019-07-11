@@ -7,7 +7,7 @@ import * as assert from "assert";
 import { MIRType, MIROOTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../compiler/mir_assembly";
 
 type Value = undefined | boolean | number | string | FloatValue | TypedStringValue | RegexValue | GUIDValue | EntityValue | TupleValue | RecordValue;
-type KeyValue = undefined | boolean | number | string | GUIDValue | EnumValue | TupleValue | RecordValue | CustomKeyValue;
+type KeyValue = undefined | boolean | number | string | GUIDValue | EnumValue | TupleValue | RecordValue | IdKeyValue;
 
 class FloatValue {
     readonly value: number;
@@ -95,7 +95,7 @@ class EnumValue extends EntityValue {
     }
 }
 
-class CustomKeyValue extends EntityValue {
+class IdKeyValue extends EntityValue {
     readonly cvalue: undefined | boolean | number | string | GUIDValue | EnumValue | TupleValue | RecordValue;
 
     constructor(etype: MIREntityType, cvalue: undefined | boolean | number | string | GUIDValue | EnumValue | TupleValue | RecordValue) {
@@ -364,7 +364,7 @@ class ValueOps {
                 if (v instanceof EnumValue) {
                     return v.etype.ekey + "::" + v.enumValue;
                 }
-                else if (v instanceof CustomKeyValue) {
+                else if (v instanceof IdKeyValue) {
                     return v.etype.ekey + "::" + v.cvalue;
                 }
                 else if (v instanceof EntityValueSimple) {
@@ -503,9 +503,9 @@ class ValueOps {
                 return hv;
             }
             else {
-                assert(v instanceof CustomKeyValue);
+                assert(v instanceof IdKeyValue);
 
-                return ValueOps.keyValueHash((v as CustomKeyValue).cvalue);
+                return ValueOps.keyValueHash((v as IdKeyValue).cvalue);
             }
         }
     }
@@ -567,8 +567,8 @@ class ValueOps {
 
                 return true;
             }
-            else if (v1 instanceof CustomKeyValue && v2 instanceof CustomKeyValue) {
-                return (v1.etype.ekey === v2.etype.ekey) && ValueOps.keyValueEqualTo((v1 as CustomKeyValue).cvalue, (v2 as CustomKeyValue).cvalue);
+            else if (v1 instanceof IdKeyValue && v2 instanceof IdKeyValue) {
+                return (v1.etype.ekey === v2.etype.ekey) && ValueOps.keyValueEqualTo((v1 as IdKeyValue).cvalue, (v2 as IdKeyValue).cvalue);
             }
             else {
                 return false;
@@ -596,6 +596,6 @@ class ValueOps {
 export {
     Value, KeyValue, FloatValue, TypedStringValue, RegexValue, GUIDValue, ValueOps,
     TupleValue, RecordValue,
-    EntityValue, EntityValueSimple, EnumValue, CustomKeyValue,
+    EntityValue, EntityValueSimple, EnumValue, IdKeyValue,
     CollectionValue, ListValue, HashSetValue, MapValue, HashMapValue
 };

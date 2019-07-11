@@ -710,7 +710,7 @@ class Assembly {
     getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
     getSpecialEnumType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
-    getSpecialCustomKeyType(): ResolvedType { return this.internSpecialConceptType("CustomKey"); }
+    getSpecialCustomKeyType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
 
     getSpecialParsableConcept(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
     getSpecialKeyedConcept(): ResolvedType { return this.internSpecialConceptType("Keyed"); }
