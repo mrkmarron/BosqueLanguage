@@ -1694,6 +1694,70 @@ entrypoint function staticConstEval(): Int {
         return x + y;
     }
 }
+
+function pthread(ref x: Int): Int {
+    x = x + 1;
+    return 5;
+}
+
+function pthread_multi(ref x: Int, y: Int): Int {
+    var k = pthread(ref x);
+    return k + y;
+}
+
+entrypoint function pthread1(): Int {
+    var x = 1;
+    var z = pthread(ref x);
+    return x + z;
+}
+
+entrypoint function pthread2(): Int {
+    var x = 2;
+    var z = pthread(ref x);
+    var w = pthread(ref x);
+    return x + z + w;
+}
+
+entrypoint function pthread3(): Int {
+    var x = 1;
+    var z = pthread_multi(ref x, 2);
+    return x + z;
+}
+
+entrypoint function returnor1(): Int | None {
+    var y = (1 == 2) ? none : 4 or return;
+    return y + 1;
+}
+
+entrypoint function returnor11(): Int | None {
+    var y = (1 == 1) ? none : 4 or return;
+    return y + 1;
+}
+
+entrypoint function returnor2(): Int {
+    var y = (1 == 1) ? none : 4 or return 1;
+    return y + 1;
+}
+
+entrypoint function returnor3(): Int | None {
+    var y = (1 == 2) ? 0 : 4 or return when _value_ == 0;
+    return y + 1;
+}
+
+entrypoint function returnor4(): Int {
+    var y = (1 == 2) ? 0 : 4 or return when _value_ == 4;
+    return y + 1;
+}
+
+entrypoint function returnor5(): Int {
+    var y = (1 == 1) ? 0 : 4 or return 8 when _value_ == 4;
+    return y + 1;
+}
+
+entrypoint function returnor6(): Int {
+    var y = (1 == 2) ? 0 : 4 or return 8 when _value_ == 4;
+    return y + 1;
+}
 `;
 
 const statement_tests: TestInfo[] = [
@@ -1784,7 +1848,19 @@ const statement_tests: TestInfo[] = [
     { name: "checkFail", input: ["checkFail"], expected: "[NO RESULT]", expectedError: true },
 
     { name: "namespaceConstEval", input: ["namespaceConstEval"], expected: "6" },
-    { name: "staticConstEval", input: ["staticConstEval"], expected: "6" }
+    { name: "staticConstEval", input: ["staticConstEval"], expected: "6" },
+
+    { name: "pthread1", input: ["pthread1"], expected: "7" },
+    { name: "pthread2", input: ["pthread2"], expected: "14" },
+    { name: "pthread3", input: ["pthread3"], expected: "9" },
+
+    { name: "returnor1", input: ["returnor1"], expected: "5" },
+    { name: "returnor11", input: ["returnor1"], expected: "none" },
+    { name: "returnor2", input: ["returnor2"], expected: "1" },
+    { name: "returnor3", input: ["returnor3"], expected: "5" },
+    { name: "returnor4", input: ["returnor4"], expected: "4" },
+    { name: "returnor5", input: ["returnor5"], expected: "1" },
+    { name: "returnor6", input: ["returnor6"], expected: "8" }
 ];
 
 function statement_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {

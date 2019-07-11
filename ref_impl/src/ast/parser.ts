@@ -519,8 +519,12 @@ class Parser {
         this.m_penv.setNamespaceAndFile(ns, file);
     }
 
-    private peekToken(): string {
-        return this.m_tokens[this.m_cpos].kind;
+    private peekToken(pos?: number): string {
+        return this.m_tokens[this.m_cpos + (pos || 0)].kind;
+    }
+
+    private peekTokenData(pos?: number): string {
+        return this.m_tokens[this.m_cpos + (pos || 0)].data as string;
     }
 
     private testToken(kind: string): boolean {
@@ -724,7 +728,7 @@ class Parser {
             const bodyid = `${srcFile}::${sinfo.pos}`;
             try {
                 this.m_penv.pushFunctionScope(new FunctionScope(argNames));
-                body = this.parseBody(bodyid, srcFile);
+                body = this.parseBody(bodyid, srcFile, fparams.map((p) => p.name));
                 captured = this.m_penv.getCurrentFunctionScope().getCaptureVars();
                 this.m_penv.popFunctionScope();
             }
@@ -2106,21 +2110,21 @@ class Parser {
         }
     }
 
-    private parseBody(bodyid: string, file: string): BodyImplementation {
+    private parseBody(bodyid: string, file: string, pnames: string[]): BodyImplementation {
         if (this.testToken("#")) {
             this.consumeToken();
             this.ensureToken(TokenStrings.Identifier);
             return new BodyImplementation(bodyid, file, this.consumeTokenAndGetValue());
         }
-        else if (this.testFollows("{", TokenStrings.Identifier, "=")) {
-            //This is ambigious with the record constructor {p=exp ...} and the statement block {x=exp; ...}
-            //However it is illegal to set a variable before declaration -- and updating a ref var as the first action doesn't make sense either
-            //So we treat this as an expression
-
-            return new BodyImplementation(bodyid, file, this.parseExpression());
-        }
         else if (this.testToken("{")) {
-            return new BodyImplementation(bodyid, file, this.parseBlockStatement());
+            if (this.testFollows("{", TokenStrings.Identifier, "=") && !pnames.includes(this.peekTokenData(1))) {
+                //This is ambigious with the record constructor {p=exp ...} and the statement block {x=exp; ...}
+                //However it is illegal to set a variable before declaration -- only option is updating a ref parameter so we check that
+                return new BodyImplementation(bodyid, file, this.parseExpression());
+            }
+            else {
+                return new BodyImplementation(bodyid, file, this.parseBlockStatement());
+            }
         }
         else {
             return new BodyImplementation(bodyid, file, this.parseExpression());

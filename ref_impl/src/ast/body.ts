@@ -614,7 +614,7 @@ class ExpOrExpression extends Expression {
     readonly cond: Expression | undefined;
 
     constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression | undefined, cond: Expression | undefined) {
-        super(ExpressionTag.SelectExpression, sinfo);
+        super(ExpressionTag.ExpOrExpression, sinfo);
         this.exp = exp;
         this.action = action;
         this.result = result;

@@ -326,8 +326,20 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRVarLifetimeEnd(sinfo, name));
     }
 
-    emitReturnAssign(sinfo: SourceInfo, src: MIRArgument) {
-        this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
+    emitReturnAssign(sinfo: SourceInfo, refparams: string[], src: MIRArgument) {
+        if (refparams.length === 0) {
+            this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
+        }
+        else {
+            let args: MIRArgument[] = [src];
+            for (let i = 0; i < refparams.length; ++i) {
+                args.push(new MIRVariable(refparams[i]));
+            }
+
+            const tupreg = this.generateTmpRegister();
+            this.m_currentBlock.push(new MIRConstructorTuple(sinfo, args, tupreg));
+            this.m_currentBlock.push(new MIRReturnAssign(sinfo, tupreg));
+        }
     }
 
     emitAbort(sinfo: SourceInfo, releaseEnable: boolean, info: string) {
