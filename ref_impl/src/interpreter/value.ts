@@ -343,7 +343,7 @@ class ValueOps {
                 return v.value.toString();
             }
             else if (v instanceof TypedStringValue) {
-                return `${v.oftype.tkey}#${ValueOps.escapeTypedString(v.value)}`;
+                return `${v.oftype.tkey}${ValueOps.escapeTypedString(v.value)}`;
             }
             else if (v instanceof RegexValue) {
                 return v.value;

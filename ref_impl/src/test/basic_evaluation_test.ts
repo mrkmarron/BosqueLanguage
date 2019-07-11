@@ -175,7 +175,7 @@ entrypoint function literalHello(): String {
 }
 
 entrypoint function literalFooString(): String<Foo> {
-    return Foo#'hello';
+    return Foo'hello';
 }
 
 entrypoint function literalFooObject(): Foo {
@@ -407,15 +407,15 @@ entrypoint function eqStringTrue(): Bool {
 }
 
 entrypoint function eqTypedStringTrue(): Bool {
-    return Foo#'hello' == Foo#'hello';
+    return Foo'hello' == Foo'hello';
 }
 
 entrypoint function eqTypedStringMixedTrue(): Bool {
-    return Foo#'hello' == "hello";
+    return Foo'hello' == "hello";
 }
 
 entrypoint function eqTypedStringMixedFalse(): Bool {
-    return Foo#'hello' == "hi";
+    return Foo'hello' == "hi";
 }
 
 entrypoint function eqTupleTrue(): Bool {
@@ -499,15 +499,15 @@ entrypoint function lteqStringTrue(): Bool {
 }
 
 entrypoint function lteqTypedStringTrue(): Bool {
-    return Foo#'hello' <= Foo#'hello';
+    return Foo'hello' <= Foo'hello';
 }
 
 entrypoint function lteqTypedStringMixedTrue(): Bool {
-    return Foo#'hello' <= "hello";
+    return Foo'hello' <= "hello";
 }
 
 entrypoint function ltTypedStringMixedFalse(): Bool {
-    return Foo#'hello' < "h";
+    return Foo'hello' < "h";
 }
 
 entrypoint function gtIntFalse(): Bool {
@@ -961,7 +961,7 @@ const expression_tests: TestInfo[] = [
     { name: "literalEmptyString", input: ["literalEmptyString"], expected: "\"\"" },
     { name: "literalHello", input: ["literalHello"], expected: "\"hello\"" },
 
-    { name: "literalFooString", input: ["literalFooString"], expected: "NSTestExpression::Foo#'hello'" },
+    { name: "literalFooString", input: ["literalFooString"], expected: "NSTestExpression::Foo'hello'" },
     { name: "literalFooObject", input: ["literalFooObject"], expected: "NSTestExpression::Foo{}" },
 
     { name: "emptyTuple", input: ["emptyTuple"], expected: "[]" },

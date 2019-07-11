@@ -87,8 +87,6 @@ const SymbolStrings = [
     "==",
     "=>",
     "==>",
-    "#",
-    "~",
     ";",
     "|",
     "||",
@@ -102,8 +100,6 @@ const SymbolStrings = [
     "?.",
     "<",
     "<=",
-    "<~",
-    "<+",
     ">",
     ">=",
     "-",
@@ -1105,8 +1101,6 @@ class Parser {
                 }
                 else {
                     const ptype = this.parseTypeSignature();
-
-                    this.ensureAndConsumeToken("#");
                     this.ensureToken(TokenStrings.TypedString);
                     const pstr = this.consumeTokenAndGetValue();
 
@@ -1294,15 +1288,14 @@ class Parser {
                     return new CallStaticFunctionExpression(sinfo, ttype, name, targs, pragmas, args);
                 }
             }
-            else if (this.testFollows("#", TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
-                if (this.testAndConsumeTokenIf("#")) {
-                    const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-                    return new LiteralTypedStringExpression(sinfo, sstr, ttype);
-                }
-                else {
-                    this.ensureAndConsumeToken("@");
+            else if (this.testToken(TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
+                if (this.testAndConsumeTokenIf("@")) {
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
                     return new LiteralTypedStringConstructorExpression(sinfo, sstr, ttype);
+                }
+                else {
+                    const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
+                    return new LiteralTypedStringExpression(sinfo, sstr, ttype);
                 }
             }
             else if (this.testFollows("@", TokenStrings.Identifier)) {

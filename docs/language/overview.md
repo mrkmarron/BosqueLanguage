@@ -29,7 +29,7 @@ The Bosque language derives from a combination of [TypeScript](https://www.types
 - [1 Type System](#1-Type-System)
   - [1.1 Nominal Types](#1.1-Nominal-Types)
   - [1.2 Structural Types](#1.2-Structural-Types)
-  - [1.3 Function Types](#1.3-Function-Types)
+  - [1.3 Parameter Code Block Types](#1.3-Parameter-Code-Block-Types)
   - [1.4 Combination Types](#1.4-Combination-Types)
   - [1.5 Generics](#1.5-Generics)
 - [2 Core Types](#2-Core-Types)
@@ -107,8 +107,6 @@ function abs(x: Int): Int {
 
 ## <a name="0.3-Reference-Parameter-Threading"></a>0.3 Reference Parameter Threading
 
-**[NOT IMPLEMENTED YET]**
-
 In addition to allowing multiple assignments to variables, the Bosque language also allows developers to thread parameters via `ref` argument passing. This alternative to multi-return values simplifies scenarios where a variable (often some sort of environment) is passed to a method which may use and update it. Allowing the update in the parameter eliminates the extra return value management that would otherwise be needed:
 
 ```none
@@ -120,6 +118,10 @@ function internString(ref env: Map<String, Int>, str: String): Int {
     env = env.add(str, env.size()); //update the ref parameter
     return env.size();
 }
+
+
+...
+var nameid = internString(ref env, "hello");
 ```
 
 ## <a name="0.4-Typed-Strings"></a>0.4 Typed Strings
@@ -127,12 +129,16 @@ function internString(ref env: Map<String, Int>, str: String): Int {
 Typed strings provide a novel mechanism for lifting known structure about the contents of a string into the type in a way that is meaningful to humans and that can be used by the type checker ([1.1.2 Typed Strings](#1.1.2-Typed-Strings)). This allows for code such as the following:
 
 ```none
-function foo(zip: String[Zipcode], name: String) {...}
+function foo(zip: String<Zipcode>, name: String) {...}
 
-var zc: String[Zipcode] = ...;
-var user: String = ...;
+var zc: String<Zipcode> = Zipcode'98052';
+var user: String = "Mark";
 
-foo(user, zc) //Type error String not convertible to String[Zipcode]
+var zcbad: String<Zipcode> = "9"; //error not a typed string on right side
+var zcbad: String<Zipcode> = "98052"; //error still not a typed string on right side
+var zcbad: String<Zipcode> = Zipcode'9'; //error bad format in typed string literal
+
+foo(user, zc) //Type error String not convertible to String<Zipcode>
 foo(zc, user) //ok
 ```
 
@@ -141,26 +147,26 @@ foo(zc, user) //ok
 Bosque provides _named arguments_ along with _rest_ and _spread_ operators. These can be used to perform simple and powerful data manipulation as part of invocations and constructor operations ([5.1 Arguments](#5.1-Arguments)).
 
 ```none
-function nsum(d: Int, ...args: List[Int]): Int {
+function nsum(d: Int, ...args: List<Int>): Int {
     return args.sum(default=d);
 }
 
 function np(p1: Int, p2: Int): {x: Int, y: Int} {
-    return @{x=p1, y=p2};
+    return {x=p1, y=p2};
 }
 
 //calls with explicit arguments
 var x = nsum(0, 1, 2, 3); //returns 6
 
-var a = np(1, 2);         //returns @{x=1, y=2}
-var b = np(p2=2, 1);      //also returns @{x=1, y=2}
+var a = np(1, 2);         //returns {x=1, y=2}
+var b = np(p2=2, 1);      //also returns {x=1, y=2}
 
 //calls with spread arguments
-var t = @[1, 2, 3];
+var t = [1, 2, 3];
 var p = nsum(0, ...t);    //returns 6 -- same as explicit call
 
-var r = @{p1=1, p2=2};
-var q = np(...r);         //returns @{x=1, y=2} -- same as explicit call
+var r = {p1=1, p2=2};
+var q = np(...r);         //returns {x=1, y=2} -- same as explicit call
 ```
 
 ## <a name="0.6-Bulk-Algebraic-Data-Operations"></a>0.6 Bulk Algebraic Data Operations
@@ -168,23 +174,23 @@ var q = np(...r);         //returns @{x=1, y=2} -- same as explicit call
 Bulk algebraic operations in Bosque start with support for bulk reads and updates to data values. Consider the common case of having a struct with 3 fields where 2 of them need to be updated. In most languages this would need to be done on a field-by-field basis. However with the bulk data operations it is possible to perform the update as an atomic operation (unlike in an imperative style) and without manually extracting and copying fields (like in a functional style).
 
 ```none
-var x = @{f=1, g=2, h=3};
-x<~(f=-1, g=-2); //@{f=-1, @g=-2, h=3}
+var x = {f=1, g=2, h=3};
+x->update(f=-1, g=-2); //{f=-1, @g=-2, h=3}
 ```
 
 In addition to eliminating opportunities to forget or confuse a field these operators help focus the code on the overall intent, instead of being hidden in the individual steps, and allow a developer to perform algebraic reasoning on the data structure operations. Bosque provides several flavors of these algebraic operations for various data types, tuples, records, and nominal types, and for various operations including projection, multi-update, and merge.
 
 ```none
-var l = @[7, 8, 9];
-var r = @{f=7, g=8};
+var l = [7, 8, 9];
+var r = {f=7, g=8};
 
-l@[0, 2];     //@[7, 9]
-l<+(@[5, 6]); //@[7, 8, 9, 5, 6]
-l#[Int, Int]; //@[7, 8]
+l.[0, 2]               //[7, 9]
+l->merge([5, 6])       //[7, 8, 9, 5, 6]
+l->project<Int, Int>() //[7, 8]
 
-r@{f, h};         //@{f=7, h=none}
-r<~(f=5, h=1);    //@{f=5, g=8, h=1}
-r<+(@{f=5, h=1}); //@{f=5, g=8, h=1}
+r.{f, h}             //{f=7, h=none}
+r->update(f=5, h=1)  //{f=5, g=8, h=1}
+r->merge({f=5, h=1}) //{f=5, g=8, h=1}
 ```
 
 ## <a name="0.7-None-Processing"></a>0.7 None Processing
@@ -199,22 +205,13 @@ function foo(val?: {tag: Int, value?: String}): String {
 
 ## <a name="0.8-Iterative-Processing"></a>0.8 Iterative Processing
 
-A fundamental concept in a programming language is the iteration construct and a critical question is should this construct be provided as high-level functors, such as filter/map/reduce, or do programmers benefit from the flexibility available with iterative, while or for, looping constructs. To answer this question in a definitive manner the authors of [Mining Semantic Loop Idioms](https://www.microsoft.com/en-us/research/uploads/prod/2018/10/LoopIdioms.pdf) engaged in a study of all the loops "idioms" found in real-world code. The categorization and coverage results showed that almost every loop a developer would want to write falls into a small number of idiomatic patterns which correspond to higher level concepts developers are using in the code, e.g., filter, find, group, map, etc. With this result in mind the Bosque language trades structured loops for a set of high-level iterative processing constructs ([3 Collections](#3-Collections) and [5.18 Pipeline](#5.18-Pipeline)).
+A fundamental concept in a programming language is the iteration construct and a critical question is should this construct be provided as high-level functors, such as filter/map/reduce, or do programmers benefit from the flexibility available with iterative, while or for, looping constructs. To answer this question in a definitive manner the authors of [Mining Semantic Loop Idioms](https://www.microsoft.com/en-us/research/uploads/prod/2018/10/LoopIdioms.pdf) engaged in a study of all the loops "idioms" found in real-world code. The categorization and coverage results showed that almost every loop a developer would want to write falls into a small number of idiomatic patterns which correspond to higher level concepts developers are using in the code, e.g., filter, find, group, map, etc. With this result in mind the Bosque language trades structured loops for a set of high-level iterative processing constructs ([3 Collections](#3-Collections)).
 
 ```none
-var v: List[Int?] = List[Int?]@{1, 2, none, 4};
+var v: List<Int?> = List<Int?>{1, 2, none, 4};
 
-//Chained - List@{1, 4, 16}
-v->filter(fn(x) => x != none)->map[Int](fn(x) => x*x)
-
-//Piped none filter - List@{1, 4, 16}
-v |> filter(fn(x) => x != none) |> map[Int](fn(x) => x*x)
-
-//Piped with noneable filter - List@{1, 4, 16}
-v |??> map[Int](fn(x) => x*x)
-
-//Piped with none to result - List@{1, 4, none, 16}
-v |?> map[Int](fn(x) => x*x)
+//Chained - List<Int>{1, 4, 16}
+v->filter(fn(x) => x != none)->map<Int>(fn(x) => x*x)
 ```
 
 Eliminating the boilerplate of writing the same loops repeatedly eliminates whole classes of errors including, e.g. bounds computations, and makes the intent clear with a descriptively named functor instead of relying on a shared set of mutually known loop patterns. Critically, for enabling automated program validation and optimization, eliminating loops also eliminates the need for computing loop-invariants. Instead, and with a careful design of the collection libraries, it is possible to write precise transformers for each functor. In this case the computation of _strongest-postconditions_ or _weakest-preconditions_ avoids the complexity of generating a loop invariant and instead becomes a simple and deterministic case of formula pushing!
@@ -223,7 +220,7 @@ Eliminating the boilerplate of writing the same loops repeatedly eliminates whol
 
 The lack of explicit looping constructs, and the presence of collection processing functors, is not unusual in functional languages. However, the result is often the replacement of complex loop structures with complex recursion structures. Complex raw flows obfuscate the intent of the code and hinder automated analysis and tooling regardless of if the flow is a loop or recursion.
 
-Thus, Bosque is designed to encourage limited uses of recursion, increase the clarity of the recursive structure, and enable compilers/runtimes to avoid stack related errors. This is done by introducing the `rec` keyword which is used at both declaration sites to indicate a function/method is recursive and again at the call site so as to affirm that the caller is aware of the recursive nature of the call ([7 Invokable-Declarations](#7-Invokable-Declarations)).
+Thus, Bosque is designed to encourage limited uses of recursion, increase the clarity of the recursive structure, and enable compilers/runtimes to avoid stack related errors. This is done by introducing the `recursive` keyword which is used at both declaration sites to indicate a function/method is recursive and again at the call site so as to affirm that the caller is aware of the recursive nature of the call ([7 Invokable-Declarations](#7-Invokable-Declarations)).
 
 ## <a name="0.10-Determinacy"></a>0.10 Determinacy
 
@@ -271,7 +268,7 @@ concept Bar {
     field f: Int;
 
     factory default(): {f: Int} {
-        return @{f=1};
+        return {f=1};
     }
 }
 
@@ -280,21 +277,21 @@ entity Baz provides Bar {
     field h: Bool = true;
 
     factory identity(i: Int): {f: Int, g: Int} {
-        return @{f=i, g=i};
+        return {f=i, g=i};
     }
 }
 
-var x = Baz@{f=1, g=2};
-var y = Baz@{f=1, g=2, h=false};
+var x = Baz{f=1, g=2};
+var y = Baz{f=1, g=2, h=false};
 
-var p = Baz@identity(1); //equivalent to Baz@{...Baz::identity(1)}
-var q = Baz@{...Bar::default(), g=2};
+var p = Baz@identity(1); //equivalent to Baz{...Baz::identity(1)}
+var q = Baz{...Bar::default(), g=2};
 ```
 
 In this code the two `Baz` entities are allocated via the atomic initialization constructor. In the first case the omitted `h` field is set to the provided default value of `true`. The `identity` factory defines `f` and `g` values for the entity via the returned record. When invoked with the constructor syntax
 this is desugared to the atomic initializer with the result of factory.
 
-With this design the need to pass data up through super calls is eliminated as the data can be directly inserted into the initializer or, if the super constructor has factory logic, then the super factory can be called and the result expanded directly into the atomic constructor as in `p = Baz@{...Bar::default(), g=2}`. The result of this inverted constructor logic is that _only_ the arguments needed for internal computation of initialization values must be propagated while all others can be directly set in the initializer. The elimination of the constructor boilerplate code and reduction in argument passing simplifies the definition of new nominal types as well as the impact of cascading changes when a field (or constructor argument) is added/removed in a base definition.
+With this design the need to pass data up through super calls is eliminated as the data can be directly inserted into the initializer or, if the super constructor has factory logic, then the super factory can be called and the result expanded directly into the atomic constructor as in `p = Baz{...Bar::default(), g=2}`. The result of this inverted constructor logic is that _only_ the arguments needed for internal computation of initialization values must be propagated while all others can be directly set in the initializer. The elimination of the constructor boilerplate code and reduction in argument passing simplifies the definition of new nominal types as well as the impact of cascading changes when a field (or constructor argument) is added/removed in a base definition.
 
 ## <a name="0.14-Synthesis-Blocks"></a>0.14 Synthesis Blocks
 
@@ -511,7 +508,7 @@ Users can define abstract types ([TODO]()), `concept` declarations, which allow 
 
 Developers can alias types or create special types ([TODO]()) using `typedef`, `enum`, and `identifier` constructs ([TODO]()).
 
-The Bosque core library defines several unique concepts/entities. The `Any` type is an uber type which all others are a subtype of, the `None` and `Some` types are for distinguishing around the unique `none` value, and `Tuple`, `Record`, etc. exist to unify with the structural type system ([section 2](#2-Core-Types)). The language has primitives for `Bool`, `Int`, `String`, etc. as well as the expected set of parametric collection types such as `List[T]` `Map[K, V]` ([section 3](#2-Collections)).
+The Bosque core library defines several unique concepts/entities. The `Any` type is an uber type which all others are a subtype of, the `None` and `Some` types are for distinguishing around the unique `none` value, and `Tuple`, `Record`, etc. exist to unify with the structural type system ([section 2](#2-Core-Types)). The language has primitives for `Bool`, `Int`, `String`, etc. as well as the expected set of parametric collection types such as `List<T>` `Map<K, V>` ([section 3](#2-Collections)).
 
 Examples of nominal types include:
 
@@ -519,7 +516,7 @@ Examples of nominal types include:
 MyType       //user declared concept or entity
 Some         //core library declared concept
 NSCore::Some //core library concept with explicit namespace scope
-List[Int]    //core collection with generic parameter Int
+List<Int>    //core collection with generic parameter Int
 ```
 
 ### <a name="1.1.1-Type-Relation-on-Nominal-Types"></a>1.1.1 Type Relation on Nominal Types
@@ -528,7 +525,7 @@ The subtype relation on nominal types `T1` and `T2` is the standard parametric i
 
 1. `T1 === T2`
 2. `T1` provides `T3` && `T3 <: T2` ([8 Concept and Entity Declarations](#8-Concept-and-Entity-Declarations))
-3. `T1 === B1[G1]` && `T2 === B2[G2]` && `B1 === B2` && `G1 <: G2`
+3. `T1 === B1<G1>` && `T2 === B2<G2>` && `B1 === B2` && `G1 <: G2`
 
 The first cases is if the two types are syntactically identical names. The second case covers the situation in which `T1` is declared to provide a concept that is, transitively, a subtype of `T2`. The final case is the standard parametric subtype relation on generic parameters. Some examples of these include:
 
@@ -536,28 +533,32 @@ The first cases is if the two types are syntactically identical names. The secon
 MyType <: MyType             //true - by case 1
 Some <: Any                  //true - Some provides Any
 Int <: Bool                  //false - no suitable `T3` for case 2
-List[Int] <: List[Any]       //true - Int <: Any
-List[Int] <: List[Bool]      //false - Int <! Bool
-List[Int] <: Collection[Int] //true - List[T] provides Collection[T]
+List<Int> <: List<Any>       //true - Int <: Any
+List<Int> <: List<Bool>      //false - Int <! Bool
+List<Int> <: Collection<Int> //true - List<Int> provides Collection<Int>
 ```
 
 Note that the subtype relation is _covariant_ as all generic types are subtyped on the parameters. This is always safe as all data types in Bosque are immutable ([0.1 Immutable Values](#0.1-Immutable-Values)).
 
 ### <a name="1.1.2-Typed-Strings"></a>1.1.2 Typed Strings
 
-Typed strings provide a novel mechanism for lifting known structure about the contents of a string into the type in a way that is meaningful to humans and that can be used by the type checker. If a type `Ty` is declared to `provide` the `Parsable` concept, which has the static method `tryParse(str: String): Ty | None` then it is possible to declare a string value type as `String[Ty]` which indicates that the call `Ty::tryParse` returns `Ty` (not `None`).
+Typed strings provide a novel mechanism for lifting known structure about the contents of a string into the type in a way that is meaningful to humans and that can be used by the type checker. If a type `Ty` is declared to `provide` the `Parsable` concept, which has the static method `tryParse(str: String): Ty | None` then it is possible to declare a string value type as `String<Ty>` which indicates that the call `Ty::tryParse` returns `Ty` (not `None`).
 
-This ties the type of the string to the entity and then, by extension, into the larger type system. If we have the type relation `Ty <: Ty2` then the type checker will allow `String[Ty] <: String[Ty2]` and of course `String[Ty] <: String`.
+This ties the type of the string to the entity and then, by extension, into the larger type system. If we have the type relation `Ty <: Ty2` then the type checker will allow `String<Ty> <: String<Ty2>` and of course `String<Ty> <: String`.
 
 This allows for code such as the following:
 
 ```none
-function foo(zip: String[Zipcode], name: String) {...}
+function foo(zip: String<Zipcode>, name: String) {...}
 
-var zc: String[Zipcode] = ...;
-var user: String = ...;
+var zc: String<Zipcode> = Zipcode#'98052';
+var user: String = "Mark";
 
-foo(user, zc) //Type error String not convertible to String[Zipcode]
+var zcbad: String<Zipcode> = "9"; //error not a typed string on right side
+var zcbad: String<Zipcode> = "98052"; //error still not a typed string on right side
+var zcbad: String<Zipcode> = Zipcode#'9'; //error bad format in typed string literal
+
+foo(user, zc) //Type error String not convertible to String<Zipcode>
 foo(zc, user) //ok
 ```
 
@@ -616,23 +617,26 @@ The subtype relation on records `R1` and `R2` is a subset based order on the rec
 
 The record `{...}` is a supertype of all others and `{...}` is a subtype of the special nominal type `Record`.
 
-## <a name="1.3-Function-Types"></a>1.3 Function Types
+## <a name="1.3-Parameter-Code-Block-Types"></a>1.3 Parameter Code Block Types
 
-Functions are first class values and types in the Bosque language. Functions can use _named_ arguments for bindings arguments at calls and, thus, names are part of the function type signature. The special `_` parameter name indicates a "don't care" for a parameter name. Functions also allow for optional parameters, with the `?` syntax, and _rest_ parameters using the `...` syntax. The types of the rest parameters can be specified as any of the collection types from the core library including, lists, sets, and maps. Examples function types include:
+Parameter code blocks, or _pcode_ functions, are special values and types in the Bosque language that can be used to specialize the behavior of another function or method. They cannot be stored in variables or values and cannot be passed to other calls. Thus, they must be placed as literals in an invocation and can be invoked using the given parameter name. 
+
+The parameter code types can use _named_ arguments for bindings arguments and, thus, names are part of the type signature. The special `_` parameter name indicates a "don't care" for a parameter name. PCode types also allow for optional parameters, with the `?` syntax, and _rest_ parameters using the `...` syntax. The types of the rest parameters can be specified as any of the collection types from the core library including, lists, sets, and maps. Example types include:
 
 ```none
-fn(x: Int) -> Int          //Function required parameter named "x"
-fn(_: Int) -> Int          //Function required unnamed parameter
-fn(x?: Int) -> Int         //Function optional x parameter
-fn(...l: List[Int]) -> Int //Function rest List parameter
+fn(x: Int) -> Int          //pcode type with required parameter named "x"
+fn(_: Int) -> Int          //pcode type required unnamed parameter
+fn(x?: Int) -> Int         //pcode type optional x parameter
+fn(...l: List<Int>) -> Int //pcode type rest List parameter
 ```
 
-The subtype relation on function `F1` and `F2` starts with a lexicographic order on the parameter entries (with _contravariant_ subtyping) where an optional. The relation is _covariant_ in the return type.
+The subtype relation on pcode types `F1` and `F2` requires equality on parameter counts and types but allows covariance. 
 
 ```none
-fn(x: Any) -> Int <: fn(x: Int) -> Int  //true - Int <: Any
-fn(x: Int) -> Int <: fn(x: Bool) -> Int //false - Bool <! Int
-fn(x: Int) -> Int <: fn(x: Any) -> Int  //false - Any <! Int
+fn(x: Int) -> Int <: fn(x: Int) -> Int  //true - Int == Int
+fn(x: Any) -> Int <: fn(x: Int) -> Int  //false - Int != Any
+fn(x: Int) -> Int <: fn(x: Bool) -> Int //false - Bool != Int
+fn(x: Int) -> Int <: fn(x: Any) -> Int  //false - Any != Int
 
 fn(x: Any) -> Int <: fn(y: Int) -> Int //false - name mismatch
 fn(x: Any) -> Int <: fn(_: Int) -> Int //true - name ignore
@@ -645,15 +649,15 @@ fn(x: Int) -> Int           <: fn(x: Int, y?: Bool) -> Int //false - mismatch op
 fn(x: Any) -> Int <: fn(x: Int) -> Any //true - Int <: Any
 fn(x: Any) -> Any <: fn(x: Any) -> Int //false - Any <! Int
 
-fn(...r: List[Int]) -> Int <: fn(...r: List[Int]) -> Int    //true - prefix match
-fn(...r: List[Int]) -> Int <: fn(_: Int) -> Int             //false - rest mismatch
-fn(...r: List[Int]) -> Int <: fn() -> Int                   //false - rest mismatch
-fn(...r: List[Int]) -> Int <: fn(...r: HashSet[Int]) -> Int //false - rest mismatch
+fn(...r: List<Int>) -> Int <: fn(...r: List<Int>) -> Int    //true - rest match
+fn(...r: List<Int>) -> Int <: fn(_: Int) -> Int             //false - rest mismatch
+fn(...r: List<Int>) -> Int <: fn() -> Int                   //false - rest mismatch
+fn(...r: List<Int>) -> Int <: fn(...r: HashSet<Int>) -> Int //false - rest mismatch
 ```
 
 ## <a name="1.4-Combination-Types"></a>1.4 Combination Types
 
-With the base structural and nominal types Bosque also supports _noneable_ (`T1?`), _union_ (`T1 | T2`), and limited _conjunction_ (`C1 + C2`) concept types.
+With the base structural and nominal types Bosque also supports _noneable_ (`T1?`), _union_ (`T1 | T2`), and limited _conjunction_ (`C1 & C2`) concept types.
 
 Example combination types include:
 
@@ -664,7 +668,7 @@ String?
 Parsable + Indexable
 ```
 
-The `T1 | T2`notation specifies a type may be either `T1` _or_ `T2` while the notation `T1?` is shorthand for `T1 | None`. Note that this implies that `(T1?)?` is the same type as `T1?`. The type system also admits conjunction but limits it to conjunctions of `concept` types where `C1 + C2` indicates a type must provide both `C1` and `C2`.
+The `T1 | T2`notation specifies a type may be either `T1` _or_ `T2` while the notation `T1?` is shorthand for `T1 | None`. Note that this implies that `(T1?)?` is the same type as `T1?`. The type system also admits conjunction but limits it to conjunctions of `concept` types where `C1 & C2` indicates a type must provide both `C1` and `C2`.
 
 ```none
 Int | Bool <: Any         //true
@@ -677,9 +681,9 @@ Int? <: Int | None        //true
 Int <: Int?               //true
 Int?? <: Int?             //true - algebra
 None? <: None             //true - algebra
-C1 + C2 <: C2             //true
-C1 + C1 <: C1             //true - algebra
-C1 <: C1 + C2             //false - (unless C1 <: C2)
+C1 & C2 <: C2             //true
+C1 & C1 <: C1             //true - algebra
+C1 <: C1 & C2             //false - (unless C1 <: C2)
 ```
 
 As shown in the above examples several combination types reduce to simpler version based on algebraic rules.
@@ -705,32 +709,32 @@ The Bosque language provides a rich set of expressions that support compact data
 Bosque provides _named arguments_ along with _rest_ and _spread_ operators. These can be used to perform simple and powerful data manipulation as part of invocations and constructor operations. Examples of these situations include:
 
 ```none
-function nsum(d: Int, ...args: List[Int]): Int {
+function nsum(d: Int, ...args: List<Int>): Int {
     return args.sum(default=d);
 }
 
 function np(p1: Int, p2: Int): {x: Int, y: Int} {
-    return @{x=p1, y=p2};
+    return {x=p1, y=p2};
 }
 
 //calls with explicit arguments
 var x = nsum(0, 1, 2, 3); //returns 6
 
-var a = np(1, 2);         //returns @{x=1, y=2}
-var b = np(p2=2, 1);      //also returns @{x=1, y=2}
-var c = np(p2=2, p1=1);   //also returns @{x=1, y=2}
+var a = np(1, 2);         //returns {x=1, y=2}
+var b = np(p2=2, 1);      //also returns {x=1, y=2}
+var c = np(p2=2, p1=1);   //also returns {x=1, y=2}
 
 //calls with spread arguments
-var t = @[1, 2, 3];
+var t = [1, 2, 3];
 var p = nsum(0, ...t);    //returns 6 -- same as explicit call
 
-var r = @{p1=1, p2=2};
-var q = np(...r);         //returns @{x=1, y=2} -- same as explicit call
+var r = {p1=1, p2=2};
+var q = np(...r);         //returns {x=1, y=2} -- same as explicit call
 ```
 
 The first of the examples show the use of rest and named arguments in call signatures. The call to `nsum` takes an arbitrary number of arguments which are automatically converted into a List. The calls to `np` show how named parameters can be used and mixed with positional parameters.
 
-The next set of examples show how _spread_ arguments can be used. In the first case a tuple, `@[1, 2, 3]`, is created and assigned to the variable `t`. This tuple is then spread to provide the last three arguments to `nsum`. Semantically the call `nsum(0, ...t)` is the same as `nsum(0, t[0], t[1], t[2])` and, as a result, the value in `p` is the same as the value computed for `x`. The spread operator also works for records and named parameters. In the example the call to `np(...r)` is semantically the same as `np(p1=r.p1, p2=r.p2)`. Although not shown here spread can also be used on any collection, List, Set, Map, based data values as well.
+The next set of examples show how _spread_ arguments can be used. In the first case a tuple, `[1, 2, 3]`, is created and assigned to the variable `t`. This tuple is then spread to provide the last three arguments to `nsum`. Semantically the call `nsum(0, ...t)` is the same as `nsum(0, t[0], t[1], t[2])` and, as a result, the value in `p` is the same as the value computed for `x`. The spread operator also works for records and named parameters. In the example the call to `np(...r)` is semantically the same as `np(p1=r.p1, p2=r.p2)`. Although not shown here spread can also be used on any collection, List, Set, Map, based data values as well.
 
 ## <a name="5.2-Constants"></a>5.2 Constants
 
@@ -745,12 +749,12 @@ true
 -1
 "ok"
 ""
-'a*b*'#Regex //String[Regex]
-'5'#Int      //String[Int]
-'a*b*'@Regex //Regex literal for Regex@{str="a*b*"}
+Regex'a*b*'  //String<Regex>
+Int'5'       //String<Int>
+Regex@'a*b*' //Regex literal for Regex{str="a*b*"}
 ```
 
-Most of these literal expressions are familiar from other languages but Bosque introduces the concept of _Typed Strings_ ([1.1.2 Typed Strings](#1.1.2-Typed-Strings)). The constant notation includes `"..."#Type` to introduce a literal typed string and `'...'@Type` to introduce a literal object that the string represents. Semantically the expression `'...'@Type` is equivalent to the expression `Type::tryParse("..."#Type)`.
+Most of these literal expressions are familiar from other languages but Bosque introduces the concept of _Typed Strings_ ([1.1.2 Typed Strings](#1.1.2-Typed-Strings)). The constant notation includes `Type#'...'` to introduce a literal typed string and `Type@'...'` to introduce a literal object that the string represents. Semantically the expression `Type@'...'` is equivalent to the expression `Type::tryParse(Type#"...")`.
 
 ## <a name="5.3-Variable-and-Scoped-Access"></a>5.3 Variable and Scoped Access
 
