@@ -1758,6 +1758,32 @@ entrypoint function returnor6(): Int {
     var y = (1 == 2) ? 0 : 4 or return 8 when _value_ == 4;
     return y + 1;
 }
+
+recursive function recf1(i: Int): Int {
+    if(i == 0) {
+        return 0;
+    }
+    else {
+        return recf1[recursive](i - 1) + 1;
+    }
+}
+
+recursive function recf2(i: Int): Int {
+    if(i == 0) {
+        return 0;
+    }
+    else {
+        return recf2[recursive](i - 1) + recf2[recursive](i - 1) + 1;
+    }
+}
+
+entrypoint function rec1(): Int {
+    return recf1[recursive](2);
+}
+
+entrypoint function rec2(): Int {
+    return recf2[recursive](2);
+}
 `;
 
 const statement_tests: TestInfo[] = [
@@ -1860,7 +1886,10 @@ const statement_tests: TestInfo[] = [
     { name: "returnor3", input: ["returnor3"], expected: "5" },
     { name: "returnor4", input: ["returnor4"], expected: "4" },
     { name: "returnor5", input: ["returnor5"], expected: "1" },
-    { name: "returnor6", input: ["returnor6"], expected: "8" }
+    { name: "returnor6", input: ["returnor6"], expected: "8" },
+
+    { name: "rec1", input: ["rec1"], expected: "2" },
+    { name: "rec1", input: ["rec1"], expected: "3" }
 ];
 
 function statement_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
