@@ -22,6 +22,26 @@ abstract class MIRArgument {
     }
 
     abstract stringify(): string;
+
+    abstract jemit(): object;
+
+    static jparse(jobj: any & {tag: string}): MIRArgument {
+        switch (jobj.tag) {
+            case "temp":
+                return MIRTempRegister.jparse(jobj);
+            case "var":
+                return MIRVariable.jparse(jobj);
+            case "none":
+                return new MIRConstantNone();
+            case "bool":
+                return jobj.tv ? new MIRConstantTrue() : new MIRConstantFalse();
+            case "int":
+                return new MIRConstantInt(jobj.iv);
+            default:
+                return new MIRConstantString(jobj.sv);
+
+        }
+    }
 }
 
 abstract class MIRRegisterArgument extends MIRArgument {
@@ -40,6 +60,14 @@ class MIRTempRegister extends MIRRegisterArgument {
         super(forcename || `#tmp_${regID}`);
         this.regID = regID;
     }
+
+    jemit(): object {
+        return { tag: "temp", regID: this.regID, nameID: this.nameID };
+    }
+
+    static jparse(jobj: any): MIRArgument {
+        return new MIRTempRegister(jobj.regID, jobj.nameID);
+    }
 }
 
 class MIRVariable extends MIRRegisterArgument {
@@ -48,6 +76,14 @@ class MIRVariable extends MIRRegisterArgument {
     constructor(name: string, forcename?: string) {
         super(forcename || name);
         this.lname = name;
+    }
+
+    jemit(): object {
+        return { tag: "var", lname: this.lname, nameID: this.nameID };
+    }
+
+    static jparse(jobj: any): MIRArgument {
+        return new MIRVariable(jobj.lname, jobj.nameID);
     }
 }
 
@@ -65,6 +101,10 @@ class MIRConstantNone extends MIRConstantArgument {
     stringify(): string {
         return "none";
     }
+
+    jemit(): object {
+        return { tag: "none" };
+    }
 }
 
 class MIRConstantTrue extends MIRConstantArgument {
@@ -75,6 +115,10 @@ class MIRConstantTrue extends MIRConstantArgument {
     stringify(): string {
         return "true";
     }
+
+    jemit(): object {
+        return { tag: "bool", tv: true };
+    }
 }
 
 class MIRConstantFalse extends MIRConstantArgument {
@@ -84,6 +128,10 @@ class MIRConstantFalse extends MIRConstantArgument {
 
     stringify(): string {
         return "false";
+    }
+
+    jemit(): object {
+        return { tag: "var", tv: false };
     }
 }
 
@@ -99,6 +147,10 @@ class MIRConstantInt extends MIRConstantArgument {
     stringify(): string {
         return this.value;
     }
+
+    jemit(): object {
+        return { tag: "var", iv: this.value };
+    }
 }
 
 class MIRConstantString extends MIRConstantArgument {
@@ -112,6 +164,10 @@ class MIRConstantString extends MIRConstantArgument {
 
     stringify(): string {
         return this.value;
+    }
+
+    jemit(): object {
+        return { tag: "var", sv: this.value };
     }
 }
 
@@ -197,6 +253,75 @@ abstract class MIROp {
     abstract getModVars(): MIRRegisterArgument[];
 
     abstract stringify(): string;
+
+    abstract jemit(): object;
+
+    static jparse(jobj: any & {tag: string}): MIRArgument {
+        switch() {
+            MIRLoadConst = "MIRLoadConst",
+    MIRLoadConstTypedString = "MIRLoadConstTypedString",
+
+    MIRAccessConstantValue = "MIRAccessConstantValue",
+    MIRLoadFieldDefaultValue = "MIRLoadFieldDefaultValue",
+    MIRAccessArgVariable = "MIRAccessArgVariable",
+    MIRAccessLocalVariable = "MIRAccessLocalVariable",
+
+    MIRConstructorPrimary = "MIRConstructorPrimary",
+    MIRConstructorPrimaryCollectionEmpty = "MIRConstructorPrimaryCollectionEmpty",
+    MIRConstructorPrimaryCollectionSingletons = "MIRConstructorPrimaryCollectionSingletons",
+    MIRConstructorPrimaryCollectionCopies = "MIRConstructorPrimaryCollectionCopies",
+    MIRConstructorPrimaryCollectionMixed = "MIRConstructorPrimaryCollectionMixed",
+    MIRConstructorTuple = "MIRConstructorTuple",
+    MIRConstructorRecord = "MIRConstructorRecord",
+
+    MIRAccessFromIndex = "MIRAccessFromIndex",
+    MIRProjectFromIndecies = "MIRProjectFromIndecies",
+    MIRAccessFromProperty = "MIRAccessFromProperty",
+    MIRProjectFromProperties = "MIRProjectFromProperties",
+    MIRAccessFromField = "MIRAccessFromField",
+    MIRProjectFromFields = "MIRProjectFromFields",
+    MIRProjectFromTypeTuple = "MIRProjectFromTypeTuple",
+    MIRProjectFromTypeRecord = "MIRProjectFromTypeRecord",
+    MIRProjectFromTypeConcept = "MIRProjectFromTypeConcept",
+    MIRModifyWithIndecies = "MIRModifyWithIndecies",
+    MIRModifyWithProperties = "MIRModifyWithProperties",
+    MIRModifyWithFields = "MIRModifyWithFields",
+    MIRStructuredExtendTuple = "MIRStructuredExtendTuple",
+    MIRStructuredExtendRecord = "MIRStructuredExtendRecord",
+    MIRStructuredExtendObject = "MIRStructuredExtendObject",
+
+    MIRInvokeFixedFunction = "MIRInvokeFixedFunction",
+    MIRInvokeVirtualTarget = "MIRInvokeVirtualTarget",
+
+    MIRPrefixOp = "MIRPrefixOp",
+
+    MIRBinOp = "MIRBinOp",
+    MIRBinEq = "MIRBinEq",
+    MIRBinCmp = "MIRBinCmp",
+
+    MIRIsTypeOfNone = "MIRIsTypeOfNone",
+    MIRIsTypeOfSome = "MIRIsTypeOfSome",
+    MIRIsTypeOf = "MIRIsTypeOf",
+
+    MIRRegAssign = "MIRRegAssign",
+    MIRTruthyConvert = "MIRTruthyConvert",
+    MIRLogicStore = "MIRLogicStore",
+    MIRVarStore = "MIRVarStore",
+    MIRReturnAssign = "MIRReturnAssign",
+
+    MIRAbort = "MIRAbort",
+    MIRDebug = "MIRDebug",
+
+    MIRJump = "MIRJump",
+    MIRJumpCond = "MIRJumpCond",
+    MIRJumpNone = "MIRJumpNone",
+
+    MIRPhi = "MIRPhi",
+
+    MIRVarLifetimeStart = "MIRVarLifetimeStart",
+    MIRVarLifetimeEnd = "MIRVarLifetimeEnd"
+        }
+    }
 }
 
 abstract class MIRValueOp extends MIROp {
