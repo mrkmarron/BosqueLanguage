@@ -1530,6 +1530,14 @@ class MIRJump extends MIRJumpOp {
     stringify(): string {
         return `jump ${this.trgtblock}`;
     }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgtblock: this.trgtblock };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRJump(jparsesinfo(jobj.sinfo), jobj.trgtblock);
+    }
 }
 
 class MIRVarLifetimeStart extends MIRJumpOp {
@@ -1548,6 +1556,14 @@ class MIRVarLifetimeStart extends MIRJumpOp {
     stringify(): string {
         return `v-begin ${this.name}`;
     }
+
+    jemit(): object {
+        return { ...this.jbemit(), name: this.name, rtype: this.rtype };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRVarLifetimeStart(jparsesinfo(jobj.sinfo), jobj.name, jobj.rtype);
+    }
 }
 
 class MIRVarLifetimeEnd extends MIRJumpOp {
@@ -1563,6 +1579,14 @@ class MIRVarLifetimeEnd extends MIRJumpOp {
 
     stringify(): string {
         return `v-end ${this.name}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), name: this.name };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRVarLifetimeEnd(jparsesinfo(jobj.sinfo), jobj.name);
     }
 }
 
@@ -1584,6 +1608,14 @@ class MIRJumpCond extends MIRJumpOp {
     stringify(): string {
         return `cjump ${this.arg.stringify()} ${this.trueblock} ${this.falseblock}`;
     }
+
+    jemit(): object {
+        return { ...this.jbemit(), arg: this.arg.jemit(), trueblock: this.trueblock, falseblock: this.falseblock };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRJumpCond(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.trueblock, jobj.falseblock);
+    }
 }
 
 class MIRJumpNone extends MIRJumpOp {
@@ -1603,6 +1635,14 @@ class MIRJumpNone extends MIRJumpOp {
 
     stringify(): string {
         return `njump ${this.arg.stringify()} ${this.noneblock} ${this.someblock}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), arg: this.arg.jemit(), noneblock: this.noneblock, someblock: this.someblock };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRJumpNone(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.noneblock, jobj.someblock);
     }
 }
 
@@ -1631,6 +1671,17 @@ class MIRPhi extends MIRFlowOp {
 
         return `${this.trgt.stringify()} = (${phis.join(", ")})`;
     }
+
+    jemit(): object {
+        const phis = [...this.src].map((phi) => [phi[0], phi[1].jemit()]);
+        return { ...this.jbemit(), src: phis, trgt: this.trgt.jemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        let phis = new Map<string, MIRRegisterArgument>();
+        jobj.src.forEach((phi: [string, any]) => phis.set(phi[0], MIRRegisterArgument.jparse(phi[1])));
+        return new MIRPhi(jparsesinfo(jobj.sinfo), phis, MIRRegisterArgument.jparse(jobj.trgt));
+    }
 }
 
 class MIRBasicBlock {
@@ -1651,6 +1702,14 @@ class MIRBasicBlock {
 
         return jblck;
     }
+
+    jemit(): object {
+        return { label: this.label, ops: this.ops.map((op) => op.jemit()) };
+    }
+
+    static jparse(jobj: any): MIRBasicBlock {
+        return new MIRBasicBlock(jobj.label, jobj.map((op: any) => MIROp.jparse(op)));
+    }
 }
 
 class MIRBody {
@@ -1666,46 +1725,37 @@ class MIRBody {
     }
 
     jsonify(): any {
-        if (typeof (this.body) === "string") {
-            return this.body;
-        }
-        else {
-            let blocks: any[] = [];
-            topologicalOrder(this.body).forEach((v, k) => blocks.push(v.jsonify()));
+        let blocks: any[] = [];
+        topologicalOrder(this.body).forEach((v, k) => blocks.push(v.jsonify()));
 
-            return blocks;
-        }
+        return blocks;
     }
 
     dgmlify(siginfo: string): string {
-        if (typeof (this.body) === "string") {
-            return this.body;
-        }
-        else {
-            const blocks = topologicalOrder(this.body);
-            const flow = computeBlockLinks(this.body);
+        const blocks = topologicalOrder(this.body);
+        const flow = computeBlockLinks(this.body);
 
-            const xmlescape = (str: string) => {
-                return str.replace(/&/g, "&amp;")
-               .replace(/</g, "&lt;")
-               .replace(/>/g, "&gt;")
-               .replace(/"/g, "&quot;")
-               .replace(/'/g, "&apos;");
-            };
+        const xmlescape = (str: string) => {
+            return str.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        };
 
-            let nodes: string[] = [`<Node Id="fdecl" Label="${siginfo}"/>`];
-            let links: string[] = [`<Link Source="fdecl" Target="entry"/>`];
-            blocks.forEach((b) => {
-                const ndata = b.jsonify();
-                const dstring = `L: ${ndata.label} &#10;  ` + ndata.ops.map((op) => xmlescape(op)).join("&#10;  ");
-                nodes.push(`<Node Id="${ndata.label}" Label="${dstring}"/>`);
+        let nodes: string[] = [`<Node Id="fdecl" Label="${siginfo}"/>`];
+        let links: string[] = [`<Link Source="fdecl" Target="entry"/>`];
+        blocks.forEach((b) => {
+            const ndata = b.jsonify();
+            const dstring = `L: ${ndata.label} &#10;  ` + ndata.ops.map((op) => xmlescape(op)).join("&#10;  ");
+            nodes.push(`<Node Id="${ndata.label}" Label="${dstring}"/>`);
 
-                (flow.get(ndata.label) as FlowLink).succs.forEach((succ) => {
-                    links.push(`<Link Source="${ndata.label}" Target="${succ}"/>`);
-                });
+            (flow.get(ndata.label) as FlowLink).succs.forEach((succ) => {
+                links.push(`<Link Source="${ndata.label}" Target="${succ}"/>`);
             });
+        });
 
-            return `<?xml version="1.0" encoding="utf-8"?>
+        return `<?xml version="1.0" encoding="utf-8"?>
         <DirectedGraph Title="DrivingTest" xmlns="http://schemas.microsoft.com/vs/2009/dgml">
            <Nodes>
                 ${nodes.join("\n")}
@@ -1714,7 +1764,17 @@ class MIRBody {
                 ${links.join("\n")}
            </Links>
         </DirectedGraph>`;
-        }
+    }
+
+    jemit(): object {
+        const blocks = topologicalOrder(this.body).map((blck) => blck.jemit());
+        return { file: this.file, sinfo: jemitsinfo(this.sinfo), blocks: blocks };
+    }
+
+    static jparse(jobj: any): MIRBody {
+        let body = new Map<string, MIRBasicBlock>();
+        jobj.blocks.map((blck: any) => MIRBasicBlock.jparse(blck)).forEach((blck: MIRBasicBlock) => body.set(blck.label, blck));
+        return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), body);
     }
 }
 
