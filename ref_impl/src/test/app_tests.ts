@@ -26,9 +26,9 @@ function appTestGenerator(app: string, expected: string): TestSet {
             return cu;
         }
         else {
-            const jmasm = cu.masm.jemit();
-            const rtmasm = MIRAssembly.jparse(jmasm);
-            if (JSON.stringify(jmasm) !== JSON.stringify(rtmasm.jemit())) {
+            const jmasm = JSON.stringify(cu.masm.jemit());
+            const rtmasm = MIRAssembly.jparse(JSON.parse(jmasm));
+            if (jmasm !== JSON.stringify(rtmasm.jemit())) {
                 return { masm: undefined, errors: ["Bad serialize round-trip"] };
             }
 

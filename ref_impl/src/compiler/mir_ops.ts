@@ -38,7 +38,7 @@ abstract class MIRArgument {
     abstract jemit(): object;
 
     static jparse(jobj: any): MIRArgument {
-        if (jobj === undefined) {
+        if (jobj === null) {
             return new MIRConstantNone();
         }
         else if (jobj === true || jobj === false) {
@@ -123,7 +123,7 @@ class MIRConstantNone extends MIRConstantArgument {
     }
 
     jemit(): any {
-        return undefined;
+        return null;
     }
 }
 
@@ -1508,7 +1508,7 @@ class MIRDebug extends MIRFlowOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), value: this.value ? [this.value.jemit()] : undefined };
+        return { ...this.jbemit(), value: this.value ? [this.value.jemit()] : null };
     }
 
     static jparse(jobj: any): MIROp {

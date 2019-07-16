@@ -47,7 +47,7 @@ function compile(files: string[], trgt: string) {
 
     process.stdout.write(`Writing assembly to ${trgt}...\n`);
 
-    FS.writeFileSync(trgt, JSON.stringify((masm as MIRAssembly).jemit(), null, 4));
+    FS.writeFileSync(trgt, JSON.stringify((masm as MIRAssembly).jemit(), undefined, 4));
 
     process.stdout.write(`Done!\n`);
     process.exit(0);
@@ -65,7 +65,7 @@ if (Commander.args.length === 0) {
     process.exit(1);
 }
 
-if (Commander.assembly === undefined) {
+if (Commander.bytecode === undefined) {
     process.stdout.write("Error -- Please specify a compiler target (--assembly)");
     process.exit(1);
 }

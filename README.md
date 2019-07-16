@@ -114,6 +114,8 @@ The `ref_impl` directory contains a simple command line runner for standalone Bo
 node bin/test/app_runner.js FILE.bsq
 ```
 
+We also provide a compiler (to bytecode only right now) in the directory `compiler\compiler.js` and a way to execute the code in the resulting bytecode assemblies with the executor in `interpreter\exec.js`. 
+
 ### Visual Studio Code Integration
 
 This repository provides basic [Visual Studio Code](https://code.visualstudio.com/) IDE support for the Bosque language (currently limited to syntax and brace highlighting). The installation requires manually copying the full `bosque-language-tools/` folder into your user `.vscode/extensions/` directory and restarting VSCode.
