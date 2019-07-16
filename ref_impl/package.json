@@ -11,7 +11,8 @@
         "url": "https://github.com/Microsoft/BosqueLanguage"
     },
     "dependencies": {
-        "@types/node": "~10.12.18"
+        "@types/node": "~10.12.18",
+        "commander": "2.20.0"
     },
     "devDependencies": {
         "chalk": "~2.4.2"

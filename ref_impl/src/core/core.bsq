@@ -53,6 +53,12 @@ entity Int provides Some, Parsable {
 
 //<summary>Primitive string value.</summary>
 entity String<T> provides Some {
+    method isStringOf<U where Parsable>(): Bool # string_isstringof
+    method asStringOf<U where Parsable>(): String<T> # string_asstringof
+    method tryAsStringOf<U where Parsable>(): String<T> | None # string_tryasstringof
+
+    method asString(): String # string_asstring
+
     method tryParseAs<U where Parsable>(): U | None {
         return U::tryParse(this);
     }

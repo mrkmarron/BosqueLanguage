@@ -971,7 +971,7 @@ class MIRModifyWithIndecies extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRModifyWithIndecies(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[0])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRModifyWithIndecies(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -996,7 +996,7 @@ class MIRModifyWithProperties extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRModifyWithProperties(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[0])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRModifyWithProperties(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -1017,11 +1017,11 @@ class MIRModifyWithFields extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), udpates: this.updates.map((update) => [update[0], update[1].jemit()]) };
+        return { ...this.jbemit(), arg: this.arg.jemit(), updates: this.updates.map((update) => [update[0], update[1].jemit()]) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRModifyWithFields(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[0])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRModifyWithFields(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -1439,10 +1439,10 @@ class MIRReturnAssign extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, name?: MIRVariable) {
         super(MIROpTag.MIRReturnAssign, sinfo);
         this.src = src;
-        this.name = new MIRVariable("__ir_ret__");
+        this.name = name || new MIRVariable("__ir_ret__");
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
@@ -1453,11 +1453,11 @@ class MIRReturnAssign extends MIRFlowOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRReturnAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src));
+        return new MIRReturnAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRVariable.jparse(jobj.name));
     }
 }
 
@@ -1508,7 +1508,7 @@ class MIRDebug extends MIRFlowOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), releaseEnable: this.value ? [this.value.jemit()] : undefined };
+        return { ...this.jbemit(), value: this.value ? [this.value.jemit()] : undefined };
     }
 
     static jparse(jobj: any): MIROp {
@@ -1708,7 +1708,7 @@ class MIRBasicBlock {
     }
 
     static jparse(jobj: any): MIRBasicBlock {
-        return new MIRBasicBlock(jobj.label, jobj.map((op: any) => MIROp.jparse(op)));
+        return new MIRBasicBlock(jobj.label, jobj.ops.map((op: any) => MIROp.jparse(op)));
     }
 }
 

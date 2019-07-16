@@ -21,7 +21,19 @@ function appTestGenerator(app: string, expected: string): TestSet {
 
         const files = core.concat([{ relativePath: "corelib_tests.bsq", contents: appdata }]);
 
-        return MIREmitter.generateMASM(new PackageConfig(), files);
+        const cu = MIREmitter.generateMASM(new PackageConfig(), files);
+        if (cu.masm === undefined || cu.errors.length !== 0) {
+            return cu;
+        }
+        else {
+            const jmasm = cu.masm.jemit();
+            const rtmasm = MIRAssembly.jparse(jmasm);
+            if (JSON.stringify(jmasm) !== JSON.stringify(rtmasm.jemit())) {
+                return { masm: undefined, errors: ["Bad serialize round-trip"] };
+            }
+
+            return { masm: rtmasm, errors: [] };
+        }
     }
 
     function action(assembly: MIRAssembly, args: any[]): any {

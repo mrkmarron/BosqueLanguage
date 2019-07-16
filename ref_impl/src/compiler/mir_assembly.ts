@@ -246,10 +246,14 @@ abstract class MIROOTypeDecl {
             jobj.terms.forEach((t: any) => terms.set(t[0], MIRType.jparse(t[1])));
 
         if (jobj.isentity) {
-            return new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
+            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
+            jobj.vcallMap.forEach((vc: any) => entity.vcallMap.set(vc[0], vc[1]));
+            return entity;
         }
         else {
-            return new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
+            const concept = new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
+            jobj.vcallMap.forEach((vc: any) => concept.vcallMap.set(vc[0], vc[1]));
+            return concept;
         }
     }
 }
@@ -351,7 +355,7 @@ class MIRConceptType extends MIRNominalType {
     }
 
     jemit(): object {
-        return {kind: "entity", ckeys: this.ckeys };
+        return {kind: "concept", ckeys: this.ckeys };
     }
 
     static jparse(jobj: any): MIRConceptType {
@@ -457,7 +461,7 @@ class MIRRecordType extends MIRStructuralType {
     }
 
     static jparse(jobj: any): MIRRecordType {
-        return MIRRecordType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRRecordType.jparse(e)));
+        return MIRRecordType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRRecordTypeEntry.jparse(e)));
     }
 }
 
