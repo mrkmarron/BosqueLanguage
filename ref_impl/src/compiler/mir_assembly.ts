@@ -5,6 +5,26 @@
 
 import { SourceInfo } from "../ast/parser";
 import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey, MIRNominalTypeKey } from "./mir_ops";
+import assert = require("assert");
+
+//
+//Probably want to declare a MIRSourceInfo class
+//
+function jemitsinfo(sinfo: SourceInfo): object {
+    return { line: sinfo.line, column: sinfo.column, pos: sinfo.pos, span: sinfo.span };
+}
+
+function jparsesinfo(jobj: any): SourceInfo {
+    return new SourceInfo(jobj.line, jobj.column, jobj.pos, jobj.span);
+}
+
+function jemitpragmas(pragmas: [MIRType, string][]): object {
+    return pragmas.map((p) => [p[0].jemit(), p[1]]);
+}
+
+function jparsepragmas(jobj: any): [MIRType, string][] {
+    return jobj.map((p: any) => [MIRType.jparse(p[0]), p[1]]);
+}
 
 class MIRFunctionParameter {
     readonly name: string;
@@ -13,6 +33,14 @@ class MIRFunctionParameter {
     constructor(name: string, type: MIRResolvedTypeKey) {
         this.name = name;
         this.type = type;
+    }
+
+    jemit(): object {
+        return { name: this.name, type: this.type };
+    }
+
+    static jparse(jobj: any): MIRFunctionParameter {
+        return new MIRFunctionParameter(jobj.name, jobj.type);
     }
 }
 
@@ -38,6 +66,14 @@ class MIRConstantDecl {
 
         this.declaredType = declaredType;
         this.value = value;
+    }
+
+    jemit(): object {
+        return { cname: this.cname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), declaredType: this.declaredType, value: this.value.jemit() };
+    }
+
+    static jparse(jobj: any): MIRConstantDecl {
+        return new MIRConstantDecl(jobj.cname, jobj.key, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.declaredType, MIRBody.jparse(jobj.value));
     }
 }
 
@@ -67,6 +103,23 @@ abstract class MIRInvokeDecl {
         this.params = params;
         this.resultType = resultType;
     }
+
+    abstract jemit(): object;
+
+    static jparse(jobj: any): MIRInvokeDecl {
+        if (jobj.body) {
+            return new MIRInvokeBodyDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => MIRBody.jparse(pre)), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), MIRBody.jparse(jobj.body));
+        }
+        else {
+            let binds = new Map<string, MIRResolvedTypeKey>();
+            jobj.binds.forEach((bind: any) => binds.set(bind[0], bind[1]));
+
+            let pcodes = new Map<string, MIRPCode>();
+            jobj.pcodes.forEach((pc: any) => pcodes.set(pc[0], pc[1]));
+
+            return new MIRInvokePrimitiveDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, binds, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.implkey, pcodes);
+        }
+    }
 }
 
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
@@ -82,6 +135,10 @@ class MIRInvokeBodyDecl extends MIRInvokeDecl {
         this.postconditions = postconds;
 
         this.body = body;
+    }
+
+    jemit(): object {
+        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => pre.jemit()), postconditions: this.postconditions.map((post) => post.jemit()), body: this.body.jemit() };
     }
 }
 
@@ -101,6 +158,11 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
         this.implkey = implkey;
         this.binds = binds;
         this.pcodes = pcodes;
+    }
+
+    jemit(): object {
+        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType,
+            implkey: this.implkey, binds: [...this.binds], pcodes: [... this.pcodes] };
     }
 }
 
@@ -131,9 +193,17 @@ class MIRFieldDecl {
         this.declaredType = dtype;
         this.value = value;
     }
+
+    jemit(): object {
+        return { fname: this.fname, fkey: this.fkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), name: this.name, declaredType: this.declaredType, value: this.value ? this.value.jemit() : undefined };
+    }
+
+    static jparse(jobj: any): MIRFieldDecl {
+        return new MIRFieldDecl(jobj.fname, jparsesinfo(jobj.sinfo), jobj.file, jobj.fkey, jparsepragmas(jobj.pragmas), jobj.name, jobj.declaredType, jobj.value ? MIRBody.jparse(jobj.value) : undefined);
+    }
 }
 
-class MIROOTypeDecl {
+abstract class MIROOTypeDecl {
     readonly ooname: string;
     readonly tkey: MIRNominalTypeKey;
 
@@ -168,11 +238,29 @@ class MIROOTypeDecl {
         this.invariants = invariants;
         this.fields = fields;
     }
+
+    abstract jemit(): object;
+
+    static jparse(jobj: any): MIROOTypeDecl {
+        let terms = new Map<string, MIRType>();
+            jobj.terms.forEach((t: any) => terms.set(t[0], MIRType.jparse(t[1])));
+
+        if (jobj.isentity) {
+            return new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
+        }
+        else {
+            return new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
+        }
+    }
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
     constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
+    }
+
+    jemit(): object {
+        return { isentity: false, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides.map((p) => p.jemit()), invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap] };
     }
 }
 
@@ -192,6 +280,10 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
         this.isCollectionEntityType = isCollectionEntityType;
         this.isMapEntityType = isMapEntityType;
     }
+
+    jemit(): object {
+        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides.map((p) => p.jemit()), invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], isEnum: this.isEnum, isKey: this.isKey, isCollectionEntityType: this.isCollectionEntityType, isMapEntityType: this.isMapEntityType };
+    }
 }
 
 abstract class MIRTypeOption {
@@ -199,6 +291,22 @@ abstract class MIRTypeOption {
 
     constructor(trkey: MIRResolvedTypeKey) {
         this.trkey = trkey;
+    }
+
+    abstract jemit(): object;
+
+    static jparse(jobj: any): MIRTypeOption {
+        switch (jobj.kind) {
+            case "entity":
+                return MIREntityType.jparse(jobj);
+            case "concept":
+                return MIRConceptType.jparse(jobj);
+            case "tuple":
+                return MIRTupleType.jparse(jobj);
+            default:
+                assert(jobj.kind === "record");
+                return MIRRecordType.jparse(jobj);
+        }
     }
 }
 
@@ -219,6 +327,14 @@ class MIREntityType extends MIRNominalType {
     static create(ekey: MIRNominalTypeKey): MIREntityType {
         return new MIREntityType(ekey);
     }
+
+    jemit(): object {
+        return {kind: "entity", ekey: this.ekey };
+    }
+
+    static jparse(jobj: any): MIREntityType {
+        return MIREntityType.create(jobj.ekey);
+    }
 }
 
 class MIRConceptType extends MIRNominalType {
@@ -232,6 +348,14 @@ class MIRConceptType extends MIRNominalType {
     static create(ckeys: MIRNominalTypeKey[]): MIRConceptType {
         const skeys = ckeys.sort();
         return new MIRConceptType(skeys.join(" & "), skeys);
+    }
+
+    jemit(): object {
+        return {kind: "entity", ckeys: this.ckeys };
+    }
+
+    static jparse(jobj: any): MIRConceptType {
+        return MIRConceptType.create(jobj.ckeys);
     }
 }
 
@@ -248,6 +372,14 @@ class MIRTupleTypeEntry {
     constructor(type: MIRType, isOpt: boolean) {
         this.isOptional = isOpt;
         this.type = type;
+    }
+
+    jemit(): object {
+        return { type: this.type.jemit(), isOptional: this.isOptional };
+    }
+
+    static jparse(jobj: any): MIRTupleTypeEntry {
+        return new MIRTupleTypeEntry(MIRType.jparse(jobj.type), jobj.isOptional);
     }
 }
 
@@ -269,6 +401,14 @@ class MIRTupleType extends MIRStructuralType {
 
         return new MIRTupleType("[" + cvalue + "]", [...entries], isOpen);
     }
+
+    jemit(): object {
+        return { kind: "tuple", isOpen: this.isOpen, entries: this.entries.map((e) => e.jemit()) };
+    }
+
+    static jparse(jobj: any): MIRTupleType {
+        return MIRTupleType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRTupleTypeEntry.jparse(e)));
+    }
 }
 
 class MIRRecordTypeEntry {
@@ -280,6 +420,14 @@ class MIRRecordTypeEntry {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
+    }
+
+    jemit(): object {
+        return { name: this.name, type: this.type.jemit(), isOptional: this.isOptional };
+    }
+
+    static jparse(jobj: any): MIRRecordTypeEntry {
+        return new MIRRecordTypeEntry(jobj.name, MIRType.jparse(jobj.type), jobj.isOptional);
     }
 }
 
@@ -303,6 +451,14 @@ class MIRRecordType extends MIRStructuralType {
 
         return new MIRRecordType("{" + cvalue + "}", rentries, isOpen);
     }
+
+    jemit(): object {
+        return { kind: "record", isOpen: this.isOpen, entries: this.entries.map((e) => e.jemit()) };
+    }
+
+    static jparse(jobj: any): MIRRecordType {
+        return MIRRecordType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRRecordType.jparse(e)));
+    }
 }
 
 class MIRType {
@@ -319,13 +475,34 @@ class MIRType {
     }
 
     static create(options: MIRTypeOption[]): MIRType {
-        const trkey = [...options].sort().map((tk) => tk.trkey).join(" | ");
-        return new MIRType(trkey, options);
+        if (options.length === 1) {
+            return MIRType.createSingle(options[0]);
+        }
+        else {
+            const trkey = [...options].sort().map((tk) => tk.trkey).join(" | ");
+            return new MIRType(trkey, options);
+        }
+    }
+
+    jemit(): object {
+        return { options: this.options.map((opt) => opt.jemit()) };
+    }
+
+    static jparse(jobj: any): MIRType {
+        return MIRType.create(jobj.options.map((opt: any) => MIRTypeOption.jparse(opt)));
     }
 }
 
 class PackageConfig {
     //TODO: package.config data
+
+    jemit(): object {
+        return { };
+    }
+
+    static jparse(jobj: any): PackageConfig {
+        return new PackageConfig();
+    }
 }
 
 class MIRAssembly {
@@ -525,6 +702,37 @@ class MIRAssembly {
 
         memores.set(t2.trkey, res);
         return res;
+    }
+
+    jemit(): object {
+        return {
+            package: this.package.jemit(),
+            srcFiles: this.srcFiles,
+            srcHash: this.srcHash,
+            constantDecls: [...this.constantDecls].map((cd) => [cd[0], cd[1].jemit()]),
+            fieldDecls: [...this.fieldDecls].map((fd) => [fd[0], fd[1].jemit()]),
+            entryPoints: this.entryPoints,
+            invokeDecls: [...this.invokeDecls].map((id) => [id[0], id[1].jemit()]),
+            primitiveInvokeDecls: [...this.primitiveInvokeDecls].map((id) => [id[0], id[1].jemit()]),
+            conceptDecls: [...this.conceptDecls].map((cd) => [cd[0], cd[1].jemit()]),
+            entityDecls: [...this.entityDecls].map((ed) => [ed[0], ed[1].jemit()]),
+            typeMap: [...this.typeMap].map((t) => [t[0], t[1].jemit()])
+        };
+    }
+
+    static jparse(jobj: any): MIRAssembly {
+        let masm = new MIRAssembly(PackageConfig.jparse(jobj.package), jobj.srcFiles, jobj.srcHash);
+
+        jobj.constantDecls.forEach((cd: any) => masm.constantDecls.set(cd[0], MIRConstantDecl.jparse(cd[1])));
+        jobj.fieldDecls.forEach((fd: any) => masm.fieldDecls.set(fd[0], MIRFieldDecl.jparse(fd[1])));
+        jobj.entryPoints.forEach((ep: any) => masm.entryPoints.push(ep));
+        jobj.invokeDecls.forEach((id: any) => masm.invokeDecls.set(id[0], MIRInvokeDecl.jparse(id[1]) as MIRInvokeBodyDecl));
+        jobj.primitiveInvokeDecls.forEach((id: any) => masm.primitiveInvokeDecls.set(id[0], MIRInvokeDecl.jparse(id[1]) as MIRInvokePrimitiveDecl));
+        jobj.conceptDecls.forEach((cd: any) => masm.conceptDecls.set(cd[0], MIROOTypeDecl.jparse(cd[1]) as MIRConceptTypeDecl));
+        jobj.entityDecls.forEach((id: any) => masm.entityDecls.set(id[0], MIROOTypeDecl.jparse(id[1]) as MIREntityTypeDecl));
+        jobj.typeMap.forEach((t: any) => masm.typeMap.set(t[0], MIRType.jparse(t[1])));
+
+        return masm;
     }
 }
 

@@ -1889,7 +1889,7 @@ const statement_tests: TestInfo[] = [
     { name: "returnor6", input: ["returnor6"], expected: "8" },
 
     { name: "rec1", input: ["rec1"], expected: "2" },
-    { name: "rec1", input: ["rec1"], expected: "3" }
+    { name: "rec2", input: ["rec2"], expected: "3" }
 ];
 
 function statement_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
