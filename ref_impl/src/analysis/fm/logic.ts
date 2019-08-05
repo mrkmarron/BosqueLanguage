@@ -9,7 +9,8 @@ class SMTInfo {
     readonly literals = new Map<string, LiteralTerm>();
     readonly strings = new Map<string, LiteralTerm>();
     readonly consts = new Map<string, ConstantTerm>();
-    readonly vars = new Map<string, NameTerm>();
+    readonly vars = new Map<string, VTerm>();
+    readonly pcs = new Map<string, PCTerm>();
     readonly funcs = new Map<string, { fname: string, argc: number }>();
 }
 
@@ -20,6 +21,10 @@ abstract class Term {
     constructor(key: string, type: MIRType) {
         this.key = key;
         this.type = type;
+    }
+
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        return;
     }
 
     abstract smtify(info: SMTInfo): string;
@@ -101,6 +106,13 @@ class ExistentialVariableTerm extends VTerm {
         this.name = name;
     }
 
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        if (vars.findIndex((t) => t.name === this.name) === -1) {
+            vars.push(this);
+        }
+        return;
+    }
+
     smtify(info: SMTInfo): string {
         if (!info.vars.has(this.key)) {
             info.vars.set(this.key, this);
@@ -118,9 +130,16 @@ class PCodeTerm extends PCTerm {
         this.name = name;
     }
 
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        if (pcs.findIndex((t) => t.name === this.name) === -1) {
+            pcs.push(this);
+        }
+        return;
+    }
+
     smtify(info: SMTInfo): string {
-        if (!info.vars.has(this.key)) {
-            info.vars.set(this.key, this);
+        if (!info.pcs.has(this.key)) {
+            info.pcs.set(this.key, this);
         }
 
         return this.key;
@@ -136,8 +155,8 @@ class ExistentialPCodeTerm extends PCTerm {
     }
 
     smtify(info: SMTInfo): string {
-        if (!info.vars.has(this.key)) {
-            info.vars.set(this.key, this);
+        if (!info.pcs.has(this.key)) {
+            info.pcs.set(this.key, this);
         }
 
         return this.key;
@@ -154,6 +173,12 @@ class FunctionTerm extends Term {
         this.args = args;
     }
 
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        this.fname.getFreeNames(vars, pcs);
+        this.args.forEach((arg) => arg.getFreeNames(vars, pcs));
+        return;
+    }
+
     smtify(info: SMTInfo): string {
         if (!info.funcs.has(this.fname.key)) {
             info.funcs.set(this.fname.key, { fname: this.fname.key, argc: this.args.length });
@@ -167,9 +192,51 @@ class Equality {
     readonly op: "=" | "<>";
     readonly lhs: Term;
     readonly rhs: Term;
+
+    constructor(op: "=" | "<>", lhs: Term, rhs: Term) {
+        this.op = op;
+        this.lhs = lhs;
+        this.rhs = rhs;
+    }
+
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        this.lhs.getFreeNames(vars, pcs);
+        this.rhs.getFreeNames(vars, pcs);
+        return;
+    }
+
+    smtify(info: SMTInfo): string {
+        return `(${this.op === "=" ? "=" : "!="} ${this.lhs.smtify(info)} ${this.rhs.smtify(info)})`;
+    }
+}
+
+class Assertion {
+    readonly fact: Equality;
+
+    constructor(fact: Equality) {
+        this.fact = fact;
+    }
+
+    getFreeNames(vars: ExistentialVariableTerm[], pcs: ExistentialPCodeTerm[]): undefined {
+        this.fact.getFreeNames(vars, pcs);
+        return;
+    }
+
+    smtify(info: SMTInfo): string {
+        return `(assert ${this.fact.smtify(info)})`;
+    }
 }
 
 class Implication {
     readonly guards: Equality[];
-    readonly implication: Equality[];
+    readonly implication: Equality;
+
+    constructor(guards: Equality[], implication: Equality) {
+        this.guards = guards;
+        this.implication = implication;
+    }
+
+    smtify(info: SMTInfo): string {
+        vars
+    }
 }
