@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRConstantArgument, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex } from "../../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRConstantArgument, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType } from "../../compiler/mir_assembly";
 
 function NOT_IMPLEMENTED(action: string): never {
@@ -62,6 +62,18 @@ const general_values = `
 ))
 `;
 
+abstract class SMTOp {
+
+}
+
+class SMTLet extends SMTOp {
+    
+}
+
+class SMTCond extends SMTOp {
+    
+}
+
 class SMTLIBGenerator {
     readonly assembly: MIRAssembly;
 
@@ -90,39 +102,43 @@ class SMTLIBGenerator {
     }
 
     generateMIRConstructorTuple(op: MIRConstructorTuple, vtypes: Map<string, MIRType>): string {
-        const ttype = (this.assembly.typeMap.get(op.tupkey) as MIRType);
-        const tupinfo = ttype.options[0] as MIRTupleType;
+        const ttype = (this.assembly.typeMap.get(op.getValueOpTypeKey()) as MIRType);
 
-        vtypes.set(op.trgt.nameID, ttype);
         if (this.isTypeExact(ttype)) {
-            const tc = `(bsq_tuple${tupinfo.entries.length} ${op.args.map((arg) => this.argToSMT2(arg))})`;
+            const tc = `(bsq_tuple@${this.typeToSMT2(ttype)} ${op.args.map((arg) => this.argToSMT2(arg))})`;
             return `((${this.varToSMT2(op.trgt)} ${tc}))`;
         }
         else {
             NOT_IMPLEMENTED("generateMIRConstructorTuple -- else branch");
+            return "[NOT IMPL]";
         }
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, vtypes: Map<string, MIRType>): string {
-        const ttype = (vtypes.get(op.arg.nameID) as MIRType);
-        const tupinfo = ttype.options[0] as MIRTupleType;
+        const argtype = vtypes.get(op.arg.nameID) as MIRType;
+        const tupinfo = argtype.options[0] as MIRTupleType;
 
-        vtypes.set(op.trgt.nameID, xxxx;);
-        if (this.isTypeExact(ttype)) {
-            const tc = `(bsq_tuple${tupinfo.entries.length} ${op.args.map((arg) => this.argToSMT2(arg))})`;
-            return `((${this.varToSMT2(op.trgt)} ${tc}))`;
+        if (this.isTypeExact(argtype)) {
+            if (op.idx >= tupinfo.entries.length) {
+                return `((${this.varToSMT2(op.trgt)} bsq_none))`;
+            }
+            else {
+                const tc = `(bsq_tuple@${this.typeToSMT2(argtype)}@${op.idx} ${this.argToSMT2(op.arg)})`;
+                return `((${this.varToSMT2(op.trgt)} ${tc}))`;
+            }
         }
         else {
-            NOT_IMPLEMENTED("generateMIRConstructorTuple -- else branch");
+            NOT_IMPLEMENTED("generateMIRAccessFromIndex -- else branch");
+            return "[NOT IMPL]";
         }
     }
 
-    generateSMTScope(op: MIROp, scope: string[], vtypes: Map<string, MIRType>): [MIROpTag, string] | undefined {
+    generateSMTScope(op: MIROp, vtypes: Map<string, MIRType>): SMTOp {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
                 scope.push(`((${this.varToSMT2(lcv.trgt)} ${this.constToSMT2(lcv.src)}))`);
-                vtypes.set(lcv.trgt.nameID, xxxx);
+                vtypes.set(lcv.trgt.nameID, this.getTypeForConstLiteral(lcv.src));
                 return undefined;
             }
             case MIROpTag.MIRLoadConstTypedString:  {
@@ -171,7 +187,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
-                scope.push(this.generateMIRConstructorTuple(tc), vtypes);
+                scope.push(this.generateMIRConstructorTuple(tc, vtypes));
                 return undefined;
             }
             case MIROpTag.MIRConstructorRecord: {
@@ -180,8 +196,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
-                ai.arg = processSSA_Use(ai.arg, remap);
-                processValueOpTempSSA(ai, remap, ctrs);
+                scope.push(this.generateMIRAccessFromIndex(ai, vtypes));
                 break;
             }
             case MIROpTag.MIRProjectFromIndecies: {

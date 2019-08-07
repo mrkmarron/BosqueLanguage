@@ -395,6 +395,10 @@ abstract class MIRValueOp extends MIROp {
         this.trgt = trgt;
     }
 
+    getValueOpTypeKey(): MIRResolvedTypeKey {
+        xxxx;
+    }
+
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     protected jbemit(): object {
@@ -1717,6 +1721,10 @@ class MIRBody {
     readonly sinfo: SourceInfo;
 
     body: Map<string, MIRBasicBlock>;
+
+    getSSAFlowTypeInfo(): Map<string, Map<string, MIRResolvedTypeKey>> {
+        xxxx;
+    }
 
     constructor(file: string, sinfo: SourceInfo, body: Map<string, MIRBasicBlock>) {
         this.file = file;
