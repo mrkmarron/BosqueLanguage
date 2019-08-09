@@ -1722,10 +1722,6 @@ class MIRBody {
 
     body: Map<string, MIRBasicBlock>;
 
-    getSSAFlowTypeInfo(): Map<string, Map<string, MIRResolvedTypeKey>> {
-        xxxx;
-    }
-
     constructor(file: string, sinfo: SourceInfo, body: Map<string, MIRBasicBlock>) {
         this.file = file;
         this.sinfo = sinfo;

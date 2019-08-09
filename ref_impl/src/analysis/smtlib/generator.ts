@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRConstantArgument, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRResolvedTypeKey, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString } from "../../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRValueOp, MIRVariable, MIRPrefixOp } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType } from "../../compiler/mir_assembly";
 
 function NOT_IMPLEMENTED(action: string): never {
@@ -18,50 +18,9 @@ const smt_header = `
 `;
 
 const exact_values_template = `
-(declare-datatypes ( (BNone 0) (BBool 0) (BInt 0) (BString 0)
-                     (BTuple0 0) (BTuple1 1) (BTuple2 2) (BTuple3 3)
-                     (BRecord0 0) (BRecord1 1) (BRecord2 2) (BRecord3 3)
-                     (BEntity0 0) (BEntity1 1) (BEntity2 2) (BEntity3 3)
-                     ) (
-    ( (bsq_none) )
-    ( (bsq_true) (bsq_false) )
-    ( (bsq_int (bsq_int_value Int)) )
-    ( (bsq_string (bsq_string_value String)) )
-
-    ( (bsq_tuple0) )
-    ( par (T0) ((bsq_tuple1 (bsq_tuple1_value0 T0))) )
-    ( par (T0 T1) ((bsq_tuple2 (bsq_tuple2_value0 T0) (bsq_tuple2_value1 T1))) )
-    ( par (T0 T1 T2) ((bsq_tuple3 (bsq_tuple3_value0 T0) (bsq_tuple3_value1 T1) (bsq_tuple3_value2 T2))) )
-
-    ( (bsq_record0) )
-    ( par (T0) ((bsq_record1 (bsq_record1_name0 String) (bsq_record1_value0 T0))) )
-    ( par (T0 T1) ((bsq_record2 (bsq_record2_name0 String) (bsq_record2_value0 T0) (bsq_record2_name1 String) (bsq_record2_value1 T1))) )
-    ( par (T0 T1 T2) ((bsq_record3 (bsq_record3_name0 String) (bsq_record3_value0 T0) (bsq_record3_name1 String) (bsq_record3_value1 T1) (bsq_record3_name2 String) (bsq_record3_value2 T2))) )
-
-    ( (bsq_entity0 (bsq_entity0_type String)) )
-    ( par (T0) ((bsq_entity1 (bsq_entity1_type String) (bsq_entity1_field0 String) (bsq_entity1_value0 T0))) )
-    ( par (T0 T1) ((bsq_entity2 (bsq_entity1_type String) (bsq_entity2_field0 String) (bsq_entity2_value0 T0) (bsq_entity2_field1 String) (bsq_value2_value1 T1))) )
-    ( par (T0 T1 T2) ((bsq_entity3 (bsq_entity1_type String) (bsq_entity3_field0 String) (bsq_entity3_value0 T0) (bsq_entity3_field1 String) (bsq_entity3_value1 T1) (bsq_entity3_field2 String) (bsq_entity3_value2 T2))) )
-))
 `;
 
 const general_values = `
-(declare-datatypes ( (BTuple 0)
-                     (BRecord 0)
-                     (BEntity 0)
-                     (BTerm 0)
-                     ) (
-    ( (bsq_tuple (bsq_tuple_size Int) (bsq_tuple_value0 BTerm) (bsq_tuple_value1 BTerm) (bsq_tuple_value2 BTerm)) )
-    ( (bsq_record (bsq_record_size Int) (bsq_record_name0 String) (bsq_record_value0 BTerm) (bsq_record_name1 String) (bsq_record_value1 BTerm) (bsq_record_name2 String) (bsq_record_value2 BTerm)) )
-    ( (bsq_entity (bsq_entity_type String) (bsq_record_size Int) (bsq_entity_name0 String) (bsq_entity_value0 BTerm) (bsq_entity_name1 String) (bsq_entity_value1 BTerm) (bsq_entity_name2 String) (bsq_entity_value2 BTerm)) )
-
-    ( (bsq_term_none) (bsq_term_bool (bsq_term_bool_value BBool)) (bsq_term_int (bsq_term_int_value BInt)) (bsq_term_string (bsq_term_string_value BString)) (bsq_term_tuple (bsq_term_tuple_value BTuple)) )
-))
-
-(declare-datatypes ( (Result 1)
-                     ) (
-    (par (T) ((result_error (error_msg String)) (result_success (result_value T0)) ))
-))
 `;
 
 abstract class SMTExp {
@@ -190,6 +149,10 @@ class SMTLIBGenerator {
         xxxx;
     }
 
+    private varToSMT2Name(varg: MIRRegisterArgument): string {
+        return varg.nameID;
+    }
+
     private argToSMT2(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTValue {
         if (arg instanceof MIRRegisterArgument) {
             if (this.isTypeExact(into)) {
@@ -287,11 +250,22 @@ class SMTLIBGenerator {
         }
     }
 
+    private updatevtypeMap(op: MIROp, vtypes: Map<string, MIRType>) {
+        if (op instanceof MIRValueOp) {
+            vtypes.set(op.trgt.nameID, this.assembly.typeMap.get(op.getValueOpTypeKey()) as MIRType);
+        }
+        else {
+            xxxx;
+        }
+    }
+
     generateSMTScope(op: MIROp, vtypes: Map<string, MIRType>): SMTExp {
+        this.updatevtypeMap(op, vtypes);
+
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
-                return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2(lcv.src), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2(lcv.src, vtypes.get(lcv.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 NOT_IMPLEMENTED("MIRLoadConstTypedString");
@@ -307,11 +281,11 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
-                return new SMTLet(this.varToSMT2Name(lav.trgt), this.argToSMT2(lav.name), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(lav.trgt), this.argToSMT2(lav.name, vtypes.get(lav.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
-                return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2(llv.name), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2(llv.name, vtypes.get(llv.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRConstructorPrimary: {
                 NOT_IMPLEMENTED("MIRConstructorPrimary");
@@ -335,8 +309,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
-                scope.push(this.generateMIRConstructorTuple(tc, vtypes));
-                return undefined;
+                return this.generateMIRConstructorTuple(tc, vtypes);
             }
             case MIROpTag.MIRConstructorRecord: {
                 NOT_IMPLEMENTED("MIRConstructorRecord");
@@ -344,8 +317,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
-                scope.push(this.generateMIRAccessFromIndex(ai, vtypes));
-                return this.generateFreeSMTVar();
+                return this.generateMIRAccessFromIndex(ai, vtypes);
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 NOT_IMPLEMENTED("MIRProjectFromIndecies");
@@ -418,9 +390,15 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRPrefixOp: {
                 const pfx = op as MIRPrefixOp;
-                pfx.arg = processSSA_Use(pfx.arg, remap);
-                processValueOpTempSSA(pfx, remap, ctrs);
-                break;
+                if (pfx.op === "!") {
+                    fscope.assignTmpReg(pfx.trgt.regID, !ValueOps.convertBoolOrNoneToBool(pvalue));
+                }
+                else if (pfx.op === "-") {
+                    xxxx;
+                }
+                else {
+                    return new SMTLet(this.varToSMT2Name(pfx.trgt), this.argToSMT2(pfx.arg, vtypes.get(pfx.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
+                }
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
