@@ -5,10 +5,10 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRValueOp, MIRVariable, MIRPrefixOp } from "../../compiler/mir_ops";
-import { MIRType, MIRAssembly, MIRTupleType } from "../../compiler/mir_assembly";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRValueOp, MIRVariable, MIRPrefixOp, MIRConstantArgument } from "../../compiler/mir_ops";
+import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType } from "../../compiler/mir_assembly";
 
-function NOT_IMPLEMENTED(action: string): never {
+function NOT_IMPLEMENTED<T>(action: string): T {
     throw new Error(`Not Implemented: ${action}`);
 }
 
@@ -185,16 +185,54 @@ class SMTLIBGenerator {
         xxxx;
     }
 
-    private coerceBoxIfNeeded(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTValue {
+    private getBoxFromTypeInfo(from: MIRType): MIRTypeOption {
+        return from.options[0];
+    }
+
+    private coerceBoxConcept(arg: MIRRegisterArgument, from: MIRTypeOption, into: MIRType): SMTExp {
+        return NOT_IMPLEMENTED<SMTExp>("coerceBoxConcept");
+    }
+
+    private coerceBoxIfNeeded(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTExp {
         assert(!this.isTypeExact(into));
 
         const argt = this.getArgType(arg, vtypes);
         if (!this.isTypeExact(argt)) {
             return new SMTValue(arg.nameID);
         }
+        else if (arg instanceof MIRConstantArgument) {
+            return this.argToSMT2(arg, into, vtypes);
+        }
         else {
-            if(argt)
-            (bsq_term_none) (bsq_term_bool (bsq_term_bool_value BBool)) (bsq_term_int (bsq_term_int_value BInt)) (bsq_term_string (bsq_term_string_value BString)) (bsq_term_tuple (bsq_term_tuple_value BTuple))
+            const fromtype = this.getBoxFromTypeInfo(argt);
+            if (fromtype instanceof MIREntityType) {
+                const typedecl = this.assembly.entityDecls.get(fromtype.ekey) as MIREntityTypeDecl;
+                if (typedecl.ns === "NSCore") {
+                    if (typedecl.name === "None") {
+                        return new SMTValue("bsq_term_none");
+                    }
+                    if (typedecl.name === "Bool") {
+                        return new SMTCond(new SMTValue(`(= ${this.varToSMT2Name(arg)} bsq_true)`), new SMTValue("bsq_term_true"), new SMTValue("bsq_term_false"))
+                    }
+                    if (typedecl.name === "Int") {
+                        return new SMTValue(`(bsq_term_int (bsq_int_value ${this.varToSMT2Name(arg)}))`);
+                    }
+                    if (typedecl.name === "String") {
+                        return new SMTValue(`(bsq_term_string (bsq_string_value ${this.varToSMT2Name(arg)}))`);
+                    }
+                }
+
+                return this.coerceBoxConcept(arg, fromtype, into);
+            }
+            else if(fromtype instanceof MIRTupleType) {
+                let entriesval = "((as const (Array Int BTerm)) bsq_term_none)";
+                xxxx;
+            }
+            else {
+                assert(fromtype instanceof MIRRecordType);
+
+                return NOT_IMPLEMENTED<SMTExp>("coerceBoxIfNeeded -- record");
+            }
         }
     }
 
@@ -245,8 +283,7 @@ class SMTLIBGenerator {
             }
         }
         else {
-            NOT_IMPLEMENTED("generateMIRAccessFromIndex -- else branch");
-            return "[NOT IMPL]";
+            NOT_IMPLEMENTED<SMTExp>("generateMIRAccessFromIndex -- else branch");
         }
     }
 
@@ -268,16 +305,13 @@ class SMTLIBGenerator {
                 return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2(lcv.src, vtypes.get(lcv.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRLoadConstTypedString:  {
-                NOT_IMPLEMENTED("MIRLoadConstTypedString");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRLoadConstTypedString");
             }
             case MIROpTag.MIRAccessConstantValue: {
-                NOT_IMPLEMENTED("MIRAccessConstantValue");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRAccessConstantValue");
             }
             case MIROpTag.MIRLoadFieldDefaultValue: {
-                NOT_IMPLEMENTED("MIRLoadFieldDefaultValue");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRLoadFieldDefaultValue");
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
@@ -288,68 +322,54 @@ class SMTLIBGenerator {
                 return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2(llv.name, vtypes.get(llv.trgt.nameID) as MIRType, vtypes), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRConstructorPrimary: {
-                NOT_IMPLEMENTED("MIRConstructorPrimary");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimary");
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
-                NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionEmpty");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionEmpty");
             }
             case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
-                NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionSingletons");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionSingletons");
             }
             case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
-                NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionCopies");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionCopies");
             }
             case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
-                NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionMixed");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionMixed");
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
                 return this.generateMIRConstructorTuple(tc, vtypes);
             }
             case MIROpTag.MIRConstructorRecord: {
-                NOT_IMPLEMENTED("MIRConstructorRecord");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorRecord");
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 return this.generateMIRAccessFromIndex(ai, vtypes);
             }
             case MIROpTag.MIRProjectFromIndecies: {
-                NOT_IMPLEMENTED("MIRProjectFromIndecies");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromIndecies");
             }
             case MIROpTag.MIRAccessFromProperty: {
-                NOT_IMPLEMENTED("MIRAccessFromProperty");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRAccessFromProperty");
             }
             case MIROpTag.MIRProjectFromProperties: {
-                NOT_IMPLEMENTED("MIRProjectFromProperties");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromProperties");
             }
             case MIROpTag.MIRAccessFromField: {
-                NOT_IMPLEMENTED("MIRAccessFromField");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRAccessFromField");
             }
             case MIROpTag.MIRProjectFromFields: {
-                NOT_IMPLEMENTED("MIRProjectFromFields");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromFields");
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
-                NOT_IMPLEMENTED("MIRProjectFromTypeTuple");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromTypeTuple");
             }
             case MIROpTag.MIRProjectFromTypeRecord: {
-                NOT_IMPLEMENTED("MIRProjectFromTypeRecord");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromTypeRecord");
             }
             case MIROpTag.MIRProjectFromTypeConcept: {
-                NOT_IMPLEMENTED("MIRProjectFromTypeConcept");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromTypeConcept");
             }
             case MIROpTag.MIRModifyWithIndecies: {
                 const mi = op as MIRModifyWithIndecies;
@@ -359,24 +379,19 @@ class SMTLIBGenerator {
                 break;
             }
             case MIROpTag.MIRModifyWithProperties: {
-                NOT_IMPLEMENTED("MIRModifyWithProperties");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithProperties");
             }
             case MIROpTag.MIRModifyWithFields: {
-                NOT_IMPLEMENTED("MIRModifyWithFields");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithFields");
             }
             case MIROpTag.MIRStructuredExtendTuple: {
-                NOT_IMPLEMENTED("MIRStructuredExtendTuple");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendTuple");
             }
             case MIROpTag.MIRStructuredExtendRecord: {
-                NOT_IMPLEMENTED("MIRStructuredExtendRecord");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendRecord");
             }
             case MIROpTag.MIRStructuredExtendObject: {
-                NOT_IMPLEMENTED("MIRStructuredExtendObject");
-                return this.generateFreeSMTVar();
+                return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendObject");
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
@@ -385,8 +400,7 @@ class SMTLIBGenerator {
                 break;
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
-                NOT_IMPLEMENTED("MIRInvokeVirtualTarget");
-                break;
+                return NOT_IMPLEMENTED<SMTExp>("MIRInvokeVirtualTarget");
             }
             case MIROpTag.MIRPrefixOp: {
                 const pfx = op as MIRPrefixOp;

@@ -37,7 +37,9 @@
 
 (declare-datatypes ( (BTerm 0) ) (
     ( (bsq_term_none) (bsq_term_true) (bsq_term_false) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String)) 
-      (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_value0 BTerm) (bsq_term_tuple_value1 BTerm) (bsq_term_tuple_value2 BTerm))
+      (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries (Array Int BTerm)))
+      (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_properties (Array Int String)) (bsq_term_record_entries (Array String BTerm)))
+      (bsq_term_entity (bsq_term_entity_type String) (bsq_term_entity_entries (Array String BTerm)))
     )
 ))
 
