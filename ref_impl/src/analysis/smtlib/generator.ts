@@ -3,7 +3,9 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRConstantArgument, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRResolvedTypeKey } from "../../compiler/mir_ops";
+import * as assert from "assert";
+
+import { MIROp, MIROpTag, MIRLoadConst, MIRConstantArgument, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRResolvedTypeKey, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType } from "../../compiler/mir_assembly";
 
 function NOT_IMPLEMENTED(action: string): never {
@@ -62,16 +64,95 @@ const general_values = `
 ))
 `;
 
-abstract class SMTOp {
-
+abstract class SMTExp {
+    abstract bind(sval: SMTExp, svar?: string): SMTExp;
+    abstract emit(indent: string | undefined): string;
 }
 
-class SMTLet extends SMTOp {
-    
+class SMTFreeVar extends SMTExp {
+    readonly vname: string;
+
+    constructor(vname: string) {
+        super();
+        this.vname = vname;
+    }
+
+    bind(sval: SMTExp, svar?: string): SMTExp {
+        return svar === undefined || this.vname === svar ? sval : this;
+    }
+
+    emit(indent: string | undefined): string {
+        return this.vname;
+    }
 }
 
-class SMTCond extends SMTOp {
-    
+class SMTValue extends SMTExp {
+    readonly value: string;
+
+    constructor(value: string) {
+        super();
+        this.value = value;
+    }
+
+    bind(sval: SMTExp, svar?: string): SMTExp {
+        return this;
+    }
+
+    emit(indent: string | undefined): string {
+        return this.value;
+    }
+}
+
+class SMTLet extends SMTExp {
+    readonly lname: string;
+    readonly exp: SMTExp;
+    readonly body: SMTExp;
+
+    constructor(lname: string, exp: SMTExp, body: SMTExp) {
+        super();
+        this.lname = lname;
+        this.exp = exp;
+        this.body = body;
+    }
+
+    bind(sval: SMTExp, svar?: string): SMTExp {
+        return new SMTLet(this.lname, this.exp.bind(sval, svar), this.body.bind(sval, svar));
+    }
+
+    emit(indent: string | undefined): string {
+        if (indent === undefined) {
+            return `(let ((${this.lname} ${this.exp.emit(undefined)})) ${this.body.emit(undefined)})`;
+        }
+        else {
+            return `(let ((${this.lname} ${this.exp.emit(undefined)}))\n${indent + "  "}${this.body.emit(indent + "  ")}\n${indent})`;
+        }
+    }
+}
+
+class SMTCond extends SMTExp {
+    readonly test: SMTExp;
+    readonly iftrue: SMTExp;
+    readonly iffalse: SMTExp;
+
+    constructor(test: SMTExp, iftrue: SMTExp, iffalse: SMTExp) {
+        super();
+        this.test = test;
+        this.iftrue = iftrue;
+        this.iffalse = iffalse;
+    }
+
+    bind(sval: SMTExp, svar?: string): SMTExp {
+        return new SMTCond(this.test.bind(sval, svar), this.iftrue.bind(sval, svar), this.iffalse.bind(sval, svar));
+    }
+
+    emit(indent: string | undefined): string {
+        if (indent === undefined) {
+            return `(ite ${this.test.emit(undefined)} ${this.iftrue.emit(undefined)} ${this.iffalse.emit(undefined)})`;
+        }
+        else {
+            return `(ite ${this.test.emit(undefined)}\n${indent + "  "}\n${this.iftrue.emit(indent + "  ")}\n${indent + "  "}${this.iffalse.emit(indent + "  ")}\n${indent})`;
+        }
+    }
 }
 
 class SMTLIBGenerator {
@@ -81,40 +162,113 @@ class SMTLIBGenerator {
         this.assembly = assembly;
     }
 
-    isTypeExact(type: MIRType): boolean {
-        xxxx;
-    }
-
-    typeToSMT2(type: MIRType): string {
-        xxxx;
-    }
-
-    constToSMT2(cv: MIRConstantArgument): string {
-        xxxx;
-    }
-
-    varToSMT2(vv: MIRRegisterArgument): string {
-        xxxx;
-    }
-
-    argToSMT2(arg: MIRArgument): string {
-        xxxx;
-    }
-
-    generateMIRConstructorTuple(op: MIRConstructorTuple, vtypes: Map<string, MIRType>): string {
-        const ttype = (this.assembly.typeMap.get(op.getValueOpTypeKey()) as MIRType);
-
-        if (this.isTypeExact(ttype)) {
-            const tc = `(bsq_tuple@${this.typeToSMT2(ttype)} ${op.args.map((arg) => this.argToSMT2(arg))})`;
-            return `((${this.varToSMT2(op.trgt)} ${tc}))`;
+    private getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
+        if (arg instanceof MIRRegisterArgument) {
+            return vtypes.get(arg.nameID) as MIRType;
         }
         else {
-            NOT_IMPLEMENTED("generateMIRConstructorTuple -- else branch");
-            return "[NOT IMPL]";
+            if (arg instanceof MIRConstantNone) {
+                return this.assembly.typeMap.get("NSCore::None") as MIRType;
+            }
+            else if (arg instanceof MIRConstantTrue || arg instanceof MIRConstantFalse) {
+                return this.assembly.typeMap.get("NSCore::Bool") as MIRType;
+            }
+            else if (arg instanceof MIRConstantInt) {
+                return this.assembly.typeMap.get("NSCore::Int") as MIRType;
+            }
+            else {
+                return this.assembly.typeMap.get("NSCore::String<NSCore::Any>") as MIRType;
+            }
         }
     }
 
-    generateMIRAccessFromIndex(op: MIRAccessFromIndex, vtypes: Map<string, MIRType>): string {
+    private isTypeExact(type: MIRType): boolean {
+        xxxx;
+    }
+
+    private typeToSMT2(type: MIRType): string {
+        xxxx;
+    }
+
+    private argToSMT2(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTValue {
+        if (arg instanceof MIRRegisterArgument) {
+            if (this.isTypeExact(into)) {
+                return this.coerceUnBoxIfNeeded(arg, into, vtypes);
+            }
+            else {
+                return this.coerceUnBoxIfNeeded(arg, into, vtypes);
+            }
+        }
+        else {
+            if (arg instanceof MIRConstantNone) {
+                return new SMTValue(this.isTypeExact(into) ? "bsq_none" : "bsq_term_none");
+            }
+            else if (arg instanceof MIRConstantTrue) {
+                return new SMTValue(this.isTypeExact(into) ? "bsq_true" : "bsq_term_true");
+            }
+            else if (arg instanceof MIRConstantFalse) {
+                return new SMTValue(this.isTypeExact(into) ? "bsq_false" : "bsq_term_false");
+            }
+            else if (arg instanceof MIRConstantInt) {
+                return new SMTValue(this.isTypeExact(into) ? `(bsq_int ${arg.value})` : `(bsq_term_int ${arg.value})`);
+            }
+            else {
+                return new SMTValue(this.isTypeExact(into) ? `(bsq_string ${(arg as MIRConstantString).value})` : `(bsq_term_string ${(arg as MIRConstantString).value})`);
+            }
+        }
+    }
+
+    private generateFreeSMTVar(): SMTFreeVar {
+        xxxx;
+    }
+
+    private coerceBoxIfNeeded(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTValue {
+        assert(!this.isTypeExact(into));
+
+        const argt = this.getArgType(arg, vtypes);
+        if (!this.isTypeExact(argt)) {
+            return new SMTValue(arg.nameID);
+        }
+        else {
+            if(argt)
+            (bsq_term_none) (bsq_term_bool (bsq_term_bool_value BBool)) (bsq_term_int (bsq_term_int_value BInt)) (bsq_term_string (bsq_term_string_value BString)) (bsq_term_tuple (bsq_term_tuple_value BTuple))
+        }
+    }
+
+    private coerceUnBoxIfNeeded(arg: MIRArgument, into: MIRType, vtypes: Map<string, MIRType>): SMTValue {
+        assert(this.isTypeExact(into));
+
+        const argt = this.getArgType(arg, vtypes);
+        if (this.isTypeExact(argt)) {
+            return new SMTValue(arg.nameID);
+        }
+        else {
+            if(argt)
+            (bsq_term_none) (bsq_term_bool (bsq_term_bool_value BBool)) (bsq_term_int (bsq_term_int_value BInt)) (bsq_term_string (bsq_term_string_value BString)) (bsq_term_tuple (bsq_term_tuple_value BTuple))
+        }
+    }
+
+    private createTuple(args: MIRArgument[], ttype: MIRType, vtypes: Map<string, MIRType>): SMTValue {
+        if (this.isTypeExact(ttype)) {
+            return new SMTValue(`(bsq_tuple@${this.typeToSMT2(ttype)} ${args.map((arg) => this.argToSMT2(arg))})`);
+        }
+        else {
+            const args = op.args.map((arg) => { 
+                if(this.isTypeExact(vtypes.))
+                this.argToSMT2(arg);
+            });
+            const tc = `(bsq_tuple ${[op.args.length, ...op.args.map((arg) => this.argToSMT2(arg))]}`;
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(tc), this.generateFreeSMTVar());
+        }
+    }
+
+    private generateMIRConstructorTuple(op: MIRConstructorTuple, vtypes: Map<string, MIRType>): SMTExp {
+        const ttype = (this.assembly.typeMap.get(op.getValueOpTypeKey()) as MIRType);
+
+        return new SMTLet(this.varToSMT2Name(op.trgt), this.createTuple(op.args, ttype, vtypes), this.generateFreeSMTVar());
+    }
+
+    generateMIRAccessFromIndex(op: MIRAccessFromIndex, vtypes: Map<string, MIRType>): SMTExp {
         const argtype = vtypes.get(op.arg.nameID) as MIRType;
         const tupinfo = argtype.options[0] as MIRTupleType;
 
@@ -133,57 +287,51 @@ class SMTLIBGenerator {
         }
     }
 
-    generateSMTScope(op: MIROp, vtypes: Map<string, MIRType>): SMTOp {
+    generateSMTScope(op: MIROp, vtypes: Map<string, MIRType>): SMTExp {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
-                scope.push(`((${this.varToSMT2(lcv.trgt)} ${this.constToSMT2(lcv.src)}))`);
-                vtypes.set(lcv.trgt.nameID, this.getTypeForConstLiteral(lcv.src));
-                return undefined;
+                return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2(lcv.src), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 NOT_IMPLEMENTED("MIRLoadConstTypedString");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRAccessConstantValue: {
                 NOT_IMPLEMENTED("MIRAccessConstantValue");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRLoadFieldDefaultValue: {
                 NOT_IMPLEMENTED("MIRLoadFieldDefaultValue");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
-                scope.push(`((${this.varToSMT2(lav.trgt)} ${this.varToSMT2(lav.name)}))`);
-                vtypes.set(lav.trgt.nameID, vtypes.get(lav.name.nameID) as MIRType);
-                return undefined;
+                return new SMTLet(this.varToSMT2Name(lav.trgt), this.argToSMT2(lav.name), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
-                scope.push(`((${this.varToSMT2(llv.trgt)} ${this.varToSMT2(llv.name)}))`);
-                vtypes.set(llv.trgt.nameID, vtypes.get(llv.name.nameID) as MIRType);
-                return undefined;
+                return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2(llv.name), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRConstructorPrimary: {
                 NOT_IMPLEMENTED("MIRConstructorPrimary");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
                 NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionEmpty");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
                 NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionSingletons");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
                 NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionCopies");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
                 NOT_IMPLEMENTED("MIRConstructorPrimaryCollectionMixed");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
@@ -192,44 +340,44 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRConstructorRecord: {
                 NOT_IMPLEMENTED("MIRConstructorRecord");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 scope.push(this.generateMIRAccessFromIndex(ai, vtypes));
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 NOT_IMPLEMENTED("MIRProjectFromIndecies");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRAccessFromProperty: {
                 NOT_IMPLEMENTED("MIRAccessFromProperty");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromProperties: {
                 NOT_IMPLEMENTED("MIRProjectFromProperties");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRAccessFromField: {
                 NOT_IMPLEMENTED("MIRAccessFromField");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromFields: {
                 NOT_IMPLEMENTED("MIRProjectFromFields");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 NOT_IMPLEMENTED("MIRProjectFromTypeTuple");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromTypeRecord: {
                 NOT_IMPLEMENTED("MIRProjectFromTypeRecord");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRProjectFromTypeConcept: {
                 NOT_IMPLEMENTED("MIRProjectFromTypeConcept");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRModifyWithIndecies: {
                 const mi = op as MIRModifyWithIndecies;
@@ -240,23 +388,23 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRModifyWithProperties: {
                 NOT_IMPLEMENTED("MIRModifyWithProperties");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRModifyWithFields: {
                 NOT_IMPLEMENTED("MIRModifyWithFields");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRStructuredExtendTuple: {
                 NOT_IMPLEMENTED("MIRStructuredExtendTuple");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRStructuredExtendRecord: {
                 NOT_IMPLEMENTED("MIRStructuredExtendRecord");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRStructuredExtendObject: {
                 NOT_IMPLEMENTED("MIRStructuredExtendObject");
-                break;
+                return this.generateFreeSMTVar();
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;

@@ -35,16 +35,10 @@
     ( par (T0 T1 T2) ((bsq_entity3 (bsq_entity1_type String) (bsq_entity3_field0 String) (bsq_entity3_value0 T0) (bsq_entity3_field1 String) (bsq_entity3_value1 T1) (bsq_entity3_field2 String) (bsq_entity3_value2 T2))) )
 ))
 
-(declare-datatypes ( (BTuple 0)
-                     (BRecord 0)
-                     (BEntity 0)
-                     (BTerm 0) 
-                     ) (
-    ( (bsq_tuple (bsq_tuple_size Int) (bsq_tuple_value0 BTerm) (bsq_tuple_value1 BTerm) (bsq_tuple_value2 BTerm)) )
-    ( (bsq_record (bsq_record_size Int) (bsq_record_name0 String) (bsq_record_value0 BTerm) (bsq_record_name1 String) (bsq_record_value1 BTerm) (bsq_record_name2 String) (bsq_record_value2 BTerm)) )
-    ( (bsq_entity (bsq_entity_type String) (bsq_record_size Int) (bsq_entity_name0 String) (bsq_entity_value0 BTerm) (bsq_entity_name1 String) (bsq_entity_value1 BTerm) (bsq_entity_name2 String) (bsq_entity_value2 BTerm)) )
-
-    ( (bsq_term_none) (bsq_term_bool (bsq_term_bool_value BBool)) (bsq_term_int (bsq_term_int_value BInt)) (bsq_term_string (bsq_term_string_value BString)) (bsq_term_tuple (bsq_term_tuple_value BTuple)) )
+(declare-datatypes ( (BTerm 0) ) (
+    ( (bsq_term_none) (bsq_term_true) (bsq_term_false) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String)) 
+      (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_value0 BTerm) (bsq_term_tuple_value1 BTerm) (bsq_term_tuple_value2 BTerm))
+    )
 ))
 
 (declare-datatypes ( (Result 1)
