@@ -395,10 +395,6 @@ abstract class MIRValueOp extends MIROp {
         this.trgt = trgt;
     }
 
-    getValueOpTypeKey(): MIRResolvedTypeKey {
-        xxxx;
-    }
-
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     protected jbemit(): object {

@@ -9,16 +9,10 @@
 ;;;;;;;;;;;;;;;;
 ;;Bosque value declarations
 
-(declare-datatypes ( (BNone 0) (BBool 0) (BInt 0) (BString 0)
-                     (BTuple0 0) (BTuple1 1) (BTuple2 2) (BTuple3 3)
+(declare-datatypes ( (BTuple0 0) (BTuple1 1) (BTuple2 2) (BTuple3 3)
                      (BRecord0 0) (BRecord1 1) (BRecord2 2) (BRecord3 3)
                      (BEntity0 0) (BEntity1 1) (BEntity2 2) (BEntity3 3)
                      ) (
-    ( (bsq_none) )
-    ( (bsq_true) (bsq_false) )
-    ( (bsq_int (bsq_int_value Int)) )
-    ( (bsq_string (bsq_string_value String)) )
-
     ( (bsq_tuple0) )
     ( par (T0) ((bsq_tuple1 (bsq_tuple1_value0 T0))) )
     ( par (T0 T1) ((bsq_tuple2 (bsq_tuple2_value0 T0) (bsq_tuple2_value1 T1))) )
@@ -36,16 +30,20 @@
 ))
 
 (declare-datatypes ( (BTerm 0) ) (
-    ( (bsq_term_none) (bsq_term_true) (bsq_term_false) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String)) 
+    ( (bsq_term_none) (bsq_term_bool (bsq_term_bool_value Bool)) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String)) 
       (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries (Array Int BTerm)))
       (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_properties (Array Int String)) (bsq_term_record_entries (Array String BTerm)))
       (bsq_term_entity (bsq_term_entity_type String) (bsq_term_entity_entries (Array String BTerm)))
     )
 ))
 
+(declare-datatypes ( (ResultCode 0) ) (
+    ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
+))
+
 (declare-datatypes ( (Result 1)
                      ) (
-    (par (T) ((result_error (error_msg String)) (result_success (result_value T)) ))
+    (par (T) ((result_with_code (result_code_value ResultCode)) (result_success (result_value T)) ))
 ))
 
 ;;;;;;;;;;;;;;;;
