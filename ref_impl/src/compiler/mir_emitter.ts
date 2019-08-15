@@ -170,24 +170,24 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRConstructorPrimaryCollectionMixed(sinfo, tkey, args, trgt));
     }
 
-    emitConstructorTuple(sinfo: SourceInfo, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRConstructorTuple(sinfo, args, trgt));
+    emitConstructorTuple(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRConstructorTuple(sinfo, resultTupleType, args, trgt));
     }
 
     emitConstructorRecord(sinfo: SourceInfo, args: [string, MIRArgument][], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRConstructorRecord(sinfo, args, trgt));
     }
 
-    emitLoadTupleIndex(sinfo: SourceInfo, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, idx, trgt));
+    emitLoadTupleIndex(sinfo: SourceInfo, resultIndexType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, resultIndexType, arg, idx, trgt));
     }
 
     emitProjectTupleIndecies(sinfo: SourceInfo, arg: MIRArgument, indecies: number[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRProjectFromIndecies(sinfo, arg, indecies, trgt));
     }
 
-    emitLoadProperty(sinfo: SourceInfo, arg: MIRArgument, pname: string, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, arg, pname, trgt));
+    emitLoadProperty(sinfo: SourceInfo, resultPropertyType: MIRResolvedTypeKey, arg: MIRArgument, pname: string, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultPropertyType, arg, pname, trgt));
     }
 
     emitLoadField(sinfo: SourceInfo, arg: MIRArgument, fname: string, trgt: MIRTempRegister) {
@@ -214,8 +214,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRProjectFromTypeConcept(sinfo, arg, ctypes, trgt));
     }
 
-    emitModifyWithIndecies(sinfo: SourceInfo, arg: MIRArgument, updates: [number, MIRArgument][], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRModifyWithIndecies(sinfo, arg, updates, trgt));
+    emitModifyWithIndecies(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey, arg: MIRArgument, updates: [number, MIRArgument][], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRModifyWithIndecies(sinfo, resultTupleType, arg, updates, trgt));
     }
 
     emitModifyWithProperties(sinfo: SourceInfo, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
@@ -238,7 +238,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, arg, update, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], refs: string[], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRResolvedTypeKey, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, ikey, args, trgt));
         }
@@ -248,15 +248,15 @@ class MIRBodyEmitter {
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
-                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, i + 1, ri));
-                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i])));
+                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1], rr, i + 1, ri));
+                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i][0])));
             }
 
-            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, 0, trgt));
+            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey, rr, 0, trgt));
         }
     }
 
-    emitInvokeVirtualTarget(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: string[], trgt: MIRTempRegister) {
+    emitInvokeVirtualTarget(sinfo: SourceInfo, rtkey: MIRResolvedTypeKey, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, vresolve, args, trgt));
         }
@@ -266,11 +266,11 @@ class MIRBodyEmitter {
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
-                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, i + 1, ri));
-                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i])));
+                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1], rr, i + 1, ri));
+                this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i][0])));
             }
 
-            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rr, 0, trgt));
+            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey, rr, 0, trgt));
         }
     }
 
@@ -326,7 +326,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRVarLifetimeEnd(sinfo, name));
     }
 
-    emitReturnAssign(sinfo: SourceInfo, refparams: string[], src: MIRArgument) {
+    emitReturnAssign(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey | undefined, refparams: string[], src: MIRArgument) {
         if (refparams.length === 0) {
             this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
         }
@@ -337,7 +337,7 @@ class MIRBodyEmitter {
             }
 
             const tupreg = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRConstructorTuple(sinfo, args, tupreg));
+            this.m_currentBlock.push(new MIRConstructorTuple(sinfo, resultTupleType as MIRResolvedTypeKey, args, tupreg));
             this.m_currentBlock.push(new MIRReturnAssign(sinfo, tupreg));
         }
     }

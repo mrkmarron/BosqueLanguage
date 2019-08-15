@@ -262,7 +262,7 @@ class TypeEnvironment {
         return this.updateVarInfo(name, newv);
     }
 
-    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][], allAssigned: [string, (string|number)[] | undefined, ResolvedType][]): TypeEnvironment {
+    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][]): TypeEnvironment {
         //TODO: many copies here could make this more efficient
         let nenv: TypeEnvironment = this;
 

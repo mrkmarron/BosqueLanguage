@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
+import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedFunctionTypeParam } from "../ast/resolved_type";
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
@@ -709,13 +709,16 @@ class TypeChecker {
             targs.push(args[i].argtype as ResolvedType);
         }
 
+        const tupleatom = ResolvedTupleAtomType.create(false, targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
+        const rtuple = ResolvedType.createSingle(tupleatom);
+
         if (this.m_emitEnabled) {
             const regs = args.map((e) => e.treg);
-            this.m_emitter.bodyEmitter.emitConstructorTuple(sinfo, regs, trgt);
+            const tupkey = this.m_emitter.registerResolvedTypeReference(rtuple);
+            this.m_emitter.bodyEmitter.emitConstructorTuple(sinfo, tupkey.trkey, regs, trgt);
         }
 
-        const tupleatom = ResolvedTupleAtomType.create(false, targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
-        return ResolvedType.createSingle(tupleatom);
+        return rtuple;
     }
 
     private checkArgumentsRecordConstructor(sinfo: SourceInfo, env: TypeEnvironment, args: ExpandedArgument[], trgt: MIRTempRegister): ResolvedType {
@@ -827,11 +830,13 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, (fieldInfo.get(pname) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>])[1].value !== undefined && !expandInfo[1].has(pname), `Constructor requires "${pname}" but it is provided as an optional argument`);
 
                     const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const lvtype =  this.getInfoForLoadFromPropertyName(arg.argtype as ResolvedType, pname);
                     if (this.m_emitEnabled) {
-                        this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, arg.treg, pname, etreg);
+                        const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
+                        this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, ptype.trkey, arg.treg, pname, etreg);
                     }
 
-                    filledLocations[fidx] = { vtype: this.getInfoForLoadFromPropertyName(arg.argtype as ResolvedType, pname), mustDef: expandInfo[1].has(pname), trgt: etreg };
+                    filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[1].has(pname), trgt: etreg };
                 });
             }
             else {
@@ -893,12 +898,13 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !sig.params[fidx].isOptional && !expandInfo[1].has(pname), `Call requires "${pname}" but it is provided as an optional argument`);
 
                     const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const lvtype = this.getInfoForLoadFromPropertyName(arg.argtype as ResolvedType, pname);
                     if (this.m_emitEnabled) {
-                        this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, arg.treg, pname, etreg);
+                        const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
+                        this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, ptype.trkey, arg.treg, pname, etreg);
                     }
 
-                    const argt = this.getInfoForLoadFromPropertyName(arg.argtype as ResolvedType, pname);
-                    filledLocations[fidx] = { vtype: argt, mustDef: expandInfo[1].has(pname), ref: undefined, pcode: undefined, trgt: etreg };
+                    filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[1].has(pname), ref: undefined, pcode: undefined, trgt: etreg };
                 });
             }
             else {
@@ -936,12 +942,13 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !sig.params[ii].isOptional && ectr >= expandInfo[1], `Call requires "${sig.params[ii].name}" but it is provided as an optional argument as part of tuple expando`);
 
                     const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const lvtype = this.getInfoForLoadFromIndex(arg.argtype as ResolvedType, ectr);
                     if (this.m_emitEnabled) {
-                        this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, arg.treg, ectr, etreg);
+                        const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
+                        this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, itype.trkey, arg.treg, ectr, etreg);
                     }
 
-                    const argt = this.getInfoForLoadFromIndex(arg.argtype as ResolvedType, ectr);
-                    filledLocations[ii] = { vtype: argt, mustDef: ectr < expandInfo[1], ref: undefined, pcode: undefined, trgt: etreg };
+                    filledLocations[ii] = { vtype: lvtype, mustDef: ectr < expandInfo[1], ref: undefined, pcode: undefined, trgt: etreg };
 
                     while (filledLocations[ii] !== undefined) {
                         this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional parameter "${sig.params[ii].name}"`);
@@ -1050,6 +1057,31 @@ class TypeChecker {
         return { args: margs, refs: refs, pcodes: pcodes, cinfo: cinfo };
     }
 
+    private generateRefInfoForCallEmit(fsig: ResolvedFunctionType, refs: string[]): [MIRResolvedTypeKey, [string, MIRResolvedTypeKey][]] {
+        const rtype = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
+        const refinfo = refs.map((rn) => {
+            const rp = fsig.params.find((p) => p.name === rn);
+            const ptk = this.m_emitter.registerResolvedTypeReference((rp as ResolvedFunctionTypeParam).type as ResolvedType);
+            return [rn, ptk.trkey] as [string, MIRResolvedTypeKey];
+        });
+
+        return [rtype.trkey, refinfo];
+    }
+
+    private generateRefInfoForReturnEmit(rtype: ResolvedType, env: TypeEnvironment): MIRResolvedTypeKey | undefined {
+        if (env.refparams.length === 0) {
+            return undefined;
+        }
+        else {
+            const entries = [
+                new ResolvedTupleAtomTypeEntry(rtype, false),
+                ...env.refparams.map((rn) => new ResolvedTupleAtomTypeEntry((env.lookupVar(rn) as VarInfo).declaredType, false))
+            ];
+
+            return this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedTupleAtomType.create(false, entries))).trkey;
+        }
+    }
+
     private checkLiteralNoneExpression(env: TypeEnvironment, exp: LiteralNoneExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitLoadConstNone(exp.sinfo, trgt);
@@ -1136,7 +1168,7 @@ class TypeChecker {
 
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
             this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, tmpr);
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, skey, [tmpr], [], trgt);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, stype.trkey, skey, [tmpr], [], trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, aoftype.ofresolved)];
@@ -1255,7 +1287,8 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oodecl, oobinds);
             const skey = this.m_emitter.registerStaticCall(oodecl, fdecl as StaticFunctionDecl, exp.factoryName, binds as Map<string, ResolvedType>, rargs.pcodes, rargs.cinfo);
 
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, skey, rargs.args, rargs.refs, etreg);
+            const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, frtype, skey, rargs.args, refinfo, etreg);
         }
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
@@ -1296,7 +1329,8 @@ class TypeChecker {
         if (this.m_emitEnabled) {
             const ckey = this.m_emitter.registerFunctionCall(exp.ns, exp.name, fdecl, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, ckey, margs.args, margs.refs, trgt);
+            const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, frtype, ckey, margs.args, refinfo, trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, fdecl.invoke.resultType, binds as Map<string, ResolvedType>))];
@@ -1326,7 +1360,8 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
             const skey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.decl as StaticFunctionDecl, (fdecl.decl as StaticFunctionDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, skey, margs.args, margs.refs, trgt);
+            const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, frtype, skey, margs.args, refinfo, trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];
@@ -1345,7 +1380,8 @@ class TypeChecker {
         this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.pragmas.recursive);
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, [], trgt);
+            const ftype = this.m_emitter.registerResolvedTypeReference((pcode as PCode).ftype.resultType);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, ftype.trkey, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, [], trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, (pcode as PCode).ftype.resultType)];
@@ -1357,11 +1393,12 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
 
+        const idxtype = this.getInfoForLoadFromIndex(texp, op.index);
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadTupleIndex(op.sinfo, arg, op.index, trgt);
+            this.m_emitter.bodyEmitter.emitLoadTupleIndex(op.sinfo, this.m_emitter.registerResolvedTypeReference(idxtype).trkey, arg, op.index, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.getInfoForLoadFromIndex(texp, op.index))];
+        return [env.setExpressionResult(this.m_assembly, idxtype)];
     }
 
     private checkProjectFromIndecies(env: TypeEnvironment, op: PostfixProjectFromIndecies, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1389,7 +1426,7 @@ class TypeChecker {
             const rtype = this.getInfoForLoadFromPropertyName(texp, op.name);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitLoadProperty(op.sinfo, arg, op.name, trgt);
+                this.m_emitter.bodyEmitter.emitLoadProperty(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, op.name, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, rtype)];
@@ -1506,12 +1543,13 @@ class TypeChecker {
         });
 
         const resultOptions = texp.options.map((opt) => this.updateTupleIndeciesAtom(op.sinfo, opt, updates.map<[number, ResolvedType]>((update) => [update[0], update[1]])));
+        const rtuple = this.m_assembly.typeUnion(resultOptions);
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitModifyWithIndecies(op.sinfo, arg, updates.map<[number, MIRArgument]>((update) => [update[0], update[2]]), trgt);
+            this.m_emitter.bodyEmitter.emitModifyWithIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtuple).trkey, arg, updates.map<[number, MIRArgument]>((update) => [update[0], update[2]]), trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+        return [env.setExpressionResult(this.m_assembly, rtuple)];
     }
 
     private checkModifyWithNames(env: TypeEnvironment, op: PostfixModifyWithNames, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1617,7 +1655,8 @@ class TypeChecker {
                 this.m_emitter.registerTypeInstantiation(mdecl.contiainingType, mdecl.binds);
                 const mkey = this.m_emitter.registerMethodCall(mdecl.contiainingType, mdecl.decl as MemberMethodDecl, mdecl.binds, (mdecl.decl as MemberMethodDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
-                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(op.sinfo, mkey, margs.args, margs.refs, trgt);
+                const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
+                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(op.sinfo, frtype, mkey, margs.args, refinfo, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, (fsig as ResolvedFunctionType).resultType)];
@@ -1709,7 +1748,8 @@ class TypeChecker {
                 else {
                     const vkey = this.m_emitter.registerVirtualMethodCall((vinfo.root as OOMemberLookupInfo).contiainingType, (vinfo.root as OOMemberLookupInfo).binds, op.name, cbindsonly, margs.pcodes, margs.cinfo);
 
-                    this.m_emitter.bodyEmitter.emitInvokeVirtualTarget(op.sinfo, vkey, margs.args, margs.refs, trgt);
+                    const [frtype, refinfo] = this.generateRefInfoForCallEmit(lsig, margs.refs);
+                    this.m_emitter.bodyEmitter.emitInvokeVirtualTarget(op.sinfo, frtype, vkey, margs.args, refinfo, trgt);
                 }
             }
 
@@ -2282,7 +2322,8 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, env.isInYieldBlock(), "Cannot use return statment inside an expression block");
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, env.refparams, rreg);
+                const rtuple = this.generateRefInfoForReturnEmit(terminaltype, env);
+                this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, rtuple, env.refparams, rreg);
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "exit");
 
                 this.m_emitter.bodyEmitter.setActiveBlock(regularblck);
@@ -2546,7 +2587,7 @@ class TypeChecker {
         return env.setVar(stmt.name, venv.getExpressionResult().etype);
     }
 
-    private checkStructuredAssign(sinfo: SourceInfo, env: TypeEnvironment, isopt: boolean, cpath: (string|number)[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][], allAssigned: [string, (string|number)[], ResolvedType][]) {
+    private checkStructuredAssign(sinfo: SourceInfo, env: TypeEnvironment, isopt: boolean, cpath: {p: (string|number), t: ResolvedType}[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][]) {
         if (assign instanceof IgnoreTermStructuredAssignment) {
             this.raiseErrorIf(sinfo, isopt && !assign.isOptional, "Missing value for required entry");
 
@@ -2591,7 +2632,7 @@ class TypeChecker {
             for (let i = 0; i < assign.assigns.length; ++i) {
                 const aopt = tuptype.options.some((atom) => (atom as ResolvedTupleAtomType).types.length < i || (atom as ResolvedTupleAtomType).types[i].isOptional);
                 const ttype = this.getInfoForLoadFromIndex(tuptype, i);
-                this.checkStructuredAssign(sinfo, env, aopt, [...cpath, i], assign.assigns[i], ttype, allDeclared, allAssigned);
+                this.checkStructuredAssign(sinfo, env, aopt, [...cpath, {p: i, t: ttype}], assign.assigns[i], ttype, allDeclared, allAssigned);
             }
 
             if (!assign.isOpen) {
@@ -2614,7 +2655,7 @@ class TypeChecker {
                     return (entry === undefined || entry.isOptional);
                 });
                 const ttype = this.getInfoForLoadFromPropertyName(rectype, pname);
-                this.checkStructuredAssign(sinfo, env, aopt, [...cpath, pname], rassign.assigns[i][1], ttype, allDeclared, allAssigned);
+                this.checkStructuredAssign(sinfo, env, aopt, [...cpath, {p: pname, t: ttype}], rassign.assigns[i][1], ttype, allDeclared, allAssigned);
             }
 
             if (!rassign.isOpen) {
@@ -2629,30 +2670,32 @@ class TypeChecker {
         }
     }
 
-    private generateAssignOps(sinfo: SourceInfo, ereg: MIRTempRegister, assign: (string|number)[]): MIRTempRegister {
+    private generateAssignOps(sinfo: SourceInfo, ereg: MIRTempRegister, assign: {p: (string|number), t: ResolvedType}[]): MIRTempRegister {
         let creg = ereg;
         for (let i = 0; i < assign.length; ++i) {
             const nreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            if (typeof (assign[i]) === "number") {
-                this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, creg, assign[i] as number, nreg);
+            const lt = this.m_emitter.registerResolvedTypeReference(assign[i].t).trkey;
+            if (typeof (assign[i].p) === "number") {
+                this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, lt, creg, assign[i].p as number, nreg);
             }
             else {
-                this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, creg, assign[i] as string, nreg);
+                this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, lt, creg, assign[i].p as string, nreg);
             }
             creg = nreg;
         }
         return creg;
     }
 
-    private generateEqualityOps(env: TypeEnvironment, sinfo: SourceInfo, ereg: MIRTempRegister, assign: (string|number)[], value: Expression): MIRTempRegister {
+    private generateEqualityOps(env: TypeEnvironment, sinfo: SourceInfo, ereg: MIRTempRegister, assign: {p: (string|number), t: ResolvedType}[], value: Expression): MIRTempRegister {
         let creg = ereg;
         for (let i = 0; i < assign.length; ++i) {
             const nreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            if (typeof (assign[i]) === "number") {
-                this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, creg, assign[i] as number, nreg);
+            const lt = this.m_emitter.registerResolvedTypeReference(assign[i].t).trkey;
+            if (typeof (assign[i].p) === "number") {
+                this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, lt, creg, assign[i].p as number, nreg);
             }
             else {
-                this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, creg, assign[i] as string, nreg);
+                this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, lt, creg, assign[i].p as string, nreg);
             }
             creg = nreg;
         }
@@ -2670,8 +2713,8 @@ class TypeChecker {
         const expreg = this.m_emitter.bodyEmitter.generateTmpRegister();
         const eenv = this.checkExpression(env, stmt.exp, expreg, { refok: true, orok: true });
 
-        let allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][] = [];
-        let allAssigned: [string, (string|number)[], ResolvedType][] = [];
+        let allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][] = [];
+        let allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][] = [];
         this.checkStructuredAssign(stmt.sinfo, env, false, [], stmt.assign, eenv.getExpressionResult().etype, allDeclared, allAssigned);
 
         if (this.m_emitEnabled) {
@@ -2756,7 +2799,7 @@ class TypeChecker {
         return TypeEnvironment.join(this.m_assembly, ...results);
     }
 
-    private checkStructuredMatch(sinfo: SourceInfo, env: TypeEnvironment, cpath: (string|number)[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [boolean, string, ResolvedType, (string|number)[], ResolvedType][], allAssigned: [string, (string|number)[], ResolvedType][], allEqChecks: [(string|number)[], Expression][]): [ResolvedType, boolean] {
+    private checkStructuredMatch(sinfo: SourceInfo, env: TypeEnvironment, cpath: {p: (string|number), t: ResolvedType}[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][], allEqChecks: [{p: (string|number), t: ResolvedType}[], Expression][]): [ResolvedType, boolean] {
         if (assign instanceof IgnoreTermStructuredAssignment) {
             return [this.resolveAndEnsureTypeOnly(sinfo, assign.termType, env.terms), assign.isOptional];
         }
@@ -2800,7 +2843,7 @@ class TypeChecker {
             const tupcheck: ResolvedTupleAtomTypeEntry[] = [];
             for (let i = 0; i < assign.assigns.length; ++i) {
                 const ttype = this.getInfoForLoadFromIndex(tuptype, i);
-                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, i], assign.assigns[i], ttype, allDeclared, allAssigned, allEqChecks);
+                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, {p: i, t: ttype}], assign.assigns[i], ttype, allDeclared, allAssigned, allEqChecks);
                 tupcheck.push(new ResolvedTupleAtomTypeEntry(...einfo));
             }
 
@@ -2818,7 +2861,7 @@ class TypeChecker {
             for (let i = 0; i < rassign.assigns.length; ++i) {
                 const pname = rassign.assigns[i][0];
                 const ttype = this.getInfoForLoadFromPropertyName(rectype, pname);
-                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, pname], rassign.assigns[i][1], ttype, allDeclared, allAssigned, allEqChecks);
+                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, {p: pname, t: ttype}], rassign.assigns[i][1], ttype, allDeclared, allAssigned, allEqChecks);
                 reccheck.push(new ResolvedRecordAtomTypeEntry(pname, ...einfo));
             }
 
@@ -2869,9 +2912,9 @@ class TypeChecker {
         else {
             const sguard = guard as StructureMatchGuard;
 
-            let allDeclared: [boolean, string, ResolvedType, (string | number)[], ResolvedType][] = [];
-            let allAssigned: [string, (string | number)[], ResolvedType][] = [];
-            let allEqChecks: [(string | number)[], Expression][] = [];
+            let allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][] = [];
+            let allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][] = [];
+            let allEqChecks: [{p: (string|number), t: ResolvedType}[], Expression][] = [];
             const oftype = this.checkStructuredMatch(sinfo, env, [], sguard.match, sexp, allDeclared, allAssigned, allEqChecks)[0];
 
             if (this.m_emitEnabled) {
@@ -3027,7 +3070,8 @@ class TypeChecker {
         this.raiseErrorIf(stmt.sinfo, env.isInYieldBlock(), "Cannot use return statment inside an expression block");
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitReturnAssign(stmt.sinfo, env.refparams, etreg);
+            const rtuple = this.generateRefInfoForReturnEmit(venv.getExpressionResult().etype, env);
+            this.m_emitter.bodyEmitter.emitReturnAssign(stmt.sinfo, rtuple, env.refparams, etreg);
             this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
         }
 
@@ -3191,7 +3235,8 @@ class TypeChecker {
             const evalue = this.checkExpression(env, body.body, etreg);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitReturnAssign(body.body.sinfo, env.refparams, etreg);
+                const rtuple = this.generateRefInfoForReturnEmit(resultType, env);
+                this.m_emitter.bodyEmitter.emitReturnAssign(body.body.sinfo, rtuple, env.refparams, etreg);
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
             }
 
@@ -3224,7 +3269,8 @@ class TypeChecker {
         const evalue = this.checkExpression(env, exp, etreg);
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, env.refparams, etreg);
+            const rtuple = this.generateRefInfoForReturnEmit(ofType, env);
+            this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, rtuple, env.refparams, etreg);
             this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "exit");
         }
 
