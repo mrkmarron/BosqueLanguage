@@ -129,6 +129,12 @@ class SMTCond extends SMTExp {
 
 class SMTLIBGenerator {
     readonly assembly: MIRAssembly;
+    readonly noneType: MIRType;
+    readonly boolType: MIRType;
+    readonly intType: MIRType;
+    readonly stringType: MIRType;
+    readonly anyType: MIRType;
+    readonly nonableboolType: MIRType;
 
     private cinvoke: MIRInvokeDecl | undefined = undefined;
 
@@ -136,6 +142,13 @@ class SMTLIBGenerator {
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
+
+        this.noneType = this.assembly.typeMap.get("NSCore::None") as MIRType;
+        this.boolType = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
+        this.intType = this.assembly.typeMap.get("NSCore::Int") as MIRType;
+        this.stringType = this.assembly.typeMap.get("NSCore::String<NSCore::Any>") as MIRType;
+        this.anyType = this.assembly.typeMap.get("NSCore::Any") as MIRType;
+        this.nonableboolType = this.assembly.typeMap.get("NSCore::Bool | NSCore::None") as MIRType;
     }
 
     private getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -144,16 +157,16 @@ class SMTLIBGenerator {
         }
         else {
             if (arg instanceof MIRConstantNone) {
-                return this.assembly.typeMap.get("NSCore::None") as MIRType;
+                return this.noneType;
             }
             else if (arg instanceof MIRConstantTrue || arg instanceof MIRConstantFalse) {
-                return this.assembly.typeMap.get("NSCore::Bool") as MIRType;
+                return this.boolType;
             }
             else if (arg instanceof MIRConstantInt) {
-                return this.assembly.typeMap.get("NSCore::Int") as MIRType;
+                return this.intType;
             }
             else {
-                return this.assembly.typeMap.get("NSCore::String<NSCore::Any>") as MIRType;
+                return this.stringType;
             }
         }
     }
@@ -372,7 +385,7 @@ class SMTLIBGenerator {
         let tentries: SMTExp[] = [];
         for (let i = 0; i < op.args.length; ++i) {
             const argt = this.getArgType(op.args[i], vtypes);
-            const tt = ttype.entries.length < i ? ttype.entries[i].type : this.assembly.typeMap.get("NSCore::Any") as MIRType;
+            const tt = ttype.entries.length < i ? ttype.entries[i].type : this.anyType;
             tentries.push(this.argToSMT2Coerce(op.args[i], argt, tt));
         }
 
@@ -562,38 +575,36 @@ class SMTLIBGenerator {
                 const pfx = op as MIRPrefixOp;
                 const argtype = this.getArgType(pfx.arg, vtypes);
                 if (pfx.op === "!") {
-                    const totype = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
+                    xxxx; //TODO -- refactor truthy convert code -- may be precise type too!
                     vtypes.set(pfx.trgt.nameID, totype);
 
                     if (this.assembly.subtypeOf(argtype, totype)) {
-                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(not ${this.argToSMT2Coerce(pfx.arg, argtype, totype)})`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(not ${this.argToSMT2Coerce(pfx.arg, argtype, this.boolType)})`), this.generateFreeSMTVar());
                     }
                     else {
                         return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTCond(new SMTValue(`(= ${this.argToSMT2Coerce(pfx.arg, argtype, argtype)} bsq_term_none)`), new SMTValue("false"), new SMTValue(`(not ${this.argToSMT2(pfx.arg, argtype, totype)})`)), this.generateFreeSMTVar());
                     }
                 }
                 else {
-                    const totype = this.assembly.typeMap.get("NSCore::Int") as MIRType;
-                    vtypes.set(pfx.trgt.nameID, totype);
+                    vtypes.set(pfx.trgt.nameID, this.intType);
 
                     if (pfx.op === "-") {
-                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(* ${this.argToSMT2Coerce(pfx.arg, argtype, totype)} -1)`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(* ${this.argToSMT2Coerce(pfx.arg, argtype, this.intType)} -1)`), this.generateFreeSMTVar());
                     }
                     else {
-                        return new SMTLet(this.varToSMT2Name(pfx.trgt), this.argToSMT2Coerce(pfx.arg, argtype, totype), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(pfx.trgt), this.argToSMT2Coerce(pfx.arg, argtype, this.intType), this.generateFreeSMTVar());
                     }
                 }
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                const totype = this.assembly.typeMap.get("NSCore::Int") as MIRType;
-                vtypes.set(bop.trgt.nameID, totype);
+                vtypes.set(bop.trgt.nameID, this.intType);
 
                 const lhvtype = this.getArgType(bop.lhs, vtypes);
-                const lhv = this.argToSMT2Coerce(bop.lhs, lhvtype, totype);
+                const lhv = this.argToSMT2Coerce(bop.lhs, lhvtype, this.intType);
 
                 const rhvtype = this.getArgType(bop.rhs, vtypes);
-                const rhv = this.argToSMT2Coerce(bop.rhs, rhvtype, totype);
+                const rhv = this.argToSMT2Coerce(bop.rhs, rhvtype, this.intType);
 
                 switch (bop.op) {
                     case "+":
@@ -616,7 +627,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
-                vtypes.set(beq.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
+                vtypes.set(beq.trgt.nameID, this.boolType);
 
                 const lhvtype = this.getArgType(beq.lhs, vtypes);
                 const rhvtype = this.getArgType(beq.rhs, vtypes);
@@ -637,7 +648,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
-                vtypes.set(bcmp.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
+                vtypes.set(bcmp.trgt.nameID, this.boolType);
 
                 const lhvtype = this.getArgType(bcmp.lhs, vtypes);
                 const rhvtype = this.getArgType(bcmp.rhs, vtypes);
@@ -652,21 +663,27 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
-                vtypes.set(ton.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
+                vtypes.set(ton.trgt.nameID, this.boolType);
 
                 const argtype = this.getArgType(ton.arg, vtypes);
-                assert(!this.isTypeExact(argtype)); //?? shouldn't we report this as a dead branch in the type checker ??
-
-                return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(`(= ${this.argToSMT2Direct(ton.arg)} bsq_term_none)`), this.generateFreeSMTVar());
+                if (this.isTypeExact(argtype)) {
+                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.noneType) ? "true" : "false"), this.generateFreeSMTVar());
+                }
+                else {
+                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(`(= ${this.argToSMT2Direct(ton.arg)} bsq_term_none)`), this.generateFreeSMTVar());
+                }
             }
             case MIROpTag.MIRIsTypeOfSome: {
                 const tos = op as MIRIsTypeOfSome;
                 vtypes.set(tos.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
 
                 const argtype = this.getArgType(tos.arg, vtypes);
-                assert(!this.isTypeExact(argtype)); //?? shouldn't we report this as a dead branch in the type checker ??
-
-                return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(`(!= ${this.argToSMT2Direct(tos.arg)} bsq_term_none)`), this.generateFreeSMTVar());
+                if (this.isTypeExact(argtype)) {
+                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.noneType) ? "false" : "true"), this.generateFreeSMTVar());
+                }
+                else {
+                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(`(!= ${this.argToSMT2Direct(tos.arg)} bsq_term_none)`), this.generateFreeSMTVar());
+                }
             }
             case MIROpTag.MIRIsTypeOf: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRIsTypeOf");
@@ -680,7 +697,8 @@ class SMTLIBGenerator {
             case MIROpTag.MIRTruthyConvert: {
                 const tcop = op as MIRTruthyConvert;
                 const argtype = this.getArgType(tcop.src, vtypes);
-                const totype = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
+
+                xxxx; //TODO -- refactor truthy convert code -- may be precise type too!
                 vtypes.set(tcop.trgt.nameID, totype);
 
                 assert(!this.assembly.subtypeOf(argtype, totype)); //?? why are we emitting this then ??
@@ -689,14 +707,13 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRLogicStore: {
                 const llop = op as MIRLogicStore;
-                const totype = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
-                vtypes.set(llop.trgt.nameID, totype);
+                vtypes.set(llop.trgt.nameID, this.boolType);
 
                 const lhvtype = this.getArgType(llop.lhs, vtypes);
-                const lhv = this.argToSMT2Coerce(llop.lhs, lhvtype, totype);
+                const lhv = this.argToSMT2Coerce(llop.lhs, lhvtype, this.boolType);
 
                 const rhvtype = this.getArgType(llop.rhs, vtypes);
-                const rhv = this.argToSMT2Coerce(llop.rhs, rhvtype, totype);
+                const rhv = this.argToSMT2Coerce(llop.rhs, rhvtype, this.boolType);
 
                 if (llop.op === "&") {
                     return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(and ${lhv} ${rhv})`), this.generateFreeSMTVar());
@@ -732,19 +749,23 @@ class SMTLIBGenerator {
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
                 const argtype = this.getArgType(cjop.arg, vtypes);
-                const totype = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
-                if (this.assembly.subtypeOf(argtype, totype)) {
-                    return new SMTCond(this.argToSMT2Coerce(cjop.arg, argtype, totype), this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
+                if (this.assembly.subtypeOf(argtype, this.boolType)) {
+                    return new SMTCond(this.argToSMT2Direct(cjop.arg), this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
                 }
                 else {
+                    xxxx; //TODO -- refactor truthy convert code -- may be precise type too!
                     return new SMTCond(new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(cjop.arg)} bsq_term_none)`), new SMTValue("false"), this.argToSMT2Coerce(cjop.arg, argtype, totype)), this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
                 }
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
-                assert(!this.isTypeExact(this.getArgType(njop.arg, vtypes))); //?? shouldn't we report this as a dead branch in the type checker ??
-
-                return new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(njop.arg)} bsq_term_none)`), this.generateFreeSMTVar("true"), this.generateFreeSMTVar("false"));
+                const argtype = this.getArgType(njop.arg, vtypes);
+                if (this.isTypeExact(argtype)) {
+                    return new SMTCond(new SMTValue(this.assembly.subtypeOf(argtype, this.noneType) ? "true" : "false"), this.generateFreeSMTVar("true"), this.generateFreeSMTVar("false"));
+                }
+                else {
+                    return new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(njop.arg)} bsq_term_none)`), this.generateFreeSMTVar("true"), this.generateFreeSMTVar("false"));
+                }
             }
             case MIROpTag.MIRPhi: {
                 const pop = op as MIRPhi;
@@ -805,6 +826,8 @@ class SMTLIBGenerator {
     }
 
     generateSMTInvoke(idecl: MIRInvokeDecl): string {
+        this.cinvoke = idecl;
+
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
 
