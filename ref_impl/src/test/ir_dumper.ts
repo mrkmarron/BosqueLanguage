@@ -9,6 +9,7 @@ import chalk from "chalk";
 import { MIREmitter } from "../compiler/mir_emitter";
 import { PackageConfig, MIRAssembly, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
 import { MIRBody } from "../compiler/mir_ops";
+import { SMTLIBGenerator } from "../analysis/smtlib/generator";
 
 function runApp(app: string) {
     process.stdout.write("Reading app code...\n");
@@ -50,6 +51,16 @@ function runApp(app: string) {
 
         process.stdout.write("Writing IR...\n");
         FS.writeFileSync("mir_ir.dgml", dgml);
+
+        ////
+        process.stdout.write("Generating SMTLIB2...\n");
+
+        const smtcode = SMTLIBGenerator.generateSMTAssembly(masm as MIRAssembly);
+
+        process.stdout.write("Writing SMTLIB2...\n");
+        FS.writeFileSync("model.smt2", smtcode);
+        ////
+
     }
     catch (ex) {
         process.stdout.write(chalk.red(`fail with exception -- ${ex}\n`));

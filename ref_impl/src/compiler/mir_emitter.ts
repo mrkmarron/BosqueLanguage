@@ -647,6 +647,15 @@ class MIREmitter {
         const emitter = new MIREmitter(masm);
         const checker = new TypeChecker(assembly, true, emitter);
 
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialBoolType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialIntType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String") as EntityTypeDecl, new Map<string, ResolvedType>().set("T", assembly.getSpecialAnyType()));
+        emitter.registerResolvedTypeReference(assembly.getSpecialStringType());
+
         //get any entrypoint functions and initialize the checker there
         const nslist = assembly.getNamespaces();
         nslist.forEach((nsentry) => {
