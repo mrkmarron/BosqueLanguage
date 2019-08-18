@@ -175,16 +175,7 @@ class SMTLIBGenerator {
         }
 
         if (type instanceof MIREntityType) {
-            if (type.ekey === "NSCore::String<NSCore::Any>") {
-                return true;
-            }
-            else {
-                let allexact = true;
-                (this.assembly.entityDecls.get(type.ekey) as MIREntityTypeDecl).terms.forEach((term) => {
-                    allexact = allexact && this.isTypeExact(term);
-                });
-                return allexact;
-            }
+            return true;
         }
         else if (type instanceof MIRTupleType) {
             return !type.isOpen && type.entries.every((entry) => !entry.isOptional && this.isTypeExact(entry.type));
@@ -425,15 +416,15 @@ class SMTLIBGenerator {
         assert(restype.options.length === 1 && restype.options[0] instanceof MIRTupleType);
 
         const ttype = restype.options[0] as MIRTupleType;
-        let tentries: SMTExp[] = [];
+        let tentries: string[] = [];
         for (let i = 0; i < op.args.length; ++i) {
             const argt = this.getArgType(op.args[i], vtypes);
-            const tt = ttype.entries.length < i ? ttype.entries[i].type : this.anyType;
-            tentries.push(this.argToSMT2Coerce(op.args[i], argt, tt));
+            const tt = i < ttype.entries.length ? ttype.entries[i].type : this.anyType;
+            tentries.push(this.argToSMT2Coerce(op.args[i], argt, tt).emit());
         }
 
         if (this.isTypeExact(ttype)) {
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typeToSMT2Constructor(ttype)} ${tentries.join(" ")}})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typeToSMT2Constructor(ttype)} ${tentries.join(" ")})`), this.generateFreeSMTVar());
         }
         else {
             let entriesval = "((as const (Array Int BTerm)) bsq_term_none)";
@@ -445,7 +436,7 @@ class SMTLIBGenerator {
         }
     }
 
-    generateMIRAccessFromIndex(op: MIRAccessFromIndex, vtypes: Map<string, MIRType>): SMTExp {
+    generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultIndexType: MIRType, vtypes: Map<string, MIRType>): SMTExp {
         const argtype = this.getArgType(op.arg, vtypes);
 
         if (this.isTypeExact(argtype)) {
@@ -459,7 +450,7 @@ class SMTLIBGenerator {
             }
         }
         else {
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(select (${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`), this.generateFreeSMTVar());
         }
     }
 
@@ -502,8 +493,8 @@ class SMTLIBGenerator {
 
         const tv = `@tmpvar@${this.tmpvarctr++}`;
         const invokeexp = new SMTValue(`(${this.invokenameToSMT2(ivop.mkey)} ${vals.join(" ")})`);
-        const checkerror = new SMTValue(`((_ is result_with_code) ${this.varToSMT2Name(ivop.trgt)})`);
-        const extracterror = new SMTValue(`(result_with_code (result_code_value ${this.varToSMT2Name(ivop.trgt)}))`);
+        const checkerror = new SMTValue(`((_ is result_with_code) ${tv})`);
+        const extracterror = new SMTValue(`(result_with_code (result_code_value ${tv}))`);
         const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(result_value ${tv})`), this.generateFreeSMTVar());
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
@@ -561,7 +552,7 @@ class SMTLIBGenerator {
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 vtypes.set(ai.trgt.nameID, this.assembly.typeMap.get(ai.resultIndexType) as MIRType);
-                return this.generateMIRAccessFromIndex(ai, vtypes);
+                return this.generateMIRAccessFromIndex(ai, resultIndexType, vtypes);
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromIndecies");
