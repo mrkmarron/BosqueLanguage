@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump } from "../../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump, MIRConstructorPrimary } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 
@@ -407,6 +407,18 @@ class SMTLIBGenerator {
         }
     }
 
+    private generateMIRConstructorPrimary(cp: MIRConstructorPrimary, vtypes: Map<string, MIRType>): SMTExp {
+        const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
+        const fvals = cp.args.map<[string, SMTExp]>((arg, i) => {
+            const argtype = this.getArgType(arg, vtypes);
+            const ftype = this.assembly.typeMap.get(ctype.fields[i].declaredType) as MIRType;
+            return [ctype.fields[i].name, this.argToSMT2Coerce(arg, argtype, ftype)];
+        });
+
+        xxxx;
+            this.checkInvariants(ctype, evalue);
+    }
+
     private generateMIRConstructorTuple(op: MIRConstructorTuple, vtypes: Map<string, MIRType>): SMTExp {
         const restype = (this.assembly.typeMap.get(op.resultTupleType) as MIRType);
         assert(restype.options.length === 1 && restype.options[0] instanceof MIRTupleType);
@@ -531,7 +543,9 @@ class SMTLIBGenerator {
                 return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2Direct(llv.name), this.generateFreeSMTVar());
             }
             case MIROpTag.MIRConstructorPrimary: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimary");
+                const cp = op as MIRConstructorPrimary;
+                vtypes.set(cp.trgt.nameID, this.assembly.typeMap.get(cp.tkey) as MIRType);
+                return this.generateMIRConstructorPrimary(cp, vtypes);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionEmpty");
@@ -915,7 +929,16 @@ class SMTLIBGenerator {
                         //don't need to do anything as these are special cases
                     }
                     else {
-                        NOT_IMPLEMENTED<string>("generateSMTAssembly -- general entities");
+                        typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
+
+                        const tpfx = smtgen.typeToSMT2Constructor(topt);
+                        const entries: string[] = [];
+                        for (let i = 0; i < edecl.fields.length; ++i) {
+                            const ftype = smtgen.assembly.typeMap.get(edecl.fields[i].declaredType) as MIRType;
+                            entries.push(`(${tpfx}@${edecl.fields[i].fname} ${smtgen.typeToSMT2Type(ftype)})`);
+                        }
+
+                        consdecls.push(`((${tpfx} ${entries.join(" ")}))`);
                     }
                 }
                 else if (topt instanceof MIRTupleType ) {
