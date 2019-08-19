@@ -50,15 +50,6 @@ entrypoint function absOpt(x?: Int): Int {
     return abs(x);
 }
 
-//entrypoint function max(x: Int, y: Int): Int {
-//    if(x > y) {
-//        return x;
-//    }
-//    else {
-//        return y;
-//    }
-//}
-
 entrypoint function maxTuple(x: [Int, Int]): Int {
     if(x.0 > x.1) {
         return x.0;
@@ -70,6 +61,10 @@ entrypoint function maxTuple(x: [Int, Int]): Int {
 
 entrypoint function swapTuple(x: [Int, Int]): [Int, Int] {
     return [x.1, x.0];
+}
+
+entrypoint function modifyTuple(x: [Int, Int]): [Int, Int, Bool] {
+    return x->update(1=0, 2=true);
 }
 `;
 
@@ -191,6 +186,29 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const r2 Int)",
             "(assert (= (bsq_tuple$_Int$Int_$ r1 r2) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestSMT2Encode@swapTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
             "(assert (not (and (= r1 p2) (= r2 p1))))",
+            "(check-sat)"
+        ],
+        expected: `unsat`
+    },
+    {
+        name: "modifyTuple_EXEC",
+        input: [
+            "(declare-const r2 Int)",
+            "(assert (= (bsq_tuple$_Int$Int$Bool_$ 1 r2 true) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestSMT2Encode@modifyTuple (bsq_tuple$_Int$Int_$ 1 2)))))",
+            "(check-sat)",
+            "(get-model)"
+        ],
+        expected: `sat (model (define-fun r2 () Int 0) )`
+    },
+    {
+        name: "modifyTuple_CHK",
+        input: [
+            "(declare-const p1 Int)",
+            "(declare-const r1 Int)",
+            "(declare-const r2 Int)",
+            "(declare-const r3 Bool)",
+            "(assert (= (bsq_tuple$_Int$Int$Bool_$ r1 r2 r3) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestSMT2Encode@modifyTuple (bsq_tuple$_Int$Int_$ p1 3)))))",
+            "(assert (not (and (= r1 p1) r3)))",
             "(check-sat)"
         ],
         expected: `unsat`

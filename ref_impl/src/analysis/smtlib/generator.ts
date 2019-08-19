@@ -477,7 +477,7 @@ class SMTLIBGenerator {
                 }
             }
 
-            return new SMTLet(this.varToSMT2Name(mi.trgt), new SMTValue(`(${this.typeToSMT2Constructor(rtinfo)} ${vals.join(" ")}})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(mi.trgt), new SMTValue(`(${this.typeToSMT2Constructor(rtinfo)} ${vals.join(" ")})`), this.generateFreeSMTVar());
         }
         else {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRModifyWithIndecies -- not type exact case");
