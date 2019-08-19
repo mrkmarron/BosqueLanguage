@@ -3550,6 +3550,10 @@ class TypeChecker {
             else {
                 this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
             }
+
+            if (f.attributes.includes("entrypoint")) {
+                this.m_emitter.masm.entryPoints.push(invinfo.key);
+            }
         }
         catch (ex) {
             this.m_emitEnabled = false;

@@ -7,6 +7,7 @@ import * as assert from "assert";
 
 import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
+import { constructCallGraphInfo } from "../../compiler/mir_callg";
 
 function NOT_IMPLEMENTED<T>(action: string): T {
     throw new Error(`Not Implemented: ${action}`);
@@ -28,11 +29,6 @@ const smtlib_code = `
 
 (declare-datatypes ( (ResultCode 0) ) (
     ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
-))
-
-(declare-datatypes ( (Result 1)
-                     ) (
-    (par (T) ((result_with_code (result_code_value ResultCode)) (result_success (result_value T)) ))
 ))
 `;
 
@@ -450,7 +446,12 @@ class SMTLIBGenerator {
             }
         }
         else {
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`), this.generateFreeSMTVar());
+            if (this.isTypeExact(resultIndexType)) {
+                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`), this.anyType, resultIndexType), this.generateFreeSMTVar());
+            }
+            else {
+                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`), this.generateFreeSMTVar());
+            }
         }
     }
 
@@ -492,10 +493,13 @@ class SMTLIBGenerator {
         }
 
         const tv = `@tmpvar@${this.tmpvarctr++}`;
+        const ivrtype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((idecl as MIRInvokeDecl).resultType) as MIRType);
+        const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+
         const invokeexp = new SMTValue(`(${this.invokenameToSMT2(ivop.mkey)} ${vals.join(" ")})`);
-        const checkerror = new SMTValue(`((_ is result_with_code) ${tv})`);
-        const extracterror = new SMTValue(`(result_with_code (result_code_value ${tv}))`);
-        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(result_value ${tv})`), this.generateFreeSMTVar());
+        const checkerror = new SMTValue(`(is-${ivrtype}@result_with_code ${tv})`);
+        const extracterror = new SMTValue(`(${resulttype}@result_with_code (${ivrtype}@result_code_value ${tv}))`);
+        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(${resulttype}@result_value ${tv})`), this.generateFreeSMTVar());
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }
@@ -552,7 +556,7 @@ class SMTLIBGenerator {
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 vtypes.set(ai.trgt.nameID, this.assembly.typeMap.get(ai.resultIndexType) as MIRType);
-                return this.generateMIRAccessFromIndex(ai, resultIndexType, vtypes);
+                return this.generateMIRAccessFromIndex(ai, this.assembly.typeMap.get(ai.resultIndexType) as MIRType, vtypes);
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromIndecies");
@@ -779,7 +783,8 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRAbort: {
                 const aop = op as MIRAbort;
-                return new SMTValue(`(result_with_code (result_error ${aop.sinfo.pos}))`);
+                const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+                return new SMTValue(`(${resulttype}@result_with_code (result_error ${aop.sinfo.pos}))`);
             }
             case MIROpTag.MIRDebug: {
                 return undefined;
@@ -829,7 +834,8 @@ class SMTLIBGenerator {
         }
 
         if (block.label === "exit") {
-            let rexp = new SMTValue("(result_success _return_)") as SMTExp;
+            const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+            let rexp = new SMTValue(`(${resulttype}@result_success _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
             }
@@ -873,7 +879,7 @@ class SMTLIBGenerator {
 
         const args = idecl.params.map((arg) => `(${this.varNameToSMT2Name(arg.name)} ${this.typeToSMT2Type(this.assembly.typeMap.get(arg.type) as MIRType)})`);
         const restype = this.typeToSMT2Type(this.assembly.typeMap.get(idecl.resultType) as MIRType);
-        const decl = `(define-fun ${this.invokenameToSMT2(idecl.key)} (${args.join(" ")}) (Result ${restype})`;
+        const decl = `(define-fun ${this.invokenameToSMT2(idecl.key)} (${args.join(" ")}) Result_${restype}`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
             if (idecl.preconditions.length !== 0 || idecl.postconditions.length !== 0) {
@@ -932,15 +938,30 @@ class SMTLIBGenerator {
             }
         });
 
+        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly.invokeDecls, assembly.primitiveInvokeDecls);
+        assert(cginfo.recursive.length === 0, "TODO: we need to support recursion here");
+
         const invokedecls: string[] = [];
-        assembly.invokeDecls.forEach((ivk) => invokedecls.push(smtgen.generateSMTInvoke(ivk)));
-        assembly.primitiveInvokeDecls.forEach((ivk) => invokedecls.push(smtgen.generateSMTInvoke(ivk)));
+        const resultset = new Set<string>();
+        const bupcg = [...cginfo.topologicalOrder].reverse();
+        for (let i = 0; i < bupcg.length; ++i) {
+            const idcl = (assembly.invokeDecls.get(bupcg[i].invoke) || assembly.primitiveInvokeDecls.get(bupcg[i].invoke)) as MIRInvokeDecl;
+            invokedecls.push(smtgen.generateSMTInvoke(idcl));
+
+            resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(idcl.resultType) as MIRType));
+        }
+
+        const resultarr = [...resultset];
+        const resultdecls = resultarr.map((rd) => `(Result_${rd} 0)`);
+        const resultcons = resultarr.map((rd) => `( (Result_${rd}@result_with_code (Result_${rd}@result_code_value ResultCode)) (Result_${rd}@result_success (Result_${rd}@result_value ${rd})) )`);
 
         return smt_header
         + "\n\n"
         + smtlib_code
         + "\n\n"
-        + `(declare-datatypes (${typedecls.join("\n\n")}) (\n${consdecls.join("\n\n")}\n))`
+        + `(declare-datatypes (${typedecls.join("\n")}) (\n${consdecls.join("\n")}\n))`
+        + "\n\n"
+        + `(declare-datatypes (${resultdecls.join("\n")}) (\n${resultcons.join("\n")}\n))`
         + "\n\n"
         + invokedecls.join("\n\n")
         + "\n\n";

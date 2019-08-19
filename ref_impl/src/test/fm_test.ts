@@ -78,7 +78,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "add_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@add 1 3))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@add 1 3))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -90,7 +90,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p1 Int)",
             "(declare-const p2 Int)",
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@add p1 p2))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@add p1 p2))))",
             "(assert (not (and (>= res p1) (>= res p2))))",
             "(check-sat)"
         ],
@@ -100,7 +100,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "addOpt1_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@addOpt1 1 3))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@addOpt1 (bsq_term_tuple 2 (store (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int 1)) 1 (bsq_term_int 3)))))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -111,7 +111,7 @@ const smt2enc_tests: TestInfo[] = [
         input: [
             "(declare-const p1 Int)",
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@addOpt1 p1))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@addOpt1 (bsq_term_tuple 2 (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int p1)))))))",
             "(assert (not (= res p1)))",
             "(check-sat)"
         ],
@@ -121,7 +121,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "absOpt_CHK_1",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@absOpt))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@absOpt bsq_term_none))))",
             "(assert (not (= res 0)))",
             "(check-sat)"
         ],
@@ -130,10 +130,11 @@ const smt2enc_tests: TestInfo[] = [
     {
         name: "absOpt_CHK_2",
         input: [
-            "(declare-const p1 Int)",
+            "(declare-const p1 BTerm)",
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@absOpt p1))))",
-            "(assert (not (>= res p1)))",
+            "(assert (is-bsq_term_int p1))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@absOpt p1))))",
+            "(assert (not (>= res (bsq_term_int_value p1))))",
             "(check-sat)"
         ],
         expected: `unsat`
@@ -142,7 +143,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "add_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@add 1 3))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@add 1 3))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -153,7 +154,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "maxTuple_EXEC",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@maxTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@maxTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -165,7 +166,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p1 Int)",
             "(declare-const p2 Int)",
             "(declare-const res Int)",
-            "(assert (= res (result_value (NSTestSMT2Encode@maxTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
+            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode@maxTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
             "(assert (not (and (>= res p1) (>= res p2) (or (= res p1) (= res p2)))))",
             "(check-sat)"
         ],
@@ -175,7 +176,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "swapTuple_EXEC",
         input: [
             "(declare-const p1 Int)",
-            "(assert (= (bsq_tuple$_Int$Int_$ p1 1) (result_value (NSTestSMT2Encode@swapTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
+            "(assert (= (bsq_tuple$_Int$Int_$ p1 1) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestSMT2Encode@swapTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -188,7 +189,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p2 Int)",
             "(declare-const r1 Int)",
             "(declare-const r2 Int)",
-            "(assert (= (bsq_tuple$_Int$Int_$ r1 r2) (result_value (NSTestSMT2Encode@swapTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
+            "(assert (= (bsq_tuple$_Int$Int_$ r1 r2) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestSMT2Encode@swapTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
             "(assert (not (and (= r1 p2) (= r2 p1))))",
             "(check-sat)"
         ],
