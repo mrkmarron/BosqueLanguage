@@ -146,6 +146,18 @@ class SMTLIBGenerator {
         this.anyType = this.assembly.typeMap.get("NSCore::Any") as MIRType;
     }
 
+    static smtsanizite(str: string): string {
+        return str
+        .replace(/::/g, "$cc$")
+        .replace(/=/g, "$eq$")
+        .replace(/\[/g, "$lb$")
+        .replace(/\]/g, "$rb$")
+        .replace(/{/g, "$lc$")
+        .replace(/}/g, "$rc$")
+        .replace(/</g, "$la$")
+        .replace(/>/g, "$ra$");
+    }
+
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
         if (arg instanceof MIRRegisterArgument) {
             return vtypes.get(arg.nameID) as MIRType;
@@ -197,7 +209,7 @@ class SMTLIBGenerator {
                     return tdecl.name;
                 }
                 else {
-                    return "T" + topt.trkey.replace(/::/g, "@");
+                    return "T" + SMTLIBGenerator.smtsanizite(topt.trkey);
                 }
             }
             else if (topt instanceof MIRTupleType) {
@@ -218,7 +230,7 @@ class SMTLIBGenerator {
 
         const topt = (type instanceof MIRType) ? type.options[0] : type;
         if (topt instanceof MIREntityType) {
-            return topt.trkey.replace(/::/g, "@");
+            return SMTLIBGenerator.smtsanizite(topt.trkey);
         }
         else if (topt instanceof MIRTupleType) {
             const entryinfos = topt.entries.map((e) => this.typeToSMT2Type(e.type));
@@ -233,7 +245,7 @@ class SMTLIBGenerator {
     }
 
     invokenameToSMT2(ivk: MIRInvokeKey): string {
-        return ivk.replace(/::/g, "@");
+        return SMTLIBGenerator.smtsanizite(ivk);
     }
 
     generateFreeSMTVar(name?: string): SMTFreeVar {
@@ -441,7 +453,7 @@ class SMTLIBGenerator {
 
         let entriesval = `((as const (Array Int BTerm)) bsq_term_none)`;
         for (let i = 0; i < cpcs.args.length; ++i) {
-            entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.anyType)}))`;
+            entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.anyType).emit()})`;
         }
 
         const cexp = new SMTValue(`(${smtctype} ${cpcs.args.length} ${entriesval})`);

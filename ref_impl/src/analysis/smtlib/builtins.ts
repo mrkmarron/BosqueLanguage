@@ -14,10 +14,18 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         return "";
     })
     .set("list_empty", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
-        return "";
+        const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
+        const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+        const resulttype = "Result_" + smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(inv.resultType) as MIRType);
+
+        return `(${resulttype}@result_success (= (${rtcons}@size this) 0))`;
     })
     .set("list_size", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
-        return "";
+        const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
+        const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+        const resulttype = "Result_" + smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(inv.resultType) as MIRType);
+
+        return `(${resulttype}@result_success (${rtcons}@size this))`;
     })
 
     .set("list_filter", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
@@ -35,10 +43,10 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
 
         return `
         ${decl}
-        (ite (< ${iv} (${rtcons}@size this))
-            ${accessexp.emit()}
+        (ite (and (<= 0 ${iv}) (< ${iv} (${rtcons}@size this)))
+            (${resulttype}@result_success ${accessexp.emit()})
             (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
-        ))
+        )
         `;
     });
 
