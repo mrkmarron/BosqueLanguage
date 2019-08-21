@@ -178,20 +178,20 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRConstructorRecord(sinfo, args, trgt));
     }
 
-    emitLoadTupleIndex(sinfo: SourceInfo, resultIndexType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, resultIndexType, arg, idx, trgt));
+    emitLoadTupleIndex(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, resultAccessType, arg, idx, trgt));
     }
 
     emitProjectTupleIndecies(sinfo: SourceInfo, arg: MIRArgument, indecies: number[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRProjectFromIndecies(sinfo, arg, indecies, trgt));
     }
 
-    emitLoadProperty(sinfo: SourceInfo, resultPropertyType: MIRResolvedTypeKey, arg: MIRArgument, pname: string, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultPropertyType, arg, pname, trgt));
+    emitLoadProperty(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, pname: string, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, pname, trgt));
     }
 
-    emitLoadField(sinfo: SourceInfo, arg: MIRArgument, fname: string, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromField(sinfo, arg, fname, trgt));
+    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, fname: string, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRAccessFromField(sinfo, resultAccessType, arg, fname, trgt));
     }
 
     emitProjectProperties(sinfo: SourceInfo, arg: MIRArgument, properties: string[], trgt: MIRTempRegister) {

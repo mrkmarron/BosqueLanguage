@@ -728,13 +728,13 @@ class MIRConstructorRecord extends MIRValueOp {
 }
 
 class MIRAccessFromIndex extends MIRValueOp {
-    readonly resultIndexType: MIRResolvedTypeKey;
+    readonly resultAccessType: MIRResolvedTypeKey;
     arg: MIRArgument;
     readonly idx: number;
 
-    constructor(sinfo: SourceInfo, resultIndexType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
         super(MIROpTag.MIRAccessFromIndex, sinfo, trgt);
-        this.resultIndexType = resultIndexType;
+        this.resultAccessType = resultAccessType;
         this.arg = arg;
         this.idx = idx;
     }
@@ -746,11 +746,11 @@ class MIRAccessFromIndex extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), resultIndexType: this.resultIndexType, arg: this.arg.jemit(), idx: this.idx };
+        return { ...this.jbemit(), resultAccessType: this.resultAccessType, arg: this.arg.jemit(), idx: this.idx };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRAccessFromIndex(jparsesinfo(jobj.sinfo), jobj.resultIndexType, MIRArgument.jparse(jobj.arg), jobj.idx, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRAccessFromIndex(jparsesinfo(jobj.sinfo), jobj.resultAccessType, MIRArgument.jparse(jobj.arg), jobj.idx, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -780,13 +780,13 @@ class MIRProjectFromIndecies extends MIRValueOp {
 }
 
 class MIRAccessFromProperty extends MIRValueOp {
-    readonly resultPropertyType: MIRResolvedTypeKey;
+    readonly resultAccessType: MIRResolvedTypeKey;
     arg: MIRArgument;
     readonly property: string;
 
-    constructor(sinfo: SourceInfo, resultPropertyType: MIRResolvedTypeKey, arg: MIRArgument, property: string, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, property: string, trgt: MIRTempRegister) {
         super(MIROpTag.MIRAccessFromProperty, sinfo, trgt);
-        this.resultPropertyType = resultPropertyType;
+        this.resultAccessType = resultAccessType;
         this.arg = arg;
         this.property = property;
     }
@@ -798,11 +798,11 @@ class MIRAccessFromProperty extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), resultPropertyType: this.resultPropertyType, arg: this.arg.jemit(), property: this.property };
+        return { ...this.jbemit(), resultAccessType: this.resultAccessType, arg: this.arg.jemit(), property: this.property };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRAccessFromProperty(jparsesinfo(jobj.sinfo), jobj.resultPropertyType, MIRArgument.jparse(jobj.arg), jobj.property, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRAccessFromProperty(jparsesinfo(jobj.sinfo), jobj.resultAccessType, MIRArgument.jparse(jobj.arg), jobj.property, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -832,11 +832,13 @@ class MIRProjectFromProperties extends MIRValueOp {
 }
 
 class MIRAccessFromField extends MIRValueOp {
+    readonly resultAccessType: MIRResolvedTypeKey;
     arg: MIRArgument;
     readonly field: string;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, field: string, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, field: string, trgt: MIRTempRegister) {
         super(MIROpTag.MIRAccessFromField, sinfo, trgt);
+        this.resultAccessType = resultAccessType;
         this.arg = arg;
         this.field = field;
     }
@@ -848,11 +850,11 @@ class MIRAccessFromField extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), field: this.field };
+        return { ...this.jbemit(), resultAccessType: this.resultAccessType, arg: this.arg.jemit(), field: this.field };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRAccessFromField(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.field, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRAccessFromField(jparsesinfo(jobj.sinfo), jobj.resultAccessType, MIRArgument.jparse(jobj.arg), jobj.field, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

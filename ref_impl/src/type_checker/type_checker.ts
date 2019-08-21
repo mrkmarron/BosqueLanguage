@@ -892,8 +892,8 @@ class TypeChecker {
 
                 expandInfo[2].forEach((pname) => {
                     const fidx = sig.params.findIndex((param) => param.name === pname);
-                    this.raiseErrorIf(sinfo, fidx === -1, `Call does not have parameter named "${arg.name}"`);
-                    this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${arg.name}"`);
+                    this.raiseErrorIf(sinfo, fidx === -1, `Call does not have parameter named "${pname}"`);
+                    this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${pname}"`);
 
                     this.raiseErrorIf(sinfo, !sig.params[fidx].isOptional && !expandInfo[1].has(pname), `Call requires "${pname}" but it is provided as an optional argument`);
 
@@ -1439,7 +1439,7 @@ class TypeChecker {
             const rtype = this.m_assembly.typeUnion(topts);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitLoadField(op.sinfo, arg, op.name, trgt);
+                this.m_emitter.bodyEmitter.emitLoadField(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, op.name, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, rtype)];

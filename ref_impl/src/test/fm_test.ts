@@ -25,6 +25,11 @@ else {
 const smt2enc_test = `
 namespace NSTestSMT2Encode;
 
+entity E1 {
+    field f: Int;
+    field g: Bool;
+}
+
 entrypoint function add(x: Int, y: Int): Int {
     return x + y;
 }
@@ -65,6 +70,21 @@ entrypoint function swapTuple(x: [Int, Int]): [Int, Int] {
 
 entrypoint function modifyTuple(x: [Int, Int]): [Int, Int, Bool] {
     return x->update(1=0, 2=true);
+}
+
+entrypoint function simpleEntity(i: Int, b: Bool): Int {
+    var e = E1{f=i, g=!b};
+    if(e.g) {
+        return e.f;
+    }
+    else {
+        return 0;
+    }
+}
+
+entrypoint function simpleList1(i: Int): Int {
+    var e = List<Int>{0, i, 2};
+    return e->at(i);
 }
 `;
 
@@ -212,6 +232,61 @@ const smt2enc_tests: TestInfo[] = [
             "(check-sat)"
         ],
         expected: `unsat`
+    },
+    {
+        name: "simpleEntity_EXEC",
+        input: [
+            "(declare-const r Int)",
+            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode@simpleEntity 5 false))))",
+            "(check-sat)",
+            "(get-model)"
+        ],
+        expected: `sat (model (define-fun r () Int 5) )`
+    },
+    {
+        name: "simpleEntity_CHK",
+        input: [
+            "(declare-const i Int)",
+            "(declare-const b Bool)",
+            "(declare-const r Int)",
+            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode@simpleEntity i b))))",
+            "(assert (not (=> b (= r 0))))",
+            "(assert (not (=> (not b) (= r i))))",
+            "(check-sat)"
+        ],
+        expected: `unsat`
+    },
+    {
+        name: "simpleList1_EXEC",
+        input: [
+            "(declare-const r Int)",
+            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode@simpleList1 2))))",
+            "(check-sat)",
+            "(get-model)"
+        ],
+        expected: `sat (model (define-fun r () Int 2) )`
+    },
+    {
+        name: "simpleList1_CHK",
+        input: [
+            "(declare-const i Int)",
+            "(declare-const r Int)",
+            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode@simpleList1 i))))",
+            "(assert (not (=> (< i 3) (< r 3))))",
+            "(check-sat)"
+        ],
+        expected: `unsat`
+    },
+    {
+        name: "simpleList1_Err",
+        input: [
+            "(declare-const i Int)",
+            "(declare-const r Result_Int)",
+            "(assert (= r (NSTestSMT2Encode@simpleList1 i)))",
+            "(assert (is-Result_Int@result_with_code r))",
+            "(check-sat)"
+        ],
+        expected: `sat`
     }
 ];
 
