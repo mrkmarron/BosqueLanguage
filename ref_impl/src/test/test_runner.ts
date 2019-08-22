@@ -9,7 +9,7 @@ import * as Regressions from "./regression_tests";
 
 import * as Apps from "./app_tests";
 
-import * as FMTest from "./fm_test";
+import * as FMTest from "./bmc_test";
 
 import * as FS from "fs";
 import chalk from "chalk";
@@ -159,7 +159,7 @@ function runAll() {
 
     Apps.tests.forEach((test) => runner.addSet(test));
 
-    runner.addSet(FMTest.testSMT2Enc);
+    runner.addSet(FMTest.testBMC);
 
     runner.run();
 }

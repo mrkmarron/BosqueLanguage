@@ -22,8 +22,8 @@ else {
     z3path = Path.resolve("./utils/macos/z3/z3.exe");
 }
 
-const smt2enc_test = `
-namespace NSTestSMT2Encode;
+const bmc_test = `
+namespace NSTestBMC;
 
 entity E1 {
     field f: Int;
@@ -88,12 +88,12 @@ entrypoint function simpleList1(i: Int): Int {
 }
 `;
 
-const smt2enc_tests: TestInfo[] = [
+const bmc_tests: TestInfo[] = [
     {
         name: "add_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$add 1 3))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$add 1 3))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -105,7 +105,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p1 Int)",
             "(declare-const p2 Int)",
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$add p1 p2))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$add p1 p2))))",
             "(assert (not (and (>= res p1) (>= res p2))))",
             "(check-sat)"
         ],
@@ -115,7 +115,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "addOpt1_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$addOpt1 (bsq_term_tuple 2 (store (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int 1)) 1 (bsq_term_int 3)))))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$addOpt1 (bsq_term_tuple 2 (store (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int 1)) 1 (bsq_term_int 3)))))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -126,7 +126,7 @@ const smt2enc_tests: TestInfo[] = [
         input: [
             "(declare-const p1 Int)",
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$addOpt1 (bsq_term_tuple 2 (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int p1)))))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$addOpt1 (bsq_term_tuple 2 (store ((as const (Array Int BTerm)) bsq_term_none) 0 (bsq_term_int p1)))))))",
             "(assert (not (= res p1)))",
             "(check-sat)"
         ],
@@ -136,7 +136,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "absOpt_CHK_1",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$absOpt bsq_term_none))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$absOpt bsq_term_none))))",
             "(assert (not (= res 0)))",
             "(check-sat)"
         ],
@@ -148,7 +148,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p1 BTerm)",
             "(declare-const res Int)",
             "(assert (is-bsq_term_int p1))",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$absOpt p1))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$absOpt p1))))",
             "(assert (not (>= res (bsq_term_int_value p1))))",
             "(check-sat)"
         ],
@@ -158,7 +158,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "add_SAT",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$add 1 3))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$add 1 3))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -169,7 +169,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "maxTuple_EXEC",
         input: [
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$maxTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$maxTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -181,7 +181,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p1 Int)",
             "(declare-const p2 Int)",
             "(declare-const res Int)",
-            "(assert (= res (Result_Int@result_value (NSTestSMT2Encode$cc$maxTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
+            "(assert (= res (Result_Int@result_value (NSTestBMC$cc$maxTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
             "(assert (not (and (>= res p1) (>= res p2) (or (= res p1) (= res p2)))))",
             "(check-sat)"
         ],
@@ -191,7 +191,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "swapTuple_EXEC",
         input: [
             "(declare-const p1 Int)",
-            "(assert (= (bsq_tuple$_Int$Int_$ p1 1) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestSMT2Encode$cc$swapTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
+            "(assert (= (bsq_tuple$_Int$Int_$ p1 1) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestBMC$cc$swapTuple (bsq_tuple$_Int$Int_$ 1 3)))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -204,7 +204,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const p2 Int)",
             "(declare-const r1 Int)",
             "(declare-const r2 Int)",
-            "(assert (= (bsq_tuple$_Int$Int_$ r1 r2) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestSMT2Encode$cc$swapTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
+            "(assert (= (bsq_tuple$_Int$Int_$ r1 r2) (Result_Tbsq_tuple$_Int$Int_$@result_value (NSTestBMC$cc$swapTuple (bsq_tuple$_Int$Int_$ p1 p2)))))",
             "(assert (not (and (= r1 p2) (= r2 p1))))",
             "(check-sat)"
         ],
@@ -214,7 +214,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "modifyTuple_EXEC",
         input: [
             "(declare-const r2 Int)",
-            "(assert (= (bsq_tuple$_Int$Int$Bool_$ 1 r2 true) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestSMT2Encode$cc$modifyTuple (bsq_tuple$_Int$Int_$ 1 2)))))",
+            "(assert (= (bsq_tuple$_Int$Int$Bool_$ 1 r2 true) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestBMC$cc$modifyTuple (bsq_tuple$_Int$Int_$ 1 2)))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -227,7 +227,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const r1 Int)",
             "(declare-const r2 Int)",
             "(declare-const r3 Bool)",
-            "(assert (= (bsq_tuple$_Int$Int$Bool_$ r1 r2 r3) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestSMT2Encode$cc$modifyTuple (bsq_tuple$_Int$Int_$ p1 3)))))",
+            "(assert (= (bsq_tuple$_Int$Int$Bool_$ r1 r2 r3) (Result_Tbsq_tuple$_Int$Int$Bool_$@result_value (NSTestBMC$cc$modifyTuple (bsq_tuple$_Int$Int_$ p1 3)))))",
             "(assert (not (and (= r1 p1) r3)))",
             "(check-sat)"
         ],
@@ -237,7 +237,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "simpleEntity_EXEC",
         input: [
             "(declare-const r Int)",
-            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode$cc$simpleEntity 5 false))))",
+            "(assert (= r (Result_Int@result_value (NSTestBMC$cc$simpleEntity 5 false))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -249,7 +249,7 @@ const smt2enc_tests: TestInfo[] = [
             "(declare-const i Int)",
             "(declare-const b Bool)",
             "(declare-const r Int)",
-            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode$cc$simpleEntity i b))))",
+            "(assert (= r (Result_Int@result_value (NSTestBMC$cc$simpleEntity i b))))",
             "(assert (not (=> b (= r 0))))",
             "(assert (not (=> (not b) (= r i))))",
             "(check-sat)"
@@ -260,7 +260,7 @@ const smt2enc_tests: TestInfo[] = [
         name: "simpleList1_EXEC",
         input: [
             "(declare-const r Int)",
-            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode$cc$simpleList1 2))))",
+            "(assert (= r (Result_Int@result_value (NSTestBMC$cc$simpleList1 2))))",
             "(check-sat)",
             "(get-model)"
         ],
@@ -271,7 +271,7 @@ const smt2enc_tests: TestInfo[] = [
         input: [
             "(declare-const i Int)",
             "(declare-const r Int)",
-            "(assert (= r (Result_Int@result_value (NSTestSMT2Encode$cc$simpleList1 i))))",
+            "(assert (= r (Result_Int@result_value (NSTestBMC$cc$simpleList1 i))))",
             "(assert (not (=> (and (<= 0 i) (< i 3)) (< r 3))))",
             "(check-sat)"
         ],
@@ -282,7 +282,7 @@ const smt2enc_tests: TestInfo[] = [
         input: [
             "(declare-const i Int)",
             "(declare-const r Result_Int)",
-            "(assert (= r (NSTestSMT2Encode$cc$simpleList1 i)))",
+            "(assert (= r (NSTestBMC$cc$simpleList1 i)))",
             "(assert (is-Result_Int@result_with_code r))",
             "(check-sat)"
         ],
@@ -290,8 +290,8 @@ const smt2enc_tests: TestInfo[] = [
     }
 ];
 
-function smt2enc_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
-    const files = core.concat([{ relativePath: "smt2enc_test.bsq", contents: smt2enc_test }]);
+function bmc_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
+    const files = core.concat([{ relativePath: "bmc_test.bsq", contents: bmc_test }]);
 
     return MIREmitter.generateMASM(new PackageConfig(), files);
 }
@@ -307,11 +307,11 @@ function runz3(smtlib: string): string {
     }
 }
 
-function smt2enc_action(assembly: MIRAssembly, args: any[]): any {
+function bmc_action(assembly: MIRAssembly, args: any[]): any {
     const smt2 = SMTLIBGenerator.generateSMTAssembly(assembly) + "\n\n" + args.join("\n");
     return runz3(smt2);
 }
 
-const testSMT2Enc = { name: "SMT2Encode", setup: smt2enc_setup, action: smt2enc_action, tests: smt2enc_tests, xmlid: "SMT2EncodeUnitTests" };
+const testBMC = { name: "BMC", setup: bmc_setup, action: bmc_action, tests: bmc_tests, xmlid: "BMCUnitTests" };
 
-export { testSMT2Enc };
+export { testBMC };
