@@ -187,10 +187,10 @@ class SMTLIBGenerator {
             return true;
         }
         else if (type instanceof MIRTupleType) {
-            return !type.isOpen && type.entries.every((entry) => !entry.isOptional && this.isTypeExact(entry.type));
+            return !type.isOpen && type.entries.every((entry) => !entry.isOptional);
         }
         else if (type instanceof MIRRecordType) {
-            return !type.isOpen && type.entries.every((entry) => !entry.isOptional && this.isTypeExact(entry.type));
+            return !type.isOpen && type.entries.every((entry) => !entry.isOptional);
         }
         else {
             return false;
@@ -320,7 +320,7 @@ class SMTLIBGenerator {
         return (from instanceof MIRType) ? from.options[0] : from;
     }
 
-    coerceBoxIfNeeded(arg: SMTValue, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
+    coerceBoxIfNeeded(arg: SMTExp, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
         assert(!this.isTypeExact(into));
 
         if (!this.isTypeExact(from)) {
@@ -363,7 +363,7 @@ class SMTLIBGenerator {
         }
     }
 
-    coerceUnBoxIfNeeded(arg: SMTValue, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
+    coerceUnBoxIfNeeded(arg: SMTExp, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
         assert(this.isTypeExact(into));
 
         if (this.isTypeExact(from)) {
@@ -495,7 +495,13 @@ class SMTLIBGenerator {
                 return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue("bsq_term_none"), this.generateFreeSMTVar());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typeToSMT2Constructor(argtype)}@${op.idx} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`), this.generateFreeSMTVar());
+                const fromtype = tupinfo.entries[op.idx].type;
+                let access: SMTExp = new SMTValue(`(${this.typeToSMT2Constructor(argtype)}@${op.idx} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`);
+                if (this.isTypeExact(resultAccessType) !== this.isTypeExact(fromtype)) {
+                    access = (this.isTypeExact(resultAccessType)) ? this.coerceUnBoxIfNeeded(access, fromtype, resultAccessType) : this.coerceBoxIfNeeded(access, fromtype, resultAccessType);
+                }
+
+                return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
             }
         }
         else {
