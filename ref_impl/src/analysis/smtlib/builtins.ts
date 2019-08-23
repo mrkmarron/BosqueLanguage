@@ -52,7 +52,7 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
 
 const BuiltinTypes = new Map<string, BuiltinTypeEmit>()
     .set("List", (tcstring: string) => {
-        return `((${tcstring} (${tcstring}@size Int) (${tcstring}@contents (Array Int BTerm))))`;
+        return `(${tcstring}@nil (${tcstring}@cons (${tcstring}@size Int) (${tcstring}@h BTerm) (${tcstring}@t ${tcstring})))`;
 });
 
 export { BuiltinTypeEmit, BuiltinTypes, BuiltinCallEmit, BuiltinCalls };

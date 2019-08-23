@@ -103,7 +103,7 @@ entity List<T> provides Collection<T> {
     override method {when T Int} sum(default?: Int): Int # list_sum
 
     //<summary>Get the element at the given index -- error if idx is out-of-bounds.</summary>
-    method at(idx: Int): T # list_at
+    method at(idx: Int): T requires (0 <= idx && idx < this->size()); # list_at
 
     //<summary>Get the element at the given index -- none if idx is out-of-bounds.</summary>
     method tryAt(idx: Int): T? # list_tryat
