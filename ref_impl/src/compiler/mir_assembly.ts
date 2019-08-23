@@ -108,7 +108,7 @@ abstract class MIRInvokeDecl {
 
     static jparse(jobj: any): MIRInvokeDecl {
         if (jobj.body) {
-            return new MIRInvokeBodyDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => MIRBody.jparse(pre)), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), MIRBody.jparse(jobj.body));
+            return new MIRInvokeBodyDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => [MIRBody.jparse(pre[0]), pre[1]]), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), MIRBody.jparse(jobj.body));
         }
         else {
             let binds = new Map<string, MIRResolvedTypeKey>();
@@ -123,12 +123,12 @@ abstract class MIRInvokeDecl {
 }
 
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
-    readonly preconditions: MIRBody[];
+    readonly preconditions: [MIRBody, boolean][];
     readonly postconditions: MIRBody[];
 
     readonly body: MIRBody;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRBody[], postconds: MIRBody[], body: MIRBody) {
+    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[], body: MIRBody) {
         super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType);
 
         this.preconditions = preconds;
@@ -138,7 +138,7 @@ class MIRInvokeBodyDecl extends MIRInvokeDecl {
     }
 
     jemit(): object {
-        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => pre.jemit()), postconditions: this.postconditions.map((post) => post.jemit()), body: this.body.jemit() };
+        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => [pre[0].jemit(), pre[1]]), postconditions: this.postconditions.map((post) => post.jemit()), body: this.body.jemit() };
     }
 }
 
@@ -161,8 +161,7 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     }
 
     jemit(): object {
-        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType,
-            implkey: this.implkey, binds: [...this.binds], pcodes: [... this.pcodes] };
+        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, implkey: this.implkey, binds: [...this.binds], pcodes: [... this.pcodes] };
     }
 }
 

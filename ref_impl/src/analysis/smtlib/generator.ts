@@ -142,7 +142,7 @@ class SMTLIBGenerator {
         this.noneType = this.assembly.typeMap.get("NSCore::None") as MIRType;
         this.boolType = this.assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = this.assembly.typeMap.get("NSCore::Int") as MIRType;
-        this.stringType = this.assembly.typeMap.get("NSCore::String<NSCore::Any>") as MIRType;
+        this.stringType = this.assembly.typeMap.get("NSCore::String") as MIRType;
         this.anyType = this.assembly.typeMap.get("NSCore::Any") as MIRType;
     }
 
@@ -754,7 +754,7 @@ class SMTLIBGenerator {
                 if (this.isTypeExact(lhvtype) && this.isTypeExact(rhvtype)) {
                     if ((lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool")
                         || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")
-                        || (lhvtype.trkey === "NSCore::String<NSCore::Any>" && rhvtype.trkey === "NSCore::String<NSCore::Any>")) {
+                        || (lhvtype.trkey === "NSCore::String" && rhvtype.trkey === "NSCore::String")) {
                             const smv = `(= ${this.argToSMT2Coerce(beq.lhs, lhvtype, lhvtype).emit()} ${this.argToSMT2Coerce(beq.rhs, rhvtype, rhvtype).emit()})`;
                             return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${smv})` : smv), this.generateFreeSMTVar());
                     }

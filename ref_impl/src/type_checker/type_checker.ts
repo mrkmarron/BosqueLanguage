@@ -198,6 +198,11 @@ class TypeChecker {
             return true;
         }
 
+        const bothStringOf = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringOfType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringOfType()));
+        if (bothStringOf) {
+            return this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
+        }
+
         const bothEnum = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialEnumType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialEnumType()));
         const bothCustomKey = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialCustomKeyType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialCustomKeyType()));
 
@@ -283,7 +288,14 @@ class TypeChecker {
         const bothInt = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
         const bothString = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()));
 
-        return (bothInt || bothString);
+        if (bothInt || bothString) {
+            return true;
+        }
+
+        const bothStringOf = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringOfType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringOfType()));
+        const orderok = this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
+
+        return bothStringOf && orderok;
     }
 
     private getInfoForLoadFromIndex(rtype: ResolvedType, idx: number): ResolvedType {
@@ -633,6 +645,22 @@ class TypeChecker {
                 this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
 
                 const pcode = this.checkPCodeExpression(env, arg.value, oftype as ResolvedFunctionType);
+
+                if (arg instanceof NamedArgument) {
+                    eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                }
+                else {
+                    this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
+
+                    eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                }
+            }
+            else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
+                const oftype = (noExpando && (firstNameIdx === -1 || i < firstNameIdx) && i < sig.params.length && !sig.params[i].isOptional) ? sig.params[i + skipthisidx].type : this.m_assembly.getSpecialAnyType();
+                this.raiseErrorIf(arg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
+                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+
+                const pcode =  (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
 
                 if (arg instanceof NamedArgument) {
                     eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
@@ -1132,7 +1160,7 @@ class TypeChecker {
         //ensure full string[T] type is registered
         const terms = [new TemplateTypeSignature("T")];
         const binds = new Map<string, ResolvedType>().set("T", oftype);
-        const stype = this.resolveAndEnsureTypeOnly(sinfo, new NominalTypeSignature("NSCore", "String", terms), binds);
+        const stype = this.resolveAndEnsureTypeOnly(sinfo, new NominalTypeSignature("NSCore", "StringOf", terms), binds);
 
         return { oftype: [oodecl, oobinds], ofresolved: oftype, stringtype: stype };
     }
@@ -1147,6 +1175,10 @@ class TypeChecker {
             const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
             this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+
+            //
+            //TODO -- should emit parse checking code here
+            //
 
             this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, trgt);
         }
@@ -1167,8 +1199,12 @@ class TypeChecker {
             const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
-            this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, tmpr);
+            this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);
             this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, stype.trkey, skey, [tmpr], [], trgt);
+
+            //
+            //TODO -- should emit parse checking code here
+            //
         }
 
         return [env.setExpressionResult(this.m_assembly, aoftype.ofresolved)];
@@ -3466,9 +3502,9 @@ class TypeChecker {
         }
         else {
             const preargs = new Map<string, VarInfo>(cargs);
-            const preconds = invoke.preconditions.map((pre) => {
+            const preconds: [MIRBody, boolean][] = invoke.preconditions.map<[MIRBody, boolean]>((pre) => {
                 const preenv = TypeEnvironment.createInitialEnvForCall(binds, [], fargs, preargs);
-                return this.checkExpressionAsBody(preenv, pre, this.m_assembly.getSpecialBoolType());
+                return [this.checkExpressionAsBody(preenv, pre[0], this.m_assembly.getSpecialBoolType()), pre[1]];
             });
 
             const postargs = new Map<string, VarInfo>(cargs).set("_return_", new VarInfo(resolvedResult, true, false, true, resolvedResult));
