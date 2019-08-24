@@ -28,8 +28,8 @@ const smtlib_code = `
       (bsq_term_none) (bsq_term_bool (bsq_term_bool_value Bool)) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String))
       (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries (Array Int BTerm)))
       (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_properties (Array Int String)) (bsq_term_record_entries (Array String BTerm)))
-      (bsq_term_list (bsq_term_list_contents BList))
       (bsq_term_entity (bsq_term_entity_type String) (bsq_term_entity_entries (Array String BTerm)))
+      (bsq_term_list (bsq_term_list_type String) (bsq_term_list_entries BList))
     )
 ))
 
@@ -189,7 +189,13 @@ class SMTLIBGenerator {
         }
 
         if (type instanceof MIREntityType) {
-            return true;
+            const tdecl = this.assembly.entityDecls.get(type.ekey) as MIREntityTypeDecl;
+            if (!tdecl.isCollectionEntityType && !tdecl.isMapEntityType) {
+                return true;
+            }
+            else {
+                return [...tdecl.terms].every((etype) => this.isTypeExact(etype[1]));
+            }
         }
         else if (type instanceof MIRTupleType) {
             return !type.isOpen && type.entries.every((entry) => !entry.isOptional && this.isTypeExact(entry.type));
@@ -519,12 +525,22 @@ class SMTLIBGenerator {
                 const fromtype = tupinfo.entries[op.idx].type;
                 let access: SMTExp = new SMTValue(`(${this.typeToSMT2Constructor(argtype)}@${op.idx} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`);
 
-                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), this.generateFreeSMTVar());
+                if (this.isTypeExact(resultAccessType)) {
+                    return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                }
+                else {
+                    return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), this.generateFreeSMTVar());
+                }
             }
         }
         else {
             const access = new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`);
-            return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.anyType, resultAccessType), this.generateFreeSMTVar());
+            if (!this.isTypeExact(resultAccessType)) {
+                return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+            }
+            else {
+                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.anyType, resultAccessType), this.generateFreeSMTVar());
+            }
         }
     }
 
@@ -934,10 +950,6 @@ class SMTLIBGenerator {
 
         if (block.label === "exit") {
             const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
-
-            xxxx;
-            //TODO: coerce the _return_ value to the right representation for the return value as needed
-
             let rexp = new SMTValue(`(${resulttype}@result_success _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
@@ -1017,9 +1029,9 @@ class SMTLIBGenerator {
                     if (edecl.ns === "NSCore" && (edecl.name === "None" || edecl.name === "Bool" || edecl.name === "Int" || edecl.name === "String")) {
                         //don't need to do anything as these are special cases
                     }
-                    else if (edecl.ns === "NSCore" && (edecl.name === "List")) {
+                    else if (edecl.isCollectionEntityType || edecl.isMapEntityType) {
                         typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
-                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(smtgen.typeToSMT2Constructor(topt)));
+                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(smtgen.typeToSMT2Type(topt), smtgen.typeToSMT2Constructor(topt), smtgen.typeToSMT2Type(edecl.terms.get("T") as MIRType)));
                     }
                     else {
                         typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);

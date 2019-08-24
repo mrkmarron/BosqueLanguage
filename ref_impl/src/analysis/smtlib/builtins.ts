@@ -6,7 +6,7 @@ import { SMTLIBGenerator, SMTValue } from "./generator";
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-type BuiltinTypeEmit = (tcstring: string) => string;
+type BuiltinTypeEmit = (ttstring: string, tcstring: string, cstring: string) => string;
 type BuiltinCallEmit = (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => string;
 
 const BuiltinCalls = new Map<string, BuiltinCallEmit>()
@@ -51,8 +51,8 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
     });
 
 const BuiltinTypes = new Map<string, BuiltinTypeEmit>()
-    .set("List", (tcstring: string) => {
-        return `(${tcstring}@nil (${tcstring}@cons (${tcstring}@size Int) (${tcstring}@h BTerm) (${tcstring}@t ${tcstring})))`;
+    .set("List", (ttstring: string, tcstring: string, cstring: string) => {
+        return `(${tcstring}@nil (${tcstring}@cons (${tcstring}@size Int) (${tcstring}@h ${cstring}) (${tcstring}@t ${ttstring})))`;
 });
 
 export { BuiltinTypeEmit, BuiltinTypes, BuiltinCallEmit, BuiltinCalls };
