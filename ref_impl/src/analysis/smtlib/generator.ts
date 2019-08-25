@@ -158,7 +158,13 @@ class SMTLIBGenerator {
         .replace(/}/g, "$rc$")
         .replace(/</g, "$la$")
         .replace(/>/g, "$ra$")
-        .replace(/\|/g, "$v$");
+        .replace(/\|/g, "$v$")
+        .replace(/:/g, "$c$")
+        .replace(/\\/g, "$sb$")
+        .replace(/\//g, "$sf$")
+        .replace(/--/g, "$dd$")
+        .replace(/%/g, "$pct$")
+        .replace(/[.]/g, "$dt$");
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -459,7 +465,7 @@ class SMTLIBGenerator {
                 return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(${smtctype} 0 ${smtctype}@emptysingleton)`), this.generateFreeSMTVar());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(bsq_term_list ${cpce.tkey} 0 ((as const (Array Int BTerm)) bsq_term_none))`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(bsq_term_list "${SMTLIBGenerator.smtsanizite(cpce.tkey)}" 0 ((as const (Array Int BTerm)) bsq_term_none))`), this.generateFreeSMTVar());
             }
         }
         else if (ctype.name === "Set") {
@@ -620,7 +626,7 @@ class SMTLIBGenerator {
         const invokeexp = new SMTValue(`(${this.invokenameToSMT2(ivop.mkey)} ${vals.join(" ")})`);
         const checkerror = new SMTValue(`(is-${ivrtype}@result_with_code ${tv})`);
         const extracterror = new SMTValue(`(${resulttype}@result_with_code (${ivrtype}@result_code_value ${tv}))`);
-        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(${resulttype}@result_value ${tv})`), this.generateFreeSMTVar());
+        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(${ivrtype}@result_value ${tv})`), this.generateFreeSMTVar());
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }

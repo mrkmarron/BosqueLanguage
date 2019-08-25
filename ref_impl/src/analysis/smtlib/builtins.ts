@@ -34,7 +34,6 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
 
     .set("list_filter", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
         const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
-        const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
         const contentstype = (smtgen.assembly.entityDecls.get((rcvrtype.options[0] as MIREntityType).ekey) as MIREntityTypeDecl).terms.get("T") as MIRType;
         const restype = smtgen.assembly.typeMap.get(inv.resultType) as MIRType;
         const resulttype = "Result_" + smtgen.typeToSMT2Type(restype);
@@ -52,6 +51,8 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         const pname = smtgen.invokenameToSMT2(pred.code);
 
         if (smtgen.isTypeExact(rcvrtype)) {
+            const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+
             const tbase = `
             (define-fun ${smtgen.invokenameToSMT2(inv.key)}0 ${rargs} ${resulttype}
                 (${resulttype}@result_with_code (result_bmc ${inv.sourceLocation.line}))
@@ -61,10 +62,15 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
             const tfun = `
             (define-fun ${smtgen.invokenameToSMT2(inv.key)}%k% ${rargs} ${resulttype}
                 (ite (= size i)
-                    (${resulttype}@result_success (${rtcons} j outa))
-                    (ite (${pname} (select ina i)${passargs})
-                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
-                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                (${resulttype}@result_success (${rtcons} j outa))
+                    (let ((pv (${pname} (select ina i)${passargs})))
+                    (ite (is-Result_Bool@result_with_code pv)
+                        (${resulttype}@result_with_code (Result_Bool@result_code_value pv))
+                        (ite (Result_Bool@result_value pv)
+                            (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
+                            (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                        )
+                    )
                     )
                 )
             )
@@ -87,10 +93,15 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
             const tfun = `
             (define-fun ${smtgen.invokenameToSMT2(inv.key)}%k% ${rargs} ${resulttype}
                 (ite (= size i)
-                    (${resulttype}@result_success (${rtcons} j outa))
-                    (ite (${pname} (select ina i)${passargs})
-                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
-                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                    (${resulttype}@result_success (bsq_term_list "${SMTLIBGenerator.smtsanizite(rcvrtype.trkey)}" j outa))
+                    (let ((pv (${pname} (select ina i)${passargs})))
+                    (ite (is-Result_Bool@result_with_code pv)
+                        (${resulttype}@result_with_code (Result_Bool@result_code_value pv))
+                        (ite (Result_Bool@result_value pv)
+                            (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
+                            (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                        )
+                    )
                     )
                 )
             )
