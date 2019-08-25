@@ -1,4 +1,4 @@
-import { MIRInvokePrimitiveDecl, MIRType } from "../../compiler/mir_assembly";
+import { MIRInvokePrimitiveDecl, MIRType, MIREntityType, MIREntityTypeDecl, MIRPCode, MIRFunctionParameter } from "../../compiler/mir_assembly";
 import { SMTLIBGenerator } from "./generator";
 
 //-------------------------------------------------------------------------------------------------------
@@ -34,56 +34,85 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
 
     .set("list_filter", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
         const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
-        const iv = smtgen.varNameToSMT2Name(inv.params[1].name);
+        const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+        const contentstype = (smtgen.assembly.entityDecls.get((rcvrtype.options[0] as MIREntityType).ekey) as MIREntityTypeDecl).terms.get("T") as MIRType;
         const restype = smtgen.assembly.typeMap.get(inv.resultType) as MIRType;
         const resulttype = "Result_" + smtgen.typeToSMT2Type(restype);
 
-        if (smtgen.isTypeExact(rcvrtype)) {
-            const ltype = smtgen.typeToSMT2Type(rcvrtype);
-            const constype = smtgen.typeToSMT2Constructor(rcvrtype);
+        const carray = `(Array Int ${smtgen.typeToSMT2Type(contentstype)})`;
 
+        const pred = inv.pcodes.get("p") as MIRPCode;
+        const cargs = pred.cargs.map((carg) => {
+            const ptname = (inv.params.find((p) => p.name === carg) as MIRFunctionParameter).type;
+            const ptype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ptname) as MIRType);
+            return `(${carg} ${ptype})`;
+        });
+        const rargs = `((size Int) (ina ${carray}) (i Int) (outa ${carray}) (j Int)${cargs.length !== 0 ? (" " + cargs.join(" ")) : ""})`;
+        const passargs = cargs.length !== 0 ? (" " + cargs.join(" ")) : "";
+        const pname = smtgen.invokenameToSMT2(pred.code);
+
+        if (smtgen.isTypeExact(rcvrtype)) {
             const tbase = `
-            (define-fun ${smtgen.invokenameToSMT2(inv.key)}0 ((l ${ltype}) (i Int)) ${resulttype}
-                (ite (= i 0) (${resulttype}@result_success (${constype}@h l)) (${resulttype}@result_with_code (result_bmc ${inv.sourceLocation.line})))
+            (define-fun ${smtgen.invokenameToSMT2(inv.key)}0 ${rargs} ${resulttype}
+                (${resulttype}@result_with_code (result_bmc ${inv.sourceLocation.line}))
             )
             `.trim();
 
             const tfun = `
-            (define-fun ${smtgen.invokenameToSMT2(inv.key)}%k% ((l ${ltype}) (i Int)) ${resulttype}
-                (ite (= i 0) (${resulttype}@result_success (${constype}@h l)) (${smtgen.invokenameToSMT2(inv.key)}%kdec% l (- i 1)))
+            (define-fun ${smtgen.invokenameToSMT2(inv.key)}%k% ${rargs} ${resulttype}
+                (ite (= size i)
+                    (${resulttype}@result_success (${rtcons} j outa))
+                    (ite (${pname} (select ina i)${passargs})
+                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
+                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                    )
+                )
             )
             `.trim();
 
             const tentry = `
             ${decl}
-            (ite (and (<= 0 ${iv}) (< ${iv} (${constype}@size this)))
-                (${smtgen.invokenameToSMT2(inv.key)}9 this ${iv})
-                (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
+            (${smtgen.invokenameToSMT2(inv.key)}10 (${rtcons}@size this) (${rtcons}@contents this) 0 ${rtcons}@emptysingleton 0${passargs}))
+            `.trim();
+
+            return [tbase, ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => tfun.replace(/%k%/g, i.toString()).replace(/%kdec%/g, (i - 1).toString())), tentry].join("\n");
+        }
+        else {
+            const tbase = `
+            (define-fun ${smtgen.invokenameToSMT2(inv.key)}0 ${rargs} ${resulttype}
+                (${resulttype}@result_with_code (result_bmc ${inv.sourceLocation.line}))
             )
             `.trim();
 
-            return [tbase, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => tfun.replace(/%k%/g, i.toString()).replace(/%kdec%/g, (i - 1).toString())), tentry].join("\n");
-        }
-        else {
-            return `
-            ${decl}
-            (ite (and (<= 0 ${iv}) (< ${iv} (bsq_term_list_size this)))
-                (let ((result (bsq_term_list_at (bsq_term_list_entries this) ${iv})))
-                    (ite (is-Result_bsq_list_h@result_with_code) (${resulttype}@result_with_code (result_bmc ${inv.sourceLocation.line})) (${resulttype}@result_success (Result_bsq_list_h@result_success result))
+            const tfun = `
+            (define-fun ${smtgen.invokenameToSMT2(inv.key)}%k% ${rargs} ${resulttype}
+                (ite (= size i)
+                    (${resulttype}@result_success (${rtcons} j outa))
+                    (ite (${pname} (select ina i)${passargs})
+                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) (store outa j (select ina i)) (+ j 1)${passargs})
+                        (${smtgen.invokenameToSMT2(inv.key)}%kdec% size ina (+ i 1) outa j${passargs})
+                    )
                 )
-                (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
             )
             `.trim();
+
+            const tentry = `
+            ${decl}
+            (${smtgen.invokenameToSMT2(inv.key)}10 (bsq_term_list_size this) (bsq_term_list_entries this) 0 ((as const (Array Int BTerm)) bsq_term_none) 0${passargs}))
+            `.trim();
+
+            return [tbase, ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => tfun.replace(/%k%/g, i.toString()).replace(/%kdec%/g, (i - 1).toString())), tentry].join("\n");
         }
     })
 
     .set("list_at", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
         const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
-        const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
         const iv = smtgen.varNameToSMT2Name(inv.params[1].name);
         const resulttype = "Result_" + smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(inv.resultType) as MIRType);
 
         if (smtgen.isTypeExact(rcvrtype)) {
+            const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+
             return `
             ${decl}
             (ite (and (<= 0 ${iv}) (< ${iv} (${rtcons}@size this)))
@@ -95,7 +124,7 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         else {
             return `
             ${decl}
-            (ite (and (<= 0 ${iv}) (< ${iv} (${rtcons}@size this)))
+            (ite (and (<= 0 ${iv}) (< ${iv} (bsq_term_list_size this)))
                 (${resulttype}@result_success (select (bsq_term_list_entries this) ${iv}))
                 (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
             )

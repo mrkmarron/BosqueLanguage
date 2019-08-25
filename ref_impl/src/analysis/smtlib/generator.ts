@@ -157,7 +157,8 @@ class SMTLIBGenerator {
         .replace(/{/g, "$lc$")
         .replace(/}/g, "$rc$")
         .replace(/</g, "$la$")
-        .replace(/>/g, "$ra$");
+        .replace(/>/g, "$ra$")
+        .replace(/\|/g, "$v$");
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -471,10 +472,10 @@ class SMTLIBGenerator {
 
     private generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons, vtypes: Map<string, MIRType>): SMTExp {
         const ctype = this.assembly.entityDecls.get(((this.assembly.typeMap.get(cpcs.tkey) as MIRType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
-        const smtctype = this.typeToSMT2Constructor(this.assembly.typeMap.get(cpcs.tkey) as MIRType);
         if (ctype.name === "List") {
             const contentstype = ctype.terms.get("T") as MIRType;
             if (this.isTypeExact(this.assembly.typeMap.get(cpcs.tkey) as MIRType)) {
+                const smtctype = this.typeToSMT2Constructor(this.assembly.typeMap.get(cpcs.tkey) as MIRType);
                 let entriesval = `${smtctype}@emptysingleton`;
                 for (let i = 0; i < cpcs.args.length; ++i) {
                     entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), contentstype).emit()})`;
@@ -488,7 +489,7 @@ class SMTLIBGenerator {
                     entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.anyType).emit()})`;
                 }
 
-                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(bsq_term_list ${cpcs.tkey} ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(bsq_term_list "${SMTLIBGenerator.smtsanizite(cpcs.tkey)}" ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
             }
         }
         else if (ctype.name === "Set") {
