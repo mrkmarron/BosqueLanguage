@@ -20,21 +20,18 @@ const smt_header = `
 `;
 
 const smtlib_code = `
-(declare-datatypes ( (BList 0) (BTerm 0) ) (
-    (
-        bsq_list_nil (bsq_list_cons (bsq_list_size Int) (bsq_list_h BTerm) (bsq_list_t BList))
-    )
+(declare-datatypes ( (ResultCode 0) ) (
+    ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
+))
+
+(declare-datatypes ( (BTerm 0) ) (
     (
       (bsq_term_none) (bsq_term_bool (bsq_term_bool_value Bool)) (bsq_term_int (bsq_term_int_value Int)) (bsq_term_string (bsq_term_string_value String))
       (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries (Array Int BTerm)))
       (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_properties (Array Int String)) (bsq_term_record_entries (Array String BTerm)))
       (bsq_term_entity (bsq_term_entity_type String) (bsq_term_entity_entries (Array String BTerm)))
-      (bsq_term_list (bsq_term_list_type String) (bsq_term_list_entries BList))
+      (bsq_term_list (bsq_term_list_type String) (bsq_term_list_size Int) (bsq_term_list_entries (Array Int BTerm)))
     )
-))
-
-(declare-datatypes ( (ResultCode 0) ) (
-    ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
 ))
 `;
 
@@ -457,7 +454,12 @@ class SMTLIBGenerator {
         const ctype = this.assembly.entityDecls.get(((this.assembly.typeMap.get(cpce.tkey) as MIRType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         const smtctype = this.typeToSMT2Constructor(this.assembly.typeMap.get(cpce.tkey) as MIRType);
         if (ctype.name === "List") {
-            return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`${smtctype}@nil`), this.generateFreeSMTVar());
+            if (this.isTypeExact(this.assembly.typeMap.get(cpce.tkey) as MIRType)) {
+                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(${smtctype} 0 ${smtctype}@emptysingleton)`), this.generateFreeSMTVar());
+            }
+            else {
+                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(bsq_term_list ${cpce.tkey} 0 ((as const (Array Int BTerm)) bsq_term_none))`), this.generateFreeSMTVar());
+            }
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionEmpty -- Set");
@@ -471,12 +473,23 @@ class SMTLIBGenerator {
         const ctype = this.assembly.entityDecls.get(((this.assembly.typeMap.get(cpcs.tkey) as MIRType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         const smtctype = this.typeToSMT2Constructor(this.assembly.typeMap.get(cpcs.tkey) as MIRType);
         if (ctype.name === "List") {
-            let entriesval = `${smtctype}@nil`;
-            for (let i = cpcs.args.length - 1; i >= 0; --i) {
-                entriesval = `(${smtctype}@cons ${cpcs.args.length - i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.anyType).emit()} ${entriesval})`;
-            }
+            const contentstype = ctype.terms.get("T") as MIRType;
+            if (this.isTypeExact(this.assembly.typeMap.get(cpcs.tkey) as MIRType)) {
+                let entriesval = `${smtctype}@emptysingleton`;
+                for (let i = 0; i < cpcs.args.length; ++i) {
+                    entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), contentstype).emit()})`;
+                }
 
-            return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(entriesval), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
+            }
+            else {
+                let entriesval = `((as const (Array Int BTerm)) bsq_term_none)`;
+                for (let i = cpcs.args.length - 1; i >= 0; --i) {
+                    entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.anyType).emit()})`;
+                }
+
+                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(bsq_term_list ${cpcs.tkey} ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
+            }
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
@@ -1020,7 +1033,7 @@ class SMTLIBGenerator {
         const smtgen = new SMTLIBGenerator(assembly);
 
         const typedecls: string[] = [];
-        const consdecls: string[] = [];
+        const consdecls: [string, string?][] = [];
         assembly.typeMap.forEach((type) => {
             if (smtgen.isTypeExact(type)) {
                 const topt = type.options[0];
@@ -1031,7 +1044,7 @@ class SMTLIBGenerator {
                     }
                     else if (edecl.isCollectionEntityType || edecl.isMapEntityType) {
                         typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
-                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(smtgen.typeToSMT2Type(topt), smtgen.typeToSMT2Constructor(topt), smtgen.typeToSMT2Type(edecl.terms.get("T") as MIRType)));
+                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(smtgen.typeToSMT2Constructor(topt), smtgen.typeToSMT2Type(edecl.terms.get("T") as MIRType)));
                     }
                     else {
                         typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
@@ -1043,7 +1056,7 @@ class SMTLIBGenerator {
                             entries.push(`(${tpfx}@${edecl.fields[i].name} ${smtgen.typeToSMT2Type(ftype)})`);
                         }
 
-                        consdecls.push(`((${tpfx} ${entries.join(" ")}))`);
+                        consdecls.push([`((${tpfx} ${entries.join(" ")}))`]);
                     }
                 }
                 else if (topt instanceof MIRTupleType ) {
@@ -1055,7 +1068,7 @@ class SMTLIBGenerator {
                         entries.push(`(${tpfx}@${i} ${smtgen.typeToSMT2Type(topt.entries[i].type)})`);
                     }
 
-                    consdecls.push(`((${tpfx} ${entries.join(" ")}))`);
+                    consdecls.push([`((${tpfx} ${entries.join(" ")}))`]);
                 }
                 else if (topt instanceof MIRRecordType) {
                     NOT_IMPLEMENTED<string>("generateSMTAssembly -- records");
@@ -1087,7 +1100,9 @@ class SMTLIBGenerator {
         + "\n\n"
         + smtlib_code
         + "\n\n"
-        + `(declare-datatypes (${typedecls.join("\n")}) (\n${consdecls.join("\n")}\n))`
+        + `${consdecls.map((cd) => cd[1]).filter((d) => d !== undefined).join("\n")}`
+        + "\n\n"
+        + `(declare-datatypes (${typedecls.join("\n")}) (\n${consdecls.map((cd) => cd[0]).join("\n")}\n))`
         + "\n\n"
         + `(declare-datatypes (${resultdecls.join("\n")}) (\n${resultcons.join("\n")}\n))`
         + "\n\n"
