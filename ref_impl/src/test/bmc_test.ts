@@ -293,7 +293,7 @@ const bmc_tests: TestInfo[] = [
 function bmc_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
     const files = core.concat([{ relativePath: "bmc_test.bsq", contents: bmc_test }]);
 
-    return MIREmitter.generateMASM(new PackageConfig(), files);
+    return MIREmitter.generateMASM(new PackageConfig(), true, true, true, files);
 }
 
 function runz3(smtlib: string): string {

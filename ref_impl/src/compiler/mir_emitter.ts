@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRBodyKey } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl } from "./mir_assembly";
@@ -16,6 +16,7 @@ import { convertBodyToSSA } from "./mir_ssa";
 
 type PCode = {
     code: InvokeDecl,
+    scope: MIRBodyKey,
     captured: Map<string, ResolvedType>,
     ftype: ResolvedFunctionType
 };
@@ -72,8 +73,13 @@ class MIRKeyGenerator {
         return `${vname}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
     }
 
-    static generatePCodeKey(inv: InvokeDecl): MIRInvokeKey {
-        return `fn--${inv.srcFile}%${inv.sourceLocation.line}%${inv.sourceLocation.column}`;
+    static generatePCodeKey(inv: InvokeDecl, scopekey: MIRBodyKey): MIRInvokeKey {
+        return `fn--${scopekey}%${inv.sourceLocation.line}%${inv.sourceLocation.column}`;
+    }
+
+    //pfx::key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
+    static generatBodyKey(prefix: "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault", data: MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey): MIRBodyKey {
+        return `${prefix}::${data}`;
     }
 }
 
@@ -366,8 +372,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    getBody(file: string, sinfo: SourceInfo, args: string[]): MIRBody {
-        let ibody = new MIRBody(file, sinfo, this.m_blockMap);
+    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: string[]): MIRBody {
+        let ibody = new MIRBody(file, sinfo, bkey, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);
@@ -557,8 +563,8 @@ class MIREmitter {
         return key;
     }
 
-    registerPCode(idecl: InvokeDecl, fsig: ResolvedFunctionType, binds: Map<string, ResolvedType>, cinfo: [string, ResolvedType][]): MIRInvokeKey {
-        const key = MIRKeyGenerator.generatePCodeKey(idecl);
+    registerPCode(scope: MIRBodyKey, idecl: InvokeDecl, fsig: ResolvedFunctionType, binds: Map<string, ResolvedType>, cinfo: [string, ResolvedType][]): MIRInvokeKey {
+        const key = MIRKeyGenerator.generatePCodeKey(idecl, scope);
         if (this.masm.invokeDecls.has(key) || this.masm.primitiveInvokeDecls.has(key) || this.pendingPCodeProcessing.findIndex((fp) => fp[0] === key) !== -1) {
             return key;
         }
@@ -611,7 +617,7 @@ class MIREmitter {
         entity.fields.sort((f1, f2) => f1.name.localeCompare(f2.name));
     }
 
-    static generateMASM(pckge: PackageConfig, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
+    static generateMASM(pckge: PackageConfig, doInvChecks: boolean, doPrePostChecks: boolean, doAssertChecks: boolean, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
         ////////////////
         //Parse the contents and generate the assembly
         const assembly = new Assembly();
@@ -645,7 +651,7 @@ class MIREmitter {
 
         const masm = new MIRAssembly(pckge, srcFiles, hash.digest("hex"));
         const emitter = new MIREmitter(masm);
-        const checker = new TypeChecker(assembly, true, emitter);
+        const checker = new TypeChecker(assembly, true, emitter, doInvChecks, doPrePostChecks, doAssertChecks);
 
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());
@@ -735,7 +741,7 @@ class MIREmitter {
 
         const tcerrors = checker.getErrorList();
         if (tcerrors.length !== 0) {
-            return { masm: undefined, errors: tcerrors.map((err) => JSON.stringify(err)) };
+            return { masm: undefined, errors: tcerrors.map((err: [string, number, string]) => JSON.stringify(err)) };
         }
         else {
             return { masm: masm, errors: [] };

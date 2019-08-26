@@ -1168,7 +1168,7 @@ const expression_tests: TestInfo[] = [
 function expression_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
     const files = core.concat([{ relativePath: "basic_expression_test.bsq", contents: expression_test }]);
 
-    return MIREmitter.generateMASM(new PackageConfig(), files);
+    return MIREmitter.generateMASM(new PackageConfig(), true, true, true, files);
 }
 
 function expression_action(assembly: MIRAssembly, args: any[]): any {
@@ -1895,7 +1895,7 @@ const statement_tests: TestInfo[] = [
 function statement_setup(core: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
     const files = core.concat([{ relativePath: "basic_statement_test.bsq", contents: statement_test }]);
 
-    return MIREmitter.generateMASM(new PackageConfig(), files);
+    return MIREmitter.generateMASM(new PackageConfig(), true, true, true, files);
 }
 
 function statement_action(assembly: MIRAssembly, args: any[]): any {

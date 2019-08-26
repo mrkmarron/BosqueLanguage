@@ -159,12 +159,8 @@ class SMTLIBGenerator {
         .replace(/</g, "$la$")
         .replace(/>/g, "$ra$")
         .replace(/\|/g, "$v$")
-        .replace(/:/g, "$c$")
-        .replace(/\\/g, "$sb$")
-        .replace(/\//g, "$sf$")
         .replace(/--/g, "$dd$")
-        .replace(/%/g, "$pct$")
-        .replace(/[.]/g, "$dt$");
+        .replace(/%/g, "$pct$");
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {

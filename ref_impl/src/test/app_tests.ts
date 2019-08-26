@@ -21,7 +21,7 @@ function appTestGenerator(app: string, expected: string): TestSet {
 
         const files = core.concat([{ relativePath: "corelib_tests.bsq", contents: appdata }]);
 
-        const cu = MIREmitter.generateMASM(new PackageConfig(), files);
+        const cu = MIREmitter.generateMASM(new PackageConfig(), true, true, true, files);
         if (cu.masm === undefined || cu.errors.length !== 0) {
             return cu;
         }
