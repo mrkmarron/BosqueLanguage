@@ -73,8 +73,12 @@ class MIRKeyGenerator {
         return `${vname}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
     }
 
-    static generatePCodeKey(inv: InvokeDecl, scopekey: MIRBodyKey): MIRInvokeKey {
-        return `fn--${scopekey}%${inv.sourceLocation.line}%${inv.sourceLocation.column}`;
+    static generatePCodeKey(inv: InvokeDecl): MIRInvokeKey {
+        //
+        //TODO: this might not be great as we leak build environment info into the assembly :(
+        //      maybe we can do a hash of contents + basename (or something similar)?
+        //
+        return `fn--${inv.srcFile}%${inv.sourceLocation.line}%${inv.sourceLocation.column}`;
     }
 
     //pfx::key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
@@ -563,8 +567,8 @@ class MIREmitter {
         return key;
     }
 
-    registerPCode(scope: MIRBodyKey, idecl: InvokeDecl, fsig: ResolvedFunctionType, binds: Map<string, ResolvedType>, cinfo: [string, ResolvedType][]): MIRInvokeKey {
-        const key = MIRKeyGenerator.generatePCodeKey(idecl, scope);
+    registerPCode(idecl: InvokeDecl, fsig: ResolvedFunctionType, binds: Map<string, ResolvedType>, cinfo: [string, ResolvedType][]): MIRInvokeKey {
+        const key = MIRKeyGenerator.generatePCodeKey(idecl);
         if (this.masm.invokeDecls.has(key) || this.masm.primitiveInvokeDecls.has(key) || this.pendingPCodeProcessing.findIndex((fp) => fp[0] === key) !== -1) {
             return key;
         }

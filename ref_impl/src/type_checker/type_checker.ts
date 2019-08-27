@@ -624,7 +624,7 @@ class TypeChecker {
             capturedMap.set(v, vinfo.flowType);
         });
 
-        this.m_emitter.registerPCode(env.scope, exp.invoke, ltypetry as ResolvedFunctionType, env.terms, [...capturedMap].sort((a, b) => a[0].localeCompare(b[0])));
+        this.m_emitter.registerPCode(exp.invoke, ltypetry as ResolvedFunctionType, env.terms, [...capturedMap].sort((a, b) => a[0].localeCompare(b[0])));
 
         return {code: exp.invoke, scope: env.scope, captured: capturedMap, ftype: ltypetry as ResolvedFunctionType};
     }
@@ -1425,7 +1425,7 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             const ftype = this.m_emitter.registerResolvedTypeReference((pcode as PCode).ftype.resultType);
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, ftype.trkey, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code, env.scope), margs.args, [], trgt);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, ftype.trkey, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, [], trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, (pcode as PCode).ftype.resultType)];
@@ -3511,7 +3511,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(iscope, binds, refNames, fargs, cargs);
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
             let mpc = new Map<string, MIRPCode>();
-            fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code, v.pcode.scope), cargs: [...v.captured].map((cname) => this.m_emitter.bodyEmitter.generateCapturedVarName(cname)) }));
+            fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.bodyEmitter.generateCapturedVarName(cname)) }));
 
             let mbinds = new Map<string, MIRResolvedTypeKey>();
             binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
