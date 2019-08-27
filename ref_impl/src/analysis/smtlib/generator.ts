@@ -5,8 +5,8 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
-import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey, MIRBodyKey } from "../../compiler/mir_ops";
+import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRNominalType, MIRConstantDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { BuiltinTypes, BuiltinTypeEmit, BuiltinCalls, BuiltinCallEmit } from "./builtins";
 
@@ -134,7 +134,7 @@ class SMTLIBGenerator {
     readonly stringType: MIRType;
     readonly anyType: MIRType;
 
-    private cinvoke: MIRInvokeDecl | undefined = undefined;
+    private cinvokeResult: MIRType | undefined = undefined;
 
     private tmpvarctr = 0;
 
@@ -447,7 +447,7 @@ class SMTLIBGenerator {
         }
         else {
             const testexp = new SMTValue(`(${smtctype}@invariant ${this.varToSMT2Name(cp.trgt)})`);
-            const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+            const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
             const errexp = new SMTValue(`(${resulttype}@result_with_code (result_error ${cp.sinfo.pos}))`);
             return bindexp.bind(new SMTCond(testexp, this.generateFreeSMTVar(), errexp));
         }
@@ -617,7 +617,7 @@ class SMTLIBGenerator {
 
         const tv = `@tmpvar@${this.tmpvarctr++}`;
         const ivrtype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((idecl as MIRInvokeDecl).resultType) as MIRType);
-        const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+        const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
 
         const invokeexp = new SMTValue(`(${this.invokenameToSMT2(ivop.mkey)} ${vals.join(" ")})`);
         const checkerror = new SMTValue(`(is-${ivrtype}@result_with_code ${tv})`);
@@ -906,7 +906,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
-                vtypes.set(raop.name.nameID, this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+                vtypes.set(raop.name.nameID, this.cinvokeResult as MIRType);
 
                 const totype = vtypes.get(raop.name.nameID) as MIRType;
                 const fromtype = this.getArgType(raop.src, vtypes);
@@ -914,7 +914,7 @@ class SMTLIBGenerator {
             }
             case MIROpTag.MIRAbort: {
                 const aop = op as MIRAbort;
-                const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+                const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
                 return new SMTValue(`(${resulttype}@result_with_code (result_error ${aop.sinfo.pos}))`);
             }
             case MIROpTag.MIRDebug: {
@@ -965,7 +965,7 @@ class SMTLIBGenerator {
         }
 
         if (block.label === "exit") {
-            const resulttype = "Result_" + this.typeToSMT2Type(this.assembly.typeMap.get((this.cinvoke as MIRInvokeDecl).resultType) as MIRType);
+            const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
             let rexp = new SMTValue(`(${resulttype}@result_success _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
@@ -1003,7 +1003,7 @@ class SMTLIBGenerator {
     }
 
     generateSMTInvoke(idecl: MIRInvokeDecl): string {
-        this.cinvoke = idecl;
+        this.cinvokeResult = this.assembly.typeMap.get(idecl.resultType) as MIRType;
 
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
@@ -1028,8 +1028,74 @@ class SMTLIBGenerator {
         }
     }
 
-    generateSMTType(tdecl: MIRTypeOption): string {
-        return NOT_IMPLEMENTED<string>("generateSMTType -- primitive");
+    generateSMTPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.cinvokeResult = this.boolType;
+
+        let argvars = new Map<string, MIRType>();
+        idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
+
+        const args = idecl.params.map((arg) => `(${this.varNameToSMT2Name(arg.name)} ${this.typeToSMT2Type(this.assembly.typeMap.get(arg.type) as MIRType)})`);
+        const decl = `(define-fun ${this.invokenameToSMT2(prekey)} (${args.join(" ")}) Result_Bool`;
+
+        if (idecl.preconditions.length === 1) {
+            const blocks = idecl.preconditions[0][0].body;
+            const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, argvars);
+            return `${decl} \n${body.emit("  ")})`;
+        }
+        else {
+            const decls = idecl.preconditions.map((pc, i) => {
+                const blocksi = idecl.preconditions[i][0].body;
+                const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
+                const decli = `(define-fun ${this.invokenameToSMT2(prekey)}${i} (${args.join(" ")}) Result_Bool \n${bodyi.emit("  ")})`;
+                const calli = (`(${this.invokenameToSMT2(prekey)}${i} ${idecl.params.map((arg) => this.varNameToSMT2Name(arg.name)).join(" ")})`);
+
+                return [decli, calli];
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${decls.map((cc) => cc[1]).join(" ")}))`;
+        }
+    }
+
+    generateSMTPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.cinvokeResult = this.boolType;
+        const restype = this.assembly.typeMap.get(idecl.resultType) as MIRType;
+
+        let argvars = new Map<string, MIRType>();
+        idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
+        argvars.set("__result__", restype);
+
+        const args = idecl.params.map((arg) => `(${this.varNameToSMT2Name(arg.name)} ${this.typeToSMT2Type(this.assembly.typeMap.get(arg.type) as MIRType)})`);
+        args.push(`(__result__ ${this.typeToSMT2Type(restype)})`);
+        const decl = `(define-fun ${this.invokenameToSMT2(postkey)} (${args.join(" ")}) Result_Bool`;
+
+        if (idecl.postconditions.length === 1) {
+            const blocks = idecl.postconditions[0].body;
+            const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, argvars);
+            return `${decl} \n${body.emit("  ")})`;
+        }
+        else {
+            const decls = idecl.postconditions.map((pc, i) => {
+                const blocksi = idecl.postconditions[i].body;
+                const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
+                const decli = `(define-fun ${this.invokenameToSMT2(postkey)}${i} (${args.join(" ")}) Result_Bool \n${bodyi.emit("  ")})`;
+                const calli = (`(${this.invokenameToSMT2(postkey)}${i} ${[idecl.params.map((arg) => this.varNameToSMT2Name(arg.name)), "__result__"].join(" ")})`);
+
+                return [decli, calli];
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${decls.map((cc) => cc[1]).join(" ")}))`;
+        }
+    }
+
+    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+        return NOT_IMPLEMENTED<string>("generateSMTInv");
+    }
+
+    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string {
+    }
+
+    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string {
+        return NOT_IMPLEMENTED<string>("generateSMTFDefault");
     }
 
     static generateSMTAssembly(assembly: MIRAssembly): string {
@@ -1082,17 +1148,45 @@ class SMTLIBGenerator {
             }
         });
 
-        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly.invokeDecls, assembly.primitiveInvokeDecls);
+        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         assert(cginfo.recursive.length === 0, "TODO: we need to support recursion here");
 
         const invokedecls: string[] = [];
         const resultset = new Set<string>();
         const bupcg = [...cginfo.topologicalOrder].reverse();
         for (let i = 0; i < bupcg.length; ++i) {
-            const idcl = (assembly.invokeDecls.get(bupcg[i].invoke) || assembly.primitiveInvokeDecls.get(bupcg[i].invoke)) as MIRInvokeDecl;
-            invokedecls.push(smtgen.generateSMTInvoke(idcl));
+            const bbup = bupcg[i];
+            const tag = extractMirBodyKeyPrefix(bbup.invoke);
+            if (tag === "invoke") {
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(smtgen.generateSMTInvoke(idcl));
 
-            resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(idcl.resultType) as MIRType));
+                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(idcl.resultType) as MIRType));
+            }
+            else if (tag === "pre") {
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(smtgen.generateSMTPre(bbup.invoke, idcl));
+            }
+            else if (tag === "post") {
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(smtgen.generateSMTPost(bbup.invoke, idcl));
+            }
+            else if (tag === "invariant") {
+                const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                invokedecls.push(smtgen.generateSMTInv(bbup.invoke, edcl));
+            }
+            else if (tag === "const") {
+                const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                invokedecls.push(smtgen.generateSMTConst(bbup.invoke, cdcl));
+            }
+            else {
+                assert(tag === "fdefault");
+                const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                invokedecls.push(smtgen.generateSMTFDefault(bbup.invoke, fdcl));
+            }
         }
 
         const resultarr = [...resultset];

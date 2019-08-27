@@ -82,7 +82,7 @@ class MIRKeyGenerator {
     }
 
     //pfx::key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
-    static generatBodyKey(prefix: "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault", data: MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey): MIRBodyKey {
+    static generateBodyKey(prefix: "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault", data: MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey): MIRBodyKey {
         return `${prefix}::${data}`;
     }
 }
@@ -140,8 +140,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantString(sv), trgt));
     }
 
-    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey, trgt));
+    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey, pfunckey, trgt));
     }
 
     emitAccessConstant(sinfo: SourceInfo, gkey: MIRConstantKey, trgt: MIRTempRegister) {

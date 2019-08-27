@@ -8,27 +8,60 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction } from "./mir_ops";
-import { MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "./mir_assembly";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey } from "./mir_ops";
+import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "./mir_assembly";
+import { MIRKeyGenerator } from "./mir_emitter";
 
 type CallGNode = {
-    invoke: MIRInvokeKey,
-    callees: Set<MIRInvokeKey>,
-    callers: Set<MIRInvokeKey>
+    invoke: MIRBodyKey,
+    callees: Set<MIRBodyKey>,
+    callers: Set<MIRBodyKey>
 };
 
-function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: CallGNode) {
+function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: CallGNode, assembly: MIRAssembly) {
     blocks.forEach((block) => {
         for (let i = 0; i < block.ops.length; ++i) {
-            if (block.ops[i].tag === MIROpTag.MIRInvokeFixedFunction) {
-                invokeNode.callees.add((block.ops[i] as MIRInvokeFixedFunction).mkey);
-            }
-            else if (block.ops[i].tag === MIROpTag.MIRInvokeFixedFunction) {
-                //TODO lookup all possible vtargets and add them
-                assert(false);
-            }
-            else {
-                //ignore all other ops
+            const op = block.ops[i];
+            switch (op.tag) {
+                case MIROpTag.MIRLoadConstTypedString: {
+                    const pkey = MIRKeyGenerator.generateBodyKey("invoke", (op as MIRLoadConstTypedString).pfunckey);
+                    invokeNode.callees.add(pkey);
+                    break;
+                }
+                case MIROpTag.MIRAccessConstantValue: {
+                    const constkey = MIRKeyGenerator.generateBodyKey("const", (op as MIRAccessConstantValue).ckey);
+                    invokeNode.callees.add(constkey);
+                    break;
+                }
+                case MIROpTag.MIRLoadFieldDefaultValue: {
+                    const fdefaultkey = MIRKeyGenerator.generateBodyKey("fdefault", (op as MIRLoadFieldDefaultValue).fkey);
+                    invokeNode.callees.add(fdefaultkey);
+                    break;
+                }
+                case MIROpTag.MIRConstructorPrimary: {
+                    const cop = op as MIRConstructorPrimary;
+                    const edecl = assembly.entityDecls.get(cop.tkey) as MIREntityTypeDecl;
+                    if (edecl.invariants.length !== 0) {
+                        const invkey = MIRKeyGenerator.generateBodyKey("invariant", cop.tkey);
+                        invokeNode.callees.add(invkey);
+                    }
+                    break;
+                }
+                case MIROpTag.MIRInvokeFixedFunction: {
+                    const iop = op as MIRInvokeFixedFunction;
+                    const ikey = MIRKeyGenerator.generateBodyKey("invoke", iop.mkey);
+                    invokeNode.callees.add(ikey);
+                    break;
+                }
+                case MIROpTag.MIRInvokeVirtualTarget: {
+                    //TODO lookup all possible vtargets and add them
+                    assert(false);
+                    break;
+                }
+                default: {
+                    //ignore all other ops
+                    break;
+                }
             }
         }
     });
@@ -55,17 +88,61 @@ function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRInvokeK
     tordered.push(cn);
 }
 
-function constructCallGraphInfo(entryPoints: MIRInvokeKey[], invokeDecls: Map<MIRInvokeKey, MIRInvokeBodyDecl>, primitiveInvokeDecls: Map<MIRInvokeKey, MIRInvokePrimitiveDecl>): { invokes: Map<MIRInvokeKey, CallGNode>, topologicalOrder: CallGNode[], roots: CallGNode[], recursive: (Set<CallGNode>)[] } {
-    let invokes = new Map<MIRInvokeKey, CallGNode>();
-    invokeDecls.forEach((ivk, ikey) => {
-        let cn = { invoke: ikey, callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
-        computeCalleesInBlocks(ivk.body.body, cn);
-        invokes.set(ikey, cn);
+function processBodyInfo(bkey: MIRBodyKey, binfo: MIRBody[], assembly: MIRAssembly): CallGNode {
+    let cn = { invoke: bkey, callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
+    binfo.forEach((b) => {
+        computeCalleesInBlocks(b.body, cn, assembly);
     });
-    primitiveInvokeDecls.forEach((ivk, ikey) => {
-        let cn = { invoke: ikey, callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
+    return cn;
+}
+
+function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssembly): { invokes: Map<MIRBodyKey, CallGNode>, topologicalOrder: CallGNode[], roots: CallGNode[], recursive: (Set<CallGNode>)[] } {
+    let invokes = new Map<MIRBodyKey, CallGNode>();
+
+    assembly.constantDecls.forEach((cdecl: MIRConstantDecl) => {
+        invokes.set(cdecl.value.bkey, processBodyInfo(cdecl.value.bkey, [cdecl.value], assembly));
+    });
+
+    assembly.entityDecls.forEach((edecl: MIREntityTypeDecl, ekey: MIRNominalTypeKey) => {
+        if (edecl.invariants.length !== 0) {
+            const invkey = MIRKeyGenerator.generateBodyKey("invariant", ekey);
+            invokes.set(invkey, processBodyInfo(invkey, edecl.invariants, assembly));
+        }
+    });
+
+    assembly.fieldDecls.forEach((fdecl: MIRFieldDecl, fkey: MIRFieldKey) => {
+        if (fdecl.value !== undefined) {
+            const fdkey = MIRKeyGenerator.generateBodyKey("fdefault", fkey);
+            invokes.set(fdkey, processBodyInfo(fdkey, [fdecl.value], assembly));
+        }
+    });
+
+    assembly.invokeDecls.forEach((ivk, ikey) => {
+        if (ivk.preconditions.length !== 0) {
+            const prekey = MIRKeyGenerator.generateBodyKey("pre", ikey);
+            invokes.set(prekey, processBodyInfo(prekey, ivk.preconditions.map((pre) => pre[0]), assembly));
+        }
+        if (ivk.postconditions.length !== 0) {
+            const postkey = MIRKeyGenerator.generateBodyKey("post", ikey);
+            invokes.set(postkey, processBodyInfo(postkey, ivk.postconditions, assembly));
+        }
+
+        invokes.set(ivk.body.bkey, processBodyInfo(ivk.body.bkey, [ivk.body], assembly));
+    });
+
+    assembly.primitiveInvokeDecls.forEach((ivk, ikey) => {
+        if (ivk.preconditions.length !== 0) {
+            const prekey = MIRKeyGenerator.generateBodyKey("pre", ikey);
+            invokes.set(prekey, processBodyInfo(prekey, ivk.preconditions.map((pre) => pre[0]), assembly));
+        }
+        if (ivk.postconditions.length !== 0) {
+            const postkey = MIRKeyGenerator.generateBodyKey("post", ikey);
+            invokes.set(postkey, processBodyInfo(postkey, ivk.postconditions, assembly));
+        }
+
+        let cn = { invoke: MIRKeyGenerator.generateBodyKey("invoke", ikey), callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
         ivk.pcodes.forEach((pc) => cn.callees.add(pc.code));
-        invokes.set(ikey, cn);
+        invokes.set(cn.invoke, cn);
     });
 
     let roots: CallGNode[] = [];
