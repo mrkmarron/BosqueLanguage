@@ -771,14 +771,17 @@ class TypeChecker {
             rargs.push([args[i].name as string, args[i].argtype as ResolvedType]);
         }
 
-        if (this.m_emitEnabled) {
-            const regs = args.map<[string, MIRTempRegister]>((e) => [e.name as string, e.treg]).sort((a, b) => a[0].localeCompare(b[0]));
-            this.m_emitter.bodyEmitter.emitConstructorRecord(sinfo, regs, trgt);
-        }
-
         const rentries = rargs.map((targ) => new ResolvedRecordAtomTypeEntry(targ[0], targ[1], false));
         const recordatom = ResolvedRecordAtomType.create(false, rentries);
-        return ResolvedType.createSingle(recordatom);
+        const rrecord = ResolvedType.createSingle(recordatom);
+
+        if (this.m_emitEnabled) {
+            const regs = args.map<[string, MIRTempRegister]>((e) => [e.name as string, e.treg]).sort((a, b) => a[0].localeCompare(b[0]));
+            const regkey = this.m_emitter.registerResolvedTypeReference(rrecord);
+            this.m_emitter.bodyEmitter.emitConstructorRecord(sinfo, regkey.trkey, regs, trgt);
+        }
+
+       return rrecord;
     }
 
     private checkArgumentsCollectionConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: ExpandedArgument[], trgt: MIRTempRegister): ResolvedType {

@@ -118,38 +118,44 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
     });
 
     assembly.invokeDecls.forEach((ivk, ikey) => {
+        invokes.set(ivk.body.bkey, processBodyInfo(ivk.body.bkey, [ivk.body], assembly));
+
         if (ivk.preconditions.length !== 0) {
             const prekey = MIRKeyGenerator.generateBodyKey("pre", ikey);
             invokes.set(prekey, processBodyInfo(prekey, ivk.preconditions.map((pre) => pre[0]), assembly));
+            (invokes.get(ivk.body.bkey) as CallGNode).callees.add(prekey);
         }
         if (ivk.postconditions.length !== 0) {
             const postkey = MIRKeyGenerator.generateBodyKey("post", ikey);
             invokes.set(postkey, processBodyInfo(postkey, ivk.postconditions, assembly));
+            (invokes.get(ivk.body.bkey) as CallGNode).callees.add(postkey);
         }
-
-        invokes.set(ivk.body.bkey, processBodyInfo(ivk.body.bkey, [ivk.body], assembly));
     });
 
     assembly.primitiveInvokeDecls.forEach((ivk, ikey) => {
+        let cn = { invoke: MIRKeyGenerator.generateBodyKey("invoke", ikey), callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
+        ivk.pcodes.forEach((pc) => cn.callees.add(pc.code));
+        invokes.set(cn.invoke, cn);
+
         if (ivk.preconditions.length !== 0) {
             const prekey = MIRKeyGenerator.generateBodyKey("pre", ikey);
             invokes.set(prekey, processBodyInfo(prekey, ivk.preconditions.map((pre) => pre[0]), assembly));
+            cn.callees.add(prekey);
         }
         if (ivk.postconditions.length !== 0) {
             const postkey = MIRKeyGenerator.generateBodyKey("post", ikey);
             invokes.set(postkey, processBodyInfo(postkey, ivk.postconditions, assembly));
+            cn.callees.add(postkey);
         }
-
-        let cn = { invoke: MIRKeyGenerator.generateBodyKey("invoke", ikey), callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
-        ivk.pcodes.forEach((pc) => cn.callees.add(pc.code));
-        invokes.set(cn.invoke, cn);
     });
 
     let roots: CallGNode[] = [];
     let tordered: CallGNode[] = [];
     entryPoints.forEach((ivk) => {
-        roots.push(invokes.get(ivk) as CallGNode);
-        topoVisit(invokes.get(ivk) as CallGNode, tordered, invokes);
+        const ikey = MIRKeyGenerator.generateBodyKey("invoke", ivk);
+
+        roots.push(invokes.get(ikey) as CallGNode);
+        topoVisit(invokes.get(ikey) as CallGNode, tordered, invokes);
     });
     tordered = tordered.reverse();
 

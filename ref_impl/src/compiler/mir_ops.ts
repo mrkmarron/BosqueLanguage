@@ -717,10 +717,12 @@ class MIRConstructorTuple extends MIRValueOp {
 }
 
 class MIRConstructorRecord extends MIRValueOp {
+    readonly resultRecordType: MIRResolvedTypeKey;
     args: [string, MIRArgument][];
 
-    constructor(sinfo: SourceInfo, args: [string, MIRArgument][], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultRecordType: MIRResolvedTypeKey, args: [string, MIRArgument][], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorRecord, sinfo, trgt);
+        this.resultRecordType = resultRecordType;
         this.args = args;
     }
 
@@ -731,11 +733,11 @@ class MIRConstructorRecord extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), args: this.args.map((arg) => [arg[0], arg[1].jemit()]) };
+        return { ...this.jbemit(), resultRecordType: this.resultRecordType, args: this.args.map((arg) => [arg[0], arg[1].jemit()]) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRConstructorRecord(jparsesinfo(jobj.sinfo), jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRConstructorRecord(jparsesinfo(jobj.sinfo), jobj.resultRecordType, jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
