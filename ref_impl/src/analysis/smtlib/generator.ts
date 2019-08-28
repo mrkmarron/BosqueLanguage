@@ -1307,11 +1307,15 @@ class SMTLIBGenerator {
             else if (tag === "const") {
                 const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
                 invokedecls.push(smtgen.generateSMTConst(bbup.invoke, cdcl));
+
+                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(cdcl.declaredType) as MIRType));
             }
             else {
                 assert(tag === "fdefault");
                 const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
                 invokedecls.push(smtgen.generateSMTFDefault(bbup.invoke, fdcl));
+
+                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(fdcl.declaredType) as MIRType));
             }
         }
 

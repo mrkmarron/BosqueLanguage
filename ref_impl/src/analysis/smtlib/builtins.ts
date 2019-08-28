@@ -248,6 +248,34 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
             )
             `;
         }
+    })
+    .set("list_set", (smtgen: SMTLIBGenerator, inv: MIRInvokePrimitiveDecl, decl: string) => {
+        const rcvrtype = smtgen.assembly.typeMap.get(inv.params[0].type) as MIRType;
+        const iv = smtgen.varNameToSMT2Name(inv.params[1].name);
+        const vv = smtgen.varNameToSMT2Name(inv.params[2].name);
+        const resulttype = "Result_" + smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(inv.resultType) as MIRType);
+
+        if (smtgen.isTypeExact(rcvrtype)) {
+            const rtcons = smtgen.typeToSMT2Constructor(rcvrtype);
+
+            return `
+            ${decl}
+            (ite (and (<= 0 ${iv}) (< ${iv} (${rtcons}@size this)))
+                (${resulttype}@result_success (${rtcons} (${rtcons}@size this) (store (${rtcons}@contents this) ${iv} ${vv})))
+                (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
+            )
+            `;
+        }
+        else {
+
+            return `
+            ${decl}
+            (ite (and (<= 0 ${iv}) (< ${iv} (bsq_term_list_size this)))
+                (${resulttype}@result_success (bsq_term_list (bsq_term_list_type this) (bsq_term_list_size this) (store (bsq_term_list_entries this) ${iv} ${vv})))
+                (${resulttype}@result_with_code (result_error ${inv.sourceLocation.pos})))
+            )
+            `;
+        }
     });
 
 const BuiltinTypes = new Map<string, BuiltinTypeEmit>()
