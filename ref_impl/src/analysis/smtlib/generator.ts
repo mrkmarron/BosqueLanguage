@@ -1163,7 +1163,12 @@ class SMTLIBGenerator {
                 return [decli, calli];
             });
 
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${decls.map((cc) => cc[1]).join(" ")}))`;
+            const declsand = decls.map((cc) => {
+                new SMTLet()
+                cc[1]
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
         }
     }
 
@@ -1194,7 +1199,12 @@ class SMTLIBGenerator {
                 return [decli, calli];
             });
 
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${decls.map((cc) => cc[1]).join(" ")}))`;
+            const declsand = decls.map((cc) => {
+                new SMTLet()
+                cc[1]
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
         }
     }
 
