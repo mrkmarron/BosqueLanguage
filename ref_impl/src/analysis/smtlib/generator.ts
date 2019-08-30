@@ -878,7 +878,8 @@ class SMTLIBGenerator {
                 const lhvtype = this.getArgType(beq.lhs, vtypes);
                 const rhvtype = this.getArgType(beq.rhs, vtypes);
                 if (this.isTypeExact(lhvtype) && this.isTypeExact(rhvtype)) {
-                    if ((lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool")
+                    if ((lhvtype.trkey === "NSCore::None" && rhvtype.trkey === "NSCore::None")
+                        || (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool")
                         || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")
                         || (lhvtype.trkey === "NSCore::String" && rhvtype.trkey === "NSCore::String")) {
                             const smv = `(= ${this.argToSMT2Coerce(beq.lhs, lhvtype, lhvtype).emit()} ${this.argToSMT2Coerce(beq.rhs, rhvtype, rhvtype).emit()})`;
@@ -889,7 +890,36 @@ class SMTLIBGenerator {
                     }
                 }
                 else {
-                    return NOT_IMPLEMENTED<SMTExp>("BINEQ -- nonexact");
+                    const larg = this.argToSMT2Coerce(beq.lhs, lhvtype, this.anyType).emit();
+                    const rarg = this.argToSMT2Coerce(beq.rhs, rhvtype, this.anyType).emit();
+
+                    let tops: SMTExp[] = [];
+                    if(this.assembly.subtypeOf(this.noneType, lhvtype) && this.assembly.subtypeOf(this.noneType, lhvtype)) {
+                        tops.push(new SMTCond(new SMTValue(`(and (= ${larg} bsq_term_none) (= ${rarg} bsq_term_none))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                    }
+
+                    if(this.assembly.subtypeOf(this.boolType, lhvtype) && this.assembly.subtypeOf(this.boolType, lhvtype)) {
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_bool ${larg}) (is-bsq_term_bool ${rarg}) (= (bsq_term_bool_value ${larg}) (bsq_term_bool_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                    }
+
+                    if(this.assembly.subtypeOf(this.intType, lhvtype) && this.assembly.subtypeOf(this.intType, lhvtype)) {
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_int ${larg}) (is-bsq_term_int ${rarg}) (= (bsq_term_int_value ${larg}) (bsq_term_int_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                    }
+
+                    if(this.assembly.subtypeOf(this.stringType, lhvtype) && this.assembly.subtypeOf(this.stringType, lhvtype)) {
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_string ${larg}) (is-bsq_term_string ${rarg}) (= (bsq_term_string_value ${larg}) (bsq_term_string_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                    }
+
+                    //
+                    //TODO: handle the other types here
+                    //
+
+                    let rexp: SMTExp = new SMTValue("false");
+                    for (let i = tops.length - 1; i >= 0; --i) {
+                        rexp = tops[i].bind(rexp);
+                    }
+
+                    return rexp;
                 }
             }
             case MIROpTag.MIRBinCmp: {
@@ -1164,11 +1194,11 @@ class SMTLIBGenerator {
             });
 
             const declsand = decls.map((cc) => {
-                new SMTLet()
-                cc[1]
+                const tv = `@tmpvarda@${this.tmpvarctr++}`;
+                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-Result_Bool@result_success ${tv}) (Result_Bool@result_value ${tv}))`)).emit();
             });
 
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(Result_Bool@result_success (and ${declsand.join(" ")})))`;
         }
     }
 
@@ -1200,11 +1230,11 @@ class SMTLIBGenerator {
             });
 
             const declsand = decls.map((cc) => {
-                new SMTLet()
-                cc[1]
+                const tv = `@tmpvarda@${this.tmpvarctr++}`;
+                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-Result_Bool@result_success ${tv}) (Result_Bool@result_value ${tv}))`)).emit();
             });
 
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(Result_Bool@result_success (and ${declsand.join(" ")})))`;
         }
     }
 
