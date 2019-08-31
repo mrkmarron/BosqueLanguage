@@ -38,10 +38,10 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         const cargs = pred.cargs.map((carg) => {
             const ptname = (inv.params.find((p) => p.name === carg) as MIRFunctionParameter).type;
             const ptype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ptname) as MIRType);
-            return `(${carg} ${ptype})`;
+            return [carg, ptype];
         });
-        const rargs = `((size Int) (ina ${carray}) (i Int)${cargs.length !== 0 ? (" " + cargs.join(" ")) : ""})`;
-        const passargs = cargs.length !== 0 ? (" " + cargs.join(" ")) : "";
+        const rargs = `((size Int) (ina ${carray}) (i Int)${cargs.length !== 0 ? (" " + cargs.map((ca) => `(${ca[0]} ${ca[1]})`).join(" ")) : ""})`;
+        const passargs = cargs.length !== 0 ? (" " + cargs.map((ca) => ca[0]).join(" ")) : "";
         const pname = smtgen.invokenameToSMT2(pred.code);
 
         const tbase = `
@@ -93,10 +93,10 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         const cargs = pred.cargs.map((carg) => {
             const ptname = (inv.params.find((p) => p.name === carg) as MIRFunctionParameter).type;
             const ptype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ptname) as MIRType);
-            return `(${carg} ${ptype})`;
+            return [carg, ptype];
         });
-        const rargs = `((size Int) (ina ${carray}) (i Int)${cargs.length !== 0 ? (" " + cargs.join(" ")) : ""})`;
-        const passargs = cargs.length !== 0 ? (" " + cargs.join(" ")) : "";
+        const rargs = `((size Int) (ina ${carray}) (i Int)${cargs.length !== 0 ? (" " + cargs.map((ca) => `(${ca[0]} ${ca[1]})`).join(" ")) : ""})`;
+        const passargs = cargs.length !== 0 ? (" " + cargs.map((ca) => ca[0]).join(" ")) : "";
         const pname = smtgen.invokenameToSMT2(pred.code);
 
         const tbase = `
@@ -152,10 +152,10 @@ const BuiltinCalls = new Map<string, BuiltinCallEmit>()
         const cargs = pred.cargs.map((carg) => {
             const ptname = (inv.params.find((p) => p.name === carg) as MIRFunctionParameter).type;
             const ptype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ptname) as MIRType);
-            return `(${carg} ${ptype})`;
+            return [carg, ptype];
         });
-        const rargs = `((size Int) (ina ${carray}) (i Int) (outa ${carray}) (j Int)${cargs.length !== 0 ? (" " + cargs.join(" ")) : ""})`;
-        const passargs = cargs.length !== 0 ? (" " + cargs.join(" ")) : "";
+        const rargs = `((size Int) (ina ${carray}) (i Int)${cargs.length !== 0 ? (" " + cargs.map((ca) => `(${ca[0]} ${ca[1]})`).join(" ")) : ""})`;
+        const passargs = cargs.length !== 0 ? (" " + cargs.map((ca) => ca[0]).join(" ")) : "";
         const pname = smtgen.invokenameToSMT2(pred.code);
 
         if (smtgen.isTypeExact(rcvrtype)) {

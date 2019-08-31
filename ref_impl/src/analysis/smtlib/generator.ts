@@ -1372,11 +1372,11 @@ class SMTLIBGenerator {
         + "\n\n"
         + smtlib_code
         + "\n\n"
-        + `${consdecls.map((cd) => cd[1]).filter((d) => d !== undefined).join("\n")}`
-        + "\n\n"
         + `(declare-datatypes (${typedecls.join("\n")}) (\n${consdecls.map((cd) => cd[0]).join("\n")}\n))`
         + "\n\n"
         + `(declare-datatypes (${resultdecls.join("\n")}) (\n${resultcons.join("\n")}\n))`
+        + "\n\n"
+        + `${consdecls.map((cd) => cd[1]).filter((d) => d !== undefined).join("\n")}`
         + "\n\n"
         + invokedecls.join("\n\n")
         + "\n\n";

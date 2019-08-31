@@ -1237,7 +1237,7 @@ class Assembly {
 
             //check that if t2p is named then t1p has the same name
             if (t2.params[i].name !== "_") {
-                if (t1.params.length <= i || t2.params[i].name === t1.params[i].name) {
+                if (t2.params[i].name !== t1.params[i].name) {
                     return false;
                 }
             }
