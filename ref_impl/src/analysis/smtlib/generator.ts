@@ -161,6 +161,11 @@ class SMTLIBGenerator {
         .replace(/>/g, "$ra$")
         .replace(/\|/g, "$v$")
         .replace(/--/g, "$dd$")
+        .replace(/, /g, "$csp$")
+        .replace(/[.]/g, "$dot$")
+        .replace(/:/g, "$c$")
+        .replace(/[\\]/g, "$bs$")
+        .replace(/[/]/g, "$fs$")
         .replace(/%/g, "$pct$");
     }
 
@@ -894,19 +899,19 @@ class SMTLIBGenerator {
                     const rarg = this.argToSMT2Coerce(beq.rhs, rhvtype, this.anyType).emit();
 
                     let tops: SMTExp[] = [];
-                    if(this.assembly.subtypeOf(this.noneType, lhvtype) && this.assembly.subtypeOf(this.noneType, lhvtype)) {
+                    if (this.assembly.subtypeOf(this.noneType, lhvtype) && this.assembly.subtypeOf(this.noneType, lhvtype)) {
                         tops.push(new SMTCond(new SMTValue(`(and (= ${larg} bsq_term_none) (= ${rarg} bsq_term_none))`), new SMTValue("true"), this.generateFreeSMTVar()));
                     }
 
-                    if(this.assembly.subtypeOf(this.boolType, lhvtype) && this.assembly.subtypeOf(this.boolType, lhvtype)) {
+                    if (this.assembly.subtypeOf(this.boolType, lhvtype) && this.assembly.subtypeOf(this.boolType, lhvtype)) {
                         tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_bool ${larg}) (is-bsq_term_bool ${rarg}) (= (bsq_term_bool_value ${larg}) (bsq_term_bool_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
                     }
 
-                    if(this.assembly.subtypeOf(this.intType, lhvtype) && this.assembly.subtypeOf(this.intType, lhvtype)) {
+                    if (this.assembly.subtypeOf(this.intType, lhvtype) && this.assembly.subtypeOf(this.intType, lhvtype)) {
                         tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_int ${larg}) (is-bsq_term_int ${rarg}) (= (bsq_term_int_value ${larg}) (bsq_term_int_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
                     }
 
-                    if(this.assembly.subtypeOf(this.stringType, lhvtype) && this.assembly.subtypeOf(this.stringType, lhvtype)) {
+                    if (this.assembly.subtypeOf(this.stringType, lhvtype) && this.assembly.subtypeOf(this.stringType, lhvtype)) {
                         tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_string ${larg}) (is-bsq_term_string ${rarg}) (= (bsq_term_string_value ${larg}) (bsq_term_string_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
                     }
 
@@ -919,7 +924,7 @@ class SMTLIBGenerator {
                         rexp = tops[i].bind(rexp);
                     }
 
-                    return rexp;
+                    return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${rexp.emit()})` : rexp.emit()), this.generateFreeSMTVar());
                 }
             }
             case MIROpTag.MIRBinCmp: {
@@ -1185,7 +1190,7 @@ class SMTLIBGenerator {
         }
         else {
             const decls = idecl.preconditions.map((pc, i) => {
-                const blocksi = idecl.preconditions[i][0].body;
+                const blocksi = pc[0].body;
                 const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
                 const decli = `(define-fun ${this.invokenameToSMT2(prekey)}${i} (${args.join(" ")}) Result_Bool \n${bodyi.emit("  ")})`;
                 const calli = (`(${this.invokenameToSMT2(prekey)}${i} ${idecl.params.map((arg) => this.varNameToSMT2Name(arg.name)).join(" ")})`);
@@ -1221,7 +1226,7 @@ class SMTLIBGenerator {
         }
         else {
             const decls = idecl.postconditions.map((pc, i) => {
-                const blocksi = idecl.postconditions[i].body;
+                const blocksi = pc.body;
                 const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
                 const decli = `(define-fun ${this.invokenameToSMT2(postkey)}${i} (${args.join(" ")}) Result_Bool \n${bodyi.emit("  ")})`;
                 const calli = (`(${this.invokenameToSMT2(postkey)}${i} ${[idecl.params.map((arg) => this.varNameToSMT2Name(arg.name)), "__result__"].join(" ")})`);

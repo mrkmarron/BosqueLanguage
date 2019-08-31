@@ -134,7 +134,7 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
 
     assembly.primitiveInvokeDecls.forEach((ivk, ikey) => {
         let cn = { invoke: MIRKeyGenerator.generateBodyKey("invoke", ikey), callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
-        ivk.pcodes.forEach((pc) => cn.callees.add(pc.code));
+        ivk.pcodes.forEach((pc) => cn.callees.add(MIRKeyGenerator.generateBodyKey("invoke", pc.code)));
         invokes.set(cn.invoke, cn);
 
         if (ivk.preconditions.length !== 0) {
