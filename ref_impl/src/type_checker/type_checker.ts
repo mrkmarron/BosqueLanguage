@@ -1609,18 +1609,19 @@ class TypeChecker {
 
         if (this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
             const resultOptions = texp.options.map((opt) => this.updateNamedPropertiesAtom(op.sinfo, opt, updates.map<[string, ResolvedType]>((update) => [update[0], update[1]])));
+            const rrecord = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitModifyWithProperties(op.sinfo, arg, updates.map<[string, MIRArgument]>((update) => [update[0], update[2]]), trgt);
+                this.m_emitter.bodyEmitter.emitModifyWithProperties(op.sinfo, this.m_emitter.registerResolvedTypeReference(rrecord).trkey, arg, updates.map<[string, MIRArgument]>((update) => [update[0], update[2]]), trgt);
             }
 
-            return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+            return [env.setExpressionResult(this.m_assembly, rrecord)];
         }
         else {
             this.updateNamedFieldsAtom(op.sinfo, texp, updates.map<[string, ResolvedType]>((update) => [update[0], update[1]]));
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitModifyWithFields(op.sinfo, arg, updates.map<[string, MIRArgument]>((update) => [update[0], update[2]]), trgt);
+                this.m_emitter.bodyEmitter.emitModifyWithFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, updates.map<[string, MIRArgument]>((update) => [update[0], update[2]]), trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, texp)];

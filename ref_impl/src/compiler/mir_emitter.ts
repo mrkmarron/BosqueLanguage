@@ -228,12 +228,12 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRModifyWithIndecies(sinfo, resultTupleType, arg, updates, trgt));
     }
 
-    emitModifyWithProperties(sinfo: SourceInfo, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRModifyWithProperties(sinfo, arg, updates, trgt));
+    emitModifyWithProperties(sinfo: SourceInfo, resultRecordType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRModifyWithProperties(sinfo, resultRecordType, arg, updates, trgt));
     }
 
-    emitModifyWithFields(sinfo: SourceInfo, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRModifyWithFields(sinfo, arg, updates, trgt));
+    emitModifyWithFields(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRModifyWithFields(sinfo, resultNominalType, arg, updates, trgt));
     }
 
     emitStructuredExtendTuple(sinfo: SourceInfo, arg: MIRArgument, update: MIRArgument, trgt: MIRTempRegister) {

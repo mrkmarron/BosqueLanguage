@@ -1000,11 +1000,13 @@ class MIRModifyWithIndecies extends MIRValueOp {
 }
 
 class MIRModifyWithProperties extends MIRValueOp {
+    readonly resultRecordType: MIRResolvedTypeKey;
     arg: MIRArgument;
     updates: [string, MIRArgument][];
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultRecordType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
         super(MIROpTag.MIRModifyWithProperties, sinfo, trgt);
+        this.resultRecordType = resultRecordType;
         this.arg = arg;
         this.updates = updates;
     }
@@ -1016,20 +1018,22 @@ class MIRModifyWithProperties extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), udpates: this.updates.map((update) => [update[0], update[1].jemit()]) };
+        return { ...this.jbemit(), resultRecordType: this.resultRecordType, arg: this.arg.jemit(), udpates: this.updates.map((update) => [update[0], update[1].jemit()]) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRModifyWithProperties(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRModifyWithProperties(jparsesinfo(jobj.sinfo), jobj.resultRecordType, MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
 class MIRModifyWithFields extends MIRValueOp {
+    readonly resultNominalType: MIRResolvedTypeKey;
     arg: MIRArgument;
     updates: [string, MIRArgument][];
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
         super(MIROpTag.MIRModifyWithFields, sinfo, trgt);
+        this.resultNominalType = resultNominalType;
         this.arg = arg;
         this.updates = updates;
     }
@@ -1041,11 +1045,11 @@ class MIRModifyWithFields extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), updates: this.updates.map((update) => [update[0], update[1].jemit()]) };
+        return { ...this.jbemit(), resultNominalType: this.resultNominalType, arg: this.arg.jemit(), updates: this.updates.map((update) => [update[0], update[1].jemit()]) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRModifyWithFields(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRModifyWithFields(jparsesinfo(jobj.sinfo), jobj.resultNominalType, MIRArgument.jparse(jobj.arg), jobj.updates.map((update: any) => [update[0], MIRArgument.jparse(update[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
