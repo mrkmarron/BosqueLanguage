@@ -10,6 +10,7 @@ import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, M
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { BuiltinTypes, BuiltinTypeEmit, BuiltinCalls, BuiltinCallEmit } from "./builtins";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
+import { SourceInfo } from "../../ast/parser";
 
 function NOT_IMPLEMENTED<T>(action: string): T {
     throw new Error(`Not Implemented: ${action}`);
@@ -135,9 +136,12 @@ class SMTLIBGenerator {
     readonly stringType: MIRType;
     readonly anyType: MIRType;
 
+    private cinvokeFile: string | undefined;
     private cinvokeResult: MIRType | undefined = undefined;
 
     private tmpvarctr = 0;
+
+    readonly errormap: Map<number, [string, SourceInfo]> = new Map<number, [string, SourceInfo]>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -167,6 +171,11 @@ class SMTLIBGenerator {
         .replace(/[\\]/g, "$bs$")
         .replace(/[/]/g, "$fs$")
         .replace(/%/g, "$pct$");
+    }
+
+    registerError(sinfo: SourceInfo): number {
+        this.errormap.set(this.errormap.size, [this.cinvokeFile as string, sinfo]);
+        return this.errormap.size - 1;
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -484,7 +493,7 @@ class SMTLIBGenerator {
         else {
             const testexp = new SMTValue(`(${smtctype}@invariant ${this.varToSMT2Name(cp.trgt)})`);
             const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
-            const errexp = new SMTValue(`(${resulttype}@result_with_code (result_error ${cp.sinfo.pos}))`);
+            const errexp = new SMTValue(`(${resulttype}@result_with_code (result_error ${this.registerError(cp.sinfo)}))`);
             return bindexp.bind(new SMTCond(testexp, this.generateFreeSMTVar(), errexp));
         }
     }
@@ -1104,7 +1113,7 @@ class SMTLIBGenerator {
             case MIROpTag.MIRAbort: {
                 const aop = op as MIRAbort;
                 const resulttype = "Result_" + this.typeToSMT2Type(this.cinvokeResult as MIRType);
-                return new SMTValue(`(${resulttype}@result_with_code (result_error ${aop.sinfo.pos}))`);
+                return new SMTValue(`(${resulttype}@result_with_code (result_error ${this.registerError(aop.sinfo)}))`);
             }
             case MIROpTag.MIRDebug: {
                 return undefined;
@@ -1192,6 +1201,7 @@ class SMTLIBGenerator {
     }
 
     generateSMTInvoke(idecl: MIRInvokeDecl): string {
+        this.cinvokeFile = idecl.srcFile;
         this.cinvokeResult = this.assembly.typeMap.get(idecl.resultType) as MIRType;
 
         let argvars = new Map<string, MIRType>();
@@ -1222,7 +1232,7 @@ class SMTLIBGenerator {
                     cbody = new SMTLet(tbody, new SMTValue(cbody.emit("  ")), new SMTCond(
                         (new SMTLet(tpostcheck, callpost, new SMTValue(`(and (is-Result_Bool@result_success ${tpostcheck}) (Result_Bool@result_value ${tpostcheck}))`))),
                         new SMTValue(tbody),
-                        new SMTValue(`(Result_${restype}@result_with_code (result_error ${idecl.sourceLocation.line}))`)
+                        new SMTValue(`(Result_${restype}@result_with_code (result_error ${this.registerError(idecl.sourceLocation)}))`)
                     ));
                 }
 
@@ -1233,7 +1243,7 @@ class SMTLIBGenerator {
                     cbody = new SMTCond(
                         new SMTLet(tprecheck, callpre, new SMTValue(`(and (is-Result_Bool@result_success ${tprecheck}) (Result_Bool@result_value ${tprecheck}))`)),
                         cbody,
-                        new SMTValue(`(Result_${restype}@result_with_code (result_error ${idecl.sourceLocation.line}))`)
+                        new SMTValue(`(Result_${restype}@result_with_code (result_error ${this.registerError(idecl.sourceLocation)}))`)
                     );
                 }
 
@@ -1248,6 +1258,7 @@ class SMTLIBGenerator {
     }
 
     generateSMTPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.cinvokeFile = idecl.srcFile;
         this.cinvokeResult = this.boolType;
 
         let argvars = new Map<string, MIRType>();
@@ -1281,6 +1292,7 @@ class SMTLIBGenerator {
     }
 
     generateSMTPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.cinvokeFile = idecl.srcFile;
         this.cinvokeResult = this.boolType;
         const restype = this.assembly.typeMap.get(idecl.resultType) as MIRType;
 
@@ -1317,10 +1329,40 @@ class SMTLIBGenerator {
     }
 
     generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
-        return NOT_IMPLEMENTED<string>("generateSMTInv");
+        this.cinvokeFile = idecl.srcFile;
+        this.cinvokeResult = this.boolType;
+
+        let argvars = new Map<string, MIRType>().set("this", this.assembly.typeMap.get(idecl.tkey) as MIRType);
+
+        const args = `(this ${this.typeToSMT2Type(this.assembly.typeMap.get(idecl.tkey) as MIRType)})`;
+        const decl = `(define-fun ${this.invokenameToSMT2(invkey)} (${args}) Result_Bool`;
+
+        if (idecl.invariants.length === 1) {
+            const blocks = idecl.invariants[0].body;
+            const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, argvars);
+            return `${decl} \n${body.emit("  ")})`;
+        }
+        else {
+            const decls = idecl.invariants.map((pc, i) => {
+                const blocksi = pc.body;
+                const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
+                const decli = `(define-fun ${this.invokenameToSMT2(invkey)}${i} (${args}) Result_Bool \n${bodyi.emit("  ")})`;
+                const calli = (`(${this.invokenameToSMT2(invkey)}${i} this)`);
+
+                return [decli, calli];
+            });
+
+            const declsand = decls.map((cc) => {
+                const tv = `@tmpvarda@${this.tmpvarctr++}`;
+                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-Result_Bool@result_success ${tv}) (Result_Bool@result_value ${tv}))`)).emit();
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(Result_Bool@result_success (and ${declsand.join(" ")})))`;
+        }
     }
 
     generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string {
+        this.cinvokeFile = cdecl.srcFile;
         this.cinvokeResult = this.assembly.typeMap.get(cdecl.declaredType) as MIRType;
 
         const restype = this.typeToSMT2Type(this.assembly.typeMap.get(cdecl.declaredType) as MIRType);
@@ -1331,6 +1373,7 @@ class SMTLIBGenerator {
     }
 
     generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string {
+        this.cinvokeFile = fdecl.srcFile;
         this.cinvokeResult = this.assembly.typeMap.get(fdecl.declaredType) as MIRType;
 
         const restype = this.typeToSMT2Type(this.assembly.typeMap.get(fdecl.declaredType) as MIRType);
@@ -1340,54 +1383,52 @@ class SMTLIBGenerator {
         return `${decl} \n${body.emit("  ")})`;
     }
 
-    static generateSMTAssembly(assembly: MIRAssembly): string {
-        const smtgen = new SMTLIBGenerator(assembly);
-
+    generateSMTAssembly(): string {
         const typedecls: string[] = [];
         const consdecls: [string, string?][] = [];
-        assembly.typeMap.forEach((type) => {
-            if (smtgen.isTypeExact(type)) {
+        this.assembly.typeMap.forEach((type) => {
+            if (this.isTypeExact(type)) {
                 const topt = type.options[0];
                 if (topt instanceof MIREntityType) {
-                    const edecl = assembly.entityDecls.get(topt.ekey) as MIREntityTypeDecl;
+                    const edecl = this.assembly.entityDecls.get(topt.ekey) as MIREntityTypeDecl;
                     if (edecl.ns === "NSCore" && (edecl.name === "None" || edecl.name === "Bool" || edecl.name === "Int" || edecl.name === "String")) {
                         //don't need to do anything as these are special cases
                     }
                     else if (edecl.isCollectionEntityType || edecl.isMapEntityType) {
-                        typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
-                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(smtgen.typeToSMT2Constructor(topt), smtgen.typeToSMT2Type(edecl.terms.get("T") as MIRType)));
+                        typedecls.push(`(${this.typeToSMT2Type(topt)} 0)`);
+                        consdecls.push((BuiltinTypes.get(edecl.name) as BuiltinTypeEmit)(this.typeToSMT2Constructor(topt), this.typeToSMT2Type(edecl.terms.get("T") as MIRType)));
                     }
                     else {
-                        typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
+                        typedecls.push(`(${this.typeToSMT2Type(topt)} 0)`);
 
-                        const tpfx = smtgen.typeToSMT2Constructor(topt);
+                        const tpfx = this.typeToSMT2Constructor(topt);
                         const entries: string[] = [];
                         for (let i = 0; i < edecl.fields.length; ++i) {
-                            const ftype = smtgen.assembly.typeMap.get(edecl.fields[i].declaredType) as MIRType;
-                            entries.push(`(${tpfx}@${edecl.fields[i].name} ${smtgen.typeToSMT2Type(ftype)})`);
+                            const ftype = this.assembly.typeMap.get(edecl.fields[i].declaredType) as MIRType;
+                            entries.push(`(${tpfx}@${edecl.fields[i].name} ${this.typeToSMT2Type(ftype)})`);
                         }
 
                         consdecls.push([`((${tpfx} ${entries.join(" ")}))`]);
                     }
                 }
                 else if (topt instanceof MIRTupleType ) {
-                    typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
+                    typedecls.push(`(${this.typeToSMT2Type(topt)} 0)`);
 
-                    const tpfx = smtgen.typeToSMT2Constructor(topt);
+                    const tpfx = this.typeToSMT2Constructor(topt);
                     const entries: string[] = [];
                     for (let i = 0; i < topt.entries.length; ++i) {
-                        entries.push(`(${tpfx}@${i} ${smtgen.typeToSMT2Type(topt.entries[i].type)})`);
+                        entries.push(`(${tpfx}@${i} ${this.typeToSMT2Type(topt.entries[i].type)})`);
                     }
 
                     consdecls.push([`((${tpfx} ${entries.join(" ")}))`]);
                 }
                 else if (topt instanceof MIRRecordType) {
-                    typedecls.push(`(${smtgen.typeToSMT2Type(topt)} 0)`);
+                    typedecls.push(`(${this.typeToSMT2Type(topt)} 0)`);
 
-                    const tpfx = smtgen.typeToSMT2Constructor(topt);
+                    const tpfx = this.typeToSMT2Constructor(topt);
                     const entries: string[] = [];
                     for (let i = 0; i < topt.entries.length; ++i) {
-                        entries.push(`(${tpfx}@${topt.entries[i].name} ${smtgen.typeToSMT2Type(topt.entries[i].type)})`);
+                        entries.push(`(${tpfx}@${topt.entries[i].name} ${this.typeToSMT2Type(topt.entries[i].type)})`);
                     }
 
                     consdecls.push([`((${tpfx} ${entries.join(" ")}))`]);
@@ -1398,7 +1439,7 @@ class SMTLIBGenerator {
             }
         });
 
-        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
+        const cginfo = constructCallGraphInfo(this.assembly.entryPoints, this.assembly);
         assert(cginfo.recursive.length === 0, "TODO: we need to support recursion here");
 
         const invokedecls: string[] = [];
@@ -1409,37 +1450,37 @@ class SMTLIBGenerator {
             const tag = extractMirBodyKeyPrefix(bbup.invoke);
             if (tag === "invoke") {
                 const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                invokedecls.push(smtgen.generateSMTInvoke(idcl));
+                const idcl = (this.assembly.invokeDecls.get(ikey) || this.assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(this.generateSMTInvoke(idcl));
 
-                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(idcl.resultType) as MIRType));
+                resultset.add(this.typeToSMT2Type(this.assembly.typeMap.get(idcl.resultType) as MIRType));
             }
             else if (tag === "pre") {
                 const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                invokedecls.push(smtgen.generateSMTPre(bbup.invoke, idcl));
+                const idcl = (this.assembly.invokeDecls.get(ikey) || this.assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(this.generateSMTPre(bbup.invoke, idcl));
             }
             else if (tag === "post") {
                 const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                invokedecls.push(smtgen.generateSMTPost(bbup.invoke, idcl));
+                const idcl = (this.assembly.invokeDecls.get(ikey) || this.assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                invokedecls.push(this.generateSMTPost(bbup.invoke, idcl));
             }
             else if (tag === "invariant") {
-                const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                invokedecls.push(smtgen.generateSMTInv(bbup.invoke, edcl));
+                const edcl = this.assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                invokedecls.push(this.generateSMTInv(bbup.invoke, edcl));
             }
             else if (tag === "const") {
-                const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
-                invokedecls.push(smtgen.generateSMTConst(bbup.invoke, cdcl));
+                const cdcl = this.assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                invokedecls.push(this.generateSMTConst(bbup.invoke, cdcl));
 
-                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(cdcl.declaredType) as MIRType));
+                resultset.add(this.typeToSMT2Type(this.assembly.typeMap.get(cdcl.declaredType) as MIRType));
             }
             else {
                 assert(tag === "fdefault");
-                const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
-                invokedecls.push(smtgen.generateSMTFDefault(bbup.invoke, fdcl));
+                const fdcl = this.assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                invokedecls.push(this.generateSMTFDefault(bbup.invoke, fdcl));
 
-                resultset.add(smtgen.typeToSMT2Type(assembly.typeMap.get(fdcl.declaredType) as MIRType));
+                resultset.add(this.typeToSMT2Type(this.assembly.typeMap.get(fdcl.declaredType) as MIRType));
             }
         }
 

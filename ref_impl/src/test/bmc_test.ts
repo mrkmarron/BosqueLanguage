@@ -308,7 +308,7 @@ function runz3(smtlib: string): string {
 }
 
 function bmc_action(assembly: MIRAssembly, args: any[]): any {
-    const smt2 = SMTLIBGenerator.generateSMTAssembly(assembly) + "\n\n" + args.join("\n");
+    const smt2 = new SMTLIBGenerator(assembly).generateSMTAssembly() + "\n\n" + args.join("\n");
     return runz3(smt2);
 }
 
