@@ -25,7 +25,7 @@ else {
     z3path = Path.resolve("./utils/macos/z3/z3.exe");
 }
 
-function smtlib2Generate(files: string[]): { smtcode: string, smtgen: SMTLIBGenerator } {
+function generateMASM(files: string[]): MIRAssembly {
     process.stdout.write("Reading code...\n");
 
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
@@ -60,17 +60,19 @@ function smtlib2Generate(files: string[]): { smtcode: string, smtgen: SMTLIBGene
         process.exit(1);
     }
 
-    process.stdout.write(`Generating SMTLIB...\n`);
+    return masm as MIRAssembly;
+}
 
-    const smtgen = new SMTLIBGenerator(masm as MIRAssembly);
+function smtlib2Generate(masm: MIRAssembly): { smtcode: string, smtgen: SMTLIBGenerator } {
+    const smtgen = new SMTLIBGenerator(masm);
     const smtcode = smtgen.generateSMTAssembly();
 
     return { smtcode: smtcode, smtgen: smtgen };
 }
 
-function smtlib2Compile(files: string[], trgt: string) {
+function smtlib2Compile(masm: MIRAssembly, trgt: string) {
     try {
-        const smtlib = smtlib2Generate(files);
+        const smtlib = smtlib2Generate(masm);
 
         process.stdout.write("Writing SMTLIB...\n");
         FS.writeFileSync(trgt, smtlib.smtcode);
@@ -84,10 +86,93 @@ function smtlib2Compile(files: string[], trgt: string) {
     process.exit(0);
 }
 
-function checkSingleEntryPointSMT(files: string[], entrypoint: string, icheck: boolean, rparallel: boolean): string {
-    const { smtgen, smtcode } = smtlib2Generate(files);
+function checkSpecificError(smtgen: SMTLIBGenerator, smtcode: string, entrypoint: string, error: number, getmodel: boolean): string {
+    const ep = [...smtgen.assembly.invokeDecls.values()].find((idcl) => idcl.key === entrypoint);
+    if (ep === undefined) {
+        process.stdout.write(`Entrypoint function ${entrypoint} is not defined -- exiting\n`);
+        process.exit(1);
+    }
+    const ivk = ep as MIRInvokeBodyDecl;
+    const restype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
 
-    const ep = [...smtgen.assembly.invokeDecls.values()].find((idcl) => idcl.key === entrypoint)
+    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
+    const resdecl = `(declare-const res Result_${restype})`;
+    const call = ivk.params.length !== 0 ? `(${smtgen.invokenameToSMT2(ivk.key)} ${ivk.params.map((fp) => fp.name).join(" ")})` : smtgen.invokenameToSMT2(ivk.key);
+    const cassert = `(assert (= res ${call}))`;
+
+    const excludeerrors = [...smtgen.errormap].filter((err) => err[1][0] === ivk.srcFile && err[1][1].line === ivk.sourceLocation.line).map((err) => err[0]);
+    if (excludeerrors.includes(error)) {
+        return "assume";
+    }
+
+    const errorasrt = `(assert (and
+            (is-Result_${restype}@result_with_code res)
+            (is-result_error (Result_${restype}@result_code_value res))
+            (= ${error} (error_id (Result_${restype}@result_code_value res)))
+           ))`;
+
+    const smtcall = smtcode
+        + "\n\n"
+        + argsdecls.join("\n")
+        + "\n\n"
+        + resdecl
+        + "\n\n"
+        + cassert + "\n" + errorasrt
+        + "\n\n"
+        + "(check-sat)\n"
+        + (getmodel ? "(get-model)\n" : "");
+
+    const res = execSync(`${z3path} -smt2 -in `, { input: smtcall });
+    return res.toString().trim();
+}
+
+function tryGetErrorModel(masm: MIRAssembly, entrypoint: string): string {
+    const { smtgen, smtcode } = smtlib2Generate(masm);
+
+    const ep = [...smtgen.assembly.invokeDecls.values()].find((idcl) => idcl.key === entrypoint);
+    if (ep === undefined) {
+        process.stdout.write(`Entrypoint function ${entrypoint} is not defined -- exiting\n`);
+        process.exit(1);
+    }
+    const ivk = ep as MIRInvokeBodyDecl;
+    const restype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
+
+    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
+    const resdecl = `(declare-const res Result_${restype})`;
+    const call = ivk.params.length !== 0 ? `(${smtgen.invokenameToSMT2(ivk.key)} ${ivk.params.map((fp) => fp.name).join(" ")})` : smtgen.invokenameToSMT2(ivk.key);
+    const cassert = `(assert (= res ${call}))`;
+
+    const excludeerrors = [...smtgen.errormap].filter((err) => err[1][0] === ivk.srcFile && err[1][1].line === ivk.sourceLocation.line).map((err) => err[0]);
+    const errorasrt = excludeerrors.length === 1
+        ? `(assert (and
+            (is-Result_${restype}@result_with_code res)
+            (is-result_error (Result_${restype}@result_code_value res))
+            (not (= ${excludeerrors[0]} (error_id (Result_${restype}@result_code_value res))))
+           ))`
+        : `(assert (and
+            (is-Result_${restype}@result_with_code res)
+            (is-result_error (Result_${restype}@result_code_value res))
+           ))`;
+
+    const smtcall = smtcode
+        + "\n\n"
+        + argsdecls.join("\n")
+        + "\n\n"
+        + resdecl
+        + "\n\n"
+        + cassert + "\n" + errorasrt
+        + "\n\n"
+        + "(check-sat)\n"
+        + "(get-model)\n";
+
+    const res = execSync(`${z3path} -smt2 -in `, { input: smtcall });
+    return res.toString().trim();
+}
+
+function checkSingleEntryPointSMT(masm: MIRAssembly, entrypoint: string): string {
+    const { smtgen, smtcode } = smtlib2Generate(masm);
+
+    const ep = [...smtgen.assembly.invokeDecls.values()].find((idcl) => idcl.key === entrypoint);
     if (ep === undefined) {
         process.stdout.write(`Entrypoint function ${entrypoint} is not defined -- exiting\n`);
         process.exit(1);
@@ -122,30 +207,27 @@ function checkSingleEntryPointSMT(files: string[], entrypoint: string, icheck: b
         + "\n\n"
         + "(check-sat)\n";
 
-    if (!icheck) {
-        const res = execSync(`${z3path} -smt2 -in `, { input: smtcall });
-        return res.toString().trim();
-    }
-    else {
-        return "NOT IMPLEMENTED YET!!!";
-    }
+    const res = execSync(`${z3path} -smt2 -in `, { input: smtcall });
+    return res.toString().trim();
 }
 
-function bmcRunAny(files: string[], entrypoint: string | undefined) {
+function bmcRunAny(masm: MIRAssembly, entrypoint: string | undefined) {
     try {
-        if (entrypoint) {
-            const result = checkSingleEntryPointSMT(files, entrypoint, false, false);
+        const eps = entrypoint ? [entrypoint] : masm.entryPoints;
+        for (let i = 0; i < eps.length; ++i) {
+            const result = checkSingleEntryPointSMT(masm, eps[i]);
+            process.stdout.write(`Checking entrypoint ${eps[i]}...`);
             if (result === "unsat") {
                 process.stdout.write(chalk.green("No errors found\n"));
             }
             else {
-                process.stdout.write(chalk.red("Errors detected!!!\n"));
+                process.stdout.write(chalk.red("Errors detected!!!\n\n"));
+
+                const single = tryGetErrorModel(masm, eps[i]);
+                process.stdout.write("Generated error model:\n");
+                process.stdout.write(chalk.blue(single) + "\n");
                 process.stdout.write("Run with -individual for more information\n");
             }
-        }
-        else {
-            process.stdout.write("NOT IMPLEMENTED YET\n");
-            process.exit(1);
         }
     }
     catch (ex) {
@@ -154,16 +236,50 @@ function bmcRunAny(files: string[], entrypoint: string | undefined) {
     }
 }
 
-function bmcRunEach(files: string[], entrypoint: string | undefined) {
-    process.stdout.write("NOT IMPLEMENTED YET\n");
-    process.exit(1);
+function bmcRunEach(masm: MIRAssembly, entrypoint: string | undefined) {
+    try {
+        const { smtgen, smtcode } = smtlib2Generate(masm);
+        const eps = entrypoint ? [entrypoint] : masm.entryPoints;
+        const errors = [...smtgen.errormap];
+
+        for (let i = 0; i < eps.length; ++i) {
+            process.stdout.write(`Checking entrypoint ${eps[i]}...\n`);
+
+            let errorfound = false;
+            for (let j = 0; j < errors.length; ++j) {
+                process.stdout.write(`Checking error at ${errors[j][1][0]}:${errors[j][1][1].line}...`);
+                const result = checkSpecificError(smtgen, smtcode, eps[i], errors[j][0], false);
+                if (result === "unsat") {
+                    process.stdout.write("\n");
+                }
+                else if (result === "assume") {
+                    process.stdout.write("entrypoint precondition -- assumed true\n");
+                }
+                else {
+                    errorfound = true;
+                    process.stdout.write("\n" + chalk.red("Errors detected!!!\n\n"));
+
+                    const single = checkSpecificError(smtgen, smtcode, eps[i], errors[j][0], true);
+                    process.stdout.write("Generated error model:\n");
+                    process.stdout.write(chalk.blue(single) + "\n");
+                }
+            }
+
+            if (!errorfound) {
+                process.stdout.write(chalk.green("No errors found\n"));
+            }
+        }
+    }
+    catch (ex) {
+        process.stdout.write(`Failed with exception -- ${ex}\n`);
+        process.exit(1);
+    }
 }
 
 Commander
-.option("-c --check [entrypoint]", "Check for errors reachable from specified entrypoint")
-.option("-e --error <line>", "Only check for error associated with the given line" )
-.option("-i --individual", "Check for errors individually")
-.option("-g --generate [file]", "Generate the smt2lib output for the assembly");
+    .option("-c --check [entrypoint]", "Check for errors reachable from specified entrypoint")
+    .option("-i --individual", "Check for errors individually")
+    .option("-g --generate [file]", "Generate the smt2lib output for the assembly");
 
 Commander.parse(process.argv);
 
@@ -172,14 +288,16 @@ if (Commander.args.length === 0) {
     process.exit(1);
 }
 
+const massembly = generateMASM(Commander.args);
+
 if (Commander.generate !== undefined) {
-    setImmediate(() => smtlib2Compile(Commander.args, Commander.output || "a.smt2"));
+    setImmediate(() => smtlib2Compile(massembly, Commander.output || "a.smt2"));
 }
 else {
     if (Commander.individual) {
-        setImmediate(() => bmcRunEach(Commander.args, Commander.check));
+        setImmediate(() => bmcRunEach(massembly, Commander.check));
     }
     else {
-        setImmediate(() => bmcRunAny(Commander.args, Commander.check));
+        setImmediate(() => bmcRunAny(massembly, Commander.check));
     }
 }
