@@ -8,6 +8,14 @@ import * as assert from "assert";
 import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
 import { smtsanizite, BuiltinTypes, BuiltinTypeEmit } from "./builtins";
 
+const typeofsig_exact = "(define-func typeof_exact () Bool ";
+
+const typeofhelpers_exact_fixed = "";
+
+const typeofsig_general = "(define-func typeof_general () Bool ";
+
+const typeofhelpers_general_fixed = "";
+
 class SMTTypeGenerator {
     readonly assembly: MIRAssembly;
 
@@ -157,6 +165,29 @@ class SMTTypeGenerator {
             else {
                 //don't need to do anything
             }
+        }
+    }
+
+    generateTypeOfDecls(): string {
+        xxxx; 
+    }
+
+    generateTypeOfCall(arg: string, argtype: MIRType, oftype: MIRType): string {
+        if (this.assembly.subtypeOf(argtype, oftype)) {
+            return "true";
+        }
+
+        if(this.isTypeExact(argtype)) {
+            xxxx;
+            if(!this.assembly.subtypeOf(argtype, oftype)) {
+                return "false"; //if type is exact then this is safe but not in non-exact case
+            }
+
+            const atype = SMTTypeGenerator.getExactTypeFrom(argtype);
+            
+        } 
+        else {
+
         }
     }
 }
