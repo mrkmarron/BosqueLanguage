@@ -12,6 +12,7 @@ import { BuiltinCalls, BuiltinCallEmit, smtsanizite } from "./builtins";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 import { SourceInfo } from "../../ast/parser";
 import { SMTTypeGenerator } from "./typegen";
+import { SMTExp, SMTValue, SMTLet, SMTCond, SMTFreeVar } from "./smtexp";
 
 function NOT_IMPLEMENTED<T>(action: string): T {
     throw new Error(`Not Implemented: ${action}`);
@@ -37,97 +38,6 @@ const smtlib_code = `
     )
 ))
 `;
-
-abstract class SMTExp {
-    abstract bind(sval: SMTExp, svar?: string): SMTExp;
-    abstract emit(indent?: string): string;
-}
-
-class SMTFreeVar extends SMTExp {
-    readonly vname: string;
-
-    constructor(vname: string) {
-        super();
-        this.vname = vname;
-    }
-
-    bind(sval: SMTExp, svar?: string): SMTExp {
-        return svar === undefined || this.vname === svar ? sval : this;
-    }
-
-    emit(indent?: string): string {
-        return this.vname;
-    }
-}
-
-class SMTValue extends SMTExp {
-    readonly value: string;
-
-    constructor(value: string) {
-        super();
-        this.value = value;
-    }
-
-    bind(sval: SMTExp, svar?: string): SMTExp {
-        return this;
-    }
-
-    emit(indent?: string): string {
-        return this.value;
-    }
-}
-
-class SMTLet extends SMTExp {
-    readonly lname: string;
-    readonly exp: SMTExp;
-    readonly body: SMTExp;
-
-    constructor(lname: string, exp: SMTExp, body: SMTExp) {
-        super();
-        this.lname = lname;
-        this.exp = exp;
-        this.body = body;
-    }
-
-    bind(sval: SMTExp, svar?: string): SMTExp {
-        return new SMTLet(this.lname, this.exp.bind(sval, svar), this.body.bind(sval, svar));
-    }
-
-    emit(indent?: string): string {
-        if (indent === undefined) {
-            return `(let ((${this.lname} ${this.exp.emit()})) ${this.body.emit()})`;
-        }
-        else {
-            return `(let ((${this.lname} ${this.exp.emit()}))\n${indent + "  "}${this.body.emit(indent + "  ")}\n${indent})`;
-        }
-    }
-}
-
-class SMTCond extends SMTExp {
-    readonly test: SMTExp;
-    readonly iftrue: SMTExp;
-    readonly iffalse: SMTExp;
-
-    constructor(test: SMTExp, iftrue: SMTExp, iffalse: SMTExp) {
-        super();
-        this.test = test;
-        this.iftrue = iftrue;
-        this.iffalse = iffalse;
-    }
-
-    bind(sval: SMTExp, svar?: string): SMTExp {
-        return new SMTCond(this.test.bind(sval, svar), this.iftrue.bind(sval, svar), this.iffalse.bind(sval, svar));
-    }
-
-    emit(indent: string | undefined): string {
-        if (indent === undefined) {
-            return `(ite ${this.test.emit()} ${this.iftrue.emit()} ${this.iffalse.emit()})`;
-        }
-        else {
-            return `(ite ${this.test.emit()}\n${indent + "  "}${this.iftrue.emit(indent + "  ")}\n${indent + "  "}${this.iffalse.emit(indent + "  ")}\n${indent})`;
-        }
-    }
-}
 
 class SMTLIBGenerator {
     readonly assembly: MIRAssembly;
@@ -174,10 +84,6 @@ class SMTLIBGenerator {
 
     invokenameToSMT2(ivk: MIRInvokeKey): string {
         return smtsanizite(ivk);
-    }
-
-    generateFreeSMTVar(name?: string): SMTFreeVar {
-        return new SMTFreeVar(`${name || "#body#"}`);
     }
 
     varNameToSMT2Name(varg: string): string {
@@ -350,7 +256,7 @@ class SMTLIBGenerator {
         const constexp = new SMTValue(this.invokenameToSMT2(cdecl.value.bkey));
         const checkerror = new SMTValue(`(is-${crtype}@result_with_code ${tv})`);
         const extracterror = new SMTValue(`(${resulttype}@result_with_code (${crtype}@result_code_value ${tv}))`);
-        const normalassign = new SMTLet(this.varToSMT2Name(cp.trgt), new SMTValue(`(${crtype}@result_value ${tv})`), this.generateFreeSMTVar());
+        const normalassign = new SMTLet(this.varToSMT2Name(cp.trgt), new SMTValue(`(${crtype}@result_value ${tv})`), SMTFreeVar.generate());
 
         return new SMTLet(tv, constexp, new SMTCond(checkerror, extracterror, normalassign));
     }
@@ -365,7 +271,7 @@ class SMTLIBGenerator {
         const fdexp = new SMTValue(this.invokenameToSMT2((fdecl.value as MIRBody).bkey));
         const checkerror = new SMTValue(`(is-${crtype}@result_with_code ${tv})`);
         const extracterror = new SMTValue(`(${resulttype}@result_with_code (${crtype}@result_code_value ${tv}))`);
-        const normalassign = new SMTLet(this.varToSMT2Name(ld.trgt), new SMTValue(`(${crtype}@result_value ${tv})`), this.generateFreeSMTVar());
+        const normalassign = new SMTLet(this.varToSMT2Name(ld.trgt), new SMTValue(`(${crtype}@result_value ${tv})`), SMTFreeVar.generate());
 
         return new SMTLet(tv, fdexp, new SMTCond(checkerror, extracterror, normalassign));
     }
@@ -380,7 +286,7 @@ class SMTLIBGenerator {
 
         const smtctype = this.typegen.typeToSMT2Constructor(this.assembly.typeMap.get(cp.tkey) as MIRType);
         const cexp = new SMTValue(`(${smtctype} ${fvals.join(" ")})`);
-        const bindexp = new SMTLet(this.varToSMT2Name(cp.trgt), cexp, this.generateFreeSMTVar());
+        const bindexp = new SMTLet(this.varToSMT2Name(cp.trgt), cexp, SMTFreeVar.generate());
         if (ctype.invariants.length === 0) {
             return bindexp;
         }
@@ -388,7 +294,7 @@ class SMTLIBGenerator {
             const testexp = new SMTValue(`(${smtctype}@invariant ${this.varToSMT2Name(cp.trgt)})`);
             const resulttype = "Result_" + this.typegen.typeToSMT2Type(this.cinvokeResult as MIRType);
             const errexp = new SMTValue(`(${resulttype}@result_with_code (result_error ${this.registerError(cp.sinfo)}))`);
-            return bindexp.bind(new SMTCond(testexp, this.generateFreeSMTVar(), errexp));
+            return bindexp.bind(new SMTCond(testexp, SMTFreeVar.generate(), errexp));
         }
     }
 
@@ -397,10 +303,10 @@ class SMTLIBGenerator {
         const smtctype = this.typegen.typeToSMT2Constructor(this.assembly.typeMap.get(cpce.tkey) as MIRType);
         if (ctype.name === "List") {
             if (this.typegen.isTypeExact(this.assembly.typeMap.get(cpce.tkey) as MIRType)) {
-                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(${smtctype} 0 ${smtctype}@emptysingleton)`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(${smtctype} 0 ${smtctype}@emptysingleton)`), SMTFreeVar.generate());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(bsq_term_list "${smtsanizite(cpce.tkey)}" 0 ((as const (Array Int BTerm)) bsq_term_none))`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpce.trgt), new SMTValue(`(bsq_term_list "${smtsanizite(cpce.tkey)}" 0 ((as const (Array Int BTerm)) bsq_term_none))`), SMTFreeVar.generate());
             }
         }
         else if (ctype.name === "Set") {
@@ -422,7 +328,7 @@ class SMTLIBGenerator {
                     entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), contentstype).emit()})`;
                 }
 
-                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${entriesval})`), SMTFreeVar.generate());
             }
             else {
                 let entriesval = `((as const (Array Int BTerm)) bsq_term_none)`;
@@ -430,7 +336,7 @@ class SMTLIBGenerator {
                     entriesval = `(store ${entriesval} ${i} ${this.argToSMT2Coerce(cpcs.args[i], this.getArgType(cpcs.args[i], vtypes), this.typegen.anyType).emit()})`;
                 }
 
-                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(bsq_term_list "${smtsanizite(cpcs.tkey)}" ${cpcs.args.length} ${entriesval})`), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(cpcs.trgt), new SMTValue(`(bsq_term_list "${smtsanizite(cpcs.tkey)}" ${cpcs.args.length} ${entriesval})`), SMTFreeVar.generate());
             }
         }
         else if (ctype.name === "Set") {
@@ -455,7 +361,7 @@ class SMTLIBGenerator {
         }
 
         if (exacttrgt) {
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(ttype)} ${tentries.join(" ")})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(ttype)} ${tentries.join(" ")})`), SMTFreeVar.generate());
         }
         else {
             let entriesval = "((as const (Array Int BTerm)) bsq_term_none)";
@@ -463,7 +369,7 @@ class SMTLIBGenerator {
                 entriesval = `(store ${entriesval} ${i} ${tentries[i]})`;
             }
 
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(bsq_term_tuple ${op.args.length} ${entriesval})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(bsq_term_tuple ${op.args.length} ${entriesval})`), SMTFreeVar.generate());
         }
     }
 
@@ -481,7 +387,7 @@ class SMTLIBGenerator {
         }
 
         if (exacttrgt) {
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(ttype)} ${tentries.join(" ")})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(ttype)} ${tentries.join(" ")})`), SMTFreeVar.generate());
         }
         else {
             let entriesval = "((as const (Array String BTerm)) bsq_term_none)";
@@ -489,7 +395,7 @@ class SMTLIBGenerator {
                 entriesval = `(store ${entriesval} "${ttype.entries[i].name}" ${tentries[i]})`;
             }
 
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(bsq_term_record ${op.args.length} ${entriesval})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(bsq_term_record ${op.args.length} ${entriesval})`), SMTFreeVar.generate());
         }
     }
 
@@ -500,27 +406,27 @@ class SMTLIBGenerator {
             const tupinfo = argtype.options[0] as MIRTupleType;
 
             if (op.idx >= tupinfo.entries.length) {
-                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue("bsq_term_none"), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue("bsq_term_none"), SMTFreeVar.generate());
             }
             else {
                 const fromtype = tupinfo.entries[op.idx].type;
                 let access: SMTExp = new SMTValue(`(${this.typegen.typeToSMT2Constructor(argtype)}@${op.idx} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`);
 
                 if (this.typegen.isTypeExact(resultAccessType)) {
-                    return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(op.trgt), access, SMTFreeVar.generate());
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), SMTFreeVar.generate());
                 }
             }
         }
         else {
             const access = new SMTValue(`(select (bsq_term_tuple_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) ${op.idx})`);
             if (!this.typegen.isTypeExact(resultAccessType)) {
-                return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), access, SMTFreeVar.generate());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), SMTFreeVar.generate());
             }
         }
     }
@@ -533,27 +439,27 @@ class SMTLIBGenerator {
 
             const pidx = recinfo.entries.findIndex((e) => e.name === op.property);
             if (pidx === -1) {
-                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue("bsq_term_none"), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue("bsq_term_none"), SMTFreeVar.generate());
             }
             else {
                 const fromtype = recinfo.entries[pidx].type;
                 let access: SMTExp = new SMTValue(`(${this.typegen.typeToSMT2Constructor(argtype)}@${op.property} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`);
 
                 if (this.typegen.isTypeExact(resultAccessType)) {
-                    return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(op.trgt), access, SMTFreeVar.generate());
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceBoxIfNeeded(access, fromtype, resultAccessType), SMTFreeVar.generate());
                 }
             }
         }
         else {
             const access = new SMTValue(`(select (bsq_term_record_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) "${op.property}")`);
             if (!this.typegen.isTypeExact(resultAccessType)) {
-                return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), access, SMTFreeVar.generate());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), SMTFreeVar.generate());
             }
         }
     }
@@ -563,15 +469,15 @@ class SMTLIBGenerator {
 
         if (this.typegen.isTypeExact(argtype)) {
             const tpfx = this.typegen.typeToSMT2Constructor(argtype);
-            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${tpfx}@${op.field} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(op.trgt), new SMTValue(`(${tpfx}@${op.field} ${this.varToSMT2Name(op.arg as MIRRegisterArgument)})`), SMTFreeVar.generate());
         }
         else {
             const access = new SMTValue(`(select (bsq_term_entity_entries ${this.varToSMT2Name(op.arg as MIRRegisterArgument)}) "${op.field}")`);
             if (this.typegen.isTypeExact(resultAccessType)) {
-                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), this.coerceUnBoxIfNeeded(access, this.typegen.anyType, resultAccessType), SMTFreeVar.generate());
             }
             else {
-                return new SMTLet(this.varToSMT2Name(op.trgt), access, this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(op.trgt), access, SMTFreeVar.generate());
             }
         }
     }
@@ -598,7 +504,7 @@ class SMTLIBGenerator {
                 }
             }
 
-            return new SMTLet(this.varToSMT2Name(mi.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(rtinfo)} ${vals.join(" ")})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(mi.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(rtinfo)} ${vals.join(" ")})`), SMTFreeVar.generate());
         }
         else {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRModifyWithIndecies -- not type exact case");
@@ -623,7 +529,7 @@ class SMTLIBGenerator {
                 }
             }
 
-            return new SMTLet(this.varToSMT2Name(mp.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(rrinfo)} ${vals.join(" ")})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(mp.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(rrinfo)} ${vals.join(" ")})`), SMTFreeVar.generate());
         }
         else {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRModifyWithProperties -- not type exact case");
@@ -649,7 +555,7 @@ class SMTLIBGenerator {
                 }
             }
 
-            return new SMTLet(this.varToSMT2Name(mf.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(reinfo)} ${vals.join(" ")})`), this.generateFreeSMTVar());
+            return new SMTLet(this.varToSMT2Name(mf.trgt), new SMTValue(`(${this.typegen.typeToSMT2Constructor(reinfo)} ${vals.join(" ")})`), SMTFreeVar.generate());
 
         }
         else {
@@ -672,7 +578,7 @@ class SMTLIBGenerator {
         const invokeexp = new SMTValue( vals.length !== 0 ? `(${this.invokenameToSMT2(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT2(ivop.mkey));
         const checkerror = new SMTValue(`(is-${ivrtype}@result_with_code ${tv})`);
         const extracterror = new SMTValue(`(${resulttype}@result_with_code (${ivrtype}@result_code_value ${tv}))`);
-        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(${ivrtype}@result_value ${tv})`), this.generateFreeSMTVar());
+        const normalassign = new SMTLet(this.varToSMT2Name(ivop.trgt), new SMTValue(`(${ivrtype}@result_value ${tv})`), SMTFreeVar.generate());
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }
@@ -682,7 +588,7 @@ class SMTLIBGenerator {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
                 vtypes.set(lcv.trgt.nameID, this.getArgType(lcv.src, vtypes));
-                return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2Direct(lcv.src), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(lcv.trgt), this.argToSMT2Direct(lcv.src), SMTFreeVar.generate());
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 return NOT_IMPLEMENTED<SMTExp>("MIRLoadConstTypedString");
@@ -700,12 +606,12 @@ class SMTLIBGenerator {
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
                 vtypes.set(lav.trgt.nameID, this.getArgType(lav.name, vtypes));
-                return new SMTLet(this.varToSMT2Name(lav.trgt), this.argToSMT2Direct(lav.name), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(lav.trgt), this.argToSMT2Direct(lav.name), SMTFreeVar.generate());
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
                 vtypes.set(llv.trgt.nameID, this.getArgType(llv.name, vtypes));
-                return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2Direct(llv.name), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(llv.trgt), this.argToSMT2Direct(llv.name), SMTFreeVar.generate());
             }
             case MIROpTag.MIRConstructorPrimary: {
                 const cp = op as MIRConstructorPrimary;
@@ -810,16 +716,16 @@ class SMTLIBGenerator {
                     vtypes.set(pfx.trgt.nameID, this.typegen.boolType);
 
                     const smttest = this.generateTruthyConvert(pfx.arg, vtypes);
-                    return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(not ${smttest.emit()})`), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(not ${smttest.emit()})`), SMTFreeVar.generate());
                 }
                 else {
                     vtypes.set(pfx.trgt.nameID, this.typegen.intType);
 
                     if (pfx.op === "-") {
-                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(* ${this.argToSMT2Coerce(pfx.arg, argtype, this.typegen.intType).emit()} -1)`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(pfx.trgt), new SMTValue(`(* ${this.argToSMT2Coerce(pfx.arg, argtype, this.typegen.intType).emit()} -1)`), SMTFreeVar.generate());
                     }
                     else {
-                        return new SMTLet(this.varToSMT2Name(pfx.trgt), this.argToSMT2Coerce(pfx.arg, argtype, this.typegen.intType), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(pfx.trgt), this.argToSMT2Coerce(pfx.arg, argtype, this.typegen.intType), SMTFreeVar.generate());
                     }
                 }
             }
@@ -835,12 +741,12 @@ class SMTLIBGenerator {
 
                 switch (bop.op) {
                     case "+":
-                        return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(+ ${lhv} ${rhv})`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(+ ${lhv} ${rhv})`), SMTFreeVar.generate());
                     case "-":
-                        return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(- ${lhv} ${rhv})`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(- ${lhv} ${rhv})`), SMTFreeVar.generate());
                     case "*": {
                         if (bop.lhs instanceof MIRConstantArgument || bop.rhs instanceof MIRConstantArgument) {
-                            return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(* ${lhv} ${rhv})`), this.generateFreeSMTVar());
+                            return new SMTLet(this.varToSMT2Name(bop.trgt), new SMTValue(`(* ${lhv} ${rhv})`), SMTFreeVar.generate());
                         }
                         else {
                             return NOT_IMPLEMENTED<SMTExp>("BINOP -- nonlinear *");
@@ -864,7 +770,7 @@ class SMTLIBGenerator {
                         || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")
                         || (lhvtype.trkey === "NSCore::String" && rhvtype.trkey === "NSCore::String")) {
                             const smv = `(= ${this.argToSMT2Coerce(beq.lhs, lhvtype, lhvtype).emit()} ${this.argToSMT2Coerce(beq.rhs, rhvtype, rhvtype).emit()})`;
-                            return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${smv})` : smv), this.generateFreeSMTVar());
+                            return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${smv})` : smv), SMTFreeVar.generate());
                     }
                     else {
                         return NOT_IMPLEMENTED<SMTExp>("BINEQ -- nonprimitive values");
@@ -876,19 +782,19 @@ class SMTLIBGenerator {
 
                     let tops: SMTExp[] = [];
                     if (this.assembly.subtypeOf(this.typegen.noneType, lhvtype) && this.assembly.subtypeOf(this.typegen.noneType, lhvtype)) {
-                        tops.push(new SMTCond(new SMTValue(`(and (= ${larg} bsq_term_none) (= ${rarg} bsq_term_none))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                        tops.push(new SMTCond(new SMTValue(`(and (= ${larg} bsq_term_none) (= ${rarg} bsq_term_none))`), new SMTValue("true"), SMTFreeVar.generate()));
                     }
 
                     if (this.assembly.subtypeOf(this.typegen.boolType, lhvtype) && this.assembly.subtypeOf(this.typegen.boolType, lhvtype)) {
-                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_bool ${larg}) (is-bsq_term_bool ${rarg}) (= (bsq_term_bool_value ${larg}) (bsq_term_bool_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_bool ${larg}) (is-bsq_term_bool ${rarg}) (= (bsq_term_bool_value ${larg}) (bsq_term_bool_value ${rarg})))`), new SMTValue("true"), SMTFreeVar.generate()));
                     }
 
                     if (this.assembly.subtypeOf(this.typegen.intType, lhvtype) && this.assembly.subtypeOf(this.typegen.intType, lhvtype)) {
-                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_int ${larg}) (is-bsq_term_int ${rarg}) (= (bsq_term_int_value ${larg}) (bsq_term_int_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_int ${larg}) (is-bsq_term_int ${rarg}) (= (bsq_term_int_value ${larg}) (bsq_term_int_value ${rarg})))`), new SMTValue("true"), SMTFreeVar.generate()));
                     }
 
                     if (this.assembly.subtypeOf(this.typegen.stringType, lhvtype) && this.assembly.subtypeOf(this.typegen.stringType, lhvtype)) {
-                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_string ${larg}) (is-bsq_term_string ${rarg}) (= (bsq_term_string_value ${larg}) (bsq_term_string_value ${rarg})))`), new SMTValue("true"), this.generateFreeSMTVar()));
+                        tops.push(new SMTCond(new SMTValue(`(and (is-bsq_term_string ${larg}) (is-bsq_term_string ${rarg}) (= (bsq_term_string_value ${larg}) (bsq_term_string_value ${rarg})))`), new SMTValue("true"), SMTFreeVar.generate()));
                     }
 
                     //
@@ -900,7 +806,7 @@ class SMTLIBGenerator {
                         rexp = tops[i].bind(rexp);
                     }
 
-                    return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${rexp.emit()})` : rexp.emit()), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${rexp.emit()})` : rexp.emit()), SMTFreeVar.generate());
                 }
             }
             case MIROpTag.MIRBinCmp: {
@@ -912,7 +818,7 @@ class SMTLIBGenerator {
 
                 if (this.typegen.isTypeExact(lhvtype) && this.typegen.isTypeExact(rhvtype)) {
                     if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
-                        return new SMTLet(this.varToSMT2Name(bcmp.trgt), new SMTValue(`(${bcmp.op} ${this.argToSMT2Coerce(bcmp.lhs, lhvtype, lhvtype).emit()} ${this.argToSMT2Coerce(bcmp.rhs, rhvtype, rhvtype).emit()})`), this.generateFreeSMTVar());
+                        return new SMTLet(this.varToSMT2Name(bcmp.trgt), new SMTValue(`(${bcmp.op} ${this.argToSMT2Coerce(bcmp.lhs, lhvtype, lhvtype).emit()} ${this.argToSMT2Coerce(bcmp.rhs, rhvtype, rhvtype).emit()})`), SMTFreeVar.generate());
                     }
                     else {
                         return NOT_IMPLEMENTED<SMTExp>("BINCMP -- string");
@@ -924,9 +830,9 @@ class SMTLIBGenerator {
                     const tvl = `@tmpl@${this.tmpvarctr++}`;
                     const tvr = `@tmpr@${this.tmpvarctr++}`;
 
-                    const lets = new SMTLet(tvl, this.typegen.isTypeExact(lhvtype) ? this.argToSMT2Direct(bcmp.lhs) : this.argToSMT2Coerce(bcmp.lhs, lhvtype, trgttype), new SMTLet(tvr, this.typegen.isTypeExact(rhvtype) ? this.argToSMT2Direct(bcmp.rhs) : this.argToSMT2Coerce(bcmp.rhs, rhvtype, trgttype), this.generateFreeSMTVar()));
+                    const lets = new SMTLet(tvl, this.typegen.isTypeExact(lhvtype) ? this.argToSMT2Direct(bcmp.lhs) : this.argToSMT2Coerce(bcmp.lhs, lhvtype, trgttype), new SMTLet(tvr, this.typegen.isTypeExact(rhvtype) ? this.argToSMT2Direct(bcmp.rhs) : this.argToSMT2Coerce(bcmp.rhs, rhvtype, trgttype), SMTFreeVar.generate()));
                     if (trgttype.trkey === "NSCore::Int") {
-                        return lets.bind(new SMTLet(this.varToSMT2Name(bcmp.trgt), new SMTValue(`(${bcmp.op} ${tvl} ${tvr})`), this.generateFreeSMTVar()));
+                        return lets.bind(new SMTLet(this.varToSMT2Name(bcmp.trgt), new SMTValue(`(${bcmp.op} ${tvl} ${tvr})`), SMTFreeVar.generate()));
                     }
                     else {
                         return NOT_IMPLEMENTED<SMTExp>("BINCMP -- string");
@@ -939,10 +845,10 @@ class SMTLIBGenerator {
 
                 const argtype = this.getArgType(ton.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), SMTFreeVar.generate());
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(`(= ${this.argToSMT2Direct(ton.arg).emit()} bsq_term_none)`), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(`(= ${this.argToSMT2Direct(ton.arg).emit()} bsq_term_none)`), SMTFreeVar.generate());
                 }
             }
             case MIROpTag.MIRIsTypeOfSome: {
@@ -951,10 +857,10 @@ class SMTLIBGenerator {
 
                 const argtype = this.getArgType(tos.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "false" : "true"), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "false" : "true"), SMTFreeVar.generate());
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(`(not (= ${this.argToSMT2Direct(tos.arg).emit()} bsq_term_none))`), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(`(not (= ${this.argToSMT2Direct(tos.arg).emit()} bsq_term_none))`), SMTFreeVar.generate());
                 }
             }
             case MIROpTag.MIRIsTypeOf: {
@@ -964,14 +870,14 @@ class SMTLIBGenerator {
                 const regop = op as MIRRegAssign;
                 vtypes.set(regop.trgt.nameID, this.getArgType(regop.src, vtypes));
 
-                return new SMTLet(this.varToSMT2Name(regop.trgt), this.argToSMT2Direct(regop.src), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(regop.trgt), this.argToSMT2Direct(regop.src), SMTFreeVar.generate());
             }
             case MIROpTag.MIRTruthyConvert: {
                 const tcop = op as MIRTruthyConvert;
                 vtypes.set(tcop.trgt.nameID, this.typegen.boolType);
 
                 const smttest = this.generateTruthyConvert(tcop.src, vtypes);
-                return new SMTLet(this.varToSMT2Name(tcop.trgt), smttest, this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(tcop.trgt), smttest, SMTFreeVar.generate());
             }
             case MIROpTag.MIRLogicStore: {
                 const llop = op as MIRLogicStore;
@@ -984,17 +890,17 @@ class SMTLIBGenerator {
                 const rhv = this.argToSMT2Coerce(llop.rhs, rhvtype, this.typegen.boolType).emit();
 
                 if (llop.op === "&") {
-                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(and ${lhv} ${rhv})`), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(and ${lhv} ${rhv})`), SMTFreeVar.generate());
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(or ${lhv} ${rhv})`), this.generateFreeSMTVar());
+                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(or ${lhv} ${rhv})`), SMTFreeVar.generate());
                 }
             }
             case MIROpTag.MIRVarStore: {
                 const vsop = op as MIRVarStore;
                 vtypes.set(vsop.name.nameID, this.getArgType(vsop.src, vtypes));
 
-                return new SMTLet(this.varToSMT2Name(vsop.name), this.argToSMT2Direct(vsop.src), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(vsop.name), this.argToSMT2Direct(vsop.src), SMTFreeVar.generate());
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
@@ -1002,7 +908,7 @@ class SMTLIBGenerator {
 
                 const totype = vtypes.get(raop.name.nameID) as MIRType;
                 const fromtype = this.getArgType(raop.src, vtypes);
-                return new SMTLet(this.varToSMT2Name(raop.name), this.argToSMT2Coerce(raop.src, fromtype, totype), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(raop.name), this.argToSMT2Coerce(raop.src, fromtype, totype), SMTFreeVar.generate());
             }
             case MIROpTag.MIRAbort: {
                 const aop = op as MIRAbort;
@@ -1018,16 +924,16 @@ class SMTLIBGenerator {
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
                 const smttest = this.generateTruthyConvert(cjop.arg, vtypes);
-                return new SMTCond(smttest, this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
+                return new SMTCond(smttest, SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
                 const argtype = this.getArgType(njop.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTCond(new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
+                    return new SMTCond(new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
                 }
                 else {
-                    return new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(njop.arg).emit()} bsq_term_none)`), this.generateFreeSMTVar("#true_trgt#"), this.generateFreeSMTVar("#false_trgt#"));
+                    return new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(njop.arg).emit()} bsq_term_none)`), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
                 }
             }
             case MIROpTag.MIRPhi: {
@@ -1035,7 +941,7 @@ class SMTLIBGenerator {
                 const uvar = pop.src.get(fromblck) as MIRRegisterArgument;
                 vtypes.set(pop.trgt.nameID, this.getArgType(uvar, vtypes));
 
-                return new SMTLet(this.varToSMT2Name(pop.trgt), this.argToSMT2Direct(uvar), this.generateFreeSMTVar());
+                return new SMTLet(this.varToSMT2Name(pop.trgt), this.argToSMT2Direct(uvar), SMTFreeVar.generate());
             }
             case MIROpTag.MIRVarLifetimeStart:
             case MIROpTag.MIRVarLifetimeEnd: {
@@ -1333,6 +1239,9 @@ class SMTLIBGenerator {
         const resultdecls = resultarr.map((rd) => `(Result_${rd} 0)`);
         const resultcons = resultarr.map((rd) => `( (Result_${rd}@result_with_code (Result_${rd}@result_code_value ResultCode)) (Result_${rd}@result_success (Result_${rd}@result_value ${rd})) )`);
 
+        const nominaltypechecks = this.typegen.generateNominalTypeDecls();
+        const structuraltypechecks = this.typegen.generateStructuralTypeDecls();
+
         return smt_header
         + "\n\n"
         + smtlib_code
@@ -1343,12 +1252,15 @@ class SMTLIBGenerator {
         + "\n\n"
         + `${consdecls.map((cd) => cd[1]).filter((d) => d !== undefined).join("\n")}`
         + "\n\n"
+        + nominaltypechecks
+        + "\n\n"
+        + structuraltypechecks
+        + "\n\n"
         + invokedecls.join("\n\n")
         + "\n\n";
     }
 }
 
 export {
-    SMTValue, SMTLet, SMTCond, SMTExp,
     SMTLIBGenerator
 };

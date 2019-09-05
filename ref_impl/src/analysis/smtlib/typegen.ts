@@ -5,16 +5,8 @@
 
 import * as assert from "assert";
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRNominalType } from "../../compiler/mir_assembly";
 import { smtsanizite, BuiltinTypes, BuiltinTypeEmit } from "./builtins";
-
-const typeofsig_exact = "(define-func typeof_exact () Bool ";
-
-const typeofhelpers_exact_fixed = "";
-
-const typeofsig_general = "(define-func typeof_general () Bool ";
-
-const typeofhelpers_general_fixed = "";
 
 class SMTTypeGenerator {
     readonly assembly: MIRAssembly;
@@ -24,6 +16,8 @@ class SMTTypeGenerator {
     readonly intType: MIRType;
     readonly stringType: MIRType;
     readonly anyType: MIRType;
+
+    private structuraltypecheckdecls: string[] = [];
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -42,12 +36,7 @@ class SMTTypeGenerator {
 
         if (type instanceof MIREntityType) {
             const tdecl = this.assembly.entityDecls.get(type.ekey) as MIREntityTypeDecl;
-            if (!tdecl.isCollectionEntityType && !tdecl.isMapEntityType) {
-                return true;
-            }
-            else {
-                return [...tdecl.terms].every((etype) => this.isTypeExact(etype[1]));
-            }
+            return [...tdecl.terms].every((etype) => this.isTypeExact(etype[1]));
         }
         else if (type instanceof MIRTupleType) {
             return !type.isOpen && type.entries.every((entry) => !entry.isOptional && this.isTypeExact(entry.type));
@@ -168,27 +157,190 @@ class SMTTypeGenerator {
         }
     }
 
-    generateTypeOfDecls(): string {
-        xxxx; 
+    private addTypeOfDecl(decl: string) {
+        if (!this.structuraltypecheckdecls.includes(decl)) {
+            this.structuraltypecheckdecls.push(decl);
+        }
+    }
+
+    generateTypeOf_Tuple(arg: string, oftype: MIRTupleType): string {
+        const ecdecl = `
+            (declare-fun typecheck@${smtsanizite(oftype.trkey)}@0 ((tuparr (Array Int BTerm))) Bool)
+                ${this.generateTypeOfCall(`(select tuparr ${oftype.entries.length - 1})`, this.anyType, oftype.entries[oftype.entries.length - 1].type)}
+            )
+            `;
+        this.addTypeOfDecl(ecdecl);
+
+        for (let i = 1; i < oftype.entries.length; ++i) {
+            const isubtype = this.generateTypeOfCall(`(select tuparr ${oftype.entries.length - (i + 1)})`, this.anyType, oftype.entries[oftype.entries.length - (i + 1)].type);
+            const rdecl = `
+            (declare-fun typecheck@${smtsanizite(oftype.trkey)}@${i} ((tuparr (Array Int BTerm))) Bool)
+                (and ${isubtype} (typecheck@${smtsanizite(oftype.trkey)}@${i - 1} tuparr))
+            )
+            `;
+            this.addTypeOfDecl(rdecl);
+        }
+
+        const reqentries = (oftype.entries.some((e) => e.isOptional)) ? oftype.entries.findIndex((e) => e.isOptional) : oftype.entries.length;
+        if (oftype.isOpen) {
+            const tcdecl = `
+            (declare-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
+                (and (is-bsq_term_tuple ${arg}) (>= (bsq_term_tuple_size ${arg}) ${reqentries}) (typecheck@${smtsanizite(oftype.trkey)}@${oftype.entries.length - 1} (bsq_term_tuple_entries tup)))
+            )
+            `;
+            this.addTypeOfDecl(tcdecl);
+
+            return `(typecheck@${smtsanizite(oftype.trkey)} ${arg})`;
+        }
+        else {
+            const tcdecl = `
+            (declare-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
+                (and (is-bsq_term_tuple ${arg}) (>= (bsq_term_tuple_size ${arg}) ${reqentries}) (<= (bsq_term_tuple_size ${arg}) ${oftype.entries.length}) (typecheck@${smtsanizite(oftype.trkey)}@${oftype.entries.length - 1} (bsq_term_tuple_entries tup)))
+            )
+            `;
+            this.addTypeOfDecl(tcdecl);
+
+            return `(typecheck@${smtsanizite(oftype.trkey)} ${arg})`;
+        }
+    }
+
+    generateTypeOf_Record(arg: string, oftype: MIRRecordType): string {
+        assert(false);
+        //Need to have (Array String Bool) global arrays for record types to count covered requred properties -- values will also need to know their properties
+        return "[NOT IMPLEMENTED]";
+    }
+
+    generateTypeOf_Nominal(arg: string, oftype: MIRNominalType): string {
+        if (oftype.trkey === "NSCore::Any") {
+            return "true";
+        }
+        else if (oftype.trkey === "NSCore::Some") {
+            return `(not (= ${arg} bsq_term_none))`;
+        }
+        else if (oftype.trkey === "NSCore::Tuple") {
+            return `(is-bsq_term_tuple ${arg})`;
+        }
+        else if (oftype.trkey === "NSCore::Record") {
+            return `(is-bsq_term_record ${arg})`;
+        }
+        else if (oftype.trkey === "NSCore::Object") {
+            return `(or (is-bsq_term_entity ${arg}) (is-bsq_term_list ${arg}))`;
+        }
+        else {
+            return `(and (is-bsq_term_entity ${arg}) (typecheck@${smtsanizite(oftype.trkey)} (bsq_term_entity_type ${arg}))`;
+        }
+    }
+
+    generateTypeOf_Collection(arg: string, oftype: MIREntityType): string {
+        return `(and (is-bsq_term_list ${arg}) (typecheck@${smtsanizite(oftype.trkey)} (bsq_term_list_type ${arg}))`;
     }
 
     generateTypeOfCall(arg: string, argtype: MIRType, oftype: MIRType): string {
-        if (this.assembly.subtypeOf(argtype, oftype)) {
-            return "true";
+        if (this.isTypeExact(argtype)) {
+            return this.assembly.subtypeOf(argtype, oftype) ? "true" : "false";
         }
-
-        if(this.isTypeExact(argtype)) {
-            xxxx;
-            if(!this.assembly.subtypeOf(argtype, oftype)) {
-                return "false"; //if type is exact then this is safe but not in non-exact case
+        else {
+            if (this.assembly.subtypeOf(argtype, oftype)) {
+                return "true";
             }
 
-            const atype = SMTTypeGenerator.getExactTypeFrom(argtype);
-            
-        } 
-        else {
+            let opts: string[] = [];
+            for (let i = 0; i < oftype.options.length; ++i) {
+                const topt = oftype.options[i];
 
+                if (this.assembly.subtypeOf(this.noneType, MIRType.createSingle(topt)) && this.assembly.subtypeOf(this.noneType, argtype)) {
+                    opts.push(`(= ${arg} bsq_term_none)`);
+                }
+                else if (this.assembly.subtypeOf(this.boolType, MIRType.createSingle(topt)) && this.assembly.subtypeOf(this.boolType, argtype)) {
+                    opts.push(`(is-bsq_term_bool ${arg})`);
+                }
+                else if (this.assembly.subtypeOf(this.intType, MIRType.createSingle(topt)) && this.assembly.subtypeOf(this.intType, argtype)) {
+                    opts.push(`(is-bsq_term_int ${arg})`);
+                }
+                else if (this.assembly.subtypeOf(this.stringType, MIRType.createSingle(topt)) && this.assembly.subtypeOf(this.stringType, argtype)) {
+                    opts.push(`(is-bsq_term_string ${arg})`);
+                }
+                else if (topt instanceof MIRTupleType) {
+                    const tupchk = this.generateTypeOf_Tuple(arg, topt);
+                    opts.push(tupchk);
+                }
+                else if (topt instanceof MIRRecordType) {
+                    const recchk = this.generateTypeOf_Record(arg, topt);
+                    opts.push(recchk);
+                }
+                else {
+                    if (topt instanceof MIREntityType && (this.assembly.entityDecls.get(topt.ekey) as MIREntityTypeDecl).isCollectionEntityType) {
+                        const cchk = this.generateTypeOf_Collection(arg, topt);
+                        opts.push(cchk);
+                    }
+                    else {
+                        const nchk = this.generateTypeOf_Nominal(arg, topt);
+                        opts.push(nchk);
+                    }
+                }
+            }
+
+            return `(and ${opts.join(" ")})`;
         }
+    }
+
+    generateNominalTypeDecls(): string {
+        let nsubf: string[] = [];
+
+        const skipconcepts = ["NSCore::Any", "NSCore::Some", "NSCore::Tuple", "NSCore::Record", "NSCore::Object"];
+
+        this.assembly.entityDecls.forEach((edcl, ekey) => {
+            const etype = MIRType.createSingle(MIREntityType.create(ekey));
+            let subts: MIRType[] = [];
+
+            this.assembly.entityDecls.forEach((sdecl, skey) => {
+                const stype = MIRType.createSingle(MIREntityType.create(skey));
+                if (this.assembly.subtypeOf(stype, etype)) {
+                    subts.push(stype);
+                }
+            });
+
+            let cexps = subts.map((t) => `(= arg "${t.trkey}")`);
+            const chk = `(declare-fun typecheck@${smtsanizite(ekey)} ((arg String)) Bool
+                ${cexps.length !== 1 ? `(or ${cexps.join(" ")})` : cexps[0]}
+            )`;
+            nsubf.push(chk);
+        });
+
+        this.assembly.conceptDecls.forEach((cdcl, ckey) => {
+            if (skipconcepts.includes(ckey)) {
+                return;
+            }
+
+            const ctype = MIRType.createSingle(MIREntityType.create(ckey));
+            let subts: MIRType[] = [];
+
+            this.assembly.entityDecls.forEach((sdecl, skey) => {
+                const stype = MIRType.createSingle(MIREntityType.create(skey));
+                if (this.assembly.subtypeOf(stype, ctype)) {
+                    subts.push(stype);
+                }
+            });
+
+            this.assembly.conceptDecls.forEach((sdecl, skey) => {
+                const stype = MIRType.createSingle(MIREntityType.create(skey));
+                if (this.assembly.subtypeOf(stype, ctype)) {
+                    subts.push(stype);
+                }
+            });
+
+            let cexps = subts.map((t) => `(= arg "${t.trkey}")`);
+            const chk = `(declare-fun typecheck@${smtsanizite(ckey)} ((arg String)) Bool
+                ${cexps.length !== 1 ? `(or ${cexps.join(" ")})` : cexps[0]}
+            )`;
+            nsubf.push(chk);
+        });
+
+        return nsubf.join("\n\n");
+    }
+
+    generateStructuralTypeDecls(): string {
+        return this.structuraltypecheckdecls.join("\n\n");
     }
 }
 
