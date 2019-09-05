@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRNominalType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRNominalType, MIRConceptType } from "../../compiler/mir_assembly";
 import { smtsanizite, BuiltinTypes, BuiltinTypeEmit } from "./builtins";
 
 class SMTTypeGenerator {
@@ -165,7 +165,7 @@ class SMTTypeGenerator {
 
     generateTypeOf_Tuple(arg: string, oftype: MIRTupleType): string {
         const ecdecl = `
-            (declare-fun typecheck@${smtsanizite(oftype.trkey)}@0 ((tuparr (Array Int BTerm))) Bool)
+            (define-fun typecheck@${smtsanizite(oftype.trkey)}@0 ((tuparr (Array Int BTerm))) Bool)
                 ${this.generateTypeOfCall(`(select tuparr ${oftype.entries.length - 1})`, this.anyType, oftype.entries[oftype.entries.length - 1].type)}
             )
             `;
@@ -174,7 +174,7 @@ class SMTTypeGenerator {
         for (let i = 1; i < oftype.entries.length; ++i) {
             const isubtype = this.generateTypeOfCall(`(select tuparr ${oftype.entries.length - (i + 1)})`, this.anyType, oftype.entries[oftype.entries.length - (i + 1)].type);
             const rdecl = `
-            (declare-fun typecheck@${smtsanizite(oftype.trkey)}@${i} ((tuparr (Array Int BTerm))) Bool)
+            (define-fun typecheck@${smtsanizite(oftype.trkey)}@${i} ((tuparr (Array Int BTerm))) Bool)
                 (and ${isubtype} (typecheck@${smtsanizite(oftype.trkey)}@${i - 1} tuparr))
             )
             `;
@@ -184,7 +184,7 @@ class SMTTypeGenerator {
         const reqentries = (oftype.entries.some((e) => e.isOptional)) ? oftype.entries.findIndex((e) => e.isOptional) : oftype.entries.length;
         if (oftype.isOpen) {
             const tcdecl = `
-            (declare-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
+            (define-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
                 (and (is-bsq_term_tuple ${arg}) (>= (bsq_term_tuple_size ${arg}) ${reqentries}) (typecheck@${smtsanizite(oftype.trkey)}@${oftype.entries.length - 1} (bsq_term_tuple_entries tup)))
             )
             `;
@@ -194,7 +194,7 @@ class SMTTypeGenerator {
         }
         else {
             const tcdecl = `
-            (declare-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
+            (define-fun typecheck@${smtsanizite(oftype.trkey)} ((tup BTerm)) Bool)
                 (and (is-bsq_term_tuple ${arg}) (>= (bsq_term_tuple_size ${arg}) ${reqentries}) (<= (bsq_term_tuple_size ${arg}) ${oftype.entries.length}) (typecheck@${smtsanizite(oftype.trkey)}@${oftype.entries.length - 1} (bsq_term_tuple_entries tup)))
             )
             `;
@@ -280,7 +280,7 @@ class SMTTypeGenerator {
                 }
             }
 
-            return `(and ${opts.join(" ")})`;
+            return (opts.length > 1) ? `(and ${opts.join(" ")})` : opts[0];
         }
     }
 
@@ -301,7 +301,7 @@ class SMTTypeGenerator {
             });
 
             let cexps = subts.map((t) => `(= arg "${t.trkey}")`);
-            const chk = `(declare-fun typecheck@${smtsanizite(ekey)} ((arg String)) Bool
+            const chk = `(define-fun typecheck@${smtsanizite(ekey)} ((arg String)) Bool
                 ${cexps.length !== 1 ? `(or ${cexps.join(" ")})` : cexps[0]}
             )`;
             nsubf.push(chk);
@@ -312,7 +312,7 @@ class SMTTypeGenerator {
                 return;
             }
 
-            const ctype = MIRType.createSingle(MIREntityType.create(ckey));
+            const ctype = MIRType.createSingle(MIRConceptType.create([ckey]));
             let subts: MIRType[] = [];
 
             this.assembly.entityDecls.forEach((sdecl, skey) => {
@@ -330,7 +330,7 @@ class SMTTypeGenerator {
             });
 
             let cexps = subts.map((t) => `(= arg "${t.trkey}")`);
-            const chk = `(declare-fun typecheck@${smtsanizite(ckey)} ((arg String)) Bool
+            const chk = `(define-fun typecheck@${smtsanizite(ckey)} ((arg String)) Bool
                 ${cexps.length !== 1 ? `(or ${cexps.join(" ")})` : cexps[0]}
             )`;
             nsubf.push(chk);

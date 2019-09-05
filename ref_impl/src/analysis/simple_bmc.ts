@@ -93,9 +93,9 @@ function checkSpecificError(smtgen: SMTLIBGenerator, smtcode: string, entrypoint
         process.exit(1);
     }
     const ivk = ep as MIRInvokeBodyDecl;
-    const restype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
+    const restype = smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
 
-    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
+    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
     const resdecl = `(declare-const res Result_${restype})`;
     const call = ivk.params.length !== 0 ? `(${smtgen.invokenameToSMT2(ivk.key)} ${ivk.params.map((fp) => fp.name).join(" ")})` : smtgen.invokenameToSMT2(ivk.key);
     const cassert = `(assert (= res ${call}))`;
@@ -135,9 +135,9 @@ function tryGetErrorModel(masm: MIRAssembly, entrypoint: string): string {
         process.exit(1);
     }
     const ivk = ep as MIRInvokeBodyDecl;
-    const restype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
+    const restype = smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
 
-    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
+    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
     const resdecl = `(declare-const res Result_${restype})`;
     const call = ivk.params.length !== 0 ? `(${smtgen.invokenameToSMT2(ivk.key)} ${ivk.params.map((fp) => fp.name).join(" ")})` : smtgen.invokenameToSMT2(ivk.key);
     const cassert = `(assert (= res ${call}))`;
@@ -178,9 +178,9 @@ function checkSingleEntryPointSMT(masm: MIRAssembly, entrypoint: string): string
         process.exit(1);
     }
     const ivk = ep as MIRInvokeBodyDecl;
-    const restype = smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
+    const restype = smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(ivk.resultType) as MIRType);
 
-    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
+    const argsdecls = ivk.params.map((fp) => `(declare-const ${fp.name} ${smtgen.typegen.typeToSMT2Type(smtgen.assembly.typeMap.get(fp.type) as MIRType)})`);
     const resdecl = `(declare-const res Result_${restype})`;
     const call = ivk.params.length !== 0 ? `(${smtgen.invokenameToSMT2(ivk.key)} ${ivk.params.map((fp) => fp.name).join(" ")})` : smtgen.invokenameToSMT2(ivk.key);
     const cassert = `(assert (= res ${call}))`;

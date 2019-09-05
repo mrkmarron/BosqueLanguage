@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey, MIRBodyKey, MIRAccessConstantValue, MIRConstructorRecord, MIRAccessFromProperty, MIRModifyWithProperties, MIRModifyWithFields, MIRBody, MIRLoadFieldDefaultValue } from "../../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorTuple, MIRAccessFromIndex, MIRConstantTrue, MIRConstantFalse, MIRConstantNone, MIRConstantInt, MIRConstantString, MIRPrefixOp, MIRConstantArgument, MIRBinOp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRBinEq, MIRBinCmp, MIRModifyWithIndecies, MIRInvokeFixedFunction, MIRInvokeKey, MIRBasicBlock, MIRPhi, MIRJump, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey, MIRBodyKey, MIRAccessConstantValue, MIRConstructorRecord, MIRAccessFromProperty, MIRModifyWithProperties, MIRModifyWithFields, MIRBody, MIRLoadFieldDefaultValue, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTupleType, MIRTypeOption, MIREntityTypeDecl, MIREntityType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { BuiltinCalls, BuiltinCallEmit, smtsanizite } from "./builtins";
@@ -864,7 +864,18 @@ class SMTLIBGenerator {
                 }
             }
             case MIROpTag.MIRIsTypeOf: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRIsTypeOf");
+                const tof = op as MIRIsTypeOf;
+                vtypes.set(tof.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
+
+                const argtype = this.getArgType(tof.arg, vtypes);
+                const oftype = this.assembly.typeMap.get(tof.oftype) as MIRType;
+                if (this.typegen.isTypeExact(argtype)) {
+                    return new SMTLet(this.varToSMT2Name(tof.trgt), new SMTValue(this.assembly.subtypeOf(argtype, oftype) ? "false" : "true"), SMTFreeVar.generate());
+                }
+                else {
+                    const tcheck = this.typegen.generateTypeOfCall(this.argToSMT2Direct(tof.arg).emit(), argtype, oftype);
+                    return new SMTLet(this.varToSMT2Name(tof.trgt), new SMTValue(tcheck), SMTFreeVar.generate());
+                }
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;

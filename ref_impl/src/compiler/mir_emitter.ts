@@ -663,7 +663,7 @@ class MIREmitter {
         emitter.registerResolvedTypeReference(assembly.getSpecialBoolType());
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialIntType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String") as EntityTypeDecl, new Map<string, ResolvedType>().set("T", assembly.getSpecialAnyType()));
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialStringType());
 
         //get any entrypoint functions and initialize the checker there
