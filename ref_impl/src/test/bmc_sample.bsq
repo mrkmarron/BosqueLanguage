@@ -99,77 +99,24 @@ entity Game {
         requires !this.board->isCellOccupied(x, y);
     {
         var nboard = this.board->markCellWith(x, y, mark);
-        return this->update(board=nboard, winner=this.board->checkForWinner());
+        return this->update(board=nboard, winner=nboard->checkForWinner());
     }
 }
 
-entrypoint function main(x: Int, y: Int): String?
+entrypoint function main(x: Int, y: Int): Int
     requires 0 <= x && x < 3;
-    requires 0 <= y && y < 2;
+    requires 0 <= y && y < 3;
 {
     var! g = Game{}
-    ->makeExplicitMove(x, y, "x")
-    ->makeExplicitMove(x, y + 1, "x");
+        ->makeExplicitMove(1, 1, "x")
+        ->makeExplicitMove(0, 1, "o")
+        ->makeExplicitMove(2, 2, "x")
+        ->makeExplicitMove(0, 2, "o");
 
-    //if(!g.board->isCellOccupied(0, 2)) {
-        g = g->makeExplicitMove(0, 2, "x");
-    //}
+    if(!g.board->isCellOccupied(x, y)) {
+        g = g->makeExplicitMove(x, y, "x");
+        //assert !g->hasWinner(); //does x have a winning move and generate model
+    }
 
-    return g->hasWinner() ? g->getWinner() : none;
+    return g->hasWinner() ? 0 : 1;
 }
-
-/*
-(declare-const x Int)
-(assert (and (<= 0 x) (< x 3)))
-(declare-const y Int)
-(assert (and (<= 0 y) (< y 2)))
-
-(declare-const res Result_Bool)
-(assert (= res (NSMain$cc$main x y)))
-
-(assert (is-Result_Bool@result_with_code res))
-;(assert (is-Result_Bool@result_success res))
-
-(check-sat)
-(get-model)
-*/
-
-/*
-entrypoint function main(x0: Int, y0: Int, x1: Int, y1: Int, x2: Int, y2: Int): Bool {
-    var g = Game{board=Board@createInitialBoard()}
-    ->makeExplicitMove(x0, y0, "x")
-    ->makeExplicitMove(0, 0, "o")
-    ->makeExplicitMove(x1, y1, "x")
-    ->makeExplicitMove(0, 1, "o")
-    ->makeExplicitMove(x2, y2, "x");
-
-    //assert g->getWinner() == Board::playerX;
-    assert g->getWinner() == Board::playerO;
-
-    return true;
-}
-
-(declare-const x0 Int)
-(assert (and (<= 0 x0) (< x0 3)))
-(declare-const y0 Int)
-(assert (and (<= 0 y0) (< y0 3)))
-
-(declare-const x1 Int)
-(assert (and (<= 0 x1) (< x1 3)))
-(declare-const y1 Int)
-(assert (and (<= 0 y1) (< y1 3)))
-
-(declare-const x2 Int)
-(assert (and (<= 0 x2) (< x2 3)))
-(declare-const y2 Int)
-(assert (and (<= 0 y2) (< y2 3)))
-
-(declare-const res Result_Bool)
-(assert (= res (NSMain$cc$main x0 y0 x1 y1 x2 y2)))
-
-;(assert (is-Result_Bool@result_with_code res))
-(assert (is-Result_Bool@result_success res))
-
-(check-sat)
-(get-model)
-*/

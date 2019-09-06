@@ -277,9 +277,9 @@ function bmcRunEach(masm: MIRAssembly, entrypoint: string | undefined) {
 }
 
 Commander
-    .option("-c --check [entrypoint]", "Check for errors reachable from specified entrypoint")
+    .option("-c --check <entrypoint>", "Check for errors reachable from specified entrypoint")
     .option("-i --individual", "Check for errors individually")
-    .option("-g --generate [file]", "Generate the smt2lib output for the assembly");
+    .option("-g --generate <out.smt2>", "Generate the smt2lib output for the assembly");
 
 Commander.parse(process.argv);
 
