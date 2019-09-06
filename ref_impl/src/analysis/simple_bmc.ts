@@ -247,13 +247,13 @@ function bmcRunEach(masm: MIRAssembly, entrypoint: string | undefined) {
 
             let errorfound = false;
             for (let j = 0; j < errors.length; ++j) {
-                process.stdout.write(`Checking error at ${errors[j][1][0]}:${errors[j][1][1].line}...`);
+                process.stdout.write(`Checking for possible error at ${errors[j][1][0]}:${errors[j][1][1].line}...`);
                 const result = checkSpecificError(smtgen, smtcode, eps[i], errors[j][0], false);
                 if (result === "unsat") {
-                    process.stdout.write("\n");
+                    process.stdout.write(chalk.green("no path found\n"));
                 }
                 else if (result === "assume") {
-                    process.stdout.write("entrypoint precondition -- assumed true\n");
+                    process.stdout.write("entrypoint precondition -- " + chalk.blue("assumed safe\n"));
                 }
                 else {
                     errorfound = true;
