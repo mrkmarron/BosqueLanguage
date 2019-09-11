@@ -9,19 +9,32 @@ namespace BSQ
 {
 enum class Tag
 {
-    ref_tag = 0x0,
-    none_tag = 0x1,
+    //none is the special nullptr value
+    ref_tag = 0x0, 
+    true_tag = 0x1,
     false_tag = 0x2,
-    true_tag = 0x4,
-    inlineint_tag = 0x8
+    inlineint_tag = 0x4
 };
 
 typedef int32_t inline_int;
-typedef void *Value;
+typedef void* Value;
 
-constexpr Value vnone = (Value)0x1;
-constexpr Value vfalse = (Value)0x2;
-constexpr Value vtrue = (Value)0x4;
+constexpr Value bnone = (Value)0x0;
+constexpr Value btrue = (Value)0x1;
+constexpr Value bfalse = (Value)0x2;
+
+inline bool JavascriptNumber::Is_NoTaggedIntCheck(Var aValue)
+{
+    return ((uint64)aValue >> 50) != 0;
+}
+
+inline double JavascriptNumber::GetValue(Var aValue)
+{
+    AssertMsg(Is(aValue), "Ensure var is actually a 'JavascriptNumber'");
+    double result;
+    (*(uint64 *)(&result)) = (((uint64)aValue) ^ FloatTag_Value);
+    return result;
+}
 
 inline Tag getTagFrom(Value v)
 {

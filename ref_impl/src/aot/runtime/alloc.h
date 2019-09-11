@@ -3,6 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 
@@ -21,21 +22,9 @@ struct AllocatorHeader
     void* mir_type;
 };
 
-constexpr ALLOC_SIZE_TYPE power2(ALLOC_SIZE_TYPE v)
-{
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
-
 constexpr ALLOC_SIZE_TYPE allocation_size(uint32_t slots) 
 {
-    return (ALLOC_SIZE_TYPE)(power2((slots == 0 ? 1 : slots) + sizeof(AllocatorHeader)));
+    return (ALLOC_SIZE_TYPE)(((slots == 0 ? 1 : slots) * sizeof(void*) + sizeof(AllocatorHeader)));
 }
 
 inline void incRef(void* mem)
@@ -72,43 +61,59 @@ struct AllocaterTypeBucket
 class Allocator
 {
 private:
-void** mir_types;
-AllocaterTypeBucket* type_segregated_allocs;
+    void **mir_types;
+    AllocaterTypeBucket *type_segregated_allocs;
 
 public:
-template <typename T, MIR_TYPE_KEY tkey, ALLOC_SIZE_TYPE size>
-inline T* allocate()
-{
-    AllocaterTypeBucket& bucket = this->type_segregated_allocs[tkey];
-    void* v = bucket.entries;
-    if(v != nullptr)
+    template <typename T, MIR_TYPE_KEY tkey, ALLOC_SIZE_TYPE size>
+    inline T* allocate()
     {
-        bucket.entries = *((void**)v);
-        bucket.free_count--;
-        return (T*)v;
+        AllocaterTypeBucket &bucket = this->type_segregated_allocs[tkey];
+        void *v = bucket.entries;
+        if (v != nullptr)
+        {
+            bucket.entries = *((void **)v);
+            bucket.free_count--;
+            return (T *)v;
+        }
+        else
+        {
+            return this->allocate_slow<T, tkey, size>();
+        }
     }
-    else
+
+    template <typename T, MIR_TYPE_KEY tkey, ALLOC_SIZE_TYPE size>
+    T* allocate_slow()
     {
-        return this->allocate_slow<T, tkey, size>();
+        void *nv = malloc(size);
+        memset(nv, 0, size);
+        prepHeader(nv, size, mir_types[tkey]);
+
+        return (T *)(nv + sizeof(AllocatorHeader));
     }
-} 
 
-template <typename T, MIR_TYPE_KEY tkey, ALLOC_SIZE_TYPE size>
-T* allocate_slow()
-{
-    void* nv = malloc(size);
-    memset(nv, 0, size);
-    prepHeader(nv, size, mir_types[tkey]);
+    inline void release(void *mem, MIR_TYPE_KEY tkey)
+    {
+        AllocaterTypeBucket &bucket = this->type_segregated_allocs[tkey];
+        *((void **)mem) = bucket.entries;
+        bucket.entries = mem;
+        bucket.free_count++;
+    }
 
-    return (T*)(nv + sizeof(AllocatorHeader));
-}
+    template <typename T, bool zerofill>
+    inline T* allocate_array(uint32_t count)
+    {
+        void *nv = malloc(count * sizeof(T));
+        if(zerofill)
+        {
+            memset(nv, 0, count * sizeof(T));
+        }
+        return (T*)nv;
+    }
 
-inline void release(void* mem, MIR_TYPE_KEY tkey)
-{
-    AllocaterTypeBucket& bucket = this->type_segregated_allocs[tkey];
-    *((void**)mem) = bucket.entries;
-    bucket.entries = mem;
-    bucket.free_count++;
-}
+    inline void release_array(void *mem)
+    {
+       free(mem);
+    }
 };
 }
