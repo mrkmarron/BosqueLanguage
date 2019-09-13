@@ -19,12 +19,12 @@ struct AllocatorHeader
 {
     REF_COUNT_TYPE ref_count;
     ALLOC_SIZE_TYPE alloc_size;
-    void* mir_type;
 };
 
-constexpr ALLOC_SIZE_TYPE allocation_size(uint32_t slots) 
+template<typename T, uint32_t slots>
+constexpr ALLOC_SIZE_TYPE allocation_size() 
 {
-    return (ALLOC_SIZE_TYPE)(((slots == 0 ? 1 : slots) * sizeof(void*) + sizeof(AllocatorHeader)));
+    return (ALLOC_SIZE_TYPE)(sizeof(T) + (slots * sizeof(void*)) + sizeof(AllocatorHeader));
 }
 
 inline void incRef(void* mem)
@@ -45,11 +45,10 @@ inline void* decRef(void* mem)
     }
 }
 
-inline void prepHeader(AllocatorHeader* header, ALLOC_SIZE_TYPE size, void* mirtype)
+inline void prepHeader(AllocatorHeader* header, ALLOC_SIZE_TYPE size)
 {
     header->ref_count = 1;
     header->alloc_size = size;
-    header->mir_type = mirtype;
 }
 
 struct AllocaterTypeBucket
@@ -61,7 +60,6 @@ struct AllocaterTypeBucket
 class Allocator
 {
 private:
-    void **mir_types;
     AllocaterTypeBucket *type_segregated_allocs;
 
 public:
