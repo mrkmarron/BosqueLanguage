@@ -17,14 +17,25 @@ class AOTTypeGenerator {
 
     registerMIRType(type: MIRType) {
         if (type.trkey === "NSCore::None") {
-            this.typesigMap.set(type.trkey, "void*");
+            this.typesigMap.set(type.trkey, "shared_ptr<BSQ::Value>");
         }
-        else if(type.trkey === "NSCore::Bool") {
+        else if (type.trkey === "NSCore::Bool") {
             this.typesigMap.set(type.trkey, "bool");
         }
-        else if(type.trkey === "NSCore::Int") {
+        else if (type.trkey === "NSCore::Int") {
             this.typesigMap.set(type.trkey, "int64_t");
         }
-        xxxx;
+        else if (type.trkey === "NSCore::String") {
+            this.typesigMap.set(type.trkey, "std::shared_ptr<std::string>");
+        }
+        else if (type.trkey === "NSCore::Float") {
+            this.typesigMap.set(type.trkey, "double");
+        }
+        else if (type.trkey === "NSCore::Regex") {
+            this.typesigMap.set(type.trkey, "std::shared_ptr<std::regex>");
+        }
+        else {
+            
+        }
     }
 }

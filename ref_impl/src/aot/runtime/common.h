@@ -5,8 +5,11 @@
 
 #include <cstdint>
 #include <memory>
+
 #include <string>
 #include <regex>
+
+#include <map>
 
 #define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
 
