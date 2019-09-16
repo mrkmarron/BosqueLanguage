@@ -4,19 +4,36 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "common.h"
-#include "mirtype.h"
 
-namespace BSQ
-{
-    class TypedStringValue
+ namespace BSQ
+ {
+    class MIRTypeOption
     {
-        const MIRType* strtype;
-        const std::string contents;
+        xxxx;
     };
 
-    class GUIDValue
+    class MIRTypeEntity
     {
-        const std::shared_ptr<std::string> host;
-        const uint64_t idv;
+        xxxx;
     };
-} 
+
+    class MIRTypeConcept
+    {
+        xxxx;
+    };
+    
+    class MIRTypeTuple
+    {
+        xxxx;
+    };
+
+    class MIRTypeRecord
+    {
+        xxxx;
+    };
+
+    class MIRType
+    {
+        xxxx;
+    };
+ }

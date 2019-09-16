@@ -3,20 +3,20 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-#include "common.h"
-#include "mirtype.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <regex>
+
+#define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
+
+#define RUNTIME_ERROR(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
+#define BSQ_ABORT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
 
 namespace BSQ
 {
-    class TypedStringValue
+    void fail(const char* msg, const char* file, int64_t line, ...)
     {
-        const MIRType* strtype;
-        const std::string contents;
-    };
-
-    class GUIDValue
-    {
-        const std::shared_ptr<std::string> host;
-        const uint64_t idv;
-    };
-} 
+        exit(1);
+    }
+}
