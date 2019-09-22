@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump } from "../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone } from "../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType } from "../compiler/mir_assembly";
 import { AOTTypeGenerator } from "./aot_type_generator";
 import { sanitizeForCpp, NOT_IMPLEMENTED } from "./utils";
@@ -16,9 +16,13 @@ class AOTCodeGenerator {
 
     readonly allConstStrings: string[] = [];
 
+    private cinvokeResult: MIRType;
+
     constructor(assembly: MIRAssembly, typegen: AOTTypeGenerator) {
         this.assembly = assembly;
         this.typegen = typegen;
+
+        this.cinvokeResult = this.typegen.noneType;
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -43,6 +47,10 @@ class AOTCodeGenerator {
 
     literalStringToCppName(str: string): string {
         return sanitizeForCpp(str);
+    }
+
+    labelToCpp(label: string): string {
+        return sanitizeForCpp(label);
     }
 
     varToCppName(varg: MIRRegisterArgument): string {
@@ -419,10 +427,10 @@ class AOTCodeGenerator {
 
                 const argtype = this.getArgType(ton.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), SMTFreeVar.generate());
+                    return `${this.varToCppName(ton.trgt)} = ${this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"};`;
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(ton.trgt), new SMTValue(`(= ${this.argToSMT2Direct(ton.arg).emit()} bsq_term_none)`), SMTFreeVar.generate());
+                    return `${this.varToCppName(ton.trgt)} = ${this.argToCppDirect(ton.arg)} == RuntimeValueEnvironment.none;`;
                 }
             }
             case MIROpTag.MIRIsTypeOfSome: {
@@ -431,12 +439,12 @@ class AOTCodeGenerator {
 
                 const argtype = this.getArgType(tos.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "false" : "true"), SMTFreeVar.generate());
+                    return `${this.varToCppName(tos.trgt)} = ${this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "false" : "true"};`;
                 }
                 else {
-                    return new SMTLet(this.varToSMT2Name(tos.trgt), new SMTValue(`(not (= ${this.argToSMT2Direct(tos.arg).emit()} bsq_term_none))`), SMTFreeVar.generate());
+                    return `${this.varToCppName(tos.trgt)} = ${this.argToCppDirect(tos.arg)} != RuntimeValueEnvironment.none;`;
                 }
-            }
+           }
             case MIROpTag.MIRIsTypeOf: {
                 return NOT_IMPLEMENTED<string>("MIRIsTypeOf");
             }
@@ -444,37 +452,32 @@ class AOTCodeGenerator {
                 const regop = op as MIRRegAssign;
                 vtypes.set(regop.trgt.nameID, this.getArgType(regop.src, vtypes));
 
-                return new SMTLet(this.varToSMT2Name(regop.trgt), this.argToSMT2Direct(regop.src), SMTFreeVar.generate());
+                return `${this.varToCppName(regop.trgt)} = ${this.argToCppDirect(regop.src)};`;
             }
             case MIROpTag.MIRTruthyConvert: {
                 const tcop = op as MIRTruthyConvert;
                 vtypes.set(tcop.trgt.nameID, this.typegen.boolType);
 
                 const smttest = this.generateTruthyConvert(tcop.src, vtypes);
-                return new SMTLet(this.varToSMT2Name(tcop.trgt), smttest, SMTFreeVar.generate());
+                return `${this.varToCppName(tcop.trgt)} = ${smttest};`;
             }
             case MIROpTag.MIRLogicStore: {
                 const llop = op as MIRLogicStore;
                 vtypes.set(llop.trgt.nameID, this.typegen.boolType);
 
                 const lhvtype = this.getArgType(llop.lhs, vtypes);
-                const lhv = this.argToSMT2Coerce(llop.lhs, lhvtype, this.typegen.boolType).emit();
+                const lhv = this.argToCppCoerce(llop.lhs, lhvtype, this.typegen.boolType);
 
                 const rhvtype = this.getArgType(llop.rhs, vtypes);
-                const rhv = this.argToSMT2Coerce(llop.rhs, rhvtype, this.typegen.boolType).emit();
+                const rhv = this.argToCppCoerce(llop.rhs, rhvtype, this.typegen.boolType);
 
-                if (llop.op === "&") {
-                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(and ${lhv} ${rhv})`), SMTFreeVar.generate());
-                }
-                else {
-                    return new SMTLet(this.varToSMT2Name(llop.trgt), new SMTValue(`(or ${lhv} ${rhv})`), SMTFreeVar.generate());
-                }
+                return `${this.varToCppName(llop.trgt)} = (${lhv} ${llop.op} ${rhv});`;
             }
             case MIROpTag.MIRVarStore: {
                 const vsop = op as MIRVarStore;
                 vtypes.set(vsop.name.nameID, this.getArgType(vsop.src, vtypes));
 
-                return new SMTLet(this.varToSMT2Name(vsop.name), this.argToSMT2Direct(vsop.src), SMTFreeVar.generate());
+                return `${this.varToCppName(vsop.name)} = ${this.argToCppDirect(vsop.src)};`;
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
@@ -482,15 +485,14 @@ class AOTCodeGenerator {
 
                 const totype = vtypes.get(raop.name.nameID) as MIRType;
                 const fromtype = this.getArgType(raop.src, vtypes);
-                return new SMTLet(this.varToSMT2Name(raop.name), this.argToSMT2Coerce(raop.src, fromtype, totype), SMTFreeVar.generate());
+                return `${this.varToCppName(raop.name)} = ${this.argToCppCoerce(raop.src, fromtype, totype)};`;
             }
             case MIROpTag.MIRAbort: {
-                const aop = op as MIRAbort;
-                const resulttype = "Result_" + this.typegen.typeToSMT2Type(this.cinvokeResult as MIRType);
-                return new SMTValue(`(${resulttype}@result_with_code (result_error ${this.registerError(aop.sinfo)}))`);
+                throw xxxx;
             }
             case MIROpTag.MIRDebug: {
-                return undefined;
+                xxxx; //temp allow debug to write to help me debug compiler!
+                return ";"; //debug is a nop in AOT mode
             }
             case MIROpTag.MIRJump: {
                 const jop = op as MIRJump;
@@ -499,16 +501,16 @@ class AOTCodeGenerator {
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
                 const smttest = this.generateTruthyConvert(cjop.arg, vtypes);
-                return new SMTCond(smttest, SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
+                return `if(${smttest}) {goto ${this.labelToCpp(cjop.trueblock)};} else {goto ${cjop.falseblock};}`;
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
                 const argtype = this.getArgType(njop.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
-                    return new SMTCond(new SMTValue(this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
+                    return this.assembly.subtypeOf(argtype, this.typegen.noneType) ? `goto ${this.labelToCpp(njop.noneblock)};` : `goto ${this.labelToCpp(njop.someblock)};`;
                 }
                 else {
-                    return new SMTCond(new SMTValue(`(= ${this.argToSMT2Direct(njop.arg).emit()} bsq_term_none)`), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
+                    return `if(${this.argToCppDirect(njop.arg)} == RuntimeValueEnvironment.none) {goto ${this.labelToCpp(njop.noneblock)};} else {goto ${njop.someblock};}`;
                 }
             }
             case MIROpTag.MIRPhi: {
@@ -520,8 +522,7 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRVarLifetimeStart:
             case MIROpTag.MIRVarLifetimeEnd: {
-                xxxx;
-                return ``;
+                return ";"; //var lifetimes are a nop in AOT mode
             }
             default: {
                 return NOT_IMPLEMENTED<string>(`Missing case ${op.tag}`);
