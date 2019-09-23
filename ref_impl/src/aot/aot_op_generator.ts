@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone } from "../compiler/mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRPhi, MIRDebug } from "../compiler/mir_ops";
 import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType } from "../compiler/mir_assembly";
 import { AOTTypeGenerator } from "./aot_type_generator";
 import { sanitizeForCpp, NOT_IMPLEMENTED } from "./utils";
@@ -214,7 +214,7 @@ class AOTCodeGenerator {
         }
     }
 
-    generateStmt(op: MIROp, vtypes: Map<string, MIRType>, fromblck: string): string {
+    generateStmt(op: MIROp, vtypes: Map<string, MIRType>, fromblck: string): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
@@ -488,11 +488,18 @@ class AOTCodeGenerator {
                 return `${this.varToCppName(raop.name)} = ${this.argToCppCoerce(raop.src, fromtype, totype)};`;
             }
             case MIROpTag.MIRAbort: {
-                throw xxxx;
+                return "throw MIRAbort{};";
             }
             case MIROpTag.MIRDebug: {
-                xxxx; //temp allow debug to write to help me debug compiler!
-                return ";"; //debug is a nop in AOT mode
+                //debug is a nop in AOT release mode but we allow it for our debugging purposes
+                const dbgop = op as MIRDebug;
+                if (dbgop.value === undefined) {
+                    return "assert(false);";
+                }
+                else {
+                    const argv = this.getArgType(dbgop.value, vtypes);
+                    return `cout << BSQ::ValueOps::diagnostic_format(${this.argToCppCoerce(dbgop.value, argv, this.typegen.anyType)}) << \n;`;
+                }
             }
             case MIROpTag.MIRJump: {
                 const jop = op as MIRJump;
@@ -514,15 +521,11 @@ class AOTCodeGenerator {
                 }
             }
             case MIROpTag.MIRPhi: {
-                const pop = op as MIRPhi;
-                const uvar = pop.src.get(fromblck) as MIRRegisterArgument;
-                vtypes.set(pop.trgt.nameID, this.getArgType(uvar, vtypes));
-
-                return new SMTLet(this.varToSMT2Name(pop.trgt), this.argToSMT2Direct(uvar), SMTFreeVar.generate());
+                return undefined; //handle this as a special case in the block processing code
             }
             case MIROpTag.MIRVarLifetimeStart:
             case MIROpTag.MIRVarLifetimeEnd: {
-                return ";"; //var lifetimes are a nop in AOT mode
+                return undefined;
             }
             default: {
                 return NOT_IMPLEMENTED<string>(`Missing case ${op.tag}`);
