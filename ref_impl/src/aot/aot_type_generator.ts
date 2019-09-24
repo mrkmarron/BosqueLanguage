@@ -10,7 +10,7 @@ import { NOT_IMPLEMENTED } from "./utils";
 class AOTTypeGenerator {
     private assembly: MIRAssembly;
     private typesigMap: Map<MIRResolvedTypeKey, string> = new Map<MIRResolvedTypeKey, string>();
-    private typedeclMap: Map<MIRResolvedTypeKey, string> = new Map<MIRResolvedTypeKey, string>();
+    //private typedeclMap: Map<MIRResolvedTypeKey, string> = new Map<MIRResolvedTypeKey, string>();
 
     readonly noneType: MIRType;
     readonly boolType: MIRType;

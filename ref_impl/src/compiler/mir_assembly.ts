@@ -708,6 +708,33 @@ class MIRAssembly {
         return res;
     }
 
+    createMIRTypeWithSimplify(options: MIRType[]): MIRType {
+        const flatoptions = ([] as MIRTypeOption[]).concat(...options.map((opt) => opt.options));
+
+        //do a simplification based on A | B when A \Subtypeeq B is B
+        let simplifiedTypes: MIRTypeOption[] = [];
+        for (let i = 0; i < flatoptions.length; ++i) {
+            let docopy = true;
+            for (let j = 0; j < flatoptions.length; ++j) {
+                if (i === j) {
+                    continue; //ignore check on same element
+                }
+
+                //if \exists a Tj s.t. Ti \Subtypeeq Tj then we discard Ti
+                if (this.atomSubtypeOf(flatoptions[i], flatoptions[j])) {
+                    docopy = (flatoptions[i].trkey === flatoptions[j].trkey) && i < j; //if same type only keep one copy
+                    break;
+                }
+            }
+
+            if (docopy) {
+                simplifiedTypes.push(options[i]);
+            }
+        }
+
+        return MIRType.create(simplifiedTypes);
+    }
+
     jemit(): object {
         return {
             package: this.package.jemit(),
