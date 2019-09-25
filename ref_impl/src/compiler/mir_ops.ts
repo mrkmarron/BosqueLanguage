@@ -1744,13 +1744,17 @@ class MIRBody {
     readonly file: string;
     readonly sinfo: SourceInfo;
     readonly bkey: MIRBodyKey;
-    body: Map<string, MIRBasicBlock>;
 
-    constructor(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, body: Map<string, MIRBasicBlock>) {
+    body: Map<string, MIRBasicBlock>;
+    vtypes: Map<string, MIRResolvedTypeKey> | undefined;
+
+    constructor(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, body: Map<string, MIRBasicBlock>, vtypes?: Map<string, MIRResolvedTypeKey>) {
         this.file = file;
         this.sinfo = sinfo;
         this.bkey = bkey;
+
         this.body = body;
+        this.vtypes = vtypes;
     }
 
     jsonify(): any {
@@ -1797,13 +1801,18 @@ class MIRBody {
 
     jemit(): object {
         const blocks = topologicalOrder(this.body).map((blck) => blck.jemit());
-        return { file: this.file, sinfo: jemitsinfo(this.sinfo), bkey: this.bkey, blocks: blocks };
+        const vtypes = this.vtypes !== undefined ? ([...this.vtypes]) : undefined;
+        return { file: this.file, sinfo: jemitsinfo(this.sinfo), bkey: this.bkey, blocks: blocks, vtypes: vtypes };
     }
 
     static jparse(jobj: any): MIRBody {
         let body = new Map<string, MIRBasicBlock>();
-        jobj.blocks.map((blck: any) => MIRBasicBlock.jparse(blck)).forEach((blck: MIRBasicBlock) => body.set(blck.label, blck));
-        return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), jobj.bkey, body);
+        jobj.blocks.forEach((blck: any) => MIRBasicBlock.jparse(blck)).forEach((blck: MIRBasicBlock) => body.set(blck.label, blck));
+
+        let vtypes = new Map<string, MIRResolvedTypeKey>();
+        jobj.vtypes.forEach((vtype: [string, string]) => vtypes.set(vtype[0], vtype[1]));
+
+        return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), jobj.bkey, body, vtypes);
     }
 }
 
