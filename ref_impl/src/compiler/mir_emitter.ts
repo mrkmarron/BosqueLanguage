@@ -13,6 +13,7 @@ import * as Crypto from "crypto";
 import { TypeChecker } from "../type_checker/type_checker";
 import { propagateTmpAssignForBody, removeDeadTempAssignsFromBody } from "./mir_cleanup";
 import { convertBodyToSSA } from "./mir_ssa";
+import { computeVarTypesForInvoke } from "./mir_vartype";
 
 type PCode = {
     code: InvokeDecl,
@@ -376,12 +377,13 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: string[]): MIRBody {
+    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: Map<string, MIRType>, resulttype: MIRType, assembly: MIRAssembly): MIRBody {
         let ibody = new MIRBody(file, sinfo, bkey, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);
         convertBodyToSSA(ibody, args);
+        computeVarTypesForInvoke(ibody, args, resulttype, assembly);
 
         return ibody;
     }

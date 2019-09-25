@@ -708,7 +708,7 @@ class MIRAssembly {
         return res;
     }
 
-    createMIRTypeWithSimplify(options: MIRType[]): MIRType {
+    registerUnionTypeIfNeeded(options: MIRType[]): MIRType {
         const flatoptions = ([] as MIRTypeOption[]).concat(...options.map((opt) => opt.options));
 
         //do a simplification based on A | B when A \Subtypeeq B is B
@@ -732,7 +732,12 @@ class MIRAssembly {
             }
         }
 
-        return MIRType.create(simplifiedTypes);
+        const tt = MIRType.create(simplifiedTypes);
+        if (!this.typeMap.has(tt.trkey)) {
+            this.typeMap.set(tt.trkey, tt);
+        }
+
+        return tt;
     }
 
     jemit(): object {

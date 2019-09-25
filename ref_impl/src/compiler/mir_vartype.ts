@@ -3,8 +3,9 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign } from "./mir_ops";
-import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIRInvokeDecl } from "./mir_assembly";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBasicBlock, MIRBody } from "./mir_ops";
+import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIRInvokeDecl, MIRInvokeBodyDecl } from "./mir_assembly";
+import assert = require("assert");
 
 function getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>, assembly: MIRAssembly): MIRType {
     if (arg instanceof MIRRegisterArgument) {
@@ -253,10 +254,10 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
         }
         case MIROpTag.MIRPhi: {
             const pop = op as MIRPhi;
-            const uvar = pop.src.get(fromblck) as MIRRegisterArgument;
-            vtypes.set(pop.trgt.nameID, this.getArgType(uvar, vtypes));
+            const vopts = [...pop.src].map((avar) => getArgType(avar[1], vtypes, assembly));
 
-            return new SMTLet(this.varToSMT2Name(pop.trgt), this.argToSMT2Direct(uvar), SMTFreeVar.generate());
+            const mtype = assembly.registerUnionTypeIfNeeded(vopts);
+            vtypes.set(pop.trgt.nameID, mtype);
         }
         case MIROpTag.MIRVarLifetimeStart:
         case MIROpTag.MIRVarLifetimeEnd: {
@@ -269,3 +270,23 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
     }
 }
 
+function extendVarTypeMapForBody(body: MIRBody, invresult: MIRType, vtypes: Map<string, MIRType>, assembly: MIRAssembly) {
+    body.body.forEach((bb) => {
+        for (let i = 0; i < bb.ops.length; ++i) {
+            extendVariableTypeMapForOp(bb.ops[i], vtypes, assembly, invresult);
+        }
+    });
+}
+
+function computeVarTypesForInvoke(body: MIRBody, params: Map<string, MIRType>, resulttype: MIRType, assembly: MIRAssembly) {
+    let vtypes = new Map<string, MIRType>();
+    params.forEach((vtype, vname) => vtypes.set(vname, vtype));
+
+    extendVarTypeMapForBody(body, resulttype as MIRType, vtypes, assembly);
+
+    body.vtypes = vtypes;
+}
+
+export {
+    computeVarTypesForInvoke
+};
