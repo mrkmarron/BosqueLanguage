@@ -249,13 +249,13 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, resultNominalType, arg, update, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
-            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, ikey, args, trgt));
+            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, rtkey.trkey, ikey, args, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, ikey, args, rr));
+            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, xxxx, ikey, args, rr));
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
