@@ -249,7 +249,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, resultNominalType, arg, update, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRResolvedTypeKey, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, ikey, args, trgt));
         }
@@ -263,25 +263,25 @@ class MIRBodyEmitter {
                 this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i][0])));
             }
 
-            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey, rr, 0, trgt));
+            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey.trkey, rr, 0, trgt));
         }
     }
 
-    emitInvokeVirtualTarget(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, rtkey: MIRResolvedTypeKey, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: [string, MIRResolvedTypeKey][], trgt: MIRTempRegister) {
+    emitInvokeVirtualTarget(sinfo: SourceInfo, rtkey: MIRType, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
-            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, resultType, vresolve, args, trgt));
+            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, rtkey.trkey, vresolve, args, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, resultType, vresolve, args, trgt));
+            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, xxxx, vresolve, args, trgt));
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
-                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1], rr, i + 1, ri));
+                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1].trkey, rr, i + 1, ri));
                 this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i][0])));
             }
 
-            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey, rr, 0, trgt));
+            this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, rtkey.trkey, rr, 0, trgt));
         }
     }
 

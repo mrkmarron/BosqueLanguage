@@ -1096,15 +1096,15 @@ class TypeChecker {
         return { args: margs, refs: refs, pcodes: pcodes, cinfo: cinfo };
     }
 
-    private generateRefInfoForCallEmit(fsig: ResolvedFunctionType, refs: string[]): [MIRResolvedTypeKey, [string, MIRResolvedTypeKey][]] {
+    private generateRefInfoForCallEmit(fsig: ResolvedFunctionType, refs: string[]): [MIRType, [string, MIRType][]] {
         const rtype = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
         const refinfo = refs.map((rn) => {
             const rp = fsig.params.find((p) => p.name === rn);
             const ptk = this.m_emitter.registerResolvedTypeReference((rp as ResolvedFunctionTypeParam).type as ResolvedType);
-            return [rn, ptk.trkey] as [string, MIRResolvedTypeKey];
+            return [rn, ptk] as [string, MIRType];
         });
 
-        return [rtype.trkey, refinfo];
+        return [rtype, refinfo];
     }
 
     private generateRefInfoForReturnEmit(rtype: ResolvedType, env: TypeEnvironment): MIRResolvedTypeKey | undefined {
@@ -1458,12 +1458,13 @@ class TypeChecker {
             let ttypes = op.indecies.map((idx) => new ResolvedTupleAtomTypeEntry(this.getInfoForLoadFromIndex(ResolvedType.createSingle(opt), idx), false));
             return ResolvedType.createSingle(ResolvedTupleAtomType.create(false, ttypes));
         });
+        const restype = this.m_assembly.typeUnion(resultOptions);
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, arg, op.indecies, trgt);
+            this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.indecies, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+        return [env.setExpressionResult(this.m_assembly, restype)];
     }
 
     private checkAccessFromName(env: TypeEnvironment, op: PostfixAccessFromName, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1502,12 +1503,13 @@ class TypeChecker {
 
                 return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, ttypes));
             });
+            const restype = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectProperties(op.sinfo, arg, op.names, trgt);
+                this.m_emitter.bodyEmitter.emitProjectProperties(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.names, trgt);
             }
 
-            return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+            return [env.setExpressionResult(this.m_assembly, restype)];
         }
         else {
             op.names.forEach((f) => {
@@ -1524,12 +1526,13 @@ class TypeChecker {
 
                 return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, oentries));
             });
+            const restype = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, arg, op.names, trgt);
+                this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.names, trgt);
             }
 
-            return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+            return [env.setExpressionResult(this.m_assembly, restype)];
         }
     }
 
@@ -1548,7 +1551,8 @@ class TypeChecker {
 
             if (this.m_emitEnabled) {
                 const ttype = this.m_emitter.registerResolvedTypeReference(opType);
-                this.m_emitter.bodyEmitter.emitProjectFromTypeTuple(op.sinfo, arg, ttype.trkey, trgt);
+                const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
+                this.m_emitter.bodyEmitter.emitProjectFromTypeTuple(op.sinfo, resultType.trkey, arg, ttype.trkey, trgt);
             }
         }
         else if (ptype instanceof ResolvedRecordAtomType) {
@@ -1558,7 +1562,8 @@ class TypeChecker {
 
             if (this.m_emitEnabled) {
                 const ttype = this.m_emitter.registerResolvedTypeReference(opType);
-                this.m_emitter.bodyEmitter.emitProjectFromTypeRecord(op.sinfo, arg, ttype.trkey, trgt);
+                const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
+                this.m_emitter.bodyEmitter.emitProjectFromTypeRecord(op.sinfo, resultType.trkey, arg, ttype.trkey, trgt);
             }
         }
         else {
@@ -1572,7 +1577,8 @@ class TypeChecker {
                 (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => this.m_emitter.registerTypeInstantiation(ctype.concept, ctype.binds));
 
                 const ckeys = (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => MIRKeyGenerator.generateTypeKey(ctype.concept, ctype.binds));
-                this.m_emitter.bodyEmitter.emitProjectFromTypeConcept(op.sinfo, arg, ckeys, trgt);
+                const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
+                this.m_emitter.bodyEmitter.emitProjectFromTypeConcept(op.sinfo, resultType.trkey, arg, ckeys, trgt);
             }
         }
 
@@ -1641,12 +1647,13 @@ class TypeChecker {
             resultOptions = resultOptions.concat(...texp.options.map((topt) => {
                 return mergeValue.options.map((tmerge) => this.appendIntoTupleAtom(topt as ResolvedTupleAtomType, tmerge));
             }));
+            const resulttype = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitStructuredExtendTuple(op.sinfo, arg, etreg, trgt);
+                this.m_emitter.bodyEmitter.emitStructuredExtendTuple(op.sinfo, this.m_emitter.registerResolvedTypeReference(resulttype).trkey, arg, etreg, trgt);
             }
 
-            return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+            return [env.setExpressionResult(this.m_assembly, resulttype)];
         }
         else if (this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
             this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(mergeValue, this.m_assembly.getSpecialRecordConceptType()), "Must be two Records to merge");
@@ -1654,9 +1661,10 @@ class TypeChecker {
             resultOptions = resultOptions.concat(...texp.options.map((topt) => {
                 return mergeValue.options.map((tmerge) => this.mergeIntoRecordAtom(op.sinfo, topt as ResolvedRecordAtomType, tmerge));
             }));
+            const resulttype = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitStructuredExtendRecord(op.sinfo, arg, etreg, trgt);
+                this.m_emitter.bodyEmitter.emitStructuredExtendRecord(op.sinfo, this.m_emitter.registerResolvedTypeReference(resulttype).trkey, arg, etreg, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
@@ -1668,7 +1676,7 @@ class TypeChecker {
             mergeValue.options.map((tmerge) => this.mergeIntoEntityConceptAtom(op.sinfo, texp, tmerge));
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitStructuredExtendObject(op.sinfo, arg, etreg, trgt);
+                this.m_emitter.bodyEmitter.emitStructuredExtendObject(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, etreg, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, texp)];
