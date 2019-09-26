@@ -1,3 +1,5 @@
 
 ref_impl/node_modules/
 **/.vscode/
+out.h
+out.cc
