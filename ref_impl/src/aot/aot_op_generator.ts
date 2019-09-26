@@ -5,8 +5,8 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRPhi, MIRDebug, MIRInvokeFixedFunction, MIRBasicBlock, MIRResolvedTypeKey } from "../compiler/mir_ops";
-import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../compiler/mir_assembly";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRPhi, MIRDebug, MIRInvokeFixedFunction, MIRBasicBlock, MIRResolvedTypeKey, MIRBodyKey } from "../compiler/mir_ops";
+import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl } from "../compiler/mir_assembly";
 import { AOTTypeGenerator } from "./aot_type_generator";
 import { sanitizeForCpp, NOT_IMPLEMENTED } from "./utils";
 import { topologicalOrder } from "../compiler/mir_info";
@@ -60,6 +60,10 @@ class AOTCodeGenerator {
         return sanitizeForCpp(varg.nameID);
     }
 
+    constNameToCppName(cname: string): string {
+        return sanitizeForCpp(cname);
+    }
+
     invokenameToCppName(invk: string): string {
         return sanitizeForCpp(invk);
     }
@@ -75,7 +79,7 @@ class AOTCodeGenerator {
             return "false";
         }
         else if (cval instanceof MIRConstantInt) {
-            return cval.value.slice(1, cval.value.length - 2);
+            return cval.value;
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -323,7 +327,7 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                return this.generateMIRInvokeFixedFunction(invk, vtypes);
+                return `${this.varToCppName(invk.trgt)} = ${this.generateMIRInvokeFixedFunction(invk, vtypes)};`;
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
                 return NOT_IMPLEMENTED<string>("MIRInvokeVirtualTarget");
@@ -534,6 +538,8 @@ class AOTCodeGenerator {
                 inblock[inblock.length - 1] = assign;
                 inblock.push(jmp);
             });
+
+            ++blocki;
         }
 
         while (blocki < block.ops.length) {
@@ -541,6 +547,8 @@ class AOTCodeGenerator {
             if (gop !== undefined) {
                 gblock.push(gop);
             }
+
+            ++blocki;
         }
 
         if (block.label === "exit") {
@@ -550,13 +558,10 @@ class AOTCodeGenerator {
         this.generatedBlocks.set(block.label, gblock);
     }
 
-    generateInvoke(idecl: MIRInvokeDecl): string {
-        let argvars = new Map<string, MIRType>();
-        idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
-
-        const args = idecl.params.map((arg) => `(${this.varNameToCppName(arg.name)} ${this.typegen.typeToCppType(this.assembly.typeMap.get(arg.type) as MIRType)})`);
-        const restype = this.typegen.typeToCppType(this.assembly.typeMap.get(idecl.resultType) as MIRType);
-        const decl = `${restype} ${this.invokenameToCppName(idecl.key)} (${args.join(" ")})`;
+    generateInvoke(idecl: MIRInvokeDecl): [string, string] {
+        const args = idecl.params.map((arg) => `${this.typegen.typeToCppType(arg.type)} ${this.varNameToCppName(arg.name)}`);
+        const restype = this.typegen.typeToCppType(idecl.resultType);
+        const decl = `${restype} ${this.invokenameToCppName(idecl.key)}(${args.join(", ")})`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
             this.generatedBlocks = new Map<string, string[]>();
@@ -568,6 +573,12 @@ class AOTCodeGenerator {
                 btypes.set(name, mtype);
             });
 
+            const vdecls = [...(idecl as MIRInvokeBodyDecl).body.vtypes as Map<string, MIRResolvedTypeKey>]
+                .filter((dcl) => idecl.params.findIndex((p) => p.name === dcl[0]) === -1)
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map((ve) => `    ${this.typegen.typeToCppType(ve[1])} ${this.varNameToCppName(ve[0])};`)
+                .join("\n");
+
             for (let i = 0; i < blocks.length; ++i) {
                 this.generateBlock(blocks[i], btypes);
             }
@@ -575,21 +586,98 @@ class AOTCodeGenerator {
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
                 const blockstrs = [...this.generatedBlocks].map((blck) => {
                     const lbl = `${this.labelToCpp(blck[0])}:\n`;
-                    const stmts = blck[1].map((stmt) => "  " + stmt).join("\n");
+                    const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
                     return lbl + stmts;
                 });
 
-                return `${decl}\n{\n${blockstrs.join("\n")}}\n`;
+                return [decl + ";", `${decl}\n{\n${vdecls}\n\n${blockstrs.join("\n\n")}\n}\n`];
             }
             else {
-                return NOT_IMPLEMENTED<string>("generateInvoke -- Pre/Post");
+                return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- Pre/Post");
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<string>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
+    }
+
+    generatePre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        return NOT_IMPLEMENTED<string>("generatePre");
+    }
+
+    generatePost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        return NOT_IMPLEMENTED<string>("generatePost");
+    }
+
+    generateInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+        return NOT_IMPLEMENTED<string>("generateInv");
+    }
+
+    generateConst(cdecl: MIRConstantDecl): [string, string] {
+        const vdecl = `${this.typegen.typeToCppType(cdecl.declaredType)} ${this.constNameToCppName(cdecl.value.bkey)}$value;`;
+        const vdeclmemo = `bool ${this.constNameToCppName(cdecl.key)}$memo = false;`;
+        const decl = `${this.typegen.typeToCppType(cdecl.declaredType)} ${this.invokenameToCppName(cdecl.value.bkey)}()`;
+        const memopath = `if(${this.constNameToCppName(cdecl.key)}$memo) { return ${this.constNameToCppName(cdecl.value.bkey)}$value; }`;
+
+        const blocks = topologicalOrder(cdecl.value.body);
+        const btypes = new Map<string, MIRType>();
+        (cdecl.value.vtypes as Map<string, MIRResolvedTypeKey>).forEach((typeid, name) => {
+            const mtype = this.assembly.typeMap.get(typeid) as MIRType;
+            btypes.set(name, mtype);
+        });
+
+        const vdecls = [...cdecl.value.vtypes as Map<string, MIRResolvedTypeKey>]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map((ve) => `    ${this.typegen.typeToCppType(ve[1])} ${this.varNameToCppName(ve[0])};`)
+            .join("\n");
+
+        for (let i = 0; i < blocks.length; ++i) {
+            this.generateBlock(blocks[i], btypes);
+        }
+
+        const blockstrs = [...this.generatedBlocks].map((blck) => {
+            const lbl = `${this.labelToCpp(blck[0])}:\n`;
+            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+            return lbl + stmts;
+        });
+
+        return [decl + ";", vdecl + "\n" + vdeclmemo + "\n" + `${decl}\n{\n  ${memopath}\n\n${vdecls}\n\n${blockstrs.join("\n\n")}\n}\n`];
+    }
+
+    generateFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string {
+        return NOT_IMPLEMENTED<string>("generateFDefault");
+    }
+
+    generateAssembly(): string {
+        const forwardConstDecls: string[] = [];
+        const constDecls: string[] = [];
+        this.assembly.constantDecls.forEach((cdecl) => {
+            const [fd, dd] = this.generateConst(cdecl);
+            forwardConstDecls.push(fd);
+            constDecls.push(dd);
+        });
+
+        const forwardInvokeDecls: string[] = [];
+        const invokeDecls: string[] = [];
+        this.assembly.invokeDecls.forEach((idecl) => {
+            const [fd, dd] = this.generateInvoke(idecl);
+            forwardInvokeDecls.push(fd);
+            invokeDecls.push(dd);
+        });
+
+        return `#include "common.h"\n`
+        + `#include "mirtype.h"\n`
+        + `#include "mirvalue.h"\n`
+        + "\n"
+        + forwardConstDecls.join("\n")
+        + "\n"
+        + forwardInvokeDecls.join("\n")
+        + "\n"
+        + constDecls.join("\n")
+        + "\n"
+        + invokeDecls.join("\n");
     }
 }
 

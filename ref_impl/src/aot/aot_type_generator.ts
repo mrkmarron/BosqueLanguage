@@ -5,7 +5,7 @@
 
 import { MIRResolvedTypeKey } from "../compiler/mir_ops";
 import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRTupleType, MIRRecordType, MIREntityTypeDecl } from "../compiler/mir_assembly";
-import { NOT_IMPLEMENTED, sanitizeForCpp } from "./utils";
+import { NOT_IMPLEMENTED } from "./utils";
 
 class AOTTypeGenerator {
     private assembly: MIRAssembly;
@@ -42,8 +42,8 @@ class AOTTypeGenerator {
     }
 
     registerMIRType(type: MIRType) {
-        if (type.trkey === "NSCore::None") {
-            this.typesigMap.set(type.trkey, "shared_ptr<BSQ::Value>");
+        if (type.trkey === "NSCore::None" || type.trkey === "NSCore::Some" || type.trkey === "NSCore::Any") {
+            this.typesigMap.set(type.trkey, "std::shared_ptr<BSQ::Value>");
         }
         else if (type.trkey === "NSCore::Bool") {
             this.typesigMap.set(type.trkey, "bool");
@@ -89,8 +89,8 @@ class AOTTypeGenerator {
         return (from instanceof MIRType) ? from.options[0] : from;
     }
 
-    typeToCppType(type: MIRType): string {
-        return sanitizeForCpp(type.trkey);
+    typeToCppType(trkey: MIRResolvedTypeKey): string {
+        return this.typesigMap.get(trkey) as string;
     }
 }
 

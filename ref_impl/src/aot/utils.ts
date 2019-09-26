@@ -8,7 +8,24 @@ function NOT_IMPLEMENTED<T>(action: string): T {
 }
 
 function sanitizeForCpp(name: string): string {
-    return name;
+    return name
+    .replace(/#/g, "$h$")
+    .replace(/::/g, "$cc$")
+    .replace(/=/g, "$eq$")
+    .replace(/\[/g, "$lb$")
+    .replace(/\]/g, "$rb$")
+    .replace(/{/g, "$lc$")
+    .replace(/}/g, "$rc$")
+    .replace(/</g, "$la$")
+    .replace(/>/g, "$ra$")
+    .replace(/\|/g, "$v$")
+    .replace(/--/g, "$dd$")
+    .replace(/, /g, "$csp$")
+    .replace(/[.]/g, "$dot$")
+    .replace(/:/g, "$c$")
+    .replace(/[\\]/g, "$bs$")
+    .replace(/[/]/g, "$fs$")
+    .replace(/%/g, "$pct$");
 }
 
 export {
