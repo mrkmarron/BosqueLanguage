@@ -3282,8 +3282,6 @@ class TypeChecker {
     }
 
     private checkBody(env: TypeEnvironment, body: BodyImplementation, args: Map<string, MIRType>, resultType: ResolvedType): MIRBody | undefined {
-        const mirrtype = this.m_emitEnabled ? this.m_emitter.registerResolvedTypeReference(resultType) : undefined;
-
         if (body.body instanceof Expression) {
             if (this.m_emitEnabled) {
                 this.m_emitter.initializeBodyEmitter();
@@ -3300,7 +3298,7 @@ class TypeChecker {
 
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(evalue.getExpressionResult().etype, resultType), "Did not produce the expected return type");
 
-            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args, mirrtype as MIRType, this.m_emitter.masm) : undefined;
+            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args) : undefined;
         }
         else if (body.body instanceof BlockStatement) {
             if (this.m_emitEnabled) {
@@ -3311,7 +3309,7 @@ class TypeChecker {
             this.raiseErrorIf(body.body.sinfo, renv.hasNormalFlow(), "Not all flow paths return a value!");
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(renv.returnResult as ResolvedType, resultType), "Did not produce the expected return type");
 
-            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args, mirrtype as MIRType, this.m_emitter.masm) : undefined;
+            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args) : undefined;
         }
         else {
             return undefined;
@@ -3340,8 +3338,7 @@ class TypeChecker {
             argTypes.set(name, atype);
         });
 
-        const rtype = this.m_emitter.registerResolvedTypeReference(ofType) as MIRType;
-        return this.m_emitter.bodyEmitter.getBody(this.m_file, exp.sinfo, bkey, argTypes, rtype, this.m_emitter.masm);
+        return this.m_emitter.bodyEmitter.getBody(this.m_file, exp.sinfo, bkey, argTypes);
     }
 
     private abortIfTooManyErrors() {

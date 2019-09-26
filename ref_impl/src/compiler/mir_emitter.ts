@@ -387,13 +387,12 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: Map<string, MIRType>, resulttype: MIRType, assembly: MIRAssembly): MIRBody {
+    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: Map<string, MIRType>): MIRBody {
         let ibody = new MIRBody(file, sinfo, bkey, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);
         convertBodyToSSA(ibody, args);
-        computeVarTypesForInvoke(ibody, args, resulttype, assembly);
 
         return ibody;
     }
@@ -750,6 +749,12 @@ class MIREmitter {
             //compute closed field and vtable info
             masm.conceptDecls.forEach((cpt) => emitter.closeConceptDecl(cpt));
             masm.entityDecls.forEach((entity) => emitter.closeEntityDecl(entity));
+
+            masm.invokeDecls.forEach((idecl) => {
+                const args = new Map<string, MIRType>();
+                idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
+                computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
+            });
         }
         catch (ex) {
             //ignore

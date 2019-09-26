@@ -728,7 +728,7 @@ class MIRAssembly {
             }
 
             if (docopy) {
-                simplifiedTypes.push(options[i]);
+                simplifiedTypes.push(flatoptions[i]);
             }
         }
 

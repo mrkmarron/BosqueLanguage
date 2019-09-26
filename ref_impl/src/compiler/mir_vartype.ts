@@ -4,8 +4,9 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey } from "./mir_ops";
-import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIRInvokeDecl } from "./mir_assembly";
+import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl } from "./mir_assembly";
 import assert = require("assert");
+import { topologicalOrder } from "./mir_info";
 
 function getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>, assembly: MIRAssembly): MIRType {
     if (arg instanceof MIRRegisterArgument) {
@@ -171,7 +172,7 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
         }
         case MIROpTag.MIRInvokeFixedFunction: {
             const invk = op as MIRInvokeFixedFunction;
-            vtypes.set(invk.trgt.nameID, assembly.typeMap.get(((assembly.invokeDecls.get(invk.mkey) || assembly.primitiveInvokeDecls.get(invk.mkey)) as MIRInvokeDecl).resultType) as MIRType);
+            vtypes.set(invk.trgt.nameID, assembly.typeMap.get(invk.resultType) as MIRType);
             break;
         }
         case MIROpTag.MIRInvokeVirtualTarget: {
@@ -271,11 +272,12 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
 }
 
 function extendVarTypeMapForBody(body: MIRBody, invresult: MIRType, vtypes: Map<string, MIRType>, assembly: MIRAssembly) {
-    body.body.forEach((bb) => {
-        for (let i = 0; i < bb.ops.length; ++i) {
-            extendVariableTypeMapForOp(bb.ops[i], vtypes, assembly, invresult);
+    const btopo = topologicalOrder(body.body);
+    for (let j = 0; j < btopo.length; ++j) {
+        for (let i = 0; i < btopo[j].ops.length; ++i) {
+            extendVariableTypeMapForOp(btopo[j].ops[i], vtypes, assembly, invresult);
         }
-    });
+    }
 }
 
 function computeVarTypesForInvoke(body: MIRBody, params: Map<string, MIRType>, resulttype: MIRType, assembly: MIRAssembly) {
