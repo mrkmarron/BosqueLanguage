@@ -5,7 +5,7 @@
 
 import { MIRResolvedTypeKey } from "../compiler/mir_ops";
 import { MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRTupleType, MIRRecordType, MIREntityTypeDecl } from "../compiler/mir_assembly";
-import { NOT_IMPLEMENTED } from "./utils";
+import { NOT_IMPLEMENTED, sanitizeForCpp } from "./utils";
 
 class AOTTypeGenerator {
     private assembly: MIRAssembly;
@@ -87,6 +87,10 @@ class AOTTypeGenerator {
 
     static getExactTypeFrom(from: MIRType | MIRTypeOption): MIRTypeOption {
         return (from instanceof MIRType) ? from.options[0] : from;
+    }
+
+    typeToCppType(type: MIRType): string {
+        return sanitizeForCpp(type.trkey);
     }
 }
 

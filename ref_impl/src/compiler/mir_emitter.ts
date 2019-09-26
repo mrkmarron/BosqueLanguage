@@ -249,17 +249,22 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, resultNominalType, arg, update, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(masm: MIRAssembly, sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, rtkey.trkey, ikey, args, trgt));
         }
         else {
+            const rtuple = MIRType.createSingle(MIRTupleType.create(false, [rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            if (!masm.typeMap.has(rtuple.trkey)) {
+                masm.typeMap.set(rtuple.trkey, rtuple);
+            }
+
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, xxxx, ikey, args, rr));
+            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, rtuple.trkey, ikey, args, rr));
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();
-                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1], rr, i + 1, ri));
+                this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, refs[i][1].trkey, rr, i + 1, ri));
                 this.m_currentBlock.push(new MIRVarStore(sinfo, ri, new MIRVariable(refs[i][0])));
             }
 
@@ -267,13 +272,18 @@ class MIRBodyEmitter {
         }
     }
 
-    emitInvokeVirtualTarget(sinfo: SourceInfo, rtkey: MIRType, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
+    emitInvokeVirtualTarget(masm: MIRAssembly, sinfo: SourceInfo, rtkey: MIRType, vresolve: MIRVirtualMethodKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {
         if (refs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, rtkey.trkey, vresolve, args, trgt));
         }
         else {
+            const rtuple = MIRType.createSingle(MIRTupleType.create(false, [rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            if (!masm.typeMap.has(rtuple.trkey)) {
+                masm.typeMap.set(rtuple.trkey, rtuple);
+            }
+
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, xxxx, vresolve, args, trgt));
+            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, rtuple.trkey, vresolve, args, trgt));
 
             for (let i = 0; i < refs.length; ++i) {
                 const ri = this.generateTmpRegister();

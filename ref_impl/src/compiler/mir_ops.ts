@@ -1147,11 +1147,13 @@ class MIRStructuredExtendObject extends MIRValueOp {
 }
 
 class MIRInvokeFixedFunction extends MIRValueOp {
+    resultType: MIRResolvedTypeKey;
     readonly mkey: MIRInvokeKey;
     args: MIRArgument[]; //this is args[0] for methods
 
-    constructor(sinfo: SourceInfo, mkey: MIRInvokeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRInvokeFixedFunction, sinfo, trgt);
+        this.resultType = resultType;
         this.mkey = mkey;
         this.args = args;
     }
@@ -1163,11 +1165,11 @@ class MIRInvokeFixedFunction extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), mkey: this.mkey, args: this.args.map((arg) => arg.jemit()) };
+        return { ...this.jbemit(), resultType: this.resultType, mkey: this.mkey, args: this.args.map((arg) => arg.jemit()) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

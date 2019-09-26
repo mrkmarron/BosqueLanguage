@@ -9,6 +9,8 @@ import chalk from "chalk";
 import { MIREmitter } from "../compiler/mir_emitter";
 import { PackageConfig, MIRAssembly, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
 import { MIRBody } from "../compiler/mir_ops";
+import { AOTCodeGenerator } from "../aot/aot_op_generator";
+import { AOTTypeGenerator } from "../aot/aot_type_generator";
 
 function runApp(app: string) {
     process.stdout.write("Reading app code...\n");
@@ -47,6 +49,11 @@ function runApp(app: string) {
 
         const irv = (masm as MIRAssembly).invokeDecls.get(process.argv[3]) as MIRInvokeBodyDecl;
         const dgml = (irv.body as MIRBody).dgmlify(irv.iname);
+
+        const typegen = new AOTTypeGenerator(masm as MIRAssembly);
+        const cppgen = new AOTCodeGenerator(masm as MIRAssembly, typegen);
+        const cpp = cppgen.generateInvoke(irv);
+        console.log(cpp);
 
         process.stdout.write("Writing IR...\n");
         FS.writeFileSync("mir_ir.dgml", dgml);

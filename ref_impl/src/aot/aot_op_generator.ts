@@ -5,10 +5,11 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRAbort, MIRJumpCond, MIRJumpNone, MIRPhi, MIRDebug, MIRInvokeFixedFunction, MIRBasicBlock } from "../compiler/mir_ops";
-import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRInvokeDecl } from "../compiler/mir_assembly";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRJump, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRPhi, MIRDebug, MIRInvokeFixedFunction, MIRBasicBlock, MIRResolvedTypeKey } from "../compiler/mir_ops";
+import { MIRType, MIRAssembly, MIRTypeOption, MIREntityType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../compiler/mir_assembly";
 import { AOTTypeGenerator } from "./aot_type_generator";
 import { sanitizeForCpp, NOT_IMPLEMENTED } from "./utils";
+import { topologicalOrder } from "../compiler/mir_info";
 
 class AOTCodeGenerator {
     readonly assembly: MIRAssembly;
@@ -16,16 +17,11 @@ class AOTCodeGenerator {
 
     readonly allConstStrings: string[] = [];
 
-    private cinvokeResult: MIRType;
-
     private generatedBlocks: Map<string, string[]> = new Map<string, string[]>();
-    private allVTypes: Map<string, Map<string, MIRType>> = new Map<string, Map<string, MIRType>>();
 
     constructor(assembly: MIRAssembly, typegen: AOTTypeGenerator) {
         this.assembly = assembly;
         this.typegen = typegen;
-
-        this.cinvokeResult = this.typegen.noneType;
     }
 
     getArgType(arg: MIRArgument, vtypes: Map<string, MIRType>): MIRType {
@@ -54,6 +50,10 @@ class AOTCodeGenerator {
 
     labelToCpp(label: string): string {
         return sanitizeForCpp(label);
+    }
+
+    varNameToCppName(name: string): string {
+        return sanitizeForCpp(name);
     }
 
     varToCppName(varg: MIRRegisterArgument): string {
@@ -236,7 +236,6 @@ class AOTCodeGenerator {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
-                vtypes.set(lcv.trgt.nameID, this.getArgType(lcv.src, vtypes));
                 return `${this.varToCppName(lcv.trgt)} = ${this.generateConstantExp(lcv.src)};`;
             }
             case MIROpTag.MIRLoadConstTypedString:  {
@@ -250,12 +249,10 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
-                vtypes.set(lav.trgt.nameID, this.getArgType(lav.name, vtypes));
                 return `${this.varToCppName(lav.trgt)} = ${this.argToCppDirect(lav.name)};`;
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
-                vtypes.set(llv.trgt.nameID, this.getArgType(llv.name, vtypes));
                 return `${this.varToCppName(llv.trgt)} = ${this.argToCppDirect(llv.name)};`;
             }
             case MIROpTag.MIRConstructorPrimary: {
@@ -326,7 +323,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                vtypes.set(invk.trgt.nameID, this.assembly.typeMap.get(((this.assembly.invokeDecls.get(invk.mkey) || this.assembly.primitiveInvokeDecls.get(invk.mkey)) as MIRInvokeDecl).resultType) as MIRType);
                 return this.generateMIRInvokeFixedFunction(invk, vtypes);
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
@@ -336,14 +332,10 @@ class AOTCodeGenerator {
                 const pfx = op as MIRPrefixOp;
                 const argtype = this.getArgType(pfx.arg, vtypes);
                 if (pfx.op === "!") {
-                    vtypes.set(pfx.trgt.nameID, this.typegen.boolType);
-
                     const tval = this.generateTruthyConvert(pfx.arg, vtypes);
                     return `${this.varToCppName(pfx.trgt)} = !${tval};`;
                 }
                 else {
-                    vtypes.set(pfx.trgt.nameID, this.typegen.intType);
-
                     if (pfx.op === "-") {
                         return `${this.varToCppName(pfx.trgt)} = -${this.argToCppCoerce(pfx.arg, argtype, this.typegen.intType)};`;
                     }
@@ -354,7 +346,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                vtypes.set(bop.trgt.nameID, this.typegen.intType);
 
                 const trgt = this.varToCppName(bop.trgt);
                 const lhv = this.argToCppCoerce(bop.lhs, this.getArgType(bop.lhs, vtypes), this.typegen.intType);
@@ -364,7 +355,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
-                vtypes.set(beq.trgt.nameID, this.typegen.boolType);
 
                 const lhvtype = this.getArgType(beq.lhs, vtypes);
                 const rhvtype = this.getArgType(beq.rhs, vtypes);
@@ -411,7 +401,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
-                vtypes.set(bcmp.trgt.nameID, this.typegen.boolType);
 
                 const lhvtype = this.getArgType(bcmp.lhs, vtypes);
                 const rhvtype = this.getArgType(bcmp.rhs, vtypes);
@@ -427,7 +416,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
-                vtypes.set(ton.trgt.nameID, this.typegen.boolType);
 
                 const argtype = this.getArgType(ton.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
@@ -439,7 +427,6 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRIsTypeOfSome: {
                 const tos = op as MIRIsTypeOfSome;
-                vtypes.set(tos.trgt.nameID, this.assembly.typeMap.get("NSCore::Bool") as MIRType);
 
                 const argtype = this.getArgType(tos.arg, vtypes);
                 if (this.typegen.isTypeExact(argtype)) {
@@ -454,20 +441,17 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;
-                vtypes.set(regop.trgt.nameID, this.getArgType(regop.src, vtypes));
 
                 return `${this.varToCppName(regop.trgt)} = ${this.argToCppDirect(regop.src)};`;
             }
             case MIROpTag.MIRTruthyConvert: {
                 const tcop = op as MIRTruthyConvert;
-                vtypes.set(tcop.trgt.nameID, this.typegen.boolType);
 
                 const smttest = this.generateTruthyConvert(tcop.src, vtypes);
                 return `${this.varToCppName(tcop.trgt)} = ${smttest};`;
             }
             case MIROpTag.MIRLogicStore: {
                 const llop = op as MIRLogicStore;
-                vtypes.set(llop.trgt.nameID, this.typegen.boolType);
 
                 const lhvtype = this.getArgType(llop.lhs, vtypes);
                 const lhv = this.argToCppCoerce(llop.lhs, lhvtype, this.typegen.boolType);
@@ -479,13 +463,11 @@ class AOTCodeGenerator {
             }
             case MIROpTag.MIRVarStore: {
                 const vsop = op as MIRVarStore;
-                vtypes.set(vsop.name.nameID, this.getArgType(vsop.src, vtypes));
 
                 return `${this.varToCppName(vsop.name)} = ${this.argToCppDirect(vsop.src)};`;
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
-                vtypes.set(raop.name.nameID, this.cinvokeResult as MIRType);
 
                 const totype = vtypes.get(raop.name.nameID) as MIRType;
                 const fromtype = this.getArgType(raop.src, vtypes);
@@ -537,25 +519,77 @@ class AOTCodeGenerator {
         }
     }
 
-    generateSingleBlocks(block: MIRBasicBlock) {
+    generateBlock(block: MIRBasicBlock, vtypes: Map<string, MIRType>) {
         let gblock: string[] = [];
 
         let blocki = 0;
-        /*
         while (blocki < block.ops.length - 1 && block.ops[blocki] instanceof MIRPhi) {
             const phiop = block.ops[blocki] as MIRPhi;
-            const vtypes = ;
+            phiop.src.forEach((src, fblock) => {
+                const assign = `${this.varToCppName(phiop.trgt)} = ${this.argToCppCoerce(src, this.getArgType(src, vtypes), vtypes.get(phiop.trgt.nameID) as MIRType)};`;
+                const inblock = this.generatedBlocks.get(fblock) as string[];
+
+                //last entry is the jump so put before that but after all other statements
+                const jmp = inblock[inblock.length - 1];
+                inblock[inblock.length - 1] = assign;
+                inblock.push(jmp);
+            });
         }
-        */
 
         while (blocki < block.ops.length) {
-            const gop = this.generateStmt(block.ops[blocki]);
+            const gop = this.generateStmt(block.ops[blocki], vtypes);
             if (gop !== undefined) {
                 gblock.push(gop);
             }
         }
 
+        if (block.label === "exit") {
+            gblock.push("return _return_;");
+        }
+
         this.generatedBlocks.set(block.label, gblock);
+    }
+
+    generateInvoke(idecl: MIRInvokeDecl): string {
+        let argvars = new Map<string, MIRType>();
+        idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
+
+        const args = idecl.params.map((arg) => `(${this.varNameToCppName(arg.name)} ${this.typegen.typeToCppType(this.assembly.typeMap.get(arg.type) as MIRType)})`);
+        const restype = this.typegen.typeToCppType(this.assembly.typeMap.get(idecl.resultType) as MIRType);
+        const decl = `${restype} ${this.invokenameToCppName(idecl.key)} (${args.join(" ")})`;
+
+        if (idecl instanceof MIRInvokeBodyDecl) {
+            this.generatedBlocks = new Map<string, string[]>();
+
+            const blocks = topologicalOrder((idecl as MIRInvokeBodyDecl).body.body);
+            const btypes = new Map<string, MIRType>();
+            ((idecl as MIRInvokeBodyDecl).body.vtypes as Map<string, MIRResolvedTypeKey>).forEach((typeid, name) => {
+                const mtype = this.assembly.typeMap.get(typeid) as MIRType;
+                btypes.set(name, mtype);
+            });
+
+            for (let i = 0; i < blocks.length; ++i) {
+                this.generateBlock(blocks[i], btypes);
+            }
+
+            if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
+                const blockstrs = [...this.generatedBlocks].map((blck) => {
+                    const lbl = `${this.labelToCpp(blck[0])}:\n`;
+                    const stmts = blck[1].map((stmt) => "  " + stmt).join("\n");
+                    return lbl + stmts;
+                });
+
+                return `${decl}\n{\n${blockstrs.join("\n")}}\n`;
+            }
+            else {
+                return NOT_IMPLEMENTED<string>("generateInvoke -- Pre/Post");
+            }
+        }
+        else {
+            assert(idecl instanceof MIRInvokePrimitiveDecl);
+
+            return NOT_IMPLEMENTED<string>("generateInvoke -- MIRInvokePrimitiveDecl");
+        }
     }
 }
 
