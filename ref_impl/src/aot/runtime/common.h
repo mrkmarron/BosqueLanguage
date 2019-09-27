@@ -18,8 +18,8 @@
 
 namespace BSQ
 {
-    void fail(const char* msg, const char* file, int64_t line, ...)
-    {
-        exit(1);
-    }
+void fail(const char* msg, const char* file, int64_t line, ...)
+{
+    exit(1);
 }
+} // namespace BSQ

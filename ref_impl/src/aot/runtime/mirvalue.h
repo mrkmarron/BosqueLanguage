@@ -46,7 +46,7 @@ namespace BSQ
     public:
         const int64_t ival;
 
-        BoxedInt() : Value(), ival(false) { ; }
+        BoxedInt() : Value(), ival(0) { ; }
         BoxedInt(const RuntimeType* vtype, int64_t val) : Value(vtype), ival(val) { ; }
 
         BoxedInt(const BoxedInt&) = default;
@@ -90,5 +90,55 @@ namespace BSQ
 
         inline static std::shared_ptr<BoxedFloat> box(double fv) { return std::make_shared<BoxedFloat>(s_typeenv.getFloatType(), fv); }
         inline double unbox() const { return this->fval; }
+    };
+
+    class BoxedTuple : public Value
+    {
+    public:
+        const std::vector<std::shared_ptr<Value>> entries;
+
+        BoxedTuple() : Value(), entries() { ; }
+        BoxedTuple(const RuntimeType* vtype, std::vector<std::shared_ptr<Value>>&& entries) : Value(vtype), entries(entries) { ; }
+
+        BoxedTuple(const BoxedTuple&) = default;
+        BoxedTuple& operator=(const BoxedTuple&) = default;
+
+        virtual ~BoxedTuple() { ; }
+
+        //
+        //TODO: box and unbox here
+        //
+    };
+
+    class BoxedRecord : public Value
+    {
+    public:
+        std::vector<std::pair<std::string, std::shared_ptr<Value>>> entries;
+
+        BoxedFloat() : Value(), fval() { ; }
+        BoxedFloat(const RuntimeType* vtype, double val) : Value(vtype), fval(val) { ; }
+
+        BoxedFloat(const BoxedFloat&) = default;
+        BoxedFloat& operator=(const BoxedFloat&) = default;
+
+        virtual ~BoxedFloat() { ; }
+
+        //
+        //TODO: box and unbox here
+        //
+    };
+
+    class BoxedEntity : public Value
+    {
+    public:
+        std::vector<std::pair<std::string, std::shared_ptr<Value>>> fields;
+
+        BoxedEntity() : Value(), fval() { ; }
+        BoxedEntity(const RuntimeType* vtype, double val) : Value(vtype), fval(val) { ; }
+
+        BoxedEntity(const BoxedEntity&) = default;
+        BoxedEntity& operator=(const BoxedEntity&) = default;
+
+        virtual ~BoxedEntity() { ; }
     };
 } 

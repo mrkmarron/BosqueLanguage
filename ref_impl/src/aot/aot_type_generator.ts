@@ -16,7 +16,7 @@ class AOTTypeGenerator {
     readonly boolType: MIRType;
     readonly intType: MIRType;
     readonly stringType: MIRType;
-    readonly someType: MIRType;
+
     readonly anyType: MIRType;
 
     constructor(assembly: MIRAssembly) {
@@ -34,15 +34,11 @@ class AOTTypeGenerator {
         this.stringType = this.assembly.typeMap.get("NSCore::String") as MIRType;
         this.registerMIRType(this.stringType);
 
-        this.someType = this.assembly.typeMap.get("NSCore::Some") as MIRType;
-        this.registerMIRType(this.someType);
-
         this.anyType = this.assembly.typeMap.get("NSCore::Any") as MIRType;
-        this.registerMIRType(this.anyType);
     }
 
     registerMIRType(type: MIRType) {
-        if (type.trkey === "NSCore::None" || type.trkey === "NSCore::Some" || type.trkey === "NSCore::Any") {
+        if (type.trkey === "NSCore::None") {
             this.typesigMap.set(type.trkey, "std::shared_ptr<BSQ::Value>");
         }
         else if (type.trkey === "NSCore::Bool") {
