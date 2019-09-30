@@ -7,12 +7,13 @@ import * as FS from "fs";
 import * as Path from "path";
 
 import { MIREmitter } from "../compiler/mir_emitter";
-import { PackageConfig, MIRAssembly } from "../compiler/mir_assembly";
+import { PackageConfig, MIRAssembly, MIRInvokeBodyDecl, MIRType } from "../compiler/mir_assembly";
 
 import chalk from "chalk";
 import * as Commander from "commander";
 import { AOTTypeGenerator } from "./aot_type_generator";
 import { AOTCodeGenerator } from "./aot_op_generator";
+import { sanitizeForCpp } from "./utils";
 
 /*
 let cpp_cmd: string | undefined = undefined;
@@ -26,6 +27,8 @@ else {
     cpp_cmd = undefined;
 }
 */
+
+const runtimedir = Path.join(__dirname, "../../src/aot/runtime");
 
 function generateMASM(files: string[]): MIRAssembly {
     process.stdout.write("Reading code...\n");
@@ -65,7 +68,7 @@ function generateMASM(files: string[]): MIRAssembly {
     return masm as MIRAssembly;
 }
 
-function generateCPP(masm: MIRAssembly, outfile: string) {
+function generateCPP(masm: MIRAssembly, outdir: string) {
     const typegen = new AOTTypeGenerator(masm);
     const cppgen = new AOTCodeGenerator(masm, typegen);
 
@@ -75,7 +78,24 @@ function generateCPP(masm: MIRAssembly, outfile: string) {
         const cppcode = cppgen.generateAssembly();
 
         process.stdout.write("Writing...\n");
-        FS.writeFileSync(outfile, cppcode);
+        FS.writeFileSync(Path.join(outdir, "assembly.h"), cppcode);
+
+        if (masm.entryPoints.length !== 1) {
+            process.stdout.write(chalk.red(`must have unique entrypoint\n`));
+            process.exit(1);
+        }
+
+        const mainname = masm.entryPoints[0];
+        const mainf = masm.invokeDecls.get(mainname) as MIRInvokeBodyDecl;
+        const coerce = cppgen.coerceBoxIfNeeded(`${sanitizeForCpp(mainname)}()`, masm.typeMap.get(mainf.resultType) as MIRType, cppgen.typegen.anyType);
+        FS.writeFileSync(Path.join(outdir, "main.cpp"), `#include "assembly.h"\nint main() { printf("%s\\n", BSQ::displayformat(${coerce}).c_str()); fflush(stdout); return 0; }`);
+
+        process.stdout.write("Copying runtime...\n");
+        FS.readdirSync(runtimedir)
+        .filter((file) => file.endsWith(".h") || file.endsWith(".cpp"))
+        .forEach((file) => FS.copyFileSync(Path.join(runtimedir, file), Path.join(outdir, file)));
+
+        process.stdout.write("Done\n");
     }
     catch (ex) {
         process.stdout.write(chalk.red(`fail with exception -- ${ex}\n`));
@@ -85,7 +105,7 @@ function generateCPP(masm: MIRAssembly, outfile: string) {
 
 Commander
     .option("-c --compile <out.exe>", "Compile the code and generate an executable that calls the single entrypoint")
-    .option("-g --generate <out.h>", "Generate the C++ code for the Bosque program");
+    .option("-g --generate <outdir>", "Generate the C++ code for the Bosque program");
 
 Commander.parse(process.argv);
 
@@ -97,7 +117,7 @@ if (Commander.args.length === 0) {
 const massembly = generateMASM(Commander.args);
 
 if (Commander.generate !== undefined) {
-    setImmediate(() => generateCPP(massembly, Commander.generate || "out.h"));
+    setImmediate(() => generateCPP(massembly, Commander.generate));
 }
 if (Commander.compile !== undefined) {
     process.stdout.write("Not Implemented!!!\n");

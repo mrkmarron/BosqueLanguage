@@ -2,6 +2,7 @@
 // Copyright (C) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
+#pragma once
 
 #include "common.h"
 #include "mirtype.h"
@@ -115,30 +116,38 @@ namespace BSQ
     public:
         std::vector<std::pair<std::string, std::shared_ptr<Value>>> entries;
 
-        BoxedFloat() : Value(), fval() { ; }
-        BoxedFloat(const RuntimeType* vtype, double val) : Value(vtype), fval(val) { ; }
+        BoxedRecord() : Value(), entries() { ; }
+        BoxedRecord(const RuntimeType* vtype, std::vector<std::pair<std::string, std::shared_ptr<Value>>>&& entries) : Value(vtype), entries(entries) { ; }
 
-        BoxedFloat(const BoxedFloat&) = default;
-        BoxedFloat& operator=(const BoxedFloat&) = default;
+        BoxedRecord(const BoxedRecord&) = default;
+        BoxedRecord& operator=(const BoxedRecord&) = default;
 
-        virtual ~BoxedFloat() { ; }
+        virtual ~BoxedRecord() { ; }
 
         //
         //TODO: box and unbox here
         //
     };
 
-    class BoxedEntity : public Value
+    class Entity : public Value
     {
     public:
-        std::vector<std::pair<std::string, std::shared_ptr<Value>>> fields;
+        Entity() : Value() { ; }
+        Entity(const RuntimeType* vtype) : Value(vtype) { ; }
 
-        BoxedEntity() : Value(), fval() { ; }
-        BoxedEntity(const RuntimeType* vtype, double val) : Value(vtype), fval(val) { ; }
+        Entity(const Entity&) = default;
+        Entity& operator=(const Entity&) = default;
 
-        BoxedEntity(const BoxedEntity&) = default;
-        BoxedEntity& operator=(const BoxedEntity&) = default;
-
-        virtual ~BoxedEntity() { ; }
+        virtual ~Entity() { ; }
     };
+
+    std::string displayformat(std::shared_ptr<Value> v)
+    {
+        if(std::dynamic_pointer_cast<BoxedInt>(v) != nullptr) {
+            return std::to_string(std::dynamic_pointer_cast<BoxedInt>(v)->ival);
+        }
+        else {
+            return std::string("formatted value here");
+        }
+    }
 } 
