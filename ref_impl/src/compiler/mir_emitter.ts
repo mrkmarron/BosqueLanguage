@@ -201,7 +201,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, pname, trgt));
     }
 
-    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, fname: string, trgt: MIRTempRegister) {
+    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, fname: MIRFieldKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessFromField(sinfo, resultAccessType, arg, fname, trgt));
     }
 
@@ -209,7 +209,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRProjectFromProperties(sinfo, resultProjectType, arg, properties, trgt));
     }
 
-    emitProjectFields(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, fields: string[], trgt: MIRTempRegister) {
+    emitProjectFields(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, fields: MIRFieldKey[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRProjectFromFields(sinfo, resultProjectType, arg, fields, trgt));
     }
 
@@ -233,7 +233,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRModifyWithProperties(sinfo, resultRecordType, arg, updates, trgt));
     }
 
-    emitModifyWithFields(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+    emitModifyWithFields(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [MIRFieldKey, MIRArgument][], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRModifyWithFields(sinfo, resultNominalType, arg, updates, trgt));
     }
 
@@ -595,6 +595,7 @@ class MIREmitter {
 
             ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
 
+            xxxx;
             ccdecl.fields.forEach((fd) => {
                 if (cpt.fields.findIndex((ff) => ff.name === fd.name) === -1) {
                     cpt.fields.push(fd);
@@ -616,6 +617,7 @@ class MIREmitter {
 
             ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));
 
+            xxxx;
             ccdecl.fields.forEach((fd) => {
                 if (entity.fields.findIndex((ff) => ff.name === fd.name) === -1) {
                     entity.fields.push(fd);

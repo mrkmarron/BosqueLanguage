@@ -441,6 +441,7 @@ class TypeChecker {
             const oentries = farray.map((f) => {
                 const finfo = this.m_assembly.tryGetOOMemberDeclUnique(ResolvedType.createSingle(atom), "field", f) as OOMemberLookupInfo;
                 const ftype = this.resolveAndEnsureTypeOnly(sinfo, (finfo.decl as MemberFieldDecl).declaredType, finfo.binds);
+                xxxx;
                 return new ResolvedRecordAtomTypeEntry(f, ftype, false);
             });
 
@@ -494,6 +495,7 @@ class TypeChecker {
     }
 
     private updateNamedFieldsAtom(sinfo: SourceInfo, t: ResolvedType, updates: [string, ResolvedType][]) {
+        xxxx;
         updates.forEach((update) => {
             const finfo = this.m_assembly.tryGetOOMemberDeclOptions(t, "field", update[0]);
             this.raiseErrorIf(sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
@@ -563,6 +565,7 @@ class TypeChecker {
         this.raiseErrorIf(sinfo, record.isOpen, "Cannot update a Concept/Entity with a open record of values");
 
         record.entries.forEach((entry) => {
+            xxxx;
             const finfo = this.m_assembly.tryGetOOMemberDeclOptions(t, "field", entry.name);
             this.raiseErrorIf(sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
         });
@@ -1487,7 +1490,7 @@ class TypeChecker {
             const rtype = this.m_assembly.typeUnion(topts);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitLoadField(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, op.name, trgt);
+                this.m_emitter.bodyEmitter.emitLoadField(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, xxxx, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, rtype)];
@@ -1529,7 +1532,7 @@ class TypeChecker {
             const restype = this.m_assembly.typeUnion(resultOptions);
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.names, trgt);
+                this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, xxxx, trgt);
             }
 
             return [env.setExpressionResult(this.m_assembly, restype)];
@@ -1578,6 +1581,7 @@ class TypeChecker {
 
                 const ckeys = (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => MIRKeyGenerator.generateTypeKey(ctype.concept, ctype.binds));
                 const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
+                xxxx;
                 this.m_emitter.bodyEmitter.emitProjectFromTypeConcept(op.sinfo, resultType.trkey, arg, ckeys, trgt);
             }
         }
@@ -1627,6 +1631,7 @@ class TypeChecker {
             this.updateNamedFieldsAtom(op.sinfo, texp, updates.map<[string, ResolvedType]>((update) => [update[0], update[1]]));
 
             if (this.m_emitEnabled) {
+                xxxx;
                 this.m_emitter.bodyEmitter.emitModifyWithFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, updates.map<[string, MIRArgument]>((update) => [update[0], update[2]]), trgt);
             }
 
@@ -1676,6 +1681,7 @@ class TypeChecker {
             mergeValue.options.map((tmerge) => this.mergeIntoEntityConceptAtom(op.sinfo, texp, tmerge));
 
             if (this.m_emitEnabled) {
+                xxxx;
                 this.m_emitter.bodyEmitter.emitStructuredExtendObject(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, etreg, trgt);
             }
 
