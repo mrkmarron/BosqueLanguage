@@ -5,4 +5,23 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <cstdint>
+
+#include <string>
+#include <vector>
+#include <unordered_set>
+#include <unordered_map>
+
+#include <memory>
+
+#define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
+
+#define RUNTIME_ERROR(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
+#define BSQ_ABORT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
+
+namespace BSQ
+{
+void fail(const char* msg, const char* file, int64_t line, ...);
+} // namespace BSQ
+
