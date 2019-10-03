@@ -5,92 +5,132 @@
 
 #include "common.h"
 
+#pragma once
+
 namespace BSQ
 {
-class Value
+class HeapValue;
+typedef void (*VCall)(std::shared_ptr<HeapValue> rcvr, ...);
+
+class VTable
 {
-protected:
+public:
     const std::string m_type;
+    const std::unordered_map<std::string, VCall> m_vmap;
 
-public:
-    Value(const std::string& vtype) : m_type(vtype) { ; }
-    virtual ~Value() = default;
-
-    const std::string& getType() const { return this->m_type; }
+    VTable(std::string&& type, std::unordered_map<std::string, VCall>&& vmap) : m_type(move(type)), m_vmap(move(vmap)) { ; }
+    ~VTable() = default;
 };
 
-class Tuple : public Value
+class HeapValue
 {
-protected:
-    const std::vector<Value> m_entries;
-
 public:
-    Tuple(const std::string& vtype, const std::vector<Value>& entries) : Value(vtype), m_entries(entries) { ; }
+    const VTable* m_vtable;
+
+    HeapValue(const VTable* vtable) : m_vtable(vtable) { ; }
+    virtual ~HeapValue() = default;
+};
+
+class BoxedNone : public HeapValue
+{
+public:
+    BoxedNone(const VTable* vtable) : HeapValue(vtable) { ; }
+    virtual ~BoxedNone() = default;
+};
+
+class BoxedBool : public HeapValue
+{
+public:
+    const bool m_value;
+
+    BoxedBool(const VTable* vtable, bool value) : HeapValue(vtable), m_value(value) { ; }
+    virtual ~BoxedBool() = default;
+};
+
+class BoxedInt : public HeapValue
+{
+public:
+    const int64_t m_value;
+
+    BoxedInt(const VTable* vtable, int64_t value) : HeapValue(vtable), m_value(value) { ; }
+    virtual ~BoxedInt() = default;
+};
+
+class String : public HeapValue
+{
+public:
+    const std::string m_value;
+
+    String(const VTable* vtable, std::string&& value) : HeapValue(vtable), m_value(move(value)) { ; }
+    virtual ~String() = default;
+};
+
+class Float : public HeapValue
+{
+public:
+    const double m_value;
+
+    Float(const VTable* vtable, double value) : HeapValue(vtable), m_value(value) { ; }
+    virtual ~Float() = default;
+};
+
+class StringOf : public HeapValue
+{
+public:
+    const std::string m_value;
+
+    StringOf(const VTable* vtable, std::string&& value) : HeapValue(vtable), m_value(move(value)) { ; }
+    virtual ~StringOf() = default;
+};
+
+class Tuple : public HeapValue
+{
+public:
+    const std::vector<std::shared_ptr<HeapValue>> m_entries;
+
+    Tuple(const VTable* vtable, std::vector<std::shared_ptr<HeapValue>>&& entries) : HeapValue(vtable), m_entries(move(entries)) { ; }
     virtual ~Tuple() = default;
-
-    const std::vector<Value>& getEntries() const { return this->m_entries; }
 };
 
-class Record : public Value
+class Record : public HeapValue
 {
-protected:
-    const std::unordered_map<std::string, Value> m_entries;
-
 public:
-    Record(const std::string& vtype, const std::unordered_map<std::string, Value>& entries) : Value(vtype), m_entries(entries) { ; }
+    const std::unordered_map<std::string, std::shared_ptr<HeapValue>> m_entries;
+
+    Record(const VTable* vtable, std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& entries) : HeapValue(vtable), m_entries(move(entries)) { ; }
     virtual ~Record() = default;
-
-    const std::unordered_map<std::string, Value>& getEntries() const { return this->m_entries; }
 };
 
-class Entity : public Value
+class Entity : public HeapValue
 {
 public:
-    Entity(const std::string& vtype) : Value(vtype) { ; }
+    Entity(const VTable* vtable) : HeapValue(vtable) { ; }
     virtual ~Entity() = default;
 };
 
 class SimpleEntity : public Entity
 {
-private:
-    const std::unordered_map<std::string, Value> m_fields;
+public:
+    const std::unordered_map<std::string, std::shared_ptr<HeapValue>> m_fields;
 
-    SimpleEntity(const std::string& vtype, const std::unordered_map<std::string, Value>& fields) : Entity(vtype), m_fields(fields) { ; }
+    SimpleEntity(const VTable* vtable, std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& fields) : Entity(vtable), m_fields(move(fields)) { ; }
     virtual ~SimpleEntity() = default;
-
-    const std::unordered_map<std::string, Value>& getFields() const { return this->m_fields; }
 };
 
-class ListCollection
+class ListCollection : public Entity
 {
+public:
+    const std::vector<std::shared_ptr<HeapValue>> m_entries;
 
+    ListCollection(const VTable* vtable, std::vector<std::shared_ptr<HeapValue>>&& entries) : Entity(vtable), m_entries(entries) { ; }
+    virtual ~ListCollection() = default;
 };
 
-class HashSetCollection
-{
-
-};
-
-class HashMapCollection
-{
-
-};
+//
+//TODO: HashSet and HashMap collections here
+//
 
 typedef void* InlineNoneType;
 typedef bool InlineBoolType;
 typedef int64_t InlineIntType;
-
-template<uint8_t k>
-class InlineTuple
-{
-public:
-    Value entries[k];
-};
-
-template<uint8_t k>
-class InlineRecord
-{
-xxxx;
-};
-
 } // namespace BSQ
