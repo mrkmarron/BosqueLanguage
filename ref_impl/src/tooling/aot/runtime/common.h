@@ -15,7 +15,7 @@
 
 #include <memory>
 
-#ifndef RELEASE
+#ifdef _DEBUG
 #define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
 #define ASSERT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
 #endif

@@ -4,37 +4,33 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "common.h"
+#include "bsqtype.h"
 
 #pragma once
 
 namespace BSQ
 {
-class HeapValue;
-typedef void (*VCall)(std::shared_ptr<HeapValue> rcvr, ...);
-
-class VTable
-{
-public:
-    const std::string m_type;
-    const std::unordered_map<std::string, VCall> m_vmap;
-
-    VTable(std::string&& type, std::unordered_map<std::string, VCall>&& vmap) : m_type(move(type)), m_vmap(move(vmap)) { ; }
-    ~VTable() = default;
-};
-
 class HeapValue
 {
 public:
-    const VTable* m_vtable;
+    const MIRNominalTypeEnum ntype;
 
-    HeapValue(const VTable* vtable) : m_vtable(vtable) { ; }
+    #define ROOT_VCALLABLE_DECL(NAME, RTYPE, ARGS) virtual RTYPE NAME ARGS = 0;
+    #include "generated/vinvoke_decls.h"
+    #undef ROOT_VCALLABLE_DECL
+
+    #define ROOT_FIELD_DECL(NAME, FTYPE) FTYPE NAME;
+    #include "generated/field_decls.h"
+    #undef ROOT_FIELD_DECL
+
+    HeapValue(MIRNominalTypeEnum nt) : ntype(ntype) { ; }
     virtual ~HeapValue() = default;
 };
 
 class BoxedNone : public HeapValue
 {
 public:
-    BoxedNone(const VTable* vtable) : HeapValue(vtable) { ; }
+    BoxedNone() : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$None) { ; }
     virtual ~BoxedNone() = default;
 };
 
@@ -43,7 +39,7 @@ class BoxedBool : public HeapValue
 public:
     const bool m_value;
 
-    BoxedBool(const VTable* vtable, bool value) : HeapValue(vtable), m_value(value) { ; }
+    BoxedBool(bool value) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$Bool), m_value(value) { ; }
     virtual ~BoxedBool() = default;
 };
 
@@ -52,7 +48,7 @@ class BoxedInt : public HeapValue
 public:
     const int64_t m_value;
 
-    BoxedInt(const VTable* vtable, int64_t value) : HeapValue(vtable), m_value(value) { ; }
+    BoxedInt(int64_t value) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$Int), m_value(value) { ; }
     virtual ~BoxedInt() = default;
 };
 
@@ -61,7 +57,7 @@ class String : public HeapValue
 public:
     const std::string m_value;
 
-    String(const VTable* vtable, std::string&& value) : HeapValue(vtable), m_value(move(value)) { ; }
+    String(std::string&& value) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$String), m_value(move(value)) { ; }
     virtual ~String() = default;
 };
 
@@ -70,7 +66,7 @@ class Float : public HeapValue
 public:
     const double m_value;
 
-    Float(const VTable* vtable, double value) : HeapValue(vtable), m_value(value) { ; }
+    Float(double value) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$Float), m_value(value) { ; }
     virtual ~Float() = default;
 };
 
@@ -79,7 +75,7 @@ class StringOf : public HeapValue
 public:
     const std::string m_value;
 
-    StringOf(const VTable* vtable, std::string&& value) : HeapValue(vtable), m_value(move(value)) { ; }
+    StringOf(MIRNominalTypeEnum nt, std::string&& value) : HeapValue(nt), m_value(move(value)) { ; }
     virtual ~StringOf() = default;
 };
 
@@ -88,7 +84,7 @@ class Tuple : public HeapValue
 public:
     const std::vector<std::shared_ptr<HeapValue>> m_entries;
 
-    Tuple(const VTable* vtable, std::vector<std::shared_ptr<HeapValue>>&& entries) : HeapValue(vtable), m_entries(move(entries)) { ; }
+    Tuple(std::vector<std::shared_ptr<HeapValue>>&& entries) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$Tuple), m_entries(move(entries)) { ; }
     virtual ~Tuple() = default;
 };
 
@@ -97,14 +93,14 @@ class Record : public HeapValue
 public:
     const std::unordered_map<std::string, std::shared_ptr<HeapValue>> m_entries;
 
-    Record(const VTable* vtable, std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& entries) : HeapValue(vtable), m_entries(move(entries)) { ; }
+    Record(std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& entries) : HeapValue(MIRNominalTypeEnum::BSQ_N_NSCore$cc$Record), m_entries(move(entries)) { ; }
     virtual ~Record() = default;
 };
 
 class Entity : public HeapValue
 {
 public:
-    Entity(const VTable* vtable) : HeapValue(vtable) { ; }
+    Entity(MIRNominalTypeEnum nt) : HeapValue(nt) { ; }
     virtual ~Entity() = default;
 };
 
@@ -113,7 +109,7 @@ class SimpleEntity : public Entity
 public:
     const std::unordered_map<std::string, std::shared_ptr<HeapValue>> m_fields;
 
-    SimpleEntity(const VTable* vtable, std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& fields) : Entity(vtable), m_fields(move(fields)) { ; }
+    SimpleEntity(MIRNominalTypeEnum nt, std::unordered_map<std::string, std::shared_ptr<HeapValue>>&& fields) : Entity(nt), m_fields(move(fields)) { ; }
     virtual ~SimpleEntity() = default;
 };
 
@@ -122,7 +118,7 @@ class ListCollection : public Entity
 public:
     const std::vector<std::shared_ptr<HeapValue>> m_entries;
 
-    ListCollection(const VTable* vtable, std::vector<std::shared_ptr<HeapValue>>&& entries) : Entity(vtable), m_entries(entries) { ; }
+    ListCollection(MIRNominalTypeEnum nt, std::vector<std::shared_ptr<HeapValue>>&& entries) : Entity(nt), m_entries(entries) { ; }
     virtual ~ListCollection() = default;
 };
 

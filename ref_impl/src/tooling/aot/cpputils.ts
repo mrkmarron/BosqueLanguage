@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRType, MIRTypeOption } from "../../compiler/mir_assembly";
+import { MIRType, MIRTypeOption, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -16,6 +16,10 @@ function isInlinableType(t: MIRType | MIRTypeOption): boolean {
 
     const ut = (t instanceof MIRType) ? t.options[0] : t;
     if (ut.trkey === "NSCore::None" || ut.trkey === "NSCore::Bool" || ut.trkey === "NSCore::Int") {
+        return true;
+    }
+
+    if ((ut instanceof MIRTupleType && !ut.isOpen && ut.entries.every((e) => !e.isOptional)) || (ut instanceof MIRRecordType && !ut.isOpen && ut.entries.every((e) => !e.isOptional))) {
         return true;
     }
 

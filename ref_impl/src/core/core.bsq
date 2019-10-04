@@ -121,7 +121,7 @@ entity Float provides Some, Parsable {
 }
 
 //<summary>Math helpers</summary>
-entity Math {
+concept Math {
     static abs(n: Float): Float # math_abs
     static acos(x: Float): Float # math_acos
     static asin(x: Float): Float # math_asin
