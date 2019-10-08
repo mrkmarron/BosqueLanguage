@@ -10,19 +10,20 @@
 
 #include <string>
 #include <vector>
-#include <unordered_set>
-#include <unordered_map>
+#include <set>
+#include <map>
 
-#include <memory>
+#include <algorithm>
 
 #ifdef _DEBUG
 #define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
-#define ASSERT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
+#define BSQ_ASSERT(C, MSG) (BSQ::assert(OP, __FILE__, __LINE__))
 #endif
 
 #define BSQ_ABORT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
 
 namespace BSQ
 {
+void assert(bool cond, const char* msg, const char* file, int64_t line, ...);
 void fail(const char* msg, const char* file, int64_t line, ...);
 } // namespace BSQ

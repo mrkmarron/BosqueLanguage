@@ -7,9 +7,13 @@
 
 namespace BSQ
 {
+//
+//Note all of the enums need to be declared in lexographic order
+//
+
 enum class MIRNominalTypeEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define NOMINAL_TYPE_ENUM_OP(T) BSQ_N_##T,
 #include "generated/nominaltypes_enum.h"
 #undef NOMINAL_TYPE_ENUM_OP
@@ -18,7 +22,7 @@ enum class MIRNominalTypeEnum
 
 enum class MIRTypeEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define MIR_TYPE_ENUM_OP(T) BSQ_T_##T,
 #include "generated/types_enum.h"
 #undef MIR_TYPE_ENUM_OP
@@ -27,7 +31,7 @@ enum class MIRTypeEnum
 
 enum class MIRPropertyEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define MIR_PROPERTY_ENUM_OP(T) BSQ_P_##T,
 #include "generated/property_enum.h"
 #undef MIR_PROPERTY_ENUM_OP
@@ -36,7 +40,7 @@ enum class MIRPropertyEnum
 
 enum class MIRFieldEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define MIR_FIELD_ENUM_OP(T) BSQ_F_##T,
 #include "generated/field_enum.h"
 #undef MIR_FIELD_ENUM_OP
@@ -45,7 +49,7 @@ enum class MIRFieldEnum
 
 enum class MIRInvokeEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define MIR_INVOKE_ENUM_OP(T) BSQ_I_##T,
 #include "generated/invoke_enum.h"
 #undef MIR_INVOKE_ENUM_OP
@@ -54,7 +58,7 @@ enum class MIRInvokeEnum
 
 enum class MIRVInvokeEnum
 {
-    Invalid,
+    Invalid = 0x0,
 #define MIR_VINVOKE_ENUM_OP(T) BSQ_VI_##T,
 #include "generated/vinvoke_enum.h"
 #undef MIR_VINVOKE_ENUM_OP
@@ -101,10 +105,10 @@ public:
 class MIRTypeRecord : public MIRTypeOption
 {
 public:
-    const std::vector<std::pair<std::string, std::pair<MIRType*, bool>>> entries;
+    const std::vector<std::pair<MIRPropertyEnum, std::pair<MIRType*, bool>>> entries;
     const bool isOpen;
     
-    MIRTypeRecord(std::vector<std::pair<std::string, std::pair<MIRType*, bool>>>&& entries, bool isOpen) : MIRTypeOption(), entries(move(entries)), isOpen(isOpen) { ; }
+    MIRTypeRecord(std::vector<std::pair<MIRPropertyEnum, std::pair<MIRType*, bool>>>&& entries, bool isOpen) : MIRTypeOption(), entries(move(entries)), isOpen(isOpen) { ; }
     virtual ~MIRTypeRecord() = default;
 };
 
