@@ -181,6 +181,14 @@ public:
     {
         return BSQ_GET_VALUE_PTR(T*, *this);
     }
+
+    inline bool getTruthy() const
+    {
+        return BSQ_GET_VALUE_BOOL(*this); //works since none is all 0s
+    }
+
+    static bool equality_op(Value lhs, Value rhs);
+    static bool compare_op(Value lhs, Value rhs);
 };
 
 class AnyValue : RefCountBase

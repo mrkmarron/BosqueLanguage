@@ -6,16 +6,11 @@
 
 namespace BSQ
 {
-void assert(bool cond, const char* msg, const char* file, int64_t line, ...)
+void assert(bool cond, const char* msg, const char* file, int64_t line)
 {
     if (cond)
     {
         exit(1);
     }
-}
-
-void fail(const char* msg, const char* file, int64_t line, ...) 
-{
-    exit(1);
 }
 } // namespace BSQ

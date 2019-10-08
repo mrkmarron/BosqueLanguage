@@ -16,14 +16,33 @@
 #include <algorithm>
 
 #ifdef _DEBUG
-#define NOT_IMPLEMENTED(OP) (BSQ::fail(OP, __FILE__, __LINE__))
-#define BSQ_ASSERT(C, MSG) (BSQ::assert(OP, __FILE__, __LINE__))
+#define BSQ_ASSERT(C, MSG) (BSQ::assert(C, MSG, __FILE__, __LINE__))
 #endif
 
-#define BSQ_ABORT(MSG) (BSQ::fail(OP, __FILE__, __LINE__))
+#ifdef _DEBUG
+#define BSQ_ABORT(MSG, F, L) (throw BSQAbort(MSG, F, L, __FILE__, __LINE__))
+#else
+#define BSQ_ABORT(MSG, F, L) (throw BSQAbort())
+#endif
 
 namespace BSQ
 {
-void assert(bool cond, const char* msg, const char* file, int64_t line, ...);
-void fail(const char* msg, const char* file, int64_t line, ...);
+void assert(bool cond, const char* msg, const char* file, int64_t line);
+
+class BSQAbort
+{
+#ifdef _DEBUG
+public:
+const char* msg;
+const char* bfile;
+int64_t bline;
+const char* cfile;
+int64_t cline;
+
+BSQAbort(const char* msg, const char* bfile, int64_t bline, const char* cfile, int64_t cline) : msg(msg), bfile(bfile), bline(bline), cfile(cfile), cline(cline) { ; }
+#else
+public:
+BSQAbort() { ; }
+#endif
+};
 } // namespace BSQ

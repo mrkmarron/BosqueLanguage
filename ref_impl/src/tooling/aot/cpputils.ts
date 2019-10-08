@@ -18,6 +18,10 @@ function isInlinableType(t: MIRType | MIRTypeOption): boolean {
     return (ut.trkey === "NSCore::None" || ut.trkey === "NSCore::Bool" || ut.trkey === "NSCore::Int");
 }
 
+function getInlinableType(t: MIRType | MIRTypeOption): MIRTypeOption {
+    return (t instanceof MIRType) ? t.options[0] : t;
+}
+
 function sanitizeForCpp(name: string): string {
     return name
     .replace(/#/g, "$h$")
@@ -42,5 +46,6 @@ function sanitizeForCpp(name: string): string {
 export {
     NOT_IMPLEMENTED,
     isInlinableType,
+    getInlinableType,
     sanitizeForCpp
 };

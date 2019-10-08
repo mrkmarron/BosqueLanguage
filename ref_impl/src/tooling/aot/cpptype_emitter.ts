@@ -8,6 +8,8 @@ import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
 
+    readonly anyType: MIRType;
+
     readonly noneType: MIRType;
     readonly boolType: MIRType;
     readonly intType: MIRType;
@@ -15,6 +17,8 @@ class CPPTypeEmitter {
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
+
+        this.anyType = assembly.typeMap.get("NSCore::Any") as MIRType;
 
         this.noneType = assembly.typeMap.get("NSCore::None") as MIRType;
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;

@@ -28,10 +28,6 @@ public:
     const MIRNominalTypeEnum s_ttuple;
     const MIRNominalTypeEnum s_trecord;
 
-    const Value s_none;
-    const Value s_true;
-    const Value s_false;
-
 #define MIR_CONST_STRING_OP(N, S) static Value BSQ_STRING_##N;
 #include "generated/const_strings.h"
 #undef MIR_CONST_STRING_OP
@@ -43,8 +39,7 @@ public:
             MIRNominalTypeEnum tnone, MIRNominalTypeEnum tbool, MIRNominalTypeEnum tint, MIRNominalTypeEnum tstring, MIRNominalTypeEnum ttuple, MIRNominalTypeEnum trecord)
         : m_nominalSubtypes(move(nominalSubtypes)), m_declaredTupleTypes(move(declaredTupleTypes)), m_declaredRecordTypes(move(declaredRecordTypes)),
           m_declaredTypes(declaredTypes),
-          s_tnone(tnone), s_tbool(tbool), s_tint(tint), s_tstring(tstring), s_ttuple(ttuple), s_trecord(trecord),
-          s_none(Value::noneValue()), s_true(Value::trueValue()), s_false(Value::falseValue())
+          s_tnone(tnone), s_tbool(tbool), s_tint(tint), s_tstring(tstring), s_ttuple(ttuple), s_trecord(trecord)
     {
         ;
     }
