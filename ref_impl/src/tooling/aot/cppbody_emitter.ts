@@ -15,6 +15,8 @@ class CPPBodyEmitter {
 
     readonly allConstStrings: Map<string, string> = new Map<string, string>();
 
+    private currentFile: string = "[No File]";
+
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
     private generatedBlocks: Map<string, string[]> = new Map<string, string[]>();
 
@@ -151,6 +153,17 @@ class CPPBodyEmitter {
         }
     }
 
+    argToCppOptimized(arg: MIRArgument, into: MIRType | MIRTypeOption): string {
+        const optType = isInlinableType(this.getArgType(arg)) ? this.getArgType(arg) : into;
+
+        if (arg instanceof MIRRegisterArgument) {
+            return this.coerce(this.varToCppName(arg), this.getArgType(arg), optType);
+        }
+        else {
+            return this.generateConstantExp(arg as MIRConstantArgument, optType);
+        }
+    }
+
     generateTruthyConvert(arg: MIRArgument): string {
         const argtype = this.getArgType(arg);
 
@@ -183,12 +196,8 @@ class CPPBodyEmitter {
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
             return `${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)}`;
         }
-        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
-            return `${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)}`;
-        }
         else {
-            assert(lhvtype.trkey === "NSCore::None" || rhvtype.trkey === "NSCore::None");
-            return op === "!=" ? "false" : "true";
+            return `${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)}`;
         }
     }
 
@@ -213,11 +222,11 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
-                return this.generateInit(lav.trgt, this.argToCpp(lav.name, this.getArgType(lav.trgt)));
+                return this.generateInit(lav.trgt, this.argToCppOptimized(lav.name, this.getArgType(lav.trgt)));
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
-                return this.generateInit(llv.trgt, this.argToCpp(llv.name, this.getArgType(llv.trgt)));
+                return this.generateInit(llv.trgt, this.argToCppOptimized(llv.name, this.getArgType(llv.trgt)));
             }
             case MIROpTag.MIRConstructorPrimary: {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimary");
@@ -309,8 +318,21 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                if()
-                return this.generateInit(bop.trgt, `${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                if (bop.op === "+") {
+                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                }
+                else if (bop.op === "-") {
+                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                }
+                else if (bop.op === "-") {
+                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                }
+                else if (bop.op === "-") {
+                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                }
+                else {
+                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                }
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
@@ -318,13 +340,13 @@ class CPPBodyEmitter {
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
                 if (isInlinableType(lhvtype) && isInlinableType(rhvtype)) {
-                    return `${this.varToCppName(beq.trgt)} = ${this.generateFastEquals(beq.op, beq.lhs, beq.rhs)};`;
+                    return this.generateInit(beq.trgt, this.generateFastEquals(beq.op, beq.lhs, beq.rhs));
                 }
                 else {
                     const larg = this.argToCpp(beq.lhs, this.typegen.anyType);
                     const rarg = this.argToCpp(beq.rhs, this.typegen.anyType);
 
-                    return `${this.varToCppName(beq.trgt)} = ${beq.op === "!=" ? "!" : ""}Value::equality_op(${larg}, ${rarg});`;
+                    return this.generateInit(beq.trgt, `${beq.op === "!=" ? "!" : ""}Value::equality_op(${larg}, ${rarg})`);
                 }
             }
             case MIROpTag.MIRBinCmp: {

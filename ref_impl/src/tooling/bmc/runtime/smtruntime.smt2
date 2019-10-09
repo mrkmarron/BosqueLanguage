@@ -43,7 +43,7 @@
     ( (result_success_None) (result_error_None (result_error_code_None ErrorCode)) )
     ( (result_success_Bool (result_success_value_Bool Bool)) (result_error_Bool (result_error_code_Bool ErrorCode)) )
     ( (result_success_Int (result_success_value_Int Bool)) (result_error_Int (result_error_code_Int ErrorCode)) )
-    ( (result_success (result_success_value BTerm)) (result_error (result_error_code ErrorCode)) )
+    ( (result_success_BTerm (result_success_value_BTerm BTerm)) (result_error_BTerm (result_error_code_BTerm ErrorCode)) )
 ))
 
 (declare-const bsq_term_true_const BTerm)
@@ -51,3 +51,9 @@
 
 (declare-const bsq_term_false_const BTerm)
 (assert (= bsq_term_false_const (bsq_term_bool false)))
+
+(declare-const BINT_MAX Int)
+(assert (= BINT_MAX 4503599627370495))
+
+(declare-const BINT_MIN Int)
+(assert (= BINT_MIN -4503599627370496))

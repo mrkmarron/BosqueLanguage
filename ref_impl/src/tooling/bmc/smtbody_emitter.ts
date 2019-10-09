@@ -8,17 +8,42 @@ import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT } from "./smtutils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort } from "../../compiler/mir_ops";
 import * as assert from "assert";
-import { SMTExp, SMTValue, SMTCond, SMTLet } from "./smtexp";
+import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smtexp";
+import { SourceInfo } from "../../ast/parser";
 
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
+
+    private errorCodes = new Map<string, number>();
+    private bmcCodes = new Map<string, number>();
+    private bmcDepths = new Map<string, number>();
+
+    private tmpvarctr = 0;
+    private currentRType: MIRType;
+    private currentFile: string = "[No File]";
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
+
+        this.currentRType = typegen.noneType;
+    }
+
+    generateTempName(): string {
+        return `@tmpvar@${this.tmpvarctr++}`;
+    }
+
+    generateErrorCreate(sinfo: SourceInfo): SMTValue {
+        const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`;
+        if (!this.errorCodes.has(errorinfo)) {
+            this.errorCodes.set(errorinfo, this.errorCodes.size);
+        }
+        const errid = this.errorCodes.get(errorinfo) as number;
+
+        return new SMTValue(`(result_error_${this.typegen.getSMTType(this.currentRType)}, (result_error ${errid}))`);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -138,6 +163,21 @@ class SMTBodyEmitter {
         }
     }
 
+    generateFastEquals(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
+        const lhvtype = this.getArgType(lhs);
+        const rhvtype = this.getArgType(rhs);
+
+        let coreop = "";
+        if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType)} ${op} ${this.argToSMT(rhs, this.typegen.boolType)}`;
+        }
+        else {
+            coreop = `${this.argToSMT(lhs, this.typegen.intType)} ${op} ${this.argToSMT(rhs, this.typegen.intType)}`;
+        }
+
+        return op === "!=" ? `(not ${coreop})` : coreop;
+    }
+
     generateStmt(op: MIROp, vtypes: Map<string, MIRType>): SMTExp | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
@@ -251,10 +291,15 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                if(bop.op === "+") {
-                    return 
+
+                const restmp = this.generateTempName();
+                let smtconds = [`(< ${restmp} BINT_MIN)`, `(< BINT_MAX ${restmp})`];
+                if (bop.op === "/" || bop.op === "%") {
+                    smtconds.push(`(= ${restmp} 0)`);
                 }
-                return `${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo), SMTFreeVar.generate());
+
+                return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType)} ${this.argToSMT(bop.rhs, this.typegen.intType)})`), ite);
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
@@ -262,13 +307,14 @@ class SMTBodyEmitter {
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
                 if (isInlinableType(lhvtype) && isInlinableType(rhvtype)) {
-                    return `${this.varToCppName(beq.trgt)} = ${this.generateFastEquals(beq.op, beq.lhs, beq.rhs)};`;
+                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, beq.lhs, beq.rhs)));
                 }
                 else {
-                    const larg = this.argToCpp(beq.lhs, this.typegen.anyType);
-                    const rarg = this.argToCpp(beq.rhs, this.typegen.anyType);
+                    const larg = this.argToSMT(beq.lhs, this.typegen.anyType);
+                    const rarg = this.argToSMT(beq.rhs, this.typegen.anyType);
 
-                    return `${this.varToCppName(beq.trgt)} = ${beq.op === "!=" ? "!" : ""}Value::equality_op(${larg}, ${rarg});`;
+                    const sloweq = `(@equality_op ${larg.emit()} ${rarg.emit()})`;
+                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${sloweq})` : sloweq));
                 }
             }
             case MIROpTag.MIRBinCmp: {

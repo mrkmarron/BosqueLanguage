@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
+import { isInlinableType } from "../aot/cpputils";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -24,6 +25,20 @@ class SMTTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    getSMTType(tt: MIRType): string {
+        if (isInlinableType(tt)) {
+            if (tt.trkey === "NSCore::Bool") {
+                return "Bool";
+            }
+            else {
+                return "Int";
+            }
+        }
+        else {
+            return "BTerm";
+        }
     }
 }
 
