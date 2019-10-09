@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
 
-class CPPTypeEmitter {
+class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
 
     readonly anyType: MIRType;
@@ -28,5 +28,5 @@ class CPPTypeEmitter {
 }
 
 export {
-    CPPTypeEmitter
+    SMTTypeEmitter
 };

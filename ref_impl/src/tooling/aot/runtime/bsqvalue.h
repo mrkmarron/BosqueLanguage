@@ -8,21 +8,22 @@
 
 #pragma once
 
-#define BSQ_GET_VALUE_TAG(V) (((uintptr_t)(V).m_data) & 0x7)
+#define BSQ_IS_VALUE_NONE(V) ((uintptr_t)((V).m_data) == 0x1)
+#define BSQ_IS_VALUE_BOOL(V) ((uintptr_t)((V).m_data) & 0x2 == 0x2)
+#define BSQ_IS_VALUE_INT(V) ((uintptr_t)((V).m_data) & 0x4 == 0x4)
+#define BSQ_IS_VALUE_PTR(V) ((uintptr_t)((V).m_data) > 0x7)
 
-#define BSQ_IS_VALUE_NONE(V) ((V).m_data == nullptr)
-#define BSQ_IS_VALUE_PTR(V) (BSQ_GET_VALUE_TAG(V) == 0x0)
-#define BSQ_IS_VALUE_BOOL(V) (BSQ_GET_VALUE_TAG(V) == 0x2)
-#define BSQ_IS_VALUE_INT(V) (BSQ_GET_VALUE_TAG(V) == 0x4)
+#define BSQ_GET_VALUE_PTR(T, V) ((T)((V).m_data))
+#define BSQ_GET_VALUE_BOOL(V) ((uintptr_t)((V).m_data) == 0x2)
+#define BSQ_GET_VALUE_INT(V) ((int64_t)((uintptr_t)((V).m_data) >> 4))
 
-#define BSQ_GET_VALUE_PTR(T, V) ((T)(V).m_data)
-#define BSQ_GET_VALUE_BOOL(V) ((uintptr_t)(V).m_data == 0x3)
-#define BSQ_GET_VALUE_INT(V) ((int32_t)(((uintptr_t)(V).m_data) >>4))
-
-#define BSQ_BOX_VALUE_BOOL(B) (void*)(B ? 0x3 : 0x2)
+#define BSQ_BOX_VALUE_BOOL(B) (void*)(0x2 & (uint32_t)(!B))
 #define BSQ_BOX_VALUE_INT(I) (void*)((((int64_t) I) << 0x4) & 0x4)
 
-#define BSQ_NEEDS_REF_COUNT(V) (((V).m_data != nullptr) & BSQ_IS_VALUE_PTR(V))
+#define BSQ_GET_VALUE_TRUTHY(V) ((uintptr_t)((V).m_data) & 0x1 == 0x0)
+
+#define BINT_MAX 4503599627370495
+#define BINT_MIN (-4503599627370496)
 
 namespace BSQ
 {
@@ -63,12 +64,12 @@ public:
     }
 
     Value(bool b) : m_data(BSQ_BOX_VALUE_BOOL(b)) { ; }
-    Value(int32_t i) : m_data(BSQ_BOX_VALUE_INT(i)) { ; }
+    Value(int64_t i) : m_data(BSQ_BOX_VALUE_INT(i)) { ; }
     Value(void* p) : m_data(p) { ; }
 
     Value(const Value& v)
     {
-        if(BSQ_NEEDS_REF_COUNT(v))
+        if(BSQ_IS_VALUE_PTR(v))
         {
             RefCountBase::increment(BSQ_GET_VALUE_PTR(RefCountBase*, v));
         }
@@ -83,12 +84,12 @@ public:
             return *this;
         }
 
-        if(BSQ_NEEDS_REF_COUNT(v))
+        if(BSQ_IS_VALUE_PTR(v))
         {
             RefCountBase::increment(BSQ_GET_VALUE_PTR(RefCountBase*, v));
         }
 
-        if(BSQ_NEEDS_REF_COUNT(*this))
+        if(BSQ_IS_VALUE_PTR(*this))
         {
             RefCountBase::decrement(BSQ_GET_VALUE_PTR(RefCountBase*, *this));
         }
@@ -109,26 +110,27 @@ public:
             return *this;
         }
 
-        if(BSQ_NEEDS_REF_COUNT(*this))
+        if(BSQ_IS_VALUE_PTR(*this))
         {
             RefCountBase::decrement(BSQ_GET_VALUE_PTR(RefCountBase*, *this));
         }
 
         this->m_data = v.m_data;
+        v.m_data = nullptr;
     }
 
     ~Value()
     {
-        if(BSQ_NEEDS_REF_COUNT(*this))
+        if(BSQ_IS_VALUE_PTR(*this))
         {
             RefCountBase::decrement(BSQ_GET_VALUE_PTR(RefCountBase*, *this));
+            this->m_data = nullptr;
         }
-        this->m_data = nullptr;
     }
 
     inline static Value noneValue()
     {
-        return Value{};
+        return Value((void*)0x1);
     }
 
     inline static Value falseValue()
@@ -143,7 +145,7 @@ public:
 
     inline Value zeroValue() const
     {
-        return Value(0);
+        return Value((int64_t)0);
     }
 
     inline bool isNone() const
@@ -166,14 +168,14 @@ public:
         return BSQ_IS_VALUE_INT(*this);
     }
 
-    inline int32_t getInt() const
+    inline int64_t getInt() const
     {
         return BSQ_GET_VALUE_INT(*this);
     }
 
     inline bool isPtr() const
     {
-        return BSQ_NEEDS_REF_COUNT(*this);
+        return BSQ_IS_VALUE_PTR(*this);
     }
 
     template <typename T>
@@ -184,7 +186,7 @@ public:
 
     inline bool getTruthy() const
     {
-        return BSQ_GET_VALUE_BOOL(*this); //works since none is all 0s
+        return BSQ_GET_VALUE_TRUTHY(*this);
     }
 
     static bool equality_op(Value lhs, Value rhs);
@@ -250,17 +252,4 @@ public:
     Entity(MIRNominalTypeEnum nt) : AnyValue(nt) { ; }
     virtual ~Entity() = default;
 };
-
-class ListCollection : public Entity
-{
-public:
-    const std::vector<Value> m_entries;
-
-    ListCollection(MIRNominalTypeEnum nt, std::vector<Value>&& entries) : Entity(nt), m_entries(entries) { ; }
-    virtual ~ListCollection() = default;
-};
-
-//
-//TODO: HashSet and HashMap collections here
-//
 } // namespace BSQ

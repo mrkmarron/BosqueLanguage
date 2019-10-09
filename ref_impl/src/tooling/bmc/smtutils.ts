@@ -15,7 +15,7 @@ function isInlinableType(t: MIRType | MIRTypeOption): boolean {
     }
 
     const ut = (t instanceof MIRType) ? t.options[0] : t;
-    return (ut.trkey === "NSCore::None" || ut.trkey === "NSCore::Bool" || ut.trkey === "NSCore::Int");
+    return (ut.trkey === "NSCore::Bool" || ut.trkey === "NSCore::Int");
 }
 
 function getInlinableType(t: MIRType | MIRTypeOption): MIRTypeOption {

@@ -23,6 +23,21 @@ class CPPBodyEmitter {
         this.typegen = typegen;
     }
 
+    generateInit(trgt: MIRRegisterArgument, value: string): string {
+        const ttype = this.getArgType(trgt);
+        if (isInlinableType(ttype)) {
+            if (ttype.trkey === "NSCore::Bool") {
+                return `bool ${this.varToCppName(trgt)} = ${value};`;
+            }
+            else {
+                return `int64_t ${this.varToCppName(trgt)} = ${value};`;
+            }
+        }
+        else {
+            return `Value ${this.varToCppName(trgt)}(${value});`;
+        }
+    }
+
     getArgType(arg: MIRArgument): MIRType {
         if (arg instanceof MIRRegisterArgument) {
             return this.vtypes.get(arg.nameID) as MIRType;
@@ -69,10 +84,7 @@ class CPPBodyEmitter {
         }
 
         const itype = getInlinableType(from);
-        if (itype.trkey === "NSCore::None") {
-            return "Value::noneValue()";
-        }
-        else if (itype.trkey === "NSCore::Bool") {
+        if (itype.trkey === "NSCore::Bool") {
             return `Value(${exp})`;
         }
         else {
@@ -86,10 +98,7 @@ class CPPBodyEmitter {
         }
 
         const itype = getInlinableType(into);
-        if (itype.trkey === "NSCore::None") {
-            return "nullptr";
-        }
-        else if (itype.trkey === "NSCore::Bool") {
+        if (itype.trkey === "NSCore::Bool") {
             return `(${exp}).getBool()`;
         }
         else {
@@ -109,7 +118,7 @@ class CPPBodyEmitter {
         const isinlineable = isInlinableType(into);
 
         if (cval instanceof MIRConstantNone) {
-            return isinlineable ? "nullptr" : "Value::noneValue()";
+            return "Value::noneValue()";
         }
         else if (cval instanceof MIRConstantTrue) {
             return isinlineable ? "true" : "Value::trueValue()";
@@ -191,7 +200,7 @@ class CPPBodyEmitter {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
-                return `${this.varToCppName(lcv.trgt)} = ${this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt))};`;
+                return this.generateInit(lcv.trgt, this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt)));
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 return NOT_IMPLEMENTED<string>("MIRLoadConstTypedString");
@@ -204,11 +213,11 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = (op as MIRAccessArgVariable);
-                return `${this.varToCppName(lav.trgt)} = ${this.argToCpp(lav.name, this.getArgType(lav.trgt))};`;
+                return this.generateInit(lav.trgt, this.argToCpp(lav.name, this.getArgType(lav.trgt)));
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = (op as MIRAccessLocalVariable);
-                return `${this.varToCppName(llv.trgt)} = ${this.argToCpp(llv.name, this.getArgType(llv.trgt))};`;
+                return this.generateInit(llv.trgt, this.argToCpp(llv.name, this.getArgType(llv.trgt)));
             }
             case MIROpTag.MIRConstructorPrimary: {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimary");
@@ -278,7 +287,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                return `${this.varToCppName(invk.trgt)} = ${this.generateMIRInvokeFixedFunction(invk)};`;
+                return this.generateInit(invk.trgt, this.generateMIRInvokeFixedFunction(invk));
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
                 return NOT_IMPLEMENTED<string>("MIRInvokeVirtualTarget");
@@ -287,20 +296,21 @@ class CPPBodyEmitter {
                 const pfx = op as MIRPrefixOp;
                 if (pfx.op === "!") {
                     const tval = this.generateTruthyConvert(pfx.arg);
-                    return `${this.varToCppName(pfx.trgt)} = !${tval};`;
+                    return this.generateInit(pfx.trgt, `!${tval}`);
                 }
                 else {
                     if (pfx.op === "-") {
-                        return `${this.varToCppName(pfx.trgt)} = -${this.argToCpp(pfx.arg, this.typegen.intType)};`;
+                        return this.generateInit(pfx.trgt, `-${this.argToCpp(pfx.arg, this.typegen.intType)}`);
                     }
                     else {
-                        return `${this.varToCppName(pfx.trgt)} = ${this.argToCpp(pfx.arg, this.typegen.intType)};`;
+                        return this.generateInit(pfx.trgt, `${this.argToCpp(pfx.arg, this.typegen.intType)}`);
                     }
                 }
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                return `${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                if()
+                return this.generateInit(bop.trgt, `${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
