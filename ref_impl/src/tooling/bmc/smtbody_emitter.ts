@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smtexp";
 import { SourceInfo } from "../../ast/parser";
@@ -163,6 +163,26 @@ class SMTBodyEmitter {
         }
     }
 
+    generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): SMTExp {
+        let vals: string[] = [];
+        const idecl = (this.assembly.invokeDecls.get(ivop.mkey) || this.assembly.primitiveInvokeDecls.get(ivop.mkey)) as MIRInvokeDecl;
+
+        for (let i = 0; i < ivop.args.length; ++i) {
+            vals.push(this.argToSMT(ivop.args[i], this.assembly.typeMap.get(idecl.params[i].type) as MIRType).emit());
+        }
+
+        const tv = `@tmpvar@${this.tmpvarctr++}`;
+        const ivrtype = "Result" + this.typegen.getSMTType(this.assembly.typeMap.get((idecl as MIRInvokeDecl).resultType) as MIRType);
+        const resulttype = "Result" + this.typegen.getSMTType(this.currentRType);
+
+        const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMTName(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMTName(ivop.mkey));
+        const checkerror = new SMTValue(`(is-result_error_${ivrtype} ${tv})`);
+        const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error_${resulttype} (result_error_code_${ivrtype} ${tv}))`) : new SMTValue(tv);
+        const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value_${ivrtype} ${tv})`));
+
+        return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
+    }
+
     generateFastEquals(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
         const lhvtype = this.getArgType(lhs);
         const rhvtype = this.getArgType(rhs);
@@ -178,7 +198,11 @@ class SMTBodyEmitter {
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
-    generateStmt(op: MIROp, vtypes: Map<string, MIRType>): SMTExp | undefined {
+    generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
+        return `(${op} ${this.argToSMT(lhs, this.typegen.intType)} ${op} ${this.argToSMT(rhs, this.typegen.intType)}`;
+    }
+
+    generateStmt(op: MIROp, fromblck: string): SMTExp | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
@@ -324,46 +348,44 @@ class SMTBodyEmitter {
                 const rhvtype = this.getArgType(bcmp.rhs);
 
                 if (isInlinableType(lhvtype) && isInlinableType(rhvtype)) {
-                    return `${this.varToCppName(bcmp.trgt)} = ${this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)};`;
+                    return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)));
                 }
                 else {
-                    const larg = this.argToCpp(bcmp.lhs, this.typegen.anyType);
-                    const rarg = this.argToCpp(bcmp.rhs, this.typegen.anyType);
+                    const larg = this.argToSMT(bcmp.lhs, this.typegen.anyType).emit();
+                    const rarg = this.argToSMT(bcmp.rhs, this.typegen.anyType).emit();
 
                     if (bcmp.op === "<") {
-                        return `${this.varToCppName(bcmp.trgt)} = Value::compare_op(${larg}, ${rarg});`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(@compare_op ${larg} ${rarg})`));
                     }
                     else if (bcmp.op === ">") {
-                        return `${this.varToCppName(bcmp.trgt)} = Value::compare_op(${rarg}, ${larg});`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(@compare_op ${rarg} ${larg})`));
                     }
                     else if (bcmp.op === "<=") {
-                        return `${this.varToCppName(bcmp.trgt)} = Value::compare_op(${larg}, ${rarg}) || Value::equality_op(${larg}, ${rarg});`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(or (@compare_op ${larg} ${rarg}) (@equality_op ${larg} ${rarg}))`));
                     }
                     else {
-                        return `${this.varToCppName(bcmp.trgt)} = Value::compare_op(${rarg}, ${larg}) || Value::equality_op(${larg}, ${rarg});`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(or (@compare_op ${rarg} ${larg}) (@equality_op ${larg} ${rarg}))`));
                     }
                 }
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
 
-                const argtype = this.getArgType(ton.arg);
-                if (isInlinableType(argtype)) {
-                    return `${this.varToCppName(ton.trgt)} = ${this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "true" : "false"};`;
+                if (isInlinableType(this.getArgType(ton.arg))) {
+                    return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue("false"));
                 }
                 else {
-                    return `${this.varToCppName(ton.trgt)} = ${this.varToCppName(ton.arg)}.isNone();`;
+                    return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue(`(= ${this.argToSMT(ton.arg, this.typegen.anyType).emit()} bsq_term_none)`));
                 }
             }
             case MIROpTag.MIRIsTypeOfSome: {
                 const tos = op as MIRIsTypeOfSome;
 
-                const argtype = this.getArgType(tos.arg);
-                if (isInlinableType(argtype)) {
-                    return `${this.varToCppName(tos.trgt)} = ${this.assembly.subtypeOf(argtype, this.typegen.noneType) ? "false" : "true"};`;
+                if (isInlinableType(this.getArgType(tos.arg))) {
+                    return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue("true"));
                 }
                 else {
-                    return `${this.varToCppName(tos.trgt)} = !(${this.varToCppName(tos.arg)}.isNone());`;
+                    return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue(`(not (= ${this.argToSMT(tos.arg, this.typegen.anyType).emit()} bsq_term_none))`));
                 }
            }
             case MIROpTag.MIRIsTypeOf: {
@@ -371,58 +393,54 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;
-                return `${this.varToCppName(regop.trgt)} = ${this.argToCpp(regop.src, this.getArgType(regop.trgt))};`;
+                return new SMTLet(this.varToSMTName(regop.trgt), this.argToSMT(regop.src, this.getArgType(regop.trgt)));
             }
             case MIROpTag.MIRTruthyConvert: {
                 const tcop = op as MIRTruthyConvert;
-                return `${this.varToCppName(tcop.trgt)} = ${this.generateTruthyConvert(tcop.src)};`;
+                return new SMTLet(this.varToSMTName(tcop.trgt), this.generateTruthyConvert(tcop.src));
             }
             case MIROpTag.MIRLogicStore: {
                 const llop = op as MIRLogicStore;
-                return `${this.varToCppName(llop.trgt)} = (${this.argToCpp(llop.lhs, this.typegen.boolType)} ${llop.op} ${this.argToCpp(llop.rhs, this.typegen.boolType)});`;
+                return new SMTLet(this.varToSMTName(llop.trgt), new SMTValue(`(${llop.op === "&" ? "and" : "or"} ${this.argToSMT(llop.lhs, this.typegen.boolType).emit()} ${this.argToSMT(llop.rhs, this.typegen.boolType).emit()})`));
             }
             case MIROpTag.MIRVarStore: {
                 const vsop = op as MIRVarStore;
-                return `${this.varToCppName(vsop.name)} = ${this.argToCpp(vsop.src, this.getArgType(vsop.name))};`;
+                return new SMTLet(this.varToSMTName(vsop.name), this.argToSMT(vsop.src, this.getArgType(vsop.name)));
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
-                return `${this.varToCppName(raop.name)} = ${this.argToCpp(raop.src, this.getArgType(raop.name))};`;
+                return new SMTLet(this.varToSMTName(raop.name), this.argToSMT(raop.src, this.getArgType(raop.name)));
             }
             case MIROpTag.MIRAbort: {
                 const aop = (op as MIRAbort);
-                return `BSQ_ABORT("${aop.info}", "[TODO: filename]", ${aop.sinfo.line});`;
+                return this.generateErrorCreate(aop.sinfo);
             }
             case MIROpTag.MIRDebug: {
-                //debug is a nop in AOT release mode but we allow it for our debugging purposes
-                const dbgop = op as MIRDebug;
-                if (dbgop.value === undefined) {
-                    return "assert(false);";
-                }
-                else {
-                    return `cout << Value::diagnostic_format(${this.argToCpp(dbgop.value, this.typegen.anyType)}) << \n;`;
-                }
+                return undefined;
             }
             case MIROpTag.MIRJump: {
-                const jop = op as MIRJump;
-                return `goto ${this.labelToCpp(jop.trgtblock)};`;
+                return undefined;
             }
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
-                return `if(${this.generateTruthyConvert(cjop.arg)}) {goto ${this.labelToCpp(cjop.trueblock)};} else {goto ${cjop.falseblock};}`;
+                const smttest = this.generateTruthyConvert(cjop.arg);
+                return new SMTCond(smttest, SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
                 const argtype = this.getArgType(njop.arg);
                 if (isInlinableType(argtype)) {
-                    return this.assembly.subtypeOf(argtype, this.typegen.noneType) ? `goto ${this.labelToCpp(njop.noneblock)};` : `goto ${this.labelToCpp(njop.someblock)};`;
+                    return new SMTCond(new SMTValue("false"), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
                 }
                 else {
-                    return `if(${this.argToCpp(njop.arg, this.typegen.anyType)}.isNone()) {goto ${this.labelToCpp(njop.noneblock)};} else {goto ${njop.someblock};}`;
+                    return new SMTCond(new SMTValue(`(= ${this.argToSMT(njop.arg, this.typegen.anyType).emit()} bsq_term_none)`), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
                 }
             }
             case MIROpTag.MIRPhi: {
-                return undefined; //handle this as a special case in the block processing code
+                const pop = op as MIRPhi;
+                const uvar = pop.src.get(fromblck) as MIRRegisterArgument;
+
+                return new SMTLet(this.varToSMTName(pop.trgt), this.argToSMT(uvar, this.getArgType(pop.trgt)));
             }
             case MIROpTag.MIRVarLifetimeStart:
             case MIROpTag.MIRVarLifetimeEnd: {

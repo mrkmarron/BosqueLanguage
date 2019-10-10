@@ -6,7 +6,7 @@
 (set-option :smt.auto-config false) ; disable automatic self configuration
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
-(declare-datatypes ( (BTerm 0) (BTermList 0) (BTermNamedList 0) (BTermSetList 0) (BTermMapList 0)) (
+(declare-datatypes ( (BTerm 0) (BTermList 0) (BTermNamedList 0) ) (
     (
       (bsq_term_none) 
       (bsq_term_bool (bsq_term_bool_value Bool))
@@ -25,22 +25,13 @@
       (bsq_term_named_list_nil)
       (bsq_term_named_list_cons (bsq_term_named_list_name Int) (bsq_term_named_list_head BTerm) (bsq_term_named_list_tail BTermNamedList))
     )
-    (
-      (bsq_term_set_list_nil)
-      (bsq_term_set_list_cons (bsq_term_set_list_rk BTerm) (bsq_term_set_list_head BTerm) (bsq_term_set_list_tail BTermSetList))
-    )
-    (
-      (bsq_term_map_list_nil)
-      (bsq_term_map_list_cons (bsq_term_map_list_rk BTerm) (bsq_term_map_list_head_key BTerm) (bsq_term_map_list_head_val BTerm) (bsq_term_map_list_tail BTermMapList))
-    )
 ))
 
 (declare-datatypes ( (ErrorCode 0) ) (
     ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
 ))
 
-(declare-datatypes ( (ResultNone 0) (ResultBool 0) (ResultInt 0) (Result 0)) (
-    ( (result_success_None) (result_error_None (result_error_code_None ErrorCode)) )
+(declare-datatypes ( (ResultBool 0) (ResultInt 0) (Result 0)) (
     ( (result_success_Bool (result_success_value_Bool Bool)) (result_error_Bool (result_error_code_Bool ErrorCode)) )
     ( (result_success_Int (result_success_value_Int Bool)) (result_error_Int (result_error_code_Int ErrorCode)) )
     ( (result_success_BTerm (result_success_value_BTerm BTerm)) (result_error_BTerm (result_error_code_BTerm ErrorCode)) )
@@ -57,3 +48,6 @@
 
 (declare-const BINT_MIN Int)
 (assert (= BINT_MIN -4503599627370496))
+
+;;PROPERTY_ENUM;;
+
