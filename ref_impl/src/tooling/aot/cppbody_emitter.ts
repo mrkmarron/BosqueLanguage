@@ -501,11 +501,18 @@ class CPPBodyEmitter {
     }
 
     generateInvoke(idecl: MIRInvokeDecl): [string, string] {
+        this.currentFile = idecl.srcFile;
+
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(arg.type) as MIRType)} ${this.varNameToCppName(arg.name)}`);
-        const restype = this.typegen.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(idecl.resultType) as MIRType);
+        const restype = this.typegen.typeToCPPType(this.assembly.typeMap.get(idecl.resultType) as MIRType);
         const decl = `${restype} ${this.invokenameToCppName(idecl.key)}(${args.join(", ")})`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
+            this.vtypes = new Map<string, MIRType>();
+            (idecl.body.vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
+            });
+
             this.generatedBlocks = new Map<string, string[]>();
 
             const blocks = topologicalOrder((idecl as MIRInvokeBodyDecl).body.body);

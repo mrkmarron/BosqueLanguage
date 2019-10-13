@@ -27,7 +27,7 @@ class SMTTypeEmitter {
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
     }
 
-    getSMTType(tt: MIRType): string {
+    typeToSMTType(tt: MIRType): string {
         if (isInlinableType(tt)) {
             if (tt.trkey === "NSCore::Bool") {
                 return "Bool";
