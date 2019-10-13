@@ -33,7 +33,7 @@
 
 (declare-datatypes ( (ResultBool 0) (ResultInt 0) (Result 0)) (
     ( (result_success_Bool (result_success_value_Bool Bool)) (result_error_Bool (result_error_code_Bool ErrorCode)) )
-    ( (result_success_Int (result_success_value_Int Bool)) (result_error_Int (result_error_code_Int ErrorCode)) )
+    ( (result_success_Int (result_success_value_Int Int)) (result_error_Int (result_error_code_Int ErrorCode)) )
     ( (result_success_BTerm (result_success_value_BTerm BTerm)) (result_error_BTerm (result_error_code_BTerm ErrorCode)) )
 ))
 

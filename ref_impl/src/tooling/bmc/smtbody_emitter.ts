@@ -43,7 +43,7 @@ class SMTBodyEmitter {
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
-        return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)}, (result_error ${errid}))`);
+        return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)} (result_error ${errid}))`);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -189,17 +189,17 @@ class SMTBodyEmitter {
 
         let coreop = "";
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
-            coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType)} ${op} ${this.argToSMT(rhs, this.typegen.boolType)}`;
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.boolType).emit()}`;
         }
         else {
-            coreop = `${this.argToSMT(lhs, this.typegen.intType)} ${op} ${this.argToSMT(rhs, this.typegen.intType)}`;
+            coreop = `${this.argToSMT(lhs, this.typegen.intType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
     generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
-        return `(${op} ${this.argToSMT(lhs, this.typegen.intType)} ${op} ${this.argToSMT(rhs, this.typegen.intType)}`;
+        return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
     }
 
     generateStmt(op: MIROp, fromblck: string): SMTExp | undefined {
@@ -321,9 +321,9 @@ class SMTBodyEmitter {
                 if (bop.op === "/" || bop.op === "%") {
                     smtconds.push(`(= ${restmp} 0)`);
                 }
-                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo), SMTFreeVar.generate());
+                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
 
-                return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType)} ${this.argToSMT(bop.rhs, this.typegen.intType)})`), ite);
+                return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;

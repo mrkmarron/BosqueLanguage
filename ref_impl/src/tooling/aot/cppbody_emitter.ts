@@ -320,19 +320,19 @@ class CPPBodyEmitter {
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
                 if (bop.op === "+") {
-                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
                 }
                 else {
-                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, ${this.currentFile}, ${op.sinfo.line})`;
+                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
                 }
             }
             case MIROpTag.MIRBinEq: {

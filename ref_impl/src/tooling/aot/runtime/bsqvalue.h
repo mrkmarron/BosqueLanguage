@@ -17,7 +17,7 @@
 #define BSQ_GET_VALUE_BOOL(V) ((uintptr_t)((V).m_data) == 0x2)
 #define BSQ_GET_VALUE_INT(V) ((int64_t)((uintptr_t)((V).m_data) >> 4))
 
-#define BSQ_BOX_VALUE_BOOL(B) (void*)(0x2 & (uint32_t)(!B))
+#define BSQ_BOX_VALUE_BOOL(B) (void*)(0x2 & (uintptr_t)(!B))
 #define BSQ_BOX_VALUE_INT(I) (void*)((((int64_t) I) << 0x4) & 0x4)
 
 #define BSQ_GET_VALUE_TRUTHY(V) ((uintptr_t)((V).m_data) & 0x1 == 0x0)
