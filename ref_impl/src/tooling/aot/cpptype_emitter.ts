@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
+import { isInlinableType } from "./cpputils";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -24,6 +25,34 @@ class CPPTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    typeToCPPTypeForCallArguments(tt: MIRType): string {
+        if (isInlinableType(tt)) {
+            if (tt.trkey === "NSCore::Bool") {
+                return "bool";
+            }
+            else {
+                return "int64_t";
+            }
+        }
+        else {
+            return "const Value&";
+        }
+    }
+
+    typeToCPPType(tt: MIRType): string {
+        if (isInlinableType(tt)) {
+            if (tt.trkey === "NSCore::Bool") {
+                return "bool";
+            }
+            else {
+                return "int64_t";
+            }
+        }
+        else {
+            return "Value";
+        }
     }
 }
 

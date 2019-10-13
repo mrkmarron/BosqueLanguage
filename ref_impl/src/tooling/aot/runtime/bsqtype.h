@@ -38,33 +38,6 @@ enum class MIRPropertyEnum
     Limit
 };
 
-enum class MIRFieldEnum
-{
-    Invalid = 0x0,
-#define MIR_FIELD_ENUM_OP(T) BSQ_F_##T,
-#include "generated/field_enum.h"
-#undef MIR_FIELD_ENUM_OP
-    Limit
-};
-
-enum class MIRInvokeEnum
-{
-    Invalid = 0x0,
-#define MIR_INVOKE_ENUM_OP(T) BSQ_I_##T,
-#include "generated/invoke_enum.h"
-#undef MIR_INVOKE_ENUM_OP
-    Limit
-};
-
-enum class MIRVInvokeEnum
-{
-    Invalid = 0x0,
-#define MIR_VINVOKE_ENUM_OP(T) BSQ_VI_##T,
-#include "generated/vinvoke_enum.h"
-#undef MIR_VINVOKE_ENUM_OP
-    Limit
-};
-
 class MIRType;
 
 class MIRTypeOption

@@ -198,14 +198,6 @@ class AnyValue : RefCountBase
 public:
     const MIRNominalTypeEnum ntype;
 
-    #define ROOT_VCALLABLE_DECL(NAME, RTYPE, ARGS) virtual RTYPE NAME ARGS = 0;
-    #include "generated/vinvoke_decls.h"
-    #undef ROOT_VCALLABLE_DECL
-
-    #define ROOT_FIELD_DECL(NAME, FTYPE) FTYPE NAME;
-    #include "generated/field_decls.h"
-    #undef ROOT_FIELD_DECL
-
     AnyValue(MIRNominalTypeEnum nt) : ntype(ntype) { ; }
     virtual ~AnyValue() = default;
 };

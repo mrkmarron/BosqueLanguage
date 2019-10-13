@@ -501,8 +501,8 @@ class CPPBodyEmitter {
     }
 
     generateInvoke(idecl: MIRInvokeDecl): [string, string] {
-        const args = idecl.params.map((arg) => `${this.typegen.typeToCppType(arg.type)} ${this.varNameToCppName(arg.name)}`);
-        const restype = this.typegen.typeToCppType(idecl.resultType);
+        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(arg.type) as MIRType)} ${this.varNameToCppName(arg.name)}`);
+        const restype = this.typegen.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(idecl.resultType) as MIRType);
         const decl = `${restype} ${this.invokenameToCppName(idecl.key)}(${args.join(", ")})`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
