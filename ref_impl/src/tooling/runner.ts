@@ -10,7 +10,6 @@
 import * as FS from "fs";
 import * as Path from "path";
 
-import chalk from "chalk";
 import * as Commander from "commander";
 import { MIRAssembly, PackageConfig, MIRInvokeDecl } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
@@ -73,7 +72,7 @@ function cppGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
 
 Commander
     .option("-v --verify <entrypoint>", "Check for errors reachable from specified entrypoint")
-    .option("-c --compile <entrypoint>", "Compile the specified entrypoint")
+    .option("-c --compile <entrypoint>", "Compile the specified entrypoint");
 
 Commander.parse(process.argv);
 

@@ -16,8 +16,8 @@ class SMTBodyEmitter {
     readonly typegen: SMTTypeEmitter;
 
     private errorCodes = new Map<string, number>();
-    private bmcCodes = new Map<string, number>();
-    private bmcDepths = new Map<string, number>();
+    //private bmcCodes = new Map<string, number>();
+    //private bmcDepths = new Map<string, number>();
 
     private tmpvarctr = 0;
     private currentRType: MIRType;
