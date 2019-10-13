@@ -499,7 +499,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateInvoke(idecl: MIRInvokeDecl): string {
+    generateInvoke(idecl: MIRInvokeDecl): [string, string] {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.assembly.typeMap.get(idecl.resultType) as MIRType;
 
@@ -520,23 +520,23 @@ class SMTBodyEmitter {
             const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                return `${decl} \n${body.emit("  ")})`;
+                return [decl, `${decl} \n${body.emit("  ")})`];
             }
             else {
                 let cbody = body;
 
                 if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                    return `${decl} \n${cbody.emit("  ")})`;
+                    return [decl, `${decl} \n${cbody.emit("  ")})`];
                 }
                 else {
-                    return NOT_IMPLEMENTED<string>("generateInvoke -- Pre/Post");
+                    return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- Pre/Post");
                 }
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<string>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
     }
 }

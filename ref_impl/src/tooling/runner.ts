@@ -28,7 +28,7 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
         const coredir = Path.join(bosque_dir, corelibpath, "/core.bsq");
         const coredata = FS.readFileSync(coredir).toString();
 
-        const collectionsdir = Path.join(bosque_dir, "src/core/collections.bsq");
+        const collectionsdir = Path.join(bosque_dir, corelibpath, "/collections.bsq");
         const collectionsdata = FS.readFileSync(collectionsdir).toString();
 
         code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
@@ -60,7 +60,7 @@ function smtlibGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
     const smtgen = new SMTBodyEmitter(masm, new SMTTypeEmitter(masm));
     const smtcode = smtgen.generateInvoke(idecl);
 
-    return smtcode;
+    return smtcode[1];
 }
 
 function cppGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
@@ -81,8 +81,8 @@ if (Commander.args.length === 0) {
     process.exit(1);
 }
 
-const massembly = generateMASM(Commander.args, Commander.verify ? "src/core_verify/" : "src/core_compile/");
-const entrypoint = massembly.invokeDecls.get(Commander.entrypoint) as MIRInvokeDecl;
+const massembly = generateMASM(Commander.args, Commander.verify ? "src/core/verify/" : "src/core/compile/");
+const entrypoint = massembly.invokeDecls.get(Commander.verify || Commander.compile) as MIRInvokeDecl;
 
 if (Commander.verify !== undefined) {
     setImmediate(() => process.stdout.write(smtlibGenerate(massembly, entrypoint) + "\n"));

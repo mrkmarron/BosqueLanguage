@@ -1,0 +1,88 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the fluent core language
+namespace NSCore;
+
+//<summary>The special concept which all values are instances of.</summary>
+concept Any {
+    method is<T>(): Bool # special_method
+    method as<T>(): T # special_method
+
+    method tryAs<T>(): T? # special_method
+    method defaultAs<T>(default: T): T # special_method
+
+    method isNone(): Bool # special_method
+    method isSome(): Bool # special_method
+}
+
+//<summary>Type for representing all non-none values.</summary>
+concept Some provides Any {
+    method update(): Some # special_method
+    method merge(): Some # special_method
+    method project<T>(): Some # special_method
+}
+
+//<summary>Type for representing the none-value.</summary>
+concept Truthy provides Any {
+}
+
+//<summary>Type for representing the none-value.</summary>
+entity None provides Any, Truthy {
+}
+
+concept Parsable provides Some {
+    abstract static tryParse(str: String): Some | None;
+}
+
+//<summary>Primitive boolean value.</summary>
+entity Bool provides Some, Truthy, Parsable {
+    override static tryParse(str: String): Bool | None {
+        if(str == "true") {
+            return true;
+        }
+        elif(str == "false") {
+            return false;
+        }
+        else {
+            return none;
+        }
+    }
+}
+
+//<summary>Primitive integer value.</summary>
+entity Int provides Some, Parsable {
+    override static tryParse(str: String): Int | None # int_tryparse
+
+    static max(v1: Int, v2: Int): Int {
+        return v1 > v2 ? v1 : v2;
+    }
+
+    static min(v1: Int, v2: Int): Int {
+        return v1 < v2 ? v1 : v2;
+    }
+}
+
+//<summary>Primitive string value.</summary>
+entity String provides Some {
+}
+
+//<summary>All actual tuples implicitly provide this concept.</summary>
+concept Tuple provides Some {
+}
+
+//<summary>All actual records implicitly provide this concept.</summary>
+concept Record provides Some {
+}
+
+//<summary>All actual entities/concepts implicitly provide this concept.</summary>
+concept Object provides Some {
+}
+
+//<summary>Shorthand for predicate function types.</summary>
+typedef Predicate<T> = fn(_: T) -> Bool;
+
+//<summary>Shorthand for transform function types.</summary>
+typedef Transform<T, U> = fn(_: T) -> U;
