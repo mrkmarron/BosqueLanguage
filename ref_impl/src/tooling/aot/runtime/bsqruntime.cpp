@@ -34,7 +34,7 @@ bool Runtime::subtype(const Value& v, const MIRTypeOption* tt) const
     });
 }
 
-#define MIR_CONST_STRING_OP(N, S) Runtime::BSQ_STRING_##N = Value(new String(MIRNominalTypeEnum::BSQ_N_NSCore$cc$String, std::string(S)));
+#define MIR_CONST_STRING_OP(N, S) Value Runtime::BSQ_STRING_##N = Value(new String(MIRNominalTypeEnum::BSQ_N_NSCore$cc$String, std::string(S)));
 #include "generated/const_strings.h"
 #undef MIR_CONST_STRING_OP
 } // namespace BSQ

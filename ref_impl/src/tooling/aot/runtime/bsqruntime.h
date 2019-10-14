@@ -24,7 +24,7 @@ private:
     const std::map<MIRTypeEnum, MIRTypeTuple*> m_declaredTupleTypes;
     const std::map<MIRTypeEnum, MIRTypeRecord*> m_declaredRecordTypes;
 
-     const std::map<MIRTypeEnum, MIRType*> m_declaredTypes;
+    const std::map<MIRTypeEnum, MIRType*> m_declaredTypes;
 
 public:
     const MIRNominalTypeEnum s_tnone;
@@ -44,7 +44,7 @@ public:
             std::map<MIRTypeEnum, MIRType*>&& declaredTypes,
             MIRNominalTypeEnum tnone, MIRNominalTypeEnum tbool, MIRNominalTypeEnum tint, MIRNominalTypeEnum tstring, MIRNominalTypeEnum ttuple, MIRNominalTypeEnum trecord)
         : m_nominalSubtypes(move(nominalSubtypes)), m_declaredTupleTypes(move(declaredTupleTypes)), m_declaredRecordTypes(move(declaredRecordTypes)),
-          m_declaredTypes(declaredTypes),
+          m_declaredTypes(move(declaredTypes)),
           s_tnone(tnone), s_tbool(tbool), s_tint(tint), s_tstring(tstring), s_ttuple(ttuple), s_trecord(trecord)
     {
         ;
@@ -98,8 +98,8 @@ public:
     bool subtype_Tuple( const Tuple* tval, const MIRTypeTuple* ttup) const
     {
         auto rp = std::mismatch(tval->m_entries.cbegin(), tval->m_entries.cend(), ttup->entries.cbegin(), ttup->entries.cend(),
-                                [&](const std::pair<MIRType*, bool>& a, const Value& b) {
-                                    return this->subtype(b, a.first);
+                                [&](const Value& a, const std::pair<MIRType*, bool>& b) {
+                                    return this->subtype(a, b.first);
                                 });
 
         if (rp.first != tval->m_entries.cend() && rp.second != ttup->entries.cend())
@@ -162,8 +162,8 @@ public:
         else if (titer != trec->entries.cend())
         {
             //There are more type entries than values so they better be optional
-            return std::all_of(titer, trec->entries.cend(), [&](const std::pair<MIRType*, bool>& entry) {
-                return entry.second;
+            return std::all_of(titer, trec->entries.cend(), [&](const std::pair<MIRPropertyEnum, std::pair<MIRType*, bool>>& entry) {
+                return entry.second.second;
             });
         }
         else
