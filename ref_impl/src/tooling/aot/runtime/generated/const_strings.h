@@ -10,6 +10,3 @@
 #ifndef MIR_CONST_STRING_OP
 #define MIR_CONST_STRING_OP(V)
 #endif
-
-MIR_CONST_STRING_OP(foo, "foo")
-MIR_CONST_STRING_OP(bar, "bar")
