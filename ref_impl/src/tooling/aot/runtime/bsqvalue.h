@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "common.h"
-#include "bsqtype.h"
 
 #pragma once
 
@@ -27,6 +26,12 @@
 
 namespace BSQ
 {
+enum class MIRPropertyEnum
+{
+    Invalid = 0,
+//%%PROPERTY_ENUM_DECLARE
+};
+
 class RefCountBase
 {
 private:
@@ -196,9 +201,7 @@ public:
 class AnyValue : RefCountBase
 {
 public:
-    const MIRNominalTypeEnum ntype;
-
-    AnyValue(MIRNominalTypeEnum nt) : ntype(ntype) { ; }
+    AnyValue() = default;
     virtual ~AnyValue() = default;
 };
 
@@ -207,7 +210,7 @@ class String : public AnyValue
 public:
     const std::string m_value;
 
-    String(MIRNominalTypeEnum nt, std::string&& value) : AnyValue(nt), m_value(move(value)) { ; }
+    String(std::string&& value) : AnyValue(), m_value(move(value)) { ; }
     virtual ~String() = default;
 };
 
@@ -216,7 +219,7 @@ class StringOf : public AnyValue
 public:
     const std::string m_value;
 
-    StringOf(MIRNominalTypeEnum nt, std::string&& value) : AnyValue(nt), m_value(move(value)) { ; }
+    StringOf(std::string&& value) : AnyValue(), m_value(move(value)) { ; }
     virtual ~StringOf() = default;
 };
 
@@ -225,7 +228,7 @@ class Tuple : public AnyValue
 public:
     const std::vector<Value> m_entries;
 
-    Tuple(MIRNominalTypeEnum nt, std::vector<Value>&& entries) : AnyValue(nt), m_entries(move(entries)) { ; }
+    Tuple(std::vector<Value>&& entries) : AnyValue(), m_entries(move(entries)) { ; }
     virtual ~Tuple() = default;
 };
 
@@ -234,14 +237,14 @@ class Record : public AnyValue
 public:
     const std::vector<std::pair<MIRPropertyEnum, Value>> m_entries;
 
-    Record(MIRNominalTypeEnum nt, std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : AnyValue(nt), m_entries(move(entries)) { ; }
+    Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : AnyValue(), m_entries(move(entries)) { ; }
     virtual ~Record() = default;
 };
 
-class Entity : public AnyValue
+class Object : public AnyValue
 {
 public:
-    Entity(MIRNominalTypeEnum nt) : AnyValue(nt) { ; }
-    virtual ~Entity() = default;
+    Object() : AnyValue() { ; }
+    virtual ~Object() = default;
 };
 } // namespace BSQ

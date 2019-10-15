@@ -14,6 +14,7 @@ class CPPBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: CPPTypeEmitter;
 
+    readonly allPropertyNames: Set<string> = new Set<string>();
     readonly allConstStrings: Map<string, string> = new Map<string, string>();
 
     private currentFile: string = "[No File]";

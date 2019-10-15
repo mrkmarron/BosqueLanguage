@@ -23,7 +23,7 @@
     )
     (
       (bsq_term_named_list_nil)
-      (bsq_term_named_list_cons (bsq_term_named_list_name Int) (bsq_term_named_list_head BTerm) (bsq_term_named_list_tail BTermNamedList))
+      (bsq_term_named_list_cons (bsq_term_named_list_name String) (bsq_term_named_list_head BTerm) (bsq_term_named_list_tail BTermNamedList))
     )
 ))
 
