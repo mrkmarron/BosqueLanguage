@@ -78,6 +78,8 @@ class MIRConstantDecl {
 }
 
 abstract class MIRInvokeDecl {
+    readonly enclosingType: MIRNominalTypeKey;
+
     readonly iname: string;
     readonly key: MIRInvokeKey;
 
@@ -93,7 +95,9 @@ abstract class MIRInvokeDecl {
     readonly preconditions: [MIRBody, boolean][];
     readonly postconditions: MIRBody[];
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[]) {
+    constructor(enclosingType: MIRNominalTypeKey, iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[]) {
+        this.enclosingType = enclosingType;
+
         this.iname = iname;
         this.key = key;
 
@@ -115,7 +119,7 @@ abstract class MIRInvokeDecl {
 
     static jparse(jobj: any): MIRInvokeDecl {
         if (jobj.body) {
-            return new MIRInvokeBodyDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => [MIRBody.jparse(pre[0]), pre[1]]), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), MIRBody.jparse(jobj.body));
+            return new MIRInvokeBodyDecl(jobj.enclosingType, jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => [MIRBody.jparse(pre[0]), pre[1]]), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), MIRBody.jparse(jobj.body));
         }
         else {
             let binds = new Map<string, MIRResolvedTypeKey>();
@@ -124,7 +128,7 @@ abstract class MIRInvokeDecl {
             let pcodes = new Map<string, MIRPCode>();
             jobj.pcodes.forEach((pc: any) => pcodes.set(pc[0], pc[1]));
 
-            return new MIRInvokePrimitiveDecl(jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, binds, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => [MIRBody.jparse(pre[0]), pre[1]]), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), jobj.implkey, pcodes);
+            return new MIRInvokePrimitiveDecl(jobj.enclosingType, jobj.iname, jobj.key, jobj.recursive, jparsepragmas(jobj.pragmas), jparsesinfo(jobj.sinfo), jobj.file, binds, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions.map((pre: any) => [MIRBody.jparse(pre[0]), pre[1]]), jobj.postconditions.map((post: any) => MIRBody.jparse(post)), jobj.implkey, pcodes);
         }
     }
 }
@@ -132,14 +136,14 @@ abstract class MIRInvokeDecl {
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
     readonly body: MIRBody;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[], body: MIRBody) {
-        super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
+    constructor(enclosingType: MIRNominalTypeKey, iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[], body: MIRBody) {
+        super(enclosingType, iname, key, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
 
         this.body = body;
     }
 
     jemit(): object {
-        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => [pre[0].jemit(), pre[1]]), postconditions: this.postconditions.map((post) => post.jemit()), body: this.body.jemit() };
+        return { enclosingType: this.enclosingType, iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => [pre[0].jemit(), pre[1]]), postconditions: this.postconditions.map((post) => post.jemit()), body: this.body.jemit() };
     }
 }
 
@@ -153,8 +157,8 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     readonly binds: Map<string, MIRResolvedTypeKey>;
     readonly pcodes: Map<string, MIRPCode>;
 
-    constructor(iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, binds: Map<string, MIRResolvedTypeKey>, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[], implkey: string, pcodes: Map<string, MIRPCode>) {
-        super(iname, key, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
+    constructor(enclosingType: MIRNominalTypeKey, iname: string, key: MIRInvokeKey, recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, binds: Map<string, MIRResolvedTypeKey>, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: [MIRBody, boolean][], postconds: MIRBody[], implkey: string, pcodes: Map<string, MIRPCode>) {
+        super(enclosingType, iname, key, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
 
         this.implkey = implkey;
         this.binds = binds;
@@ -162,7 +166,7 @@ class MIRInvokePrimitiveDecl extends MIRInvokeDecl {
     }
 
     jemit(): object {
-        return { iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => [pre[0].jemit(), pre[1]]), postconditions: this.postconditions.map((post) => post.jemit()), implkey: this.implkey, binds: [...this.binds], pcodes: [... this.pcodes] };
+        return { enclosingType: this.enclosingType, iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, recursive: this.recursive, pragmas: jemitpragmas(this.pragmas), params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions.map((pre) => [pre[0].jemit(), pre[1]]), postconditions: this.postconditions.map((post) => post.jemit()), implkey: this.implkey, binds: [...this.binds], pcodes: [... this.pcodes] };
     }
 }
 
@@ -214,14 +218,13 @@ abstract class MIROOTypeDecl {
 
     readonly ns: string;
     readonly name: string;
-    readonly terms: Map<string, MIRType>;
-    readonly provides: MIRType[];
+    readonly provides: MIRNominalTypeKey[];
 
     readonly invariants: MIRBody[] = [];
     readonly fields: MIRFieldDecl[] = [];
     readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         this.ooname = ooname;
         this.tkey = tkey;
 
@@ -232,7 +235,6 @@ abstract class MIROOTypeDecl {
 
         this.ns = ns;
         this.name = name;
-        this.terms = terms;
         this.provides = provides;
 
         this.invariants = invariants;
@@ -242,16 +244,13 @@ abstract class MIROOTypeDecl {
     abstract jemit(): object;
 
     static jparse(jobj: any): MIROOTypeDecl {
-        let terms = new Map<string, MIRType>();
-            jobj.terms.forEach((t: any) => terms.set(t[0], MIRType.jparse(t[1])));
-
         if (jobj.isentity) {
-            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
+            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, jobj.provides, jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
             jobj.vcallMap.forEach((vc: any) => entity.vcallMap.set(vc[0], vc[1]));
             return entity;
         }
         else {
-            const concept = new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides.map((p: any) => MIRType.jparse(p)), jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
+            const concept = new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, jobj.provides, jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
             jobj.vcallMap.forEach((vc: any) => concept.vcallMap.set(vc[0], vc[1]));
             return concept;
         }
@@ -259,12 +258,12 @@ abstract class MIROOTypeDecl {
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
-        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
+        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, provides, invariants, fields);
     }
 
     jemit(): object {
-        return { isentity: false, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides.map((p) => p.jemit()), invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap] };
+        return { isentity: false, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, provides: this.provides, invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap] };
     }
 }
 
@@ -275,8 +274,8 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly isCollectionEntityType: boolean;
     readonly isMapEntityType: boolean;
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRType[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
-        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, terms, provides, invariants, fields);
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, pragmas: [MIRType, string][], ns: string, name: string, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
+        super(ooname, srcInfo, srcFile, tkey, pragmas, ns, name, provides, invariants, fields);
 
         this.isEnum = isEnum;
         this.isKey = isKey;
@@ -286,7 +285,7 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     }
 
     jemit(): object {
-        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides.map((p) => p.jemit()), invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], isEnum: this.isEnum, isKey: this.isKey, isCollectionEntityType: this.isCollectionEntityType, isMapEntityType: this.isMapEntityType };
+        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, provides: this.provides, invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], isEnum: this.isEnum, isKey: this.isKey, isCollectionEntityType: this.isCollectionEntityType, isMapEntityType: this.isMapEntityType };
     }
 }
 
@@ -532,19 +531,13 @@ class MIRAssembly {
     private atomSubtypeOf_EntityEntity(t1: MIREntityType, t2: MIREntityType): boolean {
         const t1e = this.entityDecls.get(t1.ekey) as MIREntityTypeDecl;
         const t2e = this.entityDecls.get(t2.ekey) as MIREntityTypeDecl;
-        if (t1e.ns !== t2e.ns || t1e.name !== t2e.name) {
-            return false;
-        }
-
-        let allBindsOk = true;
-        t1e.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, t2e.terms.get(k) as MIRType); });
-        return allBindsOk;
+        return (t1e.ns === t2e.ns && t1e.name === t2e.name);
     }
 
     private atomSubtypeOf_EntityConcept(t1: MIREntityType, t2: MIRConceptType): boolean {
         const t1e = this.entityDecls.get(t1.ekey) as MIREntityTypeDecl;
         const mcc = MIRType.createSingle(t2);
-        return t1e.provides.some((provide) => this.subtypeOf(provide, mcc));
+        return t1e.provides.some((provide) => this.subtypeOf(this.typeMap.get(provide) as MIRType, mcc));
     }
 
     private atomSubtypeOf_ConceptConcept(t1: MIRConceptType, t2: MIRConceptType): boolean {
@@ -554,12 +547,10 @@ class MIRAssembly {
                 const c2 = this.conceptDecls.get(c2t) as MIRConceptTypeDecl;
 
                 if (c1.ns === c2.ns && c1.name === c2.name) {
-                    let allBindsOk = true;
-                    c1.terms.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, c2.terms.get(k) as MIRType); });
-                    return allBindsOk;
+                    return true;
                 }
 
-                return c1.provides.some((provide) => this.subtypeOf(provide, this.typeMap.get(c2t) as MIRType));
+                return c1.provides.some((provide) => this.subtypeOf(this.typeMap.get(provide) as MIRType, this.typeMap.get(c2t) as MIRType));
             });
         });
     }

@@ -38,7 +38,7 @@ private:
     int64_t count;
 
 public:
-    RefCountBase() : count(1) { ; }
+    RefCountBase() : count(0) { ; }
     virtual ~RefCountBase() { ; }
 
     inline static void increment(RefCountBase* rcb)
@@ -57,6 +57,80 @@ public:
     }
 };
 
+template <typename T>
+class ValueOf
+{
+private:
+    T* m_data;
+
+public:
+    ValueOf() : m_data(nullptr) { ; }
+    ValueOf(T* v) : m_data(v) { RefCountBase::increment((RefCountBase*)v); }
+
+    ValueOf(const ValueOf<T>& v)
+    {
+        RefCountBase::increment(v.m_data);
+        this->m_data = v.m_data;
+    }
+
+    ValueOf<T>& operator=(const ValueOf<T>& v)
+    {
+        if(this == &v)
+        {
+            return *this;
+        }
+
+        if(v.m_data != nullptr)
+        {
+            RefCountBase::increment(v.m_data);
+        }
+
+        if(this->m_data != nullptr)
+        {
+            RefCountBase::decrement(this->m_data);
+        }
+
+        this->m_data = v.m_data;
+    }
+    
+    ValueOf(ValueOf<T>&& v)
+    {
+        this->m_data = v.m_data;
+        v.m_data = nullptr;
+    }
+
+    ValueOf<T>& operator=(ValueOf<T>&& v)
+    {
+        if(this == &v)
+        {
+            return *this;
+        }
+ 
+        if(this->m_data != nullptr)
+        {
+            RefCountBase::decrement(this->m_data);
+        }
+
+        this->m_data = v.m_data;
+        v.m_data = nullptr;
+    }
+
+    ~ValueOf()
+    {
+        if(this->m_data != nullptr)
+        {
+            RefCountBase::decrement(this->m_data);
+        }
+
+        this->m_data = nullptr;
+    }
+
+    inline T* getPtr() const
+    {
+        return this->m_data;
+    }
+};
+
 class Value
 {
 private:
@@ -70,7 +144,18 @@ public:
 
     Value(bool b) : m_data(BSQ_BOX_VALUE_BOOL(b)) { ; }
     Value(int64_t i) : m_data(BSQ_BOX_VALUE_INT(i)) { ; }
-    Value(void* p) : m_data(p) { ; }
+    Value(void* p) : m_data(p) { RefCountBase::increment((RefCountBase*)p); }
+
+    template <typename T>
+    Value(const ValueOf<T>& v)
+    {
+        if(v.getPtr() != nullptr)
+        {
+            RefCountBase::increment(v.getPtr());
+        }
+
+        this->m_data = v.getPtr();
+    }
 
     Value(const Value& v)
     {
@@ -198,53 +283,21 @@ public:
     static bool compare_op(Value lhs, Value rhs);
 };
 
-class AnyValue : RefCountBase
-{
-public:
-    AnyValue() = default;
-    virtual ~AnyValue() = default;
-};
-
-class String : public AnyValue
-{
-public:
-    const std::string m_value;
-
-    String(std::string&& value) : AnyValue(), m_value(move(value)) { ; }
-    virtual ~String() = default;
-};
-
-class StringOf : public AnyValue
-{
-public:
-    const std::string m_value;
-
-    StringOf(std::string&& value) : AnyValue(), m_value(move(value)) { ; }
-    virtual ~StringOf() = default;
-};
-
-class Tuple : public AnyValue
+class Tuple : public RefCountBase
 {
 public:
     const std::vector<Value> m_entries;
 
-    Tuple(std::vector<Value>&& entries) : AnyValue(), m_entries(move(entries)) { ; }
+    Tuple(std::vector<Value>&& entries) : m_entries(move(entries)) { ; }
     virtual ~Tuple() = default;
 };
 
-class Record : public AnyValue
+class Record : public RefCountBase
 {
 public:
     const std::vector<std::pair<MIRPropertyEnum, Value>> m_entries;
 
-    Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : AnyValue(), m_entries(move(entries)) { ; }
+    Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : m_entries(move(entries)) { ; }
     virtual ~Record() = default;
-};
-
-class Object : public AnyValue
-{
-public:
-    Object() : AnyValue() { ; }
-    virtual ~Object() = default;
 };
 } // namespace BSQ

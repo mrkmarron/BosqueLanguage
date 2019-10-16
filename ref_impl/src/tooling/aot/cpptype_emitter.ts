@@ -3,8 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
-import { isInlinableType } from "./cpputils";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRConceptTypeDecl, MIRInvokeDecl } from "../../compiler/mir_assembly";
+import { isInlinableType, sanitizeForCpp, isUniqueEntityType } from "./cpputils";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -36,6 +36,9 @@ class CPPTypeEmitter {
                 return "int64_t";
             }
         }
+        else if (isUniqueEntityType(tt)) {
+            return `const ValueOf<${sanitizeForCpp(tt.trkey)}>&`;
+        }
         else {
             return "const Value&";
         }
@@ -50,9 +53,99 @@ class CPPTypeEmitter {
                 return "int64_t";
             }
         }
+        else if (isUniqueEntityType(tt)) {
+            return `ValueOf<${sanitizeForCpp(tt.trkey)}>`;
+        }
         else {
             return "Value";
         }
+    }
+
+    generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+        if (entity.tkey === "NSCore::String") {
+            return {
+                fwddecl: `class ${sanitizeForCpp(entity.tkey)};`,
+                fulldecl: `class ${sanitizeForCpp(entity.tkey)} : public RefCountBase, ${entity.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
+                {
+                public:
+                    std::string sdata;
+
+                    ${sanitizeForCpp(entity.tkey)}(std::string sdata) : sdata(sdata) { ; }
+                    virtual ~${sanitizeForCpp(entity.tkey)}() = default;
+                };`
+            };
+        }
+
+        const constructor_args = entity.fields.map((fd) => {
+            return `${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} ${fd.fname}`;
+        });
+
+        const constructor_initializer = entity.fields.map((fd) => {
+            return isInlinableType(this.assembly.typeMap.get(fd.declaredType) as MIRType) ? `${fd.fname}(${fd.fname})` : `${fd.fname}(std::move(${fd.fname}))`;
+        });
+
+        const fields = entity.fields.map((fd) => {
+            return `const ${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} ${fd.fname};`;
+        });
+
+        const vfield_accessors = entity.fields.map((fd) => {
+            return `${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} get$${fd.fname}() const { return this->${fd.fname}; };`;
+        });
+
+        const vcalls = [...entity.vcallMap].map((callp) => {
+            const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
+            const isvcall = rcall.enclosingType !== entity.tkey;
+            const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
+            const vargs = rcall.params.map((fp) => `${this.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
+            const cargs = rcall.params.map((fp) => fp.name).join(", ");
+            return `${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const ${isvcall ? "override" : ""}
+            {
+                return this->${sanitizeForCpp(callp[1])}(${cargs});
+            }`;
+        });
+
+        return {
+            fwddecl: `class ${sanitizeForCpp(entity.tkey)};`,
+            fulldecl: `class ${sanitizeForCpp(entity.tkey)} : public RefCountBase, ${entity.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
+            {
+            public:
+                ${sanitizeForCpp(entity.tkey)}(${constructor_args.join(", ")})${constructor_initializer.length !== 0 ? (" : " + constructor_initializer.join(", ")) : ""} { ; }
+                virtual ~${sanitizeForCpp(entity.tkey)}() = default;
+
+                ${fields.join("\t\t\t\t\n")}
+
+                ${vfield_accessors.join("\t\t\t\t\n")}
+
+                ${vcalls.join("\t\t\t\t\n")}
+            };`
+        };
+    }
+
+    generateCPPConcept(concept: MIRConceptTypeDecl): {fwddecl: string, fulldecl: string} {
+        const vfield_accessors = concept.fields.map((fd) => {
+            return `virtual ${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} get$${fd.fname}() const override { return this->${fd.fname}; };`;
+        });
+
+        const vcalls = [...concept.vcallMap].map((callp) => {
+            const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
+            const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
+            const vargs = rcall.params.map((fp) => `${this.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
+            return `virtual ${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const = 0;`;
+        });
+
+        return {
+            fwddecl: `class ${sanitizeForCpp(concept.tkey)};`,
+            fulldecl: `class ${sanitizeForCpp(concept.tkey)} : ${concept.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
+            {
+            public:
+                ${sanitizeForCpp(concept.tkey)}() { ; }
+                virtual ~${sanitizeForCpp(concept.tkey)}() = default;
+
+                ${vfield_accessors.join("\t\t\t\t\n")}
+
+                ${vcalls.join("\t\t\t\t\n")}
+            };`
+        };
     }
 }
 

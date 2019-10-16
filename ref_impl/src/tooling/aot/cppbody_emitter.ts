@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType } from "./cpputils";
+import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType } from "./cpputils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -36,6 +36,9 @@ class CPPBodyEmitter {
             else {
                 return `int64_t ${this.varToCppName(trgt)} = ${value};`;
             }
+        }
+        else if (isUniqueEntityType(ttype)) {
+            return `ValueOf<${sanitizeForCpp(ttype.trkey)}> ${this.varToCppName(trgt)}(${value})`;
         }
         else {
             return `Value ${this.varToCppName(trgt)}(${value});`;
@@ -83,39 +86,45 @@ class CPPBodyEmitter {
     }
 
     boxIfNeeded(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
-        if (!isInlinableType(from) || isInlinableType(into)) {
-            return exp;
+        if (isInlinableType(from) && !isInlinableType(into)) {
+            return `Value(${exp})`;
         }
-
-        const itype = getInlinableType(from);
-        if (itype.trkey === "NSCore::Bool") {
+        else if (isUniqueEntityType(from) && !isUniqueEntityType(into)) {
             return `Value(${exp})`;
         }
         else {
-            return `Value(${exp})`;
+            return exp;
         }
     }
 
     unboxIfNeeded(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
-        if (isInlinableType(from) || !isInlinableType(into)) {
-            return exp;
+        if (!isInlinableType(from) && isInlinableType(into)) {
+            const itype = getInlinableType(into);
+            if (itype.trkey === "NSCore::Bool") {
+                return `(${exp}).getBool()`;
+            }
+            else {
+                return `(${exp}).getInt()`;
+            }
         }
-
-        const itype = getInlinableType(into);
-        if (itype.trkey === "NSCore::Bool") {
-            return `(${exp}).getBool()`;
+        else if (!isUniqueEntityType(from) && isUniqueEntityType(into)) {
+            return `ValueOf<${sanitizeForCpp(into.trkey)}>(${exp}.getPtr<${sanitizeForCpp(into.trkey)}>())`;
         }
         else {
-            return `(${exp}).getInt()`;
+            return exp;
         }
     }
 
     coerce(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
-        if (isInlinableType(from) === isInlinableType(into)) {
+        if (isInlinableType(from) !== isInlinableType(into)) {
+            return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (isUniqueEntityType(from) !== isUniqueEntityType(into)) {
+            return isUniqueEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else {
             return exp;
         }
-
-        return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType | MIRTypeOption): string {
@@ -156,13 +165,24 @@ class CPPBodyEmitter {
     }
 
     argToCppOptimized(arg: MIRArgument, into: MIRType | MIRTypeOption): string {
-        const optType = isInlinableType(this.getArgType(arg)) ? this.getArgType(arg) : into;
-
-        if (arg instanceof MIRRegisterArgument) {
-            return this.coerce(this.varToCppName(arg), this.getArgType(arg), optType);
+        if (isInlinableType(this.getArgType(arg))) {
+            if (arg instanceof MIRRegisterArgument) {
+                return this.varToCppName(arg);
+            }
+            else {
+                return this.generateConstantExp(arg as MIRConstantArgument, this.getArgType(arg));
+            }
+        }
+        else if (isUniqueEntityType(this.getArgType(arg))) {
+            if (arg instanceof MIRRegisterArgument) {
+                return `${this.varToCppName(arg)}.getPtr()`;
+            }
+            else {
+                return this.generateConstantExp(arg as MIRConstantArgument, this.getArgType(arg));
+            }
         }
         else {
-            return this.generateConstantExp(arg as MIRConstantArgument, optType);
+            return this.argToCpp(arg, into);
         }
     }
 
@@ -176,7 +196,7 @@ class CPPBodyEmitter {
             return this.argToCpp(arg, this.typegen.boolType);
         }
         else {
-            return `(${this.varToCppName(arg)}).getTruthy()`;
+            return `${this.varToCppName(arg)}.getTruthy()`;
         }
     }
 

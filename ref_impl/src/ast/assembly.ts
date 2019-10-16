@@ -425,7 +425,7 @@ class Assembly {
             return this.normalizeTypeGeneral(aliasResolvedType, aliasResolvedBinds);
         }
         else {
-            const fconcept = this.tryGetConceptTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
+            const fconcept = this.tryGetConceptTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName, aliasResolvedBinds.size);
             if (fconcept !== undefined) {
                 if (fconcept.terms.length !== aliasResolvedType.terms.length) {
                     return ResolvedType.createEmpty();
@@ -434,7 +434,7 @@ class Assembly {
                 return ResolvedType.createSingle(this.createConceptTypeAtom(fconcept, aliasResolvedType, aliasResolvedBinds));
             }
 
-            const fobject = this.tryGetObjectTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
+            const fobject = this.tryGetObjectTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName, aliasResolvedBinds.size);
             if (fobject !== undefined) {
                 if (fobject.terms.length !== aliasResolvedType.terms.length) {
                     return ResolvedType.createEmpty();
@@ -586,7 +586,7 @@ class Assembly {
         }
 
         let allBindsOk = true;
-        t1.binds.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, t2.binds.get(k) as ResolvedType); });
+        t1.binds.forEach((v, k) => { allBindsOk = allBindsOk && v.idStr === (t2.binds.get(k) as ResolvedType).idStr; });
         return allBindsOk;
     }
 
@@ -603,7 +603,7 @@ class Assembly {
             return t2.conceptTypes.some((c2t) => {
                 if (c1t.concept.ns === c2t.concept.ns && c1t.concept.name === c2t.concept.name) {
                     let allBindsOk = true;
-                    c1t.binds.forEach((v, k) => { allBindsOk = allBindsOk && this.subtypeOf(v, c2t.binds.get(k) as ResolvedType); });
+                    c1t.binds.forEach((v, k) => { allBindsOk = allBindsOk && v.idStr === (c2t.binds.get(k) as ResolvedType).idStr; });
                     return allBindsOk;
                 }
 
@@ -684,7 +684,7 @@ class Assembly {
         }
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
-        const tconcept = this.createConceptTypeAtom(this.tryGetConceptTypeForFullyResolvedName("NSCore::" + name) as ConceptTypeDecl, rsig, binds || new Map<string, ResolvedType>());
+        const tconcept = this.createConceptTypeAtom(this.tryGetConceptTypeForFullyResolvedName("NSCore::" + name, binds ? binds.size : 0) as ConceptTypeDecl, rsig, binds || new Map<string, ResolvedType>());
         const rtype = ResolvedType.createSingle(tconcept);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
@@ -697,7 +697,7 @@ class Assembly {
         }
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
-        const tobject = this.createObjectTypeAtom(this.tryGetObjectTypeForFullyResolvedName("NSCore::" + name) as EntityTypeDecl, rsig, binds || new Map<string, ResolvedType>());
+        const tobject = this.createObjectTypeAtom(this.tryGetObjectTypeForFullyResolvedName("NSCore::" + name, binds ? binds.size : 0) as EntityTypeDecl, rsig, binds || new Map<string, ResolvedType>());
         const rtype = ResolvedType.createSingle(tobject);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
@@ -748,12 +748,12 @@ class Assembly {
         return this.typeUnion(opts);
     }
 
-    tryGetConceptTypeForFullyResolvedName(name: string): ConceptTypeDecl | undefined {
-        return this.m_conceptMap.get(name);
+    tryGetConceptTypeForFullyResolvedName(name: string, templatecount: number): ConceptTypeDecl | undefined {
+        return this.m_conceptMap.get(name + templatecount);
     }
 
-    tryGetObjectTypeForFullyResolvedName(name: string): EntityTypeDecl | undefined {
-        return this.m_objectMap.get(name);
+    tryGetObjectTypeForFullyResolvedName(name: string, templatecount: number): EntityTypeDecl | undefined {
+        return this.m_objectMap.get(name + templatecount);
     }
 
     hasNamespace(ns: string): boolean {
@@ -780,12 +780,12 @@ class Assembly {
         return decls;
     }
 
-    addConceptDecl(resolvedName: string, concept: ConceptTypeDecl) {
-        this.m_conceptMap.set(resolvedName, concept);
+    addConceptDecl(resolvedName: string, templatecount: number, concept: ConceptTypeDecl) {
+        this.m_conceptMap.set(resolvedName + templatecount, concept);
     }
 
-    addObjectDecl(resolvedName: string, object: EntityTypeDecl) {
-        this.m_objectMap.set(resolvedName, object);
+    addObjectDecl(resolvedName: string, templatecount: number, object: EntityTypeDecl) {
+        this.m_objectMap.set(resolvedName + templatecount, object);
     }
 
     ////

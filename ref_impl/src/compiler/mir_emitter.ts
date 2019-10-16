@@ -590,7 +590,7 @@ class MIREmitter {
 
     private closeConceptDecl(cpt: MIRConceptTypeDecl) {
         cpt.provides.forEach((tkey) => {
-            const ccdecl = this.masm.conceptDecls.get(tkey.trkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
@@ -611,7 +611,7 @@ class MIREmitter {
 
     private closeEntityDecl(entity: MIREntityTypeDecl) {
         entity.provides.forEach((tkey) => {
-            const ccdecl = this.masm.conceptDecls.get(tkey.trkey) as MIRConceptTypeDecl;
+            const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
             ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));
@@ -668,13 +668,18 @@ class MIREmitter {
         const emitter = new MIREmitter(masm);
         const checker = new TypeChecker(assembly, true, emitter, doInvChecks, doPrePostChecks, doAssertChecks);
 
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAnyType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Some", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialSomeType());
+
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialBoolType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialIntType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialStringType());
 
         //get any entrypoint functions and initialize the checker there

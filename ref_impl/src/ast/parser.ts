@@ -2443,7 +2443,7 @@ class Parser {
 
             this.clearRecover();
             currentDecl.concepts.set(cname, new ConceptTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-            this.m_penv.assembly.addConceptDecl(currentDecl.ns + "::" + cname, currentDecl.concepts.get(cname) as ConceptTypeDecl);
+            this.m_penv.assembly.addConceptDecl(currentDecl.ns + "::" + cname, terms.length, currentDecl.concepts.get(cname) as ConceptTypeDecl);
         }
         catch (ex) {
             this.processRecover();
@@ -2486,7 +2486,7 @@ class Parser {
 
             this.clearRecover();
             currentDecl.concepts.set(cname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods, false, false));
-            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + cname, currentDecl.concepts.get(cname) as EntityTypeDecl);
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + cname, terms.length, currentDecl.concepts.get(cname) as EntityTypeDecl);
         }
         catch (ex) {
             this.processRecover();
