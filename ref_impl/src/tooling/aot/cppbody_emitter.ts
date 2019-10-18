@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType } from "./cpputils";
+import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType, filenameClean } from "./cpputils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -38,7 +38,7 @@ class CPPBodyEmitter {
             }
         }
         else if (isUniqueEntityType(ttype)) {
-            return `ValueOf<${sanitizeForCpp(ttype.trkey)}> ${this.varToCppName(trgt)}(${value})`;
+            return `ValueOf<${sanitizeForCpp(ttype.trkey)}> ${this.varToCppName(trgt)}(${value});`;
         }
         else {
             return `Value ${this.varToCppName(trgt)}(${value});`;
@@ -341,19 +341,19 @@ class CPPBodyEmitter {
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
                 if (bop.op === "+") {
-                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
+                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
+                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
+                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
                 }
                 else if (bop.op === "-") {
-                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
+                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
                 }
                 else {
-                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${this.currentFile}", ${op.sinfo.line})`;
+                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
                 }
             }
             case MIROpTag.MIRBinEq: {

@@ -56,11 +56,16 @@ function sanitizeForCpp(name: string): string {
     .replace(/%/g, "$pct$");
 }
 
+function filenameClean(fname: string): string {
+    return fname.replace(/\\/g, "\\\\");
+}
+
 export {
     NOT_IMPLEMENTED,
     isInlinableType,
     getInlinableType,
     isUniqueEntityType,
     getUniqueEntityType,
-    sanitizeForCpp
+    sanitizeForCpp,
+    filenameClean
 };

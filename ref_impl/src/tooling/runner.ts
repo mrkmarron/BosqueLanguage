@@ -88,36 +88,29 @@ else {
         const linked = lsrc.map((fname) => {
             const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
             const bcontents = contents
-                .replace("", cparams.typedecls_fwd)
-                .replace("", cparams.typedecls)
-                .replace("", cparams.funcdecls_fwd)
-                .replace("", cparams.funcdecls)
-                .replace("//%%STATIC_STRING_DECLARE%%", cparams.conststring_declare)
-                .replace("//%%STATIC_STRING_CREATE%%", cparams.conststring_create)
-                .replace("//%%PROPERTY_ENUM_DECLARE", cparams.propertyenums);
+                .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
+                .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
+                .replace("//%%PROPERTY_ENUM_DECLARE", "  " + cparams.propertyenums);
 
             return { file: fname, contents: bcontents };
         });
 
-        const maincpp = `
-            #include "bsqruntime.cpp
-
-            namespace BSQ
-            {
-            ${cparams.typedecls_fwd}
-            \n\n
-            ${cparams.funcdecls_fwd}
-            \n\n
-            ${cparams.typedecls}
-            \n\n
-            ${cparams.funcdecls}
-            }
-            `;
+        const maincpp = "#include \"bsqruntime.cpp\"\n"
+            + "namespace BSQ\n"
+            + "{\n/*forward type decls*/\n"
+            + cparams.typedecls_fwd
+            + "\n\n/*forward function decls*/\n"
+            + cparams.funcdecls_fwd
+            + "\n\n/*type decls*/\n"
+            + cparams.typedecls
+            + "\n\n/*function decls*/\n"
+            + cparams.funcdecls
+            + "}\n";
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {
-            const outfile = Path.join("c:\\Users\\marron\\Desktop\\", fp.file);
-            console.log("write: " + outfile);
+            const outfile = Path.join("c:\\Users\\marron\\Desktop\\cpp_scratch\\", fp.file);
+            FS.writeFileSync(outfile, fp.contents);
         });
     });
 }

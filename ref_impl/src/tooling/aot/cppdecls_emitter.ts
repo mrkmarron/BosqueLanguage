@@ -56,8 +56,8 @@ class CPPEmitter {
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
-            conststring_declare.push(`static ValueOf<NSCore$cc$String> ${k};`);
-            conststring_create.push(`ValueOf<NSCore$cc$String> Runtime::${v}(new ValueOf<NSCore$cc$String>(std::string(${k})));`);
+            conststring_declare.push(`static ValueOf<NSCore$cc$String> ${v};`);
+            conststring_create.push(`ValueOf<NSCore$cc$String> Runtime::${v}(ValueOf<NSCore$cc$String>(new NSCore$cc$String(std::string(${k}))));`);
         });
 
         let propertyenums: Set<string> = new Set<string>();
@@ -75,13 +75,13 @@ class CPPEmitter {
         });
 
         return {
-            typedecls_fwd: typedecls_fwd.sort().join(""),
-            typedecls: typedecls.sort().join("\n\n"),
-            funcdecls_fwd: funcdecls_fwd.sort().join(""),
-            funcdecls: funcdecls.sort().join("\n\n"),
-            conststring_declare: conststring_declare.sort().join("\n\n"),
-            conststring_create: conststring_create.sort().join("\n\n"),
-            propertyenums: [...propertyenums].sort().join(",\n")
+            typedecls_fwd: typedecls_fwd.sort().join("\n"),
+            typedecls: typedecls.sort().join("\n"),
+            funcdecls_fwd: funcdecls_fwd.sort().join("\n"),
+            funcdecls: funcdecls.sort().join("\n"),
+            conststring_declare: conststring_declare.sort().join("\n  "),
+            conststring_create: conststring_create.sort().join("\n  "),
+            propertyenums: [...propertyenums].sort().join(",\n  ")
         };
     }
 }
