@@ -521,7 +521,7 @@ class CPPBodyEmitter {
         this.generatedBlocks.set(block.label, gblock);
     }
 
-    generateInvoke(idecl: MIRInvokeDecl): [string, string] {
+    generateInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string } {
         this.currentFile = idecl.srcFile;
 
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(arg.type) as MIRType)} ${this.varNameToCppName(arg.name)}`);
@@ -548,16 +548,16 @@ class CPPBodyEmitter {
                     return lbl + stmts;
                 });
 
-                return [decl + ";", `${decl}\n{\n${blockstrs.join("\n\n")}\n}\n`];
+                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${blockstrs.join("\n\n")}\n}\n` };
             }
             else {
-                return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- Pre/Post");
+                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- Pre/Post");
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
     }
 }

@@ -61,19 +61,9 @@ class CPPTypeEmitter {
         }
     }
 
-    generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
-        if (entity.tkey === "NSCore::String") {
-            return {
-                fwddecl: `class ${sanitizeForCpp(entity.tkey)};`,
-                fulldecl: `class ${sanitizeForCpp(entity.tkey)} : public RefCountBase, ${entity.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
-                {
-                public:
-                    std::string sdata;
-
-                    ${sanitizeForCpp(entity.tkey)}(std::string sdata) : sdata(sdata) { ; }
-                    virtual ~${sanitizeForCpp(entity.tkey)}() = default;
-                };`
-            };
+    generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
+        if (entity.tkey === "NSCore::None" || entity.tkey === "NSCore::Bool" || entity.tkey === "NSCore::Int" || entity.tkey === "NSCore::String") {
+            return undefined;
         }
 
         const constructor_args = entity.fields.map((fd) => {
@@ -121,7 +111,12 @@ class CPPTypeEmitter {
         };
     }
 
-    generateCPPConcept(concept: MIRConceptTypeDecl): {fwddecl: string, fulldecl: string} {
+    generateCPPConcept(concept: MIRConceptTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
+        if (concept.tkey === "NSCore::Any" || concept.tkey === "NSCore::Some" || concept.tkey === "NSCore::Truthy" || concept.tkey === "NSCore::Parsable"
+            || concept.tkey === "NSCore::Tuple" || concept.tkey === "NSCore::Record" || concept.tkey === "NSCore::Object") {
+            return undefined;
+        }
+
         const vfield_accessors = concept.fields.map((fd) => {
             return `virtual ${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} get$${fd.fname}() const override { return this->${fd.fname}; };`;
         });

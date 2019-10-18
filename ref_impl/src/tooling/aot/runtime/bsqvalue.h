@@ -283,21 +283,88 @@ public:
     static bool compare_op(Value lhs, Value rhs);
 };
 
-class Tuple : public RefCountBase
+class NSCore$cc$Any
+{
+public:
+    NSCore$cc$Any() = default;
+    virtual ~NSCore$cc$Any() = default;
+};
+
+class NSCore$cc$Some : virtual public NSCore$cc$Any
+{
+public:
+    NSCore$cc$Some() = default;
+    virtual ~NSCore$cc$Some() = default;
+};
+
+class NSCore$cc$Truthy : virtual public NSCore$cc$Any
+{
+public:
+    NSCore$cc$Truthy() = default;
+    virtual ~NSCore$cc$Truthy() = default;
+};
+
+class NSCore$cc$None : public RefCountBase, virtual public NSCore$cc$Truthy
+{
+public:
+    NSCore$cc$None() = default;
+    virtual ~NSCore$cc$None() = default;
+};
+
+class NSCore$cc$Parsable : virtual public NSCore$cc$Some
+{
+public:
+    NSCore$cc$Parsable() = default;
+    virtual ~NSCore$cc$Parsable() = default;
+};
+
+class NSCore$cc$Bool : public RefCountBase, virtual public NSCore$cc$Parsable, virtual public NSCore$cc$Truthy
+{
+public:
+    NSCore$cc$Bool() = default;
+    virtual ~NSCore$cc$Bool() = default;
+};
+
+class NSCore$cc$Int : public RefCountBase, virtual public NSCore$cc$Parsable
+{
+public:
+    NSCore$cc$Int() = default;
+    virtual ~NSCore$cc$Int() = default;
+};
+
+class NSCore$cc$String : public RefCountBase, virtual public NSCore$cc$Some
+{
+public:
+    std::string sdata;
+
+    NSCore$cc$String(std::string& str) : sdata(str) { ; }
+    NSCore$cc$String(std::string&& str) : sdata(move(str)) { ; }
+
+    virtual ~NSCore$cc$String() = default;
+};
+
+class NSCore$cc$Tuple : public RefCountBase, virtual public NSCore$cc$Some
 {
 public:
     const std::vector<Value> m_entries;
 
-    Tuple(std::vector<Value>&& entries) : m_entries(move(entries)) { ; }
-    virtual ~Tuple() = default;
+    NSCore$cc$Tuple(std::vector<Value>&& entries) : m_entries(move(entries)) { ; }
+    virtual ~NSCore$cc$Tuple() = default;
 };
 
-class Record : public RefCountBase
+class NSCore$cc$Record : public RefCountBase, virtual public NSCore$cc$Some
 {
 public:
     const std::vector<std::pair<MIRPropertyEnum, Value>> m_entries;
 
-    Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : m_entries(move(entries)) { ; }
-    virtual ~Record() = default;
+    NSCore$cc$Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : m_entries(move(entries)) { ; }
+    virtual ~NSCore$cc$Record() = default;
+};
+
+class NSCore$cc$Object : public RefCountBase, virtual public NSCore$cc$Some
+{
+public:
+    NSCore$cc$Object() = default;
+    virtual ~NSCore$cc$Object() = default;
 };
 } // namespace BSQ

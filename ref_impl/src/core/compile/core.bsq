@@ -38,7 +38,7 @@ concept Parsable provides Some {
 }
 
 //<summary>Primitive boolean value.</summary>
-entity Bool provides Some, Truthy, Parsable {
+entity Bool provides Truthy, Parsable {
     override static tryParse(str: String): Bool | None {
         if(str == "true") {
             return true;
@@ -53,7 +53,7 @@ entity Bool provides Some, Truthy, Parsable {
 }
 
 //<summary>Primitive integer value.</summary>
-entity Int provides Some, Parsable {
+entity Int provides Parsable {
     override static tryParse(str: String): Int | None # int_tryparse
 
     static max(v1: Int, v2: Int): Int {
