@@ -3361,15 +3361,14 @@ class TypeChecker {
         try {
             this.m_file = tdecl.srcFile;
 
-            let terms = new Map<string, MIRType>();
-            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
+           tdecl.terms.forEach((term) => this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType));
 
             const provides = tdecl.provides.map((provide) => {
                 const ptype = this.resolveAndEnsureTypeOnly(new SourceInfo(0, 0, 0, 0), provide, binds);
                 const cpt = ((ptype.options[0]) as ResolvedConceptAtomType).conceptTypes[0];
 
                 this.m_emitter.registerTypeInstantiation(cpt.concept, cpt.binds);
-                return this.m_emitter.registerResolvedTypeReference(ptype);
+                return this.m_emitter.registerResolvedTypeReference(ptype).trkey;
             });
 
             const invariants = this.m_doInvariantCheck
@@ -3408,11 +3407,11 @@ class TypeChecker {
             const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
 
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, provides, invariants, fields, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, provides, invariants, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }

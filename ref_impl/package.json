@@ -18,7 +18,7 @@
         "chalk": "~2.4.2"
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json",
+        "build": "tsc -p tsconfig.json && xcopy ./src/tooling/aot/runtime/ ./bin/tooling/aot/runtime/ /E /I",
         "test": "tsc -p tsconfig.json && node ./bin/test/test_runner.js"
     },
     "files": [

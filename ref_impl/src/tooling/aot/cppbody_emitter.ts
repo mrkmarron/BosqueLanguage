@@ -146,12 +146,12 @@ class CPPBodyEmitter {
             assert(cval instanceof MIRConstantString);
 
             const sval = (cval as MIRConstantString).value;
-            const sname = "str$" + sanitizeForCpp(sval);
-            if (!this.allConstStrings.has(sname)) {
-                this.allConstStrings.set(sname, sval);
+            const sname = "str$" + this.allConstStrings.size;
+            if (!this.allConstStrings.has(sval)) {
+                this.allConstStrings.set(sval, sname);
             }
 
-            return `Runtime::BSQ_STRING_${sname}`;
+            return `Runtime::${sname}`;
         }
     }
 

@@ -709,10 +709,9 @@ class Assembly {
     getSpecialSomeType(): ResolvedType { return this.internSpecialConceptType("Some"); }
     getSpecialBoolType(): ResolvedType { return this.internSpecialObjectType("Bool"); }
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
-    getSpecialFloatType(): ResolvedType { return this.internSpecialObjectType("Float"); }
     getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
-    getSpecialStringOfType(): ResolvedType { return this.internSpecialObjectType("StringOf", [new TemplateTypeSignature("T")], new Map<string, ResolvedType>().set("T", this.getSpecialParsableConcept())); }
+    getSpecialStringOfType(): ResolvedType { return this.internSpecialObjectType("StringOf"); }
     getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }

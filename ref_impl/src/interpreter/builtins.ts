@@ -5,7 +5,7 @@
 
 import { Value, ValueOps, ListValue, FloatValue, RegexValue, CollectionValue, MapValue, TupleValue } from "./value";
 import { raiseRuntimeErrorIf } from "./interpreter_environment";
-import { MIRAssembly, MIRInvokePrimitiveDecl, MIREntityType, MIREntityTypeDecl, MIRTupleTypeEntry, MIRTupleType, MIRPCode, MIRType } from "../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokePrimitiveDecl, MIREntityType, MIRTupleTypeEntry, MIRTupleType, MIRPCode, MIRType } from "../compiler/mir_assembly";
 import { MIRInvokeKey, MIRResolvedTypeKey } from "../compiler/mir_ops";
 
 function validateListStartEnd(lvals: Value[], start: Value, end: Value): [number, number] {
@@ -413,7 +413,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
         const avals = (args.get("this") as ListValue).values;
         const maxidx = avals.map((v) => (v as ListValue).values.length).reduce((acc, v) => Math.min(acc, v), 0);
 
-        const subltype = (masm.entityDecls.get(inv.resultType) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        const subltype = masm.typeMap.get(inv.binds.get("T") as string) as MIRType;
 
         if (maxidx === 0) {
             return createListOf(masm, masm.typeMap.get(inv.resultType) as MIRType, []);

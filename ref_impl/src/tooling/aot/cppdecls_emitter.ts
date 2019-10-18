@@ -3,10 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
-import { NOT_IMPLEMENTED } from "./cpputils";
+import { NOT_IMPLEMENTED, sanitizeForCpp } from "./cpputils";
 
 type cppcode = {
     typedecls_fwd: string,
@@ -14,7 +14,8 @@ type cppcode = {
     funcdecls_fwd: string,
     funcdecls: string,
     conststring_declare: string,
-    conststring_create: string
+    conststring_create: string,
+    propertyenums: string
 };
 
 class CPPEmitter {
@@ -55,7 +56,22 @@ class CPPEmitter {
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
+            conststring_declare.push(`static ValueOf<NSCore$cc$String> ${k};`);
+            conststring_create.push(`ValueOf<NSCore$cc$String> Runtime::${v}(new ValueOf<NSCore$cc$String>(std::string(${k})));`);
+        });
 
+        let propertyenums: Set<string> = new Set<string>();
+        bodyemitter.allPropertyNames.forEach((pname) => {
+            propertyenums.add(sanitizeForCpp(pname));
+        });
+        assembly.typeMap.forEach((tt) => {
+            tt.options.forEach((topt) => {
+                if (topt instanceof MIRRecordType) {
+                    topt.entries.forEach((entry) => {
+                        propertyenums.add(sanitizeForCpp(entry.name));
+                    });
+                }
+            });
         });
 
         return {
@@ -63,6 +79,9 @@ class CPPEmitter {
             typedecls: typedecls.sort().join("\n\n"),
             funcdecls_fwd: funcdecls_fwd.sort().join(""),
             funcdecls: funcdecls.sort().join("\n\n"),
+            conststring_declare: conststring_declare.sort().join("\n\n"),
+            conststring_create: conststring_create.sort().join("\n\n"),
+            propertyenums: [...propertyenums].sort().join(",\n")
         };
     }
 }

@@ -15,8 +15,7 @@ import { MIRAssembly, PackageConfig, MIRInvokeDecl } from "../compiler/mir_assem
 import { MIREmitter } from "../compiler/mir_emitter";
 import { SMTBodyEmitter } from "./bmc/smtbody_emitter";
 import { SMTTypeEmitter } from "./bmc/smttype_emitter";
-import { CPPBodyEmitter } from "./aot/cppbody_emitter";
-import { CPPTypeEmitter } from "./aot/cpptype_emitter";
+import { CPPEmitter } from "./aot/cppdecls_emitter";
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     process.stdout.write("Reading code...\n");
@@ -63,13 +62,6 @@ function smtlibGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
     return smtcode[1];
 }
 
-function cppGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
-    const cppgen = new CPPBodyEmitter(masm, new CPPTypeEmitter(masm));
-    const cppcode = cppgen.generateInvoke(idecl);
-
-    return cppcode[1];
-}
-
 Commander
     .option("-v --verify <entrypoint>", "Check for errors reachable from specified entrypoint")
     .option("-c --compile <entrypoint>", "Compile the specified entrypoint");
@@ -84,9 +76,48 @@ if (Commander.args.length === 0) {
 const massembly = generateMASM(Commander.args, Commander.verify ? "src/core/verify/" : "src/core/compile/");
 const entrypoint = massembly.invokeDecls.get(Commander.verify || Commander.compile) as MIRInvokeDecl;
 
+const cpp_runtime = Path.join(__dirname, "aot/runtime/");
+
 if (Commander.verify !== undefined) {
-    setImmediate(() => process.stdout.write(smtlibGenerate(massembly, entrypoint) + "\n"));
+    setImmediate(() => console.log(smtlibGenerate(massembly, entrypoint)));
 }
 else {
-    setImmediate(() => process.stdout.write(cppGenerate(massembly, entrypoint) + "\n"));
+    setImmediate(() => {
+        const cparams = CPPEmitter.emit(massembly);
+        const lsrc = FS.readdirSync(cpp_runtime);
+        const linked = lsrc.map((fname) => {
+            const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
+            const bcontents = contents
+                .replace("", cparams.typedecls_fwd)
+                .replace("", cparams.typedecls)
+                .replace("", cparams.funcdecls_fwd)
+                .replace("", cparams.funcdecls)
+                .replace("//%%STATIC_STRING_DECLARE%%", cparams.conststring_declare)
+                .replace("//%%STATIC_STRING_CREATE%%", cparams.conststring_create)
+                .replace("//%%PROPERTY_ENUM_DECLARE", cparams.propertyenums);
+
+            return { file: fname, contents: bcontents };
+        });
+
+        const maincpp = `
+            #include "bsqruntime.cpp
+
+            namespace BSQ
+            {
+            ${cparams.typedecls_fwd}
+            \n\n
+            ${cparams.funcdecls_fwd}
+            \n\n
+            ${cparams.typedecls}
+            \n\n
+            ${cparams.funcdecls}
+            }
+            `;
+        linked.push({ file: "main.cpp", contents: maincpp });
+
+        linked.forEach((fp) => {
+            const outfile = Path.join("c:\\Users\\marron\\Desktop\\", fp.file);
+            console.log("write: " + outfile);
+        });
+    });
 }
