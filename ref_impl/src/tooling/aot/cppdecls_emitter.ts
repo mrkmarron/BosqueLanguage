@@ -15,7 +15,8 @@ type cppcode = {
     funcdecls: string,
     conststring_declare: string,
     conststring_create: string,
-    propertyenums: string
+    propertyenums: string,
+    propertynames: string
 };
 
 class CPPEmitter {
@@ -61,14 +62,17 @@ class CPPEmitter {
         });
 
         let propertyenums: Set<string> = new Set<string>();
+        let propertynames: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(sanitizeForCpp(pname));
+            propertynames.add(`"${pname}"`);
         });
         assembly.typeMap.forEach((tt) => {
             tt.options.forEach((topt) => {
                 if (topt instanceof MIRRecordType) {
                     topt.entries.forEach((entry) => {
                         propertyenums.add(sanitizeForCpp(entry.name));
+                        propertynames.add(`"${entry.name}"`);
                     });
                 }
             });
@@ -81,7 +85,8 @@ class CPPEmitter {
             funcdecls: funcdecls.sort().join("\n"),
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
-            propertyenums: [...propertyenums].sort().join(",\n  ")
+            propertyenums: [...propertyenums].sort().join(",\n  "),
+            propertynames: [...propertynames].sort().join(",\n  ")
         };
     }
 }

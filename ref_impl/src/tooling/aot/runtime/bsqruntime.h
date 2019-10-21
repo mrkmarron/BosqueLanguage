@@ -21,6 +21,8 @@ class Runtime
 public:
 //%%STATIC_STRING_DECLARE%%
 
+static const char* propertyNames[];
+
 static bool equality_op(Value lhs, Value rhs);
 static bool compare_op(Value lhs, Value rhs);
 

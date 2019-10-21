@@ -91,7 +91,8 @@ else {
             const bcontents = contents
                 .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
                 .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
-                .replace("//%%PROPERTY_ENUM_DECLARE", "  " + cparams.propertyenums);
+                .replace("//%%PROPERTY_ENUM_DECLARE", "  " + cparams.propertyenums)
+                .replace("//%%PROPERTY_NAMES%%", "  " + cparams.propertynames);
 
             return { file: fname, contents: bcontents };
         });
