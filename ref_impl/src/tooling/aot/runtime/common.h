@@ -16,7 +16,9 @@
 #include <algorithm>
 
 #ifdef _DEBUG
-#define BSQ_ASSERT(C, MSG) (BSQ::assert(C, MSG, __FILE__, __LINE__))
+#define BSQ_ASSERT(C, MSG) (assert(C, MSG, __FILE__, __LINE__))
+#else
+#define BSQ_ASSERT(C, MSG)
 #endif
 
 #ifdef _DEBUG

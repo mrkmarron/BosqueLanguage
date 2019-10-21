@@ -27,23 +27,6 @@ class CPPTypeEmitter {
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
     }
 
-    typeToCPPTypeForCallArguments(tt: MIRType): string {
-        if (isInlinableType(tt)) {
-            if (tt.trkey === "NSCore::Bool") {
-                return "bool";
-            }
-            else {
-                return "int64_t";
-            }
-        }
-        else if (isUniqueEntityType(tt)) {
-            return `const ValueOf<${sanitizeForCpp(tt.trkey)}>&`;
-        }
-        else {
-            return "const Value&";
-        }
-    }
-
     typeToCPPType(tt: MIRType): string {
         if (isInlinableType(tt)) {
             if (tt.trkey === "NSCore::Bool") {
@@ -54,7 +37,7 @@ class CPPTypeEmitter {
             }
         }
         else if (isUniqueEntityType(tt)) {
-            return `ValueOf<${sanitizeForCpp(tt.trkey)}>`;
+            return `${sanitizeForCpp(tt.trkey)}*`;
         }
         else {
             return "Value";
@@ -85,7 +68,7 @@ class CPPTypeEmitter {
         const vcalls = [...entity.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
             const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
-            const vargs = rcall.params.map((fp) => `${this.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
+            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
             const cargs = rcall.params.map((fp) => fp.name).join(", ");
             return `${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const
             {
@@ -123,7 +106,7 @@ class CPPTypeEmitter {
         const vcalls = [...concept.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
             const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
-            const vargs = rcall.params.map((fp) => `${this.typeToCPPTypeForCallArguments(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
+            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
             return `virtual ${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const = 0;`;
         });
 

@@ -56,8 +56,8 @@ class CPPEmitter {
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
-            conststring_declare.push(`static ValueOf<NSCore$cc$String> ${v};`);
-            conststring_create.push(`ValueOf<NSCore$cc$String> Runtime::${v}(ValueOf<NSCore$cc$String>(new NSCore$cc$String(std::string(${k}))));`);
+            conststring_declare.push(`static NSCore$cc$String ${v};`);
+            conststring_create.push(`NSCore$cc$String Runtime::${v}(move(std::string(${k})), 1);`);
         });
 
         let propertyenums: Set<string> = new Set<string>();

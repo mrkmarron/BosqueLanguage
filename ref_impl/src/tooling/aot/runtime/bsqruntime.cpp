@@ -7,4 +7,22 @@
 namespace BSQ
 {
 //%%STATIC_STRING_CREATE%%
+
+bool Runtime::equality_op(Value lhs, Value rhs)
+{
+    BSQ_ASSERT(false, "NOT IMPLEMENTED");
+    return false;
+}
+
+bool Runtime::compare_op(Value lhs, Value rhs) 
+{
+    BSQ_ASSERT(false, "NOT IMPLEMENTED");
+    return false;
+}
+
+std::string Runtime::diagnostic_format(Value v)
+{
+    BSQ_ASSERT(false, "NOT IMPLEMENTED");
+    return std::string("");
+}
 } // namespace BSQ
