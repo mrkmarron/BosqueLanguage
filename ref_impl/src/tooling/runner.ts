@@ -16,6 +16,7 @@ import { MIREmitter } from "../compiler/mir_emitter";
 import { SMTBodyEmitter } from "./bmc/smtbody_emitter";
 import { SMTTypeEmitter } from "./bmc/smttype_emitter";
 import { CPPEmitter } from "./aot/cppdecls_emitter";
+import { sanitizeForCpp } from "./aot/cpputils";
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     process.stdout.write("Reading code...\n");
@@ -95,7 +96,7 @@ else {
             return { file: fname, contents: bcontents };
         });
 
-        const maincpp = "#include \"bsqruntime.cpp\"\n"
+        const maincpp = "#include \"bsqruntime.h\"\n"
             + "namespace BSQ\n"
             + "{\n/*forward type decls*/\n"
             + cparams.typedecls_fwd
@@ -105,7 +106,9 @@ else {
             + cparams.typedecls
             + "\n\n/*function decls*/\n"
             + cparams.funcdecls
-            + "}\n";
+            + "\n\n/*main decl*/\n"
+            + "}\n\n"
+            + `int main(int argc, char* argv) { return BSQ::${sanitizeForCpp(Commander.compile)}(); }\n`;
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {
