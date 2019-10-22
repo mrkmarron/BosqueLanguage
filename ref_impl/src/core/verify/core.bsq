@@ -38,8 +38,12 @@ concept Parsable provides Some {
 }
 
 //<summary>Primitive boolean value.</summary>
-entity Bool provides Some, Truthy, Parsable {
-    override static tryParse(str: String): Bool | None {
+entity Bool provides Truthy, Parsable {
+    override static tryParse(str: String): Some | None {
+        return Bool::tryParseAs(str);
+    }
+
+    static tryParseAs(str: String): Bool | None {
         if(str == "true") {
             return true;
         }
@@ -53,8 +57,12 @@ entity Bool provides Some, Truthy, Parsable {
 }
 
 //<summary>Primitive integer value.</summary>
-entity Int provides Some, Parsable {
-    override static tryParse(str: String): Int | None # int_tryparse
+entity Int provides Parsable {
+    override static tryParse(str: String): Some | None {
+        return Int::tryParseAs(str);
+    }
+
+    static tryParseAs(str: String): Int | None # int_tryparse
 
     static max(v1: Int, v2: Int): Int {
         return v1 > v2 ? v1 : v2;
@@ -69,6 +77,34 @@ entity Int provides Some, Parsable {
 entity String provides Some {
 }
 
+concept StringOf provides Some {
+    abstract method getString(): String;
+}
+
+entity StringOf<T where Parsable> provides StringOf {
+}
+
+//<summary>Provide JSON support for (POD).</summary>
+concept JSON provides Some {
+    static stringify<T where Tuple | Record>(data: T): StringOf<T> # json_stringify
+    static tryParse<T where Tuple | Record>(str: String): T | None # json_tryparse
+}
+
+//<summary>Primitive GUID value.</summary>
+entity GUID provides Some {
+}
+
+//<summary>Primitive regex value.</summary>
+entity Regex provides Some, Parsable {
+    override static tryParse(str: String): Some | None # regex_tryparse
+
+    method match(str: String, start?: Int, end?: Int): { start: Int, end: Int } | None # regex_match
+
+    //
+    //TODO: this is pretty boring right now
+    //
+}
+
 //<summary>All actual tuples implicitly provide this concept.</summary>
 concept Tuple provides Some {
 }
@@ -79,6 +115,48 @@ concept Record provides Some {
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {
+}
+
+//<summary>All actual enums implicitly provide this.</summary>
+concept Enum provides Some {
+}
+
+//<summary>All actual custom keys implicitly provide this.</summary>
+concept IdKey provides Some {
+}
+
+//<summary>Types that can be used as equality based keys.</summary>
+typedef KeyType = None | Bool | Int | String | StringOf | GUID | Enum | Tuple | Record | IdKey;
+
+//<summary>Concept that all Keyed instances inherit from.</summary>
+concept Keyed provides Some {
+    abstract method getKey(): KeyType;
+}
+
+//<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
+concept Keyed<T where KeyType> provides Keyed {
+    field key: T;
+
+    override method getKey(): KeyType {
+        return this.key;
+    }
+}
+
+//<summary>Types that can be used in equality operations or in key based containers.</summary>
+typedef Indexable = KeyType | Keyed;
+
+//<summary>Concept that all Tagged instances inherit from.</summary>
+concept Tagged provides Some, Keyed {
+    abstract method getValue(): Any;
+}
+
+//<summary>A lightweight tagging class for values.</summary>
+entity Tagged<T where KeyType, U> provides Tagged {
+    field value: U;
+
+    override method getValue(): Any {
+        return this.value;
+    }
 }
 
 //<summary>Shorthand for predicate function types.</summary>

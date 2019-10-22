@@ -78,6 +78,7 @@ entity String provides Some {
 }
 
 concept StringOf provides Some {
+    abstract method getString(): String;
 }
 
 entity StringOf<T where Parsable> provides StringOf {

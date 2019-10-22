@@ -194,12 +194,11 @@ public:
 class NSCore$cc$StringOf : public RefCountBase, virtual public NSCore$cc$Some
 {
 public:
-    NSCore$cc$String* bstr;
-
-    NSCore$cc$StringOf(NSCore$cc$String* str) : bstr(str) { RefCountBase::increment(str); }
-    virtual ~NSCore$cc$StringOf() { RefCountBase::decrement(this->bstr); }
+    NSCore$cc$StringOf() = default;
+    virtual ~NSCore$cc$StringOf() = default;
 
     virtual const char* getTypeOfName() const = 0;
+    virtual NSCore$cc$String* getString() const = 0;
 };
 
 class NSCore$cc$Tuple : public RefCountBase, virtual public NSCore$cc$Some

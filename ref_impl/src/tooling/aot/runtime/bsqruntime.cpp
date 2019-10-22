@@ -49,7 +49,7 @@ std::string Runtime::diagnostic_format(Value v)
         else if(dynamic_cast<const NSCore$cc$StringOf*>(vv) != nullptr)
         {
             auto sof = dynamic_cast<const NSCore$cc$StringOf*>(vv);
-            return std::string(sof->getTypeOfName()) + sof->bstr->sdata;
+            return std::string(sof->getTypeOfName()) + sof->getString()->sdata;
         }
         else if(dynamic_cast<const NSCore$cc$Tuple*>(vv) != nullptr)
         {
