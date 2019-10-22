@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType } from "../../compiler/mir_assembly";
-import { isInlinableType } from "../aot/cpputils";
+import { isInlinableType, isUniqueEntityType, getUniqueEntityType, sanitizeForSMT } from "./smtutils";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -35,6 +35,9 @@ class SMTTypeEmitter {
             else {
                 return "Int";
             }
+        }
+        else if (isUniqueEntityType(tt)) {
+            return sanitizeForSMT(getUniqueEntityType(tt).ekey);
         }
         else {
             return "BTerm";

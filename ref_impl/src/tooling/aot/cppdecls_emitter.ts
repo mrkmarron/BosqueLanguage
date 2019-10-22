@@ -3,12 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { NOT_IMPLEMENTED, sanitizeForCpp } from "./cpputils";
+import { constructCallGraphInfo } from "../../compiler/mir_callg";
+import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
 
-type cppcode = {
+type CPPCode = {
     typedecls_fwd: string,
     typedecls: string,
     funcdecls_fwd: string,
@@ -20,7 +22,7 @@ type cppcode = {
 };
 
 class CPPEmitter {
-    static emit(assembly: MIRAssembly): cppcode {
+    static emit(assembly: MIRAssembly): CPPCode {
         const typeemitter = new CPPTypeEmitter(assembly);
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
 
@@ -41,18 +43,42 @@ class CPPEmitter {
             }
         });
 
+        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
+        const rcg = [...cginfo.topologicalOrder].reverse();
+
         let funcdecls_fwd: string[] = [];
         let funcdecls: string[] = [];
-        assembly.primitiveInvokeDecls.forEach((cdecl) => {
-            NOT_IMPLEMENTED<string>("Primitive Invoke");
-        });
-        assembly.invokeDecls.forEach((fdecl) => {
-            const cppdecl = bodyemitter.generateInvoke(fdecl);
-            if (cppdecl !== undefined) {
-                funcdecls_fwd.push(cppdecl.fwddecl);
-                funcdecls.push(cppdecl.fulldecl);
+        for (let i = 0; i < rcg.length; ++i) {
+            const bbup = rcg[i];
+            if (cginfo.recursive.findIndex((scc) => scc.has(bbup.invoke)) !== -1) {
+                NOT_IMPLEMENTED<void>("Recursive Invoke");
             }
-        });
+            else {
+                const tag = extractMirBodyKeyPrefix(bbup.invoke);
+                if (tag === "invoke") {
+                    const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                    const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                    const finfo = bodyemitter.generateCPPInvoke(idcl);
+
+                    funcdecls.push(...finfo.supportcalls, finfo.fulldecl);
+                }
+                else if (tag === "pre") {
+                    NOT_IMPLEMENTED<void>("Pre");
+                }
+                else if (tag === "post") {
+                    NOT_IMPLEMENTED<void>("Post");
+                }
+                else if (tag === "invariant") {
+                    NOT_IMPLEMENTED<void>("Invariant");
+                }
+                else if (tag === "const") {
+                    NOT_IMPLEMENTED<void>("Const");
+                }
+                else {
+                    NOT_IMPLEMENTED<void>("Field Default");
+                }
+            }
+        }
 
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];

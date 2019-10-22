@@ -58,3 +58,15 @@
 (declare-const BINT_MIN Int)
 (assert (= BINT_MIN -4503599627370496))
 
+;;NOMINAL_SUBTYPES;;
+
+;;SUBTYPE_CALLS;;
+
+;;FUNCTION_DECLS;;
+
+;;ARG_VALUES;;
+
+;;INVOKE_ACTION;;
+
+(check-sat)
+;;GET_MODEL;;

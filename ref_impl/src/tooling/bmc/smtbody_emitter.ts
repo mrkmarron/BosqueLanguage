@@ -5,29 +5,32 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump } from "../../compiler/mir_ops";
+import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT, isUniqueEntityType } from "./smtutils";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey } from "../../compiler/mir_ops";
 import * as assert from "assert";
-import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smtexp";
+import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
+import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
 
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
+    readonly callg: CallGInfo;
 
     private errorCodes = new Map<string, number>();
-    //private bmcCodes = new Map<string, number>();
-    //private bmcDepths = new Map<string, number>();
+    private bmcCodes = new Map<string, number>();
+    private bmcDepths = new Map<string, number>();
 
-    private tmpvarctr = 0;
-    private currentRType: MIRType;
     private currentFile: string = "[No File]";
+    private currentRType: MIRType;
+    private tmpvarctr = 0;
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
+        this.callg = constructCallGraphInfo(assembly.entryPoints, assembly);
 
         this.currentRType = typegen.noneType;
     }
@@ -44,6 +47,26 @@ class SMTBodyEmitter {
         const errid = this.errorCodes.get(errorinfo) as number;
 
         return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)} (result_error ${errid}))`);
+    }
+
+    generateBMCCreate(invkey: MIRBodyKey): SMTValue {
+        const rc = this.callg.recursive.findIndex((scc) => scc.has(invkey));
+        const bmcid = [...(this.callg.recursive[rc] as Set<MIRBodyKey>)].sort()[0];
+
+        if (!this.bmcCodes.has(bmcid)) {
+            this.bmcCodes.set(bmcid, this.bmcCodes.size);
+            this.bmcDepths.set(bmcid, 3);
+        }
+        const errid = this.bmcCodes.get(bmcid) as number;
+
+        return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)} (result_bmc ${errid}))`);
+    }
+
+    getBMCGas(invkey: MIRBodyKey): number {
+        const rc = this.callg.recursive.findIndex((scc) => scc.has(invkey));
+        const bmcid = [...(this.callg.recursive[rc] as Set<MIRBodyKey>)].sort()[0];
+
+        return this.bmcDepths.get(bmcid) as number;
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -82,40 +105,52 @@ class SMTBodyEmitter {
         return sanitizeForSMT(invk);
     }
 
-    boxIfNeeded(exp: SMTExp, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
-        if (!isInlinableType(from) || isInlinableType(into)) {
-            return exp;
+    boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (isInlinableType(from) && !isInlinableType(into)) {
+            const itype = getInlinableType(into);
+            if (itype.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsq_term_bool ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsq_term_int ${exp.emit()})`);
+            }
         }
-
-        const itype = getInlinableType(from);
-        if (itype.trkey === "NSCore::Bool") {
-            return new SMTValue(`(bsq_term_bool ${exp.emit()})`);
+        else if (isUniqueEntityType(from) && !isUniqueEntityType(into)) {
+            return new SMTValue(`(bsq_term_${this.typegen.typeToSMTType(from)} ${exp.emit()})`);
         }
         else {
-            return new SMTValue(`(bsq_term_int ${exp.emit()})`);
+            return exp;
         }
     }
 
-    unboxIfNeeded(exp: SMTExp, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
-        if (isInlinableType(from) || !isInlinableType(into)) {
-            return exp;
+    unboxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (!isInlinableType(from) && isInlinableType(into)) {
+            const itype = getInlinableType(into);
+            if (itype.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsq_term_bool_value ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsq_term_int_value ${exp.emit()})`);
+            }
         }
-
-        const itype = getInlinableType(into);
-        if (itype.trkey === "NSCore::Bool") {
-            return new SMTValue(`(bsq_term_bool_value ${exp.emit()})`);
+        else if (!isUniqueEntityType(from) && isUniqueEntityType(into)) {
+            return new SMTValue(`(bsq_term_value_${this.typegen.typeToSMTType(from)} ${exp.emit()})`);
         }
         else {
-            return new SMTValue(`(bsq_term_int_value ${exp.emit()})`);
+            return exp;
         }
     }
 
-    coerce(exp: SMTExp, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): SMTExp {
-        if (isInlinableType(from) === isInlinableType(into)) {
+    coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (isInlinableType(from) !== isInlinableType(into)) {
+            return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (isUniqueEntityType(from) !== isUniqueEntityType(into)) {
+            return isUniqueEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else {
             return exp;
         }
-
-        return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType | MIRTypeOption): SMTExp {
@@ -136,11 +171,11 @@ class SMTBodyEmitter {
         else {
             assert(cval instanceof MIRConstantString);
 
-            return new SMTValue((cval as MIRConstantString).value);
+            return new SMTValue(`(bsq_term_string ${(cval as MIRConstantString).value}})`);
         }
     }
 
-    argToSMT(arg: MIRArgument, into: MIRType | MIRTypeOption): SMTExp {
+    argToSMT(arg: MIRArgument, into: MIRType): SMTExp {
         if (arg instanceof MIRRegisterArgument) {
             return this.coerce(new SMTValue(this.varToSMTName(arg)), this.getArgType(arg), into);
         }
@@ -202,7 +237,7 @@ class SMTBodyEmitter {
         return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
     }
 
-    generateStmt(op: MIROp, fromblck: string): SMTExp | undefined {
+    generateStmt(op: MIROp, fromblck: string, gass: number, supportcalls: string[]): SMTExp | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
@@ -452,10 +487,10 @@ class SMTBodyEmitter {
         }
     }
 
-    generateBlockExps(block: MIRBasicBlock, fromblock: string, blocks: Map<string, MIRBasicBlock>): SMTExp {
+    generateBlockExps(block: MIRBasicBlock, fromblock: string, blocks: Map<string, MIRBasicBlock>, gas: number, supportcalls: string[]): SMTExp {
         const exps: SMTExp[] = [];
         for (let i = 0; i < block.ops.length; ++i) {
-            const exp = this.generateStmt(block.ops[i], fromblock);
+            const exp = this.generateStmt(block.ops[i], fromblock, gas, supportcalls);
             if (exp !== undefined) {
                 exps.push(exp);
             }
@@ -473,7 +508,7 @@ class SMTBodyEmitter {
         else {
             const jop = block.ops[block.ops.length - 1];
             if (jop.tag === MIROpTag.MIRJump) {
-                let rexp = this.generateBlockExps(blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks);
+                let rexp = this.generateBlockExps(blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks, gas, supportcalls);
                 for (let i = exps.length - 1; i >= 0; --i) {
                     rexp = exps[i].bind(rexp, "#body#");
                 }
@@ -484,10 +519,10 @@ class SMTBodyEmitter {
                 assert(jop.tag === MIROpTag.MIRJumpCond || jop.tag === MIROpTag.MIRJumpNone);
 
                 let tblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).trueblock) : blocks.get((jop as MIRJumpNone).noneblock)) as MIRBasicBlock;
-                let texp = this.generateBlockExps(tblock, block.label, blocks);
+                let texp = this.generateBlockExps(tblock, block.label, blocks, gas, supportcalls);
 
                 let fblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).falseblock) : blocks.get((jop as MIRJumpNone).someblock)) as MIRBasicBlock;
-                let fexp = this.generateBlockExps(fblock, block.label, blocks);
+                let fexp = this.generateBlockExps(fblock, block.label, blocks, gas, supportcalls);
 
                 let rexp = exps[exps.length - 1].bind(texp, "#true_trgt#").bind(fexp, "#false_trgt#");
                 for (let i = exps.length - 2; i >= 0; --i) {
@@ -499,7 +534,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateInvoke(idecl: MIRInvokeDecl): [string, string] {
+    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number): { fulldecl: string, supportcalls: string[] } {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.assembly.typeMap.get(idecl.resultType) as MIRType;
 
@@ -517,26 +552,27 @@ class SMTBodyEmitter {
             });
 
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
-            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks);
+            let supportcalls: string[] = [];
+            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas, supportcalls);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                return [decl, `${decl} \n${body.emit("  ")})`];
+                return { fulldecl: `${decl} \n${body.emit("  ")})`, supportcalls: supportcalls };
             }
             else {
                 let cbody = body;
 
                 if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                    return [decl, `${decl} \n${cbody.emit("  ")})`];
+                    return { fulldecl: `${decl} \n${cbody.emit("  ")})`, supportcalls: supportcalls };
                 }
                 else {
-                    return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- Pre/Post");
+                    return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- Pre/Post");
                 }
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<[string, string]>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
     }
 }

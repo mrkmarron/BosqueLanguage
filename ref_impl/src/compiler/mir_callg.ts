@@ -18,6 +18,13 @@ type CallGNode = {
     callers: Set<MIRBodyKey>
 };
 
+type CallGInfo = {
+    invokes: Map<MIRBodyKey, CallGNode>,
+    topologicalOrder: CallGNode[],
+    roots: CallGNode[],
+    recursive: (Set<MIRBodyKey>)[]
+};
+
 function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: CallGNode, assembly: MIRAssembly) {
     blocks.forEach((block) => {
         for (let i = 0; i < block.ops.length; ++i) {
@@ -67,17 +74,17 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
     });
 }
 
-function sccVisit(cn: CallGNode, scc: Set<CallGNode>, marked: Set<MIRInvokeKey>, invokes: Map<MIRInvokeKey, CallGNode>) {
+function sccVisit(cn: CallGNode, scc: Set<MIRBodyKey>, marked: Set<MIRBodyKey>, invokes: Map<MIRBodyKey, CallGNode>) {
     if (marked.has(cn.invoke)) {
         return;
     }
 
-    scc.add(cn);
+    scc.add(cn.invoke);
     marked.add(cn.invoke);
     cn.callers.forEach((pred) => sccVisit(invokes.get(pred) as CallGNode, scc, marked, invokes));
 }
 
-function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRInvokeKey, CallGNode>) {
+function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRBodyKey, CallGNode>) {
     if (tordered.findIndex((vn) => vn.invoke === cn.invoke) !== -1) {
         return;
     }
@@ -89,14 +96,14 @@ function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRInvokeK
 }
 
 function processBodyInfo(bkey: MIRBodyKey, binfo: MIRBody[], assembly: MIRAssembly): CallGNode {
-    let cn = { invoke: bkey, callees: new Set<MIRInvokeKey>(), callers: new Set<MIRInvokeKey>() };
+    let cn = { invoke: bkey, callees: new Set<MIRBodyKey>(), callers: new Set<MIRBodyKey>() };
     binfo.forEach((b) => {
         computeCalleesInBlocks(b.body, cn, assembly);
     });
     return cn;
 }
 
-function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssembly): { invokes: Map<MIRBodyKey, CallGNode>, topologicalOrder: CallGNode[], roots: CallGNode[], recursive: (Set<CallGNode>)[] } {
+function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssembly): CallGInfo {
     let invokes = new Map<MIRBodyKey, CallGNode>();
 
     assembly.constantDecls.forEach((cdecl: MIRConstantDecl) => {
@@ -160,12 +167,12 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
     tordered = tordered.reverse();
 
     let marked = new Set<MIRInvokeKey>();
-    let recursive: (Set<CallGNode>)[] = [];
+    let recursive: (Set<MIRBodyKey>)[] = [];
     for (let i = 0; i < tordered.length; ++i) {
-        let scc = new Set<CallGNode>();
+        let scc = new Set<MIRBodyKey>();
         sccVisit(tordered[i], scc, marked, invokes);
 
-        if (scc.size > 1) {
+        if (scc.size > 1 || tordered[i].callees.has(tordered[i].invoke)) {
             recursive.push(scc);
         }
     }
@@ -173,4 +180,8 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
     return { invokes: invokes, topologicalOrder: tordered, roots: roots, recursive: recursive };
 }
 
-export { constructCallGraphInfo };
+export {
+    CallGNode,
+    CallGInfo,
+    constructCallGraphInfo
+};

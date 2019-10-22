@@ -89,7 +89,7 @@ class CPPBodyEmitter {
         return sanitizeForCpp(invk);
     }
 
-    boxIfNeeded(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
+    boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
         if (isInlinableType(from) && !isInlinableType(into)) {
             const itype = getInlinableType(into);
             if (itype.trkey === "NSCore::Bool") {
@@ -107,7 +107,7 @@ class CPPBodyEmitter {
         }
     }
 
-    unboxIfNeeded(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
+    unboxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
         if (!isInlinableType(from) && isInlinableType(into)) {
             const itype = getInlinableType(into);
             if (itype.trkey === "NSCore::Bool") {
@@ -125,7 +125,7 @@ class CPPBodyEmitter {
         }
     }
 
-    coerce(exp: string, from: MIRType | MIRTypeOption, into: MIRType | MIRTypeOption): string {
+    coerce(exp: string, from: MIRType, into: MIRType): string {
         if (isInlinableType(from) !== isInlinableType(into)) {
             return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
@@ -181,7 +181,7 @@ class CPPBodyEmitter {
         }
     }
 
-    argToCpp(arg: MIRArgument, into: MIRType | MIRTypeOption): string {
+    argToCpp(arg: MIRArgument, into: MIRType): string {
         if (arg instanceof MIRRegisterArgument) {
             return this.coerce(this.varToCppName(arg), this.getArgType(arg), into);
         }
@@ -235,7 +235,7 @@ class CPPBodyEmitter {
         return `${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)}`;
     }
 
-    generateStmt(op: MIROp): string | undefined {
+    generateStmt(op: MIROp, supportcalls: string[]): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = (op as MIRLoadConst);
@@ -494,7 +494,7 @@ class CPPBodyEmitter {
         }
     }
 
-    generateBlock(block: MIRBasicBlock) {
+    generateBlock(block: MIRBasicBlock, supportcalls: string[]) {
         let gblock: string[] = [];
 
         let blocki = 0;
@@ -514,7 +514,7 @@ class CPPBodyEmitter {
         }
 
         while (blocki < block.ops.length) {
-            const gop = this.generateStmt(block.ops[blocki]);
+            const gop = this.generateStmt(block.ops[blocki], supportcalls);
             if (gop !== undefined) {
                 gblock.push(gop);
             }
@@ -543,7 +543,7 @@ class CPPBodyEmitter {
         this.generatedBlocks.set(block.label, gblock);
     }
 
-    generateInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string } {
+    generateCPPInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string, supportcalls: string[] } {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.assembly.typeMap.get(idecl.resultType) as MIRType;
         this.scopectr = 0;
@@ -563,10 +563,11 @@ class CPPBodyEmitter {
             });
 
             this.generatedBlocks = new Map<string, string[]>();
+            let supportcalls: string[] = [];
 
             const blocks = topologicalOrder((idecl as MIRInvokeBodyDecl).body.body);
             for (let i = 0; i < blocks.length; ++i) {
-                this.generateBlock(blocks[i]);
+                this.generateBlock(blocks[i], supportcalls);
             }
 
             const refscope = this.scopectr !== 0 ? `RefCountScope<${this.scopectr}> $scope$;` : ";";
@@ -604,16 +605,16 @@ class CPPBodyEmitter {
 
                 const scopestrs = [refscope, ...vdeclscpp].join("\n");
 
-                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
+                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, supportcalls: supportcalls };
             }
             else {
-                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- Pre/Post");
+                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- Pre/Post");
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
     }
 }
