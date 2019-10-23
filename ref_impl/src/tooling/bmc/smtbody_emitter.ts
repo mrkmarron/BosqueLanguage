@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT, isUniqueEntityType } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
@@ -198,6 +198,38 @@ class SMTBodyEmitter {
         }
     }
 
+    generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
+        let tcons = "bsq_tuple_entry_array_empty";
+        for (let i = 0; i < op.args.length; ++i) {
+            const smtarg = `(bsq_tuple_entry true ${this.argToSMT(op.args[i], this.typegen.anyType)})`;
+            tcons = `(store ${tcons} ${i} ${smtarg})`;
+        }
+
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_tuple ${op.args.length} ${tcons})`));
+    }
+
+    generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
+        let rcons = "bsq_record_entry_array_empty";
+        for (let i = 0; i < op.args.length; ++i) {
+            const smtarg = `(bsq_record_entry true ${this.argToSMT(op.args[i][1], this.typegen.anyType)})`;
+            rcons = `(store ${rcons} \"${op.args[i][0]}\" ${smtarg})`;
+        }
+
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_record ${op.args.length} ${rcons})`));
+    }
+
+    generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
+        let tacc = `(bsq_tuple_entry_value (select (bsq_term_tuple_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) ${op.idx}))`;
+        const val = this.unboxIfNeeded(new SMTValue(tacc), this.typegen.anyType, resultAccessType);
+        return new SMTLet(this.varToSMTName(op.trgt), val);
+    }
+
+    generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): SMTExp {
+        let tacc = `(bsq_record_entry_value (select (bsq_term_record_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) \"${op.property}\"))`;
+        const val = this.unboxIfNeeded(new SMTValue(tacc), this.typegen.anyType, resultAccessType);
+        return new SMTLet(this.varToSMTName(op.trgt), val);
+    }
+
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): SMTExp {
         let vals: string[] = [];
         const idecl = (this.assembly.invokeDecls.get(ivop.mkey) || this.assembly.primitiveInvokeDecls.get(ivop.mkey)) as MIRInvokeDecl;
@@ -240,7 +272,7 @@ class SMTBodyEmitter {
     generateStmt(op: MIROp, fromblck: string, gass: number, supportcalls: string[]): SMTExp | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
-                const lcv = (op as MIRLoadConst);
+                const lcv = op as MIRLoadConst;
                 return new SMTLet(this.varToSMTName(lcv.trgt), this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt)));
             }
             case MIROpTag.MIRLoadConstTypedString:  {
@@ -253,11 +285,11 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRLoadFieldDefaultValue");
             }
             case MIROpTag.MIRAccessArgVariable: {
-                const lav = (op as MIRAccessArgVariable);
+                const lav = op as MIRAccessArgVariable;
                 return new SMTLet(this.varToSMTName(lav.trgt), this.argToSMT(lav.name, this.getArgType(lav.trgt)));
             }
             case MIROpTag.MIRAccessLocalVariable: {
-                const llv = (op as MIRAccessLocalVariable);
+                const llv = op as MIRAccessLocalVariable;
                 return new SMTLet(this.varToSMTName(llv.trgt), this.argToSMT(llv.name, this.getArgType(llv.trgt)));
             }
             case MIROpTag.MIRConstructorPrimary: {
@@ -276,19 +308,23 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionMixed");
             }
             case MIROpTag.MIRConstructorTuple: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorTuple");
+                const tc = op as MIRConstructorTuple;
+                return this.generateMIRConstructorTuple(tc);
             }
             case MIROpTag.MIRConstructorRecord: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorRecord");
+                const tr = op as MIRConstructorRecord;
+                return this.generateMIRConstructorRecord(tr);
             }
             case MIROpTag.MIRAccessFromIndex: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRAccessFromIndex");
+                const ai = op as MIRAccessFromIndex;
+                return this.generateMIRAccessFromIndex(ai, this.assembly.typeMap.get(ai.resultAccessType) as MIRType);
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromIndecies");
             }
             case MIROpTag.MIRAccessFromProperty: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRAccessFromProperty");
+                const ap = op as MIRAccessFromProperty;
+                return this.generateMIRAccessFromProperty(ap, this.assembly.typeMap.get(ap.resultAccessType) as MIRType);
             }
             case MIROpTag.MIRProjectFromProperties: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromProperties");

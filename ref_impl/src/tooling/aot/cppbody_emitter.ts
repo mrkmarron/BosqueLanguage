@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType, filenameClean } from "./cpputils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 
@@ -238,7 +238,7 @@ class CPPBodyEmitter {
     generateStmt(op: MIROp, supportcalls: string[]): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
-                const lcv = (op as MIRLoadConst);
+                const lcv = op as MIRLoadConst;
                 return this.generateInit(lcv.trgt, this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt)));
             }
             case MIROpTag.MIRLoadConstTypedString:  {
@@ -251,11 +251,11 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRLoadFieldDefaultValue");
             }
             case MIROpTag.MIRAccessArgVariable: {
-                const lav = (op as MIRAccessArgVariable);
+                const lav = op as MIRAccessArgVariable;
                 return this.generateInit(lav.trgt, this.argToCpp(lav.name, this.getArgType(lav.trgt)));
             }
             case MIROpTag.MIRAccessLocalVariable: {
-                const llv = (op as MIRAccessLocalVariable);
+                const llv = op as MIRAccessLocalVariable;
                 return this.generateInit(llv.trgt, this.argToCpp(llv.name, this.getArgType(llv.trgt)));
             }
             case MIROpTag.MIRConstructorPrimary: {
@@ -274,13 +274,20 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionMixed");
             }
             case MIROpTag.MIRConstructorTuple: {
-                return NOT_IMPLEMENTED<string>("MIRConstructorTuple");
+                const tc = op as MIRConstructorTuple;
+                const args = tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
+                return this.generateInit(tc.trgt, `new NSCore$cc$Tuple(std::vector<Value>{${args.join(", ")}})`);
             }
             case MIROpTag.MIRConstructorRecord: {
-                return NOT_IMPLEMENTED<string>("MIRConstructorRecord");
+                const tr = op as MIRConstructorRecord;
+                const args = tr.args.map((arg) => `std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::${sanitizeForCpp(arg[0])}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
+                return this.generateInit(tr.trgt, `new NSCore$cc$Tuple(std::vector<std::pair<MIRPropertyEnum, Value>>{${args.join(", ")}})`);
             }
             case MIROpTag.MIRAccessFromIndex: {
-                return NOT_IMPLEMENTED<string>("MIRAccessFromIndex");
+                const ai = op as MIRAccessFromIndex;
+                const argv = `auto tentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ai.arg, this.typegen.anyType)}, NSCore$cc$Tuple)->m_entries`;
+                const opv = this.generateInit(ai.trgt, this.unboxIfNeeded(`(tentries.size() < ${ai.idx}) ? tentries[${ai.idx}]: BSQ_VALUE_NONE`, this.typegen.anyType, this.assembly.typeMap.get(ai.resultAccessType) as MIRType));
+                return `{ ${argv}; ${opv}; }`;
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromIndecies");

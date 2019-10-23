@@ -7,7 +7,7 @@
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
 (declare-datatypes ( 
-      (BTerm 0) (BTermList 0) (BTermNamedList 0)
+      (BTerm 0) (BTermList 0) (BTupleEntry 0) (BRecordEntry 0)
       ;;NOMINAL_DECLS_FWD;;
     ) (
     (
@@ -15,20 +15,24 @@
       (bsq_term_bool (bsq_term_bool_value Bool))
       (bsq_term_int (bsq_term_int_value Int))
       (bsq_term_string (bsq_term_string_value String))
-      (bsq_term_tuple (bsq_term_tuple_entries BTermList))
-      (bsq_term_record (bsq_term_record_entries BTermNamedList))
+      (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries BTermList))
+      (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_entries (Array String BRecordEntry)))
       ;;BOXED_NOMINAL_DECLS;;
     )
     (
-      (bsq_term_list_nil) 
-      (bsq_term_list_cons (bsq_term_list_head BTerm) (bsq_term_list_tail BTermList))
+      (bsq_tuple_entry (bsq_tuple_entry_valid Bool) (bsq_tuple_entry_value BTerm)) 
     )
-    (
-      (bsq_term_named_list_nil)
-      (bsq_term_named_list_cons (bsq_term_named_list_name String) (bsq_term_named_list_head BTerm) (bsq_term_named_list_tail BTermNamedList))
+    ( 
+      (bsq_record_entry (bsq_record_entry_valid Bool) (bsq_record_entry_value BTerm)) 
     )
     ;;NOMINAL_DECLS;;
 ))
+
+(declare-const bsq_tuple_entry_array_empty (Array String BTupleEntry))
+(assert (= bsq_tuple_entry_array_empty ((as const (Array String BTupleEntry)) (bsq_tuple_entry false bsq_term_none))))
+
+(declare-const bsq_record_entry_array_empty (Array String BRecordEntry))
+(assert (= bsq_record_entry_array_empty ((as const (Array String BRecordEntry)) (bsq_record_entry false bsq_term_none))))
 
 (declare-datatypes ( (ErrorCode 0) ) (
     ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
