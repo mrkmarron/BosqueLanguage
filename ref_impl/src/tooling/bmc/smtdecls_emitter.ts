@@ -3,11 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { NOT_IMPLEMENTED } from "./smtutils";
+import { NOT_IMPLEMENTED, sanitizeForSMT } from "./smtutils";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
 
 type SMTCode = {
@@ -38,6 +38,9 @@ class SMTEmitter {
                 typedecls_fwd.push(smtdecl.fwddecl);
                 typedecls_boxed.push(smtdecl.boxeddecl);
                 typedecls.push(smtdecl.fulldecl);
+
+                resultdecls_fwd.push(`(Result$${sanitizeForSMT(edecl.tkey)} 0)`);
+                resultdecls.push(`( (result_success$${sanitizeForSMT(edecl.tkey)} (result_success_value$${sanitizeForSMT(edecl.tkey)} ${sanitizeForSMT(edecl.tkey)})) (result_error$${sanitizeForSMT(edecl.tkey)} (result_error_code$${sanitizeForSMT(edecl.tkey)} ${sanitizeForSMT(edecl.tkey)})) )`);
             }
         });
 
@@ -81,6 +84,24 @@ class SMTEmitter {
             resultdecls_fwd: resultdecls_fwd.sort().join("\n"),
             resultdecls: resultdecls.sort().join("\n"),
             function_decls: funcdecls.sort().join("\n")
+        };
+    }
+
+    static emitEntrypointCall(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): { arginfo: string, callinfo: string } {
+        const typeemitter = new SMTTypeEmitter(assembly);
+        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
+
+        const rrtype = typeemitter.typeToSMTType(assembly.typeMap.get(entrypoint.resultType) as MIRType);
+
+        const resv = `(declare-const @smtres@ ${rrtype})`;
+        const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMTName(entrypoint.key)}))`;
+        const chk = `(assert (is-result_error_${rrtype} @smtres@))`;
+
+        const callinfo = resv + "\n" + cassert + "\n" + chk;
+
+        return {
+            arginfo: "",
+            callinfo: callinfo
         };
     }
 }

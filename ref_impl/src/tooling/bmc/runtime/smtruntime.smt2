@@ -37,12 +37,12 @@
 ))
 
 (declare-datatypes ( 
-      (ResultBool 0) (ResultInt 0) (ResultBTerm 0)
+      (Result$Bool 0) (Result$Int 0) (Result$BTerm 0)
       ;;NOMINAL_RESULT_FWD;;
     ) (
-    ( (result_success_Bool (result_success_value_Bool Bool)) (result_error_Bool (result_error_code_Bool ErrorCode)) )
-    ( (result_success_Int (result_success_value_Int Int)) (result_error_Int (result_error_code_Int ErrorCode)) )
-    ( (result_success_BTerm (result_success_value_BTerm BTerm)) (result_error_BTerm (result_error_code_BTerm ErrorCode)) )
+    ( (result_success$Bool (result_success_value$Bool Bool)) (result_error$Bool (result_error_code$Bool ErrorCode)) )
+    ( (result_success$Int (result_success_value$Int Int)) (result_error$Int (result_error_code$Int ErrorCode)) )
+    ( (result_success$BTerm (result_success_value$BTerm BTerm)) (result_error$BTerm (result_error_code$BTerm ErrorCode)) )
     ;;NOMINAL_RESULT;;
 ))
 
@@ -57,10 +57,6 @@
 
 (declare-const BINT_MIN Int)
 (assert (= BINT_MIN -4503599627370496))
-
-;;NOMINAL_SUBTYPES;;
-
-;;SUBTYPE_CALLS;;
 
 ;;FUNCTION_DECLS;;
 

@@ -11,12 +11,11 @@ import * as FS from "fs";
 import * as Path from "path";
 
 import * as Commander from "commander";
-import { MIRAssembly, PackageConfig, MIRInvokeDecl } from "../compiler/mir_assembly";
+import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
-import { SMTBodyEmitter } from "./bmc/smtbody_emitter";
-import { SMTTypeEmitter } from "./bmc/smttype_emitter";
 import { CPPEmitter } from "./aot/cppdecls_emitter";
 import { sanitizeForCpp } from "./aot/cpputils";
+import { SMTEmitter } from "./bmc/smtdecls_emitter";
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     process.stdout.write("Reading code...\n");
@@ -56,13 +55,6 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     return masm as MIRAssembly;
 }
 
-function smtlibGenerate(masm: MIRAssembly, idecl: MIRInvokeDecl): string {
-    const smtgen = new SMTBodyEmitter(masm, new SMTTypeEmitter(masm));
-    const smtcode = smtgen.generateInvoke(idecl);
-
-    return smtcode[1];
-}
-
 Commander
     .option("-v --verify <entrypoint>", "Check for errors reachable from specified entrypoint")
     .option("-c --compile <entrypoint>", "Compile the specified entrypoint");
@@ -75,15 +67,42 @@ if (Commander.args.length === 0) {
 }
 
 const massembly = generateMASM(Commander.args, Commander.verify ? "src/core/verify/" : "src/core/compile/");
-const entrypoint = massembly.invokeDecls.get(Commander.verify || Commander.compile) as MIRInvokeDecl;
-
-const cpp_runtime = Path.join(__dirname, "aot/runtime/");
 
 if (Commander.verify !== undefined) {
-    setImmediate(() => console.log(smtlibGenerate(massembly, entrypoint)));
+    setImmediate(() => {
+        const smt_runtime = Path.join(__dirname, "bmc/runtime/smtruntime.smt2");
+
+        const sparams = SMTEmitter.emit(massembly);
+        const lsrc = FS.readFileSync(smt_runtime).toString();
+        const gensrc = lsrc
+            .replace(";;NOMINAL_DECLS_FWD;;", "  " + sparams.typedecls_fwd)
+            .replace(";;BOXED_NOMINAL_DECLS;;", "  " + sparams.typedecls_boxed)
+            .replace(";;NOMINAL_DECLS;;", "  " + sparams.typedecls)
+            .replace(";;NOMINAL_RESULT_FWD;;", "  " + sparams.resultdecls_fwd)
+            .replace(";;NOMINAL_RESULT;;", "  " + sparams.resultdecls)
+            .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls);
+
+        const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
+        let contents = gensrc;
+        if (entrypoint.params.length !== 0) {
+            process.stderr.write("Entrypoint args are not currently supported!!!\n");
+            process.exit(1);
+        }
+
+        const chkinfo = SMTEmitter.emitEntrypointCall(massembly, entrypoint);
+        contents = contents
+            .replace(";;ARG_VALUES;;", chkinfo.arginfo)
+            .replace(";;INVOKE_ACTION;;", chkinfo.callinfo)
+            .replace(";;GET_MODEL;;", "(get-model)");
+
+        const outfile = Path.join("c:\\Users\\marron\\Desktop\\smt_scratch\\", "scratch.smt2");
+        FS.writeFileSync(outfile, contents);
+    });
 }
 else {
     setImmediate(() => {
+        const cpp_runtime = Path.join(__dirname, "aot/runtime/");
+
         const cparams = CPPEmitter.emit(massembly);
         const lsrc = FS.readdirSync(cpp_runtime);
         const linked = lsrc.map((fname) => {

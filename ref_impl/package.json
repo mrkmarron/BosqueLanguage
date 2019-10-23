@@ -18,7 +18,7 @@
         "chalk": "~2.4.2"
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y",
+        "build": "tsc -p tsconfig.json && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y && xcopy \"src\\tooling\\bmc\\runtime\" \"bin\\tooling\\bmc\\runtime\" /s /i /y",
         "test": "tsc -p tsconfig.json && node ./bin/test/test_runner.js"
     },
     "files": [

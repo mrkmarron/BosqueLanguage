@@ -207,13 +207,13 @@ class SMTBodyEmitter {
         }
 
         const tv = this.generateTempName();
-        const ivrtype = "Result" + this.typegen.typeToSMTType(this.assembly.typeMap.get((idecl as MIRInvokeDecl).resultType) as MIRType);
-        const resulttype = "Result" + this.typegen.typeToSMTType(this.currentRType);
+        const ivrtype = this.typegen.typeToSMTType(this.assembly.typeMap.get((idecl as MIRInvokeDecl).resultType) as MIRType);
+        const resulttype = this.typegen.typeToSMTType(this.currentRType);
 
         const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMTName(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMTName(ivop.mkey));
-        const checkerror = new SMTValue(`(is-result_error_${ivrtype} ${tv})`);
-        const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error_${resulttype} (result_error_code_${ivrtype} ${tv}))`) : new SMTValue(tv);
-        const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value_${ivrtype} ${tv})`));
+        const checkerror = new SMTValue(`(is-result_error$${ivrtype} ${tv})`);
+        const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error$${this.typegen.typeToSMTType(this.currentRType)} (result_error_code$${ivrtype} ${tv}))`) : new SMTValue(tv);
+        const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value$${ivrtype} ${tv})`));
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }
@@ -498,7 +498,7 @@ class SMTBodyEmitter {
 
         if (block.label === "exit") {
             const resulttype = this.typegen.typeToSMTType(this.currentRType);
-            let rexp = new SMTValue(`(result_success_${resulttype} _return_)`) as SMTExp;
+            let rexp = new SMTValue(`(result_success_value$${resulttype} _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
             }
@@ -543,7 +543,7 @@ class SMTBodyEmitter {
 
         const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTType(this.assembly.typeMap.get(arg.type) as MIRType)})`);
         const restype = this.typegen.typeToSMTType(this.assembly.typeMap.get(idecl.resultType) as MIRType);
-        const decl = `(define-fun ${this.invokenameToSMTName(idecl.key)} (${args.join(" ")}) Result${restype}`;
+        const decl = `(define-fun ${this.invokenameToSMTName(idecl.key)} (${args.join(" ")}) Result$${restype}`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
             this.vtypes = new Map<string, MIRType>();
