@@ -46,7 +46,7 @@ class SMTBodyEmitter {
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
-        return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)} (result_error ${errid}))`);
+        return new SMTValue(`(result_error$${this.typegen.typeToSMTType(this.currentRType)} (result_error ${errid}))`);
     }
 
     generateBMCCreate(invkey: MIRBodyKey): SMTValue {
@@ -59,7 +59,7 @@ class SMTBodyEmitter {
         }
         const errid = this.bmcCodes.get(bmcid) as number;
 
-        return new SMTValue(`(result_error_${this.typegen.typeToSMTType(this.currentRType)} (result_bmc ${errid}))`);
+        return new SMTValue(`(result_error$${this.typegen.typeToSMTType(this.currentRType)} (result_bmc ${errid}))`);
     }
 
     getBMCGas(invkey: MIRBodyKey): number {
@@ -160,13 +160,13 @@ class SMTBodyEmitter {
             return new SMTValue("bsq_term_none");
         }
         else if (cval instanceof MIRConstantTrue) {
-            return new SMTValue(isinlineable ? "true" : "(bsq_term_bool_value true)");
+            return new SMTValue(isinlineable ? "true" : "(bsq_term_true_const true)");
         }
         else if (cval instanceof MIRConstantFalse) {
-            return new SMTValue(isinlineable ? "false" : "(bsq_term_bool_value false)");
+            return new SMTValue(isinlineable ? "false" : "(bsq_term_false_const false)");
         }
         else if (cval instanceof MIRConstantInt) {
-            return new SMTValue(isinlineable ? cval.value : `(bsq_term_int_value ${cval.value})`);
+            return new SMTValue(isinlineable ? cval.value : `(bsq_term_int ${cval.value})`);
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -224,10 +224,10 @@ class SMTBodyEmitter {
 
         let coreop = "";
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
-            coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.boolType).emit()}`;
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${this.argToSMT(rhs, this.typegen.boolType).emit()})`;
         }
         else {
-            coreop = `${this.argToSMT(lhs, this.typegen.intType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()})`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
@@ -328,7 +328,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                return new SMTLet(this.varToSMTName(invk.trgt), this.generateMIRInvokeFixedFunction(invk));
+                return this.generateMIRInvokeFixedFunction(invk);
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRInvokeVirtualTarget");
@@ -498,7 +498,7 @@ class SMTBodyEmitter {
 
         if (block.label === "exit") {
             const resulttype = this.typegen.typeToSMTType(this.currentRType);
-            let rexp = new SMTValue(`(result_success_value$${resulttype} _return_)`) as SMTExp;
+            let rexp = new SMTValue(`(result_success$${resulttype} _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
             }

@@ -93,9 +93,9 @@ class SMTEmitter {
 
         const rrtype = typeemitter.typeToSMTType(assembly.typeMap.get(entrypoint.resultType) as MIRType);
 
-        const resv = `(declare-const @smtres@ ${rrtype})`;
+        const resv = `(declare-const @smtres@ Result$${rrtype})`;
         const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMTName(entrypoint.key)}))`;
-        const chk = `(assert (is-result_error_${rrtype} @smtres@))`;
+        const chk = `(assert (is-result_error$${rrtype} @smtres@))`;
 
         const callinfo = resv + "\n" + cassert + "\n" + chk;
 
