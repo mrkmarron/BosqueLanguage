@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT, isUniqueEntityType } from "./smtutils";
+import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT, isUniqueEntityType, getUniqueEntityType } from "./smtutils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
@@ -109,14 +109,17 @@ class SMTBodyEmitter {
         if (isInlinableType(from) && !isInlinableType(into)) {
             const itype = getInlinableType(into);
             if (itype.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsq_term_bool ${exp.emit()})`);
+                return new SMTValue(`(bsq_term_NSCore$cc$Bool ${exp.emit()})`);
+            }
+            else if (itype.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsq_term_NSCore$cc$Int ${exp.emit()})`);
             }
             else {
-                return new SMTValue(`(bsq_term_int ${exp.emit()})`);
+                return new SMTValue(`(bsq_term_NSCore$cc$String ${exp.emit()})`);
             }
         }
         else if (isUniqueEntityType(from) && !isUniqueEntityType(into)) {
-            return new SMTValue(`(bsq_term_${this.typegen.typeToSMTType(from)} ${exp.emit()})`);
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
         }
         else {
             return exp;
@@ -127,14 +130,17 @@ class SMTBodyEmitter {
         if (!isInlinableType(from) && isInlinableType(into)) {
             const itype = getInlinableType(into);
             if (itype.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsq_term_bool_value ${exp.emit()})`);
+                return new SMTValue(`(bsq_term_value_NSCore$cc$Bool ${exp.emit()})`);
+            }
+            else if (itype.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsq_term_value_NSCore$cc$Int ${exp.emit()})`);
             }
             else {
-                return new SMTValue(`(bsq_term_int_value ${exp.emit()})`);
+                return new SMTValue(`(bsq_term_value_NSCore$cc$String ${exp.emit()})`);
             }
         }
         else if (!isUniqueEntityType(from) && isUniqueEntityType(into)) {
-            return new SMTValue(`(bsq_term_value_${this.typegen.typeToSMTType(from)} ${exp.emit()})`);
+            return new SMTValue(`(bsq_term_value_${sanitizeForSMT(getUniqueEntityType(into).ekey)} ${exp.emit()})`);
         }
         else {
             return exp;
@@ -166,12 +172,12 @@ class SMTBodyEmitter {
             return new SMTValue(isinlineable ? "false" : "(bsq_term_false_const false)");
         }
         else if (cval instanceof MIRConstantInt) {
-            return new SMTValue(isinlineable ? cval.value : `(bsq_term_int ${cval.value})`);
+            return new SMTValue(isinlineable ? cval.value : `(bsq_term_NSCore$cc$Int ${cval.value})`);
         }
         else {
             assert(cval instanceof MIRConstantString);
 
-            return new SMTValue(`(bsq_term_string ${(cval as MIRConstantString).value}})`);
+            return new SMTValue(isinlineable ? (cval as MIRConstantString).value : `(bsq_term_NSCore$cc$String ${(cval as MIRConstantString).value}})`);
         }
     }
 
@@ -201,11 +207,11 @@ class SMTBodyEmitter {
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
         let tcons = "bsq_tuple_entry_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
-            const smtarg = `(bsq_tuple_entry true ${this.argToSMT(op.args[i], this.typegen.anyType)})`;
+            const smtarg = `(bsq_tuple_entry true ${this.argToSMT(op.args[i], this.typegen.anyType).emit()})`;
             tcons = `(store ${tcons} ${i} ${smtarg})`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_tuple ${op.args.length} ${tcons})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_tuple ${tcons})`));
     }
 
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
@@ -215,7 +221,7 @@ class SMTBodyEmitter {
             rcons = `(store ${rcons} \"${op.args[i][0]}\" ${smtarg})`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_record ${op.args.length} ${rcons})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_term_record ${rcons})`));
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
@@ -258,15 +264,26 @@ class SMTBodyEmitter {
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
             coreop = `(= ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${this.argToSMT(rhs, this.typegen.boolType).emit()})`;
         }
-        else {
+        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
             coreop = `(= ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()})`;
+        }
+        else {
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.stringType).emit()} ${this.argToSMT(rhs, this.typegen.stringType).emit()})`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
     generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
-        return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${op} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
+        const lhvtype = this.getArgType(lhs);
+        const rhvtype = this.getArgType(rhs);
+
+        if ((lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")) {
+            return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
+        }
+        else {
+            return NOT_IMPLEMENTED<string>("generateFastCompare -- string");
+        }
     }
 
     generateStmt(op: MIROp, fromblck: string, gass: number, supportcalls: string[]): SMTExp | undefined {
@@ -405,8 +422,8 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, beq.lhs, beq.rhs)));
                 }
                 else {
-                    const larg = this.argToSMT(beq.lhs, this.typegen.anyType);
-                    const rarg = this.argToSMT(beq.rhs, this.typegen.anyType);
+                    const larg = this.argToSMT(beq.lhs, lhvtype);
+                    const rarg = this.argToSMT(beq.rhs, rhvtype);
 
                     const sloweq = `(@equality_op ${larg.emit()} ${rarg.emit()})`;
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${sloweq})` : sloweq));
@@ -422,8 +439,8 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)));
                 }
                 else {
-                    const larg = this.argToSMT(bcmp.lhs, this.typegen.anyType).emit();
-                    const rarg = this.argToSMT(bcmp.rhs, this.typegen.anyType).emit();
+                    const larg = this.argToSMT(bcmp.lhs, lhvtype).emit();
+                    const rarg = this.argToSMT(bcmp.rhs, rhvtype).emit();
 
                     if (bcmp.op === "<") {
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(@compare_op ${larg} ${rarg})`));

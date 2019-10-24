@@ -12,11 +12,11 @@
     ) (
     (
       (bsq_term_none) 
-      (bsq_term_bool (bsq_term_bool_value Bool))
-      (bsq_term_int (bsq_term_int_value Int))
-      (bsq_term_string (bsq_term_string_value String))
-      (bsq_term_tuple (bsq_term_tuple_size Int) (bsq_term_tuple_entries BTermList))
-      (bsq_term_record (bsq_term_record_size Int) (bsq_term_record_entries (Array String BRecordEntry)))
+      (bsq_term_NSCore$cc$Bool (bsq_term_value_NSCore$cc$Bool Bool))
+      (bsq_term_NSCore$cc$Int (bsq_term_value_NSCore$cc$Int Int))
+      (bsq_term_NSCore$cc$String (bsq_term_value_NSCore$cc$String String))
+      (bsq_term_tuple (bsq_term_tuple_entries BTermList))
+      (bsq_term_record (bsq_term_record_entries (Array String BRecordEntry)))
       ;;BOXED_NOMINAL_DECLS;;
     )
     (

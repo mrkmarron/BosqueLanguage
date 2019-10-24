@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType, filenameClean } from "./cpputils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 
@@ -286,14 +286,20 @@ class CPPBodyEmitter {
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 const argv = `auto tentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ai.arg, this.typegen.anyType)}, NSCore$cc$Tuple)->m_entries`;
-                const opv = this.generateInit(ai.trgt, this.unboxIfNeeded(`(tentries.size() < ${ai.idx}) ? tentries[${ai.idx}]: BSQ_VALUE_NONE`, this.typegen.anyType, this.assembly.typeMap.get(ai.resultAccessType) as MIRType));
-                return `{ ${argv}; ${opv}; }`;
+                const accop = this.unboxIfNeeded(`tentries[${ai.idx}]`, this.typegen.anyType, this.assembly.typeMap.get(ai.resultAccessType) as MIRType);
+                const opv = this.generateInit(ai.trgt, `(${ai.idx} < tentries.size()) ? ${accop} : BSQ_VALUE_NONE`);
+                return `{ ${argv}; ${opv} }`;
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromIndecies");
             }
             case MIROpTag.MIRAccessFromProperty: {
-                return NOT_IMPLEMENTED<string>("MIRAccessFromProperty");
+                const ap = op as MIRAccessFromProperty;
+                const argv = `auto rentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ap.arg, this.typegen.anyType)}, NSCore$cc$Record)->m_entries`;
+                const valexp = `auto iter = std::find_if(rentries.cbegin(), rentries.cend(), [&](const std::pair<<MIRPropertyEnum, Value>& entry) { return entry.first == MIRPropertyEnum::${sanitizeForCpp(ap.property)}; })`;
+                const accop = this.unboxIfNeeded("rentries->second", this.typegen.anyType, this.assembly.typeMap.get(ap.resultAccessType) as MIRType);
+                const opv = this.generateInit(ap.trgt, `(iter != rentries.cend()) ? ${accop} : BSQ_VALUE_NONE`);
+                return `{ ${argv}; ${valexp}; ${opv} }`;
             }
             case MIROpTag.MIRProjectFromProperties: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromProperties");
@@ -380,8 +386,8 @@ class CPPBodyEmitter {
                     return this.generateInit(beq.trgt, this.generateFastEquals(beq.op, beq.lhs, beq.rhs));
                 }
                 else {
-                    const larg = this.argToCpp(beq.lhs, this.typegen.anyType);
-                    const rarg = this.argToCpp(beq.rhs, this.typegen.anyType);
+                    const larg = this.argToCpp(beq.lhs, lhvtype);
+                    const rarg = this.argToCpp(beq.rhs, rhvtype);
 
                     return this.generateInit(beq.trgt, `${beq.op === "!=" ? "!" : ""}Runtime::equality_op(${larg}, ${rarg})`);
                 }
@@ -396,8 +402,8 @@ class CPPBodyEmitter {
                     return this.generateInit(bcmp.trgt, this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs));
                 }
                 else {
-                    const larg = this.argToCpp(bcmp.lhs, this.typegen.anyType);
-                    const rarg = this.argToCpp(bcmp.rhs, this.typegen.anyType);
+                    const larg = this.argToCpp(bcmp.lhs, lhvtype);
+                    const rarg = this.argToCpp(bcmp.rhs, rhvtype);
 
                     if (bcmp.op === "<") {
                         return this.generateInit(bcmp.trgt, `Runtime::compare_op(${larg}, ${rarg})`);

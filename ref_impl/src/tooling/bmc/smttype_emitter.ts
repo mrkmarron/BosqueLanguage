@@ -32,8 +32,11 @@ class SMTTypeEmitter {
             if (tt.trkey === "NSCore::Bool") {
                 return "Bool";
             }
-            else {
+            else if (tt.trkey === "NSCore::Int") {
                 return "Int";
+            }
+            else {
+                return "String";
             }
         }
         else if (isUniqueEntityType(tt)) {
