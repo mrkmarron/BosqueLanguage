@@ -177,7 +177,7 @@ class SMTBodyEmitter {
         else {
             assert(cval instanceof MIRConstantString);
 
-            return new SMTValue(isinlineable ? (cval as MIRConstantString).value : `(bsq_term_NSCore$cc$String ${(cval as MIRConstantString).value}})`);
+            return new SMTValue(isinlineable ? (cval as MIRConstantString).value : `(bsq_term_NSCore$cc$String ${(cval as MIRConstantString).value})`);
         }
     }
 

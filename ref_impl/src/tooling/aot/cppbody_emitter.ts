@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType, filenameClean } from "./cpputils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
@@ -177,7 +177,7 @@ class CPPBodyEmitter {
                 this.allConstStrings.set(sval, sname);
             }
 
-            return `(&Runtime::${sname})`;
+            return `(&Runtime::${this.allConstStrings.get(sval) as string})`;
         }
     }
 
@@ -287,7 +287,8 @@ class CPPBodyEmitter {
                 const ai = op as MIRAccessFromIndex;
                 const argv = `auto tentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ai.arg, this.typegen.anyType)}, NSCore$cc$Tuple)->m_entries`;
                 const accop = this.unboxIfNeeded(`tentries[${ai.idx}]`, this.typegen.anyType, this.assembly.typeMap.get(ai.resultAccessType) as MIRType);
-                const opv = this.generateInit(ai.trgt, `(${ai.idx} < tentries.size()) ? ${accop} : BSQ_VALUE_NONE`);
+                const safeload = this.getArgType(ai.arg).options.every((opt) => opt instanceof MIRTupleType && ai.idx < opt.entries.length && !opt.entries[ai.idx].isOptional);
+                const opv = this.generateInit(ai.trgt, !safeload ? `(${ai.idx} < tentries.size()) ? ${accop} : BSQ_VALUE_NONE` : accop);
                 return `{ ${argv}; ${opv} }`;
             }
             case MIROpTag.MIRProjectFromIndecies: {
@@ -298,7 +299,8 @@ class CPPBodyEmitter {
                 const argv = `auto rentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ap.arg, this.typegen.anyType)}, NSCore$cc$Record)->m_entries`;
                 const valexp = `auto iter = std::find_if(rentries.cbegin(), rentries.cend(), [&](const std::pair<<MIRPropertyEnum, Value>& entry) { return entry.first == MIRPropertyEnum::${sanitizeForCpp(ap.property)}; })`;
                 const accop = this.unboxIfNeeded("rentries->second", this.typegen.anyType, this.assembly.typeMap.get(ap.resultAccessType) as MIRType);
-                const opv = this.generateInit(ap.trgt, `(iter != rentries.cend()) ? ${accop} : BSQ_VALUE_NONE`);
+                const safeload = this.getArgType(ap.arg).options.every((opt) => opt instanceof MIRRecordType && opt.entries.findIndex((entry) => entry.name === ap.property) !== -1 && !opt.entries[opt.entries.findIndex((entry) => entry.name === ap.property)].isOptional);
+                const opv = this.generateInit(ap.trgt, !safeload ? `(iter != rentries.cend()) ? ${accop} : BSQ_VALUE_NONE` : accop);
                 return `{ ${argv}; ${valexp}; ${opv} }`;
             }
             case MIROpTag.MIRProjectFromProperties: {

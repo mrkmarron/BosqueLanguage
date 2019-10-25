@@ -7,7 +7,7 @@
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
 (declare-datatypes ( 
-      (BTerm 0) (BTermList 0) (BTupleEntry 0) (BRecordEntry 0)
+      (BTerm 0) (BTupleEntry 0) (BRecordEntry 0)
       ;;NOMINAL_DECLS_FWD;;
     ) (
     (
@@ -15,7 +15,7 @@
       (bsq_term_NSCore$cc$Bool (bsq_term_value_NSCore$cc$Bool Bool))
       (bsq_term_NSCore$cc$Int (bsq_term_value_NSCore$cc$Int Int))
       (bsq_term_NSCore$cc$String (bsq_term_value_NSCore$cc$String String))
-      (bsq_term_tuple (bsq_term_tuple_entries BTermList))
+      (bsq_term_tuple (bsq_term_tuple_entries (Array Int BTupleEntry)))
       (bsq_term_record (bsq_term_record_entries (Array String BRecordEntry)))
       ;;BOXED_NOMINAL_DECLS;;
     )
@@ -28,8 +28,8 @@
     ;;NOMINAL_DECLS;;
 ))
 
-(declare-const bsq_tuple_entry_array_empty (Array String BTupleEntry))
-(assert (= bsq_tuple_entry_array_empty ((as const (Array String BTupleEntry)) (bsq_tuple_entry false bsq_term_none))))
+(declare-const bsq_tuple_entry_array_empty (Array Int BTupleEntry))
+(assert (= bsq_tuple_entry_array_empty ((as const (Array Int BTupleEntry)) (bsq_tuple_entry false bsq_term_none))))
 
 (declare-const bsq_record_entry_array_empty (Array String BRecordEntry))
 (assert (= bsq_record_entry_array_empty ((as const (Array String BRecordEntry)) (bsq_record_entry false bsq_term_none))))
@@ -49,10 +49,10 @@
 ))
 
 (declare-const bsq_term_true_const BTerm)
-(assert (= bsq_term_true_const (bsq_term_bool true)))
+(assert (= bsq_term_true_const (bsq_term_NSCore$cc$Bool true)))
 
 (declare-const bsq_term_false_const BTerm)
-(assert (= bsq_term_false_const (bsq_term_bool false)))
+(assert (= bsq_term_false_const (bsq_term_NSCore$cc$Bool false)))
 
 (declare-const BINT_MAX Int)
 (assert (= BINT_MAX 4503599627370495))
