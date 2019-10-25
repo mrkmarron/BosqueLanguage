@@ -42,24 +42,52 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE
 };
 
+enum class MIRNominalTypeEnum
+{
+    Invalid = 0x0,
+//%%NOMINAL_TYPE_ENUM_DECLARE
+};
+
+enum class BSQRepr
+{
+    Invalid = 0x0,
+    ReprNone,
+    ReprBool,
+    ReprInt,
+    ReprString,
+    ReprStringOf,
+    ReprTuple,
+    ReprRecord,
+    ReprEnum,
+    ReprIdKey,
+    ReprKeyed,
+    ReprTagged,
+    ReprObject,
+    //Extra compared to SMT since we need to use efficient encoding not slow rec version
+    ReprList,
+    ReprHashSet,
+    ReprHashMap
+};
+
 typedef void* Value;
 
-class RefCountBase
+class BSQRef
 {
 private:
     int64_t count;
+    const BSQRepr representation;
 
 public:
-    RefCountBase() : count(0) { ; }
-    RefCountBase(int64_t excount) : count(excount) { ; }
-    virtual ~RefCountBase() { ; }
+    BSQRef(BSQRepr representation) : count(0), representation(representation) { ; }
+    BSQRef(int64_t excount, BSQRepr representation) : count(excount), representation(representation) { ; }
+    virtual ~BSQRef() { ; }
 
-    inline static void increment(RefCountBase* rcb)
+    inline static void increment(BSQRef* rcb)
     {
         rcb->count++;
     }
 
-    inline static void decrement(RefCountBase* rcb)
+    inline static void decrement(BSQRef* rcb)
     {
         rcb->count--;
 
@@ -68,13 +96,18 @@ public:
             delete rcb;    
         }
     }
+
+    inline BSQRepr getRepr() const
+    {
+        return this->representation;
+    }
 };
 
 template <uint16_t k>
-class RefCountScope
+class BSQRefScope
 {
 private:
-    RefCountBase* opts[k];
+    BSQRef* opts[k];
 
 public:
     RefCountScope() : opts{nullptr}
@@ -86,19 +119,19 @@ public:
     {
         for(size_t i = 0; i < k; ++i)
         {
-            RefCountBase::decrement(opts[i]);
+            BSQRef::decrement(opts[i]);
         }
     }
 
     template<uint16_t pos>
-    inline RefCountBase** getCallerSlot() {
+    inline BSQRef** getCallerSlot() {
         return this->opts + pos; 
     }
 
     template <uint16_t pos>
-    inline void addAllocRef(RefCountBase* ptr)
+    inline void addAllocRef(BSQRef* ptr)
     {
-        RefCountBase::increment(ptr);
+        BSQRef::increment(ptr);
         this->opts[pos] = ptr;
     }
 };
@@ -106,89 +139,40 @@ public:
 class RefCountScopeCallMgr
 {
 public:
-    inline static void processCallReturnFast(RefCountBase** callerslot, RefCountBase* ptr)
+    inline static void processCallReturnFast(BSQRef** callerslot, BSQRef* ptr)
     {
-        RefCountBase::increment(ptr);
+        BSQRef::increment(ptr);
         *callerslot = ptr;
     }
 
-    inline static void processCallRefNoneable(RefCountBase** callerslot, Value ptr)
+    inline static void processCallRefNoneable(BSQRef** callerslot, Value ptr)
     {
         if(BSQ_IS_VALUE_NONNONE(ptr))
         {
-            RefCountBase::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
+            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
             *callerslot = BSQ_GET_VALUE_PTR(ptr, RefCountBase);
         }
     }
 
-    inline static void processCallRefAny(RefCountBase** callerslot, Value ptr)
+    inline static void processCallRefAny(BSQRef** callerslot, Value ptr)
     {
         if(BSQ_IS_VALUE_PTR(ptr) & BSQ_IS_VALUE_NONNONE(ptr))
         {
-            RefCountBase::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
+            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
             *callerslot = BSQ_GET_VALUE_PTR(ptr, RefCountBase);
         }
     }
 };
 
-class NSCore$cc$Any
-{
-public:
-    NSCore$cc$Any() = default;
-    virtual ~NSCore$cc$Any() = default;
-};
-
-class NSCore$cc$Some : virtual public NSCore$cc$Any
-{
-public:
-    NSCore$cc$Some() = default;
-    virtual ~NSCore$cc$Some() = default;
-};
-
-class NSCore$cc$Truthy : virtual public NSCore$cc$Any
-{
-public:
-    NSCore$cc$Truthy() = default;
-    virtual ~NSCore$cc$Truthy() = default;
-};
-
-class NSCore$cc$None : public RefCountBase, virtual public NSCore$cc$Truthy
-{
-public:
-    NSCore$cc$None() = default;
-    virtual ~NSCore$cc$None() = default;
-};
-
-class NSCore$cc$Parsable : virtual public NSCore$cc$Some
-{
-public:
-    NSCore$cc$Parsable() = default;
-    virtual ~NSCore$cc$Parsable() = default;
-};
-
-class NSCore$cc$Bool : public RefCountBase, virtual public NSCore$cc$Parsable, virtual public NSCore$cc$Truthy
-{
-public:
-    NSCore$cc$Bool() = default;
-    virtual ~NSCore$cc$Bool() = default;
-};
-
-class NSCore$cc$Int : public RefCountBase, virtual public NSCore$cc$Parsable
-{
-public:
-    NSCore$cc$Int() = default;
-    virtual ~NSCore$cc$Int() = default;
-};
-
-class NSCore$cc$String : public RefCountBase, virtual public NSCore$cc$Some
+class BSQString : public BSQRef
 {
 public:
     std::string sdata;
 
-    NSCore$cc$String(std::string& str) : sdata(str) { ; }
-    NSCore$cc$String(std::string&& str, int64_t excount) : RefCountBase(excount), sdata(move(str)) { ; }
+    BSQString(std::string& str) : BSQRef(BSQRepr::ReprString), sdata(str) { ; }
+    BSQString(std::string&& str, int64_t excount) : BSQRef(excount, BSQRepr::ReprString), sdata(move(str)) { ; }
 
-    virtual ~NSCore$cc$String() = default;
+    virtual ~BSQString() = default;
 };
 
 class NSCore$cc$StringOf : public RefCountBase, virtual public NSCore$cc$Some

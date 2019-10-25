@@ -84,12 +84,6 @@ concept StringOf provides Some {
 entity StringOf<T where Parsable> provides StringOf {
 }
 
-//<summary>Provide JSON support for (POD).</summary>
-concept JSON provides Some {
-    static stringify<T where Tuple | Record>(data: T): StringOf<T> # json_stringify
-    static tryParse<T where Tuple | Record>(str: String): T | None # json_tryparse
-}
-
 //<summary>Primitive GUID value.</summary>
 entity GUID provides Some {
 }
