@@ -22,12 +22,9 @@
 (declare-const repr_object Int) (assert (= repr_object 12))
 
 (declare-datatypes ( 
-      (BTerm 0) (BValue) (BTupleEntry 0) (BRecordEntry 0)
+      (BValue) (BTupleEntry 0) (BRecordEntry 0)
       ;;NOMINAL_DECLS_FWD;;
     ) (
-    (
-      (bsqterm (bsqterm_repr Int) (bsqterm_value BValue))
-    )
     (
       (bsqvalue_none) 
       (bsqvalue_bool (bsqvalue_bool_value Bool))
@@ -37,9 +34,7 @@
       (bsqvalue_tuple (bsqvalue_tuple_entries (Array Int BTupleEntry)))
       (bsqvalue_record (bsqvalue_record_entries (Array String BRecordEntry)))
       (bsqvalue_enum (bsqvalue_enum_type String) (bsqvalue_enum_value String))
-      (bsqvalue_idkey (bsqvalue_idkey_type String) (bsqvalue_idkey_value BValue))
-      (bsqvalue_keyed_or_tagged (bsqvalue_keyed_or_tagged_type String) (bsqvalue_keyed_or_tagged_key BValue) (bsqvalue_keyed_or_tagged_value BTerm))
-      ;;BOXED_NOMINAL_DECLS;;
+      (bsqvalue_object (bsqvalue_object_entries (Array String BValue)))
     )
     (
       (bsqtuple_entry (bsqtuple_entry_valid Bool) (bsqtuple_entry_value BTerm)) 

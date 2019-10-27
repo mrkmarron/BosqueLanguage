@@ -48,38 +48,17 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
-enum class BSQRepr
-{
-    Invalid = 0x0,
-    ReprNone,
-    ReprBool,
-    ReprInt,
-    ReprString,
-    ReprStringOf,
-    ReprTuple,
-    ReprRecord,
-    ReprEnum,
-    ReprIdKey,
-    ReprKeyed,
-    ReprTagged,
-    ReprObject,
-    //Extra compared to SMT since we need to use efficient encoding not slow rec version
-    ReprList,
-    ReprHashSet,
-    ReprHashMap
-};
-
 typedef void* Value;
 
 class BSQRef
 {
 private:
     int64_t count;
-    const BSQRepr representation;
+    const MIRNominalTypeEnum ntype;
 
 public:
-    BSQRef(BSQRepr representation) : count(0), representation(representation) { ; }
-    BSQRef(int64_t excount, BSQRepr representation) : count(excount), representation(representation) { ; }
+    BSQRef(MIRNominalTypeEnum ntype) : count(0), ntype(ntype) { ; }
+    BSQRef(int64_t excount, MIRNominalTypeEnum ntype) : count(excount), ntype(ntype) { ; }
     virtual ~BSQRef() { ; }
 
     inline static void increment(BSQRef* rcb)
@@ -97,10 +76,20 @@ public:
         }
     }
 
-    inline BSQRepr getRepr() const
+    constexpr static MIRNominalTypeEnum s_stringtype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_stringoftype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_tupletype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_recordtype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_objecttype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+
+    inline MIRNominalTypeEnum getNominalType() const
     {
-        return this->representation;
+        return this->ntype;
     }
+
+    //%%ALL_VFIELD_ACCESS_DECLS
+
+    //%%ALL_VCALL_DECLS
 };
 
 template <uint16_t k>
@@ -169,8 +158,8 @@ class BSQString : public BSQRef
 public:
     std::string sdata;
 
-    BSQString(std::string& str) : BSQRef(BSQRepr::ReprString), sdata(str) { ; }
-    BSQString(std::string&& str, int64_t excount) : BSQRef(excount, BSQRepr::ReprString), sdata(move(str)) { ; }
+    BSQString(std::string& str) : BSQRef(BSQRef::s_stringtype), sdata(str) { ; }
+    BSQString(std::string&& str, int64_t excount) : BSQRef(excount, BSQRef::s_stringtype), sdata(move(str)) { ; }
 
     virtual ~BSQString() = default;
 };
