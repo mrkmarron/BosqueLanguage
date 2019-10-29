@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { sanitizeForCpp, NOT_IMPLEMENTED, isInlinableType, getInlinableType, isUniqueEntityType, filenameClean } from "./cpputils";
+import { NOT_IMPLEMENTED, filenameClean, sanitizeStringForCpp } from "./cpputils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -31,22 +31,16 @@ class CPPBodyEmitter {
         this.currentRType = typegen.noneType;
     }
 
-    generateInit(trgt: MIRRegisterArgument, value: string): string {
-        const ttype = this.getArgType(trgt);
-        if (isInlinableType(ttype)) {
-            if (ttype.trkey === "NSCore::Bool") {
-                return `${this.varToCppName(trgt)} = ${value};`;
-            }
-            else {
-                return `${this.varToCppName(trgt)} = ${value};`;
-            }
-        }
-        else if (isUniqueEntityType(ttype)) {
-            return `${this.varToCppName(trgt)} = ${value};`;
-        }
-        else {
-            return `${this.varToCppName(trgt)} = ${value};`;
-        }
+    labelToCpp(label: string): string {
+        return sanitizeStringForCpp(label);
+    }
+
+    varNameToCppName(name: string): string {
+        return sanitizeStringForCpp(name);
+    }
+
+    varToCppName(varg: MIRRegisterArgument): string {
+        return this.varNameToCppName(varg.nameID);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -69,38 +63,30 @@ class CPPBodyEmitter {
         }
     }
 
-    labelToCpp(label: string): string {
-        return sanitizeForCpp(label);
-    }
-
-    varNameToCppName(name: string): string {
-        return sanitizeForCpp(name);
-    }
-
-    varToCppName(varg: MIRRegisterArgument): string {
-        return sanitizeForCpp(varg.nameID);
-    }
-
-    constNameToCppName(cname: string): string {
-        return sanitizeForCpp(cname);
-    }
-
-    invokenameToCppName(invk: string): string {
-        return sanitizeForCpp(invk);
-    }
-
     boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
-        if (isInlinableType(from) && !isInlinableType(into)) {
-            const itype = getInlinableType(into);
-            if (itype.trkey === "NSCore::Bool") {
+        if (CPPTypeEmitter.isPrimitiveType(from)) {
+            if (CPPTypeEmitter.isPrimitiveType(into)) {
+                return exp;
+            }
+
+            if (into.trkey === "NSCore::Bool") {
                 return `BSQ_BOX_VALUE_BOOL(${exp})`;
             }
+            else if (into.trkey === "NSCore::Int") {
+                return `BSQ_BOX_VALUE_Int(${exp})`;
+            }
             else {
-                return `BSQ_BOX_VALUE_INT(${exp})`;
+                return exp;
             }
         }
-        else if (isUniqueEntityType(from) && !isUniqueEntityType(into)) {
-            return `${exp}`;
+        else if (CPPTypeEmitter.isFixedTupleType(from)) {
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+        }
+        else if (CPPTypeEmitter.isFixedRecordType(from)) {
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+        }
+        else if (CPPTypeEmitter.isUEntityType(from)) {
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
         }
         else {
             return exp;

@@ -3,8 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRConceptTypeDecl, MIRInvokeDecl } from "../../compiler/mir_assembly";
-import { isInlinableType, sanitizeForCpp, isUniqueEntityType } from "./cpputils";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRConceptTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { sanitizeStringForCpp } from "./cpputils";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -25,6 +25,37 @@ class CPPTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    static isPrimitiveType(tt: MIRType): boolean {
+        if (tt.options.length !== 1) {
+            return false;
+        }
+
+        const uname = tt.options[0].trkey;
+        return (uname === "NSCore::Bool" || uname === "NSCore::Int" ||  uname === "NSCore::String");
+    }
+
+    static isFixedTupleType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
+            return false;
+        }
+
+        const tup = tt.options[0] as MIRTupleType;
+        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+    }
+
+    static isFixedRecordType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
+            return false;
+        }
+
+        const tup = tt.options[0] as MIRRecordType;
+        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+    }
+
+    static isUEntityType(tt: MIRType): boolean {
+        return !CPPTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
     }
 
     typeToCPPType(tt: MIRType): string {

@@ -48,6 +48,16 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
+enum class MIRRecordTypeEnum
+{
+    Invalid = 0x0,
+//%%RECORD_TYPE_ENUM_DECLARE
+};
+
+typedef uint16_t MIRRecordTypePropertyIndex;
+constexpr MIRRecordTypePropertyIndex MIRRecordTypePropertyIndex$$alwaysMissing = UINT16_MAX;
+//%%RECORD_TYPE_PROPERTY_INDEX_ENUM_DECLARE
+
 typedef void* Value;
 
 class BSQRef
@@ -138,10 +148,12 @@ public:
     }
 
     template <uint16_t pos>
-    inline void addAllocRef(BSQRef* ptr)
+    inline BSQRef* addAllocRef(BSQRef* ptr)
     {
         BSQRef::increment(ptr);
         this->opts[pos] = ptr;
+
+        return ptr;
     }
 };
 
@@ -178,7 +190,7 @@ class BSQString : public BSQRef
 public:
     std::string sdata;
 
-    BSQString(std::string& str) : BSQRef(BSQRef::s_stringtype), sdata(str) { ; }
+    BSQString(const std::string& str) : BSQRef(BSQRef::s_stringtype), sdata(str) { ; }
     BSQString(std::string&& str, int64_t excount) : BSQRef(excount, BSQRef::s_stringtype), sdata(move(str)) { ; }
 
     virtual ~BSQString() = default;
@@ -211,19 +223,21 @@ public:
     }
 };
 
-typedef std::vector<Value> BSQTupleFixed;
-class BSQTupleFixedOps
+template <uint16_t k>
+class BSQTupleFixed
 {
 public:
+    Value entries[k];
+
     template <uint16_t idx>
-    inline static Value atFixed(const BSQTupleFixed& tup)
+    inline Value atFixed()
     {
-        return (idx < tup.size()) ? tup[idx] : BSQ_VALUE_NONE;
+        return (idx < k) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
 
-    inline static Value atVar(const BSQTupleFixed& tup, uint16_t idx)
+    inline Value atVar(uint16_t idx)
     {
-        return (idx < tup.size()) ? tup[idx] : BSQ_VALUE_NONE;
+        return (idx < k) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
 };
 
@@ -260,32 +274,44 @@ public:
     }
 };
 
-typedef std::vector<std::pair<MIRPropertyEnum, Value>> BSQRecordFixed;
-class BSQRecordFixedOps
+template <MIRRecordTypeEnum rt, uint16_t k>
+class BSQRecordFixed
 {
 public:
-    template <uint16_t pos, MIRPropertyEnum p>
-    inline static Value atKnown(const BSQRecordFixed& rec)
+    Value entries[K];
+
+    template <MIRRecordTypePropertyIndex pidx>
+    inline Value atFixed()
     {
-        BSQ_ASSERT(pos >= tup.size() || rec[pos].first == p, "Bad index -- atKnown");
-        return (pos < rec.size()) ? rec[pos].second : BSQ_VALUE_NONE;
+        return (pidx < k) ? this->entries[pidx] : BSQ_VALUE_NONE;
     }
 
-    template <MIRPropertyEnum p>
-    inline static Value atFixed(const BSQRecordFixed& rec)
+    inline Value atVar( MIRRecordTypePropertyIndex pidx)
     {
-        auto iter = std::find_if(rec.cbegin(), rec.cend() [](const std::pair<MIRPropertyEnum, Value>& entry) {
-            return entry.first == p;
-        });
-        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+        return (pidx < k) ? this->entries[pidx] : BSQ_VALUE_NONE;
     }
+};
 
-    inline static Value atVar(const BSQRecordFixed& rec, MIRPropertyEnum p)
+class BSQArray : public BSQRef
+{
+public:
+   const std::vector<Value> contents;
+
+    BSQArray(std::vector<Value>&& contents) : BSQRef(BSQRef::s_arraytype), contents(move(contents)) { ; }
+
+    virtual ~BSQArray()
     {
-        auto iter = std::find_if(rec.cbegin(), rec.cend() [p](const std::pair<MIRPropertyEnum, Value>& entry) {
-            return entry.first == p;
-        });
-        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+        for(size_t i = 0; i < this->contents.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->contents[i])
+        }
     }
+};
+
+class BSQObject : public BSQRef
+{
+public:
+    BSQObject() : BSQRef(BSQRef::s_objecttype), entries(move(entries)) { ; }
+    virtual ~BSQObject() = default;
 };
 } // namespace BSQ

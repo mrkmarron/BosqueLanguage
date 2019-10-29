@@ -8,8 +8,8 @@
 
 (declare-datatypes ( 
       (BTerm) (BTupleEntry 0) (BRecordEntry 0) (BRecordPropertyList 0)
-      (BTupleFixed 0)
-      (BRecordFixed 0)
+      ;;FIXED_TUPLE_DECLS_FWD;;
+      ;;FIXED_RECORD_DECLS_FWD;;
       ;;NOMINAL_DECLS_FWD;;
     ) (
     (
@@ -17,8 +17,8 @@
       (bsqterm_bool (bsqterm_bool_value Bool))
       (bsqterm_int (bsqterm_int_value Int))
       (bsqterm_string (bsqterm_string_value String))
-      (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTerm)))
-      (bsqterm_record (bsqterm_record_properties BRecordPropertyList) (bsqterm_record_entries (Array String BTerm)))
+      (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTupleEntry)))
+      (bsqterm_record (bsqterm_record_properties BRecordPropertyList) (bsqterm_record_entries (Array String BRecordEntry)))
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_entries (Array String BTerm)))
     )
@@ -29,15 +29,12 @@
       (bsqrecord_entry (bsqrecord_entry_valid Bool) (bsqrecord_entry_value BTerm)) 
     )
     ( 
+    ( 
       (bsqrecord_property_list_empty) 
       (bsqrecord_property_list_const (bsqrecord_property_list_head String) (bsqrecord_property_list_tail BRecordPropertyList)) 
     )
-    (
-      (bsq_tuple_fixed (bsq_tuple_fixed_entries (Array Int BTerm)))
-    )
-    (
-      (bsq_record_fixed (bsq_record_fixed_entries (Array String BTerm)))
-    )
+    ;;FIXED_TUPLE_DECLS;;
+    ;;FIXED_RECORD_DECLS;;
     ;;NOMINAL_DECLS;;
 ))
 
@@ -45,11 +42,11 @@
 (declare-const bsqterm_true_const BTerm) (assert (= bsqterm_true_const (bsqterm_bool true)))
 (declare-const bsqterm_false_const BTerm) (assert (= bsqterm_false_const (bsqterm_bool false)))
 
-(declare-const bsqtuple_array_empty (Array Int BTerm))
-(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
+(declare-const bsqtuple_array_empty (Array Int BTupleEntry))
+(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) (bsqtuple_entry false bsqterm_none_const))))
 
-(declare-const bsqrecord_array_empty (Array String BTerm))
-(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
+(declare-const bsqrecord_array_empty (Array String BRecordEntry))
+(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) (bsqrecord_entry false bsqterm_none_const))))
 
 (declare-const bsqarray_array_empty (Array Int BTerm))
 (assert (= bsqarray_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
@@ -62,16 +59,16 @@
 
 (declare-datatypes ( 
       (Result@Bool 0) (Result@Int 0) (Result@String 0) (Result@BTerm 0)
-      (Result@TupleFixed 0)
-      (Result@RecordFixed 0)
+      ;;FIXED_TUPLE_RESULT_FWD;;
+      ;;FIXED_RECORD_RESULT_FWD;;
       ;;NOMINAL_RESULT_FWD;;
     ) (
     ( (result_success@Bool (result_success_value@Bool Bool)) (result_error@Bool (result_error_code@Bool ErrorCode)) )
     ( (result_success@Int (result_success_value@Int Int)) (result_error@Int (result_error_code@Int ErrorCode)) )
     ( (result_success@String (result_success_value@String String)) (result_error@String (result_error_code@String ErrorCode)) )
     ( (result_success@BTerm (result_success_value@BTerm BTerm)) (result_error@BTerm (result_error_code@BTerm ErrorCode)) )
-    ( (result_success@TupleFixed (result_success_value@TupleFixed BTerm)) (result_error@TupleFixed (result_error_code@TupleFixed ErrorCode)) )
-    ( (result_success@RecordFixed (result_success_value@RecordFixed BTerm)) (result_error@RecordFixed (result_error_code@RecordFixed ErrorCode)) )
+    ;;FIXED_TUPLE_RESULT;;
+    ;;FIXED_RECORD_RESULT;;
     ;;NOMINAL_RESULT;;
 ))
 

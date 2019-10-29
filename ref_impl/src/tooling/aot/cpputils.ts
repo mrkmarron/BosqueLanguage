@@ -7,7 +7,7 @@ function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
 }
 
-function sanitizeForCpp(name: string): string {
+function sanitizeStringForCpp(name: string): string {
     return name
     .replace(/#/g, "$h$")
     .replace(/::/g, "$cc$")
@@ -34,6 +34,6 @@ function filenameClean(fname: string): string {
 
 export {
     NOT_IMPLEMENTED,
-    sanitizeForCpp,
+    sanitizeStringForCpp,
     filenameClean
 };

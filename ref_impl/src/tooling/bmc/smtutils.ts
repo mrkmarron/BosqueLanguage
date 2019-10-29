@@ -7,7 +7,7 @@ function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
 }
 
-function sanitizeForSMT(name: string): string {
+function sanitizeStringForSMT(name: string): string {
     return name
     .replace(/#/g, "$h$")
     .replace(/::/g, "$cc$")
@@ -30,5 +30,5 @@ function sanitizeForSMT(name: string): string {
 
 export {
     NOT_IMPLEMENTED,
-    sanitizeForSMT
+    sanitizeStringForSMT
 };

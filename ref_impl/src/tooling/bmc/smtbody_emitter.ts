@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { NOT_IMPLEMENTED, isInlinableType, getInlinableType, sanitizeForSMT, isUniqueEntityType, getUniqueEntityType } from "./smtutils";
+import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
@@ -62,11 +62,19 @@ class SMTBodyEmitter {
         return new SMTValue(`(result_error$${this.typegen.typeToSMTType(this.currentRType)} (result_bmc ${errid}))`);
     }
 
-    getBMCGas(invkey: MIRBodyKey): number {
-        const rc = this.callg.recursive.findIndex((scc) => scc.has(invkey));
+    getBMCGas(key: string): number {
+        const rc = this.callg.recursive.findIndex((scc) => scc.has(key));
         const bmcid = [...(this.callg.recursive[rc] as Set<MIRBodyKey>)].sort()[0];
 
         return this.bmcDepths.get(bmcid) as number;
+    }
+
+    varNameToSMTName(name: string): string {
+        return sanitizeStringForSMT(name);
+    }
+
+    varToSMTName(varg: MIRRegisterArgument): string {
+        return this.varNameToSMTName(varg.nameID);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -89,36 +97,29 @@ class SMTBodyEmitter {
         }
     }
 
-    varNameToSMTName(name: string): string {
-        return sanitizeForSMT(name);
-    }
-
-    varToSMTName(varg: MIRRegisterArgument): string {
-        return sanitizeForSMT(varg.nameID);
-    }
-
-    constNameToSMTName(cname: string): string {
-        return sanitizeForSMT(cname);
-    }
-
-    invokenameToSMTName(invk: string): string {
-        return sanitizeForSMT(invk);
-    }
-
     boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (isInlinableType(from) && !isInlinableType(into)) {
-            const itype = getInlinableType(into);
-            if (itype.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsq_term_NSCore$cc$Bool ${exp.emit()})`);
+        if (SMTTypeEmitter.isPrimitiveType(from)) {
+            if (SMTTypeEmitter.isPrimitiveType(into)) {
+                return exp;
             }
-            else if (itype.trkey === "NSCore::Int") {
-                return new SMTValue(`(bsq_term_NSCore$cc$Int ${exp.emit()})`);
+
+            if (into.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
+            }
+            else if (into.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsqterm_int ${exp.emit()})`);
             }
             else {
-                return new SMTValue(`(bsq_term_NSCore$cc$String ${exp.emit()})`);
+                return new SMTValue(`(bsqterm_string ${exp.emit()})`);
             }
         }
-        else if (isUniqueEntityType(from) && !isUniqueEntityType(into)) {
+        else if (SMTTypeEmitter.isFixedTupleType(from)) {
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+        }
+        else if (SMTTypeEmitter.isFixedRecordType(from)) {
+            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+        }
+        else if (SMTTypeEmitter.isUEntityType(from)) {
             return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
         }
         else {
