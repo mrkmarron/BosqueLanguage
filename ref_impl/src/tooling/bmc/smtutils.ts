@@ -3,36 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRType, MIRTypeOption, MIREntityType } from "../../compiler/mir_assembly";
-
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
-}
-
-function isInlinableType(t: MIRType | MIRTypeOption): boolean {
-    if (t instanceof MIRType && t.options.length !== 1) {
-        return false;
-    }
-
-    const ut = (t instanceof MIRType) ? t.options[0] : t;
-    return (ut.trkey === "NSCore::Bool" || ut.trkey === "NSCore::Int" || ut.trkey === "NSCore::String");
-}
-
-function getInlinableType(t: MIRType | MIRTypeOption): MIRTypeOption {
-    return (t instanceof MIRType) ? t.options[0] : t;
-}
-
-function isUniqueEntityType(t: MIRType | MIRTypeOption): boolean {
-    if (t instanceof MIRType && t.options.length !== 1) {
-        return false;
-    }
-
-    const ut = (t instanceof MIRType) ? t.options[0] : t;
-    return ut instanceof MIREntityType;
-}
-
-function getUniqueEntityType(t: MIRType | MIRTypeOption): MIREntityType {
-    return ((t instanceof MIRType) ? t.options[0] : t) as MIREntityType;
 }
 
 function sanitizeForSMT(name: string): string {
@@ -58,9 +30,5 @@ function sanitizeForSMT(name: string): string {
 
 export {
     NOT_IMPLEMENTED,
-    isInlinableType,
-    getInlinableType,
-    isUniqueEntityType,
-    getUniqueEntityType,
     sanitizeForSMT
 };

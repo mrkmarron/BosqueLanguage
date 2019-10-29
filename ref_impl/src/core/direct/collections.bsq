@@ -12,6 +12,12 @@ concept Collection<T> provides Object {
 
 //<summary>A List entity.</summary>
 entity List<T> provides Collection<T> {
+    field value: T;
+    field tail: List<T>?;
 }
 
-
+entity Set<T where Indexable> provides Collection<T> {
+    field value: T;
+    field left: Set<T>?;
+    field right: Set<T>?;
+}

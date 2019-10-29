@@ -40,7 +40,7 @@ concept Parsable provides Any {
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
 concept POD provides Any {
-    static stringify<T where POD>(data: T): String # pod_stringify
+    static stringify<T where POD>(data: T): ValidatedString<T> # pod_stringify //note special case where T is ValidatedString<X> then type system should know identity -- ValidatedString<ValidatedString<ZipCode>> = ValidatedString<Zipcode>
     static bufferify<T where POD>(data: T): PODBuffer<T> # pod_bufferify
 
     static tryParseAs<T where POD>(data: String | PODBuffer): Result<T> # pod_trypodparseas
@@ -112,16 +112,18 @@ concept Validator provides Any {
 }
 
 //<summary>An efficient buffer encoding for POD data.</summary>
-entiry PODBuffer<T> provides Some {
+entity PODBuffer<T where Validator> provides Some {
+    field podbuffer_value: String;
 }
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, POD, Some {
+    field guid_value: String;
 }
 
 //<summary>Primitive regex value.</summary>
-entity Regex provides Some, Parsable {
-    override static tryParse(str: String): Some? # regex_tryparse
+entity Regex provides Some {
+    field regex_value: String;
 
     method match(str: String, start?: Int, end?: Int): { start: Int, end: Int }? # regex_match
 
@@ -148,6 +150,7 @@ concept PODRecord provides KeyType, POD, Record {
 
 //<summary>All actual arrays implicitly provide this concept.</summary>
 concept Array provides Some {
+    static length(a: Array): Int # array_length
 }
 
 //<summary>All actual POD arrays implicitly provide this concept.</summary>
@@ -159,11 +162,11 @@ concept Object provides Some {
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
-concept Enum provides KeyType, POD {
+concept Enum provides KeyType, POD, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
-concept IdKey provides KeyType, POD {
+concept IdKey provides KeyType, POD, Some {
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>

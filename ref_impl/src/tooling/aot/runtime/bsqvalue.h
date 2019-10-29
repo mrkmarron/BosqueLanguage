@@ -76,11 +76,31 @@ public:
         }
     }
 
+    inline static Value checkedIncrement(Value v)
+    {
+        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+        }
+
+        return v;
+    }
+
+    inline static void checkedDecrement(Value v)
+    {
+        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef::decrement(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+        }
+
+        return v;
+    }
+
     constexpr static MIRNominalTypeEnum s_stringtype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_stringoftype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_tupletype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_recordtype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_objecttype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_tupletype = /*%%NOMINAL_TUPLE*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_recordtype = /*%%NOMINAL_RECORD*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_arraytype = /*%%NOMINAL_ARRAY*/MIRNominalTypeEnum::Invalid;
+    constexpr static MIRNominalTypeEnum s_objecttype = /*%%NOMINAL_OBJECT*/MIRNominalTypeEnum::Invalid;
 
     inline MIRNominalTypeEnum getNominalType() const
     {
@@ -138,8 +158,8 @@ public:
     {
         if(BSQ_IS_VALUE_NONNONE(ptr))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
-            *callerslot = BSQ_GET_VALUE_PTR(ptr, RefCountBase);
+            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+            *callerslot = BSQ_GET_VALUE_PTR(ptr, BSQRef);
         }
     }
 
@@ -147,8 +167,8 @@ public:
     {
         if(BSQ_IS_VALUE_PTR(ptr) & BSQ_IS_VALUE_NONNONE(ptr))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, RefCountBase));
-            *callerslot = BSQ_GET_VALUE_PTR(ptr, RefCountBase);
+            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+            *callerslot = BSQ_GET_VALUE_PTR(ptr, BSQRef);
         }
     }
 };
@@ -164,38 +184,108 @@ public:
     virtual ~BSQString() = default;
 };
 
-class NSCore$cc$StringOf : public RefCountBase, virtual public NSCore$cc$Some
+class BSQTuple : public BSQRef
 {
 public:
-    NSCore$cc$StringOf() = default;
-    virtual ~NSCore$cc$StringOf() = default;
+    const std::vector<Value> entries;
 
-    virtual const char* getTypeOfName() const = 0;
-    virtual NSCore$cc$String* getString() const = 0;
+    BSQTuple(std::vector<Value>&& entries) : BSQRef(BSQRef::s_tupletype), entries(move(entries)) { ; }
+
+    virtual ~BSQTuple()
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i])
+        }
+    }
+
+    template <uint16_t idx>
+    Value atFixed() const
+    {
+        return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
+    }
+
+    Value atVar(uint16_t idx) const
+    {
+        return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
+    }
 };
 
-class NSCore$cc$Tuple : public RefCountBase, virtual public NSCore$cc$Some
+typedef std::vector<Value> BSQTupleFixed;
+class BSQTupleFixedOps
 {
 public:
-    const std::vector<Value> m_entries;
+    template <uint16_t idx>
+    inline static Value atFixed(const BSQTupleFixed& tup)
+    {
+        return (idx < tup.size()) ? tup[idx] : BSQ_VALUE_NONE;
+    }
 
-    NSCore$cc$Tuple(std::vector<Value>&& entries) : m_entries(move(entries)) { ; }
-    virtual ~NSCore$cc$Tuple() = default;
+    inline static Value atVar(const BSQTupleFixed& tup, uint16_t idx)
+    {
+        return (idx < tup.size()) ? tup[idx] : BSQ_VALUE_NONE;
+    }
 };
 
-class NSCore$cc$Record : public RefCountBase, virtual public NSCore$cc$Some
+class BSQRecord : public BSQRef
 {
 public:
-    const std::vector<std::pair<MIRPropertyEnum, Value>> m_entries;
+    const std::vector<std::pair<MIRPropertyEnum, Value>> entries;
 
-    NSCore$cc$Record(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : m_entries(move(entries)) { ; }
-    virtual ~NSCore$cc$Record() = default;
+    BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(BSQRef::s_recordtype), entries(move(entries)) { ; }
+
+    virtual ~BSQRecord()
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i].second)
+        }
+    }
+
+    template <MIRPropertyEnum p>
+    Value atFixed() const
+    {
+        auto iter = std::find_if(this->entries.cbegin(), this->entries.cend() [](const std::pair<MIRPropertyEnum, Value>& entry) {
+            return entry.first == p;
+        });
+        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+    }
+
+    Value atVar(MIRPropertyEnum p) const
+    {
+        auto iter = std::find_if(this->entries.cbegin(), this->entries.cend() [p](const std::pair<MIRPropertyEnum, Value>& entry) {
+            return entry.first == p;
+        });
+        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+    }
 };
 
-class NSCore$cc$Object : public RefCountBase, virtual public NSCore$cc$Some
+typedef std::vector<std::pair<MIRPropertyEnum, Value>> BSQRecordFixed;
+class BSQRecordFixedOps
 {
 public:
-    NSCore$cc$Object() = default;
-    virtual ~NSCore$cc$Object() = default;
+    template <uint16_t pos, MIRPropertyEnum p>
+    inline static Value atKnown(const BSQRecordFixed& rec)
+    {
+        BSQ_ASSERT(pos >= tup.size() || rec[pos].first == p, "Bad index -- atKnown");
+        return (pos < rec.size()) ? rec[pos].second : BSQ_VALUE_NONE;
+    }
+
+    template <MIRPropertyEnum p>
+    inline static Value atFixed(const BSQRecordFixed& rec)
+    {
+        auto iter = std::find_if(rec.cbegin(), rec.cend() [](const std::pair<MIRPropertyEnum, Value>& entry) {
+            return entry.first == p;
+        });
+        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+    }
+
+    inline static Value atVar(const BSQRecordFixed& rec, MIRPropertyEnum p)
+    {
+        auto iter = std::find_if(rec.cbegin(), rec.cend() [p](const std::pair<MIRPropertyEnum, Value>& entry) {
+            return entry.first == p;
+        });
+        return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
+    }
 };
 } // namespace BSQ
