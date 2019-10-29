@@ -7,7 +7,7 @@
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
 (declare-datatypes ( 
-      (BTerm) (BTupleEntry 0) (BRecordEntry 0) (BRecordPropertyList 0)
+      (BTerm)
       ;;FIXED_TUPLE_DECLS_FWD;;
       ;;FIXED_RECORD_DECLS_FWD;;
       ;;NOMINAL_DECLS_FWD;;
@@ -17,21 +17,10 @@
       (bsqterm_bool (bsqterm_bool_value Bool))
       (bsqterm_int (bsqterm_int_value Int))
       (bsqterm_string (bsqterm_string_value String))
-      (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTupleEntry)))
-      (bsqterm_record (bsqterm_record_properties BRecordPropertyList) (bsqterm_record_entries (Array String BRecordEntry)))
+      (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTerm)))
+      (bsqterm_record (bsqterm_record_size Int) (bsqterm_record_properties (Array Int String)) (bsqterm_record_entries (Array String BTerm)))
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_entries (Array String BTerm)))
-    )
-    (
-      (bsqtuple_entry (bsqtuple_entry_valid Bool) (bsqtuple_entry_value BTerm)) 
-    )
-    ( 
-      (bsqrecord_entry (bsqrecord_entry_valid Bool) (bsqrecord_entry_value BTerm)) 
-    )
-    ( 
-    ( 
-      (bsqrecord_property_list_empty) 
-      (bsqrecord_property_list_const (bsqrecord_property_list_head String) (bsqrecord_property_list_tail BRecordPropertyList)) 
     )
     ;;FIXED_TUPLE_DECLS;;
     ;;FIXED_RECORD_DECLS;;
@@ -42,11 +31,14 @@
 (declare-const bsqterm_true_const BTerm) (assert (= bsqterm_true_const (bsqterm_bool true)))
 (declare-const bsqterm_false_const BTerm) (assert (= bsqterm_false_const (bsqterm_bool false)))
 
-(declare-const bsqtuple_array_empty (Array Int BTupleEntry))
-(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) (bsqtuple_entry false bsqterm_none_const))))
+(declare-const bsqtuple_array_empty (Array Int BTerm))
+(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
 
-(declare-const bsqrecord_array_empty (Array String BRecordEntry))
-(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) (bsqrecord_entry false bsqterm_none_const))))
+(declare-const bsqrecord_array_empty (Array String BTerm))
+(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
+
+(declare-const bsqrecord_property_array_empty (Array Int String))
+(assert (= bsqrecord_property_array_empty ((as const (Array Int String)) "[INVALID]")))
 
 (declare-const bsqarray_array_empty (Array Int BTerm))
 (assert (= bsqarray_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))

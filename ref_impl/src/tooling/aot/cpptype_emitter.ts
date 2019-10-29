@@ -5,6 +5,7 @@
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRConceptTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForCpp } from "./cpputils";
+import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -25,6 +26,10 @@ class CPPTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    getMIRType(tkey: MIRResolvedTypeKey): MIRType {
+        return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
     static isPrimitiveType(tt: MIRType): boolean {
@@ -55,24 +60,74 @@ class CPPTypeEmitter {
     }
 
     static isUEntityType(tt: MIRType): boolean {
-        return !CPPTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
+        return (tt.trkey !== "NSCore::None") && !CPPTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
     }
 
-    typeToCPPType(tt: MIRType): string {
-        if (isInlinableType(tt)) {
-            if (tt.trkey === "NSCore::Bool") {
+    static getPrimitiveType(tt: MIRType): MIREntityType {
+        return tt.options[0] as MIREntityType;
+    }
+
+    static getFixedTupleType(tt: MIRType): MIRTupleType {
+        return tt.options[0] as MIRTupleType;
+    }
+
+    static getFixedRecordType(tt: MIRType): MIRRecordType {
+        return tt.options[0] as MIRRecordType;
+    }
+
+    static getUEntityType(tt: MIRType): MIREntityType {
+        return tt.options[0] as MIREntityType;
+    }
+
+    static isRefableReturnType(tt: MIRType): boolean {
+        if (tt.options.length !== 1) {
+            return true;
+        }
+
+        const uname = tt.options[0].trkey;
+        if (uname === "NSCore::None" || uname === "NSCore::Bool" ||  uname === "NSCore::Int") {
+            return false;
+        }
+
+        if (CPPTypeEmitter.isFixedTupleType(tt) || CPPTypeEmitter.isFixedRecordType(tt)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    typeToCPPBaseType(ttype: MIRType, declspec?: boolean): string {
+        if (CPPTypeEmitter.isPrimitiveType(ttype)) {
+            if (ttype.trkey === "NSCore::Bool") {
                 return "bool";
             }
-            else {
+            else if (ttype.trkey === "NSCore::Int") {
                 return "int64_t";
             }
+            else {
+                return "BSQString" + (declspec ? "*" : "");
+            }
         }
-        else if (isUniqueEntityType(tt)) {
-            return `${sanitizeForCpp(tt.trkey)}*`;
+        else if (CPPTypeEmitter.isFixedTupleType(ttype)) {
+            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>`;
+        }
+        else if (CPPTypeEmitter.isFixedRecordType(ttype)) {
+            return `BSQRecordFixed<MIRRecordTypeEnum::${sanitizeStringForCpp(ttype.trkey)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
+        }
+        else if (CPPTypeEmitter.isUEntityType(ttype)) {
+            return sanitizeStringForCpp(ttype.trkey) + (declspec ? "*" : "");
         }
         else {
             return "Value";
         }
+    }
+
+    generateFixedTupleAccessor(idx: number): string {
+        return `.atFixed<${idx}>()`;
+    }
+
+    generateFixedRecordAccessor(ttype: MIRType, p: string): string {
+        return `.atFixed<${CPPTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
     }
 
     generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {

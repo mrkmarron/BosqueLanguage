@@ -6,6 +6,9 @@
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
+import * as assert from "assert";
+import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
+
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
 
@@ -25,6 +28,10 @@ class SMTTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    getMIRType(tkey: MIRResolvedTypeKey): MIRType {
+        return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
     static isPrimitiveType(tt: MIRType): boolean {
@@ -55,7 +62,65 @@ class SMTTypeEmitter {
     }
 
     static isUEntityType(tt: MIRType): boolean {
-        return !SMTTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
+        return (tt.trkey !== "NSCore::None") && !SMTTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
+    }
+
+    static getPrimitiveType(tt: MIRType): MIREntityType {
+        return tt.options[0] as MIREntityType;
+    }
+
+    static getFixedTupleType(tt: MIRType): MIRTupleType {
+        return tt.options[0] as MIRTupleType;
+    }
+
+    static getFixedRecordType(tt: MIRType): MIRRecordType {
+        return tt.options[0] as MIRRecordType;
+    }
+
+    static getUEntityType(tt: MIRType): MIREntityType {
+        return tt.options[0] as MIREntityType;
+    }
+
+    typeToSMTCategory(ttype: MIRType): string {
+        if (SMTTypeEmitter.isPrimitiveType(ttype)) {
+            if (ttype.trkey === "NSCore::Bool") {
+                return "Bool";
+            }
+            else if (ttype.trkey === "NSCore::Int") {
+                return "Int";
+            }
+            else {
+                return "String";
+            }
+        }
+        else if (SMTTypeEmitter.isFixedTupleType(ttype)) {
+            return "bsqtuple_" + (ttype.options[0] as MIRTupleType).entries.length;
+        }
+        else if (SMTTypeEmitter.isFixedRecordType(ttype)) {
+            return "bsqrecord_" + sanitizeStringForSMT(ttype.trkey);
+        }
+        else if (SMTTypeEmitter.isUEntityType(ttype)) {
+            return "bsqentity_" + sanitizeStringForSMT(ttype.trkey);
+        }
+        else {
+            return "BTerm";
+        }
+    }
+
+    generateFixedTupleConstructor(ttype: MIRType): string {
+        return `bsqtuple_${(ttype.options[0] as MIRTupleType).entries.length}@cons`;
+    }
+
+    generateFixedTupleAccessor(ttype: MIRType, idx: number): string {
+        return `bsqtuple_${(ttype.options[0] as MIRTupleType).entries.length}@${idx}`;
+    }
+
+    generateFixedRecordConstructor(ttype: MIRType): string {
+        return `bsqrecord_${sanitizeStringForSMT(ttype.trkey)}@cons`;
+    }
+
+    generateFixedRecordAccessor(ttype: MIRType, p: string): string {
+        return `bsqrecord_${sanitizeStringForSMT(ttype.trkey)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, boxeddecl: string, fulldecl: string } | undefined {

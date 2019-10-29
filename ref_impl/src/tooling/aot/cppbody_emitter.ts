@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRTupleType, MIRRecordType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { NOT_IMPLEMENTED, filenameClean, sanitizeStringForCpp } from "./cpputils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 
@@ -23,6 +23,9 @@ class CPPBodyEmitter {
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
     private generatedBlocks: Map<string, string[]> = new Map<string, string[]>();
+
+    private typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
+    private typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
@@ -41,6 +44,10 @@ class CPPBodyEmitter {
 
     varToCppName(varg: MIRRegisterArgument): string {
         return this.varNameToCppName(varg.nameID);
+    }
+
+    invokenameToCPP(ivk: MIRInvokeKey): string {
+        return sanitizeStringForCpp(ivk);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -63,6 +70,18 @@ class CPPBodyEmitter {
         }
     }
 
+    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
+        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForCpp(`Box$$${from.trkey}$$${into.trkey}`);
+        this.typeboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
     boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
         if (CPPTypeEmitter.isPrimitiveType(from)) {
             if (CPPTypeEmitter.isPrimitiveType(into)) {
@@ -73,38 +92,62 @@ class CPPBodyEmitter {
                 return `BSQ_BOX_VALUE_BOOL(${exp})`;
             }
             else if (into.trkey === "NSCore::Int") {
-                return `BSQ_BOX_VALUE_Int(${exp})`;
+                return `BSQ_BOX_VALUE_INT(${exp})`;
             }
             else {
                 return exp;
             }
         }
         else if (CPPTypeEmitter.isFixedTupleType(from)) {
-            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
         }
         else if (CPPTypeEmitter.isFixedRecordType(from)) {
-            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
         }
         else if (CPPTypeEmitter.isUEntityType(from)) {
-            return new SMTValue(`(bsq_term_${sanitizeForSMT(getUniqueEntityType(from).ekey)} ${exp.emit()})`);
+            return exp;
         }
         else {
             return exp;
         }
     }
 
+    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
+        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeunboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForCpp(`UnBox$$${from.trkey}$$${into.trkey}`);
+        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
     unboxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
-        if (!isInlinableType(from) && isInlinableType(into)) {
-            const itype = getInlinableType(into);
-            if (itype.trkey === "NSCore::Bool") {
+        if (CPPTypeEmitter.isPrimitiveType(into)) {
+            if (CPPTypeEmitter.isPrimitiveType(from)) {
+                return exp;
+            }
+
+            if (into.trkey === "NSCore::Bool") {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
+            else if (into.trkey === "NSCore::Int") {
+                return `BSQ_GET_VALUE_Int(${exp})`;
+            }
             else {
-                return `BSQ_GET_VALUE_INT(${exp})`;
+                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
             }
         }
-        else if (!isUniqueEntityType(from) && isUniqueEntityType(into)) {
-            return `BSQ_GET_VALUE_PTR(${exp}, ${sanitizeForCpp(into.trkey)})`;
+        else if (CPPTypeEmitter.isFixedTupleType(into)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
+        }
+        else if (CPPTypeEmitter.isFixedRecordType(into)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
+        }
+        else if (CPPTypeEmitter.isUEntityType(into)) {
+            return (from.trkey !== into.trkey) ? `BSQ_GET_VALUE_PTR(${exp}, ${this.typegen.typeToCPPBaseType(into)})` : exp;
         }
         else {
             return exp;
@@ -112,19 +155,25 @@ class CPPBodyEmitter {
     }
 
     coerce(exp: string, from: MIRType, into: MIRType): string {
-        if (isInlinableType(from) !== isInlinableType(into)) {
-            return isInlinableType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        if (CPPTypeEmitter.isPrimitiveType(from) !== CPPTypeEmitter.isPrimitiveType(into)) {
+            return CPPTypeEmitter.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (isUniqueEntityType(from) !== isUniqueEntityType(into)) {
-            return isUniqueEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (CPPTypeEmitter.isFixedTupleType(from) !== CPPTypeEmitter.isFixedTupleType(into)) {
+            return CPPTypeEmitter.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (CPPTypeEmitter.isFixedRecordType(from) !== CPPTypeEmitter.isFixedRecordType(into)) {
+            return CPPTypeEmitter.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (CPPTypeEmitter.isUEntityType(from) !== CPPTypeEmitter.isUEntityType(into)) {
+            return CPPTypeEmitter.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
         else {
             return exp;
         }
     }
 
-    generateConstantExp(cval: MIRConstantArgument, into: MIRType | MIRTypeOption): string {
-        const isinlineable = isInlinableType(into);
+    generateConstantExp(cval: MIRConstantArgument, into: MIRType): string {
+        const isinlineable = CPPTypeEmitter.isPrimitiveType(into);
 
         if (cval instanceof MIRConstantNone) {
             return "BSQ_VALUE_NONE";
@@ -190,19 +239,57 @@ class CPPBodyEmitter {
         }
     }
 
+    generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
+        const tuptype = this.getArgType(op.arg);
+        if (CPPTypeEmitter.isFixedTupleType(tuptype)) {
+            const ftuptype = CPPTypeEmitter.getFixedTupleType(tuptype);
+            if (op.idx < ftuptype.entries.length) {
+                const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
+                return `${this.varToCppName(op.trgt)} = ${this.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            }
+            else {
+                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+            }
+        }
+        else {
+            const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${op.idx}>()`;
+            return `${this.varToCppName(op.trgt)} = ${this.coerce(value, this.typegen.anyType, resultAccessType)};`;
+        }
+    }
+
+    generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): string {
+        const rectype = this.getArgType(op.arg);
+        if (CPPTypeEmitter.isFixedRecordType(rectype)) {
+            const frectype = CPPTypeEmitter.getFixedRecordType(rectype);
+            const hasproperty = frectype.entries.findIndex((entry) => entry.name === op.property) !== -1;
+            if (hasproperty) {
+                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(rectype, op.property)}`;
+                return `${this.varToCppName(op.trgt)} = ${this.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            }
+            else {
+                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+            }
+        }
+        else {
+            const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRecord)->atFixed<MIRPropertyEnum::${sanitizeStringForCpp(op.property)}>()`;
+            return `${this.varToCppName(op.trgt)} = ${this.coerce(value, this.typegen.anyType, resultAccessType)};`;
+        }
+    }
+
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): string {
         let vals: string[] = [];
         const idecl = (this.assembly.invokeDecls.get(ivop.mkey) || this.assembly.primitiveInvokeDecls.get(ivop.mkey)) as MIRInvokeDecl;
 
         for (let i = 0; i < ivop.args.length; ++i) {
-            vals.push(this.argToCpp(ivop.args[i], this.assembly.typeMap.get(idecl.params[i].type) as MIRType));
+            vals.push(this.argToCpp(ivop.args[i], this.typegen.getMIRType(idecl.params[i].type)));
         }
 
-        if (!isInlinableType(this.assembly.typeMap.get(ivop.resultType) as MIRType)) {
+        const rtype = this.typegen.getMIRType(ivop.resultType);
+        if (CPPTypeEmitter.isRefableReturnType(rtype)) {
             vals.push(`$scope$.getCallerSlot<${this.scopectr++}>()`);
         }
 
-        return `${this.invokenameToCppName(ivop.mkey)}(${vals.join(", ")})`;
+        return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.mkey)}(${vals.join(", ")});`;
     }
 
     generateFastEquals(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
@@ -210,22 +297,36 @@ class CPPBodyEmitter {
         const rhvtype = this.getArgType(rhs);
 
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
-            return `${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)}`;
+            return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
+        }
+        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
+            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
         else {
-            return `${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)}`;
+            return `(BSQ_GET_VALUE_PTR(${this.argToCpp(lhs, this.typegen.stringType)}, BSQString)->sdata ${op} BSQ_GET_VALUE_PTR(${this.argToCpp(rhs, this.typegen.stringType)}, BSQString)->sdata)`;
         }
     }
 
     generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
-        return `${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)}`;
+        const lhvtype = this.getArgType(lhs);
+        const rhvtype = this.getArgType(rhs);
+
+        if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
+            return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
+        }
+        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
+            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
+        }
+        else {
+            return `(BSQ_GET_VALUE_PTR(${this.argToCpp(lhs, this.typegen.stringType)}, BSQString)->sdata ${op} BSQ_GET_VALUE_PTR(${this.argToCpp(rhs, this.typegen.stringType)}, BSQString)->sdata)`;
+        }
     }
 
-    generateStmt(op: MIROp, supportcalls: string[]): string | undefined {
+    generateStmt(op: MIROp): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = op as MIRLoadConst;
-                return this.generateInit(lcv.trgt, this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt)));
+                return `${this.varToCppName(lcv.trgt)} = ${this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt))};`;
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 return NOT_IMPLEMENTED<string>("MIRLoadConstTypedString");
@@ -238,11 +339,11 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = op as MIRAccessArgVariable;
-                return this.generateInit(lav.trgt, this.argToCpp(lav.name, this.getArgType(lav.trgt)));
+                return `${this.varToCppName(lav.trgt)} = ${this.argToCpp(lav.name, this.getArgType(lav.trgt))};`;
             }
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = op as MIRAccessLocalVariable;
-                return this.generateInit(llv.trgt, this.argToCpp(llv.name, this.getArgType(llv.trgt)));
+                return `${this.varToCppName(llv.trgt)} = ${this.argToCpp(llv.name, this.getArgType(llv.trgt))};`;
             }
             case MIROpTag.MIRConstructorPrimary: {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimary");
@@ -261,33 +362,22 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
-                const args = tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
-                return this.generateInit(tc.trgt, `new NSCore$cc$Tuple(std::vector<Value>{${args.join(", ")}})`);
+                return `${this.varToCppName(tc.trgt)} = { ${tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType)).join(", ")} };`;
             }
             case MIROpTag.MIRConstructorRecord: {
                 const tr = op as MIRConstructorRecord;
-                const args = tr.args.map((arg) => `std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::${sanitizeForCpp(arg[0])}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
-                return this.generateInit(tr.trgt, `new NSCore$cc$Tuple(std::vector<std::pair<MIRPropertyEnum, Value>>{${args.join(", ")}})`);
+                return `${this.varToCppName(tr.trgt)} = { ${tr.args.map((arg) => this.argToCpp(arg[1], this.typegen.anyType)).join(", ")} };`;
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
-                const argv = `auto tentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ai.arg, this.typegen.anyType)}, NSCore$cc$Tuple)->m_entries`;
-                const accop = this.unboxIfNeeded(`tentries[${ai.idx}]`, this.typegen.anyType, this.assembly.typeMap.get(ai.resultAccessType) as MIRType);
-                const safeload = this.getArgType(ai.arg).options.every((opt) => opt instanceof MIRTupleType && ai.idx < opt.entries.length && !opt.entries[ai.idx].isOptional);
-                const opv = this.generateInit(ai.trgt, !safeload ? `(${ai.idx} < tentries.size()) ? ${accop} : BSQ_VALUE_NONE` : accop);
-                return `{ ${argv}; ${opv} }`;
+                return this.generateMIRAccessFromIndex(ai, this.typegen.getMIRType(ai.resultAccessType));
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromIndecies");
             }
             case MIROpTag.MIRAccessFromProperty: {
                 const ap = op as MIRAccessFromProperty;
-                const argv = `auto rentries = BSQ_GET_VALUE_PTR(${this.argToCpp(ap.arg, this.typegen.anyType)}, NSCore$cc$Record)->m_entries`;
-                const valexp = `auto iter = std::find_if(rentries.cbegin(), rentries.cend(), [&](const std::pair<<MIRPropertyEnum, Value>& entry) { return entry.first == MIRPropertyEnum::${sanitizeForCpp(ap.property)}; })`;
-                const accop = this.unboxIfNeeded("rentries->second", this.typegen.anyType, this.assembly.typeMap.get(ap.resultAccessType) as MIRType);
-                const safeload = this.getArgType(ap.arg).options.every((opt) => opt instanceof MIRRecordType && opt.entries.findIndex((entry) => entry.name === ap.property) !== -1 && !opt.entries[opt.entries.findIndex((entry) => entry.name === ap.property)].isOptional);
-                const opv = this.generateInit(ap.trgt, !safeload ? `(iter != rentries.cend()) ? ${accop} : BSQ_VALUE_NONE` : accop);
-                return `{ ${argv}; ${valexp}; ${opv} }`;
+                return this.generateMIRAccessFromProperty(ap, this.typegen.getMIRType(ap.resultAccessType));
             }
             case MIROpTag.MIRProjectFromProperties: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromProperties");
@@ -327,7 +417,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                return this.generateInit(invk.trgt, this.generateMIRInvokeFixedFunction(invk));
+                return this.generateMIRInvokeFixedFunction(invk);
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
                 return NOT_IMPLEMENTED<string>("MIRInvokeVirtualTarget");

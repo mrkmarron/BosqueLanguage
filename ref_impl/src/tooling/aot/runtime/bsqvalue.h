@@ -54,10 +54,6 @@ enum class MIRRecordTypeEnum
 //%%RECORD_TYPE_ENUM_DECLARE
 };
 
-typedef uint16_t MIRRecordTypePropertyIndex;
-constexpr MIRRecordTypePropertyIndex MIRRecordTypePropertyIndex$$alwaysMissing = UINT16_MAX;
-//%%RECORD_TYPE_PROPERTY_INDEX_ENUM_DECLARE
-
 typedef void* Value;
 
 class BSQRef
@@ -232,12 +228,12 @@ public:
     template <uint16_t idx>
     inline Value atFixed()
     {
-        return (idx < k) ? this->entries[idx] : BSQ_VALUE_NONE;
+        return this->entries[idx];
     }
 
     inline Value atVar(uint16_t idx)
     {
-        return (idx < k) ? this->entries[idx] : BSQ_VALUE_NONE;
+        return this->entries[idx];
     }
 };
 
@@ -280,15 +276,15 @@ class BSQRecordFixed
 public:
     Value entries[K];
 
-    template <MIRRecordTypePropertyIndex pidx>
+    template <uint16_t pidx>
     inline Value atFixed()
     {
-        return (pidx < k) ? this->entries[pidx] : BSQ_VALUE_NONE;
+        return this->entries[pidx];
     }
 
-    inline Value atVar( MIRRecordTypePropertyIndex pidx)
+    inline Value atVar(uint16_t pidx)
     {
-        return (pidx < k) ? this->entries[pidx] : BSQ_VALUE_NONE;
+        return this->entries[pidx];
     }
 };
 
