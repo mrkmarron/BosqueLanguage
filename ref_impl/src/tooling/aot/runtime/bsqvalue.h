@@ -60,11 +60,10 @@ class BSQRef
 {
 private:
     int64_t count;
-    const MIRNominalTypeEnum ntype;
 
 public:
-    BSQRef(MIRNominalTypeEnum ntype) : count(0), ntype(ntype) { ; }
-    BSQRef(int64_t excount, MIRNominalTypeEnum ntype) : count(excount), ntype(ntype) { ; }
+    BSQRef() : count(0) { ; }
+    BSQRef(int64_t excount) : count(excount) { ; }
     virtual ~BSQRef() { ; }
 
     inline static void increment(BSQRef* rcb)
@@ -100,16 +99,6 @@ public:
         }
 
         return v;
-    }
-
-    constexpr static MIRNominalTypeEnum s_stringtype = /*%%NOMINAL_STRING*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_tupletype = /*%%NOMINAL_TUPLE*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_recordtype = /*%%NOMINAL_RECORD*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_arraytype = /*%%NOMINAL_ARRAY*/MIRNominalTypeEnum::Invalid;
-
-    inline MIRNominalTypeEnum getNominalType() const
-    {
-        return this->ntype;
     }
 
     //%%ALL_VFIELD_ACCESS_DECLS
@@ -183,12 +172,77 @@ public:
 class BSQString : public BSQRef
 {
 public:
-    std::string sdata;
+    const std::string sdata;
 
-    BSQString(const std::string& str) : BSQRef(BSQRef::s_stringtype), sdata(str) { ; }
-    BSQString(std::string&& str, int64_t excount) : BSQRef(excount, BSQRef::s_stringtype), sdata(move(str)) { ; }
+    BSQString(const std::string& str) : BSQRef(), sdata(str) { ; }
+    BSQString(std::string&& str, int64_t excount) : BSQRef(excount), sdata(move(str)) { ; }
 
     virtual ~BSQString() = default;
+};
+
+class BSQTypedString : public BSQRef
+{
+public:
+    const std::string sdata;
+    const MIRNominalTypeEnum oftype;
+
+    BSQTypedString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    virtual ~BSQTypedString() = default;
+};
+
+class BSQValidatedString : public BSQRef
+{
+public:
+    const std::string sdata;
+    const MIRNominalTypeEnum oftype;
+
+    BSQValidatedString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    virtual ~BSQValidatedString() = default;
+};
+
+class BSQPODBuffer : public BSQRef
+{
+public:
+    const std::vector<byte> sdata;
+
+    BSQPODBuffer(std::vector<byte>&& sdata) : BSQRef(), sdata(move(sdata)) { ; }
+    virtual ~BSQPODBuffer() = default;
+};
+
+class BSQGUID : public BSQRef
+{
+public:
+    const std::string sdata;
+
+    BSQGUID(const std::string& sdata) : BSQRef(), sdata(sdata) { ; }
+    virtual ~BSQGUID() = default;
+};
+
+class BSQEnum : public BSQRef
+{
+public:
+    const char* ename;
+    const int64_t value;
+    const MIRNominalTypeEnum oftype;
+
+    BSQEnum(const char* ename, int64_t value, MIRNominalTypeEnum oftype) : BSQRef(), ename(ename), value(value), oftype(oftype) { ; }
+    virtual ~BSQEnum() = default;
+};
+
+class BSQIdKey : public BSQRef
+{
+public:
+    const Value sdata;
+
+    BSQIdKey(Value sdata) : BSQRef(), sdata(sdata) 
+    {
+        BSQRef::checkedIncrement(this->sdata);
+    }
+
+    virtual ~BSQIdKey()
+    {
+        BSQRef::checkedDecrement(this->sdata);
+    }
 };
 
 class BSQTuple : public BSQRef
@@ -196,7 +250,7 @@ class BSQTuple : public BSQRef
 public:
     const std::vector<Value> entries;
 
-    BSQTuple(std::vector<Value>&& entries) : BSQRef(BSQRef::s_tupletype), entries(move(entries)) { ; }
+    BSQTuple(std::vector<Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
 
     virtual ~BSQTuple()
     {
@@ -241,7 +295,7 @@ class BSQRecord : public BSQRef
 public:
     const std::vector<std::pair<MIRPropertyEnum, Value>> entries;
 
-    BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(BSQRef::s_recordtype), entries(move(entries)) { ; }
+    BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(), entries(move(entries)) { ; }
 
     virtual ~BSQRecord()
     {
@@ -292,7 +346,7 @@ class BSQArray : public BSQRef
 public:
    const std::vector<Value> contents;
 
-    BSQArray(std::vector<Value>&& contents) : BSQRef(BSQRef::s_arraytype), contents(move(contents)) { ; }
+    BSQArray(std::vector<Value>&& contents) : BSQRef(), contents(move(contents)) { ; }
 
     virtual ~BSQArray()
     {
@@ -306,7 +360,7 @@ public:
 class BSQObject : public BSQRef
 {
 public:
-    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(ntype) { ; }
+    BSQObject() : BSQRef(ntype) { ; }
     virtual ~BSQObject() = default;
 };
 } // namespace BSQ

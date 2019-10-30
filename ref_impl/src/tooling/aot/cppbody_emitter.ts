@@ -83,8 +83,8 @@ class CPPBodyEmitter {
     }
 
     boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
-        if (CPPTypeEmitter.isPrimitiveType(from)) {
-            if (CPPTypeEmitter.isPrimitiveType(into)) {
+        if (this.typegen.isPrimitiveType(from)) {
+            if (this.typegen.isPrimitiveType(into)) {
                 return exp;
             }
 
@@ -98,13 +98,13 @@ class CPPBodyEmitter {
                 return exp;
             }
         }
-        else if (CPPTypeEmitter.isFixedTupleType(from)) {
+        else if (this.typegen.isFixedTupleType(from)) {
             return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
         }
-        else if (CPPTypeEmitter.isFixedRecordType(from)) {
+        else if (this.typegen.isFixedRecordType(from)) {
             return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
         }
-        else if (CPPTypeEmitter.isUEntityType(from)) {
+        else if (this.typegen.isUEntityType(from)) {
             return exp;
         }
         else {
@@ -125,8 +125,8 @@ class CPPBodyEmitter {
     }
 
     unboxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
-        if (CPPTypeEmitter.isPrimitiveType(into)) {
-            if (CPPTypeEmitter.isPrimitiveType(from)) {
+        if (this.typegen.isPrimitiveType(into)) {
+            if (this.typegen.isPrimitiveType(from)) {
                 return exp;
             }
 
@@ -140,13 +140,13 @@ class CPPBodyEmitter {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
             }
         }
-        else if (CPPTypeEmitter.isFixedTupleType(into)) {
+        else if (this.typegen.isFixedTupleType(into)) {
             return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
         }
-        else if (CPPTypeEmitter.isFixedRecordType(into)) {
+        else if (this.typegen.isFixedRecordType(into)) {
             return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
         }
-        else if (CPPTypeEmitter.isUEntityType(into)) {
+        else if (this.typegen.isUEntityType(into)) {
             return (from.trkey !== into.trkey) ? `BSQ_GET_VALUE_PTR(${exp}, ${this.typegen.typeToCPPType(into, "base")})` : exp;
         }
         else {
@@ -155,17 +155,17 @@ class CPPBodyEmitter {
     }
 
     coerce(exp: string, from: MIRType, into: MIRType): string {
-        if (CPPTypeEmitter.isPrimitiveType(from) !== CPPTypeEmitter.isPrimitiveType(into)) {
-            return CPPTypeEmitter.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        if (this.typegen.isPrimitiveType(from) !== this.typegen.isPrimitiveType(into)) {
+            return this.typegen.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (CPPTypeEmitter.isFixedTupleType(from) !== CPPTypeEmitter.isFixedTupleType(into)) {
-            return CPPTypeEmitter.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isFixedTupleType(from) !== this.typegen.isFixedTupleType(into)) {
+            return this.typegen.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (CPPTypeEmitter.isFixedRecordType(from) !== CPPTypeEmitter.isFixedRecordType(into)) {
-            return CPPTypeEmitter.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isFixedRecordType(from) !== this.typegen.isFixedRecordType(into)) {
+            return this.typegen.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (CPPTypeEmitter.isUEntityType(from) !== CPPTypeEmitter.isUEntityType(into)) {
-            return CPPTypeEmitter.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isUEntityType(from) !== this.typegen.isUEntityType(into)) {
+            return this.typegen.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
         else {
             return exp;
@@ -173,7 +173,7 @@ class CPPBodyEmitter {
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): string {
-        const isinlineable = CPPTypeEmitter.isPrimitiveType(into);
+        const isinlineable = this.typegen.isPrimitiveType(into);
 
         if (cval instanceof MIRConstantNone) {
             return "BSQ_VALUE_NONE";
@@ -241,7 +241,7 @@ class CPPBodyEmitter {
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
         const tuptype = this.getArgType(op.arg);
-        if (CPPTypeEmitter.isFixedTupleType(tuptype)) {
+        if (this.typegen.isFixedTupleType(tuptype)) {
             const ftuptype = CPPTypeEmitter.getFixedTupleType(tuptype);
             if (op.idx < ftuptype.entries.length) {
                 const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
@@ -259,7 +259,7 @@ class CPPBodyEmitter {
 
     generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): string {
         const rectype = this.getArgType(op.arg);
-        if (CPPTypeEmitter.isFixedRecordType(rectype)) {
+        if (this.typegen.isFixedRecordType(rectype)) {
             const frectype = CPPTypeEmitter.getFixedRecordType(rectype);
             const hasproperty = frectype.entries.findIndex((entry) => entry.name === op.property) !== -1;
             if (hasproperty) {
@@ -285,7 +285,7 @@ class CPPBodyEmitter {
         }
 
         const rtype = this.typegen.getMIRType(ivop.resultType);
-        if (CPPTypeEmitter.isRefableReturnType(rtype)) {
+        if (this.typegen.isRefableReturnType(rtype)) {
             vals.push(`$scope$.getCallerSlot<${this.scopectr++}>()`);
         }
 
@@ -460,7 +460,7 @@ class CPPBodyEmitter {
 
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
-                if (CPPTypeEmitter.isPrimitiveType(lhvtype) && CPPTypeEmitter.isPrimitiveType(rhvtype)) {
+                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
                     return `${this.varToCppName(beq.trgt)} = this.generateFastEquals(beq.op, beq.lhs, beq.rhs);`;
                 }
                 else {
@@ -476,7 +476,7 @@ class CPPBodyEmitter {
                 const lhvtype = this.getArgType(bcmp.lhs);
                 const rhvtype = this.getArgType(bcmp.rhs);
 
-                if (CPPTypeEmitter.isPrimitiveType(lhvtype) && CPPTypeEmitter.isPrimitiveType(rhvtype)) {
+                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
                     return `${this.varToCppName(bcmp.trgt)} = ${this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)};`;
                 }
                 else {
@@ -620,7 +620,7 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
-            if (!CPPTypeEmitter.isRefableReturnType(this.currentRType)) {
+            if (!this.typegen.isRefableReturnType(this.currentRType)) {
                 if (!this.assembly.subtypeOf(this.typegen.boolType, this.currentRType) && !this.assembly.subtypeOf(this.typegen.intType, this.currentRType)) {
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
                         gblock.push("RefCountScopeCallMgr::processCallRefNoneable($callerslot$, _return_);");
@@ -648,7 +648,7 @@ class CPPBodyEmitter {
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
 
-        if (!CPPTypeEmitter.isRefableReturnType(this.typegen.getMIRType(idecl.resultType))) {
+        if (!this.typegen.isRefableReturnType(this.typegen.getMIRType(idecl.resultType))) {
             args.push("RefCountBase** $callerslot$");
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;
@@ -672,7 +672,7 @@ class CPPBodyEmitter {
             let vdecls = new Map<string, string[]>();
             (idecl.body.vtypes as Map<string, string>).forEach((tkey, name) => {
                 if (idecl.params.findIndex((p) => p.name === name) === -1) {
-                    const declt = this.typegen.typeToCPPType(this.typegen.getMIRType(tkey), "local");
+                    const declt = this.typegen.typeToCPPType(this.typegen.getMIRType(tkey), "decl");
                     if (!vdecls.has(declt)) {
                         vdecls.set(declt, [] as string[]);
                     }

@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRNominalType } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
@@ -33,7 +33,7 @@ class SMTTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
-    static isPrimitiveType(tt: MIRType): boolean {
+    isPrimitiveType(tt: MIRType): boolean {
         if (tt.options.length !== 1) {
             return false;
         }
@@ -42,7 +42,7 @@ class SMTTypeEmitter {
         return (uname === "NSCore::Bool" || uname === "NSCore::Int" || uname === "NSCore::String");
     }
 
-    static isFixedTupleType(tt: MIRType): boolean {
+    isFixedTupleType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
             return false;
         }
@@ -51,7 +51,7 @@ class SMTTypeEmitter {
         return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
     }
 
-    static isFixedRecordType(tt: MIRType): boolean {
+    isFixedRecordType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
             return false;
         }
@@ -60,8 +60,31 @@ class SMTTypeEmitter {
         return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
     }
 
-    static isUEntityType(tt: MIRType): boolean {
-        return (tt.trkey !== "NSCore::None") && !SMTTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
+    isUEntityType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
+            return false;
+        }
+
+        const et = tt.options[0] as MIREntityType;
+        const tdecl = this.assembly.entityDecls.get(et.ekey) as MIREntityTypeDecl;
+
+        return this.doDefaultEmitOnEntity(tdecl);
+    }
+
+    doDefaultEmitOnEntity(et: MIREntityTypeDecl): boolean {
+        if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::Regex") {
+            return false;
+        }
+
+        if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::ValidatedString<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
+            return false;
+        }
+
+        if (et.provides.includes("NSCore::Enum") || et.provides.includes("NSCore::IdKey")) {
+            return false;
+        }
+
+        return true;
     }
 
     static getPrimitiveType(tt: MIRType): MIREntityType {
@@ -81,7 +104,7 @@ class SMTTypeEmitter {
     }
 
     typeToSMTCategory(ttype: MIRType): string {
-        if (SMTTypeEmitter.isPrimitiveType(ttype)) {
+        if (this.isPrimitiveType(ttype)) {
             if (ttype.trkey === "NSCore::Bool") {
                 return "Bool";
             }
@@ -92,13 +115,13 @@ class SMTTypeEmitter {
                 return "String";
             }
         }
-        else if (SMTTypeEmitter.isFixedTupleType(ttype)) {
+        else if (this.isFixedTupleType(ttype)) {
             return "bsqtuple_" + (ttype.options[0] as MIRTupleType).entries.length;
         }
-        else if (SMTTypeEmitter.isFixedRecordType(ttype)) {
+        else if (this.isFixedRecordType(ttype)) {
             return "bsqrecord_" + sanitizeStringForSMT(ttype.trkey);
         }
-        else if (SMTTypeEmitter.isUEntityType(ttype)) {
+        else if (this.isUEntityType(ttype)) {
             return "bsqentity_" + sanitizeStringForSMT(ttype.trkey);
         }
         else {

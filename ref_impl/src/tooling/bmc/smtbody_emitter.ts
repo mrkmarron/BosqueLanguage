@@ -103,8 +103,8 @@ class SMTBodyEmitter {
     }
 
     boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (SMTTypeEmitter.isPrimitiveType(from)) {
-            if (SMTTypeEmitter.isPrimitiveType(into)) {
+        if (this.typegen.isPrimitiveType(from)) {
+            if (this.typegen.isPrimitiveType(into)) {
                 return exp;
             }
 
@@ -118,13 +118,13 @@ class SMTBodyEmitter {
                 return new SMTValue(`(bsqterm_string ${exp.emit()})`);
             }
         }
-        else if (SMTTypeEmitter.isFixedTupleType(from)) {
+        else if (this.typegen.isFixedTupleType(from)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
         }
-        else if (SMTTypeEmitter.isFixedRecordType(from)) {
+        else if (this.typegen.isFixedRecordType(from)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
         }
-        else if (SMTTypeEmitter.isUEntityType(from)) {
+        else if (this.typegen.isUEntityType(from)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
         }
         else {
@@ -145,8 +145,8 @@ class SMTBodyEmitter {
     }
 
     unboxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (SMTTypeEmitter.isPrimitiveType(into)) {
-            if (SMTTypeEmitter.isPrimitiveType(from)) {
+        if (this.typegen.isPrimitiveType(into)) {
+            if (this.typegen.isPrimitiveType(from)) {
                 return exp;
             }
 
@@ -160,13 +160,13 @@ class SMTBodyEmitter {
                 return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
             }
         }
-        else if (SMTTypeEmitter.isFixedTupleType(into)) {
+        else if (this.typegen.isFixedTupleType(into)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
         }
-        else if (SMTTypeEmitter.isFixedRecordType(into)) {
+        else if (this.typegen.isFixedRecordType(into)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
         }
-        else if (SMTTypeEmitter.isUEntityType(into)) {
+        else if (this.typegen.isUEntityType(into)) {
             return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
         }
         else {
@@ -175,17 +175,17 @@ class SMTBodyEmitter {
     }
 
     coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (SMTTypeEmitter.isPrimitiveType(from) !== SMTTypeEmitter.isPrimitiveType(into)) {
-            return SMTTypeEmitter.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        if (this.typegen.isPrimitiveType(from) !== this.typegen.isPrimitiveType(into)) {
+            return this.typegen.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (SMTTypeEmitter.isFixedTupleType(from) !== SMTTypeEmitter.isFixedTupleType(into)) {
-            return SMTTypeEmitter.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isFixedTupleType(from) !== this.typegen.isFixedTupleType(into)) {
+            return this.typegen.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (SMTTypeEmitter.isFixedRecordType(from) !== SMTTypeEmitter.isFixedRecordType(into)) {
-            return SMTTypeEmitter.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isFixedRecordType(from) !== this.typegen.isFixedRecordType(into)) {
+            return this.typegen.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
-        else if (SMTTypeEmitter.isUEntityType(from) !== SMTTypeEmitter.isUEntityType(into)) {
-            return SMTTypeEmitter.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        else if (this.typegen.isUEntityType(from) !== this.typegen.isUEntityType(into)) {
+            return this.typegen.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
         else {
             return exp;
@@ -193,7 +193,7 @@ class SMTBodyEmitter {
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): SMTExp {
-        const isinlineable = SMTTypeEmitter.isPrimitiveType(into);
+        const isinlineable = this.typegen.isPrimitiveType(into);
 
         if (cval instanceof MIRConstantNone) {
             return new SMTValue("bsqterm_none_const");
@@ -249,7 +249,7 @@ class SMTBodyEmitter {
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
         const tuptype = this.getArgType(op.arg);
-        if (SMTTypeEmitter.isFixedTupleType(tuptype)) {
+        if (this.typegen.isFixedTupleType(tuptype)) {
             const ftuptype = SMTTypeEmitter.getFixedTupleType(tuptype);
             if (op.idx < ftuptype.entries.length) {
                 return new SMTLet(this.varToSMTName(op.trgt), this.coerce(new SMTValue(`(${this.typegen.generateFixedTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`), this.typegen.anyType, resultAccessType));
@@ -266,7 +266,7 @@ class SMTBodyEmitter {
 
     generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): SMTExp {
         const rectype = this.getArgType(op.arg);
-        if (SMTTypeEmitter.isFixedRecordType(rectype)) {
+        if (this.typegen.isFixedRecordType(rectype)) {
             const frectype = SMTTypeEmitter.getFixedRecordType(rectype);
             const hasproperty = frectype.entries.findIndex((entry) => entry.name === op.property) !== -1;
             if (hasproperty) {
@@ -526,7 +526,7 @@ class SMTBodyEmitter {
 
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
-                if (SMTTypeEmitter.isPrimitiveType(lhvtype) && SMTTypeEmitter.isPrimitiveType(rhvtype)) {
+                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, beq.lhs, beq.rhs)));
                 }
                 else {

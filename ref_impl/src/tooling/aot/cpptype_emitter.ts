@@ -32,7 +32,7 @@ class CPPTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
-    static isPrimitiveType(tt: MIRType): boolean {
+    isPrimitiveType(tt: MIRType): boolean {
         if (tt.options.length !== 1) {
             return false;
         }
@@ -41,7 +41,7 @@ class CPPTypeEmitter {
         return (uname === "NSCore::Bool" || uname === "NSCore::Int" ||  uname === "NSCore::String");
     }
 
-    static isFixedTupleType(tt: MIRType): boolean {
+    isFixedTupleType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
             return false;
         }
@@ -50,7 +50,7 @@ class CPPTypeEmitter {
         return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
     }
 
-    static isFixedRecordType(tt: MIRType): boolean {
+    isFixedRecordType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
             return false;
         }
@@ -59,8 +59,31 @@ class CPPTypeEmitter {
         return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
     }
 
-    static isUEntityType(tt: MIRType): boolean {
-        return (tt.trkey !== "NSCore::None") && !CPPTypeEmitter.isPrimitiveType(tt) && (tt.options.length === 1 && tt.options[0] instanceof MIREntityType);
+    isUEntityType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
+            return false;
+        }
+
+        const et = tt.options[0] as MIREntityType;
+        const tdecl = this.assembly.entityDecls.get(et.ekey) as MIREntityTypeDecl;
+
+        return this.doDefaultEmitOnEntity(tdecl);
+    }
+
+    doDefaultEmitOnEntity(et: MIREntityTypeDecl): boolean {
+        if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::Regex") {
+            return false;
+        }
+
+        if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::ValidatedString<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
+            return false;
+        }
+
+        if (et.provides.includes("NSCore::Enum") || et.provides.includes("NSCore::IdKey")) {
+            return false;
+        }
+
+        return true;
     }
 
     static getPrimitiveType(tt: MIRType): MIREntityType {
@@ -79,7 +102,7 @@ class CPPTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    static isRefableReturnType(tt: MIRType): boolean {
+    isRefableReturnType(tt: MIRType): boolean {
         if (tt.options.length !== 1) {
             return true;
         }
@@ -89,15 +112,15 @@ class CPPTypeEmitter {
             return false;
         }
 
-        if (CPPTypeEmitter.isFixedTupleType(tt) || CPPTypeEmitter.isFixedRecordType(tt)) {
+        if (this.isFixedTupleType(tt) || this.isFixedRecordType(tt)) {
             return false;
         }
 
         return true;
     }
 
-    typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "local"): string {
-        if (CPPTypeEmitter.isPrimitiveType(ttype)) {
+    typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "decl"): string {
+        if (this.isPrimitiveType(ttype)) {
             if (ttype.trkey === "NSCore::Bool") {
                 return "bool";
             }
@@ -108,13 +131,13 @@ class CPPTypeEmitter {
                 return "BSQString" + (declspec !== "base" ? "*" : "");
             }
         }
-        else if (CPPTypeEmitter.isFixedTupleType(ttype)) {
+        else if (this.isFixedTupleType(ttype)) {
             return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
         }
-        else if (CPPTypeEmitter.isFixedRecordType(ttype)) {
+        else if (this.isFixedRecordType(ttype)) {
             return `BSQRecordFixed<MIRRecordTypeEnum::${sanitizeStringForCpp(ttype.trkey)}, ${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
         }
-        else if (CPPTypeEmitter.isUEntityType(ttype)) {
+        else if (this.isUEntityType(ttype)) {
             return sanitizeStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");
         }
         else {
@@ -131,78 +154,50 @@ class CPPTypeEmitter {
     }
 
     generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
-        if (entity.tkey === "NSCore::None" || entity.tkey === "NSCore::Bool" || entity.tkey === "NSCore::Int" || entity.tkey === "NSCore::String") {
+        if (!this.doDefaultEmitOnEntity(entity)) {
             return undefined;
         }
 
         const constructor_args = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} ${fd.fname}`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.fname}`;
         });
 
         const constructor_initializer = entity.fields.map((fd) => {
-            return isInlinableType(this.assembly.typeMap.get(fd.declaredType) as MIRType) ? `${fd.fname}(${fd.fname})` : `${fd.fname}(std::move(${fd.fname}))`;
+            return `${fd.fname}(${fd.fname})`; ---- increment as needed
+        });
+
+        const destructor_list = entity.fields.map((fd) => {
+            return `(${fd.fname})`; ---- decincrement as needed
         });
 
         const fields = entity.fields.map((fd) => {
-            return `const ${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} ${fd.fname};`;
+            return `const ${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.fname};`;
         });
 
         const vfield_accessors = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} get$${fd.fname}() const { return this->${fd.fname}; };`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "return")} get$${fd.fname}() const { return this->${fd.fname}; };`;
         });
 
         const vcalls = [...entity.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-            const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
-            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
+            const rtype = this.typeToCPPType(this.getMIRType(rcall.resultType), "return");
+            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`).join(", ");
             const cargs = rcall.params.map((fp) => fp.name).join(", ");
-            return `${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const
+            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs}) const
             {
-                return this->${sanitizeForCpp(callp[1])}(${cargs});
+                return this->${sanitizeStringForCpp(callp[1])}(${cargs});
             }`;
         });
 
         return {
-            fwddecl: `class ${sanitizeForCpp(entity.tkey)};`,
-            fulldecl: `class ${sanitizeForCpp(entity.tkey)} : public RefCountBase, ${entity.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
+            fwddecl: `class ${sanitizeStringForCpp(entity.tkey)};`,
+            fulldecl: `class ${sanitizeStringForCpp(entity.tkey)} : public BSQObject
             {
             public:
-                ${sanitizeForCpp(entity.tkey)}(${constructor_args.join(", ")})${constructor_initializer.length !== 0 ? (" : " + constructor_initializer.join(", ")) : ""} { ; }
-                virtual ~${sanitizeForCpp(entity.tkey)}() = default;
+                ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")})${constructor_initializer.length !== 0 ? (" : " + constructor_initializer.join(", ")) : ""} { ; }
+                virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} };
 
                 ${fields.join("\t\t\t\t\n")}
-
-                ${vfield_accessors.join("\t\t\t\t\n")}
-
-                ${vcalls.join("\t\t\t\t\n")}
-            };`
-        };
-    }
-
-    generateCPPConcept(concept: MIRConceptTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
-        if (concept.tkey === "NSCore::Any" || concept.tkey === "NSCore::Some" || concept.tkey === "NSCore::Truthy" || concept.tkey === "NSCore::Parsable"
-            || concept.tkey === "NSCore::Tuple" || concept.tkey === "NSCore::Record" || concept.tkey === "NSCore::Object") {
-            return undefined;
-        }
-
-        const vfield_accessors = concept.fields.map((fd) => {
-            return `virtual ${this.typeToCPPType(this.assembly.typeMap.get(fd.declaredType) as MIRType)} get$${fd.fname}() const override { return this->${fd.fname}; };`;
-        });
-
-        const vcalls = [...concept.vcallMap].map((callp) => {
-            const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-            const rtype = this.typeToCPPType(this.assembly.typeMap.get(rcall.resultType) as MIRType);
-            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.assembly.typeMap.get(fp.type) as MIRType)} ${fp.name}`).join(", ");
-            return `virtual ${rtype} ${sanitizeForCpp(callp[0])}(${vargs}) const = 0;`;
-        });
-
-        return {
-            fwddecl: `class ${sanitizeForCpp(concept.tkey)};`,
-            fulldecl: `class ${sanitizeForCpp(concept.tkey)} : ${concept.provides.map((pkey) => `public virtual ${sanitizeForCpp(pkey)}`).join(", ")}
-            {
-            public:
-                ${sanitizeForCpp(concept.tkey)}() { ; }
-                virtual ~${sanitizeForCpp(concept.tkey)}() = default;
 
                 ${vfield_accessors.join("\t\t\t\t\n")}
 

@@ -500,38 +500,33 @@ class TypeChecker {
         });
     }
 
-    private appendIntoTupleAtom(t: ResolvedTupleAtomType, merge: ResolvedAtomType): ResolvedType {
+    private appendIntoTupleAtom(sinfo: SourceInfo, t: ResolvedTupleAtomType, merge: ResolvedAtomType): ResolvedType {
         const tuple = this.m_assembly.normalizeToTupleRepresentation(merge);
 
         let tentries: ResolvedTupleAtomTypeEntry[] = [];
-        let isOpen = false;
         if (t.isOpen || tuple.isOpen) {
-            //TODO: This is not the most precise transformer but for now we go with it
-            isOpen = true;
+            this.raiseError(sinfo, "Cannot merge open tuples");
+        }
+        else if (t.types.some((entry) => entry.isOptional)) {
+            this.raiseError(sinfo, "Appending to tuple with optional entries creates ambigious result tuple");
         }
         else if (t.types.length === 0 || tuple.types.length === 0) {
             tentries = t.types.length !== 0 ? [...t.types] : [...tuple.types];
         }
-        else if (t.types.some((entry) => entry.isOptional)) {
-            tentries = t.types.slice(0, t.types.findIndex((entry) => entry.isOptional));
-            isOpen = true;
-        }
         else {
             //not open and no optional entries so just copy everything along
             tentries = [...t.types, ...tuple.types];
-            isOpen = tuple.isOpen;
         }
 
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(isOpen, tentries));
+        return ResolvedType.createSingle(ResolvedTupleAtomType.create(false, tentries));
     }
 
     private mergeIntoRecordAtom(sinfo: SourceInfo, t: ResolvedRecordAtomType, merge: ResolvedAtomType): ResolvedType {
         const record = this.m_assembly.normalizeToRecordRepresentation(merge);
 
         let rentries: ResolvedRecordAtomTypeEntry[] = [];
-        let isOpen = false;
         if (t.isOpen || record.isOpen) {
-            isOpen = true;
+            this.raiseError(sinfo, "Cannot merge open records");
         }
         else {
             rentries = [...t.entries];
@@ -555,7 +550,7 @@ class TypeChecker {
             }
         }
 
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(isOpen, rentries));
+        return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, rentries));
     }
 
     private mergeIntoEntityConceptAtom(sinfo: SourceInfo, t: ResolvedType, merge: ResolvedAtomType) {
@@ -1645,7 +1640,7 @@ class TypeChecker {
             this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(mergeValue, this.m_assembly.getSpecialTupleConceptType()), "Must be two Tuples to merge");
 
             resultOptions = resultOptions.concat(...texp.options.map((topt) => {
-                return mergeValue.options.map((tmerge) => this.appendIntoTupleAtom(topt as ResolvedTupleAtomType, tmerge));
+                return mergeValue.options.map((tmerge) => this.appendIntoTupleAtom(op.sinfo, topt as ResolvedTupleAtomType, tmerge));
             }));
             const resulttype = this.m_assembly.typeUnion(resultOptions);
 

@@ -95,11 +95,17 @@ entity String provides KeyType, POD, Some {
 }
 
 entity StringOf<T where Parsable> provides KeyType, Some {
+    method rawString(): String # stringof_rawstring
+
     method convert<U where Parsable>(): StringOf<U> # stringof_convert;
+    method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert;
 }
 
 entity ValidatedString<T where Validator> provides KeyType, POD, Some {
-    field validated_string_value: String;
+    method rawString(): String # validatedstring_rawstring
+
+    method convert<U where Validator>(): ValidatedString<U> # validatedstring_convert;
+    method tryConvert<U where Validator>(): ValidatedString<U> # validatedstring_convert;
 }
 
 //<summary>All actual format validators provide this concept.</summary>
@@ -117,10 +123,16 @@ entity PODBuffer<T where Validator> provides Some {
 entity GUID provides KeyType, POD, Some {
 }
 
+//<summary>All actual enums implicitly provide this.</summary>
+concept Enum provides KeyType, POD, Some {
+}
+
+//<summary>All actual custom keys implicitly provide this.</summary>
+concept IdKey provides KeyType, POD, Some {
+}
+
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {
-    field regex_value: String;
-
     method match(str: String, start?: Int, end?: Int): { start: Int, end: Int }? # regex_match
 
     //
@@ -157,20 +169,12 @@ concept PODArray provides POD, Array {
 concept Object provides Some {
 }
 
-//<summary>All actual enums implicitly provide this.</summary>
-concept Enum provides KeyType, POD, Some {
-}
-
-//<summary>All actual custom keys implicitly provide this.</summary>
-concept IdKey provides KeyType, POD, Some {
-}
-
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Keyed<T where KeyType> provides Indexable, Any {
+concept Keyed<T where KeyType> provides Indexable, Some {
     field key_value: T;
 }
 
 //<summary>A lightweight tagging class for values.</summary>
-entity Tagged<T where KeyType, U> provides Keyed<T>, Any {
+entity Tagged<T where KeyType, U> provides Keyed<T>, Object {
     field tagged_value: U;
 }
