@@ -20,7 +20,7 @@
       (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTerm)))
       (bsqterm_record (bsqterm_record_size Int) (bsqterm_record_properties (Array Int String)) (bsqterm_record_entries (Array String BTerm)))
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
-      (bsqterm_object (bsqterm_object_entries (Array String BTerm)))
+      (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
     ;;FIXED_TUPLE_DECLS;;
     ;;FIXED_RECORD_DECLS;;

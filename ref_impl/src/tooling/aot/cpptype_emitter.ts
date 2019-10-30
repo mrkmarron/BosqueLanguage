@@ -96,7 +96,7 @@ class CPPTypeEmitter {
         return true;
     }
 
-    typeToCPPBaseType(ttype: MIRType, declspec?: boolean): string {
+    typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "local"): string {
         if (CPPTypeEmitter.isPrimitiveType(ttype)) {
             if (ttype.trkey === "NSCore::Bool") {
                 return "bool";
@@ -105,17 +105,17 @@ class CPPTypeEmitter {
                 return "int64_t";
             }
             else {
-                return "BSQString" + (declspec ? "*" : "");
+                return "BSQString" + (declspec !== "base" ? "*" : "");
             }
         }
         else if (CPPTypeEmitter.isFixedTupleType(ttype)) {
-            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>`;
+            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
         }
         else if (CPPTypeEmitter.isFixedRecordType(ttype)) {
-            return `BSQRecordFixed<MIRRecordTypeEnum::${sanitizeStringForCpp(ttype.trkey)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
+            return `BSQRecordFixed<MIRRecordTypeEnum::${sanitizeStringForCpp(ttype.trkey)}, ${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
         }
         else if (CPPTypeEmitter.isUEntityType(ttype)) {
-            return sanitizeStringForCpp(ttype.trkey) + (declspec ? "*" : "");
+            return sanitizeStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");
         }
         else {
             return "Value";

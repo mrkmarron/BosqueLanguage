@@ -106,7 +106,6 @@ public:
     constexpr static MIRNominalTypeEnum s_tupletype = /*%%NOMINAL_TUPLE*/MIRNominalTypeEnum::Invalid;
     constexpr static MIRNominalTypeEnum s_recordtype = /*%%NOMINAL_RECORD*/MIRNominalTypeEnum::Invalid;
     constexpr static MIRNominalTypeEnum s_arraytype = /*%%NOMINAL_ARRAY*/MIRNominalTypeEnum::Invalid;
-    constexpr static MIRNominalTypeEnum s_objecttype = /*%%NOMINAL_OBJECT*/MIRNominalTypeEnum::Invalid;
 
     inline MIRNominalTypeEnum getNominalType() const
     {
@@ -307,7 +306,7 @@ public:
 class BSQObject : public BSQRef
 {
 public:
-    BSQObject() : BSQRef(BSQRef::s_objecttype), entries(move(entries)) { ; }
+    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(ntype) { ; }
     virtual ~BSQObject() = default;
 };
 } // namespace BSQ

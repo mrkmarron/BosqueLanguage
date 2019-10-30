@@ -6,7 +6,6 @@
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
-import * as assert from "assert";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
 class SMTTypeEmitter {

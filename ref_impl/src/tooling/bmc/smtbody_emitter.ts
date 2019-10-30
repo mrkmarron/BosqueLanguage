@@ -6,11 +6,13 @@
 import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRBodyKey, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
+
+const DEFAULT_GAS = 3;
 
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
@@ -29,6 +31,10 @@ class SMTBodyEmitter {
 
     private typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
     private typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
+
+    private slowEqualityOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
+    private slowLTOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
+    private slowLTEQOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -50,26 +56,6 @@ class SMTBodyEmitter {
         const errid = this.errorCodes.get(errorinfo) as number;
 
         return new SMTValue(`(result_error$${this.typegen.typeToSMTCategory(this.currentRType)} (result_error ${errid}))`);
-    }
-
-    generateBMCCreate(invkey: MIRBodyKey): SMTValue {
-        const rc = this.callg.recursive.findIndex((scc) => scc.has(invkey));
-        const bmcid = [...(this.callg.recursive[rc] as Set<MIRBodyKey>)].sort()[0];
-
-        if (!this.bmcCodes.has(bmcid)) {
-            this.bmcCodes.set(bmcid, this.bmcCodes.size);
-            this.bmcDepths.set(bmcid, 3);
-        }
-        const errid = this.bmcCodes.get(bmcid) as number;
-
-        return new SMTValue(`(result_error$${this.typegen.typeToSMTCategory(this.currentRType)} (result_bmc ${errid}))`);
-    }
-
-    getBMCGas(key: string): number {
-        const rc = this.callg.recursive.findIndex((scc) => scc.has(key));
-        const bmcid = [...(this.callg.recursive[rc] as Set<MIRBodyKey>)].sort()[0];
-
-        return this.bmcDepths.get(bmcid) as number;
     }
 
     varNameToSMTName(name: string): string {
@@ -316,6 +302,25 @@ class SMTBodyEmitter {
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }
 
+    registerSlowEquals(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
+        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
+
+        const slowname = `slowequals@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
+        if (!this.bmcCodes.has(slowname)) {
+            this.bmcCodes.set(slowname, this.bmcCodes.size);
+            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+        }
+        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
+        const fkey = `${slowname}@${gas}`;
+
+        if (this.slowEqualityOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
+            this.slowEqualityOps.push({ fkey: fkey, gas: gas, t1: lt, t2: rt });
+        }
+
+        return fkey;
+    }
+
     generateFastEquals(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
         const lhvtype = this.getArgType(lhs);
         const rhvtype = this.getArgType(rhs);
@@ -334,6 +339,41 @@ class SMTBodyEmitter {
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
+    registerSlowLT(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+        const slowname = `slowlt@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
+        if (!this.bmcCodes.has(slowname)) {
+            this.bmcCodes.set(slowname, this.bmcCodes.size);
+            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+        }
+        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
+        const fkey = `${slowname}@${gas}`;
+
+        if (this.slowLTOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.slowLTOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+        }
+
+        return fkey;
+    }
+
+    registerSlowLTEQ(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
+        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
+
+        const slowname = `slowlteq@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
+        if (!this.bmcCodes.has(slowname)) {
+            this.bmcCodes.set(slowname, this.bmcCodes.size);
+            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+        }
+        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
+        const fkey = `${slowname}@${gas}`;
+
+        if (this.slowLTEQOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.slowLTEQOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+        }
+
+        return fkey;
+    }
+
     generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
         const lhvtype = this.getArgType(lhs);
         const rhvtype = this.getArgType(rhs);
@@ -349,7 +389,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateStmt(op: MIROp, fromblck: string, gass: number): SMTExp | undefined {
+    generateStmt(op: MIROp, fromblck: string, gas: number | undefined): SMTExp | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = op as MIRLoadConst;
@@ -457,7 +497,12 @@ class SMTBodyEmitter {
                 }
                 else {
                     if (pfx.op === "-") {
-                        return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`(* -1 ${this.argToSMT(pfx.arg, this.typegen.intType).emit()})`));
+                        if (pfx.arg instanceof MIRConstantInt) {
+                            return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`-${(pfx.arg as MIRConstantInt).value}`));
+                        }
+                        else {
+                            return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`(* -1 ${this.argToSMT(pfx.arg, this.typegen.intType).emit()})`));
+                        }
                     }
                     else {
                         return new SMTLet(this.varToSMTName(pfx.trgt), this.argToSMT(pfx.arg, this.typegen.intType));
@@ -481,14 +526,14 @@ class SMTBodyEmitter {
 
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
-                if (isInlinableType(lhvtype) && isInlinableType(rhvtype)) {
+                if (SMTTypeEmitter.isPrimitiveType(lhvtype) && SMTTypeEmitter.isPrimitiveType(rhvtype)) {
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, beq.lhs, beq.rhs)));
                 }
                 else {
                     const larg = this.argToSMT(beq.lhs, lhvtype);
                     const rarg = this.argToSMT(beq.rhs, rhvtype);
 
-                    const sloweq = `(@equality_op ${larg.emit()} ${rarg.emit()})`;
+                    const sloweq = `(${this.registerSlowEquals(lhvtype, rhvtype, gas)} ${larg.emit()} ${rarg.emit()})`;
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${sloweq})` : sloweq));
                 }
             }
@@ -498,7 +543,7 @@ class SMTBodyEmitter {
                 const lhvtype = this.getArgType(bcmp.lhs);
                 const rhvtype = this.getArgType(bcmp.rhs);
 
-                if (isInlinableType(lhvtype) && isInlinableType(rhvtype)) {
+                if ((lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")) {
                     return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)));
                 }
                 else {
@@ -506,37 +551,44 @@ class SMTBodyEmitter {
                     const rarg = this.argToSMT(bcmp.rhs, rhvtype).emit();
 
                     if (bcmp.op === "<") {
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(@compare_op ${larg} ${rarg})`));
+                        const slowlt = `(${this.registerSlowLT(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlt));
                     }
                     else if (bcmp.op === ">") {
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(@compare_op ${rarg} ${larg})`));
+                        const slowlt = `(${this.registerSlowLT(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlt));
                     }
                     else if (bcmp.op === "<=") {
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(or (@compare_op ${larg} ${rarg}) (@equality_op ${larg} ${rarg}))`));
+                        const slowlteq = `(${this.registerSlowLTEQ(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlteq));
                     }
                     else {
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(`(or (@compare_op ${rarg} ${larg}) (@equality_op ${larg} ${rarg}))`));
+                        const slowlteq = `(${this.registerSlowLTEQ(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlteq));
                     }
                 }
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
 
-                if (isInlinableType(this.getArgType(ton.arg))) {
+                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, this.getArgType(ton.arg))) {
                     return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue("false"));
                 }
+                else if (this.typegen.assembly.subtypeOf(this.getArgType(ton.arg), this.typegen.noneType)) {
+                    return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue("true"));
+                }
                 else {
-                    return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue(`(= ${this.argToSMT(ton.arg, this.typegen.anyType).emit()} bsq_term_none)`));
+                    return new SMTLet(this.varToSMTName(ton.trgt), new SMTValue(`(= ${this.argToSMT(ton.arg, this.typegen.anyType).emit()} bsqterm_none)`));
                 }
             }
             case MIROpTag.MIRIsTypeOfSome: {
                 const tos = op as MIRIsTypeOfSome;
 
-                if (isInlinableType(this.getArgType(tos.arg))) {
+                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, this.getArgType(tos.arg))) {
                     return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue("true"));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue(`(not (= ${this.argToSMT(tos.arg, this.typegen.anyType).emit()} bsq_term_none))`));
+                    return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue(`(not (= ${this.argToSMT(tos.arg, this.typegen.anyType).emit()} bsqterm_none))`));
                 }
            }
             case MIROpTag.MIRIsTypeOf: {
@@ -580,8 +632,11 @@ class SMTBodyEmitter {
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
                 const argtype = this.getArgType(njop.arg);
-                if (isInlinableType(argtype)) {
+                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
                     return new SMTCond(new SMTValue("false"), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
+                }
+                else if (this.typegen.assembly.subtypeOf(this.getArgType(njop.arg), this.typegen.noneType)) {
+                    return new SMTCond(new SMTValue("true"), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
                 }
                 else {
                     return new SMTCond(new SMTValue(`(= ${this.argToSMT(njop.arg, this.typegen.anyType).emit()} bsq_term_none)`), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
@@ -603,18 +658,18 @@ class SMTBodyEmitter {
         }
     }
 
-    generateBlockExps(block: MIRBasicBlock, fromblock: string, blocks: Map<string, MIRBasicBlock>, gas: number, supportcalls: string[]): SMTExp {
+    generateBlockExps(block: MIRBasicBlock, fromblock: string, blocks: Map<string, MIRBasicBlock>, gas: number | undefined): SMTExp {
         const exps: SMTExp[] = [];
         for (let i = 0; i < block.ops.length; ++i) {
-            const exp = this.generateStmt(block.ops[i], fromblock, gas, supportcalls);
+            const exp = this.generateStmt(block.ops[i], fromblock, gas);
             if (exp !== undefined) {
                 exps.push(exp);
             }
         }
 
         if (block.label === "exit") {
-            const resulttype = this.typegen.typeToSMTType(this.currentRType);
-            let rexp = new SMTValue(`(result_success$${resulttype} _return_)`) as SMTExp;
+            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+            let rexp = new SMTValue(`(result_success@${resulttype} _return_)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
             }
@@ -624,7 +679,7 @@ class SMTBodyEmitter {
         else {
             const jop = block.ops[block.ops.length - 1];
             if (jop.tag === MIROpTag.MIRJump) {
-                let rexp = this.generateBlockExps(blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks, gas, supportcalls);
+                let rexp = this.generateBlockExps(blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks, gas);
                 for (let i = exps.length - 1; i >= 0; --i) {
                     rexp = exps[i].bind(rexp, "#body#");
                 }
@@ -635,10 +690,10 @@ class SMTBodyEmitter {
                 assert(jop.tag === MIROpTag.MIRJumpCond || jop.tag === MIROpTag.MIRJumpNone);
 
                 let tblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).trueblock) : blocks.get((jop as MIRJumpNone).noneblock)) as MIRBasicBlock;
-                let texp = this.generateBlockExps(tblock, block.label, blocks, gas, supportcalls);
+                let texp = this.generateBlockExps(tblock, block.label, blocks, gas);
 
                 let fblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).falseblock) : blocks.get((jop as MIRJumpNone).someblock)) as MIRBasicBlock;
-                let fexp = this.generateBlockExps(fblock, block.label, blocks, gas, supportcalls);
+                let fexp = this.generateBlockExps(fblock, block.label, blocks, gas);
 
                 let rexp = exps[exps.length - 1].bind(texp, "#true_trgt#").bind(fexp, "#false_trgt#");
                 for (let i = exps.length - 2; i >= 0; --i) {
@@ -657,9 +712,9 @@ class SMTBodyEmitter {
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
 
-        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTType(this.assembly.typeMap.get(arg.type) as MIRType)})`);
-        const restype = this.typegen.typeToSMTType(this.assembly.typeMap.get(idecl.resultType) as MIRType);
-        const decl = `(define-fun ${this.invokenameToSMTName(idecl.key)} (${args.join(" ")}) Result$${restype}`;
+        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
+        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.resultType));
+        const decl = `(define-fun ${this.invokenameToSMT(idecl.key)} (${args.join(" ")}) Result@${restype}`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
             this.vtypes = new Map<string, MIRType>();
@@ -669,7 +724,7 @@ class SMTBodyEmitter {
 
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
             let supportcalls: string[] = [];
-            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas, supportcalls);
+            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
                 return { fulldecl: `${decl} \n${body.emit("  ")})`, supportcalls: supportcalls };
