@@ -14,7 +14,6 @@ import * as Commander from "commander";
 import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
 import { CPPEmitter } from "./aot/cppdecls_emitter";
-import { sanitizeForCpp } from "./aot/cpputils";
 import { SMTEmitter } from "./bmc/smtdecls_emitter";
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {

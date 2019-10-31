@@ -32,9 +32,9 @@ class SMTBodyEmitter {
     private typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
     private typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
-    private slowEqualityOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
-    private slowLTOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
-    private slowLTEQOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
+    private compoundEqualityOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
+    private compoundLTOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
+    private compoundLTEQOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -302,20 +302,20 @@ class SMTBodyEmitter {
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
     }
 
-    registerSlowEquals(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+    registerCompoundEquals(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
         const lt = (t1.trkey < t2.trkey) ? t1 : t2;
         const rt = (t1.trkey < t2.trkey) ? t2 : t1;
 
-        const slowname = `slowequals@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
-        if (!this.bmcCodes.has(slowname)) {
-            this.bmcCodes.set(slowname, this.bmcCodes.size);
-            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+        const compoundname = `equals@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
+        if (!this.bmcCodes.has(compoundname)) {
+            this.bmcCodes.set(compoundname, this.bmcCodes.size);
+            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
         }
-        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
-        const fkey = `${slowname}@${gas}`;
+        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const fkey = `${compoundname}@${gas}`;
 
-        if (this.slowEqualityOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
-            this.slowEqualityOps.push({ fkey: fkey, gas: gas, t1: lt, t2: rt });
+        if (this.compoundEqualityOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
+            this.compoundEqualityOps.push({ fkey: fkey, gas: gas, t1: lt, t2: rt });
         }
 
         return fkey;
@@ -339,36 +339,33 @@ class SMTBodyEmitter {
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
-    registerSlowLT(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
-        const slowname = `slowlt@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
-        if (!this.bmcCodes.has(slowname)) {
-            this.bmcCodes.set(slowname, this.bmcCodes.size);
-            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+    registerCompoundLT(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+        const compoundname = `lt@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
+        if (!this.bmcCodes.has(compoundname)) {
+            this.bmcCodes.set(compoundname, this.bmcCodes.size);
+            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
         }
-        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
-        const fkey = `${slowname}@${gas}`;
+        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const fkey = `${compoundname}@${gas}`;
 
-        if (this.slowLTOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.slowLTOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+        if (this.compoundLTOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.compoundLTOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
         }
 
         return fkey;
     }
 
-    registerSlowLTEQ(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
-        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
-        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
-
-        const slowname = `slowlteq@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
-        if (!this.bmcCodes.has(slowname)) {
-            this.bmcCodes.set(slowname, this.bmcCodes.size);
-            this.bmcDepths.set(slowname, cgas || DEFAULT_GAS);
+    registerCompoundLTEQ(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+        const compoundname = `lteq@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
+        if (!this.bmcCodes.has(compoundname)) {
+            this.bmcCodes.set(compoundname, this.bmcCodes.size);
+            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
         }
-        const gas = (cgas || this.bmcDepths.get(slowname)) as number;
-        const fkey = `${slowname}@${gas}`;
+        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const fkey = `${compoundname}@${gas}`;
 
-        if (this.slowLTEQOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.slowLTEQOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+        if (this.compoundLTEQOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.compoundLTEQOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
         }
 
         return fkey;
@@ -533,8 +530,8 @@ class SMTBodyEmitter {
                     const larg = this.argToSMT(beq.lhs, lhvtype);
                     const rarg = this.argToSMT(beq.rhs, rhvtype);
 
-                    const sloweq = `(${this.registerSlowEquals(lhvtype, rhvtype, gas)} ${larg.emit()} ${rarg.emit()})`;
-                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${sloweq})` : sloweq));
+                    const compoundeq = `(${this.registerCompoundEquals(lhvtype, rhvtype, gas)} ${larg.emit()} ${rarg.emit()})`;
+                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${compoundeq})` : compoundeq));
                 }
             }
             case MIROpTag.MIRBinCmp: {
@@ -551,20 +548,20 @@ class SMTBodyEmitter {
                     const rarg = this.argToSMT(bcmp.rhs, rhvtype).emit();
 
                     if (bcmp.op === "<") {
-                        const slowlt = `(${this.registerSlowLT(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlt));
+                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
                     }
                     else if (bcmp.op === ">") {
-                        const slowlt = `(${this.registerSlowLT(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlt));
+                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
                     }
                     else if (bcmp.op === "<=") {
-                        const slowlteq = `(${this.registerSlowLTEQ(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlteq));
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
                     }
                     else {
-                        const slowlteq = `(${this.registerSlowLTEQ(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(slowlteq));
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
                     }
                 }
             }

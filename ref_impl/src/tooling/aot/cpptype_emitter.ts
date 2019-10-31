@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRConceptTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForCpp } from "./cpputils";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
@@ -102,13 +102,13 @@ class CPPTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    isRefableReturnType(tt: MIRType): boolean {
-        if (tt.options.length !== 1) {
-            return true;
-        }
+    maybeRefableCountableType(tt: MIRType): boolean {
+        const allinlineable = tt.options.every((opt) => {
+            const uname = opt.trkey;
+            return (uname === "NSCore::None" || uname === "NSCore::Bool" || uname === "NSCore::Int");
+        });
 
-        const uname = tt.options[0].trkey;
-        if (uname === "NSCore::None" || uname === "NSCore::Bool" ||  uname === "NSCore::Int") {
+        if (allinlineable) {
             return false;
         }
 
@@ -163,15 +163,31 @@ class CPPTypeEmitter {
         });
 
         const constructor_initializer = entity.fields.map((fd) => {
-            return `${fd.fname}(${fd.fname})`; ---- increment as needed
+            return `${fd.fname}(${fd.fname})`;
         });
 
         const destructor_list = entity.fields.map((fd) => {
-            return `(${fd.fname})`; ---- decincrement as needed
-        });
+            const ftype = this.getMIRType(fd.declaredType);
+            if (!this.maybeRefableCountableType(ftype)) {
+                return undefined;
+            }
+
+            if (!this.assembly.subtypeOf(this.boolType, ftype) && !this.assembly.subtypeOf(this.intType, ftype)) {
+                if (this.assembly.subtypeOf(this.noneType, ftype)) {
+                    return `BSQRef::checkedDecrementNoneable(this->${fd.fname});`;
+                }
+                else {
+                    return `BSQRef::checkedDecrementFast(this->${fd.fname});`;
+                }
+            }
+            else {
+                return `BSQRef::checkedDecrement(this->${fd.fname});`;
+            }
+        })
+        .filter((fd) => fd !== undefined);
 
         const fields = entity.fields.map((fd) => {
-            return `const ${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.fname};`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.fname};`;
         });
 
         const vfield_accessors = entity.fields.map((fd) => {

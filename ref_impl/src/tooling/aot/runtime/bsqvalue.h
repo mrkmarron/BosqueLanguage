@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "common.h"
+#include "bsqvalidator.h"
 
 #pragma once
 
@@ -48,10 +49,26 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
+constexpr const char* s_nominaltypenames[] = {
+    "[INVALID]",
+//%%NOMINAL_TYPE_DISPLAY_NAMES
+};
+
 enum class MIRRecordTypeEnum
 {
     Invalid = 0x0,
 //%%RECORD_TYPE_ENUM_DECLARE
+};
+
+enum class MIRArrayTypeEnum
+{
+    Invalid = 0x0,
+//%%ARRAY_TYPE_ENUM_DECLARE
+};
+
+constexpr const char* s_arraytypenames[] = {
+    "[INVALID]",
+//%%ARRAY_TYPE_DISPLAY_NAMES
 };
 
 typedef void* Value;
@@ -85,20 +102,31 @@ public:
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+            BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
         }
 
         return v;
+    }
+
+    inline static void checkedDecrementFast(Value v)
+    {
+        BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
+    }
+
+    inline static void checkedDecrementNoneable(Value v)
+    {
+        if(BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
+        }
     }
 
     inline static void checkedDecrement(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::decrement(BSQ_GET_VALUE_PTR(ptr, BSQRef));
+            BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
         }
-
-        return v;
     }
 
     //%%ALL_VFIELD_ACCESS_DECLS
@@ -180,32 +208,32 @@ public:
     virtual ~BSQString() = default;
 };
 
-class BSQTypedString : public BSQRef
+class BSQStringOf : public BSQRef
 {
 public:
     const std::string sdata;
     const MIRNominalTypeEnum oftype;
 
-    BSQTypedString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
-    virtual ~BSQTypedString() = default;
+    BSQStringOf(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    virtual ~BSQStringOf() = default;
 };
 
 class BSQValidatedString : public BSQRef
 {
 public:
     const std::string sdata;
-    const MIRNominalTypeEnum oftype;
+    const BSQValidator* validator;
 
-    BSQValidatedString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    BSQValidatedString(const std::string& str, const BSQValidator* validator) : BSQRef(), sdata(str), validator(validator) { ; }
     virtual ~BSQValidatedString() = default;
 };
 
 class BSQPODBuffer : public BSQRef
 {
 public:
-    const std::vector<byte> sdata;
+    const std::vector<uint8_t> sdata;
 
-    BSQPODBuffer(std::vector<byte>&& sdata) : BSQRef(), sdata(move(sdata)) { ; }
+    BSQPODBuffer(std::vector<uint8_t>&& sdata) : BSQRef(), sdata(move(sdata)) { ; }
     virtual ~BSQPODBuffer() = default;
 };
 
@@ -233,11 +261,9 @@ class BSQIdKey : public BSQRef
 {
 public:
     const Value sdata;
+    const MIRNominalTypeEnum oftype;
 
-    BSQIdKey(Value sdata) : BSQRef(), sdata(sdata) 
-    {
-        BSQRef::checkedIncrement(this->sdata);
-    }
+    BSQIdKey(Value sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(sdata), oftype(oftype) { ; }
 
     virtual ~BSQIdKey()
     {
@@ -256,7 +282,7 @@ public:
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i])
+            BSQRef::checkedDecrement(this->entries[i]);
         }
     }
 
@@ -301,7 +327,7 @@ public:
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i].second)
+            BSQRef::checkedDecrement(this->entries[i].second);
         }
     }
 
@@ -316,7 +342,7 @@ public:
 
     Value atVar(MIRPropertyEnum p) const
     {
-        auto iter = std::find_if(this->entries.cbegin(), this->entries.cend() [p](const std::pair<MIRPropertyEnum, Value>& entry) {
+        auto iter = std::find_if(this->entries.cbegin(), this->entries.cend(), [p](const std::pair<MIRPropertyEnum, Value>& entry) {
             return entry.first == p;
         });
         return (iter != this->entries.cend()) ? iter->second : BSQ_VALUE_NONE;
@@ -344,15 +370,16 @@ public:
 class BSQArray : public BSQRef
 {
 public:
-   const std::vector<Value> contents;
+    const MIRArrayTypeEnum atype;
+    const std::vector<Value> contents;
 
-    BSQArray(std::vector<Value>&& contents) : BSQRef(), contents(move(contents)) { ; }
+    BSQArray(MIRArrayTypeEnum atype, std::vector<Value>&& contents) : BSQRef(), atype(atype), contents(move(contents)) { ; }
 
     virtual ~BSQArray()
     {
         for(size_t i = 0; i < this->contents.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->contents[i])
+            BSQRef::checkedDecrement(this->contents[i]);
         }
     }
 };
@@ -360,7 +387,11 @@ public:
 class BSQObject : public BSQRef
 {
 public:
-    BSQObject() : BSQRef(ntype) { ; }
+    MIRNominalTypeEnum ntype;
+
+    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(), ntype(ntype) { ; }
     virtual ~BSQObject() = default;
+
+    virtual std::string display() const;
 };
 } // namespace BSQ

@@ -23,13 +23,6 @@ public:
 
 static const char* propertyNames[];
 
-static uint64_t keyvalue_hashcode(Value v);
-static bool keyvalue_equality(Value lhs, Value rhs);
-
-static uint64_t hashcode(Value v);
-static bool equality_op(Value lhs, Value rhs);
-static bool compare_op(Value lhs, Value rhs);
-
 static std::string diagnostic_format(Value v);
 };
 } // namespace BSQ

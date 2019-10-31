@@ -27,6 +27,10 @@ class CPPBodyEmitter {
     private typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
     private typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
+    private compoundEqualityOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
+    private compoundLTOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
+    private compoundLTEQOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
+
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
@@ -285,11 +289,24 @@ class CPPBodyEmitter {
         }
 
         const rtype = this.typegen.getMIRType(ivop.resultType);
-        if (this.typegen.isRefableReturnType(rtype)) {
+        if (this.typegen.maybeRefableCountableType(rtype)) {
             vals.push(`$scope$.getCallerSlot<${this.scopectr++}>()`);
         }
 
         return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.mkey)}(${vals.join(", ")});`;
+    }
+
+    registerCompoundEquals(t1: MIRType, t2: MIRType): string {
+        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
+        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
+
+        const fkey = `equals@${sanitizeStringForCpp(lt.trkey)}$${sanitizeStringForCpp(rt.trkey)}`;
+
+        if (this.compoundEqualityOps.findIndex((eop) => eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
+            this.compoundEqualityOps.push({ fkey: fkey, t1: lt, t2: rt });
+        }
+
+        return fkey;
     }
 
     generateFastEquals(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
@@ -305,6 +322,26 @@ class CPPBodyEmitter {
         else {
             return `(BSQ_GET_VALUE_PTR(${this.argToCpp(lhs, this.typegen.stringType)}, BSQString)->sdata ${op} BSQ_GET_VALUE_PTR(${this.argToCpp(rhs, this.typegen.stringType)}, BSQString)->sdata)`;
         }
+    }
+
+    registerCompoundLT(t1: MIRType, t2: MIRType): string {
+        const fkey = `lt$${sanitizeStringForCpp(t1.trkey)}$${sanitizeStringForCpp(t2.trkey)}`;
+
+        if (this.compoundLTOps.findIndex((eop) => eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.compoundLTOps.push({ fkey: fkey, t1: t1, t2: t2 });
+        }
+
+        return fkey;
+    }
+
+    registerCompoundLTEQ(t1: MIRType, t2: MIRType): string {
+        const fkey = `lteq$${sanitizeStringForCpp(t1.trkey)}$${sanitizeStringForCpp(t2.trkey)}`;
+
+        if (this.compoundLTEQOps.findIndex((eop) => eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
+            this.compoundLTEQOps.push({ fkey: fkey, t1: t1, t2: t2 });
+        }
+
+        return fkey;
     }
 
     generateFastCompare(op: string, lhs: MIRArgument, rhs: MIRArgument): string {
@@ -461,13 +498,14 @@ class CPPBodyEmitter {
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
                 if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
-                    return `${this.varToCppName(beq.trgt)} = this.generateFastEquals(beq.op, beq.lhs, beq.rhs);`;
+                    return `${this.varToCppName(beq.trgt)} = ${this.generateFastEquals(beq.op, beq.lhs, beq.rhs)};`;
                 }
                 else {
                     const larg = this.argToCpp(beq.lhs, lhvtype);
                     const rarg = this.argToCpp(beq.rhs, rhvtype);
 
-                    return `${this.varToCppName(beq.trgt)} = ${beq.op === "!=" ? "!" : ""}Runtime::equality_op(${larg}, ${rarg});`;
+                    const compoundeq = `${this.registerCompoundEquals(lhvtype, rhvtype)}(${larg} ${rarg})`;
+                    return `${this.varToCppName(beq.trgt)} = ${beq.op === "!=" ? "!" : ""}${compoundeq};`;
                 }
             }
             case MIROpTag.MIRBinCmp: {
@@ -484,16 +522,20 @@ class CPPBodyEmitter {
                     const rarg = this.argToCpp(bcmp.rhs, rhvtype);
 
                     if (bcmp.op === "<") {
-                        return `${this.varToCppName(bcmp.trgt)} = Runtime::lt_op(${larg}, ${rarg});`;
+                        const compoundlt = `${this.registerCompoundLT(lhvtype, rhvtype)}(${larg} ${rarg})`;
+                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
                     }
                     else if (bcmp.op === ">") {
-                        return `${this.varToCppName(bcmp.trgt)} = Runtime::lt_op(${rarg}, ${larg});`;
+                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype)} ${rarg} ${larg})`;
+                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
                     }
                     else if (bcmp.op === "<=") {
-                        return `${this.varToCppName(bcmp.trgt)} = Runtime::lteq_op(${larg}, ${rarg});`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${larg} ${rarg})`;
+                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
                     }
                     else {
-                        return `${this.varToCppName(bcmp.trgt)} = Runtime::lteq_op(${rarg}, ${larg});`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${rarg} ${larg})`;
+                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
                     }
                 }
             }
@@ -620,7 +662,7 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
-            if (!this.typegen.isRefableReturnType(this.currentRType)) {
+            if (!this.typegen.maybeRefableCountableType(this.currentRType)) {
                 if (!this.assembly.subtypeOf(this.typegen.boolType, this.currentRType) && !this.assembly.subtypeOf(this.typegen.intType, this.currentRType)) {
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
                         gblock.push("RefCountScopeCallMgr::processCallRefNoneable($callerslot$, _return_);");
@@ -648,7 +690,7 @@ class CPPBodyEmitter {
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
 
-        if (!this.typegen.isRefableReturnType(this.typegen.getMIRType(idecl.resultType))) {
+        if (!this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
             args.push("RefCountBase** $callerslot$");
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;

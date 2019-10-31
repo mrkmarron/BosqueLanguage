@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRRecordType, MIRInvokeDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
-import { NOT_IMPLEMENTED, sanitizeForCpp } from "./cpputils";
+import { NOT_IMPLEMENTED, sanitizeStringForCpp } from "./cpputils";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
 
@@ -28,13 +28,6 @@ class CPPEmitter {
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
-        assembly.conceptDecls.forEach((cdecl) => {
-            const cppdecl = typeemitter.generateCPPConcept(cdecl);
-            if (cppdecl !== undefined) {
-                typedecls_fwd.push(cppdecl.fwddecl);
-                typedecls.push(cppdecl.fulldecl);
-            }
-        });
         assembly.entityDecls.forEach((edecl) => {
             const cppdecl = typeemitter.generateCPPEntity(edecl);
             if (cppdecl !== undefined) {
@@ -90,14 +83,14 @@ class CPPEmitter {
         let propertyenums: Set<string> = new Set<string>();
         let propertynames: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
-            propertyenums.add(sanitizeForCpp(pname));
+            propertyenums.add(sanitizeStringForCpp(pname));
             propertynames.add(`"${pname}"`);
         });
         assembly.typeMap.forEach((tt) => {
             tt.options.forEach((topt) => {
                 if (topt instanceof MIRRecordType) {
                     topt.entries.forEach((entry) => {
-                        propertyenums.add(sanitizeForCpp(entry.name));
+                        propertyenums.add(sanitizeStringForCpp(entry.name));
                         propertynames.add(`"${entry.name}"`);
                     });
                 }

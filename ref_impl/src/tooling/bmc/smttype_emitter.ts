@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRNominalType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
@@ -145,19 +145,18 @@ class SMTTypeEmitter {
         return `bsqrecord_${sanitizeStringForSMT(ttype.trkey)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
     }
 
-    generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, boxeddecl: string, fulldecl: string } | undefined {
-        if (entity.tkey === "NSCore::None" || entity.tkey === "NSCore::Bool" || entity.tkey === "NSCore::Int" || entity.tkey === "NSCore::String") {
+    generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
+        if (!this.doDefaultEmitOnEntity(entity)) {
             return undefined;
         }
 
         const fargs = entity.fields.map((fd) => {
-            return `(${sanitizeForSMT(entity.tkey)}@${fd.fname} ${this.typeToSMTType(this.assembly.typeMap.get(fd.declaredType) as MIRType)})`;
+            return `(${sanitizeStringForSMT(entity.tkey)}@${fd.fname} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
         });
 
         return {
-            fwddecl: `(${sanitizeForSMT(entity.tkey)} 0)`,
-            boxeddecl: `(bsq_term_${sanitizeForSMT(entity.tkey)} (bsq_term_value_${sanitizeForSMT(entity.tkey)} ${sanitizeForSMT(entity.tkey)}))`,
-            fulldecl: `( (cons$${sanitizeForSMT(entity.tkey)} ${fargs.join(" ")}) )`
+            fwddecl: `(${sanitizeStringForSMT(entity.tkey)} 0)`,
+            fulldecl: `( (cons$${sanitizeStringForSMT(entity.tkey)} ${fargs.join(" ")}) )`
         };
     }
 }

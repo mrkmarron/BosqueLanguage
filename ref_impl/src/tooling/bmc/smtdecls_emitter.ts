@@ -3,11 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { NOT_IMPLEMENTED, sanitizeForSMT } from "./smtutils";
+import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
 
 type SMTCode = {
@@ -28,7 +28,6 @@ class SMTEmitter {
         const rcg = [...cginfo.topologicalOrder].reverse();
 
         let typedecls_fwd: string[] = [];
-        let typedecls_boxed: string[] = [];
         let typedecls: string[] = [];
         let resultdecls_fwd: string[] = [];
         let resultdecls: string[] = [];
@@ -36,11 +35,10 @@ class SMTEmitter {
             const smtdecl = typeemitter.generateSMTEntity(edecl);
             if (smtdecl !== undefined) {
                 typedecls_fwd.push(smtdecl.fwddecl);
-                typedecls_boxed.push(smtdecl.boxeddecl);
                 typedecls.push(smtdecl.fulldecl);
 
-                resultdecls_fwd.push(`(Result$${sanitizeForSMT(edecl.tkey)} 0)`);
-                resultdecls.push(`( (result_success$${sanitizeForSMT(edecl.tkey)} (result_success_value$${sanitizeForSMT(edecl.tkey)} ${sanitizeForSMT(edecl.tkey)})) (result_error$${sanitizeForSMT(edecl.tkey)} (result_error_code$${sanitizeForSMT(edecl.tkey)} ${sanitizeForSMT(edecl.tkey)})) )`);
+                resultdecls_fwd.push(`(Result@${sanitizeStringForSMT(edecl.tkey)} 0)`);
+                resultdecls.push(`( (result_success$${sanitizeStringForSMT(edecl.tkey)} (result_success_value@${sanitizeStringForSMT(edecl.tkey)} ${sanitizeStringForSMT(edecl.tkey)})) (result_error@${sanitizeStringForSMT(edecl.tkey)} (result_error_code@${sanitizeStringForSMT(edecl.tkey)} ErrorCode)) )`);
             }
         });
 
@@ -91,10 +89,10 @@ class SMTEmitter {
         const typeemitter = new SMTTypeEmitter(assembly);
         const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
 
-        const rrtype = typeemitter.typeToSMTType(assembly.typeMap.get(entrypoint.resultType) as MIRType);
+        const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
 
         const resv = `(declare-const @smtres@ Result$${rrtype})`;
-        const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMTName(entrypoint.key)}))`;
+        const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMT(entrypoint.key)}))`;
         const chk = `(assert (is-result_error$${rrtype} @smtres@))`;
 
         const callinfo = resv + "\n" + cassert + "\n" + chk;
