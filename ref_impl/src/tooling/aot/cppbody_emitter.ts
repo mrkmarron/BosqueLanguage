@@ -320,7 +320,7 @@ class CPPBodyEmitter {
             return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
         else {
-            return `(BSQ_GET_VALUE_PTR(${this.argToCpp(lhs, this.typegen.stringType)}, BSQString)->sdata ${op} BSQ_GET_VALUE_PTR(${this.argToCpp(rhs, this.typegen.stringType)}, BSQString)->sdata)`;
+            return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
         }
     }
 
@@ -355,7 +355,7 @@ class CPPBodyEmitter {
             return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
         else {
-            return `(BSQ_GET_VALUE_PTR(${this.argToCpp(lhs, this.typegen.stringType)}, BSQString)->sdata ${op} BSQ_GET_VALUE_PTR(${this.argToCpp(rhs, this.typegen.stringType)}, BSQString)->sdata)`;
+            return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
         }
     }
 
