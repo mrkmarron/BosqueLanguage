@@ -13,6 +13,16 @@ const char* Runtime::propertyNames[] = {
 //%%PROPERTY_NAMES%%
 };
 
+constexpr const char* s_nominaltypenames[] = {
+    "[INVALID]",
+//%%NOMINAL_TYPE_DISPLAY_NAMES
+};
+
+constexpr const char* s_arraytypenames[] = {
+    "[INVALID]",
+//%%ARRAY_TYPE_DISPLAY_NAMES
+};
+
 std::string Runtime::diagnostic_format(Value v)
 {
     if(BSQ_IS_VALUE_NONE(v))

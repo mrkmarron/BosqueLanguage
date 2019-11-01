@@ -102,6 +102,10 @@ class CPPTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
+    static fixedRecordPropertyName(frec: MIRRecordType): string {
+        return sanitizeStringForCpp(`{${frec.entries.map((entry) => entry.name).join("$")}}`);
+    }
+
     maybeRefableCountableType(tt: MIRType): boolean {
         const allinlineable = tt.options.every((opt) => {
             const uname = opt.trkey;
@@ -132,10 +136,10 @@ class CPPTypeEmitter {
             }
         }
         else if (this.isFixedTupleType(ttype)) {
-            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
+            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>`;
         }
         else if (this.isFixedRecordType(ttype)) {
-            return `BSQRecordFixed<MIRRecordTypeEnum::${sanitizeStringForCpp(ttype.trkey)}, ${(ttype.options[0] as MIRTupleType).entries.length}>` + (declspec === "parameter" ? "&" : "");
+            return `BSQRecordFixed<FixedRecordPropertyListEnum::${CPPTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
         }
         else if (this.isUEntityType(ttype)) {
             return sanitizeStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");

@@ -18,6 +18,7 @@ type CPPCode = {
     conststring_declare: string,
     conststring_create: string,
     propertyenums: string,
+    fixedrecord_property_lists: string,
     propertynames: string
 };
 
@@ -82,6 +83,7 @@ class CPPEmitter {
 
         let propertyenums: Set<string> = new Set<string>();
         let propertynames: Set<string> = new Set<string>();
+        let fixedrecord_property_lists: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(sanitizeStringForCpp(pname));
             propertynames.add(`"${pname}"`);
@@ -95,6 +97,10 @@ class CPPEmitter {
                     });
                 }
             });
+
+            if (typeemitter.isFixedRecordType(tt)) {
+                fixedrecord_property_lists.add(CPPTypeEmitter.fixedRecordPropertyName(tt.options[0] as MIRRecordType));
+            }
         });
 
         return {
@@ -105,6 +111,7 @@ class CPPEmitter {
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
             propertyenums: [...propertyenums].sort().join(",\n  "),
+            fixedrecord_property_lists: [...fixedrecord_property_lists].sort().join("\n  "),
             propertynames: [...propertynames].sort().join(",\n  ")
         };
     }

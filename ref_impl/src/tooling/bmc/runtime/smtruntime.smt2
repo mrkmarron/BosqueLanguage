@@ -16,10 +16,10 @@
 (declare-datatypes ( 
       (BTerm 0)
       (bsqtuple_0 0)
-      ;;FIXED_TUPLE_DECLS_FWD;;
-      (bsqtuple_$lp$$rp$ 0)
-      ;;FIXED_RECORD_DECLS_FWD;;
-      ;;NOMINAL_DECLS_FWD;;
+    ;;FIXED_TUPLE_DECLS_FWD;;
+      (bsqrecord_$lp$$rp$ 0)
+    ;;FIXED_RECORD_DECLS_FWD;;
+    ;;NOMINAL_DECLS_FWD;;
     ) (
     (
       (bsqterm_none) 
@@ -39,10 +39,10 @@
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
     ( (bsqtuple_0@cons) )
-    ;;FIXED_TUPLE_DECLS;;
-    ( (bsqtuple_$lp$$rp$@cons) )
-    ;;FIXED_RECORD_DECLS;;
-    ;;NOMINAL_DECLS;;
+  ;;FIXED_TUPLE_DECLS;;
+    ( (bsqrecord_$lp$$rp$@cons) )
+  ;;FIXED_RECORD_DECLS;;
+  ;;NOMINAL_DECLS;;
 ))
 
 ;;KNOWN_RECORD_PROPERTY_TYPE_LISTS;;
@@ -52,7 +52,7 @@
 (declare-const bsqterm_false_const BTerm) (assert (= bsqterm_false_const (bsqterm_bool false)))
 
 (declare-const bsqtuple_empty_const bsqtuple_0) (assert (= bsqtuple_empty_const bsqtuple_0@cons))
-(declare-const bsqrecord_empty_const bsqtuple_$lp$$rp$) (assert (= bsqrecord_empty_const bsqtuple_$lp$$rp$@cons))
+(declare-const bsqrecord_empty_const bsqrecord_$lp$$rp$) (assert (= bsqrecord_empty_const bsqrecord_$lp$$rp$@cons))
 
 (declare-const bsqtuple_array_empty (Array Int BTerm))
 (assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))

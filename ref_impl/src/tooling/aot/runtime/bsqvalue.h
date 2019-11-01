@@ -49,26 +49,17 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
-constexpr const char* s_nominaltypenames[] = {
-    "[INVALID]",
-//%%NOMINAL_TYPE_DISPLAY_NAMES
-};
-
-enum class MIRRecordTypeEnum
-{
-    Invalid = 0x0,
-//%%RECORD_TYPE_ENUM_DECLARE
-};
-
 enum class MIRArrayTypeEnum
 {
     Invalid = 0x0,
 //%%ARRAY_TYPE_ENUM_DECLARE
 };
 
-constexpr const char* s_arraytypenames[] = {
-    "[INVALID]",
-//%%ARRAY_TYPE_DISPLAY_NAMES
+
+enum class FixedRecordPropertyListEnum
+{
+    Invalid = 0x0,
+//%%FIXED_RECORD_PROPERTY_LIST_ENUM_DECLARE
 };
 
 typedef void* Value;
@@ -349,7 +340,7 @@ public:
     }
 };
 
-template <MIRRecordTypeEnum rt, uint16_t k>
+template <FixedRecordPropertyListEnum rt, uint16_t k>
 class BSQRecordFixed
 {
 public:

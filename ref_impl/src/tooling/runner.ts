@@ -112,6 +112,7 @@ else {
             const bcontents = contents
                 .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
                 .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
+                .replace("//%%FIXED_RECORD_PROPERTY_LIST_ENUM_DECLARE", "  " + cparams.fixedrecord_property_lists)
                 .replace("//%%PROPERTY_ENUM_DECLARE", "  " + cparams.propertyenums)
                 .replace("//%%PROPERTY_NAMES%%", "  " + cparams.propertynames);
 

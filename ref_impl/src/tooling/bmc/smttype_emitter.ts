@@ -103,6 +103,10 @@ class SMTTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
+    static fixedRecordPropertyName(frec: MIRRecordType): string {
+        return sanitizeStringForSMT(`{${frec.entries.map((entry) => entry.name).join("$")}}`);
+    }
+
     typeToSMTCategory(ttype: MIRType): string {
         if (this.isPrimitiveType(ttype)) {
             if (ttype.trkey === "NSCore::Bool") {
@@ -119,7 +123,7 @@ class SMTTypeEmitter {
             return "bsqtuple_" + (ttype.options[0] as MIRTupleType).entries.length;
         }
         else if (this.isFixedRecordType(ttype)) {
-            return "bsqrecord_" + sanitizeStringForSMT(ttype.trkey);
+            return "bsqrecord_" + SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType);
         }
         else if (this.isUEntityType(ttype)) {
             return "bsqentity_" + sanitizeStringForSMT(ttype.trkey);
@@ -138,11 +142,11 @@ class SMTTypeEmitter {
     }
 
     generateFixedRecordConstructor(ttype: MIRType): string {
-        return `bsqrecord_${sanitizeStringForSMT(ttype.trkey)}@cons`;
+        return `bsqrecord_${SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@cons`;
     }
 
     generateFixedRecordAccessor(ttype: MIRType, p: string): string {
-        return `bsqrecord_${sanitizeStringForSMT(ttype.trkey)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
+        return `bsqrecord_${SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
