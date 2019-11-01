@@ -141,16 +141,16 @@ private:
     BSQRef* opts[k];
 
 public:
-    RefCountScope() : opts{nullptr}
+    BSQRefScope() : opts{nullptr}
     {
         ;
     }
 
-    ~RefCountScope()
+    ~BSQRefScope()
     {
-        for(size_t i = 0; i < k; ++i)
+        for(uint16_t i = 0; i < k; ++i)
         {
-            BSQRef::decrement(opts[i]);
+            BSQRef::decrement(this->opts[i]);
         }
     }
 
@@ -353,7 +353,7 @@ template <MIRRecordTypeEnum rt, uint16_t k>
 class BSQRecordFixed
 {
 public:
-    Value entries[K];
+    Value entries[k];
 
     template <uint16_t pidx>
     inline Value atFixed()

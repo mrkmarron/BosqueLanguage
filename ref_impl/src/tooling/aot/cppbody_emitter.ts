@@ -92,10 +92,10 @@ class CPPBodyEmitter {
                 return exp;
             }
 
-            if (into.trkey === "NSCore::Bool") {
+            if (from.trkey === "NSCore::Bool") {
                 return `BSQ_BOX_VALUE_BOOL(${exp})`;
             }
-            else if (into.trkey === "NSCore::Int") {
+            else if (from.trkey === "NSCore::Int") {
                 return `BSQ_BOX_VALUE_INT(${exp})`;
             }
             else {
@@ -138,7 +138,7 @@ class CPPBodyEmitter {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
             else if (into.trkey === "NSCore::Int") {
-                return `BSQ_GET_VALUE_Int(${exp})`;
+                return `BSQ_GET_VALUE_INT(${exp})`;
             }
             else {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
@@ -662,7 +662,7 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
-            if (!this.typegen.maybeRefableCountableType(this.currentRType)) {
+            if (this.typegen.maybeRefableCountableType(this.currentRType)) {
                 if (!this.assembly.subtypeOf(this.typegen.boolType, this.currentRType) && !this.assembly.subtypeOf(this.typegen.intType, this.currentRType)) {
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
                         gblock.push("RefCountScopeCallMgr::processCallRefNoneable($callerslot$, _return_);");
@@ -690,8 +690,8 @@ class CPPBodyEmitter {
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
 
-        if (!this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
-            args.push("RefCountBase** $callerslot$");
+        if (this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
+            args.push("BSQRef** $callerslot$");
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;
 

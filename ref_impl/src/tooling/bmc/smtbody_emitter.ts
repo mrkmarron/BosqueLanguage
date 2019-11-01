@@ -108,10 +108,10 @@ class SMTBodyEmitter {
                 return exp;
             }
 
-            if (into.trkey === "NSCore::Bool") {
+            if (from.trkey === "NSCore::Bool") {
                 return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
             }
-            else if (into.trkey === "NSCore::Int") {
+            else if (from.trkey === "NSCore::Int") {
                 return new SMTValue(`(bsqterm_int ${exp.emit()})`);
             }
             else {

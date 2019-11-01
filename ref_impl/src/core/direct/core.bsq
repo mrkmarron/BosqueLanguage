@@ -43,7 +43,7 @@ concept POD provides Any {
     static stringify<T where POD>(data: T): ValidatedString<T> # pod_stringify //note special case where T is ValidatedString<X> then type system should know identity -- ValidatedString<ValidatedString<ZipCode>> = ValidatedString<Zipcode>
     static bufferify<T where POD>(data: T): PODBuffer<T> # pod_bufferify
 
-    static tryParseAs<T where POD>(data: String | PODBuffer): Result<T> # pod_trypodparseas
+    static tryParseAs<T where POD>(data: String | PODBuffer<T>): Result<T> # pod_trypodparseas
 }
 
 //<summary>Type for representing the none-value.</summary>
@@ -65,7 +65,7 @@ entity Bool provides KeyType, Parsable, POD, Some, Truthy {
             return true;
         }
         elif(str == "false") {
-            return result: false;
+            return false;
         }
         else {
             return none;
@@ -97,15 +97,15 @@ entity String provides KeyType, POD, Some {
 entity StringOf<T where Parsable> provides KeyType, Some {
     method rawString(): String # stringof_rawstring
 
-    method convert<U where Parsable>(): StringOf<U> # stringof_convert;
-    method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert;
+    method convert<U where Parsable>(): StringOf<U> # stringof_convert
+    method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert
 }
 
 entity ValidatedString<T where Validator> provides KeyType, POD, Some {
     method rawString(): String # validatedstring_rawstring
 
-    method convert<U where Validator>(): ValidatedString<U> # validatedstring_convert;
-    method tryConvert<U where Validator>(): ValidatedString<U> # validatedstring_convert;
+    method convert<U where Validator>(): ValidatedString<U> # validatedstring_convert
+    method tryConvert<U where Validator>(): ValidatedString<U> # validatedstring_convert
 }
 
 //<summary>All actual format validators provide this concept.</summary>
@@ -167,6 +167,33 @@ concept PODArray provides POD, Array {
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {
+}
+
+//<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
+concept Result<T> provides Some {
+    hidden field _success: Bool;
+    hidden field _result: T?;
+
+    factory static error(): { _success: Bool, _result: T? } {
+        return { _success=false, _result=none };
+    }
+
+    factory static success(result: T): { _success: Bool, _result: T? } {
+        return { _success=true, _result=result };
+    }
+
+    method isError(): Bool {
+        return !this._success;
+    }
+
+    method isSuccess(): Bool {
+        return this._success;
+    }
+
+    method getResult(): T {
+        check this.success;
+        return this.result->as<T>();
+    }
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
