@@ -75,8 +75,10 @@ if (Commander.verify !== undefined) {
         const sparams = SMTEmitter.emit(massembly);
         const lsrc = FS.readFileSync(smt_runtime).toString();
         const gensrc = lsrc
-            .replace(";;NOMINAL_DECLS_FWD;;", "  " + sparams.typedecls_fwd)
-            .replace(";;BOXED_NOMINAL_DECLS;;", "  " + sparams.typedecls_boxed)
+            .replace(";;FIXED_TUPLE_DECLS_FWD;;", "  " + sparams.fixedtupledecls_fwd)
+            .replace(";;FIXED_RECORD_DECLS_FWD;;", "  " + sparams.fixedrecorddecls_fwd)
+            .replace(";;FIXED_TUPLE_DECLS;;", "  " + sparams.fixedtupledecls)
+            .replace(";;FIXED_RECORD_DECLS;;", "  " + sparams.fixedrecorddecls)
             .replace(";;NOMINAL_DECLS;;", "  " + sparams.typedecls)
             .replace(";;NOMINAL_RESULT_FWD;;", "  " + sparams.resultdecls_fwd)
             .replace(";;NOMINAL_RESULT;;", "  " + sparams.resultdecls)

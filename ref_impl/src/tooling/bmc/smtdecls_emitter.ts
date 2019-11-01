@@ -12,8 +12,11 @@ import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "..
 
 type SMTCode = {
     typedecls_fwd: string,
-    typedecls_boxed: string,
     typedecls: string,
+    fixedtupledecls_fwd: string,
+    fixedtupledecls: string,
+    fixedrecorddecls_fwd: string,
+    fixedrecorddecls: string,
     resultdecls_fwd: string,
     resultdecls: string,
     function_decls: string
@@ -39,6 +42,30 @@ class SMTEmitter {
 
                 resultdecls_fwd.push(`(Result@${sanitizeStringForSMT(edecl.tkey)} 0)`);
                 resultdecls.push(`( (result_success$${sanitizeStringForSMT(edecl.tkey)} (result_success_value@${sanitizeStringForSMT(edecl.tkey)} ${sanitizeStringForSMT(edecl.tkey)})) (result_error@${sanitizeStringForSMT(edecl.tkey)} (result_error_code@${sanitizeStringForSMT(edecl.tkey)} ErrorCode)) )`);
+            }
+        });
+
+        let fixedtupledecls_fwd: string[] = [];
+        let fixedtupledecls: string[] = [];
+        let fixedrecorddecls_fwd: string[] = [];
+        let fixedrecorddecls: string[] = [];
+        assembly.typeMap.forEach((tt) => {
+            if (typeemitter.isFixedTupleType(tt) && SMTTypeEmitter.getFixedTupleType(tt).entries.length !== 0) {
+                fixedtupledecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
+
+                const cargs = (SMTTypeEmitter.getFixedTupleType(tt)).entries.map((entry, i) => {
+                    return `(${typeemitter.generateFixedTupleAccessor(tt, i)} BTerm)`;
+                });
+                fixedtupledecls.push(`( (${typeemitter.generateFixedTupleConstructor(tt)} ${cargs.join(" ")}) )`);
+            }
+
+            if (typeemitter.isFixedRecordType(tt) && SMTTypeEmitter.getFixedRecordType(tt).entries.length !== 0) {
+                fixedrecorddecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
+
+                const cargs = (SMTTypeEmitter.getFixedRecordType(tt)).entries.map((entry) => {
+                    return `(${typeemitter.generateFixedRecordAccessor(tt, entry.name)} BTerm)`;
+                });
+                fixedrecorddecls.push(`( (${typeemitter.generateFixedRecordConstructor(tt)} ${cargs.join(" ")}) )`);
             }
         });
 
@@ -78,7 +105,10 @@ class SMTEmitter {
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
-            typedecls_boxed: typedecls.sort().join("\n"),
+            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n"),
+            fixedtupledecls: fixedtupledecls.sort().join("\n"),
+            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n"),
+            fixedrecorddecls: fixedrecorddecls.sort().join("\n"),
             resultdecls_fwd: resultdecls_fwd.sort().join("\n"),
             resultdecls: resultdecls.sort().join("\n"),
             function_decls: funcdecls.sort().join("\n")
@@ -91,9 +121,9 @@ class SMTEmitter {
 
         const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
 
-        const resv = `(declare-const @smtres@ Result$${rrtype})`;
+        const resv = `(declare-const @smtres@ Result@${rrtype})`;
         const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMT(entrypoint.key)}))`;
-        const chk = `(assert (is-result_error$${rrtype} @smtres@))`;
+        const chk = `(assert (is-result_error@${rrtype} @smtres@))`;
 
         const callinfo = resv + "\n" + cassert + "\n" + chk;
 

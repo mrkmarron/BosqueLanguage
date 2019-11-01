@@ -55,7 +55,7 @@ class SMTBodyEmitter {
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
-        return new SMTValue(`(result_error$${this.typegen.typeToSMTCategory(this.currentRType)} (result_error ${errid}))`);
+        return new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error ${errid}))`);
     }
 
     varNameToSMTName(name: string): string {
@@ -239,12 +239,22 @@ class SMTBodyEmitter {
 
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
         const tcons = this.typegen.generateFixedTupleConstructor(this.typegen.getMIRType(op.resultTupleType));
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons}, ${op.args.map((arg) => this.argToSMT(arg, this.typegen.anyType)).join(" ")})`));
+        if (tcons === "bsqtuple_0@cons") {
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqtuple_empty_const"));
+        }
+        else {
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${op.args.map((arg) => this.argToSMT(arg, this.typegen.anyType).emit()).join(" ")})`));
+        }
     }
 
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
         const tcons = this.typegen.generateFixedRecordConstructor(this.typegen.getMIRType(op.resultRecordType));
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons}, ${op.args.map((arg) => this.argToSMT(arg[1], this.typegen.anyType)).join(" ")})`));
+        if (tcons === "bsqtuple_$lp$$rp$@cons") {
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqrecord_empty_const"));
+        }
+        else {
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${op.args.map((arg) => this.argToSMT(arg[1], this.typegen.anyType).emit()).join(" ")})`));
+        }
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
