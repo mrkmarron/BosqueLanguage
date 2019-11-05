@@ -3,10 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
@@ -28,9 +28,6 @@ class SMTBodyEmitter {
     private tmpvarctr = 0;
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
-
-    private typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
-    private typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     private compoundEqualityOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
     private compoundLTOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
@@ -90,108 +87,6 @@ class SMTBodyEmitter {
         }
     }
 
-    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
-        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeboxings[tbi].fkey;
-        }
-
-        const fkey = sanitizeStringForSMT(`Box@${from.trkey}@${into.trkey}`);
-        this.typeboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (this.typegen.isPrimitiveType(from)) {
-            if (this.typegen.isPrimitiveType(into)) {
-                return exp;
-            }
-
-            if (from.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
-            }
-            else if (from.trkey === "NSCore::Int") {
-                return new SMTValue(`(bsqterm_int ${exp.emit()})`);
-            }
-            else {
-                return new SMTValue(`(bsqterm_string ${exp.emit()})`);
-            }
-        }
-        else if (this.typegen.isFixedTupleType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
-        }
-        else if (this.typegen.isFixedRecordType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
-        }
-        else if (this.typegen.isUEntityType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
-        }
-        else {
-            return exp;
-        }
-    }
-
-    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
-        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeunboxings[tbi].fkey;
-        }
-
-        const fkey = sanitizeStringForSMT(`UnBox@${from.trkey}@${into.trkey}`);
-        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    unboxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (this.typegen.isPrimitiveType(into)) {
-            if (this.typegen.isPrimitiveType(from)) {
-                return exp;
-            }
-
-            if (into.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
-            }
-            else if (into.trkey === "NSCore::Int") {
-                return new SMTValue(`(bsqterm_int_value ${exp.emit()})`);
-            }
-            else {
-                return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
-            }
-        }
-        else if (this.typegen.isFixedTupleType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
-        }
-        else if (this.typegen.isFixedRecordType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
-        }
-        else if (this.typegen.isUEntityType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
-        }
-        else {
-            return exp;
-        }
-    }
-
-    coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (this.typegen.isPrimitiveType(from) !== this.typegen.isPrimitiveType(into)) {
-            return this.typegen.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.typegen.isFixedTupleType(from) !== this.typegen.isFixedTupleType(into)) {
-            return this.typegen.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.typegen.isFixedRecordType(from) !== this.typegen.isFixedRecordType(into)) {
-            return this.typegen.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.typegen.isUEntityType(from) !== this.typegen.isUEntityType(into)) {
-            return this.typegen.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else {
-            return exp;
-        }
-    }
-
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): SMTExp {
         const isinlineable = this.typegen.isPrimitiveType(into);
 
@@ -216,7 +111,7 @@ class SMTBodyEmitter {
 
     argToSMT(arg: MIRArgument, into: MIRType): SMTExp {
         if (arg instanceof MIRRegisterArgument) {
-            return this.coerce(new SMTValue(this.varToSMTName(arg)), this.getArgType(arg), into);
+            return this.typegen.coerce(new SMTValue(this.varToSMTName(arg)), this.getArgType(arg), into);
         }
         else {
             return this.generateConstantExp(arg as MIRConstantArgument, into);
@@ -341,7 +236,7 @@ class SMTBodyEmitter {
         if (this.typegen.isFixedTupleType(tuptype)) {
             const ftuptype = SMTTypeEmitter.getFixedTupleType(tuptype);
             if (op.idx < ftuptype.entries.length) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.coerce(new SMTValue(`(${this.typegen.generateFixedTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`), this.typegen.anyType, resultAccessType));
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(${this.typegen.generateFixedTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`), this.typegen.anyType, resultAccessType));
             }
             else {
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
@@ -349,7 +244,7 @@ class SMTBodyEmitter {
         }
         else {
             const value = new SMTValue(`(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${op.idx})`);
-            return new SMTLet(this.varToSMTName(op.trgt), this.coerce(value, this.typegen.anyType, resultAccessType));
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
         }
     }
 
@@ -359,7 +254,7 @@ class SMTBodyEmitter {
             const frectype = SMTTypeEmitter.getFixedRecordType(rectype);
             const hasproperty = frectype.entries.findIndex((entry) => entry.name === op.property) !== -1;
             if (hasproperty) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.coerce(new SMTValue(`(${this.typegen.generateFixedRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()})`), this.typegen.anyType, resultAccessType));
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(${this.typegen.generateFixedRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()})`), this.typegen.anyType, resultAccessType));
             }
             else {
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
@@ -367,7 +262,24 @@ class SMTBodyEmitter {
         }
         else {
             const value = new SMTValue(`(select (bsqterm_record_entries ${this.argToSMT(op.arg, rectype).emit()}) "${op.property}")`);
-            return new SMTLet(this.varToSMTName(op.trgt), this.coerce(value, this.typegen.anyType, resultAccessType));
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
+        }
+    }
+
+    generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
+        const argtype = this.getArgType(op.arg);
+
+        if (this.typegen.isUEntityType(argtype)) {
+            const etype = SMTTypeEmitter.getUEntityType(argtype);
+            const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
+            const field = entity.fields.find((f) => f.name === op.field) as MIRFieldDecl;
+
+            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype)})`);
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType));
+        }
+        else {
+            const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType)}) "${op.field}")`);
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.anyType, resultAccessType));
         }
     }
 
@@ -539,7 +451,8 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromProperties");
             }
             case MIROpTag.MIRAccessFromField: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRAccessFromField");
+                const af = op as MIRAccessFromField;
+                return this.generateMIRAccessFromField(af, this.typegen.getMIRType(af.resultAccessType));
             }
             case MIROpTag.MIRProjectFromFields: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromFields");

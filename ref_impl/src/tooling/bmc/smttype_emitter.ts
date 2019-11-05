@@ -3,10 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
+import { SMTExp, SMTValue } from "./smt_exp";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -17,6 +18,9 @@ class SMTTypeEmitter {
     readonly boolType: MIRType;
     readonly intType: MIRType;
     readonly stringType: MIRType;
+
+    typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
+    typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -130,6 +134,108 @@ class SMTTypeEmitter {
         }
         else {
             return "BTerm";
+        }
+    }
+
+    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
+        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForSMT(`Box@${from.trkey}@${into.trkey}`);
+        this.typeboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
+    boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (this.isPrimitiveType(from)) {
+            if (this.isPrimitiveType(into)) {
+                return exp;
+            }
+
+            if (from.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
+            }
+            else if (from.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsqterm_int ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_string ${exp.emit()})`);
+            }
+        }
+        else if (this.isFixedTupleType(from)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+        }
+        else if (this.isFixedRecordType(from)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+        }
+        else if (this.isUEntityType(from)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+        }
+        else {
+            return exp;
+        }
+    }
+
+    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
+        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeunboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForSMT(`UnBox@${from.trkey}@${into.trkey}`);
+        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
+    unboxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (this.isPrimitiveType(into)) {
+            if (this.isPrimitiveType(from)) {
+                return exp;
+            }
+
+            if (into.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
+            }
+            else if (into.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsqterm_int_value ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
+            }
+        }
+        else if (this.isFixedTupleType(into)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+        }
+        else if (this.isFixedRecordType(into)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+        }
+        else if (this.isUEntityType(into)) {
+            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+        }
+        else {
+            return exp;
+        }
+    }
+
+    coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+        if (this.isPrimitiveType(from) !== this.isPrimitiveType(into)) {
+            return this.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isFixedTupleType(from) !== this.isFixedTupleType(into)) {
+            return this.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isFixedRecordType(from) !== this.isFixedRecordType(into)) {
+            return this.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isUEntityType(from) !== this.isUEntityType(into)) {
+            return this.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else {
+            return exp;
         }
     }
 

@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
 import { sanitizeStringForCpp } from "./cpputils";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
@@ -16,6 +16,11 @@ class CPPTypeEmitter {
     readonly boolType: MIRType;
     readonly intType: MIRType;
     readonly stringType: MIRType;
+
+    scopectr: number = 0;
+
+    typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
+    typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -149,6 +154,108 @@ class CPPTypeEmitter {
         }
     }
 
+    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
+        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForCpp(`Box$$${from.trkey}$$${into.trkey}`);
+        this.typeboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
+    boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
+        if (this.isPrimitiveType(from)) {
+            if (this.isPrimitiveType(into)) {
+                return exp;
+            }
+
+            if (from.trkey === "NSCore::Bool") {
+                return `BSQ_BOX_VALUE_BOOL(${exp})`;
+            }
+            else if (from.trkey === "NSCore::Int") {
+                return `BSQ_BOX_VALUE_INT(${exp})`;
+            }
+            else {
+                return exp;
+            }
+        }
+        else if (this.isFixedTupleType(from)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
+        }
+        else if (this.isFixedRecordType(from)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
+        }
+        else if (this.isUEntityType(from)) {
+            return exp;
+        }
+        else {
+            return exp;
+        }
+    }
+
+    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
+        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
+        if (tbi !== -1) {
+            return this.typeunboxings[tbi].fkey;
+        }
+
+        const fkey = sanitizeStringForCpp(`UnBox$$${from.trkey}$$${into.trkey}`);
+        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
+
+        return fkey;
+    }
+
+    unboxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
+        if (this.isPrimitiveType(into)) {
+            if (this.isPrimitiveType(from)) {
+                return exp;
+            }
+
+            if (into.trkey === "NSCore::Bool") {
+                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            }
+            else if (into.trkey === "NSCore::Int") {
+                return `BSQ_GET_VALUE_INT(${exp})`;
+            }
+            else {
+                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
+            }
+        }
+        else if (this.isFixedTupleType(into)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
+        }
+        else if (this.isFixedRecordType(into)) {
+            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
+        }
+        else if (this.isUEntityType(into)) {
+            return (from.trkey !== into.trkey) ? `BSQ_GET_VALUE_PTR(${exp}, ${this.typeToCPPType(into, "base")})` : exp;
+        }
+        else {
+            return exp;
+        }
+    }
+
+    coerce(exp: string, from: MIRType, into: MIRType): string {
+        if (this.isPrimitiveType(from) !== this.isPrimitiveType(into)) {
+            return this.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isFixedTupleType(from) !== this.isFixedTupleType(into)) {
+            return this.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isFixedRecordType(from) !== this.isFixedRecordType(into)) {
+            return this.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else if (this.isUEntityType(from) !== this.isUEntityType(into)) {
+            return this.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        }
+        else {
+            return exp;
+        }
+    }
+
     generateFixedTupleAccessor(idx: number): string {
         return `.atFixed<${idx}>()`;
     }
@@ -163,11 +270,11 @@ class CPPTypeEmitter {
         }
 
         const constructor_args = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.fname}`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.name}`;
         });
 
         const constructor_initializer = entity.fields.map((fd) => {
-            return `${fd.fname}(${fd.fname})`;
+            return `${fd.name}(${fd.name})`;
         });
 
         const destructor_list = entity.fields.map((fd) => {
@@ -178,34 +285,36 @@ class CPPTypeEmitter {
 
             if (!this.assembly.subtypeOf(this.boolType, ftype) && !this.assembly.subtypeOf(this.intType, ftype)) {
                 if (this.assembly.subtypeOf(this.noneType, ftype)) {
-                    return `BSQRef::checkedDecrementNoneable(this->${fd.fname});`;
+                    return `BSQRef::checkedDecrementNoneable(this->${fd.name});`;
                 }
                 else {
-                    return `BSQRef::checkedDecrementFast(this->${fd.fname});`;
+                    return `BSQRef::checkedDecrementFast(this->${fd.name});`;
                 }
             }
             else {
-                return `BSQRef::checkedDecrement(this->${fd.fname});`;
+                return `BSQRef::checkedDecrement(this->${fd.name});`;
             }
         })
         .filter((fd) => fd !== undefined);
 
         const fields = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.fname};`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.name};`;
         });
 
         const vfield_accessors = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "return")} get$${fd.fname}() const { return this->${fd.fname}; };`;
+            const fn = `this->${fd.name}`;
+            const fdv = this.coerce(fn, this.getMIRType(fd.declaredType), this.anyType);
+            return `Value get$${fd.name}() const { return ${fdv}; };`;
         });
 
         const vcalls = [...entity.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
             const rtype = this.typeToCPPType(this.getMIRType(rcall.resultType), "return");
-            const vargs = rcall.params.map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`).join(", ");
+            const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`).join(", ");
             const cargs = rcall.params.map((fp) => fp.name).join(", ");
-            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs}) const
+            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs})
             {
-                return this->${sanitizeStringForCpp(callp[1])}(${cargs});
+                return ${sanitizeStringForCpp(callp[1])}(${cargs});
             }`;
         });
 
@@ -214,10 +323,10 @@ class CPPTypeEmitter {
             fulldecl: `class ${sanitizeStringForCpp(entity.tkey)} : public BSQObject
             {
             public:
-                ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")})${constructor_initializer.length !== 0 ? (" : " + constructor_initializer.join(", ")) : ""} { ; }
-                virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} };
-
                 ${fields.join("\t\t\t\t\n")}
+
+                ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${sanitizeStringForCpp(entity.tkey)}) ${constructor_initializer.length !== 0 ? ", " : ""} ${constructor_initializer.join(", ")} { ; }
+                virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} };
 
                 ${vfield_accessors.join("\t\t\t\t\n")}
 
