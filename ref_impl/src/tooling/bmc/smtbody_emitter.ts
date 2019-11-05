@@ -812,7 +812,6 @@ class SMTBodyEmitter {
             });
 
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
-            let supportcalls: string[] = [];
             const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
@@ -840,10 +839,8 @@ class SMTBodyEmitter {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
 
-        let argvars = new Map<string, MIRType>().set("this", this.typegen.getMIRType(idecl.tkey));
-
         const args = `(this ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
-        const decl = `(define-fun ${sanitizeStringForSMT(invkey)} (${args}) Result@Bool`;
+        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Result@Bool`;
 
         if (idecl.invariants.length === 1) {
             this.vtypes = new Map<string, MIRType>();
@@ -858,41 +855,49 @@ class SMTBodyEmitter {
         else {
             const decls = idecl.invariants.map((pc, i) => {
                 const blocksi = pc.body;
-                const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
-                const decli = `(define-fun ${this.invokenameToSMT2(invkey)}${i} (${args}) Result_Bool \n${bodyi.emit("  ")})`;
-                const calli = (`(${this.invokenameToSMT2(invkey)}${i} this)`);
+                const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
+                const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
+                const calli = (`(${this.invokenameToSMT(invkey)}${i} this)`);
 
                 return [decli, calli];
             });
 
             const declsand = decls.map((cc) => {
                 const tv = `@tmpvarda@${this.tmpvarctr++}`;
-                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-Result_Bool@result_success ${tv}) (Result_Bool@result_value ${tv}))`)).emit();
+                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
             });
 
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(Result_Bool@result_success (and ${declsand.join(" ")})))`;
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
         }
     }
 
-    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string {
-        this.cinvokeFile = cdecl.srcFile;
-        this.cinvokeResult = this.assembly.typeMap.get(cdecl.declaredType) as MIRType;
+    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {
+        this.currentFile = cdecl.srcFile;
+        this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
 
-        const restype = this.typegen.typeToSMT2Type(this.assembly.typeMap.get(cdecl.declaredType) as MIRType);
-        const decl = `(define-fun ${this.invokenameToSMT2(constkey)} () Result_${restype}`;
+        if (SMTBodyEmitter.expBodyTrivialCheck(cdecl.value as MIRBody)) {
+            return undefined;
+        }
+
+        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(cdecl.declaredType));
+        const decl = `(define-fun ${this.invokenameToSMT(constkey)} () Result@${restype}`;
         const blocks = cdecl.value.body;
-        const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, new Map<string, MIRType>());
+        const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
         return `${decl} \n${body.emit("  ")})`;
     }
 
-    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string {
-        this.cinvokeFile = fdecl.srcFile;
-        this.cinvokeResult = this.assembly.typeMap.get(fdecl.declaredType) as MIRType;
+    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string | undefined {
+        this.currentFile = fdecl.srcFile;
+        this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
 
-        const restype = this.typegen.typeToSMT2Type(this.assembly.typeMap.get(fdecl.declaredType) as MIRType);
-        const decl = `(define-fun ${this.invokenameToSMT2(fdkey)} () Result_${restype}`;
+        if (SMTBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
+            return undefined;
+        }
+
+        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(fdecl.declaredType));
+        const decl = `(define-fun ${this.invokenameToSMT(fdkey)} () Result@${restype}`;
         const blocks = (fdecl.value as MIRBody).body;
-        const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, new Map<string, MIRType>());
+        const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
         return `${decl} \n${body.emit("  ")})`;
     }
 }

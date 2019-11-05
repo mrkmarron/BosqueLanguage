@@ -3,12 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
-import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
+import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey } from "../../compiler/mir_ops";
+
+import * as assert from "assert";
 
 type SMTCode = {
     typedecls_fwd: string,
@@ -82,7 +84,7 @@ class SMTEmitter {
                     const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
                     const finfo = bodyemitter.generateSMTInvoke(idcl, 0);
 
-                    funcdecls.push(...finfo.supportcalls, finfo.fulldecl);
+                    funcdecls.push(finfo);
                 }
                 else if (tag === "pre") {
                     NOT_IMPLEMENTED<void>("Pre");
@@ -91,13 +93,25 @@ class SMTEmitter {
                     NOT_IMPLEMENTED<void>("Post");
                 }
                 else if (tag === "invariant") {
-                    NOT_IMPLEMENTED<void>("Invariant");
+                    const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                    funcdecls.push(bodyemitter.generateSMTInv(bbup.invoke, edcl));
                 }
                 else if (tag === "const") {
-                    NOT_IMPLEMENTED<void>("Const");
+                    const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                    const cdeclemit = bodyemitter.generateSMTConst(bbup.invoke, cdcl);
+                    if (cdeclemit !== undefined) {
+                        funcdecls.push(cdeclemit);
+                    }
+
                 }
                 else {
-                    NOT_IMPLEMENTED<void>("Field Default");
+                    assert(tag === "fdefault");
+
+                    const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                    const fdeclemit = bodyemitter.generateSMTFDefault(bbup.invoke, fdcl);
+                    if (fdeclemit !== undefined) {
+                        funcdecls.push(fdeclemit);
+                    }
                 }
             }
         }
