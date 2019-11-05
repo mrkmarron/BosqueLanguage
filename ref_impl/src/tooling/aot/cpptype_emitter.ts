@@ -312,26 +312,31 @@ class CPPTypeEmitter {
             const rtype = this.typeToCPPType(this.getMIRType(rcall.resultType), "return");
             const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`).join(", ");
             const cargs = rcall.params.map((fp) => fp.name).join(", ");
-            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs})
-            {
-                return ${sanitizeStringForCpp(callp[1])}(${cargs});
-            }`;
+            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs})\n`
+            + "    {\n"
+            + `        return ${sanitizeStringForCpp(callp[1])}(${cargs});\n`
+            + "    }\n";
         });
+
+        const faccess = entity.fields.map((f) => this.coerce(`this->${f.name}`, this.getMIRType(f.declaredType), this.anyType));
+        const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + \", \" + ") : "\" \"";
+        const display = "std::string display() const\n"
+        + "    {\n"
+        + `        return std::string("${entity.tkey}{ ") + ${fjoins} + std::string(" }");\n`
+        + "    }";
 
         return {
             fwddecl: `class ${sanitizeStringForCpp(entity.tkey)};`,
-            fulldecl: `class ${sanitizeStringForCpp(entity.tkey)} : public BSQObject
-            {
-            public:
-                ${fields.join("\t\t\t\t\n")}
-
-                ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${sanitizeStringForCpp(entity.tkey)}) ${constructor_initializer.length !== 0 ? ", " : ""} ${constructor_initializer.join(", ")} { ; }
-                virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} };
-
-                ${vfield_accessors.join("\t\t\t\t\n")}
-
-                ${vcalls.join("\t\t\t\t\n")}
-            };`
+            fulldecl: `class ${sanitizeStringForCpp(entity.tkey)} : public BSQObject\n`
+            + "{\n"
+            + "public:\n"
+            + `    ${fields.join("\n    ")}\n\n`
+            + `    ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${sanitizeStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
+            + `    virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} }\n\n`
+            + `    ${display}\n\n`
+            + `    ${vfield_accessors.join("\n    ")}\n\n`
+            + `    ${vcalls.join("\n    ")}\n`
+            + "};"
         };
     }
 }

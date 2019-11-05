@@ -289,6 +289,7 @@ public:
     }
 };
 
+
 template <uint16_t k>
 class BSQTupleFixed
 {
@@ -304,6 +305,11 @@ public:
     inline Value atVar(uint16_t idx)
     {
         return this->entries[idx];
+    }
+
+    inline Value box()
+    {
+        return new BSQRecord(std::vector<Value>(this->entries, this->entries + k));
     }
 };
 
@@ -383,6 +389,9 @@ public:
     BSQObject(MIRNominalTypeEnum ntype) : BSQRef(), ntype(ntype) { ; }
     virtual ~BSQObject() = default;
 
-    virtual std::string display() const;
+    virtual std::string display() const = 0;
+
+//%%VFIELD_DECLS
+//%%VMETHOD_DECLS
 };
 } // namespace BSQ

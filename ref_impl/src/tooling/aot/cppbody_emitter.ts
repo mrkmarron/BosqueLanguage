@@ -146,7 +146,7 @@ class CPPBodyEmitter {
     }
 
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
-        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 1) {
+        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 2) {
             return undefined;
         }
 
@@ -664,7 +664,7 @@ class CPPBodyEmitter {
     }
 
     generateCPPVarDecls(body: MIRBody, params: MIRFunctionParameter[]): string {
-        const refscope = this.typegen.scopectr !== 0 ? `RefCountScope<${this.typegen.scopectr}> $scope$;` : ";";
+        const refscope = "    " + (this.typegen.scopectr !== 0 ? `RefCountScope<${this.typegen.scopectr}> $scope$;` : ";");
 
         let vdecls = new Map<string, string[]>();
         (body.vtypes as Map<string, string>).forEach((tkey, name) => {
@@ -690,7 +690,7 @@ class CPPBodyEmitter {
             }
         });
 
-        return [refscope, ...vdeclscpp].join("\n");
+        return [refscope, ...vdeclscpp].join("\n    ");
     }
 
     generateCPPInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string } {

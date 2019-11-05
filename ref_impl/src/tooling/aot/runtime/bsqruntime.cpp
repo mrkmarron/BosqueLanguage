@@ -10,7 +10,7 @@ namespace BSQ
 
 const char* Runtime::propertyNames[] = {
     "Invalid",
-//%%PROPERTY_NAMES%%
+//%%PROPERTY_NAMES
 };
 
 constexpr const char* s_nominaltypenames[] = {

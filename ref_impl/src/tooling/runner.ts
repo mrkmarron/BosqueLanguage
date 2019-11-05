@@ -110,11 +110,14 @@ else {
         const linked = lsrc.map((fname) => {
             const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
             const bcontents = contents
+                .replace("//%%NOMINAL_TYPE_ENUM_DECLARE", "    " + cparams.nominalenums)
                 .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
                 .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
-                .replace("//%%FIXED_RECORD_PROPERTY_LIST_ENUM_DECLARE", "  " + cparams.fixedrecord_property_lists)
-                .replace("//%%PROPERTY_ENUM_DECLARE", "  " + cparams.propertyenums)
-                .replace("//%%PROPERTY_NAMES%%", "  " + cparams.propertynames);
+                .replace("//%%FIXED_RECORD_PROPERTY_LIST_ENUM_DECLARE", "    " + cparams.fixedrecord_property_lists)
+                .replace("//%%PROPERTY_ENUM_DECLARE", "    " + cparams.propertyenums)
+                .replace("//%%PROPERTY_NAMES", "  " + cparams.propertynames)
+                .replace("//%%VFIELD_DECLS", "    " + cparams.vfield_decls)
+                .replace("//%%VMETHOD_DECLS", "  " + cparams.propertynames);
 
             return { file: fname, contents: bcontents };
         });

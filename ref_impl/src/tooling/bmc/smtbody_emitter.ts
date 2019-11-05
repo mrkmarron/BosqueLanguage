@@ -133,7 +133,7 @@ class SMTBodyEmitter {
     }
 
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
-        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 1) {
+        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 2) {
             return undefined;
         }
 

@@ -15,13 +15,16 @@ import * as assert from "assert";
 type CPPCode = {
     typedecls_fwd: string,
     typedecls: string,
+    nominalenums: string,
     funcdecls_fwd: string,
     funcdecls: string,
     conststring_declare: string,
     conststring_create: string,
     propertyenums: string,
     fixedrecord_property_lists: string,
-    propertynames: string
+    propertynames: string,
+    vfield_decls: string,
+    vmethod_decls: string
 };
 
 class CPPEmitter {
@@ -31,11 +34,13 @@ class CPPEmitter {
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
+        let nominalenums: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
             const cppdecl = typeemitter.generateCPPEntity(edecl);
             if (cppdecl !== undefined) {
                 typedecls_fwd.push(cppdecl.fwddecl);
                 typedecls.push(cppdecl.fulldecl);
+                nominalenums.push(sanitizeStringForCpp(edecl.tkey));
             }
         });
 
@@ -126,13 +131,16 @@ class CPPEmitter {
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
+            nominalenums: nominalenums.sort().join("\n"),
             funcdecls_fwd: funcdecls_fwd.sort().join("\n"),
             funcdecls: funcdecls.sort().join("\n"),
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
             propertyenums: [...propertyenums].sort().join(",\n  "),
             fixedrecord_property_lists: [...fixedrecord_property_lists].sort().join("\n  "),
-            propertynames: [...propertynames].sort().join(",\n  ")
+            propertynames: [...propertynames].sort().join(",\n  "),
+            vfield_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-FIELD RESOLUTION",
+            vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION"
         };
     }
 }
