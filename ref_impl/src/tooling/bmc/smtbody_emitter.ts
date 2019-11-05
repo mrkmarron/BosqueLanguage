@@ -3,10 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
@@ -237,6 +237,85 @@ class SMTBodyEmitter {
         }
     }
 
+    static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
+        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 1) {
+            return undefined;
+        }
+
+        const op = (bd.body.get("entry") as MIRBasicBlock).ops[0];
+        if (op.tag === MIROpTag.MIRLoadConst) {
+            return op;
+        }
+        else {
+            return undefined;
+        }
+    }
+
+    generateAccessConstantValue(cp: MIRAccessConstantValue): SMTExp {
+        const cdecl = this.assembly.constantDecls.get(cp.ckey) as MIRConstantDecl;
+
+        const top = SMTBodyEmitter.expBodyTrivialCheck(cdecl.value);
+        if (top !== undefined) {
+            const cvv = top as MIRLoadConst;
+            return new SMTLet(this.varToSMTName(cp.trgt), this.generateConstantExp(cvv.src, this.getArgType(cvv.trgt)));
+        }
+        else {
+            const tv = this.generateTempName();
+            const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(cdecl.declaredType));
+            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+
+            const constexp = new SMTValue(this.invokenameToSMT(cdecl.value.bkey));
+            const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
+            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+            const normalassign = new SMTLet(this.varToSMTName(cp.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
+
+            return new SMTLet(tv, constexp, new SMTCond(checkerror, extracterror, normalassign));
+        }
+    }
+
+    generateLoadFieldDefaultValue(ld: MIRLoadFieldDefaultValue): SMTExp {
+        const fdecl = this.assembly.fieldDecls.get(ld.fkey) as MIRFieldDecl;
+
+        const top = SMTBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody);
+        if (top !== undefined) {
+            const cvv = top as MIRLoadConst;
+            return new SMTLet(this.varToSMTName(ld.trgt), this.generateConstantExp(cvv.src, this.getArgType(cvv.trgt)));
+        }
+        else {
+            const tv = this.generateTempName();
+            const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(fdecl.declaredType));
+            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+
+            const constexp = new SMTValue(this.invokenameToSMT((fdecl.value as MIRBody).bkey));
+            const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
+            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+            const normalassign = new SMTLet(this.varToSMTName(ld.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
+
+            return new SMTLet(tv, constexp, new SMTCond(checkerror, extracterror, normalassign));
+        }
+    }
+
+    generateMIRConstructorPrimary(cp: MIRConstructorPrimary): SMTExp {
+        const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
+        const fvals = cp.args.map((arg, i) => {
+            const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
+            return this.argToSMT(arg, ftype).emit();
+        });
+
+        const smtctype = this.typegen.generateEntityConstructor(cp.tkey);
+        const cexp = ctype.fields.length === 0 ? new SMTValue(smtctype) : new SMTValue(`(${smtctype} ${fvals.join(" ")})`);
+        const bindexp = new SMTLet(this.varToSMTName(cp.trgt), cexp);
+        if (ctype.invariants.length === 0) {
+            return bindexp;
+        }
+        else {
+            const testexp = new SMTValue(`(${sanitizeStringForSMT("invariant::" + cp.tkey)} ${this.varToSMTName(cp.trgt)})`);
+            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+            const errexp = new SMTValue(`((result_error@${resulttype} (result_error ${this.generateErrorCreate(cp.sinfo)}))`);
+            return bindexp.bind(new SMTCond(testexp, SMTFreeVar.generate(), errexp));
+        }
+    }
+
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
         const tcons = this.typegen.generateFixedTupleConstructor(this.typegen.getMIRType(op.resultTupleType));
         if (tcons === "bsqtuple_0@cons") {
@@ -306,7 +385,7 @@ class SMTBodyEmitter {
 
         const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
         const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
-        const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+        const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
         const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
 
         return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
@@ -406,10 +485,12 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRLoadConstTypedString");
             }
             case MIROpTag.MIRAccessConstantValue: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRAccessConstantValue");
+                const acv = (op as MIRAccessConstantValue);
+                return this.generateAccessConstantValue(acv);
             }
             case MIROpTag.MIRLoadFieldDefaultValue: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRLoadFieldDefaultValue");
+                const ldv = (op as MIRLoadFieldDefaultValue);
+                return this.generateLoadFieldDefaultValue(ldv);
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = op as MIRAccessArgVariable;
@@ -420,7 +501,8 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(llv.trgt), this.argToSMT(llv.name, this.getArgType(llv.trgt)));
             }
             case MIROpTag.MIRConstructorPrimary: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimary");
+                const cp = op as MIRConstructorPrimary;
+                return this.generateMIRConstructorPrimary(cp);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionEmpty");
@@ -712,9 +794,9 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number): { fulldecl: string, supportcalls: string[] } {
+    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number): string {
         this.currentFile = idecl.srcFile;
-        this.currentRType = this.assembly.typeMap.get(idecl.resultType) as MIRType;
+        this.currentRType = this.typegen.getMIRType(idecl.resultType);
 
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
@@ -726,7 +808,7 @@ class SMTBodyEmitter {
         if (idecl instanceof MIRInvokeBodyDecl) {
             this.vtypes = new Map<string, MIRType>();
             (idecl.body.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
             });
 
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
@@ -734,24 +816,84 @@ class SMTBodyEmitter {
             const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                return { fulldecl: `${decl} \n${body.emit("  ")})`, supportcalls: supportcalls };
+                return `${decl} \n${body.emit("  ")})`;
             }
             else {
                 let cbody = body;
 
                 if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                    return { fulldecl: `${decl} \n${cbody.emit("  ")})`, supportcalls: supportcalls };
+                    return `${decl} \n${cbody.emit("  ")})`;
                 }
                 else {
-                    return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- Pre/Post");
+                    return NOT_IMPLEMENTED<string>("generateInvoke -- Pre/Post");
                 }
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- MIRInvokePrimitiveDecl");
+            return NOT_IMPLEMENTED<string>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
+    }
+
+    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+
+        let argvars = new Map<string, MIRType>().set("this", this.typegen.getMIRType(idecl.tkey));
+
+        const args = `(this ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
+        const decl = `(define-fun ${sanitizeStringForSMT(invkey)} (${args}) Result@Bool`;
+
+        if (idecl.invariants.length === 1) {
+            this.vtypes = new Map<string, MIRType>();
+            (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
+            const blocks = idecl.invariants[0].body;
+            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
+            return `${decl} \n${body.emit("  ")})`;
+        }
+        else {
+            const decls = idecl.invariants.map((pc, i) => {
+                const blocksi = pc.body;
+                const bodyi = this.generateSMTBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, argvars);
+                const decli = `(define-fun ${this.invokenameToSMT2(invkey)}${i} (${args}) Result_Bool \n${bodyi.emit("  ")})`;
+                const calli = (`(${this.invokenameToSMT2(invkey)}${i} this)`);
+
+                return [decli, calli];
+            });
+
+            const declsand = decls.map((cc) => {
+                const tv = `@tmpvarda@${this.tmpvarctr++}`;
+                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-Result_Bool@result_success ${tv}) (Result_Bool@result_value ${tv}))`)).emit();
+            });
+
+            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(Result_Bool@result_success (and ${declsand.join(" ")})))`;
+        }
+    }
+
+    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string {
+        this.cinvokeFile = cdecl.srcFile;
+        this.cinvokeResult = this.assembly.typeMap.get(cdecl.declaredType) as MIRType;
+
+        const restype = this.typegen.typeToSMT2Type(this.assembly.typeMap.get(cdecl.declaredType) as MIRType);
+        const decl = `(define-fun ${this.invokenameToSMT2(constkey)} () Result_${restype}`;
+        const blocks = cdecl.value.body;
+        const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, new Map<string, MIRType>());
+        return `${decl} \n${body.emit("  ")})`;
+    }
+
+    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string {
+        this.cinvokeFile = fdecl.srcFile;
+        this.cinvokeResult = this.assembly.typeMap.get(fdecl.declaredType) as MIRType;
+
+        const restype = this.typegen.typeToSMT2Type(this.assembly.typeMap.get(fdecl.declaredType) as MIRType);
+        const decl = `(define-fun ${this.invokenameToSMT2(fdkey)} () Result_${restype}`;
+        const blocks = (fdecl.value as MIRBody).body;
+        const body = this.generateSMTBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, new Map<string, MIRType>());
+        return `${decl} \n${body.emit("  ")})`;
     }
 }
 

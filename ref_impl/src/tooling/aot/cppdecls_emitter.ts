@@ -3,12 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { NOT_IMPLEMENTED, sanitizeStringForCpp } from "./cpputils";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey } from "../../compiler/mir_ops";
+import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
+
+import * as assert from "assert";
 
 type CPPCode = {
     typedecls_fwd: string,
@@ -54,7 +56,8 @@ class CPPEmitter {
                     const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
                     const finfo = bodyemitter.generateCPPInvoke(idcl);
 
-                    funcdecls.push(...finfo.supportcalls, finfo.fulldecl);
+                    funcdecls_fwd.push(finfo.fwddecl);
+                    funcdecls.push(finfo.fulldecl);
                 }
                 else if (tag === "pre") {
                     NOT_IMPLEMENTED<void>("Pre");
@@ -63,13 +66,30 @@ class CPPEmitter {
                     NOT_IMPLEMENTED<void>("Post");
                 }
                 else if (tag === "invariant") {
-                    NOT_IMPLEMENTED<void>("Invariant");
+                    const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                    const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
+
+                    funcdecls_fwd.push(finfo.fwddecl);
+                    funcdecls.push(finfo.fulldecl);
                 }
                 else if (tag === "const") {
-                    NOT_IMPLEMENTED<void>("Const");
+                    const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                    const finfo = bodyemitter.generateCPPConst(bbup.invoke, cdcl);
+
+                    if (finfo !== undefined) {
+                        funcdecls_fwd.push(finfo.fwddecl);
+                        funcdecls.push(finfo.fulldecl);
+                    }
                 }
                 else {
-                    NOT_IMPLEMENTED<void>("Field Default");
+                    assert(tag === "fdefault");
+                    const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                    const finfo = bodyemitter.generateCPPFDefault(bbup.invoke, fdcl);
+
+                    if (finfo !== undefined) {
+                        funcdecls_fwd.push(finfo.fwddecl);
+                        funcdecls.push(finfo.fulldecl);
+                    }
                 }
             }
         }

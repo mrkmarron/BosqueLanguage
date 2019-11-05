@@ -3,16 +3,18 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRTypeOption, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { NOT_IMPLEMENTED, filenameClean, sanitizeStringForCpp } from "./cpputils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
+import { constructCallGraphInfo, CallGInfo } from "../../compiler/mir_callg";
 
 class CPPBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: CPPTypeEmitter;
+    readonly callg: CallGInfo;
 
     readonly allPropertyNames: Set<string> = new Set<string>();
     readonly allConstStrings: Map<string, string> = new Map<string, string>();
@@ -34,6 +36,7 @@ class CPPBodyEmitter {
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
+        this.callg = constructCallGraphInfo(assembly.entryPoints, assembly);
 
         this.currentRType = typegen.noneType;
     }
@@ -243,6 +246,64 @@ class CPPBodyEmitter {
         }
     }
 
+    static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
+        if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 1) {
+            return undefined;
+        }
+
+        const op = (bd.body.get("entry") as MIRBasicBlock).ops[0];
+        if (op.tag === MIROpTag.MIRLoadConst) {
+            return op;
+        }
+        else {
+            return undefined;
+        }
+    }
+
+    generateAccessConstantValue(cp: MIRAccessConstantValue): string {
+        const cdecl = this.assembly.constantDecls.get(cp.ckey) as MIRConstantDecl;
+
+        const top = CPPBodyEmitter.expBodyTrivialCheck(cdecl.value);
+        if (top !== undefined) {
+            const cvv = top as MIRLoadConst;
+            return `${this.varToCppName(cp.trgt)} = ${this.generateConstantExp(cvv.src, this.getArgType(cvv.trgt))};`;
+        }
+        else {
+            return `${this.varToCppName(cp.trgt)} = ${this.invokenameToCPP(cdecl.value.bkey)}();`;
+        }
+    }
+
+    generateLoadFieldDefaultValue(ld: MIRLoadFieldDefaultValue): string {
+        const fdecl = this.assembly.fieldDecls.get(ld.fkey) as MIRFieldDecl;
+
+        const top = CPPBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody);
+        if (top !== undefined) {
+            const cvv = top as MIRLoadConst;
+            return `${this.varToCppName(ld.trgt)} = ${this.generateConstantExp(cvv.src, this.getArgType(cvv.trgt))};`;
+        }
+        else {
+            return `${this.varToCppName(ld.trgt)} = ${this.invokenameToCPP((fdecl.value as MIRBody).bkey)}();`;
+        }
+    }
+
+    generateMIRConstructorPrimary(cp: MIRConstructorPrimary): string {
+        const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
+        const fvals = cp.args.map((arg, i) => {
+            const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
+            return this.argToCpp(arg, ftype);
+        });
+
+        const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
+        const cexp = `${this.varToCppName(cp.trgt)} = new ${smtctype}(${fvals.join(", ")});`;
+        if (ctype.invariants.length === 0) {
+            return cexp;
+        }
+        else {
+            const testexp = `${sanitizeStringForCpp("invariant::" + cp.tkey)}(${this.varToCppName(cp.trgt)});`;
+            return cexp + " " + testexp;
+        }
+    }
+
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
         const tuptype = this.getArgType(op.arg);
         if (this.typegen.isFixedTupleType(tuptype)) {
@@ -369,10 +430,12 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRLoadConstTypedString");
             }
             case MIROpTag.MIRAccessConstantValue: {
-                return NOT_IMPLEMENTED<string>("MIRAccessConstantValue");
+                const acv = (op as MIRAccessConstantValue);
+                return this.generateAccessConstantValue(acv);
             }
             case MIROpTag.MIRLoadFieldDefaultValue: {
-                return NOT_IMPLEMENTED<string>("MIRLoadFieldDefaultValue");
+                const ldv = (op as MIRLoadFieldDefaultValue);
+                return this.generateLoadFieldDefaultValue(ldv);
             }
             case MIROpTag.MIRAccessArgVariable: {
                 const lav = op as MIRAccessArgVariable;
@@ -383,7 +446,8 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(llv.trgt)} = ${this.argToCpp(llv.name, this.getArgType(llv.trgt))};`;
             }
             case MIROpTag.MIRConstructorPrimary: {
-                return NOT_IMPLEMENTED<string>("MIRConstructorPrimary");
+                const cp = op as MIRConstructorPrimary;
+                return this.generateMIRConstructorPrimary(cp);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionEmpty");
@@ -682,9 +746,39 @@ class CPPBodyEmitter {
         this.generatedBlocks.set(block.label, gblock);
     }
 
-    generateCPPInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string, supportcalls: string[] } {
+    generateCPPVarDecls(body: MIRBody, params: MIRFunctionParameter[]): string {
+        const refscope = this.scopectr !== 0 ? `RefCountScope<${this.scopectr}> $scope$;` : ";";
+
+        let vdecls = new Map<string, string[]>();
+        (body.vtypes as Map<string, string>).forEach((tkey, name) => {
+            if (params.findIndex((p) => p.name === name) === -1) {
+                const declt = this.typegen.typeToCPPType(this.typegen.getMIRType(tkey), "decl");
+                if (!vdecls.has(declt)) {
+                    vdecls.set(declt, [] as string[]);
+                }
+
+                (vdecls.get(declt) as string[]).push(this.varNameToCppName(name));
+            }
+        });
+        let vdeclscpp: string[] = [];
+        if (vdecls.has("bool")) {
+            vdeclscpp.push(`bool ${(vdecls.get("bool") as string[]).join(", ")};`);
+        }
+        if (vdecls.has("int64_t")) {
+            vdeclscpp.push(`int64_t ${(vdecls.get("int64_t") as string[]).join(", ")};`);
+        }
+        [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
+            if (kv[0] !== "bool" && kv[0] !== "int64_t") {
+                vdeclscpp.push(kv[1].map((vname) => `${kv[0]} ${vname}`).join("; ") + ";");
+            }
+        });
+
+        return [refscope, ...vdeclscpp].join("\n");
+    }
+
+    generateCPPInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string } {
         this.currentFile = idecl.srcFile;
-        this.currentRType = this.assembly.typeMap.get(idecl.resultType) as MIRType;
+        this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.scopectr = 0;
 
         const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
@@ -702,38 +796,11 @@ class CPPBodyEmitter {
             });
 
             this.generatedBlocks = new Map<string, string[]>();
-            let supportcalls: string[] = [];
 
             const blocks = topologicalOrder((idecl as MIRInvokeBodyDecl).body.body);
             for (let i = 0; i < blocks.length; ++i) {
                 this.generateBlock(blocks[i]);
             }
-
-            const refscope = this.scopectr !== 0 ? `RefCountScope<${this.scopectr}> $scope$;` : ";";
-
-            let vdecls = new Map<string, string[]>();
-            (idecl.body.vtypes as Map<string, string>).forEach((tkey, name) => {
-                if (idecl.params.findIndex((p) => p.name === name) === -1) {
-                    const declt = this.typegen.typeToCPPType(this.typegen.getMIRType(tkey), "decl");
-                    if (!vdecls.has(declt)) {
-                        vdecls.set(declt, [] as string[]);
-                    }
-
-                    (vdecls.get(declt) as string[]).push(this.varNameToCppName(name));
-                }
-            });
-            let vdeclscpp: string[] = [];
-            if (vdecls.has("bool")) {
-                vdeclscpp.push(`bool ${(vdecls.get("bool") as string[]).join(", ")};`);
-            }
-            if (vdecls.has("int64_t")) {
-                vdeclscpp.push(`int64_t ${(vdecls.get("int64_t") as string[]).join(", ")};`);
-            }
-            [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
-                if (kv[0] !== "bool" && kv[0] !== "int64_t") {
-                    vdeclscpp.push(kv[1].map((vname) => `${kv[0]} ${vname}`).join("; ") + ";");
-                }
-            });
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
                 const blockstrs = [...this.generatedBlocks].map((blck) => {
@@ -742,12 +809,12 @@ class CPPBodyEmitter {
                     return lbl + stmts;
                 });
 
-                const scopestrs = [refscope, ...vdeclscpp].join("\n");
+                const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
 
-                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, supportcalls: supportcalls };
+                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
             }
             else {
-                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- Pre/Post");
+                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- Pre/Post");
             }
         }
         else {
@@ -755,6 +822,129 @@ class CPPBodyEmitter {
 
             return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- MIRInvokePrimitiveDecl");
         }
+    }
+
+    generateSingleCPPInv(body: MIRBody, invname: string, idecl: MIREntityTypeDecl): { fulldecl: string } {
+        this.scopectr = 0;
+
+        const decl = `bool ${invname}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} this)`;
+
+        this.vtypes = new Map<string, MIRType>();
+        (body.vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
+        });
+
+        this.generatedBlocks = new Map<string, string[]>();
+
+        const blocks = topologicalOrder(body.body);
+        for (let i = 0; i < blocks.length; ++i) {
+            this.generateBlock(blocks[i]);
+        }
+
+        const blockstrs = [...this.generatedBlocks].map((blck) => {
+            const lbl = `${this.labelToCpp(blck[0])}:\n`;
+            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+            return lbl + stmts;
+        });
+
+        const scopestrs = this.generateCPPVarDecls(idecl.invariants[0], [new MIRFunctionParameter("this", idecl.tkey)]);
+
+        return { fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
+    }
+
+    generateCPPInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+
+        const decl = `bool ${sanitizeStringForCpp(invkey)}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} this)`;
+
+        if (idecl.invariants.length === 1) {
+            const icall = this.generateSingleCPPInv(idecl.invariants[0], sanitizeStringForCpp(invkey), idecl);
+
+            return { fwddecl: decl + ";", fulldecl: icall.fulldecl };
+        }
+        else {
+            let supportcalls: string[] = [];
+            const decls = idecl.invariants.map((pc, i) => {
+                const icall = this.generateSingleCPPInv(idecl.invariants[0], `sanitizeStringForCpp(invkey)$${i}`, idecl);
+
+                supportcalls = [...supportcalls, icall.fulldecl];
+                return `${sanitizeStringForCpp(invkey)}}$${i}(this)`;
+            });
+
+            return { fwddecl: decl + ";", fulldecl: `${supportcalls.join("\n")}\n${decl}\n{\n  return ${decls.join(" & ")};\n}\n` };
+        }
+    }
+
+    generateCPPConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): { fwddecl: string, fulldecl: string } | undefined {
+        this.currentFile = cdecl.srcFile;
+        this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
+        this.scopectr = 0;
+
+        if (CPPBodyEmitter.expBodyTrivialCheck(cdecl.value)) {
+            return undefined;
+        }
+
+        const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
+        const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
+
+        this.vtypes = new Map<string, MIRType>();
+        (cdecl.value.vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
+        });
+
+        this.generatedBlocks = new Map<string, string[]>();
+
+        const blocks = topologicalOrder(cdecl.value.body);
+        for (let i = 0; i < blocks.length; ++i) {
+            this.generateBlock(blocks[i]);
+        }
+
+        const blockstrs = [...this.generatedBlocks].map((blck) => {
+            const lbl = `${this.labelToCpp(blck[0])}:\n`;
+            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+            return lbl + stmts;
+        });
+
+        const scopestrs = this.generateCPPVarDecls(cdecl.value, []);
+
+        return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
+    }
+
+    generateCPPFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): { fwddecl: string, fulldecl: string } | undefined {
+        this.currentFile = fdecl.srcFile;
+        this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
+        this.scopectr = 0;
+
+        if (CPPBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
+            return undefined;
+        }
+
+        const fdbody = fdecl.value as MIRBody;
+        const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");
+        const decl = `${restype} ${this.invokenameToCPP(fdkey)}()`;
+
+        this.vtypes = new Map<string, MIRType>();
+        (fdbody.vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
+        });
+
+        this.generatedBlocks = new Map<string, string[]>();
+
+        const blocks = topologicalOrder(fdbody.body);
+        for (let i = 0; i < blocks.length; ++i) {
+            this.generateBlock(blocks[i]);
+        }
+
+        const blockstrs = [...this.generatedBlocks].map((blck) => {
+            const lbl = `${this.labelToCpp(blck[0])}:\n`;
+            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+            return lbl + stmts;
+        });
+
+        const scopestrs = this.generateCPPVarDecls(fdbody, []);
+
+        return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
     }
 }
 

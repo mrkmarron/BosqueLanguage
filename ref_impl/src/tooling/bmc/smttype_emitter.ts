@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { sanitizeStringForSMT } from "./smtutils";
 
-import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
+import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -162,6 +162,14 @@ class SMTTypeEmitter {
             fwddecl: `(${sanitizeStringForSMT(entity.tkey)} 0)`,
             fulldecl: `( (cons$${sanitizeStringForSMT(entity.tkey)} ${fargs.join(" ")}) )`
         };
+    }
+
+    generateEntityConstructor(ekey: MIRNominalTypeKey): string {
+        return `cons_${sanitizeStringForSMT(ekey)}`;
+    }
+
+    generateEntityAccessor(ekey: MIRNominalTypeKey, f: string): string {
+        return `${sanitizeStringForSMT(ekey)}@${f}`;
     }
 }
 
