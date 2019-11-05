@@ -6,11 +6,11 @@
 
 namespace BSQ
 {
-void assert(bool cond, const char* msg, const char* file, int64_t line)
+void bsqassert(bool cond, const char* msg, const char* file, int32_t line)
 {
-    if (cond)
+    if (!cond)
     {
-        exit(1);
+        printf("\"%s\" in %s on line %i\n", msg, file, line); assert(false);
     }
 }
 } // namespace BSQ

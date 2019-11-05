@@ -125,7 +125,7 @@ class SMTEmitter {
             fixedrecorddecls: fixedrecorddecls.sort().join("\n"),
             resultdecls_fwd: resultdecls_fwd.sort().join("\n"),
             resultdecls: resultdecls.sort().join("\n"),
-            function_decls: funcdecls.sort().join("\n")
+            function_decls: funcdecls.join("\n")
         };
     }
 

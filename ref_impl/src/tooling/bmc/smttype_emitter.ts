@@ -130,7 +130,7 @@ class SMTTypeEmitter {
             return "bsqrecord_" + SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType);
         }
         else if (this.isUEntityType(ttype)) {
-            return "bsqentity_" + sanitizeStringForSMT(ttype.trkey);
+            return sanitizeStringForSMT(ttype.trkey);
         }
         else {
             return "BTerm";
@@ -261,7 +261,7 @@ class SMTTypeEmitter {
         }
 
         const fargs = entity.fields.map((fd) => {
-            return `(${sanitizeStringForSMT(entity.tkey)}@${fd.fname} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
+            return `(${sanitizeStringForSMT(entity.tkey)}@${fd.name} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
         });
 
         return {
@@ -271,7 +271,7 @@ class SMTTypeEmitter {
     }
 
     generateEntityConstructor(ekey: MIRNominalTypeKey): string {
-        return `cons_${sanitizeStringForSMT(ekey)}`;
+        return `cons$${sanitizeStringForSMT(ekey)}`;
     }
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: string): string {

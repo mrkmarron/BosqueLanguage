@@ -274,7 +274,7 @@ class SMTBodyEmitter {
             const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
             const field = entity.fields.find((f) => f.name === op.field) as MIRFieldDecl;
 
-            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype)})`);
+            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype).emit()})`);
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType));
         }
         else {
@@ -766,6 +766,11 @@ class SMTBodyEmitter {
             return `${decl} \n${body.emit("  ")})`;
         }
         else {
+            this.vtypes = new Map<string, MIRType>();
+            (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
             const decls = idecl.invariants.map((pc, i) => {
                 const blocksi = pc.body;
                 const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
@@ -792,6 +797,11 @@ class SMTBodyEmitter {
             return undefined;
         }
 
+        this.vtypes = new Map<string, MIRType>();
+        (cdecl.value.vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.typegen.getMIRType(tkey));
+        });
+
         const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(cdecl.declaredType));
         const decl = `(define-fun ${this.invokenameToSMT(constkey)} () Result@${restype}`;
         const blocks = cdecl.value.body;
@@ -806,6 +816,11 @@ class SMTBodyEmitter {
         if (SMTBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
             return undefined;
         }
+
+        this.vtypes = new Map<string, MIRType>();
+        ((fdecl.value as MIRBody).vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.typegen.getMIRType(tkey));
+        });
 
         const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(fdecl.declaredType));
         const decl = `(define-fun ${this.invokenameToSMT(fdkey)} () Result@${restype}`;

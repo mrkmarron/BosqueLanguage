@@ -79,6 +79,7 @@ if (Commander.verify !== undefined) {
             .replace(";;FIXED_RECORD_DECLS_FWD;;", "  " + sparams.fixedrecorddecls_fwd)
             .replace(";;FIXED_TUPLE_DECLS;;", "  " + sparams.fixedtupledecls)
             .replace(";;FIXED_RECORD_DECLS;;", "  " + sparams.fixedrecorddecls)
+            .replace(";;NOMINAL_DECLS_FWD;;", "  " + sparams.typedecls_fwd)
             .replace(";;NOMINAL_DECLS;;", "  " + sparams.typedecls)
             .replace(";;NOMINAL_RESULT_FWD;;", "  " + sparams.resultdecls_fwd)
             .replace(";;NOMINAL_RESULT;;", "  " + sparams.resultdecls)
@@ -134,7 +135,7 @@ else {
             + cparams.funcdecls
             + "}\n\n"
             + "\n\n/*main decl*/\n"
-            + `int main(int argc, char* argv) { return BSQ::${sanitizeStringForCpp(Commander.compile)}(); }\n`;
+            + `int main(int argc, char* argv) { try { return BSQ::${sanitizeStringForCpp(Commander.compile)}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {
