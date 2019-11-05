@@ -759,6 +759,33 @@ class MIREmitter {
                 const args = new Map<string, MIRType>();
                 idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
                 computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
+
+                idecl.preconditions.forEach((pre) => {
+                    computeVarTypesForInvoke(pre[0], args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
+                });
+
+                idecl.postconditions.forEach((post) => {
+                    computeVarTypesForInvoke(post, args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
+                });
+            });
+
+            masm.constantDecls.forEach((cdecl) => {
+                const args = new Map<string, MIRType>();
+                computeVarTypesForInvoke(cdecl.value, args, masm.typeMap.get(cdecl.declaredType) as MIRType, masm);
+            });
+
+            masm.fieldDecls.forEach((fdecl) => {
+                if (fdecl.value !== undefined) {
+                    const args = new Map<string, MIRType>();
+                    computeVarTypesForInvoke(fdecl.value, args, masm.typeMap.get(fdecl.declaredType) as MIRType, masm);
+                }
+            });
+
+            masm.entityDecls.forEach((edecl) => {
+                edecl.invariants.forEach((invdecl) => {
+                    const args = new Map<string, MIRType>().set("this", masm.typeMap.get(edecl.tkey) as MIRType);
+                    computeVarTypesForInvoke(invdecl, args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
+                });
             });
         }
         catch (ex) {
