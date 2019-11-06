@@ -11,12 +11,12 @@ concept Collection<T> provides Object {
 }
 
 entity ListEntry<T> provides Object {
-    field value: T;
+    field entry: T;
     field tail: ListEntry<T>?;
 
      recursive method at(idx: Int): T {
         if(idx == 0) {
-            return this.value;
+            return this.entry;
         }
         else {
             var tl = this.tail;
@@ -27,15 +27,15 @@ entity ListEntry<T> provides Object {
     }
 
     recursive method map<U>(f: recursive? fn(_: T) -> U): ListEntry<U> {
-        var nvalue = f[recursive?](this.value);
+        var nentry = f[recursive?](this.entry);
 
         var tl = this.tail;
         if(tl == none) {
-            return ListEntry<U>{value=nvalue, tail=none};
+            return ListEntry<U>{entry=nentry, tail=none};
         }
         else {
             var ntail = tl->map<U>[recursive](f);
-            return ListEntry<U>{value=nvalue, tail=ntail};
+            return ListEntry<U>{entry=nentry, tail=ntail};
         }
     }
 }

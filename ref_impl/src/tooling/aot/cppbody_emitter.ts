@@ -189,11 +189,11 @@ class CPPBodyEmitter {
         const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
         const fvals = cp.args.map((arg, i) => {
             const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
-            return this.argToCpp(arg, ftype);
+            return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
         });
 
         const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
-        const cexp = `${this.varToCppName(cp.trgt)} = new ${smtctype}(${fvals.join(", ")});`;
+        const cexp = `${this.varToCppName(cp.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}>(new ${smtctype}(${fvals.join(", ")}));`;
         if (ctype.invariants.length === 0) {
             return cexp;
         }
@@ -219,15 +219,16 @@ class CPPBodyEmitter {
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         if (ctype.name === "List") {
+            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
+            const clistcons = `new ${sanitizeStringForCpp(clisttype.trkey)}`;
             const contentstype = ctype.terms.get("T") as MIRType;
-            const tt = this.typegen.typeToCPPType(contentstype, "decl");
 
             let cons = "BSQ_VALUE_NONE";
-            for(let i = cpcs.args.length - 1; i >= 0; --i) {
-                cons = `new ListEntry<${tt}>(${this.argToCpp(cpcs.args[i], contentstype)}, ${cons})`;
+            for (let i = cpcs.args.length - 1; i >= 0; --i) {
+                cons = `${clistcons}(${this.typegen.generateConstructorArgInc(contentstype, this.argToCpp(cpcs.args[i], contentstype))}, BSQRef::checkedIncrementNoneable(${cons}))`;
             }
 
-            return `${this.varToCppName(cpcs.trgt)} = _listcons(${cpcs.args.length}, ${cons});`;
+            return `${this.varToCppName(cpcs.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}>(_listcons(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons})));`;
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
@@ -576,7 +577,7 @@ class CPPBodyEmitter {
                     return "true";
                 }
                 else {
-                    return `${this.varToCppName(tos.trgt)} = BSQ_IS_VALUE_NONNONE(${this.varToCppName(tos.arg)};`;
+                    return `${this.varToCppName(tos.trgt)} = BSQ_IS_VALUE_NONNONE(${this.varToCppName(tos.arg)});`;
                 }
            }
             case MIROpTag.MIRIsTypeOf: {
@@ -682,14 +683,14 @@ class CPPBodyEmitter {
             if (this.typegen.maybeRefableCountableType(this.currentRType)) {
                 if (!this.assembly.subtypeOf(this.typegen.boolType, this.currentRType) && !this.assembly.subtypeOf(this.typegen.intType, this.currentRType)) {
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
-                        gblock.push("RefCountScopeCallMgr::processCallRefNoneable($callerslot$, _return_);");
+                        gblock.push("BSQRefScopeMgr::processCallRefNoneable($callerslot$, _return_);");
                     }
                     else {
-                        gblock.push("RefCountScopeCallMgr::processCallReturnFast($callerslot$, _return_);");
+                        gblock.push("BSQRefScopeMgr::processCallReturnFast($callerslot$, _return_);");
                     }
                 }
                 else {
-                    gblock.push("RefCountScopeCallMgr::processCallRefAny($callerslot$, _return_);");
+                    gblock.push("BSQRefScopeMgr::processCallRefAny($callerslot$, _return_);");
                 }
             }
 
@@ -700,7 +701,7 @@ class CPPBodyEmitter {
     }
 
     generateCPPVarDecls(body: MIRBody, params: MIRFunctionParameter[]): string {
-        const refscope = "    " + (this.typegen.scopectr !== 0 ? `RefCountScope<${this.typegen.scopectr}> $scope$;` : ";");
+        const refscope = "    " + (this.typegen.scopectr !== 0 ? `BSQRefScope<${this.typegen.scopectr}> $scope$;` : ";");
 
         let vdecls = new Map<string, string[]>();
         (body.vtypes as Map<string, string>).forEach((tkey, name) => {
@@ -774,7 +775,8 @@ class CPPBodyEmitter {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
             const pdecl = idecl as MIRInvokePrimitiveDecl;
-            return { fwddecl: pdecl.implkey + ";", fulldecl: pdecl.implkey };
+
+            return { fwddecl: decl + ";", fulldecl: `${decl} { "${pdecl.implkey}"; }\n` };
         }
     }
 

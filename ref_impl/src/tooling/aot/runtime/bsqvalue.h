@@ -89,6 +89,21 @@ public:
         }
     }
 
+    inline static void checkedIncrementFast(Value v)
+    {
+        BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
+        return v;
+    }
+
+    inline static void checkedIncrementNoneable(Value v)
+    {
+        if(BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
+        }
+        return v;
+    }
+
     inline static Value checkedIncrement(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
@@ -160,7 +175,7 @@ public:
     }
 };
 
-class RefCountScopeCallMgr
+class BSQRefScopeMgr
 {
 public:
     inline static void processCallReturnFast(BSQRef** callerslot, BSQRef* ptr)

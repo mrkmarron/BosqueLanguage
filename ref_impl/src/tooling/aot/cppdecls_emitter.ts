@@ -55,16 +55,13 @@ class CPPEmitter {
             //
             //TODO: rec is implmented via stack recusion -- want to add option for bounded stack version
             //
-            const isrec = cginfo.recursive.findIndex((scc) => scc.has(bbup.invoke)) !== -1;
 
             if (tag === "invoke") {
                 const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
                 const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
                 const finfo = bodyemitter.generateCPPInvoke(idcl);
 
-                if (isrec) {
-                    funcdecls_fwd.push(finfo.fwddecl);
-                }
+                funcdecls_fwd.push(finfo.fwddecl);
                 funcdecls.push(finfo.fulldecl);
             }
             else if (tag === "pre") {
@@ -77,9 +74,7 @@ class CPPEmitter {
                 const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
                 const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
 
-                if (isrec) {
-                    funcdecls_fwd.push(finfo.fwddecl);
-                }
+                funcdecls_fwd.push(finfo.fwddecl);
                 funcdecls.push(finfo.fulldecl);
             }
             else if (tag === "const") {
@@ -87,9 +82,7 @@ class CPPEmitter {
                 const finfo = bodyemitter.generateCPPConst(bbup.invoke, cdcl);
 
                 if (finfo !== undefined) {
-                    if (isrec) {
-                        funcdecls_fwd.push(finfo.fwddecl);
-                    }
+                    funcdecls_fwd.push(finfo.fwddecl);
                     funcdecls.push(finfo.fulldecl);
                 }
             }
@@ -99,9 +92,7 @@ class CPPEmitter {
                 const finfo = bodyemitter.generateCPPFDefault(bbup.invoke, fdcl);
 
                 if (finfo !== undefined) {
-                    if (isrec) {
-                        funcdecls_fwd.push(finfo.fwddecl);
-                    }
+                    funcdecls_fwd.push(finfo.fwddecl);
                     funcdecls.push(finfo.fulldecl);
                 }
             }
@@ -139,7 +130,7 @@ class CPPEmitter {
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
-            nominalenums: nominalenums.sort().join("\n"),
+            nominalenums: nominalenums.sort().join(",\n    "),
             funcdecls_fwd: funcdecls_fwd.join("\n"),
             funcdecls: funcdecls.join("\n"),
             conststring_declare: conststring_declare.sort().join("\n  "),

@@ -264,6 +264,24 @@ class CPPTypeEmitter {
         return `.atFixed<${CPPTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
     }
 
+    generateConstructorArgInc(argtype: MIRType, arg: string): string {
+        if (!this.maybeRefableCountableType(argtype)) {
+            return arg;
+        }
+
+        if (!this.assembly.subtypeOf(this.boolType, argtype) && !this.assembly.subtypeOf(this.intType, argtype)) {
+            if (this.assembly.subtypeOf(this.noneType, argtype)) {
+                return `BSQRef::checkedIncrementNoneable(${arg});`;
+            }
+            else {
+                return `BSQRef::checkedIncrementFast(${arg});`;
+            }
+        }
+        else {
+            return `BSQRef::checkedIncrement(${arg});`;
+        }
+    }
+
     generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
         if (!this.doDefaultEmitOnEntity(entity)) {
             return undefined;
