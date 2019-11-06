@@ -51,50 +51,58 @@ class CPPEmitter {
         let funcdecls: string[] = [];
         for (let i = 0; i < rcg.length; ++i) {
             const bbup = rcg[i];
-            if (cginfo.recursive.findIndex((scc) => scc.has(bbup.invoke)) !== -1) {
-                NOT_IMPLEMENTED<void>("Recursive Invoke");
+            const tag = extractMirBodyKeyPrefix(bbup.invoke);
+            //
+            //TODO: rec is implmented via stack recusion -- want to add option for bounded stack version
+            //
+            const isrec = cginfo.recursive.findIndex((scc) => scc.has(bbup.invoke)) !== -1;
+
+            if (tag === "invoke") {
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                const finfo = bodyemitter.generateCPPInvoke(idcl);
+
+                if (isrec) {
+                    funcdecls_fwd.push(finfo.fwddecl);
+                }
+                funcdecls.push(finfo.fulldecl);
+            }
+            else if (tag === "pre") {
+                NOT_IMPLEMENTED<void>("Pre");
+            }
+            else if (tag === "post") {
+                NOT_IMPLEMENTED<void>("Post");
+            }
+            else if (tag === "invariant") {
+                const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
+
+                if (isrec) {
+                    funcdecls_fwd.push(finfo.fwddecl);
+                }
+                funcdecls.push(finfo.fulldecl);
+            }
+            else if (tag === "const") {
+                const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                const finfo = bodyemitter.generateCPPConst(bbup.invoke, cdcl);
+
+                if (finfo !== undefined) {
+                    if (isrec) {
+                        funcdecls_fwd.push(finfo.fwddecl);
+                    }
+                    funcdecls.push(finfo.fulldecl);
+                }
             }
             else {
-                const tag = extractMirBodyKeyPrefix(bbup.invoke);
-                if (tag === "invoke") {
-                    const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                    const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                    const finfo = bodyemitter.generateCPPInvoke(idcl);
+                assert(tag === "fdefault");
+                const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                const finfo = bodyemitter.generateCPPFDefault(bbup.invoke, fdcl);
 
-                    funcdecls_fwd.push(finfo.fwddecl);
-                    funcdecls.push(finfo.fulldecl);
-                }
-                else if (tag === "pre") {
-                    NOT_IMPLEMENTED<void>("Pre");
-                }
-                else if (tag === "post") {
-                    NOT_IMPLEMENTED<void>("Post");
-                }
-                else if (tag === "invariant") {
-                    const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                    const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
-
-                    funcdecls_fwd.push(finfo.fwddecl);
-                    funcdecls.push(finfo.fulldecl);
-                }
-                else if (tag === "const") {
-                    const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
-                    const finfo = bodyemitter.generateCPPConst(bbup.invoke, cdcl);
-
-                    if (finfo !== undefined) {
+                if (finfo !== undefined) {
+                    if (isrec) {
                         funcdecls_fwd.push(finfo.fwddecl);
-                        funcdecls.push(finfo.fulldecl);
                     }
-                }
-                else {
-                    assert(tag === "fdefault");
-                    const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
-                    const finfo = bodyemitter.generateCPPFDefault(bbup.invoke, fdcl);
-
-                    if (finfo !== undefined) {
-                        funcdecls_fwd.push(finfo.fwddecl);
-                        funcdecls.push(finfo.fulldecl);
-                    }
+                    funcdecls.push(finfo.fulldecl);
                 }
             }
         }

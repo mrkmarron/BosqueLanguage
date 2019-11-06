@@ -139,9 +139,9 @@ class TypeChecker {
         this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, invokeBinds);
     }
 
-    private checkPCodeDecl(sinfo: SourceInfo, fsig: ResolvedFunctionType) {
+    private checkPCodeDecl(sinfo: SourceInfo, fsig: ResolvedFunctionType, rec: "yes" | "no" | "cond") {
         this.raiseErrorIf(sinfo, fsig.optRestParamType !== undefined && fsig.params.some((param) => param.isOptional), "Cannot have optional and rest parameters in an invocation signature");
-        this.raiseErrorIf(sinfo, fsig.recursive !== "no", "Recursive decl does not match use");
+        this.raiseErrorIf(sinfo, rec === "no" && fsig.recursive === "yes", "Recursive decl does not match use");
 
         const allNames = new Set<string>();
         if (fsig.optRestParamName !== undefined && fsig.optRestParamName !== "_") {
@@ -3356,7 +3356,8 @@ class TypeChecker {
         try {
             this.m_file = tdecl.srcFile;
 
-           tdecl.terms.forEach((term) => this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType));
+            let terms = new Map<string, MIRType>();
+            tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
 
             const provides = tdecl.provides.map((provide) => {
                 const ptype = this.resolveAndEnsureTypeOnly(new SourceInfo(0, 0, 0, 0), provide, binds);
@@ -3402,11 +3403,11 @@ class TypeChecker {
             const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
 
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, provides, invariants, fields, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields, tdecl.isTypeACollectionEntity(), tdecl.isTypeAMapEntity(), (tdecl as EntityTypeDecl).isEnum, (tdecl as EntityTypeDecl).isKey);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, provides, invariants, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, pragmas, tdecl.ns, tdecl.name, terms, provides, invariants, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -3551,7 +3552,7 @@ class TypeChecker {
     }
 
     private processPCodeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, pci: InvokeDecl, binds: Map<string, ResolvedType>, fsig: ResolvedFunctionType, pargs: [string, ResolvedType][]): MIRInvokeDecl {
-        this.checkPCodeDecl(sinfo, fsig);
+        this.checkPCodeDecl(sinfo, fsig, pci.recursive);
 
         const pragmas = this.processPragmas(pci.sourceLocation, pci.pragmas);
 
@@ -3601,7 +3602,7 @@ class TypeChecker {
         const mirbody = this.checkBody(env, pci.body as BodyImplementation, argTypes, fsig.resultType);
         this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
 
-        return new MIRInvokeBodyDecl(iname, ikey, false, pragmas, sinfo, pci.srcFile, params, resultType.trkey, [], [], mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(iname, ikey, pci.recursive === "yes", pragmas, sinfo, pci.srcFile, params, resultType.trkey, [], [], mirbody as MIRBody);
     }
 
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {

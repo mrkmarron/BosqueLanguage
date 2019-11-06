@@ -89,10 +89,10 @@ function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRBodyKey
         return;
     }
 
+    tordered.push(cn);
+
     cn.callees.forEach((succ) => (invokes.get(succ) as CallGNode).callers.add(cn.invoke));
     cn.callees.forEach((succ) => topoVisit(invokes.get(succ) as CallGNode, tordered, invokes));
-
-    tordered.push(cn);
 }
 
 function processBodyInfo(bkey: MIRBodyKey, binfo: MIRBody[], assembly: MIRAssembly): CallGNode {

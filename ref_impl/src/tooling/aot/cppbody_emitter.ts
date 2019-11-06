@@ -3,10 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { NOT_IMPLEMENTED, filenameClean, sanitizeStringForCpp } from "./cpputils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { constructCallGraphInfo, CallGInfo } from "../../compiler/mir_callg";
@@ -203,6 +203,40 @@ class CPPBodyEmitter {
         }
     }
 
+    generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): string {
+        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpce.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        if (ctype.name === "List") {
+            return sanitizeStringForCpp(cpce.tkey + "::empty");
+        }
+        else if (ctype.name === "Set") {
+            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionEmpty -- Set");
+        }
+        else {
+            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionEmpty -- Map");
+        }
+    }
+
+    generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
+        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        if (ctype.name === "List") {
+            const contentstype = ctype.terms.get("T") as MIRType;
+            const tt = this.typegen.typeToCPPType(contentstype, "decl");
+
+            let cons = "BSQ_VALUE_NONE";
+            for(let i = cpcs.args.length - 1; i >= 0; --i) {
+                cons = `new ListEntry<${tt}>(${this.argToCpp(cpcs.args[i], contentstype)}, ${cons})`;
+            }
+
+            return `${this.varToCppName(cpcs.trgt)} = _listcons(${cpcs.args.length}, ${cons});`;
+        }
+        else if (ctype.name === "Set") {
+            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
+        }
+        else {
+            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Map");
+        }
+    }
+
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
         const tuptype = this.getArgType(op.arg);
         if (this.typegen.isFixedTupleType(tuptype)) {
@@ -366,10 +400,12 @@ class CPPBodyEmitter {
                 return this.generateMIRConstructorPrimary(cp);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
-                return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionEmpty");
+                const cpce = op as MIRConstructorPrimaryCollectionEmpty;
+                return this.generateMIRConstructorPrimaryCollectionEmpty(cpce);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
-                return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionSingletons");
+                const cpcs = op as MIRConstructorPrimaryCollectionSingletons;
+                return this.generateMIRConstructorPrimaryCollectionSingletons(cpcs);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionCopies");
@@ -737,7 +773,8 @@ class CPPBodyEmitter {
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string, supportcalls: string[] }>("generateInvoke -- MIRInvokePrimitiveDecl");
+            const pdecl = idecl as MIRInvokePrimitiveDecl;
+            return { fwddecl: pdecl.implkey + ";", fulldecl: pdecl.implkey };
         }
     }
 
@@ -802,6 +839,10 @@ class CPPBodyEmitter {
             return undefined;
         }
 
+        //
+        //TODO: should have lazy initialize and memo in this impl
+        //
+
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
 
@@ -836,6 +877,10 @@ class CPPBodyEmitter {
         if (CPPBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
             return undefined;
         }
+
+        //
+        //TODO: should have lazy initialize and memo in this impl
+        //
 
         const fdbody = fdecl.value as MIRBody;
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");

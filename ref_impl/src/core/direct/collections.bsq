@@ -10,20 +10,63 @@ namespace NSCore;
 concept Collection<T> provides Object {
 }
 
-//<summary>A List entity.</summary>
-entity List<T> provides Collection<T> {
+entity ListEntry<T> provides Object {
     field value: T;
-    field tail: List<T>?;
+    field tail: ListEntry<T>?;
 
-    recursive method map<U>(f: recursive? fn(_: T) -> U): List<U> {
-        var nvalue = f[recursive?](this.value);
-
-        if(this.tail == none) {
-            return List<U>{value=nvalue, tail=none};
+     recursive method at(idx: Int): T {
+        if(idx == 0) {
+            return this.value;
         }
         else {
-            const ntail = this.tail->map<U>[recursive](f);
-            return List<U>{value=nvalue, tail=ntail};
+            var tl = this.tail;
+            check tl != none;
+
+            return tl->at[recursive](idx - 1);
+        }
+    }
+
+    recursive method map<U>(f: recursive? fn(_: T) -> U): ListEntry<U> {
+        var nvalue = f[recursive?](this.value);
+
+        var tl = this.tail;
+        if(tl == none) {
+            return ListEntry<U>{value=nvalue, tail=none};
+        }
+        else {
+            var ntail = tl->map<U>[recursive](f);
+            return ListEntry<U>{value=nvalue, tail=ntail};
+        }
+    }
+}
+
+function _listcons<T>(size: Int, list: ListEntry<T>?): List<T> # _listcons
+
+//<summary>A List entity.</summary>
+entity List<T> provides Collection<T> {
+    field size: Int;
+    field list: ListEntry<T>?;
+
+    const empty: List<T> = _listcons<T>(0, none);
+
+    method size(): Int {
+        return this.size;
+    }
+    
+    method at(idx: Int): T {
+        var tl = this.list;
+        check idx < this.size && tl != none;
+
+        return tl->at[recursive](idx);
+    }
+
+    method map<U>(f: recursive? fn(_: T) -> U): List<U> {
+        var tl = this.list;
+        if(tl == none) {
+            return List<U>::empty;
+        }
+        else {
+            return _listcons<U>(this.size, tl->map<U>[recursive](f));
         }
     }
 }
