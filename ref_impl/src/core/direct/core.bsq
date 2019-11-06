@@ -205,9 +205,3 @@ concept Keyed<T where KeyType> provides Indexable, Some {
 entity Tagged<T where KeyType, U> provides Keyed<T>, Object {
     field tagged_value: U;
 }
-
-//<summary>Shorthand for predicate function types.</summary>
-typedef Predicate<T> = fn(_: T) -> Bool;
-
-//<summary>Shorthand for transform function types.</summary>
-typedef Transform<T, U> = fn(_: T) -> U;

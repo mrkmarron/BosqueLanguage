@@ -14,6 +14,18 @@ concept Collection<T> provides Object {
 entity List<T> provides Collection<T> {
     field value: T;
     field tail: List<T>?;
+
+    recursive method map<U>(f: recursive? fn(_: T) -> U): List<U> {
+        var nvalue = f[recursive?](this.value);
+
+        if(this.tail == none) {
+            return List<U>{value=nvalue, tail=none};
+        }
+        else {
+            const ntail = this.tail->map<U>[recursive](f);
+            return List<U>{value=nvalue, tail=ntail};
+        }
+    }
 }
 
 entity Set<T where Indexable> provides Collection<T> {

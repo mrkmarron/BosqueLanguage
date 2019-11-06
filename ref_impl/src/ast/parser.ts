@@ -1199,15 +1199,9 @@ class Parser {
                 }
 
                 if (this.testToken("[")) {
-                    const mp = this.scanMatchingParens("[", "]");
-                    if (this.testFollowsFrom(mp, "]", "(")) {
-                        const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
-                        const args = this.parseArguments("(", ")");
-                        return new PCodeInvokeExpression(sinfo, istr, pragmas, args);
-                    }
-                    else {
-                        return new AccessVariableExpression(sinfo, istr);
-                    }
+                    const pragmas = this.parsePragmaArguments();
+                    const args = this.parseArguments("(", ")");
+                    return new PCodeInvokeExpression(sinfo, istr, pragmas, args);
                 }
                 else if (this.testToken("(")) {
                     const args = this.parseArguments("(", ")");
