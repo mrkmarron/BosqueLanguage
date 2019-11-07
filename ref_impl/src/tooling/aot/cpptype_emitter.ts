@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
-import { sanitizeStringForCpp } from "./cpputils";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
 class CPPTypeEmitter {
@@ -16,6 +15,8 @@ class CPPTypeEmitter {
     readonly boolType: MIRType;
     readonly intType: MIRType;
     readonly stringType: MIRType;
+
+    private mangledNameMap: Map<string, string> = new Map<string, string>();
 
     scopectr: number = 0;
 
@@ -31,6 +32,15 @@ class CPPTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    mangleStringForCpp(name: string): string {
+        if (!this.mangledNameMap.has(name)) {
+            const cleanname = name.replace(/\W/g, "_").toLowerCase() + "I" + this.mangledNameMap.size + "I";
+            this.mangledNameMap.set(name, cleanname);
+        }
+
+        return this.mangledNameMap.get(name) as string;
     }
 
     getMIRType(tkey: MIRResolvedTypeKey): MIRType {
@@ -107,8 +117,8 @@ class CPPTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    static fixedRecordPropertyName(frec: MIRRecordType): string {
-        return sanitizeStringForCpp(`{${frec.entries.map((entry) => entry.name).join("$")}}`);
+    generateFixedRecordPropertyName(frec: MIRRecordType): string {
+        return this.mangleStringForCpp(`{${frec.entries.map((entry) => entry.name).join(", ")}}`);
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {
@@ -144,10 +154,10 @@ class CPPTypeEmitter {
             return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>`;
         }
         else if (this.isFixedRecordType(ttype)) {
-            return `BSQRecordFixed<FixedRecordPropertyListEnum::${CPPTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
+            return `BSQRecordFixed<FixedRecordPropertyListEnum::${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
         }
         else if (this.isUEntityType(ttype)) {
-            return sanitizeStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");
+            return this.mangleStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");
         }
         else {
             return "Value";
@@ -160,7 +170,7 @@ class CPPTypeEmitter {
             return this.typeboxings[tbi].fkey;
         }
 
-        const fkey = sanitizeStringForCpp(`Box$$${from.trkey}$$${into.trkey}`);
+        const fkey = "BOX_" + this.mangleStringForCpp(`${from.trkey}_${into.trkey}`);
         this.typeboxings.push({ fkey: fkey, from: from, into: into });
 
         return fkey;
@@ -202,7 +212,7 @@ class CPPTypeEmitter {
             return this.typeunboxings[tbi].fkey;
         }
 
-        const fkey = sanitizeStringForCpp(`UnBox$$${from.trkey}$$${into.trkey}`);
+        const fkey = "UNBOX_" + this.mangleStringForCpp(`${from.trkey}_${into.trkey}`);
         this.typeunboxings.push({ fkey: fkey, from: from, into: into });
 
         return fkey;
@@ -346,9 +356,9 @@ class CPPTypeEmitter {
                     cargs.push("$callerslot$");
                 }
 
-                return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs.join(", ")})\n`
+                return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`
                     + "    {\n"
-                    + `        return ${sanitizeStringForCpp(callp[1])}(${cargs.join(", ")});\n`
+                    + `        return ${this.mangleStringForCpp(callp[1])}(${cargs.join(", ")});\n`
                     + "    }\n";
             }
         });
@@ -361,13 +371,13 @@ class CPPTypeEmitter {
         + "    }";
 
         return {
-            fwddecl: `class ${sanitizeStringForCpp(entity.tkey)};`,
-            fulldecl: `class ${sanitizeStringForCpp(entity.tkey)} : public BSQObject\n`
+            fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
+            fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
             + "{\n"
             + "public:\n"
             + `    ${fields.join("\n    ")}\n\n`
-            + `    ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${sanitizeStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
-            + `    virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} }\n\n`
+            + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
+            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} }\n\n`
             + `    ${display}\n\n`
             + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
             + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`

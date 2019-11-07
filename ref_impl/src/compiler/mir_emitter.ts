@@ -7,7 +7,7 @@ import { SourceInfo, Parser } from "../ast/parser";
 import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRBodyKey } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
-import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl } from "./mir_assembly";
+import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIROOTypeDecl } from "./mir_assembly";
 
 import * as Crypto from "crypto";
 import { TypeChecker } from "../type_checker/type_checker";
@@ -85,6 +85,25 @@ class MIRKeyGenerator {
     //pfx::key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
     static generateBodyKey(prefix: "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault", data: MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey): MIRBodyKey {
         return `${prefix}::${data}`;
+    }
+
+    static computeBindsKeyInfo_MIR(binds: Map<string, MIRType>): string {
+        if (binds.size === 0) {
+            return "";
+        }
+
+        let terms: string[] = [];
+        binds.forEach((v, k) => terms.push(`${k}=${v.trkey}`));
+
+        return `<${terms.sort().join(", ")}>`;
+    }
+
+    static generateTypeKey_MIR(t: MIROOTypeDecl, binds: Map<string, MIRType>): MIRResolvedTypeKey {
+        return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(binds)}`;
+    }
+
+    static generateStaticKey_MIR(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
+        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}}`;
     }
 }
 

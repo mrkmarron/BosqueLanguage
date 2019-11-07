@@ -6,11 +6,14 @@
 import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
-import { NOT_IMPLEMENTED, sanitizeStringForCpp } from "./cpputils";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
+
+function NOT_IMPLEMENTED<T>(msg: string): T {
+    throw new Error(`Not Implemented: ${msg}`);
+}
 
 type CPPCode = {
     typedecls_fwd: string,
@@ -24,11 +27,12 @@ type CPPCode = {
     fixedrecord_property_lists: string,
     propertynames: string,
     vfield_decls: string,
-    vmethod_decls: string
+    vmethod_decls: string,
+    entryname: string
 };
 
 class CPPEmitter {
-    static emit(assembly: MIRAssembly): CPPCode {
+    static emit(assembly: MIRAssembly, entrypoint: string): CPPCode {
         const typeemitter = new CPPTypeEmitter(assembly);
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
 
@@ -40,7 +44,7 @@ class CPPEmitter {
             if (cppdecl !== undefined) {
                 typedecls_fwd.push(cppdecl.fwddecl);
                 typedecls.push(cppdecl.fulldecl);
-                nominalenums.push(sanitizeStringForCpp(edecl.tkey));
+                nominalenums.push(typeemitter.mangleStringForCpp(edecl.tkey));
             }
         });
 
@@ -109,21 +113,21 @@ class CPPEmitter {
         let propertynames: Set<string> = new Set<string>();
         let fixedrecord_property_lists: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
-            propertyenums.add(sanitizeStringForCpp(pname));
+            propertyenums.add(pname);
             propertynames.add(`"${pname}"`);
         });
         assembly.typeMap.forEach((tt) => {
             tt.options.forEach((topt) => {
                 if (topt instanceof MIRRecordType) {
                     topt.entries.forEach((entry) => {
-                        propertyenums.add(sanitizeStringForCpp(entry.name));
+                        propertyenums.add(entry.name);
                         propertynames.add(`"${entry.name}"`);
                     });
                 }
             });
 
             if (typeemitter.isFixedRecordType(tt)) {
-                fixedrecord_property_lists.add(CPPTypeEmitter.fixedRecordPropertyName(tt.options[0] as MIRRecordType));
+                fixedrecord_property_lists.add(typeemitter.generateFixedRecordPropertyName(tt.options[0] as MIRRecordType));
             }
         });
 
@@ -139,7 +143,8 @@ class CPPEmitter {
             fixedrecord_property_lists: [...fixedrecord_property_lists].sort().join("\n  "),
             propertynames: [...propertynames].sort().join(",\n  "),
             vfield_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-FIELD RESOLUTION",
-            vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION"
+            vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION",
+            entryname: typeemitter.mangleStringForCpp(entrypoint)
         };
     }
 }

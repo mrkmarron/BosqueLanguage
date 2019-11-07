@@ -15,7 +15,6 @@ import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl } from "../compiler/mir_a
 import { MIREmitter } from "../compiler/mir_emitter";
 import { CPPEmitter } from "./aot/cppdecls_emitter";
 import { SMTEmitter } from "./bmc/smtdecls_emitter";
-import { sanitizeStringForCpp } from "./aot/cpputils";
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     process.stdout.write("Reading code...\n");
@@ -106,7 +105,7 @@ else {
     setImmediate(() => {
         const cpp_runtime = Path.join(__dirname, "aot/runtime/");
 
-        const cparams = CPPEmitter.emit(massembly);
+        const cparams = CPPEmitter.emit(massembly, Commander.compile);
         const lsrc = FS.readdirSync(cpp_runtime);
         const linked = lsrc.map((fname) => {
             const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
@@ -135,7 +134,7 @@ else {
             + cparams.funcdecls
             + "}\n\n"
             + "\n\n/*main decl*/\n"
-            + `int main(int argc, char* argv) { try { return BSQ::${sanitizeStringForCpp(Commander.compile)}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
+            + `int main(int argc, char* argv) { try { return BSQ::${cparams.entryname}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {
