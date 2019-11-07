@@ -89,13 +89,14 @@ public:
         }
     }
 
-    inline static void checkedIncrementFast(Value v)
+    template <typename T>
+    inline static T* checkedIncrementFast(T* v)
     {
-        BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
+        BSQRef::increment(v);
         return v;
     }
 
-    inline static void checkedIncrementNoneable(Value v)
+    inline static Value checkedIncrementNoneable(Value v)
     {
         if(BSQ_IS_VALUE_NONNONE(v))
         {
@@ -160,13 +161,13 @@ public:
         }
     }
 
-    template<uint16_t pos>
+    template <uint16_t pos>
     inline BSQRef** getCallerSlot() {
         return this->opts + pos; 
     }
 
-    template <uint16_t pos>
-    inline BSQRef* addAllocRef(BSQRef* ptr)
+    template <uint16_t pos, typename T>
+    inline T* addAllocRef(T* ptr)
     {
         BSQRef::increment(ptr);
         this->opts[pos] = ptr;

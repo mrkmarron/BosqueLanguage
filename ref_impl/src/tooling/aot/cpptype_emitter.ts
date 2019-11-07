@@ -271,14 +271,14 @@ class CPPTypeEmitter {
 
         if (!this.assembly.subtypeOf(this.boolType, argtype) && !this.assembly.subtypeOf(this.intType, argtype)) {
             if (this.assembly.subtypeOf(this.noneType, argtype)) {
-                return `BSQRef::checkedIncrementNoneable(${arg});`;
+                return `BSQRef::checkedIncrementNoneable(${arg})`;
             }
             else {
-                return `BSQRef::checkedIncrementFast(${arg});`;
+                return `BSQRef::checkedIncrementFast${this.typeToCPPType(argtype, "parameter")}(${arg})`;
             }
         }
         else {
-            return `BSQRef::checkedIncrement(${arg});`;
+            return `BSQRef::checkedIncrement(${arg})`;
         }
     }
 
@@ -320,20 +320,37 @@ class CPPTypeEmitter {
         });
 
         const vfield_accessors = entity.fields.map((fd) => {
-            const fn = `this->${fd.name}`;
-            const fdv = this.coerce(fn, this.getMIRType(fd.declaredType), this.anyType);
-            return `Value get$${fd.name}() const { return ${fdv}; };`;
+            if (!fd.attributes.includes("virtual") && !fd.attributes.includes("override")) {
+                return "NA";
+            }
+            else {
+                const fn = `this->${fd.name}`;
+                const fdv = this.coerce(fn, this.getMIRType(fd.declaredType), this.anyType);
+                return `Value get$${fd.name}() const { return ${fdv}; };`;
+            }
         });
 
         const vcalls = [...entity.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-            const rtype = this.typeToCPPType(this.getMIRType(rcall.resultType), "return");
-            const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`).join(", ");
-            const cargs = rcall.params.map((fp) => fp.name).join(", ");
-            return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs})\n`
-            + "    {\n"
-            + `        return ${sanitizeStringForCpp(callp[1])}(${cargs});\n`
-            + "    }\n";
+            if (!rcall.attributes.includes("override")) {
+                return "NA";
+            }
+            else {
+                const resulttype = this.getMIRType(rcall.resultType);
+                const rtype = this.typeToCPPType(resulttype, "return");
+
+                const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`);
+                const cargs = rcall.params.map((fp) => fp.name);
+                if (this.maybeRefableCountableType(resulttype)) {
+                    vargs.push("BSQRef** $callerslot$");
+                    cargs.push("$callerslot$");
+                }
+
+                return `${rtype} ${sanitizeStringForCpp(callp[0])}(${vargs.join(", ")})\n`
+                    + "    {\n"
+                    + `        return ${sanitizeStringForCpp(callp[1])}(${cargs.join(", ")});\n`
+                    + "    }\n";
+            }
         });
 
         const faccess = entity.fields.map((f) => this.coerce(`this->${f.name}`, this.getMIRType(f.declaredType), this.anyType));
@@ -352,8 +369,8 @@ class CPPTypeEmitter {
             + `    ${sanitizeStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${sanitizeStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
             + `    virtual ~${sanitizeStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} }\n\n`
             + `    ${display}\n\n`
-            + `    ${vfield_accessors.join("\n    ")}\n\n`
-            + `    ${vcalls.join("\n    ")}\n`
+            + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
+            + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
             + "};"
         };
     }

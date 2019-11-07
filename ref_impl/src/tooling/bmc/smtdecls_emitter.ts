@@ -30,7 +30,7 @@ class SMTEmitter {
         const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
 
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
-        const rcg = [...cginfo.topologicalOrder].reverse();
+        const rcg = [...cginfo.topologicalOrder];
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];

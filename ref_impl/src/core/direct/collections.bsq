@@ -40,14 +40,14 @@ entity ListEntry<T> provides Object {
     }
 }
 
-function _listcons<T>(size: Int, list: ListEntry<T>?): List<T> # _listcons
-
 //<summary>A List entity.</summary>
 entity List<T> provides Collection<T> {
     field size: Int;
     field list: ListEntry<T>?;
 
-    const empty: List<T> = _listcons<T>(0, none);
+    hidden static _cons(size: Int, list: ListEntry<T>?): List<T> # _listcons
+
+    const empty: List<T> = List<T>::_cons<T>(0, none);
 
     method size(): Int {
         return this.size;
@@ -66,7 +66,7 @@ entity List<T> provides Collection<T> {
             return List<U>::empty;
         }
         else {
-            return _listcons<U>(this.size, tl->map<U>[recursive](f));
+            return List<U>::_cons(this.size, tl->map<U>[recursive](f));
         }
     }
 }

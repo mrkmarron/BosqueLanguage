@@ -8,8 +8,8 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey } from "./mir_ops";
-import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "./mir_assembly";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "./mir_ops";
+import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl, MIRType } from "./mir_assembly";
 import { MIRKeyGenerator } from "./mir_emitter";
 
 type CallGNode = {
@@ -24,6 +24,21 @@ type CallGInfo = {
     roots: CallGNode[],
     recursive: (Set<MIRBodyKey>)[]
 };
+
+function computeBindsKeyInfo(binds: Map<string, MIRType>): string {
+    if (binds.size === 0) {
+        return "";
+    }
+
+    let terms: string[] = [];
+    binds.forEach((v, k) => terms.push(`${k}=${v.trkey}`));
+
+    return `<${terms.sort().join(", ")}>`;
+}
+
+function generateStaticKey(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
+    return `${t.ns}::${t.name}::${name}${computeBindsKeyInfo(t.terms)}`;
+}
 
 function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: CallGNode, assembly: MIRAssembly) {
     blocks.forEach((block) => {
@@ -52,6 +67,26 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                         const invkey = MIRKeyGenerator.generateBodyKey("invariant", cop.tkey);
                         invokeNode.callees.add(invkey);
                     }
+                    break;
+                }
+                case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
+                    const cop = op as MIRConstructorPrimaryCollectionEmpty;
+                    const invkey = MIRKeyGenerator.generateBodyKey("const", cop.tkey + "::empty");
+                    invokeNode.callees.add(invkey);
+                    break;
+                }
+                case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
+                    const cop = op as MIRConstructorPrimaryCollectionSingletons;
+                    const invkey = MIRKeyGenerator.generateBodyKey("invoke", generateStaticKey(assembly.entityDecls.get(cop.tkey) as MIREntityTypeDecl, "_cons"));
+                    invokeNode.callees.add(invkey);
+                    break;
+                }
+                case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
+                    assert(false);
+                    break;
+                }
+                case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
+                    assert(false);
                     break;
                 }
                 case MIROpTag.MIRInvokeFixedFunction: {

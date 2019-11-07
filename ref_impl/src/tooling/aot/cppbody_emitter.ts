@@ -58,6 +58,21 @@ class CPPBodyEmitter {
         return sanitizeStringForCpp(ivk);
     }
 
+    computeBindsKeyInfo(binds: Map<string, MIRType>): string {
+        if (binds.size === 0) {
+            return "";
+        }
+
+        let terms: string[] = [];
+        binds.forEach((v, k) => terms.push(`${k}=${v.trkey}`));
+
+        return `<${terms.sort().join(", ")}>`;
+    }
+
+    generateStaticKey(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
+        return `${t.ns}::${t.name}::${name}${this.computeBindsKeyInfo(t.terms)}`;
+    }
+
     getArgType(arg: MIRArgument): MIRType {
         if (arg instanceof MIRRegisterArgument) {
             return this.vtypes.get(arg.nameID) as MIRType;
@@ -193,7 +208,7 @@ class CPPBodyEmitter {
         });
 
         const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
-        const cexp = `${this.varToCppName(cp.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}>(new ${smtctype}(${fvals.join(", ")}));`;
+        const cexp = `${this.varToCppName(cp.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}, ${smtctype}>(new ${smtctype}(${fvals.join(", ")}));`;
         if (ctype.invariants.length === 0) {
             return cexp;
         }
@@ -219,6 +234,7 @@ class CPPBodyEmitter {
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         if (ctype.name === "List") {
+            const smtmpltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cpcs.tkey), "base");
             const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
             const clistcons = `new ${sanitizeStringForCpp(clisttype.trkey)}`;
             const contentstype = ctype.terms.get("T") as MIRType;
@@ -228,7 +244,8 @@ class CPPBodyEmitter {
                 cons = `${clistcons}(${this.typegen.generateConstructorArgInc(contentstype, this.argToCpp(cpcs.args[i], contentstype))}, BSQRef::checkedIncrementNoneable(${cons}))`;
             }
 
-            return `${this.varToCppName(cpcs.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}>(_listcons(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons})));`;
+            const lcname = this.invokenameToCPP(this.generateStaticKey(ctype, "_cons"));
+            return `${this.varToCppName(cpcs.trgt)} = $scope$.addAllocRef<${this.typegen.scopectr++}, ${smtmpltype}>(${lcname}(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons})));`;
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
@@ -841,10 +858,12 @@ class CPPBodyEmitter {
             return undefined;
         }
 
-        //
-        //TODO: should have lazy initialize and memo in this impl
-        //
-
+        const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "decl");
+        const flagname = `_flag_${this.invokenameToCPP(constkey)}`;
+        const memoname = `_memo_${this.invokenameToCPP(constkey)}`;
+        const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
+        const rupdate = `_return_ = __ir_ret__; ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** $callerslot$ = &$callerslot_dummy$;" : ""} ${memoname} = _return_;  ${flagname} = true;`;
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
 
@@ -867,8 +886,13 @@ class CPPBodyEmitter {
         });
 
         const scopestrs = this.generateCPPVarDecls(cdecl.value, []);
+        const jblockstrs = blockstrs.join("\n\n");
 
-        return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
+        const rstart = jblockstrs.indexOf("_return_ = __ir_ret__;");
+        const rend = jblockstrs.indexOf("return _return_;");
+        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rend);
+
+        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
     }
 
     generateCPPFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): { fwddecl: string, fulldecl: string } | undefined {
@@ -880,11 +904,15 @@ class CPPBodyEmitter {
             return undefined;
         }
 
-        //
-        //TODO: should have lazy initialize and memo in this impl
-        //
-
         const fdbody = fdecl.value as MIRBody;
+
+        const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "decl");
+        const flagname = `_flag_${this.invokenameToCPP(fdkey)}`;
+        const memoname = `_memo_${this.invokenameToCPP(fdkey)}`;
+        const gdecl = `bool ${flagname} = false; ${decltype}; ${memoname};`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
+        const rupdate = `_return_ = __ir_ret__; ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** $callerslot$ = &$callerslot_dummy$;" : ""} ${memoname} = _return_;  ${flagname} = true;`;
+
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(fdkey)}()`;
 
@@ -907,8 +935,13 @@ class CPPBodyEmitter {
         });
 
         const scopestrs = this.generateCPPVarDecls(fdbody, []);
+        const jblockstrs = blockstrs.join("\n\n");
 
-        return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
+        const rstart = jblockstrs.indexOf("_return_ = __ir_ret__;");
+        const rend = jblockstrs.indexOf("return _return_;");
+        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rend);
+
+        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
     }
 }
 

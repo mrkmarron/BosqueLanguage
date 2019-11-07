@@ -45,7 +45,7 @@ class CPPEmitter {
         });
 
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
-        const rcg = [...cginfo.topologicalOrder].reverse();
+        const rcg = [...cginfo.topologicalOrder];
 
         let funcdecls_fwd: string[] = [];
         let funcdecls: string[] = [];
