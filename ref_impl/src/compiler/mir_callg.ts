@@ -9,7 +9,7 @@
 
 import * as assert from "assert";
 import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "./mir_ops";
-import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl, MIRType } from "./mir_assembly";
+import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "./mir_assembly";
 import { MIRKeyGenerator } from "./mir_emitter";
 
 type CallGNode = {
@@ -24,21 +24,6 @@ type CallGInfo = {
     roots: CallGNode[],
     recursive: (Set<MIRBodyKey>)[]
 };
-
-function computeBindsKeyInfo(binds: Map<string, MIRType>): string {
-    if (binds.size === 0) {
-        return "";
-    }
-
-    let terms: string[] = [];
-    binds.forEach((v, k) => terms.push(`${k}=${v.trkey}`));
-
-    return `<${terms.sort().join(", ")}>`;
-}
-
-function generateStaticKey(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
-    return `${t.ns}::${t.name}::${name}${computeBindsKeyInfo(t.terms)}`;
-}
 
 function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: CallGNode, assembly: MIRAssembly) {
     blocks.forEach((block) => {
@@ -77,7 +62,7 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                 }
                 case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
                     const cop = op as MIRConstructorPrimaryCollectionSingletons;
-                    const invkey = MIRKeyGenerator.generateBodyKey("invoke", generateStaticKey(assembly.entityDecls.get(cop.tkey) as MIREntityTypeDecl, "_cons"));
+                    const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(assembly.entityDecls.get(cop.tkey) as MIREntityTypeDecl, "_cons"));
                     invokeNode.callees.add(invkey);
                     break;
                 }

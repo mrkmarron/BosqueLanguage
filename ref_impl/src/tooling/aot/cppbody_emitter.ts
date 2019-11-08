@@ -10,6 +10,7 @@ import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { constructCallGraphInfo, CallGInfo } from "../../compiler/mir_callg";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
+import { CoreImplBodyText } from "./cppcore_impls";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -53,7 +54,7 @@ class CPPBodyEmitter {
         if (name === "this") {
             return this.typegen.mangleStringForCpp("$this");
         }
-        else if(name === "_return_") {
+        else if (name === "_return_") {
             return "_return_";
         }
         else {
@@ -231,7 +232,6 @@ class CPPBodyEmitter {
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         if (ctype.name === "List") {
-            const smtmpltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cpcs.tkey), "base");
             const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
             const clistcons = `new ${this.typegen.mangleStringForCpp(clisttype.trkey)}`;
             const contentstype = ctype.terms.get("T") as MIRType;
@@ -243,7 +243,7 @@ class CPPBodyEmitter {
 
             const lcname = this.invokenameToCPP(MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons"));
             const scopevar = this.varNameToCppName("$scope$");
-            return `${this.varToCppName(cpcs.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${smtmpltype}>(${lcname}(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons})));`;
+            return `${this.varToCppName(cpcs.trgt)} = ${lcname}(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons}), ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>());`;
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
@@ -793,9 +793,13 @@ class CPPBodyEmitter {
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            const pdecl = idecl as MIRInvokePrimitiveDecl;
+            const params = idecl.params.map((arg) => this.varNameToCppName(arg.name));
+            if (this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                params.push(cslotvar);
+            }
 
-            return { fwddecl: decl + ";", fulldecl: `${decl} { "${pdecl.implkey}"; }\n` };
+            return { fwddecl: decl + ";", fulldecl: `${decl} { ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)} }\n` };
         }
     }
 
@@ -863,9 +867,10 @@ class CPPBodyEmitter {
         const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "decl");
         const flagname = `_flag_${this.invokenameToCPP(constkey)}`;
         const memoname = `_memo_${this.invokenameToCPP(constkey)}`;
+        const cslotvar = this.varNameToCppName("$callerslot$");
         const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
-        const rupdate = `_return_ = __ir_ret__; ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** $callerslot$ = &$callerslot_dummy$;" : ""} ${memoname} = _return_;  ${flagname} = true;`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }\n    ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** " + cslotvar + " = &$callerslot_dummy$;" : ""}`;
+        const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
 
@@ -890,9 +895,8 @@ class CPPBodyEmitter {
         const scopestrs = this.generateCPPVarDecls(cdecl.value, []);
         const jblockstrs = blockstrs.join("\n\n");
 
-        const rstart = jblockstrs.indexOf("_return_ = __ir_ret__;");
-        const rend = jblockstrs.indexOf("return _return_;");
-        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rend);
+        const rstart = jblockstrs.indexOf("return _return_");
+        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
 
         return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
     }
@@ -911,9 +915,10 @@ class CPPBodyEmitter {
         const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "decl");
         const flagname = `_flag_${this.invokenameToCPP(fdkey)}`;
         const memoname = `_memo_${this.invokenameToCPP(fdkey)}`;
+        const cslotvar = this.varNameToCppName("$callerslot$");
         const gdecl = `bool ${flagname} = false; ${decltype}; ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
-        const rupdate = `_return_ = __ir_ret__; ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** $callerslot$ = &$callerslot_dummy$;" : ""} ${memoname} = _return_;  ${flagname} = true;`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }\n    ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** " + cslotvar + " = &$callerslot_dummy$;" : ""}`;
+        const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
 
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(fdkey)}()`;
@@ -939,11 +944,22 @@ class CPPBodyEmitter {
         const scopestrs = this.generateCPPVarDecls(fdbody, []);
         const jblockstrs = blockstrs.join("\n\n");
 
-        const rstart = jblockstrs.indexOf("_return_ = __ir_ret__;");
-        const rend = jblockstrs.indexOf("return _return_;");
-        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rend);
+        const rstart = jblockstrs.indexOf("return _return_;");
+        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
 
         return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
+    }
+
+    generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
+        switch (idecl.implkey) {
+            case "_listcons": {
+                const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "base");
+                return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
+            }
+            default: {
+                return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);
+            }
+        }
     }
 }
 

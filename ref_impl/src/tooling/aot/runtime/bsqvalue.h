@@ -157,7 +157,10 @@ public:
     {
         for(uint16_t i = 0; i < k; ++i)
         {
-            BSQRef::decrement(this->opts[i]);
+            if(this->opts[i] != nullptr)
+            {
+                BSQRef::decrement(this->opts[i]);
+            }
         }
     }
 

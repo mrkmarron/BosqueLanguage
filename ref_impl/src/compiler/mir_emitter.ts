@@ -103,7 +103,7 @@ class MIRKeyGenerator {
     }
 
     static generateStaticKey_MIR(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}}`;
+        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}`;
     }
 }
 
