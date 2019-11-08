@@ -17,7 +17,7 @@
       (BTerm 0)
       (bsqtuple_0 0)
     ;;FIXED_TUPLE_DECLS_FWD;;
-      (bsqrecord_$lp$$rp$ 0)
+      (bsqrecord_empty 0)
     ;;FIXED_RECORD_DECLS_FWD;;
     ;;NOMINAL_DECLS_FWD;;
     ) (
@@ -40,7 +40,7 @@
     )
     ( (bsqtuple_0@cons) )
   ;;FIXED_TUPLE_DECLS;;
-    ( (bsqrecord_$lp$$rp$@cons) )
+    ( (bsqrecord_empty@cons) )
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
 ))

@@ -3,14 +3,17 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
+
+function NOT_IMPLEMENTED<T>(msg: string): T {
+    throw new Error(`Not Implemented: ${msg}`);
+}
 
 const DEFAULT_GAS = 3;
 
@@ -56,7 +59,7 @@ class SMTBodyEmitter {
     }
 
     varNameToSMTName(name: string): string {
-        return sanitizeStringForSMT(name);
+        return this.typegen.mangleStringForSMT(name);
     }
 
     varToSMTName(varg: MIRRegisterArgument): string {
@@ -64,7 +67,7 @@ class SMTBodyEmitter {
     }
 
     invokenameToSMT(ivk: MIRInvokeKey): string {
-        return sanitizeStringForSMT(ivk);
+        return this.typegen.mangleStringForSMT(ivk);
     }
 
     getArgType(arg: MIRArgument): MIRType {
@@ -204,10 +207,45 @@ class SMTBodyEmitter {
             return bindexp;
         }
         else {
-            const testexp = new SMTValue(`(${sanitizeStringForSMT("invariant::" + cp.tkey)} ${this.varToSMTName(cp.trgt)})`);
+            const testexp = new SMTValue(`(${this.typegen.mangleStringForSMT("invariant::" + cp.tkey)} ${this.varToSMTName(cp.trgt)})`);
             const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
             const errexp = new SMTValue(`((result_error@${resulttype} (result_error ${this.generateErrorCreate(cp.sinfo)}))`);
             return bindexp.bind(new SMTCond(testexp, SMTFreeVar.generate(), errexp));
+        }
+    }
+
+    generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
+        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpce.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        if (ctype.name === "List") {
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} bsqterm_none_const 0)`));
+        }
+        else if (ctype.name === "Set") {
+            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionEmpty -- Set");
+        }
+        else {
+            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionEmpty -- Map");
+        }
+    }
+
+    generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
+        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        if (ctype.name === "List") {
+            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
+            const clistcons = this.typegen.generateEntityConstructor(clisttype.trkey);
+            const contentstype = ctype.terms.get("T") as MIRType;
+
+            let cons = "bsqterm_none_const";
+            for (let i = cpcs.args.length - 1; i >= 0; --i) {
+                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype)}, ${cons})`;
+            }
+
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpcs.tkey)} ${cons} ${cpcs.args.length})`));
+        }
+        else if (ctype.name === "Set") {
+            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
+        }
+        else {
+            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Map");
         }
     }
 
@@ -307,7 +345,7 @@ class SMTBodyEmitter {
         const lt = (t1.trkey < t2.trkey) ? t1 : t2;
         const rt = (t1.trkey < t2.trkey) ? t2 : t1;
 
-        const compoundname = `equals@${sanitizeStringForSMT(lt.trkey)}@${sanitizeStringForSMT(rt.trkey)}`;
+        const compoundname = `equals@${this.typegen.mangleStringForSMT(lt.trkey)}_${this.typegen.mangleStringForSMT(rt.trkey)}`;
         if (!this.bmcCodes.has(compoundname)) {
             this.bmcCodes.set(compoundname, this.bmcCodes.size);
             this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
@@ -341,7 +379,7 @@ class SMTBodyEmitter {
     }
 
     registerCompoundLT(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
-        const compoundname = `lt@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
+        const compoundname = `lt@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
         if (!this.bmcCodes.has(compoundname)) {
             this.bmcCodes.set(compoundname, this.bmcCodes.size);
             this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
@@ -357,7 +395,7 @@ class SMTBodyEmitter {
     }
 
     registerCompoundLTEQ(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
-        const compoundname = `lteq@${sanitizeStringForSMT(t1.trkey)}@${sanitizeStringForSMT(t2.trkey)}`;
+        const compoundname = `lteq@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
         if (!this.bmcCodes.has(compoundname)) {
             this.bmcCodes.set(compoundname, this.bmcCodes.size);
             this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
@@ -417,10 +455,12 @@ class SMTBodyEmitter {
                 return this.generateMIRConstructorPrimary(cp);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionEmpty");
+                const cpce = op as MIRConstructorPrimaryCollectionEmpty;
+                return this.generateMIRConstructorPrimaryCollectionEmpty(cpce);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionSingletons");
+                const cpcs = op as MIRConstructorPrimaryCollectionSingletons;
+                return this.generateMIRConstructorPrimaryCollectionSingletons(cpcs);
             }
             case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRConstructorPrimaryCollectionCopies");

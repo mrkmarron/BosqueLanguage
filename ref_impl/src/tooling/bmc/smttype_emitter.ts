@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
-import { sanitizeStringForSMT } from "./smtutils";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue } from "./smt_exp";
@@ -19,6 +18,8 @@ class SMTTypeEmitter {
     readonly intType: MIRType;
     readonly stringType: MIRType;
 
+    private mangledNameMap: Map<string, string> = new Map<string, string>();
+
     typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
     typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
@@ -31,6 +32,15 @@ class SMTTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+    }
+
+    mangleStringForSMT(name: string): string {
+        if (!this.mangledNameMap.has(name)) {
+            const cleanname = name.replace(/\W/g, "_").toLowerCase() + "I" + this.mangledNameMap.size + "I";
+            this.mangledNameMap.set(name, cleanname);
+        }
+
+        return this.mangledNameMap.get(name) as string;
     }
 
     getMIRType(tkey: MIRResolvedTypeKey): MIRType {
@@ -107,8 +117,13 @@ class SMTTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    static fixedRecordPropertyName(frec: MIRRecordType): string {
-        return sanitizeStringForSMT(`{${frec.entries.map((entry) => entry.name).join("$")}}`);
+    generateFixedRecordPropertyName(frec: MIRRecordType): string {
+        if (frec.entries.length === 0) {
+            return "empty";
+        }
+        else {
+            return this.mangleStringForSMT(`{${frec.entries.map((entry) => entry.name).join(", ")}}`);
+        }
     }
 
     typeToSMTCategory(ttype: MIRType): string {
@@ -127,10 +142,10 @@ class SMTTypeEmitter {
             return "bsqtuple_" + (ttype.options[0] as MIRTupleType).entries.length;
         }
         else if (this.isFixedRecordType(ttype)) {
-            return "bsqrecord_" + SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType);
+            return "bsqrecord_" + this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType);
         }
         else if (this.isUEntityType(ttype)) {
-            return sanitizeStringForSMT(ttype.trkey);
+            return this.mangleStringForSMT(ttype.trkey);
         }
         else {
             return "BTerm";
@@ -143,7 +158,7 @@ class SMTTypeEmitter {
             return this.typeboxings[tbi].fkey;
         }
 
-        const fkey = sanitizeStringForSMT(`Box@${from.trkey}@${into.trkey}`);
+        const fkey = "BOX@" + this.mangleStringForSMT(`${from.trkey}_${into.trkey}`);
         this.typeboxings.push({ fkey: fkey, from: from, into: into });
 
         return fkey;
@@ -185,7 +200,7 @@ class SMTTypeEmitter {
             return this.typeunboxings[tbi].fkey;
         }
 
-        const fkey = sanitizeStringForSMT(`UnBox@${from.trkey}@${into.trkey}`);
+        const fkey = "UNBOX@" + this.mangleStringForSMT(`${from.trkey}_${into.trkey}`);
         this.typeunboxings.push({ fkey: fkey, from: from, into: into });
 
         return fkey;
@@ -248,11 +263,11 @@ class SMTTypeEmitter {
     }
 
     generateFixedRecordConstructor(ttype: MIRType): string {
-        return `bsqrecord_${SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@cons`;
+        return `bsqrecord_${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@cons`;
     }
 
     generateFixedRecordAccessor(ttype: MIRType, p: string): string {
-        return `bsqrecord_${SMTTypeEmitter.fixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
+        return `bsqrecord_${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
@@ -261,21 +276,21 @@ class SMTTypeEmitter {
         }
 
         const fargs = entity.fields.map((fd) => {
-            return `(${sanitizeStringForSMT(entity.tkey)}@${fd.name} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
+            return `(${this.mangleStringForSMT(entity.tkey)}@${fd.name} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
         });
 
         return {
-            fwddecl: `(${sanitizeStringForSMT(entity.tkey)} 0)`,
-            fulldecl: `( (cons$${sanitizeStringForSMT(entity.tkey)} ${fargs.join(" ")}) )`
+            fwddecl: `(${this.mangleStringForSMT(entity.tkey)} 0)`,
+            fulldecl: `( (cons$${this.mangleStringForSMT(entity.tkey)} ${fargs.join(" ")}) )`
         };
     }
 
     generateEntityConstructor(ekey: MIRNominalTypeKey): string {
-        return `cons$${sanitizeStringForSMT(ekey)}`;
+        return `cons$${this.mangleStringForSMT(ekey)}`;
     }
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: string): string {
-        return `${sanitizeStringForSMT(ekey)}@${f}`;
+        return `${this.mangleStringForSMT(ekey)}@${f}`;
     }
 }
 

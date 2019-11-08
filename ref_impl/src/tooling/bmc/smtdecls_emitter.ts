@@ -7,10 +7,13 @@ import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityTypeDecl, MIRCo
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { NOT_IMPLEMENTED, sanitizeStringForSMT } from "./smtutils";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
+
+function NOT_IMPLEMENTED<T>(msg: string): T {
+    throw new Error(`Not Implemented: ${msg}`);
+}
 
 type SMTCode = {
     typedecls_fwd: string,
@@ -42,8 +45,8 @@ class SMTEmitter {
                 typedecls_fwd.push(smtdecl.fwddecl);
                 typedecls.push(smtdecl.fulldecl);
 
-                resultdecls_fwd.push(`(Result@${sanitizeStringForSMT(edecl.tkey)} 0)`);
-                resultdecls.push(`( (result_success$${sanitizeStringForSMT(edecl.tkey)} (result_success_value@${sanitizeStringForSMT(edecl.tkey)} ${sanitizeStringForSMT(edecl.tkey)})) (result_error@${sanitizeStringForSMT(edecl.tkey)} (result_error_code@${sanitizeStringForSMT(edecl.tkey)} ErrorCode)) )`);
+                resultdecls_fwd.push(`(Result@${typeemitter.mangleStringForSMT(edecl.tkey)} 0)`);
+                resultdecls.push(`( (result_success$${typeemitter.mangleStringForSMT(edecl.tkey)} (result_success_value@${typeemitter.mangleStringForSMT(edecl.tkey)} ${typeemitter.mangleStringForSMT(edecl.tkey)})) (result_error@${typeemitter.mangleStringForSMT(edecl.tkey)} (result_error_code@${typeemitter.mangleStringForSMT(edecl.tkey)} ErrorCode)) )`);
             }
         });
 
