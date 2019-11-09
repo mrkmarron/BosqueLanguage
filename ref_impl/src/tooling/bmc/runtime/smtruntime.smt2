@@ -93,6 +93,8 @@
 (declare-const BINT_MIN Int)
 (assert (= BINT_MIN -4503599627370496))
 
+(declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
+
 ;;FUNCTION_DECLS;;
 
 ;;ARG_VALUES;;

@@ -77,44 +77,44 @@ class SMTEmitter {
         let funcdecls: string[] = [];
         for (let i = 0; i < rcg.length; ++i) {
             const bbup = rcg[i];
+            let gas: number | undefined = undefined;
             if (cginfo.recursive.findIndex((scc) => scc.has(bbup.invoke)) !== -1) {
-                NOT_IMPLEMENTED<void>("Recursive Invoke");
+                gas = bodyemitter.getGasForOperation(bbup.invoke);
+            }
+
+            const tag = extractMirBodyKeyPrefix(bbup.invoke);
+            if (tag === "invoke") {
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                const finfo = bodyemitter.generateSMTInvoke(idcl, gas);
+
+                funcdecls.push(finfo);
+            }
+            else if (tag === "pre") {
+                NOT_IMPLEMENTED<void>("Pre");
+            }
+            else if (tag === "post") {
+                NOT_IMPLEMENTED<void>("Post");
+            }
+            else if (tag === "invariant") {
+                const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                funcdecls.push(bodyemitter.generateSMTInv(bbup.invoke, edcl, gas));
+            }
+            else if (tag === "const") {
+                const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
+                const cdeclemit = bodyemitter.generateSMTConst(bbup.invoke, cdcl, gas);
+                if (cdeclemit !== undefined) {
+                    funcdecls.push(cdeclemit);
+                }
+
             }
             else {
-                const tag = extractMirBodyKeyPrefix(bbup.invoke);
-                if (tag === "invoke") {
-                    const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                    const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                    const finfo = bodyemitter.generateSMTInvoke(idcl, 0);
+                assert(tag === "fdefault");
 
-                    funcdecls.push(finfo);
-                }
-                else if (tag === "pre") {
-                    NOT_IMPLEMENTED<void>("Pre");
-                }
-                else if (tag === "post") {
-                    NOT_IMPLEMENTED<void>("Post");
-                }
-                else if (tag === "invariant") {
-                    const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                    funcdecls.push(bodyemitter.generateSMTInv(bbup.invoke, edcl));
-                }
-                else if (tag === "const") {
-                    const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
-                    const cdeclemit = bodyemitter.generateSMTConst(bbup.invoke, cdcl);
-                    if (cdeclemit !== undefined) {
-                        funcdecls.push(cdeclemit);
-                    }
-
-                }
-                else {
-                    assert(tag === "fdefault");
-
-                    const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
-                    const fdeclemit = bodyemitter.generateSMTFDefault(bbup.invoke, fdcl);
-                    if (fdeclemit !== undefined) {
-                        funcdecls.push(fdeclemit);
-                    }
+                const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
+                const fdeclemit = bodyemitter.generateSMTFDefault(bbup.invoke, fdcl, gas);
+                if (fdeclemit !== undefined) {
+                    funcdecls.push(fdeclemit);
                 }
             }
         }

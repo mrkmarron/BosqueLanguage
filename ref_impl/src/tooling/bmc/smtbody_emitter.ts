@@ -6,10 +6,12 @@
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
-import * as assert from "assert";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
+import { CoreImplBodyText } from "./cppcore_impls";
+
+import * as assert from "assert";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -24,7 +26,7 @@ class SMTBodyEmitter {
 
     private errorCodes = new Map<string, number>();
     private bmcCodes = new Map<string, number>();
-    private bmcDepths = new Map<string, number>();
+    private bmcGas = new Map<string, number>();
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -56,6 +58,22 @@ class SMTBodyEmitter {
         const errid = this.errorCodes.get(errorinfo) as number;
 
         return new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error ${errid}))`);
+    }
+
+    getGasForOperation(key: string): number {
+        if (!this.bmcGas.has(key)) {
+           this.bmcGas.set(key, DEFAULT_GAS);
+        }
+        return this.bmcGas.get(key) as number;
+    }
+
+    generateBMCLimitCreate(key: string): SMTValue {
+        if (!this.bmcCodes.has(key)) {
+            this.bmcCodes.set(key, this.bmcCodes.size);
+         }
+        const errid = this.bmcCodes.get(key) as number;
+
+        return new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_bmc ${errid}))`);
     }
 
     varNameToSMTName(name: string): string {
@@ -236,7 +254,7 @@ class SMTBodyEmitter {
 
             let cons = "bsqterm_none_const";
             for (let i = cpcs.args.length - 1; i >= 0; --i) {
-                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype)}, ${cons})`;
+                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype).emit()}, ${cons})`;
             }
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpcs.tkey)} ${cons} ${cpcs.args.length})`));
@@ -321,7 +339,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): SMTExp {
+    generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction, gas: number | undefined): SMTExp {
         let vals: string[] = [];
         const idecl = (this.assembly.invokeDecls.get(ivop.mkey) || this.assembly.primitiveInvokeDecls.get(ivop.mkey)) as MIRInvokeDecl;
 
@@ -333,28 +351,36 @@ class SMTBodyEmitter {
         const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType((idecl as MIRInvokeDecl).resultType));
         const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
 
-        const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
         const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
         const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
         const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
 
-        return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
+        if (gas === undefined) {
+            const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
+            return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
+        }
+        else {
+            if (gas === 0) {
+                const invokeexp = this.generateBMCLimitCreate(ivop.mkey);
+                return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
+            }
+            else {
+                const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)}@gas${gas} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
+                return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
+            }
+        }
     }
 
-    registerCompoundEquals(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+    registerCompoundEquals(t1: MIRType, t2: MIRType): string {
         const lt = (t1.trkey < t2.trkey) ? t1 : t2;
         const rt = (t1.trkey < t2.trkey) ? t2 : t1;
 
         const compoundname = `equals@${this.typegen.mangleStringForSMT(lt.trkey)}_${this.typegen.mangleStringForSMT(rt.trkey)}`;
-        if (!this.bmcCodes.has(compoundname)) {
-            this.bmcCodes.set(compoundname, this.bmcCodes.size);
-            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
-        }
-        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const gas = this.getGasForOperation(compoundname);
         const fkey = `${compoundname}@${gas}`;
 
         if (this.compoundEqualityOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
-            this.compoundEqualityOps.push({ fkey: fkey, gas: gas, t1: lt, t2: rt });
+            this.compoundEqualityOps.push({ fkey: compoundname, gas: gas, t1: lt, t2: rt });
         }
 
         return fkey;
@@ -378,33 +404,25 @@ class SMTBodyEmitter {
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
-    registerCompoundLT(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+    registerCompoundLT(t1: MIRType, t2: MIRType): string {
         const compoundname = `lt@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
-        if (!this.bmcCodes.has(compoundname)) {
-            this.bmcCodes.set(compoundname, this.bmcCodes.size);
-            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
-        }
-        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const gas = this.getGasForOperation(compoundname);
         const fkey = `${compoundname}@${gas}`;
 
         if (this.compoundLTOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+            this.compoundLTOps.push({ fkey: compoundname, gas: gas, t1: t1, t2: t2 });
         }
 
         return fkey;
     }
 
-    registerCompoundLTEQ(t1: MIRType, t2: MIRType, cgas: number | undefined): string {
+    registerCompoundLTEQ(t1: MIRType, t2: MIRType): string {
         const compoundname = `lteq@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
-        if (!this.bmcCodes.has(compoundname)) {
-            this.bmcCodes.set(compoundname, this.bmcCodes.size);
-            this.bmcDepths.set(compoundname, cgas || DEFAULT_GAS);
-        }
-        const gas = (cgas || this.bmcDepths.get(compoundname)) as number;
+        const gas = this.getGasForOperation(compoundname);
         const fkey = `${compoundname}@${gas}`;
 
         if (this.compoundLTEQOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTEQOps.push({ fkey: fkey, gas: gas, t1: t1, t2: t2 });
+            this.compoundLTEQOps.push({ fkey: compoundname, gas: gas, t1: t1, t2: t2 });
         }
 
         return fkey;
@@ -526,7 +544,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
-                return this.generateMIRInvokeFixedFunction(invk);
+                return this.generateMIRInvokeFixedFunction(invk, gas);
             }
             case MIROpTag.MIRInvokeVirtualTarget: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRInvokeVirtualTarget");
@@ -575,7 +593,7 @@ class SMTBodyEmitter {
                     const larg = this.argToSMT(beq.lhs, lhvtype);
                     const rarg = this.argToSMT(beq.rhs, rhvtype);
 
-                    const compoundeq = `(${this.registerCompoundEquals(lhvtype, rhvtype, gas)} ${larg.emit()} ${rarg.emit()})`;
+                    const compoundeq = `(${this.registerCompoundEquals(lhvtype, rhvtype)} ${larg.emit()} ${rarg.emit()})`;
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${compoundeq})` : compoundeq));
                 }
             }
@@ -593,19 +611,19 @@ class SMTBodyEmitter {
                     const rarg = this.argToSMT(bcmp.rhs, rhvtype).emit();
 
                     if (bcmp.op === "<") {
-                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype)} ${larg} ${rarg})`;
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
                     }
                     else if (bcmp.op === ">") {
-                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype)} ${rarg} ${larg})`;
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
                     }
                     else if (bcmp.op === "<=") {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype, gas)} ${larg} ${rarg})`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${larg} ${rarg})`;
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
                     }
                     else {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype, gas)} ${rarg} ${larg})`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${rarg} ${larg})`;
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
                     }
                 }
@@ -747,7 +765,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number): string {
+    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number | undefined): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
 
@@ -784,11 +802,13 @@ class SMTBodyEmitter {
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return NOT_IMPLEMENTED<string>("generateInvoke -- MIRInvokePrimitiveDecl");
+            const params = idecl.params.map((arg) => this.varNameToSMTName(arg.name));
+
+            return `${decl} \n${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)} `;
         }
     }
 
-    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl, gas: number | undefined): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
 
@@ -829,7 +849,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {
+    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl, gas: number | undefined): string | undefined {
         this.currentFile = cdecl.srcFile;
         this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
 
@@ -849,7 +869,7 @@ class SMTBodyEmitter {
         return `${decl} \n${body.emit("  ")})`;
     }
 
-    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string | undefined {
+    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl, gas: number | undefined): string | undefined {
         this.currentFile = fdecl.srcFile;
         this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
 
@@ -867,6 +887,18 @@ class SMTBodyEmitter {
         const blocks = (fdecl.value as MIRBody).body;
         const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
         return `${decl} \n${body.emit("  ")})`;
+    }
+
+    generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
+        switch (idecl.implkey) {
+            case "_listcons": {
+                const mres = this.typegen.getMIRType(idecl.resultType);
+                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            }
+            default: {
+                return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);
+            }
+        }
     }
 }
 
