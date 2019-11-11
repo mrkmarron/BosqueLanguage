@@ -278,6 +278,7 @@ class CPPTypeEmitter {
         }
         else {
             assert(this.typeToCPPType(from, "base") === "Value", "must be a Value mapped type");
+
             if (this.isPrimitiveType(into)) {
                 if (into.trkey === "NSCore::Bool") {
                     return `BSQ_GET_VALUE_BOOL(${exp})`;
@@ -322,6 +323,10 @@ class CPPTypeEmitter {
 
     generateKnownRecordAccessor(ttype: MIRType, p: string): string {
         return `.atFixed<${CPPTypeEmitter.getKnownLayoutRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
+    }
+
+    generateFixedRecordAccessor(p: string): string {
+        return `.atFixed<MIRPropertyEnum::${p}>()`;
     }
 
     generateConstructorArgInc(argtype: MIRType, arg: string): string {

@@ -273,7 +273,7 @@ class MIRBodyEmitter {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, rtkey.trkey, ikey, args, trgt));
         }
         else {
-            const rtuple = MIRType.createSingle(MIRTupleType.create(false, [rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            const rtuple = MIRType.createSingle(MIRTupleType.create([rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
             if (!masm.typeMap.has(rtuple.trkey)) {
                 masm.typeMap.set(rtuple.trkey, rtuple);
             }
@@ -296,7 +296,7 @@ class MIRBodyEmitter {
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, rtkey.trkey, vresolve, args, trgt));
         }
         else {
-            const rtuple = MIRType.createSingle(MIRTupleType.create(false, [rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            const rtuple = MIRType.createSingle(MIRTupleType.create([rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
             if (!masm.typeMap.has(rtuple.trkey)) {
                 masm.typeMap.set(rtuple.trkey, rtuple);
             }
@@ -522,11 +522,11 @@ class MIREmitter {
             }
             else if (sopt instanceof ResolvedTupleAtomType) {
                 const tatoms = sopt.types.map((entry) => new MIRTupleTypeEntry(this.registerResolvedTypeReference(entry.type), entry.isOptional));
-                rt = MIRTupleType.create(sopt.isOpen, tatoms);
+                rt = MIRTupleType.create(tatoms);
             }
             else {
                 const tatoms = (sopt as ResolvedRecordAtomType).entries.map((entry) => new MIRRecordTypeEntry(entry.name, this.registerResolvedTypeReference(entry.type), entry.isOptional));
-                rt = MIRRecordType.create((sopt as ResolvedRecordAtomType).isOpen, tatoms);
+                rt = MIRRecordType.create(tatoms);
             }
 
             const ft = MIRType.create([(rt as MIRTypeOption)]);

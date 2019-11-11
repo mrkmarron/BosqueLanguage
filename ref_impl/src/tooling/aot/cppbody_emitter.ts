@@ -94,7 +94,7 @@ class CPPBodyEmitter {
         const isinlineable = this.typegen.isPrimitiveType(into);
 
         if (cval instanceof MIRConstantNone) {
-            return "BSQ_VALUE_NONE";
+            return this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, into);
         }
         else if (cval instanceof MIRConstantTrue) {
             return isinlineable ? "true" : "BSQ_VALUE_TRUE";
@@ -154,6 +154,20 @@ class CPPBodyEmitter {
         }
         else {
             return `BSQ_GET_VALUE_TRUTHY(${this.varToCppName(arg)})`;
+        }
+    }
+
+    generateNoneCheck(arg: MIRArgument): string {
+        const argtype = this.getArgType(arg);
+
+        if (this.assembly.subtypeOf(argtype, this.typegen.noneType)) {
+            return "true";
+        }
+        else if (!this.assembly.subtypeOf(this.typegen.noneType, argtype)) {
+            return "false";
+        }
+        else {
+            return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
         }
     }
 
@@ -255,9 +269,19 @@ class CPPBodyEmitter {
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
         const tuptype = this.getArgType(op.arg);
-        if (this.typegen.isFixedTupleType(tuptype)) {
-            const ftuptype = CPPTypeEmitter.getFixedTupleType(tuptype);
+        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
             if (op.idx < ftuptype.entries.length) {
+                const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            }
+            else {
+                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+            }
+        }
+        else if (this.typegen.isTupleType(tuptype)) {
+            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
+            if (op.idx < maxlen) {
                 const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
@@ -273,11 +297,20 @@ class CPPBodyEmitter {
 
     generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): string {
         const rectype = this.getArgType(op.arg);
-        if (this.typegen.isFixedRecordType(rectype)) {
-            const frectype = CPPTypeEmitter.getFixedRecordType(rectype);
-            const hasproperty = frectype.entries.findIndex((entry) => entry.name === op.property) !== -1;
-            if (hasproperty) {
-                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(rectype, op.property)}`;
+        if (this.typegen.isKnownLayoutRecordType(rectype)) {
+            const frectype = CPPTypeEmitter.getKnownLayoutRecordType(rectype);
+            if (frectype.entries.some((entry) => entry.name === op.property)) {
+                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateKnownRecordAccessor(rectype, op.property)}`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            }
+            else {
+                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+            }
+        }
+        else if (this.typegen.isRecordType(rectype)) {
+            const maxset = CPPTypeEmitter.getRecordTypeMaxPropertySet(rectype);
+            if (maxset.some((pname) => pname === op.property)) {
+                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(op.property)}`;
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
             else {
@@ -432,11 +465,26 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRConstructorTuple: {
                 const tc = op as MIRConstructorTuple;
-                return `${this.varToCppName(tc.trgt)} = { ${tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType)).join(", ")} };`;
+                const args = tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
+
+                if (this.typegen.isKnownLayoutTupleType(this.typegen.getMIRType(tc.resultTupleType))) {
+                    return `${this.varToCppName(tc.trgt)} = { ${args.join(", ")} };`;
+                }
+                else {
+                    return `${this.varToCppName(tc.trgt)} = { ${[args.length, ...args].join(", ")} };`;
+                }
             }
             case MIROpTag.MIRConstructorRecord: {
                 const tr = op as MIRConstructorRecord;
-                return `${this.varToCppName(tr.trgt)} = { ${tr.args.map((arg) => this.argToCpp(arg[1], this.typegen.anyType)).join(", ")} };`;
+
+                if (this.typegen.isKnownLayoutRecordType(this.typegen.getMIRType(tr.resultRecordType))) {
+                    const args = tr.args.map((arg) => this.argToCpp(arg[1], this.typegen.anyType));
+                    return `${this.varToCppName(tr.trgt)} = { ${args.join(", ")} };`;
+                }
+                else {
+                    const args = tr.args.map((arg) => `std::make_pair(MIRPropertyEnum::${this.typegen.mangleStringForCpp(arg[0])}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
+                    return `${this.varToCppName(tr.trgt)} = { ${[args.length, ...args].join(", ")} };`;
+                }
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
@@ -575,26 +623,11 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
-
-                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, this.getArgType(ton.arg))) {
-                    return "false";
-                }
-                else if (this.typegen.assembly.subtypeOf(this.getArgType(ton.arg), this.typegen.noneType)) {
-                    return "true";
-                }
-                else {
-                    return `${this.varToCppName(ton.trgt)} = BSQ_IS_VALUE_NONE(${this.varToCppName(ton.arg)});`;
-                }
+                return `${this.varToCppName(ton.trgt)} = ${this.generateNoneCheck(ton.arg)};`;
             }
             case MIROpTag.MIRIsTypeOfSome: {
                 const tos = op as MIRIsTypeOfSome;
-
-                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, this.getArgType(tos.arg))) {
-                    return "true";
-                }
-                else {
-                    return `${this.varToCppName(tos.trgt)} = BSQ_IS_VALUE_NONNONE(${this.varToCppName(tos.arg)});`;
-                }
+                return `${this.varToCppName(tos.trgt)} = !${this.generateNoneCheck(tos.arg)};`;
            }
             case MIROpTag.MIRIsTypeOf: {
                 return NOT_IMPLEMENTED<string>("MIRIsTypeOf");
@@ -643,16 +676,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;
-                const argtype = this.getArgType(njop.arg);
-                if (!this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
-                    return `goto ${this.labelToCpp(njop.someblock)};`;
-                }
-                else if (this.typegen.assembly.subtypeOf(this.getArgType(njop.arg), this.typegen.noneType)) {
-                    return `goto ${this.labelToCpp(njop.noneblock)};`;
-                }
-                else {
-                    return `if(BSQ_IS_VALUE_NONE(${this.argToCpp(njop.arg, this.typegen.anyType)})) {goto ${this.labelToCpp(njop.noneblock)};} else {goto ${njop.someblock};}`;
-                }
+                return `if(${this.generateNoneCheck(njop.arg)}) {goto ${this.labelToCpp(njop.noneblock)};} else {goto ${njop.someblock};}`;
             }
             case MIROpTag.MIRPhi: {
                 return undefined; //handle this as a special case in the block processing code

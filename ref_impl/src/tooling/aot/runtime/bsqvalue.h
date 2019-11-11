@@ -306,18 +306,18 @@ template <uint16_t k>
 class BSQTupleFixed
 {
 public:
-    Value entries[k];
     uint16_t size;
+    Value entries[k];
 
     template <uint16_t idx>
     inline Value atFixed()
     {
-        return this->entries[idx];
+        return (idx < this->size) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
 
     inline Value atVar(uint16_t idx)
     {
-        return this->entries[idx];
+        return (idx < this->size) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
 };
 
@@ -384,13 +384,13 @@ template <uint16_t k>
 class BSQRecordFixed
 {
 public:
-    std::pair<MIRPropertyEnum, Value> entries[k];
     uint16_t size;
+    std::pair<MIRPropertyEnum, Value> entries[k];
 
     template <MIRPropertyEnum p>
     Value atFixed() const
     {
-        for(uint16_t i = 0; i < k; ++i)
+        for(uint16_t i = 0; i < this->size; ++i)
         {
             if(this->entries[i].first == p)
             {
@@ -403,7 +403,7 @@ public:
 
     Value atVar(MIRPropertyEnum p) const
     {
-        for(uint16_t i = 0; i < k; ++i)
+        for(uint16_t i = 0; i < this->size; ++i)
         {
             if(this->entries[i].first == p)
             {
@@ -450,10 +450,6 @@ class StructuralCoercionOps
         {
             res.entries[i] = src->entries[i];
         }
-        for(uint16_t i = src->entries.size(); i < k; ++i)
-        {
-            res.entries[i] = nullptr;
-        }
         return res;
     }
 
@@ -481,10 +477,6 @@ class StructuralCoercionOps
         for(uint16_t i = 0; i < j; ++i)
         {
             res.entries[i] = entries[i];
-        }
-        for(uint16_t i = j; i < k; ++i)
-        {
-            res.entries[i] = nullptr;
         }
         return res;
     }
@@ -522,10 +514,6 @@ class StructuralCoercionOps
         {
             res.entries[i] = src.entries[i];
         }
-        for(uint16_t i = j; i < k; ++i)
-        {
-            res.entries[i] = nullptr;
-        }
         return res;
     }
 
@@ -562,10 +550,6 @@ class StructuralCoercionOps
         {
             res.entries[i] = src->entries[i];
         }
-        for(uint16_t i = src->entires.size(); i < k; ++i)
-        {
-            res.entries[i] = std::make_pair(MIRPropertyEnum::Invalid, nullptr);
-        }
         return res;
     }
 
@@ -580,7 +564,6 @@ class StructuralCoercionOps
         {
             res.entries[i] = src.entries[i];
         }
-
         return res;
     }
 
@@ -595,11 +578,6 @@ class StructuralCoercionOps
         {
             res.entries[i] = entries[i];
         }
-        for(uint16_t i = j; i < k; ++i)
-        {
-            res.entries[i] = std::make_pair(MIRPropertyEnum::Invalid, nullptr);
-        }
-
         return res;
     }
 
@@ -635,10 +613,6 @@ class StructuralCoercionOps
         for(uint16_t i = 0; i < j; ++i)
         {
             res.entries[i] = std::make_pair(properties[i], src.entries[i]);
-        }
-        for(uint16_t i = j; i < k; ++i)
-        {
-            res.entries[i] = std::make_pair(MIRPropertyEnum::Invalid, nullptr);
         }
         return res;
     }

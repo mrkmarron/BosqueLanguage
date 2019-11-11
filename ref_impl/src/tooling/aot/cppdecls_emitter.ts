@@ -125,10 +125,6 @@ class CPPEmitter {
                     });
                 }
             });
-
-            if (typeemitter.isFixedRecordType(tt)) {
-                fixedrecord_property_lists.add(typeemitter.generateFixedRecordPropertyName(tt.options[0] as MIRRecordType));
-            }
         });
 
         return {

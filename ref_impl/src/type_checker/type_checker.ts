@@ -218,10 +218,10 @@ class TypeChecker {
             return this.m_assembly.subtypeOf(lhs, rhs) && this.m_assembly.subtypeOf(rhs, lhs); //types are equal
         }
 
-        const bothTuple = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialTupleConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialTupleConceptType()));
+        const bothTuple = (lhs.options[0] instanceof ResolvedTupleAtomType) && (rhs.options[0] instanceof ResolvedTupleAtomType);
         if (bothTuple) {
-            const tup1 = this.m_assembly.normalizeToTupleRepresentation(lhs.options[0]);
-            const tup2 = this.m_assembly.normalizeToTupleRepresentation(rhs.options[0]);
+            const tup1 = lhs.options[0] as ResolvedTupleAtomType;
+            const tup2 = rhs.options[0] as ResolvedTupleAtomType;
 
             for (let i = 0; i < Math.max(tup1.types.length, tup2.types.length); ++i) {
                 const t1 = (i < tup1.types.length) ? tup1.types[i] : undefined;
@@ -234,19 +234,24 @@ class TypeChecker {
                 }
                 else {
                     if (t1 !== undefined && t2 === undefined) {
-                        if (!t1.isOptional && !tup2.isOpen) {
+                        if (!t1.isOptional) {
                             return false;
                         }
                     }
 
                     if (t1 === undefined && t2 !== undefined) {
-                        if (!tup1.isOpen && !t2.isOptional) {
+                        if (!t2.isOptional) {
                             return false;
                         }
                     }
                 }
             }
 
+            return true;
+        }
+
+        const bothTupleConcept = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialTupleConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialTupleConceptType()));
+        if (bothTupleConcept) {
             return true;
         }
 

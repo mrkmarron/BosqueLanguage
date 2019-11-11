@@ -463,7 +463,7 @@ class Assembly {
             }
         }
 
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(t.isOpen, entries));
+        return ResolvedType.createSingle(ResolvedTupleAtomType.create(entries));
     }
 
     private normalizeType_Record(t: RecordTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -480,7 +480,7 @@ class Assembly {
             return ResolvedType.createEmpty();
         }
 
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(t.isOpen, entries));
+        return ResolvedType.createSingle(ResolvedRecordAtomType.create(entries));
     }
 
     private normalizeType_Intersection(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -619,24 +619,17 @@ class Assembly {
     }
 
     private atomSubtypeOf_TupleTuple(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): boolean {
-        //Then this is definitely not ok
-        if (t1.isOpen && !t2.isOpen) {
-            return false;
-        }
-
-        for (let i = 0; i < t1.types.length; ++i) {
+       for (let i = 0; i < t1.types.length; ++i) {
             const t1e = t1.types[i];
 
-            if (i >= t2.types.length) {
-                if (!t2.isOpen) {
-                    return false;
-                }
-            }
-            else {
-                const t2e = t2.types[i];
-                if ((t1e.isOptional && !t2e.isOptional) || !this.subtypeOf(t1e.type, t2e.type)) {
-                    return false;
-                }
+           if (i >= t2.types.length) {
+               return false;
+           }
+           else {
+               const t2e = t2.types[i];
+               if ((t1e.isOptional && !t2e.isOptional) || !this.subtypeOf(t1e.type, t2e.type)) {
+                   return false;
+               }
             }
         }
 
@@ -649,18 +642,11 @@ class Assembly {
     }
 
     private atomSubtypeOf_RecordRecord(t1: ResolvedRecordAtomType, t2: ResolvedRecordAtomType): boolean {
-        //Then this is definitely not ok
-        if (t1.isOpen && !t2.isOpen) {
-            return false;
-        }
-
         let badEntry = false;
         t1.entries.forEach((entry) => {
             const t2e = t2.entries.find((e) => e.name === entry.name);
             if (t2e === undefined) {
-                if (!t2.isOpen) {
-                    badEntry = badEntry || true;
-                }
+                badEntry = badEntry || true;
             }
             else {
                 if ((entry.isOptional && !t2e.isOptional) || !this.subtypeOf(entry.type, t2e.type)) {
@@ -724,14 +710,6 @@ class Assembly {
 
     getSpecialParsableConcept(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
     getSpecialKeyedConcept(): ResolvedType { return this.internSpecialConceptType("Keyed"); }
-
-    ensureTupleStructuralRepresentation(atom: ResolvedAtomType): ResolvedTupleAtomType {
-        return (atom instanceof ResolvedTupleAtomType) ? atom : ResolvedTupleAtomType.createGenericOpen();
-    }
-
-    ensureRecordStructuralRepresentation(atom: ResolvedAtomType): ResolvedRecordAtomType {
-        return (atom instanceof ResolvedRecordAtomType) ? atom : ResolvedRecordAtomType.createGenericOpen();
-    }
 
     ensureNominalRepresentation(t: ResolvedType): ResolvedType {
         const opts = t.options.map((opt) => {
@@ -1030,24 +1008,6 @@ class Assembly {
         }
         else {
             return this.normalizeType_Union(t as UnionTypeSignature, binds);
-        }
-    }
-
-    normalizeToTupleRepresentation(t: ResolvedAtomType): ResolvedTupleAtomType {
-        if (t.idStr === "NSCore::Tuple") {
-            return ResolvedTupleAtomType.createGenericOpen();
-        }
-        else {
-            return t as ResolvedTupleAtomType;
-        }
-    }
-
-    normalizeToRecordRepresentation(t: ResolvedAtomType): ResolvedRecordAtomType {
-        if (t.idStr === "NSCore::Record") {
-            return ResolvedRecordAtomType.createGenericOpen();
-        }
-        else {
-            return t as ResolvedRecordAtomType;
         }
     }
 

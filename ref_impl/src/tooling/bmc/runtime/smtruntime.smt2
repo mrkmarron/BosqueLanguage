@@ -65,6 +65,9 @@
 (declare-const bsqarray_array_empty (Array Int BTerm))
 (assert (= bsqarray_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
 
+(declare-const bsqentity_array_empty (Array String BTerm))
+(assert (= bsqentity_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
+
 ;;RECORD_PROPERTY_LIST_DECLS;;
 
 (declare-datatypes ( (ErrorCode 0) ) (

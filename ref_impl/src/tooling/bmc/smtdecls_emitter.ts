@@ -55,22 +55,26 @@ class SMTEmitter {
         let fixedrecorddecls_fwd: string[] = [];
         let fixedrecorddecls: string[] = [];
         assembly.typeMap.forEach((tt) => {
-            if (typeemitter.isFixedTupleType(tt) && SMTTypeEmitter.getFixedTupleType(tt).entries.length !== 0) {
+            if (typeemitter.isTupleType(tt) && SMTTypeEmitter.getTupleTypeMaxLength(tt) !== 0) {
                 fixedtupledecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
 
-                const cargs = (SMTTypeEmitter.getFixedTupleType(tt)).entries.map((entry, i) => {
-                    return `(${typeemitter.generateFixedTupleAccessor(tt, i)} BTerm)`;
-                });
-                fixedtupledecls.push(`( (${typeemitter.generateFixedTupleConstructor(tt)} ${cargs.join(" ")}) )`);
+                const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
+                let cargs: string[] = [];
+                for (let i = 0; i < maxlen; ++i) {
+                    cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} BTerm)`);
+                }
+                fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
             }
 
-            if (typeemitter.isFixedRecordType(tt) && SMTTypeEmitter.getFixedRecordType(tt).entries.length !== 0) {
+            if (typeemitter.isRecordType(tt) && SMTTypeEmitter.getRecordTypeMaxPropertySet(tt).length !== 0) {
                 fixedrecorddecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
 
-                const cargs = (SMTTypeEmitter.getFixedRecordType(tt)).entries.map((entry) => {
-                    return `(${typeemitter.generateFixedRecordAccessor(tt, entry.name)} BTerm)`;
-                });
-                fixedrecorddecls.push(`( (${typeemitter.generateFixedRecordConstructor(tt)} ${cargs.join(" ")}) )`);
+                const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
+                let cargs: string[] = [];
+                for (let i = 0; i < maxset.length; ++i) {
+                    cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} BTerm)`);
+                }
+                fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
             }
         });
 
