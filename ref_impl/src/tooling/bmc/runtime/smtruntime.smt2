@@ -33,8 +33,8 @@
       (bsqterm_enum (bsqterm_enum_name String) (bsqterm_enum_value Int))
       (bsqterm_idkey (bsqterm_idkey_value BTerm))
       (bsqterm_regex (bsqterm_regex_value String))
-      (bsqterm_tuple (bsqterm_tuple_length Int) (bsqterm_tuple_entries (Array Int BTerm)))
-      (bsqterm_record (bsqterm_record_property_ub RecordPropertyList) (bsqterm_record_properties (Array String Bool)) (bsqterm_record_entries (Array String BTerm)))
+      (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
+      (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
@@ -45,23 +45,22 @@
   ;;NOMINAL_DECLS;;
 ))
 
-;;KNOWN_RECORD_PROPERTY_TYPE_LISTS;;
+(declare-datatypes ( 
+      (bsqtuple_entry 0) (bsqrecord_entry 0)
+    ) (
+    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@value BTerm)) )
+    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@value BTerm)) )
+))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))
 (declare-const bsqterm_true_const BTerm) (assert (= bsqterm_true_const (bsqterm_bool true)))
 (declare-const bsqterm_false_const BTerm) (assert (= bsqterm_false_const (bsqterm_bool false)))
 
-(declare-const bsqtuple_empty_const bsqtuple_0) (assert (= bsqtuple_empty_const bsqtuple_0@cons))
-(declare-const bsqrecord_empty_const bsqrecord_$lp$$rp$) (assert (= bsqrecord_empty_const bsqrecord_$lp$$rp$@cons))
+(declare-const bsqtuple_array_empty (Array Int bsqtuple_entry))
+(assert (= bsqtuple_array_empty ((as const (Array Int bsqtuple_entry)) bsqtuple_entry@clear)))
 
-(declare-const bsqtuple_array_empty (Array Int BTerm))
-(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
-
-(declare-const bsqrecord_array_empty (Array String BTerm))
-(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
-
-(declare-const bsqrecord_property_array_empty (Array String Bool))
-(assert (= bsqrecord_property_array_empty ((as const (Array String Bool)) false)))
+(declare-const bsqrecord_array_empty (Array String bsqrecord_entry))
+(assert (= bsqrecord_array_empty ((as const (Array String bsqrecord_entry)) bsqrecord_entry@clear)))
 
 (declare-const bsqarray_array_empty (Array Int BTerm))
 (assert (= bsqarray_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))

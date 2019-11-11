@@ -120,14 +120,14 @@ class SMTEmitter {
         }
 
         return {
-            typedecls_fwd: typedecls_fwd.sort().join("\n"),
-            typedecls: typedecls.sort().join("\n"),
-            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n"),
-            fixedtupledecls: fixedtupledecls.sort().join("\n"),
-            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n"),
-            fixedrecorddecls: fixedrecorddecls.sort().join("\n"),
-            resultdecls_fwd: resultdecls_fwd.sort().join("\n"),
-            resultdecls: resultdecls.sort().join("\n"),
+            typedecls_fwd: typedecls_fwd.sort().join("\n    "),
+            typedecls: typedecls.sort().join("\n    "),
+            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),
+            fixedtupledecls: fixedtupledecls.sort().join("\n    "),
+            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n    "),
+            fixedrecorddecls: fixedrecorddecls.sort().join("\n    "),
+            resultdecls_fwd: resultdecls_fwd.sort().join("\n    "),
+            resultdecls: resultdecls.sort().join("\n    "),
             function_decls: funcdecls.join("\n")
         };
     }

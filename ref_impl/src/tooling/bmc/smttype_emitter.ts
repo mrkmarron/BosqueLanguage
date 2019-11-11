@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
-import { SMTExp, SMTValue } from "./smt_exp";
+import { SMTExp, SMTValue, SMTLet } from "./smt_exp";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -18,10 +18,8 @@ class SMTTypeEmitter {
     readonly intType: MIRType;
     readonly stringType: MIRType;
 
+    private tempconvctr = 0;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
-
-    typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
-    typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -56,30 +54,26 @@ class SMTTypeEmitter {
         return (uname === "NSCore::Bool" || uname === "NSCore::Int" || uname === "NSCore::String");
     }
 
-    isFixedTupleType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
-            return false;
-        }
-
-        const tup = tt.options[0] as MIRTupleType;
-        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+    isNoneable(tt: MIRType): boolean {
+        return tt.options.some((opt) => opt.trkey === "NSCore::None");
     }
 
-    isFixedRecordType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
-            return false;
-        }
+    isTupleType(tt: MIRType): boolean {
+        return tt.options.every((opt) => opt instanceof MIRTupleType);
+    }
 
-        const tup = tt.options[0] as MIRRecordType;
-        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+    isRecordType(tt: MIRType): boolean {
+        return tt.options.every((opt) => opt instanceof MIRRecordType);
     }
 
     isUEntityType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
+        const ropts = tt.options.filter((opt) => opt.trkey === "NSCore::None");
+
+        if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
             return false;
         }
 
-        const et = tt.options[0] as MIREntityType;
+        const et = ropts[0] as MIREntityType;
         const tdecl = this.assembly.entityDecls.get(et.ekey) as MIREntityTypeDecl;
 
         return this.doDefaultEmitOnEntity(tdecl);
@@ -105,24 +99,27 @@ class SMTTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    static getFixedTupleType(tt: MIRType): MIRTupleType {
-        return tt.options[0] as MIRTupleType;
+    static getTupleTypeMaxLength(tt: MIRType): number {
+        return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
     }
 
-    static getFixedRecordType(tt: MIRType): MIRRecordType {
-        return tt.options[0] as MIRRecordType;
+    static getRecordTypeMaxPropertySet(tt: MIRType): string[] {
+        let popts = new Set<string>();
+        tt.options.filter((opt) => opt instanceof MIRRecordType).forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => popts.add(entry.name)));
+        return [...popts].sort();
     }
 
     static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options[0] as MIREntityType;
+        return tt.options.find((opt) => opt instanceof MIREntityType) as MIREntityType;
     }
 
-    generateFixedRecordPropertyName(frec: MIRRecordType): string {
-        if (frec.entries.length === 0) {
+    generateRecordTypePropertyName(tt: MIRType): string {
+        const pnames = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
+        if (pnames.length === 0) {
             return "empty";
         }
         else {
-            return this.mangleStringForSMT(`{${frec.entries.map((entry) => entry.name).join(", ")}}`);
+            return this.mangleStringForSMT(`{${pnames.join(", ")}}`);
         }
     }
 
@@ -138,38 +135,22 @@ class SMTTypeEmitter {
                 return "String";
             }
         }
-        else if (this.isFixedTupleType(ttype)) {
-            return "bsqtuple_" + (ttype.options[0] as MIRTupleType).entries.length;
+        else if (this.isTupleType(ttype)) {
+            return "bsqtuple_" + SMTTypeEmitter.getTupleTypeMaxLength(ttype);
         }
-        else if (this.isFixedRecordType(ttype)) {
-            return "bsqrecord_" + this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType);
+        else if (this.isRecordType(ttype)) {
+            return "bsqrecord_" + this.generateRecordTypePropertyName(ttype);
         }
         else if (this.isUEntityType(ttype)) {
-            return this.mangleStringForSMT(ttype.trkey);
+            return this.mangleStringForSMT(SMTTypeEmitter.getUEntityType(ttype).ekey);
         }
         else {
             return "BTerm";
         }
     }
 
-    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
-        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeboxings[tbi].fkey;
-        }
-
-        const fkey = "BOX@" + this.mangleStringForSMT(`${from.trkey}_${into.trkey}`);
-        this.typeboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    boxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+    box(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
         if (this.isPrimitiveType(from)) {
-            if (this.isPrimitiveType(into)) {
-                return exp;
-            }
-
             if (from.trkey === "NSCore::Bool") {
                 return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
             }
@@ -180,38 +161,22 @@ class SMTTypeEmitter {
                 return new SMTValue(`(bsqterm_string ${exp.emit()})`);
             }
         }
-        else if (this.isFixedTupleType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+        else if (this.isTupleType(from)) {
+            return new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`);
         }
-        else if (this.isFixedRecordType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+        else if (this.isRecordType(from)) {
+            return new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`);
         }
         else if (this.isUEntityType(from)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`) : exp;
+            return new SMTValue(`(${this.registerTypeBoxing(from.options[0], into)} ${exp.emit()})`);
         }
         else {
             return exp;
         }
     }
 
-    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
-        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeunboxings[tbi].fkey;
-        }
-
-        const fkey = "UNBOX@" + this.mangleStringForSMT(`${from.trkey}_${into.trkey}`);
-        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    unboxIfNeeded(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
+    unbox(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
         if (this.isPrimitiveType(into)) {
-            if (this.isPrimitiveType(from)) {
-                return exp;
-            }
-
             if (into.trkey === "NSCore::Bool") {
                 return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
             }
@@ -222,14 +187,14 @@ class SMTTypeEmitter {
                 return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
             }
         }
-        else if (this.isFixedTupleType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+        else if (this.isTupleType(into)) {
+            return new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`);
         }
-        else if (this.isFixedRecordType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+        else if (this.isRecordType(into)) {
+            return new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`);
         }
         else if (this.isUEntityType(into)) {
-            return (from.trkey !== into.trkey) ? new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`) : exp;
+            return new SMTValue(`(${this.registerTypeUnBoxing(from, into.options[0])} ${exp.emit()})`);
         }
         else {
             return exp;
@@ -237,10 +202,68 @@ class SMTTypeEmitter {
     }
 
     coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        if (this.isPrimitiveType(from) !== this.isPrimitiveType(into)) {
-            return this.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
+        if (this.typeToSMTCategory(from) === this.typeToSMTCategory(into)) {
+            return exp;
         }
-        else if (this.isFixedTupleType(from) !== this.isFixedTupleType(into)) {
+
+        if (this.isPrimitiveType(from)) {
+            if (from.trkey === "NSCore::Bool") {
+                return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
+            }
+            else if (from.trkey === "NSCore::Int") {
+                return new SMTValue(`(bsqterm_int ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_string ${exp.emit()})`);
+            }
+        }
+        else if (this.isTupleType(from)) {
+            const fromsize = SMTTypeEmitter.getTupleTypeMaxLength(from);
+            if (this.isTupleType(into)) {
+                const intosize = SMTTypeEmitter.getTupleTypeMaxLength(into);
+                const intocons = this.generateTupleConstructor(into);
+                if (intosize === 0) {
+                    return new SMTValue(intocons);
+                }
+                else {
+                    let args: string[] = [];
+                    for (let i = 0; i < fromsize; ++i) {
+                        args.push(this.generateTupleAccessor(from, i));
+                    }
+                    for (let i = fromsize; i < intosize; ++i) {
+                        args.push("bsqtuple_entry@empty");
+                    }
+                    return new SMTValue(`(${intocons} ${args.join(" ")})`);
+                }
+            }
+            else {
+                if (fromsize === 0) {
+                    return new SMTValue(`(bsqterm_tuple bsqtuple_array_empty)`);
+                }
+                else {
+                    let temp = `@tmpconv_${this.tempconvctr++}`;
+                    let tuparray = "bsqtuple_array_empty";
+                    for (let i = 0; i < fromsize; ++i) {
+                        tuparray = `(store ${tuparray} ${i} (${this.generateTupleAccessor(from, i)} ${temp}))`;
+                    }
+                    return new SMTLet(temp, exp, new SMTValue(`bsqterm_tuple ${tuparray}`));
+                }
+            }
+        }
+        else if (this.isRecordType(from)) {
+
+        }
+        else if (this.isUEntityType(from)) {
+            
+        }
+        else {
+
+        }
+
+        if (this.isPrimitiveType(from) !== this.isPrimitiveType(into)) {
+            return this.isPrimitiveType(from) ? this.box(exp, from, into) : this.unbox(exp, from, into);
+        }
+        else if (this.isTupleType(from) !== this.isTupleType(into)) {
             return this.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
         }
         else if (this.isFixedRecordType(from) !== this.isFixedRecordType(into)) {
@@ -254,20 +277,20 @@ class SMTTypeEmitter {
         }
     }
 
-    generateFixedTupleConstructor(ttype: MIRType): string {
-        return `bsqtuple_${(ttype.options[0] as MIRTupleType).entries.length}@cons`;
+    generateTupleConstructor(ttype: MIRType): string {
+        return `bsqtuple_${SMTTypeEmitter.getTupleTypeMaxLength(ttype)}@cons`;
     }
 
-    generateFixedTupleAccessor(ttype: MIRType, idx: number): string {
-        return `bsqtuple_${(ttype.options[0] as MIRTupleType).entries.length}@${idx}`;
+    generateTupleAccessor(ttype: MIRType, idx: number): string {
+        return `bsqtuple_${SMTTypeEmitter.getTupleTypeMaxLength(ttype)}@${idx}`;
     }
 
-    generateFixedRecordConstructor(ttype: MIRType): string {
-        return `bsqrecord_${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@cons`;
+    generateRecordConstructor(ttype: MIRType): string {
+        return `bsqrecord_${this.generateRecordTypePropertyName(ttype)}@cons`;
     }
 
-    generateFixedRecordAccessor(ttype: MIRType, p: string): string {
-        return `bsqrecord_${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}@${SMTTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}`;
+    generateRecordAccessor(ttype: MIRType, p: string): string {
+        return `bsqrecord_${this.generateRecordTypePropertyName(ttype)}@${p}`;
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {

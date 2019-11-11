@@ -399,29 +399,23 @@ class MIRTupleTypeEntry {
 
 class MIRTupleType extends MIRStructuralType {
     readonly entries: MIRTupleTypeEntry[];
-    readonly isOpen: boolean;
 
-    private constructor(trkey: MIRResolvedTypeKey, entries: MIRTupleTypeEntry[], isOpen: boolean) {
+    private constructor(trkey: MIRResolvedTypeKey, entries: MIRTupleTypeEntry[]) {
         super(trkey);
         this.entries = entries;
-        this.isOpen = isOpen;
     }
 
-    static create(isOpen: boolean, entries: MIRTupleTypeEntry[]): MIRTupleType {
+    static create(entries: MIRTupleTypeEntry[]): MIRTupleType {
         let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.trkey).join(", ");
-        if (isOpen) {
-            cvalue += (entries.length !== 0 ? ", " : "") + "...";
-        }
-
-        return new MIRTupleType("[" + cvalue + "]", [...entries], isOpen);
+        return new MIRTupleType("[" + cvalue + "]", [...entries]);
     }
 
     jemit(): object {
-        return { kind: "tuple", isOpen: this.isOpen, entries: this.entries.map((e) => e.jemit()) };
+        return { kind: "tuple", entries: this.entries.map((e) => e.jemit()) };
     }
 
     static jparse(jobj: any): MIRTupleType {
-        return MIRTupleType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRTupleTypeEntry.jparse(e)));
+        return MIRTupleType.create(jobj.entries.map((e: any) => MIRTupleTypeEntry.jparse(e)));
     }
 }
 
@@ -447,31 +441,25 @@ class MIRRecordTypeEntry {
 
 class MIRRecordType extends MIRStructuralType {
     readonly entries: MIRRecordTypeEntry[];
-    readonly isOpen: boolean;
 
-    constructor(rstr: string, entries: MIRRecordTypeEntry[], isOpen: boolean) {
+    constructor(rstr: string, entries: MIRRecordTypeEntry[]) {
         super(rstr);
         this.entries = entries;
-        this.isOpen = isOpen;
     }
 
-    static create(isOpen: boolean, entries: MIRRecordTypeEntry[]): MIRRecordType {
+    static create(entries: MIRRecordTypeEntry[]): MIRRecordType {
         const rentries = [...entries].sort((a, b) => a.name.localeCompare(b.name));
 
         let cvalue = rentries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.trkey).join(", ");
-        if (isOpen) {
-            cvalue += (rentries.length !== 0 ? ", " : "") + "...";
-        }
-
-        return new MIRRecordType("{" + cvalue + "}", rentries, isOpen);
+        return new MIRRecordType("{" + cvalue + "}", rentries);
     }
 
     jemit(): object {
-        return { kind: "record", isOpen: this.isOpen, entries: this.entries.map((e) => e.jemit()) };
+        return { kind: "record", entries: this.entries.map((e) => e.jemit()) };
     }
 
     static jparse(jobj: any): MIRRecordType {
-        return MIRRecordType.create(jobj.isOpen, jobj.entries.map((e: any) => MIRRecordTypeEntry.jparse(e)));
+        return MIRRecordType.create(jobj.entries.map((e: any) => MIRRecordTypeEntry.jparse(e)));
     }
 }
 
@@ -567,18 +555,11 @@ class MIRAssembly {
     }
 
     private atomSubtypeOf_TupleTuple(t1: MIRTupleType, t2: MIRTupleType): boolean {
-        //Then this is definitely not ok
-        if (t1.isOpen && !t2.isOpen) {
-            return false;
-        }
-
         for (let i = 0; i < t1.entries.length; ++i) {
             const t1e = t1.entries[i];
 
             if (i >= t2.entries.length) {
-                if (!t2.isOpen) {
-                    return false;
-                }
+                return false;
             }
             else {
                 const t2e = t2.entries[i];
@@ -597,18 +578,11 @@ class MIRAssembly {
     }
 
     private atomSubtypeOf_RecordRecord(t1: MIRRecordType, t2: MIRRecordType): boolean {
-        //Then this is definitely not ok
-        if (t1.isOpen && !t2.isOpen) {
-            return false;
-        }
-
         let badEntry = false;
         t1.entries.forEach((entry) => {
             const t2e = t2.entries.find((e) => e.name === entry.name);
             if (t2e === undefined) {
-                if (!t2.isOpen) {
-                    badEntry = badEntry || true;
-                }
+                badEntry = badEntry || true;
             }
             else {
                 if ((entry.isOptional && !t2e.isOptional) || !this.subtypeOf(entry.type, t2e.type)) {

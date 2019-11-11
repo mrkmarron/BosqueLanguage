@@ -3,8 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRTypeOption } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
+
+import * as assert from "assert";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -19,9 +21,6 @@ class CPPTypeEmitter {
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
     scopectr: number = 0;
-
-    typeboxings: { fkey: string, from: MIRTypeOption, into: MIRType }[] = [];
-    typeunboxings: { fkey: string, from: MIRType, into: MIRTypeOption }[] = [];
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -56,30 +55,44 @@ class CPPTypeEmitter {
         return (uname === "NSCore::Bool" || uname === "NSCore::Int" ||  uname === "NSCore::String");
     }
 
-    isFixedTupleType(tt: MIRType): boolean {
+    isNoneable(tt: MIRType): boolean {
+        return tt.options.some((opt) => opt.trkey === "NSCore::None");
+    }
+
+    isKnownLayoutTupleType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
             return false;
         }
 
         const tup = tt.options[0] as MIRTupleType;
-        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+        return !tup.entries.some((entry) => entry.isOptional);
     }
 
-    isFixedRecordType(tt: MIRType): boolean {
+    isTupleType(tt: MIRType): boolean {
+        return tt.options.every((opt) => opt instanceof MIRTupleType);
+    }
+
+    isKnownLayoutRecordType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
             return false;
         }
 
         const tup = tt.options[0] as MIRRecordType;
-        return !tup.isOpen && !tup.entries.some((entry) => entry.isOptional);
+        return !tup.entries.some((entry) => entry.isOptional);
+    }
+
+    isRecordType(tt: MIRType): boolean {
+        return tt.options.every((opt) => opt instanceof MIRRecordType);
     }
 
     isUEntityType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
+        const ropts = tt.options.filter((opt) => opt.trkey === "NSCore::None");
+
+        if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
             return false;
         }
 
-        const et = tt.options[0] as MIREntityType;
+        const et = ropts[0] as MIREntityType;
         const tdecl = this.assembly.entityDecls.get(et.ekey) as MIREntityTypeDecl;
 
         return this.doDefaultEmitOnEntity(tdecl);
@@ -105,20 +118,31 @@ class CPPTypeEmitter {
         return tt.options[0] as MIREntityType;
     }
 
-    static getFixedTupleType(tt: MIRType): MIRTupleType {
+    static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
         return tt.options[0] as MIRTupleType;
     }
 
-    static getFixedRecordType(tt: MIRType): MIRRecordType {
+    static getTupleTypeMaxLength(tt: MIRType): number {
+        return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
+    }
+
+    static getKnownLayoutRecordType(tt: MIRType): MIRRecordType {
         return tt.options[0] as MIRRecordType;
     }
 
-    static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options[0] as MIREntityType;
+    static getRecordTypeMaxPropertySet(tt: MIRType): string[] {
+        let popts = new Set<string>();
+        tt.options.filter((opt) => opt instanceof MIRRecordType).forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => popts.add(entry.name)));
+        return [...popts].sort();
     }
 
-    generateFixedRecordPropertyName(frec: MIRRecordType): string {
-        return this.mangleStringForCpp(`{${frec.entries.map((entry) => entry.name).join(", ")}}`);
+    getKnownPropertyRecordArrayName(tt: MIRType): string {
+        const name = `{ CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).join(", ") }`;
+        return `Runtime::KnownPropertySet_${this.mangleStringForCpp(name)}`;
+    }
+
+    static getUEntityType(tt: MIRType): MIREntityType {
+        return tt.options.find((opt) => opt instanceof MIREntityType) as MIREntityType;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {
@@ -131,7 +155,7 @@ class CPPTypeEmitter {
             return false;
         }
 
-        if (this.isFixedTupleType(tt) || this.isFixedRecordType(tt)) {
+        if (this.isTupleType(tt) || this.isRecordType(tt)) {
             return false;
         }
 
@@ -150,38 +174,31 @@ class CPPTypeEmitter {
                 return "BSQString" + (declspec !== "base" ? "*" : "");
             }
         }
-        else if (this.isFixedTupleType(ttype)) {
-            return `BSQTupleFixed<${(ttype.options[0] as MIRTupleType).entries.length}>`;
+        else if (this.isTupleType(ttype)) {
+            return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : "");
         }
-        else if (this.isFixedRecordType(ttype)) {
-            return `BSQRecordFixed<FixedRecordPropertyListEnum::${this.generateFixedRecordPropertyName(ttype.options[0] as MIRRecordType)}, ${(ttype.options[0] as MIRTupleType).entries.length}>`;
+        else if (this.isRecordType(ttype)) {
+            if (this.isKnownLayoutRecordType(ttype)) {
+                return `BSQRecordKnown<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>` + (declspec === "parameter" ? "&" : "");
+            }
+            else {
+                return `BSQRecordFixed<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>` + (declspec === "parameter" ? "&" : "");
+            }
         }
         else if (this.isUEntityType(ttype)) {
-            return this.mangleStringForCpp(ttype.trkey) + (declspec !== "base" ? "*" : "");
+            return this.mangleStringForCpp(CPPTypeEmitter.getUEntityType(ttype).ekey) + (declspec !== "base" ? "*" : "");
         }
         else {
             return "Value";
         }
     }
 
-    registerTypeBoxing(from: MIRTypeOption, into: MIRType): string {
-        const tbi = this.typeboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeboxings[tbi].fkey;
+    coerce(exp: string, from: MIRType, into: MIRType): string {
+        if (this.typeToCPPType(from, "base") === this.typeToCPPType(into, "base")) {
+            return exp;
         }
 
-        const fkey = "BOX_" + this.mangleStringForCpp(`${from.trkey}_${into.trkey}`);
-        this.typeboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    boxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
         if (this.isPrimitiveType(from)) {
-            if (this.isPrimitiveType(into)) {
-                return exp;
-            }
-
             if (from.trkey === "NSCore::Bool") {
                 return `BSQ_BOX_VALUE_BOOL(${exp})`;
             }
@@ -192,77 +209,110 @@ class CPPTypeEmitter {
                 return exp;
             }
         }
-        else if (this.isFixedTupleType(from)) {
-            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
+        else if (this.isTupleType(from)) {
+            assert(!(this.isKnownLayoutTupleType(from) && this.isKnownLayoutTupleType(into)), "Shoud be a type error or handled by equality case");
+
+            const fromsize = CPPTypeEmitter.getTupleTypeMaxLength(from);
+            if (this.isKnownLayoutTupleType(from)) {
+                if (this.isTupleType(into)) {
+                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                    return `StructuralCoercionOps::convertTupleKnownToFixed<${intosize}, ${fromsize}>(${exp})`;
+                }
+                else {
+                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleKnown<${fromsize}>(${exp}))`;
+                }
+            }
+            else if (this.isKnownLayoutTupleType(into)) {
+                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                return `StructuralCoercionOps::convertTupleFixedToKnown<${intosize}, ${fromsize}>(${exp})`;
+            }
+            else {
+               if (this.isTupleType(into)) {
+                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                    if (intosize < fromsize) {
+                        return `StructuralCoercionOps::projectTupleDownFixed<${intosize}, ${fromsize}>(${exp})`;
+                    }
+                    else {
+                        return `StructuralCoercionOps::projectTupleUpFixed<${intosize}, ${fromsize}>(${exp})`;
+                    }
+                }
+                else {
+                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleFixed<${fromsize}>(${exp}))`;
+                }
+            }
         }
-        else if (this.isFixedRecordType(from)) {
-            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeBoxing(from.options[0], into)}($scope$.getCallerSlot<${this.scopectr++}>(), ${exp})` : exp;
+        else if (this.isRecordType(from)) {
+            assert(!(this.isKnownLayoutRecordType(from) && this.isKnownLayoutRecordType(into)), "Shoud be a type error or handled by equality case");
+
+            const fromset = CPPTypeEmitter.getRecordTypeMaxPropertySet(from);
+            if (this.isKnownLayoutRecordType(from)) {
+                if (this.isRecordType(into)) {
+                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                    return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                }
+                else {
+                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
+                }
+            }
+            else if (this.isKnownLayoutRecordType(into)) {
+                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                return `StructuralCoercionOps::convertRecordFixedToKnown<${intoset.length}, ${fromset.length}>(${exp})`;
+            }
+            else {
+               if (this.isRecordType(into)) {
+                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                    if (intoset.length < fromset.length) {
+                        return `StructuralCoercionOps::projectRecordDownFixed<${intoset.length}, ${fromset.length}>(${exp})`;
+                    }
+                    else {
+                        return `StructuralCoercionOps::projectRecordUpFixed<${intoset.length}, ${fromset.length}>(${exp})`;
+                    }
+                }
+                else {
+                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordFixed<${fromset.length}>(${exp}))`;
+                }
+            }
         }
         else if (this.isUEntityType(from)) {
             return exp;
         }
         else {
-            return exp;
-        }
-    }
-
-    registerTypeUnBoxing(from: MIRType, into: MIRTypeOption): string {
-        const tbi = this.typeunboxings.findIndex((tb) => tb.from.trkey === from.trkey && tb.into.trkey === into.trkey);
-        if (tbi !== -1) {
-            return this.typeunboxings[tbi].fkey;
-        }
-
-        const fkey = "UNBOX_" + this.mangleStringForCpp(`${from.trkey}_${into.trkey}`);
-        this.typeunboxings.push({ fkey: fkey, from: from, into: into });
-
-        return fkey;
-    }
-
-    unboxIfNeeded(exp: string, from: MIRType, into: MIRType): string {
-        if (this.isPrimitiveType(into)) {
-            if (this.isPrimitiveType(from)) {
-                return exp;
+            assert(this.typeToCPPType(from, "base") === "Value", "must be a Value mapped type");
+            if (this.isPrimitiveType(into)) {
+                if (into.trkey === "NSCore::Bool") {
+                    return `BSQ_GET_VALUE_BOOL(${exp})`;
+                }
+                else if (into.trkey === "NSCore::Int") {
+                    return `BSQ_GET_VALUE_INT(${exp})`;
+                }
+                else {
+                    return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
+                }
             }
-
-            if (into.trkey === "NSCore::Bool") {
-                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            else if (this.isTupleType(into)) {
+                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                if (this.isKnownLayoutTupleType(into)) {
+                    return `StructuralCoercionOps::unboxTupleKnown<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
+                }
+                else {
+                    return `StructuralCoercionOps::unboxTupleFixed<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
+                }
             }
-            else if (into.trkey === "NSCore::Int") {
-                return `BSQ_GET_VALUE_INT(${exp})`;
+            else if (this.isRecordType(into)) {
+                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                if (this.isKnownLayoutRecordType(into)) {
+                    return `StructuralCoercionOps::unboxRecordKnown<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
+                }
+                else {
+                    return `StructuralCoercionOps::unboxRecordFixed<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
+                }
+            }
+            else if (this.isUEntityType(into)) {
+                return `BSQ_GET_VALUE_PTR(${exp}, ${this.typeToCPPType(into, "base")})`;
             }
             else {
-                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
+                return exp;
             }
-        }
-        else if (this.isFixedTupleType(into)) {
-            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
-        }
-        else if (this.isFixedRecordType(into)) {
-            return (from.trkey !== into.trkey) ? `Runtime::${this.registerTypeUnBoxing(from, into.options[0])}(exp)` : exp;
-        }
-        else if (this.isUEntityType(into)) {
-            return (from.trkey !== into.trkey) ? `BSQ_GET_VALUE_PTR(${exp}, ${this.typeToCPPType(into, "base")})` : exp;
-        }
-        else {
-            return exp;
-        }
-    }
-
-    coerce(exp: string, from: MIRType, into: MIRType): string {
-        if (this.isPrimitiveType(from) !== this.isPrimitiveType(into)) {
-            return this.isPrimitiveType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.isFixedTupleType(from) !== this.isFixedTupleType(into)) {
-            return this.isFixedTupleType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.isFixedRecordType(from) !== this.isFixedRecordType(into)) {
-            return this.isFixedRecordType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else if (this.isUEntityType(from) !== this.isUEntityType(into)) {
-            return this.isUEntityType(from) ? this.boxIfNeeded(exp, from, into) : this.unboxIfNeeded(exp, from, into);
-        }
-        else {
-            return exp;
         }
     }
 
@@ -270,8 +320,8 @@ class CPPTypeEmitter {
         return `.atFixed<${idx}>()`;
     }
 
-    generateFixedRecordAccessor(ttype: MIRType, p: string): string {
-        return `.atFixed<${CPPTypeEmitter.getFixedRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
+    generateKnownRecordAccessor(ttype: MIRType, p: string): string {
+        return `.atFixed<${CPPTypeEmitter.getKnownLayoutRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
     }
 
     generateConstructorArgInc(argtype: MIRType, arg: string): string {
