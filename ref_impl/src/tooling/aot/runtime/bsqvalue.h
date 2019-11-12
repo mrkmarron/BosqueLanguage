@@ -89,7 +89,8 @@ public:
         return v;
     }
 
-    inline static Value checkedIncrementNoneable(Value v)
+    template <typename T>
+    inline static T* checkedIncrementNoneable(T* v)
     {
         if(BSQ_IS_VALUE_NONNONE(v))
         {
@@ -348,7 +349,7 @@ public:
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i]);
+            BSQRef::checkedDecrement(this->entries[i].second);
         }
     }
 
@@ -430,6 +431,7 @@ public:
 
 class StructuralCoercionOps
 {
+public:
     template<uint16_t k>
     inline BSQTuple boxTupleFixed(const BSQTupleFixed<k>& src)
     {

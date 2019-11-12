@@ -86,7 +86,7 @@ class CPPTypeEmitter {
     }
 
     isUEntityType(tt: MIRType): boolean {
-        const ropts = tt.options.filter((opt) => opt.trkey === "NSCore::None");
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
 
         if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
             return false;
@@ -198,7 +198,10 @@ class CPPTypeEmitter {
             return exp;
         }
 
-        if (this.isPrimitiveType(from)) {
+        if (from.trkey === "NSCore::None") {
+            return "BSQ_VALUE_NONE";
+        }
+        else if (this.isPrimitiveType(from)) {
             if (from.trkey === "NSCore::Bool") {
                 return `BSQ_BOX_VALUE_BOOL(${exp})`;
             }
@@ -219,7 +222,7 @@ class CPPTypeEmitter {
                     return `StructuralCoercionOps::convertTupleKnownToFixed<${intosize}, ${fromsize}>(${exp})`;
                 }
                 else {
-                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleKnown<${fromsize}>(${exp}))`;
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleKnown<${fromsize}>(${exp}))`;
                 }
             }
             else if (this.isKnownLayoutTupleType(into)) {
@@ -237,7 +240,7 @@ class CPPTypeEmitter {
                     }
                 }
                 else {
-                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleFixed<${fromsize}>(${exp}))`;
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleFixed<${fromsize}>(${exp}))`;
                 }
             }
         }
@@ -251,7 +254,7 @@ class CPPTypeEmitter {
                     return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
                 }
                 else {
-                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
                 }
             }
             else if (this.isKnownLayoutRecordType(into)) {
@@ -269,7 +272,7 @@ class CPPTypeEmitter {
                     }
                 }
                 else {
-                    return `$scope$.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordFixed<${fromset.length}>(${exp}))`;
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxRecordFixed<${fromset.length}>(${exp}))`;
                 }
             }
         }
@@ -336,10 +339,10 @@ class CPPTypeEmitter {
 
         if (!this.assembly.subtypeOf(this.boolType, argtype) && !this.assembly.subtypeOf(this.intType, argtype)) {
             if (this.assembly.subtypeOf(this.noneType, argtype)) {
-                return `BSQRef::checkedIncrementNoneable(${arg})`;
+                return `BSQRef::checkedIncrementNoneable<${this.typeToCPPType(argtype, "base")}>(${arg})`;
             }
             else {
-                return `BSQRef::checkedIncrementFast${this.typeToCPPType(argtype, "parameter")}(${arg})`;
+                return `BSQRef::checkedIncrementFast<${this.typeToCPPType(argtype, "base")}>(${arg})`;
             }
         }
         else {
@@ -418,10 +421,12 @@ class CPPTypeEmitter {
             }
         });
 
+        this.scopectr = 0;
         const faccess = entity.fields.map((f) => this.coerce(`this->${f.name}`, this.getMIRType(f.declaredType), this.anyType));
         const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + \", \" + ") : "\" \"";
         const display = "std::string display() const\n"
         + "    {\n"
+        + (this.scopectr !== 0 ? `        BSQRefScope<${this.scopectr}> ${this.mangleStringForCpp("$scope$")};\n` : "")
         + `        return std::string("${entity.tkey}{ ") + ${fjoins} + std::string(" }");\n`
         + "    }";
 

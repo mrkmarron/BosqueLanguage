@@ -37,16 +37,11 @@ class SMTEmitter {
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
-        let resultdecls_fwd: string[] = [];
-        let resultdecls: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
             const smtdecl = typeemitter.generateSMTEntity(edecl);
             if (smtdecl !== undefined) {
                 typedecls_fwd.push(smtdecl.fwddecl);
                 typedecls.push(smtdecl.fulldecl);
-
-                resultdecls_fwd.push(`(Result@${typeemitter.mangleStringForSMT(edecl.tkey)} 0)`);
-                resultdecls.push(`( (result_success$${typeemitter.mangleStringForSMT(edecl.tkey)} (result_success_value@${typeemitter.mangleStringForSMT(edecl.tkey)} ${typeemitter.mangleStringForSMT(edecl.tkey)})) (result_error@${typeemitter.mangleStringForSMT(edecl.tkey)} (result_error_code@${typeemitter.mangleStringForSMT(edecl.tkey)} ErrorCode)) )`);
             }
         });
 
@@ -61,7 +56,7 @@ class SMTEmitter {
                 const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
                 let cargs: string[] = [];
                 for (let i = 0; i < maxlen; ++i) {
-                    cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} BTerm)`);
+                    cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} bsqtuple_entry)`);
                 }
                 fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
             }
@@ -72,13 +67,15 @@ class SMTEmitter {
                 const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
                 let cargs: string[] = [];
                 for (let i = 0; i < maxset.length; ++i) {
-                    cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} BTerm)`);
+                    cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} bsqrecord_entry)`);
                 }
                 fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
             }
         });
 
         let funcdecls: string[] = [];
+        let resultdecls_fwd: string[] = [];
+        let resultdecls: string[] = [];
         for (let i = 0; i < rcg.length; ++i) {
             const bbup = rcg[i];
             let gas: number | undefined = undefined;
@@ -93,6 +90,12 @@ class SMTEmitter {
                 const finfo = bodyemitter.generateSMTInvoke(idcl, gas);
 
                 funcdecls.push(finfo);
+
+                const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(idcl.resultType));
+                if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                    resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                    resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                }
             }
             else if (tag === "pre") {
                 NOT_IMPLEMENTED<void>("Pre");
@@ -109,6 +112,12 @@ class SMTEmitter {
                 const cdeclemit = bodyemitter.generateSMTConst(bbup.invoke, cdcl, gas);
                 if (cdeclemit !== undefined) {
                     funcdecls.push(cdeclemit);
+
+                    const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(cdcl.declaredType));
+                    if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                        resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                        resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                    }
                 }
 
             }
@@ -119,6 +128,12 @@ class SMTEmitter {
                 const fdeclemit = bodyemitter.generateSMTFDefault(bbup.invoke, fdcl, gas);
                 if (fdeclemit !== undefined) {
                     funcdecls.push(fdeclemit);
+
+                    const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(fdcl.declaredType));
+                    if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                        resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                        resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                    }
                 }
             }
         }

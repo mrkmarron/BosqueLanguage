@@ -116,7 +116,7 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
     }
 
     static create(entries: ResolvedRecordAtomTypeEntry[]): ResolvedRecordAtomType {
-        let simplifiedEntries: ResolvedRecordAtomTypeEntry[] = [];
+        let simplifiedEntries: ResolvedRecordAtomTypeEntry[] = [...entries];
         simplifiedEntries.sort((a, b) => a.name.localeCompare(b.name));
         let cvalue = simplifiedEntries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.idStr).join(", ");
 

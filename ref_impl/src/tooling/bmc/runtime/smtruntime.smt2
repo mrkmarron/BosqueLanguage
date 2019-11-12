@@ -72,15 +72,10 @@
 ))
 
 (declare-datatypes ( 
-      (Result@Bool 0) (Result@Int 0) (Result@String 0) (Result@BTerm 0)
       ;;FIXED_TUPLE_RESULT_FWD;;
       ;;FIXED_RECORD_RESULT_FWD;;
       ;;NOMINAL_RESULT_FWD;;
     ) (
-    ( (result_success@Bool (result_success_value@Bool Bool)) (result_error@Bool (result_error_code@Bool ErrorCode)) )
-    ( (result_success@Int (result_success_value@Int Int)) (result_error@Int (result_error_code@Int ErrorCode)) )
-    ( (result_success@String (result_success_value@String String)) (result_error@String (result_error_code@String ErrorCode)) )
-    ( (result_success@BTerm (result_success_value@BTerm BTerm)) (result_error@BTerm (result_error_code@BTerm ErrorCode)) )
     ;;FIXED_TUPLE_RESULT;;
     ;;FIXED_RECORD_RESULT;;
     ;;NOMINAL_RESULT;;

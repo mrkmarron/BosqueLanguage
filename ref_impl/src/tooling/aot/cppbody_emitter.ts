@@ -246,18 +246,18 @@ class CPPBodyEmitter {
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         if (ctype.name === "List") {
-            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
-            const clistcons = `new ${this.typegen.mangleStringForCpp(clisttype.trkey)}`;
+            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType);
+            const clistcons = `new ${this.typegen.mangleStringForCpp(clisttype.options[0].trkey)}`;
             const contentstype = ctype.terms.get("T") as MIRType;
 
             let cons = "BSQ_VALUE_NONE";
             for (let i = cpcs.args.length - 1; i >= 0; --i) {
-                cons = `${clistcons}(${this.typegen.generateConstructorArgInc(contentstype, this.argToCpp(cpcs.args[i], contentstype))}, BSQRef::checkedIncrementNoneable(${cons}))`;
+                cons = `${clistcons}(${this.typegen.generateConstructorArgInc(contentstype, this.argToCpp(cpcs.args[i], contentstype))}, BSQRef::checkedIncrementNoneable<${this.typegen.typeToCPPType(clisttype, "base")}>(${cons}))`;
             }
 
             const lcname = this.invokenameToCPP(MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons"));
             const scopevar = this.varNameToCppName("$scope$");
-            return `${this.varToCppName(cpcs.trgt)} = ${lcname}(${cpcs.args.length}, BSQRef::checkedIncrementNoneable(${cons}), ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>());`;
+            return `${this.varToCppName(cpcs.trgt)} = ${lcname}(${cpcs.args.length}, ${cons}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>());`;
         }
         else if (ctype.name === "Set") {
             return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
@@ -335,7 +335,7 @@ class CPPBodyEmitter {
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType)};`;
         }
         else {
-            const access = `${this.argToCpp(op.arg, this.typegen.anyType)}get$${op.field}()`;
+            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRef)->get$${op.field}()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.anyType, resultAccessType)};`;
         }
     }
@@ -977,8 +977,11 @@ class CPPBodyEmitter {
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
         switch (idecl.implkey) {
             case "_listcons": {
+                const lentity = this.assembly.entityDecls.get((this.typegen.getMIRType(idecl.resultType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+                const clisttype = this.typegen.getMIRType((lentity.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType);
                 const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "base");
-                return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
+
+                return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable<${this.typegen.typeToCPPType(clisttype, "base")}>(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
             }
             default: {
                 return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);

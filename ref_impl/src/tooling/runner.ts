@@ -117,7 +117,7 @@ else {
                 .replace("//%%PROPERTY_ENUM_DECLARE", "    " + cparams.propertyenums)
                 .replace("//%%PROPERTY_NAMES", "  " + cparams.propertynames)
                 .replace("//%%VFIELD_DECLS", "    " + cparams.vfield_decls)
-                .replace("//%%VMETHOD_DECLS", "  " + cparams.propertynames);
+                .replace("//%%VMETHOD_DECLS", "  " + cparams.vmethod_decls);
 
             return { file: fname, contents: bcontents };
         });

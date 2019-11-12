@@ -69,7 +69,7 @@ class SMTTypeEmitter {
     }
 
     isUEntityType(tt: MIRType): boolean {
-        const ropts = tt.options.filter((opt) => opt.trkey === "NSCore::None");
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
 
         if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
             return false;

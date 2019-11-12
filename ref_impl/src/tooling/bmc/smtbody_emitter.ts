@@ -77,7 +77,12 @@ class SMTBodyEmitter {
     }
 
     varNameToSMTName(name: string): string {
-        return this.typegen.mangleStringForSMT(name);
+        if (name === "_return_") {
+            return "_return_";
+        }
+        else {
+            return this.typegen.mangleStringForSMT(name);
+        }
     }
 
     varToSMTName(varg: MIRRegisterArgument): string {
@@ -271,7 +276,7 @@ class SMTBodyEmitter {
 
             let cons = "bsqterm_none_const";
             for (let i = cpcs.args.length - 1; i >= 0; --i) {
-                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype).emit()}, ${cons})`;
+                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype).emit()} ${cons})`;
             }
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpcs.tkey)} ${cons} ${cpcs.args.length})`));
@@ -290,7 +295,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqtuple_empty_const"));
         }
         else {
-            const argl = op.args.map((arg) => `(bsqtuple_entry, ${this.argToSMT(arg, this.typegen.anyType).emit()})`);
+            const argl = op.args.map((arg) => `(bsqtuple_entry@value ${this.argToSMT(arg, this.typegen.anyType).emit()})`);
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${argl.join(" ")})`));
         }
     }
@@ -301,7 +306,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqrecord_empty_const"));
         }
         else {
-            const argl = op.args.map((arg) => `(bsqrecord_entry, ${this.argToSMT(arg[1], this.typegen.anyType).emit()})`);
+            const argl = op.args.map((arg) => `(bsqrecord_entry@value ${this.argToSMT(arg[1], this.typegen.anyType).emit()})`);
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${argl.join(" ")})`));
         }
     }
@@ -453,10 +458,10 @@ class SMTBodyEmitter {
         const rhvtype = this.getArgType(rhs);
 
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
-            return `(${op} ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${this.argToSMT(rhs, this.typegen.boolType).emit()}`;
+            return `(${op} ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${this.argToSMT(rhs, this.typegen.boolType).emit()})`;
         }
         else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
-            return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()}`;
+            return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()})`;
         }
         else {
             return NOT_IMPLEMENTED<string>("generateFastCompare -- string");
