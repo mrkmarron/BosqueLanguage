@@ -24,8 +24,8 @@ type CPPCode = {
     conststring_declare: string,
     conststring_create: string,
     propertyenums: string,
-    fixedrecord_property_lists: string,
     propertynames: string,
+    known_property_lists_declare: string,
     vfield_decls: string,
     vmethod_decls: string,
     entryname: string
@@ -111,7 +111,7 @@ class CPPEmitter {
 
         let propertyenums: Set<string> = new Set<string>();
         let propertynames: Set<string> = new Set<string>();
-        let fixedrecord_property_lists: Set<string> = new Set<string>();
+        let known_property_lists_declare: string[] = [];
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(pname);
             propertynames.add(`"${pname}"`);
@@ -123,6 +123,12 @@ class CPPEmitter {
                         propertyenums.add(entry.name);
                         propertynames.add(`"${entry.name}"`);
                     });
+                }
+
+                if (typeemitter.isKnownLayoutRecordType(tt)) {
+                    const knownrec = CPPTypeEmitter.getKnownLayoutRecordType(tt);
+                    const knownenum = knownrec.entries.map((entry) => `MIRPropertyEnum::${entry.name}`);
+                    known_property_lists_declare.push(`constexpr static MIRPropertyEnum ${typeemitter.getKnownPropertyRecordArrayName(tt)}[${knownrec.entries.length}] = {${knownenum.join(", ")}};`);
                 }
             });
         });
@@ -136,8 +142,8 @@ class CPPEmitter {
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
             propertyenums: [...propertyenums].sort().join(",\n  "),
-            fixedrecord_property_lists: [...fixedrecord_property_lists].sort().join("\n  "),
             propertynames: [...propertynames].sort().join(",\n  "),
+            known_property_lists_declare: known_property_lists_declare.sort().join("\n  "),
             vfield_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-FIELD RESOLUTION",
             vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION",
             entryname: typeemitter.mangleStringForCpp(entrypoint)

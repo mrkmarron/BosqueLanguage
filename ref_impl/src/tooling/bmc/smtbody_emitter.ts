@@ -270,11 +270,11 @@ class SMTBodyEmitter {
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
         if (ctype.name === "List") {
-            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0];
-            const clistcons = this.typegen.generateEntityConstructor(clisttype.trkey);
+            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType);
+            const clistcons = this.typegen.generateEntityConstructor(clisttype.options[0].trkey);
             const contentstype = ctype.terms.get("T") as MIRType;
 
-            let cons = "bsqterm_none_const";
+            let cons = this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, clisttype).emit();
             for (let i = cpcs.args.length - 1; i >= 0; --i) {
                 cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype).emit()} ${cons})`;
             }
@@ -805,7 +805,7 @@ class SMTBodyEmitter {
 
             const params = idecl.params.map((arg) => this.varNameToSMTName(arg.name));
 
-            return `${decl} \n${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)} `;
+            return `${decl} \n    ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)}\n)`;
         }
     }
 

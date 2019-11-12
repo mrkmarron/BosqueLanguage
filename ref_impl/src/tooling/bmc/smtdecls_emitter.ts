@@ -24,11 +24,13 @@ type SMTCode = {
     fixedrecorddecls: string,
     resultdecls_fwd: string,
     resultdecls: string,
-    function_decls: string
+    function_decls: string,
+    args_info: string,
+    main_info: string
 };
 
 class SMTEmitter {
-    static emit(assembly: MIRAssembly): SMTCode {
+    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
         const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
 
@@ -138,23 +140,6 @@ class SMTEmitter {
             }
         }
 
-        return {
-            typedecls_fwd: typedecls_fwd.sort().join("\n    "),
-            typedecls: typedecls.sort().join("\n    "),
-            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),
-            fixedtupledecls: fixedtupledecls.sort().join("\n    "),
-            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n    "),
-            fixedrecorddecls: fixedrecorddecls.sort().join("\n    "),
-            resultdecls_fwd: resultdecls_fwd.sort().join("\n    "),
-            resultdecls: resultdecls.sort().join("\n    "),
-            function_decls: funcdecls.join("\n")
-        };
-    }
-
-    static emitEntrypointCall(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): { arginfo: string, callinfo: string } {
-        const typeemitter = new SMTTypeEmitter(assembly);
-        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
-
         const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
 
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
@@ -164,8 +149,17 @@ class SMTEmitter {
         const callinfo = resv + "\n" + cassert + "\n" + chk;
 
         return {
-            arginfo: "",
-            callinfo: callinfo
+            typedecls_fwd: typedecls_fwd.sort().join("\n    "),
+            typedecls: typedecls.sort().join("\n    "),
+            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),
+            fixedtupledecls: fixedtupledecls.sort().join("\n    "),
+            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n    "),
+            fixedrecorddecls: fixedrecorddecls.sort().join("\n    "),
+            resultdecls_fwd: resultdecls_fwd.sort().join("\n    "),
+            resultdecls: resultdecls.sort().join("\n    "),
+            function_decls: funcdecls.join("\n"),
+            args_info: "",
+            main_info: callinfo
         };
     }
 }

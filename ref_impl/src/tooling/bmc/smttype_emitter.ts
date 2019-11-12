@@ -349,7 +349,7 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( (${this.generateEntityNoneConstructor(entity.tkey)}) (cons@${ename} (${ename}@$type String) ${fargs.join(" ")}) )`
+            fulldecl: `( (${this.generateEntityNoneConstructor(entity.tkey)}) (cons@${ename} ${fargs.join(" ")}) )`
         };
     }
 

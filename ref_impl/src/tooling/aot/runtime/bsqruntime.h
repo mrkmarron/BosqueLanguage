@@ -21,7 +21,7 @@ class Runtime
 public:
 //%%STATIC_STRING_DECLARE%%
 
-//%%STATIC_KNOWN_PROPERTY_SETS%%
+//%%KNOWN_PROPERTY_LIST_DECLARE
 
 static const char* propertyNames[];
 

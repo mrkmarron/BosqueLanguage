@@ -16,7 +16,7 @@
 #define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0xF) == 0)
 
 #define BSQ_GET_VALUE_BOOL(V) (((uintptr_t)(V)) & 0x1)
-#define BSQ_GET_VALUE_INT(V) ((int64_t)(((uintptr_t)(V)) >> 4))
+#define BSQ_GET_VALUE_INT(V) (((int64_t)(V)) >> 0x4)
 #define BSQ_GET_VALUE_PTR(V, T) ((T*)(V))
 
 #define BSQ_BOX_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
@@ -345,6 +345,8 @@ class BSQRecord : public BSQRef
 public:
     const std::vector<std::pair<MIRPropertyEnum, Value>> entries;
 
+    BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(), entries(move(entries)) { ; }
+
     virtual ~BSQRecord()
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
@@ -433,7 +435,7 @@ class StructuralCoercionOps
 {
 public:
     template<uint16_t k>
-    inline BSQTuple boxTupleFixed(const BSQTupleFixed<k>& src)
+    inline static BSQTuple* boxTupleFixed(const BSQTupleFixed<k>& src)
     {
         std::vector<Value> rvals(src.size, nullptr);
         for(uint16_t i = 0; i < src.size; ++i)
@@ -444,7 +446,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQTupleFixed<k> unboxTupleFixed(const BSQTuple* src)
+    inline static BSQTupleFixed<k> unboxTupleFixed(const BSQTuple* src)
     {
         BSQTupleFixed<k> res;
         res.size = src->entries.size();
@@ -456,7 +458,7 @@ public:
     }
 
     template <uint16_t k, uint16_t j>
-    inline BSQTupleFixed<k> projectTupleDownFixed(const BSQTupleFixed<j>& src)
+    inline static BSQTupleFixed<k> projectTupleDownFixed(const BSQTupleFixed<j>& src)
     {
         static_assert(k < j);
 
@@ -470,7 +472,7 @@ public:
     }
 
     template <uint16_t k, uint16_t j>
-    inline BSQTupleFixed<k> projectTupleUpFixed(const BSQTupleFixed<j>& src)
+    inline static BSQTupleFixed<k> projectTupleUpFixed(const BSQTupleFixed<j>& src)
     {
         static_assert(k > j);
 
@@ -484,7 +486,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQTuple boxTupleKnown(const BSQTupleKnown<k>& src)
+    inline static BSQTuple* boxTupleKnown(const BSQTupleKnown<k>& src)
     {
         std::vector<Value> rvals(k, nullptr);
         for(uint16_t i = 0; i < k; ++i)
@@ -495,7 +497,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQTupleFixed<k> unboxTupleKnown(const BSQTuple* src)
+    inline static BSQTupleFixed<k> unboxTupleKnown(const BSQTuple* src)
     {
         BSQTupleFixed<k> res;
         for(uint16_t i = 0; i < k; ++i)
@@ -506,7 +508,7 @@ public:
     }
 
     template<uint16_t k, uint16_t j>
-    inline BSQTupleFixed<k> convertTupleKnownToFixed(const BSQTupleKnown<j>& src)
+    inline static BSQTupleFixed<k> convertTupleKnownToFixed(const BSQTupleKnown<j>& src)
     {
         static_assert(k >= j);
 
@@ -520,7 +522,7 @@ public:
     }
 
     template<uint16_t k, uint16_t j>
-    inline BSQTupleKnown<k> convertTupleFixedToKnown(const BSQTupleFixed<j> src)
+    inline static BSQTupleKnown<k> convertTupleFixedToKnown(const BSQTupleFixed<j> src)
     {
         static_assert(k <= j);
 
@@ -533,7 +535,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQRecord boxRecordFixed(const BSQRecordFixed<k>& src)
+    inline static BSQRecord* boxRecordFixed(const BSQRecordFixed<k>& src)
     {
         std::vector<std::pair<MIRPropertyEnum, Value>> rvals(src.size, std::make_pair(MIRPropertyEnum::Invalid, nullptr));
         for(uint16_t i = 0; i < src.size; ++i)
@@ -544,7 +546,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQRecordFixed<k> unboxRecordFixed(const BSQRecord* src)
+    inline static BSQRecordFixed<k> unboxRecordFixed(const BSQRecord* src)
     {
         BSQTupleFixed<k> res;
         res.size = src->entries.size();
@@ -556,7 +558,7 @@ public:
     }
 
     template <uint16_t k, uint16_t j>
-    inline BSQTupleFixed<k> projectRecordDownFixed(const BSQTupleFixed<j>& src)
+    inline static BSQTupleFixed<k> projectRecordDownFixed(const BSQTupleFixed<j>& src)
     {
         static_assert(k < j);
 
@@ -570,7 +572,7 @@ public:
     }
 
     template <uint16_t k, uint16_t j>
-    inline BSQTupleFixed<k> projectRecordUpFixed(const BSQTupleFixed<j>& src)
+    inline static BSQTupleFixed<k> projectRecordUpFixed(const BSQTupleFixed<j>& src)
     {
         static_assert(k > j);
 
@@ -584,7 +586,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQRecord boxRecordKnown(const BSQRecordKnown<k>& src, const MIRPropertyEnum(&properties)[k])
+    inline static BSQRecord* boxRecordKnown(const BSQRecordKnown<k>& src, const MIRPropertyEnum(&properties)[k])
     {
         std::vector<std::pair<MIRPropertyEnum, Value>> rvals(k, std::make_pair(MIRPropertyEnum::Invalid, nullptr));
         for(uint16_t i = 0; i < k; ++i)
@@ -595,7 +597,7 @@ public:
     }
 
     template<uint16_t k>
-    inline BSQRecordKnown<k> unboxRecordKnown(const BSQRecord* src)
+    inline static BSQRecordKnown<k> unboxRecordKnown(const BSQRecord* src)
     {
         BSQRecordKnown<k> res;
         for(uint16_t i = 0; i < k; ++i)
@@ -606,7 +608,7 @@ public:
     }
 
     template<uint16_t k, uint16_t j>
-    inline BSQRecordFixed<k> convertRecordKnownToFixed(const BSQRecordKnown<j>& src, const MIRPropertyEnum(&properties)[j])
+    inline static BSQRecordFixed<k> convertRecordKnownToFixed(const BSQRecordKnown<j>& src, const MIRPropertyEnum(&properties)[j])
     {
         static_assert(k >= j);
 
@@ -620,7 +622,7 @@ public:
     }
 
     template<uint16_t k, uint16_t j>
-    inline BSQRecordKnown<k> convertRecordFixedToKnown(const BSQRecordFixed<j> src)
+    inline static BSQRecordKnown<k> convertRecordFixedToKnown(const BSQRecordFixed<j> src)
     {
         static_assert(k <= j);
 

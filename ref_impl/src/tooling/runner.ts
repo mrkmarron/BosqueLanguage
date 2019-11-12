@@ -71,9 +71,15 @@ if (Commander.verify !== undefined) {
     setImmediate(() => {
         const smt_runtime = Path.join(__dirname, "bmc/runtime/smtruntime.smt2");
 
-        const sparams = SMTEmitter.emit(massembly);
+        const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
+        if (entrypoint.params.length !== 0) {
+            process.stderr.write("Entrypoint args are not currently supported!!!\n");
+            process.exit(1);
+        }
+
+        const sparams = SMTEmitter.emit(massembly, entrypoint);
         const lsrc = FS.readFileSync(smt_runtime).toString();
-        const gensrc = lsrc
+        const contents = lsrc
             .replace(";;FIXED_TUPLE_DECLS_FWD;;", "  " + sparams.fixedtupledecls_fwd)
             .replace(";;FIXED_RECORD_DECLS_FWD;;", "  " + sparams.fixedrecorddecls_fwd)
             .replace(";;FIXED_TUPLE_DECLS;;", "  " + sparams.fixedtupledecls)
@@ -82,19 +88,9 @@ if (Commander.verify !== undefined) {
             .replace(";;NOMINAL_DECLS;;", "  " + sparams.typedecls)
             .replace(";;NOMINAL_RESULT_FWD;;", "  " + sparams.resultdecls_fwd)
             .replace(";;NOMINAL_RESULT;;", "  " + sparams.resultdecls)
-            .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls);
-
-        const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
-        let contents = gensrc;
-        if (entrypoint.params.length !== 0) {
-            process.stderr.write("Entrypoint args are not currently supported!!!\n");
-            process.exit(1);
-        }
-
-        const chkinfo = SMTEmitter.emitEntrypointCall(massembly, entrypoint);
-        contents = contents
-            .replace(";;ARG_VALUES;;", chkinfo.arginfo)
-            .replace(";;INVOKE_ACTION;;", chkinfo.callinfo)
+            .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls)
+            .replace(";;ARG_VALUES;;", sparams.args_info)
+            .replace(";;INVOKE_ACTION;;", sparams.main_info)
             .replace(";;GET_MODEL;;", "(get-model)");
 
         const outfile = Path.join("c:\\Users\\marron\\Desktop\\smt_scratch\\", "scratch.smt2");
@@ -113,9 +109,9 @@ else {
                 .replace("//%%NOMINAL_TYPE_ENUM_DECLARE", "    " + cparams.nominalenums)
                 .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
                 .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
-                .replace("//%%FIXED_RECORD_PROPERTY_LIST_ENUM_DECLARE", "    " + cparams.fixedrecord_property_lists)
                 .replace("//%%PROPERTY_ENUM_DECLARE", "    " + cparams.propertyenums)
                 .replace("//%%PROPERTY_NAMES", "  " + cparams.propertynames)
+                .replace("//%%KNOWN_PROPERTY_LIST_DECLARE", "    " + cparams.known_property_lists_declare)
                 .replace("//%%VFIELD_DECLS", "    " + cparams.vfield_decls)
                 .replace("//%%VMETHOD_DECLS", "  " + cparams.vmethod_decls);
 

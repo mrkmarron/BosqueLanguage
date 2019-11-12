@@ -101,7 +101,7 @@ function sccVisit(cn: CallGNode, scc: Set<MIRBodyKey>, marked: Set<MIRBodyKey>, 
 
     scc.add(cn.invoke);
     marked.add(cn.invoke);
-    cn.callers.forEach((pred) => sccVisit(invokes.get(pred) as CallGNode, scc, marked, invokes));
+    cn.callees.forEach((pred) => sccVisit(invokes.get(pred) as CallGNode, scc, marked, invokes));
 }
 
 function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRBodyKey, CallGNode>) {
