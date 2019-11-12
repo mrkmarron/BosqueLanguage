@@ -293,7 +293,7 @@ class Interpreter {
                     tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(v), false));
                     tvalues.push(v);
                 }
-                fscope.assignTmpReg(tc.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
+                fscope.assignTmpReg(tc.trgt.regID, new TupleValue(MIRTupleType.create(tentries), tvalues));
                 break;
             }
             case MIROpTag.MIRConstructorRecord: {
@@ -306,7 +306,7 @@ class Interpreter {
                     tentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(v), false));
                     tvalues.push([f, v]);
                 }
-                fscope.assignTmpReg(tc.trgt.regID, new RecordValue(MIRRecordType.create(false, tentries), tvalues));
+                fscope.assignTmpReg(tc.trgt.regID, new RecordValue(MIRRecordType.create(tentries), tvalues));
                 break;
             }
             case MIROpTag.MIRAccessFromIndex: {
@@ -323,7 +323,7 @@ class Interpreter {
                     tentries.push(new MIRTupleTypeEntry(ValueOps.getValueType(arg.values[pi.indecies[i]]), false));
                     tvalues.push(arg.values[pi.indecies[i]]);
                 }
-                fscope.assignTmpReg(pi.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
+                fscope.assignTmpReg(pi.trgt.regID, new TupleValue(MIRTupleType.create(tentries), tvalues));
                 break;
             }
             case MIROpTag.MIRAccessFromProperty: {
@@ -343,7 +343,7 @@ class Interpreter {
                     rentries.push(new MIRRecordTypeEntry(pi.properties[i], ValueOps.getValueType(pidx !== -1 ? arg.values[pidx][1] : undefined), false));
                     rvalues.push(pidx !== -1 ? arg.values[pidx] : [pi.properties[i], undefined]);
                 }
-                fscope.assignTmpReg(pi.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
+                fscope.assignTmpReg(pi.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRAccessFromField: {
@@ -362,46 +362,36 @@ class Interpreter {
                     rentries.push(new MIRRecordTypeEntry(pf.fields[i], ValueOps.getValueType(fidx !== -1 ? arg.fields[fidx][1] : undefined), false));
                     rvalues.push(fidx !== -1 ? arg.fields[fidx] : [pf.fields[i], undefined]);
                 }
-                fscope.assignTmpReg(pf.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
+                fscope.assignTmpReg(pf.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 const pt = op as MIRProjectFromTypeTuple;
                 const projectType = (this.m_env.assembly.typeMap.get(pt.ptype) as MIRType).options[0] as MIRTupleType;
                 const arg = this.getArgValue(fscope, pt.arg) as TupleValue;
-                if (projectType.isOpen) {
-                    fscope.assignTmpReg(pt.trgt.regID, new TupleValue(arg.ttype, [...arg.values]));
+                let tentries: MIRTupleTypeEntry[] = [];
+                let tvalues: Value[] = [];
+                for (let i = 0; i < projectType.entries.length && i < arg.values.length; ++i) {
+                    tentries.push(arg.ttype.entries[i]);
+                    tvalues.push(arg.values[i]);
                 }
-                else {
-                    let tentries: MIRTupleTypeEntry[] = [];
-                    let tvalues: Value[] = [];
-                    for (let i = 0; i < projectType.entries.length && i < arg.values.length; ++i) {
-                        tentries.push(arg.ttype.entries[i]);
-                        tvalues.push(arg.values[i]);
-                    }
-                    fscope.assignTmpReg(pt.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
-                }
+                fscope.assignTmpReg(pt.trgt.regID, new TupleValue(MIRTupleType.create(tentries), tvalues));
                 break;
             }
             case MIROpTag.MIRProjectFromTypeRecord: {
                 const pr = op as MIRProjectFromTypeRecord;
                 const projectType = (this.m_env.assembly.typeMap.get(pr.ptype) as MIRType).options[0] as MIRRecordType;
                 const arg = this.getArgValue(fscope, pr.arg) as RecordValue;
-                if (projectType.isOpen) {
-                    fscope.assignTmpReg(pr.trgt.regID, new RecordValue(arg.rtype, [...arg.values]));
-                }
-                else {
-                    let rentries: MIRRecordTypeEntry[] = [];
-                    let rvalues: [string, Value][] = [];
-                    for (let i = 0; i < projectType.entries.length; ++i) {
-                        const ridx = arg.values.findIndex((rv) => rv[0] === projectType.entries[i].name);
-                        if (ridx !== -1) {
-                            rentries.push(arg.rtype.entries[ridx]);
-                            rvalues.push(arg.values[ridx]);
-                        }
+                let rentries: MIRRecordTypeEntry[] = [];
+                let rvalues: [string, Value][] = [];
+                for (let i = 0; i < projectType.entries.length; ++i) {
+                    const ridx = arg.values.findIndex((rv) => rv[0] === projectType.entries[i].name);
+                    if (ridx !== -1) {
+                        rentries.push(arg.rtype.entries[ridx]);
+                        rvalues.push(arg.values[ridx]);
                     }
-                    fscope.assignTmpReg(pr.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
                 }
+                fscope.assignTmpReg(pr.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRProjectFromTypeConcept: {
@@ -417,7 +407,7 @@ class Interpreter {
                     rentries.push(new MIRRecordTypeEntry(f, ValueOps.getValueType(pv), false));
                     rvalues.push([f, pv]);
                 });
-                fscope.assignTmpReg(pc.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
+                fscope.assignTmpReg(pc.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRModifyWithIndecies: {
@@ -438,7 +428,7 @@ class Interpreter {
                     tentries[update[0]] = new MIRTupleTypeEntry(ValueOps.getValueType(uarg), false);
                     tvalues[update[0]] = uarg;
                 }
-                fscope.assignTmpReg(mi.trgt.regID, new TupleValue(MIRTupleType.create(false, tentries), tvalues));
+                fscope.assignTmpReg(mi.trgt.regID, new TupleValue(MIRTupleType.create(tentries), tvalues));
                 break;
             }
             case MIROpTag.MIRModifyWithProperties: {
@@ -461,7 +451,7 @@ class Interpreter {
                 }
                 rentries.sort((a, b) => a.name.localeCompare(b.name));
                 rvalues.sort((a, b) => a[0].localeCompare(b[0]));
-                fscope.assignTmpReg(mp.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
+                fscope.assignTmpReg(mp.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRModifyWithFields: {
@@ -483,7 +473,7 @@ class Interpreter {
                 const st = op as MIRStructuredExtendTuple;
                 const arg = this.getArgValue(fscope, st.arg) as TupleValue;
                 const ext = this.getArgValue(fscope, st.update) as TupleValue;
-                const ntuple = new TupleValue(MIRTupleType.create(false, [...arg.ttype.entries, ...ext.ttype.entries]), [...arg.values, ...ext.values]);
+                const ntuple = new TupleValue(MIRTupleType.create([...arg.ttype.entries, ...ext.ttype.entries]), [...arg.values, ...ext.values]);
                 fscope.assignTmpReg(st.trgt.regID, ntuple);
                 break;
             }
@@ -507,7 +497,7 @@ class Interpreter {
                 }
                 rentries.sort((a, b) => a.name.localeCompare(b.name));
                 rvalues.sort((a, b) => a[0].localeCompare(b[0]));
-                fscope.assignTmpReg(sr.trgt.regID, new RecordValue(MIRRecordType.create(false, rentries), rvalues));
+                fscope.assignTmpReg(sr.trgt.regID, new RecordValue(MIRRecordType.create(rentries), rvalues));
                 break;
             }
             case MIROpTag.MIRStructuredExtendObject: {

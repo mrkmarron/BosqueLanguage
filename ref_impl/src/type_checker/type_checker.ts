@@ -255,10 +255,10 @@ class TypeChecker {
             return true;
         }
 
-        const bothRecord = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialRecordConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialRecordConceptType()));
+        const bothRecord = (lhs.options[0] instanceof ResolvedRecordAtomType) && (rhs.options[0] instanceof ResolvedRecordAtomType);
         if (bothRecord) {
-            const rec1 = this.m_assembly.normalizeToRecordRepresentation(lhs.options[0]);
-            const rec2 = this.m_assembly.normalizeToRecordRepresentation(rhs.options[0]);
+            const rec1 = lhs.options[0] as ResolvedRecordAtomType;
+            const rec2 = rhs.options[0] as ResolvedRecordAtomType;
 
             let allprops = new Set<string>();
             rec1.entries.forEach((e) => allprops.add(e.name));
@@ -278,19 +278,24 @@ class TypeChecker {
                 }
                 else {
                     if (t1 !== undefined && t2 === undefined) {
-                        if (!t1.isOptional && !rec2.isOpen) {
+                        if (!t1.isOptional) {
                             return false;
                         }
                     }
 
                     if (t1 === undefined && t2 !== undefined) {
-                        if (!rec1.isOpen && !t2.isOptional) {
+                        if (!t2.isOptional) {
                             return false;
                         }
                     }
                 }
             }
 
+            return true;
+        }
+
+        const bothRecordConcept = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialRecordConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialRecordConceptType()));
+        if (bothRecordConcept) {
             return true;
         }
 
@@ -313,7 +318,11 @@ class TypeChecker {
 
     private getInfoForLoadFromIndex(rtype: ResolvedType, idx: number): ResolvedType {
         const options = rtype.options.map((atom) => {
-            const tatom = this.m_assembly.normalizeToTupleRepresentation(atom);
+            if (atom instanceof ResolvedEntityAtomType) {
+                return this.m_assembly.getSpecialAnyType();
+            }
+
+            const tatom = atom as ResolvedTupleAtomType;
             if (idx < tatom.types.length) {
                 if (!tatom.types[idx].isOptional) {
                     return tatom.types[idx].type;
@@ -321,9 +330,6 @@ class TypeChecker {
                 else {
                     return this.m_assembly.typeUnion([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
                 }
-            }
-            else if (tatom.isOpen) {
-                return this.m_assembly.getSpecialAnyType();
             }
             else {
                 return this.m_assembly.getSpecialNoneType();
@@ -335,7 +341,11 @@ class TypeChecker {
 
     private getInfoForLoadFromPropertyName(rtype: ResolvedType, pname: string): ResolvedType {
         const options = rtype.options.map((atom) => {
-            const ratom = this.m_assembly.normalizeToRecordRepresentation(atom);
+            if (atom instanceof ResolvedEntityAtomType) {
+                return this.m_assembly.getSpecialAnyType();
+            }
+
+            const ratom = atom as ResolvedRecordAtomType;
             const tidx = ratom.entries.findIndex((re) => re.name === pname);
             if (tidx !== -1) {
                 if (!ratom.entries[tidx].isOptional) {
@@ -344,9 +354,6 @@ class TypeChecker {
                 else {
                     return this.m_assembly.typeUnion([ratom.entries[tidx].type, this.m_assembly.getSpecialNoneType()]);
                 }
-            }
-            else if (ratom.isOpen) {
-                return this.m_assembly.getSpecialAnyType();
             }
             else {
                 return this.m_assembly.getSpecialNoneType();
@@ -357,7 +364,8 @@ class TypeChecker {
     }
 
     private projectTupleAtom(sinfo: SourceInfo, opt: ResolvedAtomType, ptype: ResolvedTupleAtomType): ResolvedType {
-        const tuple = this.m_assembly.normalizeToTupleRepresentation(opt);
+        this.raiseErrorIf(sinfo, !(opt instanceof ResolvedTupleAtomType), "Cannot project over 'Tuple' type");
+        const tuple = opt as ResolvedTupleAtomType;
 
         let tentries: ResolvedTupleAtomTypeEntry[] = [];
         for (let i = 0; i < ptype.types.length; ++i) {
@@ -372,25 +380,15 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(tuple.types[i].type, ptype.types[i].type), "Type mismatch in projection");
                     tentries.push(new ResolvedTupleAtomTypeEntry(tuple.types[i].type, tuple.types[i].isOptional));
                 }
-                else {
-                    if (tuple.isOpen) {
-                        tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.getSpecialAnyType(), true));
-                    }
-                }
             }
         }
 
-        if (ptype.isOpen) {
-            for (let i = ptype.types.length; i < tuple.types.length; ++i) {
-                tentries.push(tuple.types[i]);
-            }
-        }
-
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(ptype.isOpen && tuple.isOpen, tentries));
+        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
     }
 
     private projectRecordAtom(sinfo: SourceInfo, opt: ResolvedAtomType, ptype: ResolvedRecordAtomType): ResolvedType {
-        const record = this.m_assembly.normalizeToRecordRepresentation(opt);
+        this.raiseErrorIf(sinfo, !(opt instanceof ResolvedRecordAtomType), "Cannot project over 'Record' type");
+        const record = opt as ResolvedRecordAtomType;
 
         let rentries: ResolvedRecordAtomTypeEntry[] = [];
         for (let i = 0; i < ptype.entries.length; ++i) {
@@ -406,24 +404,10 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(riter.type, ptype.entries[i].type), "Type mismatch in projection");
                     rentries.push(new ResolvedRecordAtomTypeEntry(ptype.entries[i].name, riter.type, riter.isOptional));
                 }
-                else {
-                    if (record.isOpen) {
-                        rentries.push(new ResolvedRecordAtomTypeEntry(ptype.entries[i].name, this.m_assembly.getSpecialAnyType(), true));
-                    }
-                }
             }
         }
 
-        if (ptype.isOpen) {
-            for (let i = 0; i < record.entries.length; ++i) {
-                const idx = ptype.entries.findIndex((e) => e.name === record.entries[i].name);
-                if (idx === -1) {
-                    rentries.push(record.entries[i]);
-                }
-            }
-        }
-
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(ptype.isOpen && record.isOpen, rentries));
+        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
     }
 
     private projectOOTypeAtom(sinfo: SourceInfo, opt: ResolvedType, ptype: ResolvedConceptAtomType): ResolvedType[] {
@@ -449,14 +433,15 @@ class TypeChecker {
                 return new ResolvedRecordAtomTypeEntry(f, ftype, false);
             });
 
-            return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, oentries));
+            return ResolvedType.createSingle(ResolvedRecordAtomType.create(oentries));
         });
 
         return rentries;
     }
 
     private updateTupleIndeciesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [number, ResolvedType][]): ResolvedType {
-        const tuple = this.m_assembly.normalizeToTupleRepresentation(t);
+        this.raiseErrorIf(sinfo, !(t instanceof ResolvedTupleAtomType), "Cannot update on 'Tuple' type");
+        const tuple = t as ResolvedTupleAtomType;
 
         let tentries: ResolvedTupleAtomTypeEntry[] = [];
         for (let i = 0; i < updates.length; ++i) {
@@ -475,18 +460,19 @@ class TypeChecker {
                         }
                     }
                     else {
-                        tentries.push(new ResolvedTupleAtomTypeEntry(tuple.isOpen ? this.m_assembly.getSpecialAnyType() : this.m_assembly.getSpecialNoneType(), false));
+                        tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.getSpecialNoneType(), false));
                     }
                 }
             }
             tentries[update[0]] = new ResolvedTupleAtomTypeEntry(update[1], false);
         }
 
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tuple.isOpen, tentries));
+        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
     }
 
     private updateNamedPropertiesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [string, ResolvedType][]): ResolvedType {
-        const record = this.m_assembly.normalizeToRecordRepresentation(t);
+        this.raiseErrorIf(sinfo, !(t instanceof ResolvedRecordAtomType), "Cannot update on 'Record' type");
+        const record = t as ResolvedRecordAtomType;
 
         let rentries: ResolvedRecordAtomTypeEntry[] = [...record.entries];
         for (let i = 0; i < updates.length; ++i) {
@@ -495,7 +481,7 @@ class TypeChecker {
             rentries[idx !== -1 ? idx : rentries.length] = new ResolvedRecordAtomTypeEntry(update[0], update[1], false);
         }
 
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(record.isOpen, rentries));
+        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
     }
 
     private updateNamedFieldsAtom(sinfo: SourceInfo, t: ResolvedType, updates: [string, ResolvedType][]) {
@@ -506,13 +492,11 @@ class TypeChecker {
     }
 
     private appendIntoTupleAtom(sinfo: SourceInfo, t: ResolvedTupleAtomType, merge: ResolvedAtomType): ResolvedType {
-        const tuple = this.m_assembly.normalizeToTupleRepresentation(merge);
+        this.raiseErrorIf(sinfo, !(t instanceof ResolvedTupleAtomType), "Cannot append on 'Tuple' type");
+        const tuple = t as ResolvedTupleAtomType;
 
         let tentries: ResolvedTupleAtomTypeEntry[] = [];
-        if (t.isOpen || tuple.isOpen) {
-            this.raiseError(sinfo, "Cannot merge open tuples");
-        }
-        else if (t.types.some((entry) => entry.isOptional)) {
+        if (t.types.some((entry) => entry.isOptional)) {
             this.raiseError(sinfo, "Appending to tuple with optional entries creates ambigious result tuple");
         }
         else if (t.types.length === 0 || tuple.types.length === 0) {
@@ -523,44 +507,38 @@ class TypeChecker {
             tentries = [...t.types, ...tuple.types];
         }
 
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(false, tentries));
+        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
     }
 
     private mergeIntoRecordAtom(sinfo: SourceInfo, t: ResolvedRecordAtomType, merge: ResolvedAtomType): ResolvedType {
-        const record = this.m_assembly.normalizeToRecordRepresentation(merge);
+        this.raiseErrorIf(sinfo, !(t instanceof ResolvedRecordAtomType), "Cannot merge with 'Record' type");
+        const record = t as ResolvedRecordAtomType;
 
-        let rentries: ResolvedRecordAtomTypeEntry[] = [];
-        if (t.isOpen || record.isOpen) {
-            this.raiseError(sinfo, "Cannot merge open records");
-        }
-        else {
-            rentries = [...t.entries];
+        let rentries: ResolvedRecordAtomTypeEntry[] = [...t.entries];
+        for (let i = 0; i < record.entries.length; ++i) {
+            const update = record.entries[i];
+            const fidx = rentries.findIndex((e) => e.name === update.name);
+            const idx = fidx !== -1 ? fidx : rentries.length;
 
-            for (let i = 0; i < record.entries.length; ++i) {
-                const update = record.entries[i];
-                const fidx = rentries.findIndex((e) => e.name === update.name);
-                const idx = fidx !== -1 ? fidx : rentries.length;
-
-                if (!update.isOptional) {
-                    rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, update.type, false);
+            if (!update.isOptional) {
+                rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, update.type, false);
+            }
+            else {
+                if (idx === rentries.length) {
+                    rentries[idx] = update;
                 }
                 else {
-                    if (idx === rentries.length) {
-                        rentries[idx] = update;
-                    }
-                    else {
-                        rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, this.m_assembly.typeUnion([update.type, rentries[idx].type]), true);
-                    }
+                    rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, this.m_assembly.typeUnion([update.type, rentries[idx].type]), true);
                 }
             }
         }
 
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, rentries));
+        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
     }
 
     private mergeIntoEntityConceptAtom(sinfo: SourceInfo, t: ResolvedType, merge: ResolvedAtomType) {
-        const record = this.m_assembly.normalizeToRecordRepresentation(merge);
-        this.raiseErrorIf(sinfo, record.isOpen, "Cannot update a Concept/Entity with a open record of values");
+        this.raiseErrorIf(sinfo, !(merge instanceof ResolvedRecordAtomType), "Cannot merge with 'Record' type");
+        const record = merge as ResolvedRecordAtomType;
 
         record.entries.forEach((entry) => {
             const finfo = this.m_assembly.tryGetOOMemberDeclOptions(t, "field", entry.name);
@@ -568,18 +546,22 @@ class TypeChecker {
         });
     }
 
-    private checkTypeOkForTupleExpando(rtype: ResolvedType): [boolean, number, number] {
-        const tslist = rtype.options.map((opt) => this.m_assembly.ensureTupleStructuralRepresentation(opt));
+    private checkTypeOkForTupleExpando(sinfo: SourceInfo, rtype: ResolvedType): [number, number] {
+        const tslist = rtype.options.map((opt) => {
+            this.raiseErrorIf(sinfo, !(opt instanceof ResolvedTupleAtomType), "Cannot expando on 'Tuple' type argument");
+            return opt as ResolvedTupleAtomType;
+        });
         const reqlen = tslist.reduce((acc, v) => Math.min(acc, v.types.filter((te) => !te.isOptional).length), Number.MAX_SAFE_INTEGER);
         const tlen = tslist.reduce((acc, v) => Math.max(acc, v.types.length), 0);
 
-        const ok = tslist.every((topt) => !topt.isOpen);
-
-        return [ok, reqlen, tlen];
+        return [reqlen, tlen];
     }
 
-    private checkTypeOkForRecordExpando(rtype: ResolvedType): [boolean, Set<string>, Set<string>] {
-        const rslist = rtype.options.map((opt) => this.m_assembly.ensureRecordStructuralRepresentation(opt));
+    private checkTypeOkForRecordExpando(sinfo: SourceInfo, rtype: ResolvedType): [Set<string>, Set<string>] {
+        const rslist = rtype.options.map((opt) => {
+            this.raiseErrorIf(sinfo, !(opt instanceof ResolvedRecordAtomType), "Cannot expando on 'Record' type argument");
+            return opt as ResolvedRecordAtomType;
+        });
 
         let allNames = new Set<string>();
         rslist.forEach((opt) => {
@@ -597,9 +579,7 @@ class TypeChecker {
             });
         });
 
-        const ok = rslist.every((opt) => !opt.isOpen);
-
-        return [ok, reqNames, allNames];
+        return [reqNames, allNames];
     }
 
     private checkPCodeExpression(env: TypeEnvironment, exp: ConstructorPCodeExpression, expectedFunction?: ResolvedFunctionType): PCode {
@@ -745,7 +725,7 @@ class TypeChecker {
             targs.push(args[i].argtype as ResolvedType);
         }
 
-        const tupleatom = ResolvedTupleAtomType.create(false, targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
+        const tupleatom = ResolvedTupleAtomType.create(targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
         const rtuple = ResolvedType.createSingle(tupleatom);
 
         if (this.m_emitEnabled) {
@@ -772,7 +752,7 @@ class TypeChecker {
         }
 
         const rentries = rargs.map((targ) => new ResolvedRecordAtomTypeEntry(targ[0], targ[1], false));
-        const recordatom = ResolvedRecordAtomType.create(false, rentries);
+        const recordatom = ResolvedRecordAtomType.create(rentries);
         const rrecord = ResolvedType.createSingle(recordatom);
 
         if (this.m_emitEnabled) {
@@ -805,7 +785,7 @@ class TypeChecker {
                     else {
                         const ktype = oatom.binds.get("K") as ResolvedType;
                         const vtype = oatom.binds.get("V") as ResolvedType;
-                        const tupleType = ResolvedType.createSingle(ResolvedTupleAtomType.create(false, [new ResolvedTupleAtomTypeEntry(ktype, false), new ResolvedTupleAtomTypeEntry(vtype, false)]));
+                        const tupleType = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(ktype, false), new ResolvedTupleAtomTypeEntry(vtype, false)]));
                         this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(tupleType, ctype), "Container contents not of suitable subtype");
                     }
                 });
@@ -858,10 +838,10 @@ class TypeChecker {
                 filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, trgt: arg.treg };
             }
             else if (arg.expando && this.m_assembly.subtypeOf(arg.argtype as ResolvedType, this.m_assembly.getSpecialRecordConceptType())) {
-                const expandInfo = this.checkTypeOkForRecordExpando(arg.argtype as ResolvedType);
+                const expandInfo = this.checkTypeOkForRecordExpando(sinfo, arg.argtype as ResolvedType);
                 this.raiseErrorIf(sinfo, !expandInfo[0], `Type cannot be expanded as part of Entity constructor ${arg.argtype.idStr}`);
 
-                expandInfo[2].forEach((pname) => {
+                expandInfo[1].forEach((pname) => {
                     const fidx = fields.indexOf(pname);
                     this.raiseErrorIf(sinfo, fidx === -1, `Entity ${oftype.idStr} does not have field named "${pname}"`);
                     this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${pname}"`);
@@ -926,10 +906,10 @@ class TypeChecker {
                 filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
             }
             else if (arg.expando && this.m_assembly.subtypeOf(arg.argtype as ResolvedType, this.m_assembly.getSpecialRecordConceptType())) {
-                const expandInfo = this.checkTypeOkForRecordExpando(arg.argtype as ResolvedType);
+                const expandInfo = this.checkTypeOkForRecordExpando(sinfo, arg.argtype as ResolvedType);
                 this.raiseErrorIf(sinfo, !expandInfo[0], "Type cannot be expanded as part of call");
 
-                expandInfo[2].forEach((pname) => {
+                expandInfo[1].forEach((pname) => {
                     const fidx = sig.params.findIndex((param) => param.name === pname);
                     this.raiseErrorIf(sinfo, fidx === -1, `Call does not have parameter named "${pname}"`);
                     this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${pname}"`);
@@ -972,11 +952,9 @@ class TypeChecker {
             }
             else {
                 this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg.argtype as ResolvedType, this.m_assembly.getSpecialTupleConceptType()), "Only Tuple types can be expanded as positional arguments");
+                const expandInfo = this.checkTypeOkForTupleExpando(sinfo, arg.argtype as ResolvedType);
 
-                const expandInfo = this.checkTypeOkForTupleExpando(arg.argtype as ResolvedType);
-                this.raiseErrorIf(sinfo, !expandInfo[0], "Type cannot be expanded as part of call");
-
-                for (let ectr = 0; ectr < expandInfo[2]; ++ectr) {
+                for (let ectr = 0; ectr < expandInfo[1]; ++ectr) {
                     this.raiseErrorIf(sinfo, ii >= sig.params.length, "Too many arguments as part of tuple expando and/or cannot split tuple expando (between arguments and rest)");
                     this.raiseErrorIf(sinfo, !sig.params[ii].isOptional && ectr >= expandInfo[1], `Call requires "${sig.params[ii].name}" but it is provided as an optional argument as part of tuple expando`);
 
@@ -1072,7 +1050,7 @@ class TypeChecker {
                 this.checkArgumentsCollectionConstructor(sinfo, oftype, oobinds.get("T") as ResolvedType, rargs, rtreg);
             }
             else {
-                const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create(false, [new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
+                const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
                 this.checkArgumentsCollectionConstructor(sinfo, oftype, contentstype, rargs, rtreg);
             }
 
@@ -1117,7 +1095,7 @@ class TypeChecker {
                 ...env.refparams.map((rn) => new ResolvedTupleAtomTypeEntry((env.lookupVar(rn) as VarInfo).declaredType, false))
             ];
 
-            return this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedTupleAtomType.create(false, entries))).trkey;
+            return this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedTupleAtomType.create(entries))).trkey;
         }
     }
 
@@ -1305,7 +1283,7 @@ class TypeChecker {
                 this.m_emitter.registerStaticCall(oodecl, oodecl.staticFunctions.get("_cons") as StaticFunctionDecl, "_cons", oobinds, [], []);
             }
 
-            const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create(false, [new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
+            const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
             return [env.setExpressionResult(this.m_assembly, this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, contentstype, eargs, trgt))];
         }
         else {
@@ -1466,7 +1444,7 @@ class TypeChecker {
 
         const resultOptions = texp.options.map((opt) => {
             let ttypes = op.indecies.map((idx) => new ResolvedTupleAtomTypeEntry(this.getInfoForLoadFromIndex(ResolvedType.createSingle(opt), idx), false));
-            return ResolvedType.createSingle(ResolvedTupleAtomType.create(false, ttypes));
+            return ResolvedType.createSingle(ResolvedTupleAtomType.create(ttypes));
         });
         const restype = this.m_assembly.typeUnion(resultOptions);
 
@@ -1511,7 +1489,7 @@ class TypeChecker {
             const resultOptions = texp.options.map((opt) => {
                 let ttypes = op.names.map((name) => new ResolvedRecordAtomTypeEntry(name, this.getInfoForLoadFromPropertyName(ResolvedType.createSingle(opt), name), false));
 
-                return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, ttypes));
+                return ResolvedType.createSingle(ResolvedRecordAtomType.create(ttypes));
             });
             const restype = this.m_assembly.typeUnion(resultOptions);
 
@@ -1534,7 +1512,7 @@ class TypeChecker {
                     return new ResolvedRecordAtomTypeEntry(f, ftype, false);
                 });
 
-                return ResolvedType.createSingle(ResolvedRecordAtomType.create(false, oentries));
+                return ResolvedType.createSingle(ResolvedRecordAtomType.create(oentries));
             });
             const restype = this.m_assembly.typeUnion(resultOptions);
 
@@ -2693,7 +2671,10 @@ class TypeChecker {
         else if (assign instanceof TupleStructuredAssignment) {
             this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
             this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(expt, this.m_assembly.getSpecialTupleConceptType()), "Assign value is not subtype of declared variable type");
-            const tuptype = ResolvedType.create(expt.options.map((opt) => this.m_assembly.ensureTupleStructuralRepresentation(opt)));
+            const tuptype = ResolvedType.create(expt.options.map((opt) => {
+                this.raiseErrorIf(sinfo, !(opt instanceof ResolvedTupleAtomType), "Cannot use 'Tuple' type in structured assignment");
+                return opt as ResolvedTupleAtomType;
+            }));
 
             for (let i = 0; i < assign.assigns.length; ++i) {
                 const aopt = tuptype.options.some((atom) => (atom as ResolvedTupleAtomType).types.length < i || (atom as ResolvedTupleAtomType).types[i].isOptional);
@@ -2701,17 +2682,17 @@ class TypeChecker {
                 this.checkStructuredAssign(sinfo, env, aopt, [...cpath, {p: i, t: ttype}], assign.assigns[i], ttype, allDeclared, allAssigned);
             }
 
-            if (!assign.isOpen) {
-                this.raiseErrorIf(sinfo, tuptype.options.some((atom) => (atom as ResolvedTupleAtomType).types.length > assign.assigns.length), "More values in tuple that assignment");
-                this.raiseErrorIf(sinfo, tuptype.options.some((atom) => (atom as ResolvedTupleAtomType).isOpen), "Tuple is open and assignemnt is not");
-            }
+            this.raiseErrorIf(sinfo, tuptype.options.some((atom) => (atom as ResolvedTupleAtomType).types.length > assign.assigns.length), "More values in tuple that assignment");
         }
         else {
             this.raiseErrorIf(sinfo, !(assign instanceof RecordStructuredAssignment), "Unknown structured assignment type");
 
             this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
             this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(expt, this.m_assembly.getSpecialRecordConceptType()), "Assign value is not subtype of declared variable type");
-            const rectype = ResolvedType.create(expt.options.map((opt) => this.m_assembly.ensureRecordStructuralRepresentation(opt)));
+            const rectype = ResolvedType.create(expt.options.map((opt) =>  {
+                this.raiseErrorIf(sinfo, !(opt instanceof ResolvedRecordAtomType), "Cannot use 'Record' type in structured assignment");
+                return opt as ResolvedRecordAtomType;
+            }));
 
             const rassign = assign as RecordStructuredAssignment;
             for (let i = 0; i < rassign.assigns.length; ++i) {
@@ -2724,15 +2705,12 @@ class TypeChecker {
                 this.checkStructuredAssign(sinfo, env, aopt, [...cpath, {p: pname, t: ttype}], rassign.assigns[i][1], ttype, allDeclared, allAssigned);
             }
 
-            if (!rassign.isOpen) {
-                this.raiseErrorIf(sinfo, rectype.options.some((atom) => {
-                    return (atom as ResolvedRecordAtomType).entries.some((re) => {
-                        const entry = rassign.assigns.find((e) => e[0] === re.name);
-                        return entry === undefined;
-                    });
-                }), "More values in record that assignment");
-                this.raiseErrorIf(sinfo, rectype.options.some((atom) => (atom as ResolvedRecordAtomType).isOpen), "Record is open and assignemnt is not");
-            }
+            this.raiseErrorIf(sinfo, rectype.options.some((atom) => {
+                return (atom as ResolvedRecordAtomType).entries.some((re) => {
+                    const entry = rassign.assigns.find((e) => e[0] === re.name);
+                    return entry === undefined;
+                });
+            }), "More values in record that assignment");
         }
     }
 
@@ -2902,7 +2880,7 @@ class TypeChecker {
             return [(vinfo as VarInfo).declaredType, assign.isOptional];
         }
         else if (assign instanceof TupleStructuredAssignment) {
-            const tupopts = expt.options.filter((opt) => opt instanceof ResolvedTupleAtomType || this.m_assembly.atomSubtypeOf(ResolvedTupleAtomType.createGenericOpen(), opt)).map((opt) => this.m_assembly.ensureTupleStructuralRepresentation(opt));
+            const tupopts = expt.options.filter((opt) => opt instanceof ResolvedTupleAtomType);
             this.raiseErrorIf(sinfo, tupopts.length === 0, "Check will always fail");
 
             const tuptype = ResolvedType.create(tupopts);
@@ -2913,12 +2891,12 @@ class TypeChecker {
                 tupcheck.push(new ResolvedTupleAtomTypeEntry(...einfo));
             }
 
-            return [ResolvedType.createSingle(ResolvedTupleAtomType.create(assign.isOpen, tupcheck)), false];
+            return [ResolvedType.createSingle(ResolvedTupleAtomType.create(tupcheck)), false];
         }
         else {
             this.raiseErrorIf(sinfo, !(assign instanceof RecordStructuredAssignment), "Unknown structured assignment type");
 
-            const recopts = expt.options.filter((opt) => opt instanceof ResolvedRecordAtomType || this.m_assembly.atomSubtypeOf(ResolvedRecordAtomType.createGenericOpen(), opt)).map((opt) => this.m_assembly.ensureRecordStructuralRepresentation(opt));
+            const recopts = expt.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
             this.raiseErrorIf(sinfo, recopts.length === 0, "Check will always fail");
 
             const rassign = assign as RecordStructuredAssignment;
@@ -2931,7 +2909,7 @@ class TypeChecker {
                 reccheck.push(new ResolvedRecordAtomTypeEntry(pname, ...einfo));
             }
 
-            return [ResolvedType.createSingle(ResolvedRecordAtomType.create(rassign.isOpen, reccheck)), false];
+            return [ResolvedType.createSingle(ResolvedRecordAtomType.create(reccheck)), false];
         }
     }
 
@@ -3529,7 +3507,7 @@ class TypeChecker {
         let resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
         if (invoke.params.some((p) => p.isRef)) {
             const pout = invoke.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(this.resolveAndEnsureTypeOnly(sinfo, p.type, binds)));
-            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            resultType = MIRType.createSingle(MIRTupleType.create([resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
         }
 
         const iscope = MIRKeyGenerator.generateBodyKey("invoke", ikey);
@@ -3610,7 +3588,7 @@ class TypeChecker {
         let resultType = this.m_emitter.registerResolvedTypeReference(fsig.resultType);
         if (fsig.params.some((p) => p.isRef)) {
             const pout = fsig.params.filter((p) => p.isRef).map((p) => this.m_emitter.registerResolvedTypeReference(p.type as ResolvedType));
-            resultType = MIRType.createSingle(MIRTupleType.create(false, [resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
+            resultType = MIRType.createSingle(MIRTupleType.create([resultType, ...pout].map((tt) => new MIRTupleTypeEntry(tt, false))));
         }
 
         const env = TypeEnvironment.createInitialEnvForCall(MIRKeyGenerator.generateBodyKey("invoke", ikey), binds, refNames, fargs, cargs);

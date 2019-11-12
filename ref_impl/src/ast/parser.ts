@@ -869,11 +869,10 @@ class Parser {
     private parseTupleType(): TypeSignature {
         const line = this.getCurrentLine();
         let entries: [TypeSignature, boolean][] = [];
-        let isOpen = false;
 
         try {
             this.setRecover(this.scanMatchingParens("[", "]"));
-            [entries, isOpen] = this.parseListOf<[TypeSignature, boolean]>("[", "]", ",", () => {
+            entries = this.parseListOf<[TypeSignature, boolean]>("[", "]", ",", () => {
                 const isopt = this.testAndConsumeTokenIf("?");
                 if (isopt) {
                     this.ensureAndConsumeToken(":");
@@ -882,7 +881,7 @@ class Parser {
                 const rtype = this.parseTypeSignature();
 
                 return [rtype, isopt];
-            }, "...");
+            })[0];
 
             const firstOpt = entries.findIndex((entry) => entry[1]);
             if (entries.slice(firstOpt).findIndex((entry) => !entry[0]) !== -1) {
@@ -890,7 +889,7 @@ class Parser {
             }
 
             this.clearRecover();
-            return new TupleTypeSignature(isOpen, entries);
+            return new TupleTypeSignature(entries);
         }
         catch (ex) {
             this.processRecover();
@@ -900,11 +899,10 @@ class Parser {
 
     private parseRecordType(): TypeSignature {
         let entries: [string, TypeSignature, boolean][] = [];
-        let isOpen = false;
 
         try {
             this.setRecover(this.scanMatchingParens("{", "}"));
-            [entries, isOpen] = this.parseListOf<[string, TypeSignature, boolean]>("{", "}", ",", () => {
+            entries = this.parseListOf<[string, TypeSignature, boolean]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
 
                 const name = this.consumeTokenAndGetValue();
@@ -913,10 +911,10 @@ class Parser {
                 const rtype = this.parseTypeSignature();
 
                 return [name, rtype, isopt];
-            }, "...");
+            })[0];
 
             this.clearRecover();
-            return new RecordTypeSignature(isOpen, entries);
+            return new RecordTypeSignature(entries);
         }
         catch (ex) {
             this.processRecover();
@@ -1714,14 +1712,14 @@ class Parser {
 
     parseStructuredAssignment(sinfo: SourceInfo, vars: "var" | "var!" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
         if (this.testToken("[")) {
-            const [assigns, isOpen] = this.parseListOf<StructuredAssignment>("[", "]", ",", () => {
+            const assigns = this.parseListOf<StructuredAssignment>("[", "]", ",", () => {
                 return this.parseStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
-            }, "...");
+            })[0];
 
-            return new TupleStructuredAssignment(assigns, isOpen);
+            return new TupleStructuredAssignment(assigns);
         }
         else if (this.testToken("{")) {
-            const [assigns, isOpen] = this.parseListOf<[string, StructuredAssignment]>("{", "}", ",", () => {
+            const assigns = this.parseListOf<[string, StructuredAssignment]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
                 const name = this.consumeTokenAndGetValue();
 
@@ -1729,9 +1727,9 @@ class Parser {
                 const subg = this.parseStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
 
                 return [name, subg];
-            }, "...");
+            })[0];
 
-            return new RecordStructuredAssignment(assigns, isOpen);
+            return new RecordStructuredAssignment(assigns);
         }
         else {
             if (this.testToken("var")) {

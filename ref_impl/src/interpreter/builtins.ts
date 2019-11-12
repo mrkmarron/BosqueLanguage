@@ -283,7 +283,7 @@ const BuiltinCalls = new Map<string, BuiltinCallSig>()
                 const values = [avals[i], avals[j]];
                 const types = values.map<MIRTupleTypeEntry>((v) => new MIRTupleTypeEntry(ValueOps.getValueType(v), false));
 
-                res.push(new TupleValue(MIRTupleType.create(false, types), values));
+                res.push(new TupleValue(MIRTupleType.create(types), values));
             }
         }
 

@@ -307,7 +307,7 @@ class BSQTupleFixed
 {
 public:
     uint16_t size;
-    Value entries[k];
+    Value entries[std::max(k, (uint16_t)1)];
 
     template <uint16_t idx>
     inline Value atFixed()
@@ -325,7 +325,7 @@ template <uint16_t k>
 class BSQTupleKnown
 {
 public:
-    Value entries[k];
+    Value entries[std::max(k, (uint16_t)1)];
 
     template <uint16_t idx>
     inline Value atFixed()
@@ -385,7 +385,7 @@ class BSQRecordFixed
 {
 public:
     uint16_t size;
-    std::pair<MIRPropertyEnum, Value> entries[k];
+    std::pair<MIRPropertyEnum, Value> entries[std::max(k, (uint16_t)1)];
 
     template <MIRPropertyEnum p>
     Value atFixed() const
@@ -419,7 +419,7 @@ template <uint16_t k>
 class BSQRecordKnown
 {
 public:
-    Value entries[k];
+    Value entries[std::max(k, (uint16_t)1)];
 
     template <uint16_t pidx>
     inline Value atIndex()

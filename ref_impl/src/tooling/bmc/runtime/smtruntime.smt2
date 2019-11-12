@@ -15,8 +15,10 @@
 
 (declare-datatypes ( 
       (BTerm 0)
+      (bsqtuple_entry 0)
       (bsqtuple_0 0)
     ;;FIXED_TUPLE_DECLS_FWD;;
+      (bsqrecord_entry 0)
       (bsqrecord_empty 0)
     ;;FIXED_RECORD_DECLS_FWD;;
     ;;NOMINAL_DECLS_FWD;;
@@ -38,18 +40,13 @@
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
+    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@value BTerm)) )
     ( (bsqtuple_0@cons) )
   ;;FIXED_TUPLE_DECLS;;
+    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@value BTerm)) )
     ( (bsqrecord_empty@cons) )
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
-))
-
-(declare-datatypes ( 
-      (bsqtuple_entry 0) (bsqrecord_entry 0)
-    ) (
-    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@value BTerm)) )
-    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@value BTerm)) )
 ))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))
