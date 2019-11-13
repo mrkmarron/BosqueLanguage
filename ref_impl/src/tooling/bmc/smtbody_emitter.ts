@@ -31,6 +31,7 @@ class SMTBodyEmitter {
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
     private tmpvarctr = 0;
+    private currentSCC = new Set<string>();
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
 
@@ -50,14 +51,14 @@ class SMTBodyEmitter {
         return `@tmpvar@${this.tmpvarctr++}`;
     }
 
-    generateErrorCreate(sinfo: SourceInfo): SMTValue {
+    generateErrorCreate(sinfo: SourceInfo, rtype: string): SMTValue {
         const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`;
         if (!this.errorCodes.has(errorinfo)) {
             this.errorCodes.set(errorinfo, this.errorCodes.size);
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
-        return new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error ${errid}))`);
+        return new SMTValue(`(result_error@${rtype} (result_error ${errid}))`);
     }
 
     getGasForOperation(key: string): number {
@@ -67,13 +68,13 @@ class SMTBodyEmitter {
         return this.bmcGas.get(key) as number;
     }
 
-    generateBMCLimitCreate(key: string): SMTValue {
+    generateBMCLimitCreate(key: string, rtype: string): SMTValue {
         if (!this.bmcCodes.has(key)) {
             this.bmcCodes.set(key, this.bmcCodes.size);
          }
         const errid = this.bmcCodes.get(key) as number;
 
-        return new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_bmc ${errid}))`);
+        return new SMTValue(`(result_error@${rtype} (result_bmc ${errid}))`);
     }
 
     varNameToSMTName(name: string): string {
@@ -249,7 +250,7 @@ class SMTBodyEmitter {
         else {
             const testexp = new SMTValue(`(${this.typegen.mangleStringForSMT("invariant::" + cp.tkey)} ${this.varToSMTName(cp.trgt)})`);
             const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
-            const errexp = new SMTValue(`((result_error@${resulttype} (result_error ${this.generateErrorCreate(cp.sinfo)}))`);
+            const errexp = this.generateErrorCreate(cp.sinfo, resulttype);
             return bindexp.bind(new SMTCond(testexp, SMTFreeVar.generate(), errexp));
         }
     }
@@ -380,13 +381,13 @@ class SMTBodyEmitter {
         const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
         const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
 
-        if (gas === undefined) {
+        if (this.currentSCC === undefined || this.currentSCC.has(ivop.mkey)) {
             const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
             return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
         }
         else {
             if (gas === 0) {
-                const invokeexp = this.generateBMCLimitCreate(ivop.mkey);
+                const invokeexp = this.generateBMCLimitCreate(ivop.mkey, ivrtype);
                 return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
             }
             else {
@@ -602,7 +603,7 @@ class SMTBodyEmitter {
                 if (bop.op === "/" || bop.op === "%") {
                     smtconds.push(`(= ${restmp} 0)`);
                 }
-                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
+                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo, this.typegen.typeToSMTCategory(this.currentRType)), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
 
                 return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
             }
@@ -686,7 +687,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRAbort: {
                 const aop = (op as MIRAbort);
-                return this.generateErrorCreate(aop.sinfo);
+                return this.generateErrorCreate(aop.sinfo, this.typegen.typeToSMTCategory(this.currentRType));
             }
             case MIROpTag.MIRDebug: {
                 return undefined;
@@ -766,16 +767,17 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, gas: number | undefined): string {
+    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>, gas: number | undefined, gasdown: number | undefined): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
+        this.currentSCC = cscc;
 
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
 
         const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
         const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.resultType));
-        const decl = `(define-fun ${this.invokenameToSMT(idecl.key)} (${args.join(" ")}) Result@${restype}`;
+        const decl = `(define-fun ${this.invokenameToSMT(idecl.key)}${gas !== undefined ? `@gas${gas}` : ""} (${args.join(" ")}) Result@${restype}`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
             this.vtypes = new Map<string, MIRType>();
@@ -784,7 +786,7 @@ class SMTBodyEmitter {
             });
 
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
-            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gas);
+            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gasdown);
 
             if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
                 return `${decl} \n${body.emit("  ")})`;
@@ -809,7 +811,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl, gas: number | undefined): string {
+    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
 
@@ -850,7 +852,7 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl, gas: number | undefined): string | undefined {
+    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {
         this.currentFile = cdecl.srcFile;
         this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
 
@@ -870,7 +872,7 @@ class SMTBodyEmitter {
         return `${decl} \n${body.emit("  ")})`;
     }
 
-    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl, gas: number | undefined): string | undefined {
+    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string | undefined {
         this.currentFile = fdecl.srcFile;
         this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
 
