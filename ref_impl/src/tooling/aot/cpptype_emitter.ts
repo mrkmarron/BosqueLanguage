@@ -137,8 +137,8 @@ class CPPTypeEmitter {
     }
 
     getKnownPropertyRecordArrayName(tt: MIRType): string {
-        const name = `{ CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).join(", ") }`;
-        return `Runtime::KnownPropertySet_${this.mangleStringForCpp(name)}`;
+        const name = `{ ${CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).join(", ")} }`;
+        return `KnownPropertySet_${this.mangleStringForCpp(name)}`;
     }
 
     static getUEntityType(tt: MIRType): MIREntityType {
@@ -325,7 +325,7 @@ class CPPTypeEmitter {
     }
 
     generateKnownRecordAccessor(ttype: MIRType, p: string): string {
-        return `.atFixed<${CPPTypeEmitter.getKnownLayoutRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
+        return `.atPropertyIndex<${CPPTypeEmitter.getKnownLayoutRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
     }
 
     generateFixedRecordAccessor(p: string): string {

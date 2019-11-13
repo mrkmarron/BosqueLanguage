@@ -315,12 +315,19 @@ class SMTBodyEmitter {
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
         const tuptype = this.getArgType(op.arg);
         if (this.typegen.isTupleType(tuptype)) {
-            const tmax = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
-            if (op.idx < tmax) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`), this.typegen.anyType, resultAccessType));
+            if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term (${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()}))`), this.typegen.anyType, resultAccessType));
             }
             else {
-                return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                const tmax = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
+                if (op.idx < tmax) {
+                    const recaccess = new SMTValue(`(${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`);
+                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqtuple_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqtuple_entry@term ${recaccess.emit()})`), new SMTValue("bsqterm_none_const"));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
+                }
+                else {
+                    return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                }
             }
         }
         else {
@@ -333,12 +340,19 @@ class SMTBodyEmitter {
     generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): SMTExp {
         const rectype = this.getArgType(op.arg);
         if (this.typegen.isRecordType(rectype)) {
-            const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(rectype);
-            if (maxset.includes(op.property)) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()})`), this.typegen.anyType, resultAccessType));
+            if (this.typegen.isKnownLayoutRecordType(rectype)) {
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term (${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()}))`), this.typegen.anyType, resultAccessType));
             }
             else {
-                return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(rectype);
+                if (maxset.includes(op.property)) {
+                    const recaccess = new SMTValue(`(${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()})`);
+                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqrecord_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqrecord_entry@term ${recaccess.emit()})`), new SMTValue("bsqterm_none_const"));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
+                }
+                else {
+                    return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                }
             }
         }
         else {
@@ -381,7 +395,7 @@ class SMTBodyEmitter {
         const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
         const normalassign = new SMTLet(this.varToSMTName(ivop.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
 
-        if (this.currentSCC === undefined || this.currentSCC.has(ivop.mkey)) {
+        if (this.currentSCC === undefined || !this.currentSCC.has(ivop.mkey)) {
             const invokeexp = new SMTValue(vals.length !== 0 ? `(${this.invokenameToSMT(ivop.mkey)} ${vals.join(" ")})` : this.invokenameToSMT(ivop.mkey));
             return new SMTLet(tv, invokeexp, new SMTCond(checkerror, extracterror, normalassign));
         }

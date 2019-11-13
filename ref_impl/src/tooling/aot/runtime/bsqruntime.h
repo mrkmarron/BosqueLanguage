@@ -21,8 +21,6 @@ class Runtime
 public:
 //%%STATIC_STRING_DECLARE%%
 
-//%%KNOWN_PROPERTY_LIST_DECLARE
-
 static const char* propertyNames[];
 
 static std::string diagnostic_format(Value v);

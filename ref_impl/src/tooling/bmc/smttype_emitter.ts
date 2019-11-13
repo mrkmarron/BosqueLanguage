@@ -64,8 +64,26 @@ class SMTTypeEmitter {
         return tt.options.every((opt) => opt instanceof MIRTupleType);
     }
 
+    isKnownLayoutTupleType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
+            return false;
+        }
+
+        const tup = tt.options[0] as MIRTupleType;
+        return !tup.entries.some((entry) => entry.isOptional);
+    }
+
     isRecordType(tt: MIRType): boolean {
         return tt.options.every((opt) => opt instanceof MIRRecordType);
+    }
+
+    isKnownLayoutRecordType(tt: MIRType): boolean {
+        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
+            return false;
+        }
+
+        const tup = tt.options[0] as MIRRecordType;
+        return !tup.entries.some((entry) => entry.isOptional);
     }
 
     isUEntityType(tt: MIRType): boolean {
@@ -105,10 +123,18 @@ class SMTTypeEmitter {
         return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
     }
 
+    static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
+        return tt.options[0] as MIRTupleType;
+    }
+
     static getRecordTypeMaxPropertySet(tt: MIRType): string[] {
         let popts = new Set<string>();
         tt.options.filter((opt) => opt instanceof MIRRecordType).forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => popts.add(entry.name)));
         return [...popts].sort();
+    }
+
+    static getKnownLayoutRecordType(tt: MIRType): MIRRecordType {
+        return tt.options[0] as MIRRecordType;
     }
 
     static getUEntityType(tt: MIRType): MIREntityType {

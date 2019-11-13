@@ -40,10 +40,10 @@
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
-    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@value BTerm)) )
+    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@term BTerm)) )
     ( (bsqtuple_0@cons) )
   ;;FIXED_TUPLE_DECLS;;
-    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@value BTerm)) )
+    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@term BTerm)) )
     ( (bsqrecord_empty@cons) )
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;

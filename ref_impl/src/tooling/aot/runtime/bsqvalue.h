@@ -43,6 +43,8 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE
 };
 
+//%%KNOWN_PROPERTY_LIST_DECLARE
+
 enum class MIRNominalTypeEnum
 {
     Invalid = 0x0,
@@ -425,9 +427,9 @@ public:
     Value entries[std::max(k, (uint16_t)1)];
 
     template <uint16_t pidx>
-    inline Value atIndex()
+    inline Value atPropertyIndex()
     {
-        return this->entries[pidx].second;
+        return this->entries[pidx];
     }
 };
 

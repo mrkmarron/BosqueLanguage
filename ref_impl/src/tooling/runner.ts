@@ -130,7 +130,7 @@ else {
             + cparams.funcdecls
             + "}\n\n"
             + "\n\n/*main decl*/\n"
-            + `int main(int argc, char* argv) { try { return BSQ::${cparams.entryname}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
+            + `int main(int argc, char** argv) { try { return BSQ::${cparams.entryname}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {
