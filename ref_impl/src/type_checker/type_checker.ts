@@ -206,7 +206,7 @@ class TypeChecker {
             return true;
         }
 
-        const bothStringOf = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringOfType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringOfType()));
+        const bothStringOf = (lhs.idStr.startsWith("NSCore::StringOf<") && rhs.idStr.startsWith("NSCore::StringOf<"));
         if (bothStringOf) {
             return this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
         }
@@ -310,7 +310,7 @@ class TypeChecker {
             return true;
         }
 
-        const bothStringOf = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringOfType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringOfType()));
+        const bothStringOf = (lhs.idStr.startsWith("NSCore::StringOf<") && rhs.idStr.startsWith("NSCore::StringOf<"));
         const orderok = this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
 
         return bothStringOf && orderok;

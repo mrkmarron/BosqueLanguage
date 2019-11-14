@@ -237,7 +237,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "List" || this.name === "HashSet";
+        return this.name === "List" || this.name === "Set";
     }
 
     isTypeAMapEntity(): boolean {
@@ -245,7 +245,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "HashMap";
+        return this.name === "Map";
     }
 
     static attributeSetContains(attr: string, attrSet: string[]): boolean {
@@ -699,7 +699,6 @@ class Assembly {
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
     getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
-    getSpecialStringOfType(): ResolvedType { return this.internSpecialObjectType("StringOf"); }
     getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }

@@ -71,8 +71,175 @@ entity List<T> provides Collection<T> {
     }
 }
 
-entity Set<T where Indexable> provides Collection<T> {
+entity SetEntry<T where Indexable> provides Object {
     field value: T;
-    field left: Set<T>?;
-    field right: Set<T>?;
+    field tail: SetEntry<T>?;
+
+    recursive method has(v: T): Bool {
+        if(this.value == v) {
+            return true;
+        }
+        else {
+            var tl = this.tail;
+            return tl != none && tl->has[recursive](v);
+        }
+    }
+
+    recursive method insert(v: T): SetEntry<T> {
+        if(v == this.value) {
+            return SetEntry<T>{value=v, tail=this.tail}; //replace old value
+        }
+        elif(v > this.value || this.tail == none) {
+            return SetEntry<T>{value=v, tail=this};
+        }
+        else {
+            var tl = this.tail;
+            check tl != none;
+
+            var newtail = tl->insert[recursive](v);
+            return SetEntry<T>{value=this.value, tail=newtail};
+        }
+    }
+
+    recursive method remove(v: T): SetEntry<T>? {
+        if(v == this.value) {
+            return this.tail; 
+        }
+        elif(v > this.value || this.tail == none) {
+            return this;
+        }
+        else {
+            var tl = this.tail;
+            check tl != none;
+
+            var newtail = tl->remove[recursive](v);
+            return SetEntry<T>{value=this.value, tail=newtail};
+        }
+    }
+}
+
+//<summary>A Set entity.</summary>
+entity Set<T where Indexable> provides Collection<T> {
+    field size: Int;
+    field set: SetEntry<T>?;
+
+    hidden static _cons(size: Int, set: SetEntry<T>?): Set<T> # _setcons
+
+    const empty: Set<T> = Set<T>::_cons<T>(0, none);
+
+    method size(): Int {
+        return this.size;
+    }
+    
+    method has(v: T): Bool {
+        var ts = this.set;
+        return ts != none && ts->has[recursive](v); 
+    }
+
+    method insert(v: T): Set<T> {
+        var ts = this.set;
+        if(ts == none) {
+            return Set<T>::_cons<T>(1, SetEntry<T>{value=v, tail=none});
+        }
+        else {
+            return Set<T>::_cons<T>(this.size + (ts->has[recursive](v) ? 1 : 0), ts->insert[recursive](v));
+        }
+    }
+
+    method remove(v: T): Set<T> {
+        var ts = this.set;
+        if(ts == none || !this->has(v)) {
+            return this;
+        }
+        else {
+            return Set<T>::_cons<T>(this.size - 1, ts->remove[recursive](v));
+        }
+    }
+}
+
+entity MapEntry<K where Indexable, V> provides Object {
+    field key: K;
+    field value: V;
+    field tail: MapEntry<K, V>?;
+
+    recursive method has(k: K): Bool {
+        if(this.key == k) {
+            return true;
+        }
+        else {
+            var tl = this.tail;
+            return tl != none && tl->has[recursive](k);
+        }
+    }
+
+    recursive method insert(k: K, v: V): MapEntry<K, V> {
+        if(k == this.key) {
+            return MapEntry<K, V>{key=k, value=v, tail=this.tail}; //replace old value
+        }
+        elif(k > this.key || this.tail == none) {
+            return MapEntry<K, V>{key=k, value=v, tail=this};
+        }
+        else {
+            var tl = this.tail;
+            check tl != none;
+            
+            var newtail = tl->insert[recursive](k, v);
+            return MapEntry<K, V>{key=this.key, value=this.value, tail=newtail};
+        }
+    }
+
+    recursive method remove(k: K): MapEntry<K, V>? {
+        if(k == this.key) {
+            return this.tail; 
+        }
+        elif(k > this.key || this.tail == none) {
+            return this;
+        }
+        else {
+            var tl = this.tail;
+            check tl != none;
+
+            var newtail = tl->remove[recursive](k);
+            return MapEntry<K, V>{key=this.key, value=this.value, tail=newtail};
+        }
+    }
+}
+
+//<summary>A Map entity.</summary>
+entity Map<K where Indexable, V> provides Object {
+    field size: Int;
+    field map: MapEntry<K, V>?;
+
+    hidden static _cons(size: Int, map: MapEntry<K, V>?): Map<K, V> # _mapcons
+
+    const empty: Map<K, V> = Map<K, V>::_cons<K, V>(0, none);
+
+    method size(): Int {
+        return this.size;
+    }
+    
+    method has(k: K): Bool {
+        var tm = this.map;
+        return tm != none && tm->has[recursive](k); 
+    }
+
+    method insert(k: K, v: V): Map<K, V> {
+        var tm = this.map;
+        if(tm == none) {
+            return Map<K, V>::_cons<K, V>(1, MapEntry<K, V>{key=k, value=v, tail=none});
+        }
+        else {
+            return Map<K, V>::_cons<K, V>(this.size + (tm->has[recursive](k) ? 1 : 0), tm->insert[recursive](k, v));
+        }
+    }
+
+    method remove(k: K): Map<K, V> {
+        var tm = this.map;
+        if(tm == none || !this->has(k)) {
+            return this;
+        }
+        else {
+            return Map<K, V>::_cons<K, V>(this.size - 1, tm->remove[recursive](k));
+        }
+    }
 }
