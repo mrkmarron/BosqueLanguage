@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import * as assert from "assert";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { constructCallGraphInfo, CallGInfo } from "../../compiler/mir_callg";
@@ -420,6 +420,86 @@ class CPPBodyEmitter {
         }
     }
 
+    generateFastPrimitiveTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+        if(this.typegen.isPrimitiveType(argtype)) {
+            return "false"; //since oftype is primitive and argtype is not subtype then this must be false
+        }
+        else {
+            assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
+
+            if(oftype.trkey === "NSCore::Bool") {
+                return `BSQ_IS_VALUE_BOOL(${arg})`;
+            }
+            else if (oftype.trkey === "NSCore::Int") {
+                return `BSQ_IS_VALUE_INT(${arg})`;
+            }
+            else {
+                return `BSQ_IS_VALUE_PTR(${arg})`;
+            }
+        }
+    }
+
+    generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+        if (this.typegen.isTupleType(argtype)) {
+            const otuplelen = CPPTypeEmitter.getTupleTypeMaxLength(oftype);
+
+            if (this.typegen.isKnownLayoutTupleType(argtype)) {
+                const atuple = CPPTypeEmitter.getKnownLayoutTupleType(argtype);
+                if(otuplelen < atuple.entries.length) {
+                    return "false";
+                }
+                else {
+                    const ttests = atuple.entries.map((entry, i) => this.generateTypeCheck(`(${arg})${this.typegen.generateFixedTupleAccessor(i)}`, this.typegen.anyType, entry.type));
+                    return `(${ttests.join(" && ")})`;
+                }
+            }
+            else {
+                const atuplelen = CPPTypeEmitter.
+            }
+        }
+        else {
+            assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
+
+            xxxx;
+        }
+    }
+
+    generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    }
+
+    generateFastUEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    }
+
+    generateFastNominalishTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    }
+
+    generateGeneralTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    }
+
+    generateTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+        if(this.typegen.assembly.subtypeOf(argtype, oftype)) {
+            return "true";
+        }
+        else if(this.typegen.isPrimitiveType(oftype)) {
+            return this.generateFastPrimitiveTypeCheck(arg, argtype, oftype);
+        }
+        else if(this.typegen.isTupleType(oftype)) {
+            return this.generateFastTupleTypeCheck(arg, argtype, oftype);
+        }
+        else if(this.typegen.isRecordType(oftype)) {
+            return this.generateFastRecordTypeCheck(arg, argtype, oftype);
+        }
+        else if(this.typegen.isUEntityType(oftype)) {
+            return this.generateFastUEntityTypeCheck(arg, argtype, oftype);
+        }
+        else if(this.typegen.isUNominalish(oftype)) {
+            return this.generateFastNominalishTypeCheck(arg, argtype, oftype);
+        }
+        else {
+            return this.generateGeneralTypeCheck(arg, argtype, oftype);
+        }
+    }
+
     generateStmt(op: MIROp): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
@@ -630,7 +710,8 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(tos.trgt)} = !${this.generateNoneCheck(tos.arg)};`;
            }
             case MIROpTag.MIRIsTypeOf: {
-                return NOT_IMPLEMENTED<string>("MIRIsTypeOf");
+                const top = op as MIRIsTypeOf;
+                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, this.getArgType(top.arg)),  this.getArgType(top.arg), this.typegen.getMIRType(top.oftype))};`;
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;

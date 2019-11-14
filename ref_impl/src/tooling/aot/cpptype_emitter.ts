@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
@@ -112,6 +112,12 @@ class CPPTypeEmitter {
         }
 
         return true;
+    }
+
+    isUNominalish(tt: MIRType): boolean {
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
+
+        return ropts.length === 1 && (ropts[0] instanceof MIREntityType || ropts[1] instanceof MIRConceptType);
     }
 
     static getPrimitiveType(tt: MIRType): MIREntityType {
