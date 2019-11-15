@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTypeOption, MIRTupleType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import * as assert from "assert";
@@ -420,9 +420,9 @@ class CPPBodyEmitter {
         }
     }
 
-    generateFastPrimitiveTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    generateFastPrimitiveTypeCheck(arg: string, argtype: MIRType, oftype: MIRTypeOption): string {
         if(this.typegen.isPrimitiveType(argtype)) {
-            return "false"; //since oftype is primitive and argtype is not subtype then this must be false
+            return argtype.options.length === 1 && argtype.options[0].trkey === oftype.trkey ? "true" : "false";
         }
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
@@ -433,34 +433,73 @@ class CPPBodyEmitter {
             else if (oftype.trkey === "NSCore::Int") {
                 return `BSQ_IS_VALUE_INT(${arg})`;
             }
-            else {
+            else if (oftype.trkey === "NSCore::String") {
                 return `BSQ_IS_VALUE_PTR(${arg})`;
+            }
+            else {
+                return "false";
             }
         }
     }
 
-    generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
-        if (this.typegen.isTupleType(argtype)) {
-            const otuplelen = CPPTypeEmitter.getTupleTypeMaxLength(oftype);
+    generateSubtypeTupleCheck(argv: string, argt: string, args: string | number, accessor: string, argtype: MIRType, oftype: MIRTupleType): string {
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argt} atuple)`;
 
+        if(this.subtypelist) {
+
+        }
+
+        let reqlen = oftype.entries.findIndex((entry) => entry.isOptional);
+        if(reqlen === -1) {
+            reqlen = oftype.entries.length;
+        }
+
+        const alength = typeof(args) === "string" ? `atuple${args}` : args.toString();
+        const lenchk = `if(${alength} < ${reqlen} || ${oftype.entries.length} < ${alength}) return false;`;
+
+        const checks: string[] = [];
+        for(let i = 0; i < reqlen; ++i) {
+            checks.push(this.generateTypeCheck(`atuple${accessor}<${i}>()`, this.typegen.anyType, oftype.entries[i].type, true));
+        }
+        for(let i = reqlen; i < oftype.entries.length; ++i) {
+            const chk = this.generateTypeCheck(`atuple${accessor}<${i}>()`, this.typegen.anyType, oftype.entries[i].type, true);
+            checks.push(`(${alength} <= ${i} || ${chk})`);
+        }
+
+        this.subtypelist.push();
+
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argv})`;
+    }
+
+    generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType, inline: boolean): string {
+        if (this.typegen.isTupleType(argtype)) {
             if (this.typegen.isKnownLayoutTupleType(argtype)) {
                 const atuple = CPPTypeEmitter.getKnownLayoutTupleType(argtype);
-                if(otuplelen < atuple.entries.length) {
+                if(oftype.entries.length < atuple.entries.length) {
                     return "false";
                 }
                 else {
-                    const ttests = atuple.entries.map((entry, i) => this.generateTypeCheck(`(${arg})${this.typegen.generateFixedTupleAccessor(i)}`, this.typegen.anyType, entry.type));
-                    return `(${ttests.join(" && ")})`;
+                    if(atuple.entries.length === 0) {
+                        return "true";
+                    }
+
+                    if (!inline) {
+                        const ttests = atuple.entries.map((entry, i) => this.generateTypeCheck(`(${arg})${this.typegen.generateFixedTupleAccessor(i)}`, this.typegen.anyType, entry.type, false));
+                        return `(${ttests.join(" && ")})`;
+                    }
+                    else {
+                        return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutTupleType(argtype).entries.length, ".atFixed", argtype, oftype);
+                    }
                 }
             }
             else {
-                const atuplelen = CPPTypeEmitter.
+                return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), ".size", ".atFixed", argtype, oftype);
             }
         }
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
 
-            xxxx;
+            return this.generateSubtypeTupleCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQTuple)`, "BSQTuple*", "->size", "->atFixed", argtype, oftype);
         }
     }
 
@@ -476,7 +515,7 @@ class CPPBodyEmitter {
     generateGeneralTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
     }
 
-    generateTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    generateTypeCheck(arg: string, argtype: MIRType, oftype: MIRType, inline: boolean): string {
         if(this.typegen.assembly.subtypeOf(argtype, oftype)) {
             return "true";
         }
@@ -484,7 +523,8 @@ class CPPBodyEmitter {
             return this.generateFastPrimitiveTypeCheck(arg, argtype, oftype);
         }
         else if(this.typegen.isTupleType(oftype)) {
-            return this.generateFastTupleTypeCheck(arg, argtype, oftype);
+            const topts = oftype.options.map((topt) => this.generateFastTupleTypeCheck(arg, argtype, topt as MIRTupleType, inline));
+            return `(${topts.join( "||" )})`;
         }
         else if(this.typegen.isRecordType(oftype)) {
             return this.generateFastRecordTypeCheck(arg, argtype, oftype);
