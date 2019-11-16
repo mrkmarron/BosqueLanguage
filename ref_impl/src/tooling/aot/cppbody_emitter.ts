@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTypeOption, MIRTupleType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTypeOption, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import * as assert from "assert";
@@ -33,6 +33,9 @@ class CPPBodyEmitter {
 
     private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
     private generatedBlocks: Map<string, string[]> = new Map<string, string[]>();
+
+    private subtypeOrderCtr = 0;
+    private subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
     private compoundEqualityOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
     private compoundLTOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
@@ -442,31 +445,77 @@ class CPPBodyEmitter {
         }
     }
 
-    generateSubtypeTupleCheck(argv: string, argt: string, args: string | number, accessor: string, argtype: MIRType, oftype: MIRTupleType): string {
+    generateSubtypeTupleCheck(argv: string, argt: string, size_macro: string, accessor_macro: string, argtype: MIRType, oftype: MIRTupleType): string {
         const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argt} atuple)`;
 
-        if(this.subtypelist) {
+        if (this.subtypeFMap.has(subtypesig)) {
+            const order = this.subtypeOrderCtr++;
 
+            let reqlen = oftype.entries.findIndex((entry) => entry.isOptional);
+            if (reqlen === -1) {
+                reqlen = oftype.entries.length;
+            }
+
+            const alength = size_macro.replace("ARG", "atuple");
+            const lenchk = `if(${alength} < ${reqlen} || ${oftype.entries.length} < ${alength}) return false;`;
+
+            const checks: string[] = [];
+            for (let i = 0; i < oftype.entries.length; ++i) {
+                if (!oftype.entries[i].isOptional) {
+                    if (!(this.typegen.isKnownLayoutTupleType(argtype) && this.typegen.assembly.subtypeOf(CPPTypeEmitter.getKnownLayoutTupleType(argtype).entries[i].type, oftype.entries[i].type))) {
+                        checks.push(this.generateTypeCheck(`${accessor_macro.replace("ARG", "atuple").replace("IDX", i.toString())}`, this.typegen.anyType, oftype.entries[i].type, true));
+                    }
+                }
+                else {
+                    const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "atuple").replace("IDX", i.toString())}`, this.typegen.anyType, oftype.entries[i].type, true);
+                    checks.push(`(${alength} <= ${i} || ${chk})`);
+                }
+            }
+
+            const decl = subtypesig
+            + "{\n"
+            + `    ${lenchk} \n\n`
+            + `    return ${checks.join(" && ")};\n`
+            + `}\n`;
+
+            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
         }
 
-        let reqlen = oftype.entries.findIndex((entry) => entry.isOptional);
-        if(reqlen === -1) {
-            reqlen = oftype.entries.length;
-        }
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argv})`;
+    }
 
-        const alength = typeof(args) === "string" ? `atuple${args}` : args.toString();
-        const lenchk = `if(${alength} < ${reqlen} || ${oftype.entries.length} < ${alength}) return false;`;
+    generateSubtypeRecordCheck(argv: string, argt: string, size_macro: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRRecordType): string {
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argt} arecord)`;
 
-        const checks: string[] = [];
-        for(let i = 0; i < reqlen; ++i) {
-            checks.push(this.generateTypeCheck(`atuple${accessor}<${i}>()`, this.typegen.anyType, oftype.entries[i].type, true));
-        }
-        for(let i = reqlen; i < oftype.entries.length; ++i) {
-            const chk = this.generateTypeCheck(`atuple${accessor}<${i}>()`, this.typegen.anyType, oftype.entries[i].type, true);
-            checks.push(`(${alength} <= ${i} || ${chk})`);
-        }
+        if (this.subtypeFMap.has(subtypesig)) {
+            const order = this.subtypeOrderCtr++;
 
-        this.subtypelist.push();
+            let reqlen = oftype.entries.filter((entry) => !entry.isOptional);
+            const alength = size_macro.replace("ARG", "arecord");
+            const lenchk = `if(${alength} < ${reqlen} || ${oftype.entries.length} < ${alength}) return false;`;
+
+            const checks: string[] = [];
+            for (let i = 0; i < oftype.entries.length; ++i) {
+                const pname = oftype.entries[i].name;
+                if (!oftype.entries[i].isOptional) {
+                    if (!(this.typegen.isKnownLayoutRecordType(argtype) && this.typegen.assembly.subtypeOf((CPPTypeEmitter.getKnownLayoutRecordType(argtype).entries.find((e) => e.name === pname) as MIRRecordTypeEntry).type, oftype.entries[i].type))) {
+                        checks.push(this.generateTypeCheck(`${accessor_macro.replace("ARG", "arecord").replace("PNAME", pname)}`, this.typegen.anyType, oftype.entries[i].type, true));
+                    }
+                }
+                else {
+                    const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "arecord").replace("PNAME", pname)}`, this.typegen.anyType, oftype.entries[i].type, true);
+                    checks.push(`(${has_macro.replace("ARG", "arecord").replace("PNAME", pname)} || ${chk})`);
+                }
+            }
+
+            const decl = subtypesig
+            + "{\n"
+            + `    ${lenchk} \n\n`
+            + `    return ${checks.join(" && ")};\n`
+            + `}\n`;
+
+            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
+        }
 
         return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${oftype.trkey}(${argv})`;
     }
@@ -475,49 +524,141 @@ class CPPBodyEmitter {
         if (this.typegen.isTupleType(argtype)) {
             if (this.typegen.isKnownLayoutTupleType(argtype)) {
                 const atuple = CPPTypeEmitter.getKnownLayoutTupleType(argtype);
-                if(oftype.entries.length < atuple.entries.length) {
+                if(atuple.entries.length === 0) {
+                    return "true";
+                }
+                else if(oftype.entries.length < atuple.entries.length) {
+                    return "false";
+                }
+                else if(oftype.entries.length > atuple.entries.length && !oftype.entries[atuple.entries.length].isOptional) {
                     return "false";
                 }
                 else {
-                    if(atuple.entries.length === 0) {
-                        return "true";
-                    }
-
-                    if (!inline) {
+                    if (inline) {
                         const ttests = atuple.entries.map((entry, i) => this.generateTypeCheck(`(${arg})${this.typegen.generateFixedTupleAccessor(i)}`, this.typegen.anyType, entry.type, false));
                         return `(${ttests.join(" && ")})`;
                     }
                     else {
-                        return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutTupleType(argtype).entries.length, ".atFixed", argtype, oftype);
+                        return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutTupleType(argtype).entries.length.toString(), "ARG.atFixed<IDX>()", argtype, oftype);
                     }
                 }
             }
             else {
-                return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), ".size", ".atFixed", argtype, oftype);
+                return this.generateSubtypeTupleCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), "ARG.size", "ARG.atFixed<IDX>()", argtype, oftype);
             }
         }
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
 
-            return this.generateSubtypeTupleCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQTuple)`, "BSQTuple*", "->size", "->atFixed", argtype, oftype);
+            return this.generateSubtypeTupleCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQTuple)`, "BSQTuple*", "ARG->size", "ARG->atFixed<IDX>()", argtype, oftype);
         }
     }
 
-    generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType, inline: boolean): string {
+        if (this.typegen.isRecordType(argtype)) {
+            if (this.typegen.isKnownLayoutRecordType(argtype)) {
+                const arecord = CPPTypeEmitter.getKnownLayoutRecordType(argtype);
+                if(arecord.entries.length === 0) {
+                    return "true";
+                }
+                else if(arecord.entries.some((entry) => oftype.entries.find((oe) => entry.name ===  oe.name) === undefined)) {
+                    return "false";
+                }
+                else if(oftype.entries.some((entry) => !entry.isOptional && arecord.entries.find((ae) => entry.name ===  ae.name) === undefined)) {
+                    return "false";
+                }
+                else {
+                    if (inline) {
+                        const ttests = arecord.entries.map((entry) => {
+                            const ofentry = oftype.entries.find((oe) => oe.name === entry.name) as MIRRecordTypeEntry;
+                            return this.generateTypeCheck(`(${arg})${this.typegen.generateFixedRecordAccessor(entry.name)}`, this.typegen.anyType, ofentry.type, false)
+                        });
+                        return `(${ttests.join(" && ")})`;
+                    }
+                    else {
+                        const pmacro = `${this.typegen.typeToCPPType(argtype, "base")}::hasProperty<PNAME>(${this.typegen.getKnownPropertyRecordArrayName(argtype)})`;
+                        return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutRecordType(argtype).entries.length.toString(), "ARG.atFixed<PNAME>()", pmacro, argtype, oftype);
+                    }
+                }
+            }
+            else {
+                return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), "ARG.size", "ARG.atFixed<PNAME>()", "ARG.hasProperty<PNAME>()", argtype, oftype);
+            }
+        }
+        else {
+            assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
+
+            return this.generateSubtypeRecordCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`, "BSQRecord*", "ARG->size", "ARG->atFixed<PNAME>()", "ARG->hasProperty<PNAME>()", argtype, oftype);
+        }
     }
 
-    generateFastUEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    generateFastUEntityTypeCheck(arg: string, argtype: MIRType, hasnone: boolean, oftype: MIREntityType): string {
+        let tests: string[] = [];
+        if (hasnone) {
+            tests.push(`BSQ_IS_VALUE_NONE(${arg})`);
+        }
+
+        if (this.typegen.isUEntityType(argtype)) {
+            tests.push(`(${arg})->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)}`)
+        }
+        else {
+            assert(this.typegen.typeToCPPType(argtype, "base") === "Value");
+
+            tests.push(`BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)}`)
+        }
+
+        return `(${tests.join(" || ")})`;
     }
 
-    generateFastNominalishTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+    generateFastConceptTypeCheck(arg: string, argtype: MIRType, hasnone: boolean, oftype: MIRConceptType): string {
+        let tests: string[] = [];
+        if (hasnone) {
+            tests.push(`BSQ_IS_VALUE_NONE(${arg})`);
+        }
+
+        if (this.typegen.isUEntityType(argtype)) {
+            tests.push(`BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>((${arg})->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
+        }
+        else {
+            assert(this.typegen.typeToCPPType(argtype, "base") === "Value");
+
+            tests.push(`BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
+        }
+
+        return `(${tests.join(" || ")})`;
     }
 
     generateGeneralTypeCheck(arg: string, argtype: MIRType, oftype: MIRType): string {
+        const tests = oftype.options.map((topt) => {
+            const mtype = this.typegen.getMIRType(topt.trkey);
+            assert(mtype !== undefined, "We should generate all the component types by default??");
+
+            return this.generateTypeCheck(arg, argtype, mtype, true);
+        })
+        .filter((test) => test === "false");
+
+        if(tests.includes("true") || tests.length === 0) {
+            return "true";
+        }
+        else {
+            return `(${tests.join(" || ")})`
+        }
     }
 
     generateTypeCheck(arg: string, argtype: MIRType, oftype: MIRType, inline: boolean): string {
         if(this.typegen.assembly.subtypeOf(argtype, oftype)) {
             return "true";
+        }
+        else if(oftype.trkey === "NSCore::None") {
+            if (this.assembly.subtypeOf(argtype, this.typegen.noneType)) {
+                return "true";
+            }
+            else if (!this.assembly.subtypeOf(this.typegen.noneType, argtype)) {
+                return "false";
+            }
+            else {
+                return `BSQ_IS_VALUE_NONE(${arg})`;
+            }
         }
         else if(this.typegen.isPrimitiveType(oftype)) {
             return this.generateFastPrimitiveTypeCheck(arg, argtype, oftype);
@@ -527,13 +668,14 @@ class CPPBodyEmitter {
             return `(${topts.join( "||" )})`;
         }
         else if(this.typegen.isRecordType(oftype)) {
-            return this.generateFastRecordTypeCheck(arg, argtype, oftype);
+            const ropts = oftype.options.map((ropt) => this.generateFastRecordTypeCheck(arg, argtype, ropt as MIRRecordType, inline));
+            return `(${ropts.join( "||" )})`;
         }
         else if(this.typegen.isUEntityType(oftype)) {
-            return this.generateFastUEntityTypeCheck(arg, argtype, oftype);
+            return this.generateFastUEntityTypeCheck(arg, argtype, oftype.options.length > 1, CPPTypeEmitter.getUEntityType(oftype));
         }
-        else if(this.typegen.isUNominalish(oftype)) {
-            return this.generateFastNominalishTypeCheck(arg, argtype, oftype);
+        else if(this.typegen.isUConcept(oftype)) {
+            return this.generateFastConceptTypeCheck(arg, argtype, oftype.options.length > 1, CPPTypeEmitter.getUConceptType(oftype));
         }
         else {
             return this.generateGeneralTypeCheck(arg, argtype, oftype);
@@ -751,7 +893,7 @@ class CPPBodyEmitter {
            }
             case MIROpTag.MIRIsTypeOf: {
                 const top = op as MIRIsTypeOf;
-                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, this.getArgType(top.arg)),  this.getArgType(top.arg), this.typegen.getMIRType(top.oftype))};`;
+                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, this.getArgType(top.arg)), this.getArgType(top.arg), this.typegen.getMIRType(top.oftype), true)};`;
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;

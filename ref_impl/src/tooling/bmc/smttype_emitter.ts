@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType } from "../../compiler/mir_assembly";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTLet, SMTCond } from "./smt_exp";
@@ -115,6 +115,12 @@ class SMTTypeEmitter {
         return true;
     }
 
+    isUConcept(tt: MIRType): boolean {
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
+
+        return ropts.length === 1 && ropts[0] instanceof MIRConceptType;
+    }
+
     static getPrimitiveType(tt: MIRType): MIREntityType {
         return tt.options[0] as MIREntityType;
     }
@@ -138,7 +144,11 @@ class SMTTypeEmitter {
     }
 
     static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options.find((opt) => opt instanceof MIREntityType) as MIREntityType;
+        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
+    }
+
+    static getUConceptType(tt: MIRType): MIRConceptType {
+        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIRConceptType;
     }
 
     generateRecordTypePropertyName(tt: MIRType): string {

@@ -114,10 +114,10 @@ class CPPTypeEmitter {
         return true;
     }
 
-    isUNominalish(tt: MIRType): boolean {
+    isUConcept(tt: MIRType): boolean {
         const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
 
-        return ropts.length === 1 && (ropts[0] instanceof MIREntityType || ropts[1] instanceof MIRConceptType);
+        return ropts.length === 1 && ropts[0] instanceof MIRConceptType;
     }
 
     static getPrimitiveType(tt: MIRType): MIREntityType {
@@ -148,7 +148,15 @@ class CPPTypeEmitter {
     }
 
     static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options.find((opt) => opt instanceof MIREntityType) as MIREntityType;
+        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
+    }
+
+    static getUConceptType(tt: MIRType): MIRConceptType {
+        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIRConceptType;
+    }
+
+    getSubtypesArrayCount(tt: MIRConceptType): number {
+        xxxx;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {

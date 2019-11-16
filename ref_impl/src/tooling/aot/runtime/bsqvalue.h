@@ -358,6 +358,20 @@ public:
     }
 
     template <MIRPropertyEnum p>
+    bool hasProperty() const
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            if(this->entries[i].first == p)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    template <MIRPropertyEnum p>
     Value atFixed() const
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
@@ -391,6 +405,20 @@ class BSQRecordFixed
 public:
     uint16_t size;
     std::pair<MIRPropertyEnum, Value> entries[std::max(k, (uint16_t)1)];
+
+    template <MIRPropertyEnum p>
+    bool hasProperty() const
+    {
+        for(size_t i = 0; i < this->size; ++i)
+        {
+            if(this->entries[i].first == p)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     template <MIRPropertyEnum p>
     Value atFixed() const
@@ -430,6 +458,20 @@ public:
     inline Value atPropertyIndex()
     {
         return this->entries[pidx];
+    }
+
+    template <MIRPropertyEnum p>
+    inline static bool hasProperty(const MIRPropertyEnum(&properties)[k])
+    {
+        for(uint16_t i = 0; i < k; ++i)
+        {
+            if(properties[i] == p)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 };
 
