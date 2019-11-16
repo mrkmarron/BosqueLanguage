@@ -17,19 +17,19 @@
 
 #include <algorithm>
 
-#ifdef _DEBUG
+#ifdef BDEBUG
 #define BSQ_ASSERT(C, MSG) (bsqassert(C, MSG, __FILE__, __LINE__))
 #else
 #define BSQ_ASSERT(C, MSG)
 #endif
 
-#ifdef _DEBUG
+#ifdef BDEBUG
 #define BSQ_ABORT(MSG, F, L) (throw BSQAbort(MSG, F, L, __FILE__, __LINE__))
 #else
 #define BSQ_ABORT(MSG, F, L) (throw BSQAbort())
 #endif
 
-#ifdef _DEBUG
+#ifdef BDEBUG
 #define HANDLE_BSQ_ABORT(abrt) { printf("\"%s\" in %s on line %i\n", abrt.msg, abrt.bfile, abrt.bline); fflush(stdout); exit(1); }
 #else
 #define HANDLE_BSQ_ABORT(abrt) { printf("ABORT\n"); exit(1); }
@@ -41,7 +41,7 @@ void bsqassert(bool cond, const char* msg, const char* file, int32_t line);
 
 class BSQAbort
 {
-#ifdef _DEBUG
+#ifdef BDEBUG
 public:
 const char* msg;
 const char* bfile;

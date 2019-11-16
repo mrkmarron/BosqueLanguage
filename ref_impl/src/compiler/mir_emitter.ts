@@ -98,11 +98,15 @@ class MIRKeyGenerator {
         return `<${terms.sort().join(", ")}>`;
     }
 
-    static generateTypeKey_MIR(t: MIROOTypeDecl, binds: Map<string, MIRType>): MIRResolvedTypeKey {
-        return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(binds)}`;
+    static generateTypeKey_MIR(t: MIROOTypeDecl): MIRResolvedTypeKey {
+        return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}`;
     }
 
-    static generateStaticKey_MIR(t: MIREntityTypeDecl, name: string): MIRInvokeKey {
+    static generateConstKey_MIR(t: MIROOTypeDecl, name: string): MIRConstantKey {
+        return `${MIRKeyGenerator.generateTypeKey_MIR(t)}::${name}`;
+    }
+
+    static generateStaticKey_MIR(t: MIROOTypeDecl, name: string): MIRInvokeKey {
         return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}`;
     }
 }

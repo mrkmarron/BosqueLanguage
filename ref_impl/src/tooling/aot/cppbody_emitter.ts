@@ -35,7 +35,7 @@ class CPPBodyEmitter {
     private generatedBlocks: Map<string, string[]> = new Map<string, string[]>();
 
     private subtypeOrderCtr = 0;
-    private subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
+    subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
     private compoundEqualityOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
     private compoundLTOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
@@ -235,14 +235,15 @@ class CPPBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): string {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpce.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        const itrgt = this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("const", MIRKeyGenerator.generateConstKey_MIR(ctype, "empty")));
         if (ctype.name === "List") {
-            return this.typegen.mangleStringForCpp(cpce.tkey + "::empty");
+            return `${this.varToCppName(cpce.trgt)} = ${itrgt}();`;
         }
         else if (ctype.name === "Set") {
-            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionEmpty -- Set");
+            return `${this.varToCppName(cpce.trgt)} = ${itrgt}();`;
         }
         else {
-            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionEmpty -- Map");
+            return `${this.varToCppName(cpce.trgt)} = ${itrgt}();`;
         }
     }
 
@@ -1245,6 +1246,20 @@ class CPPBodyEmitter {
                 const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "base");
 
                 return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable<${this.typegen.typeToCPPType(clisttype, "base")}>(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
+            }
+            case "_setcons": {
+                const sentity = this.assembly.entityDecls.get((this.typegen.getMIRType(idecl.resultType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+                const csettype = this.typegen.getMIRType((sentity.fields.find((fd) => fd.name === "set") as MIRFieldDecl).declaredType);
+                const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "base");
+
+                return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable<${this.typegen.typeToCPPType(csettype, "base")}>(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
+            }
+            case "_mapcons": {
+                const mentity = this.assembly.entityDecls.get((this.typegen.getMIRType(idecl.resultType).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+                const cmaptype = this.typegen.getMIRType((mentity.fields.find((fd) => fd.name === "map") as MIRFieldDecl).declaredType);
+                const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "base");
+
+                return `auto res = new ${smtctype}(BSQRef::checkedIncrementNoneable<${this.typegen.typeToCPPType(cmaptype, "base")}>(${params[1]}), ${params[0]}); BSQRefScopeMgr::processCallReturnFast(${params[2]}, res); return res;`;
             }
             default: {
                 return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);

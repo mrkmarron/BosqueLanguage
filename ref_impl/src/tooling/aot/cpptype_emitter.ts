@@ -22,6 +22,8 @@ class CPPTypeEmitter {
 
     scopectr: number = 0;
 
+    conceptSubtypeRelation: Map<string, string[]> = new Map<string, string[]>();
+
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
 
@@ -155,8 +157,19 @@ class CPPTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIRConceptType;
     }
 
+    initializeConceptSubtypeRelation(): void {
+        this.assembly.typeMap.forEach((tt) => {
+           if(tt instanceof MIRConceptType) {
+               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
+               const keyarray = est.map((et) => et.trkey).sort();
+
+               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
+           } 
+        });
+    }
+
     getSubtypesArrayCount(tt: MIRConceptType): number {
-        xxxx;
+        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {

@@ -51,6 +51,8 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
+//%%CONCEPT_SUBTYPE_RELATION_DECLARE
+
 enum class MIRArrayTypeEnum
 {
     Invalid = 0x0,

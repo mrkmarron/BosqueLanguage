@@ -19,6 +19,8 @@ type CPPCode = {
     typedecls_fwd: string,
     typedecls: string,
     nominalenums: string,
+    conceptSubtypeRelation: string,
+    typechecks: string,
     funcdecls_fwd: string,
     funcdecls: string,
     conststring_declare: string,
@@ -34,6 +36,8 @@ type CPPCode = {
 class CPPEmitter {
     static emit(assembly: MIRAssembly, entrypoint: string): CPPCode {
         const typeemitter = new CPPTypeEmitter(assembly);
+        typeemitter.initializeConceptSubtypeRelation();
+
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
 
         let typedecls_fwd: string[] = [];
@@ -47,6 +51,16 @@ class CPPEmitter {
                 nominalenums.push(typeemitter.mangleStringForCpp(edecl.tkey));
             }
         });
+
+        let conceptSubtypes: string[] = [];
+        typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
+            const nemums = stv.map((ek) => `MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(ek)}`).sort();
+            const sta = `constexpr MIRNominalTypeEnum MIRConceptSubtypeArray__${typeemitter.mangleStringForCpp(cpt)}[${nemums.length}] = {${nemums.join(", ")}};`;
+
+            conceptSubtypes.push(sta);
+        });
+
+        const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
 
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         const rcg = [...cginfo.topologicalOrder];
@@ -138,13 +152,15 @@ class CPPEmitter {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
             nominalenums: nominalenums.sort().join(",\n    "),
+            conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
+            typechecks: typechecks.join("\n"),
             funcdecls_fwd: funcdecls_fwd.join("\n"),
             funcdecls: funcdecls.join("\n"),
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
             propertyenums: [...propertyenums].sort().join(",\n  "),
             propertynames: [...propertynames].sort().join(",\n  "),
-            known_property_lists_declare: known_property_lists_declare.sort().join("\n  "),
+            known_property_lists_declare: known_property_lists_declare.sort().join("\n"),
             vfield_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-FIELD RESOLUTION",
             vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION",
             entryname: typeemitter.mangleStringForCpp(entrypoint)

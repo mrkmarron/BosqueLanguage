@@ -107,6 +107,7 @@ else {
             const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
             const bcontents = contents
                 .replace("//%%NOMINAL_TYPE_ENUM_DECLARE", "    " + cparams.nominalenums)
+                .replace("//%%CONCEPT_SUBTYPE_RELATION_DECLARE", "    " + cparams.conceptSubtypeRelation)
                 .replace("//%%STATIC_STRING_DECLARE%%", "  " + cparams.conststring_declare)
                 .replace("//%%STATIC_STRING_CREATE%%", "  " + cparams.conststring_create)
                 .replace("//%%PROPERTY_ENUM_DECLARE", "    " + cparams.propertyenums)
@@ -126,6 +127,8 @@ else {
             + cparams.funcdecls_fwd
             + "\n\n/*type decls*/\n"
             + cparams.typedecls
+            + "\n\n/*typecheck decls*/\n"
+            + cparams.typechecks
             + "\n\n/*function decls*/\n"
             + cparams.funcdecls
             + "}\n\n"
