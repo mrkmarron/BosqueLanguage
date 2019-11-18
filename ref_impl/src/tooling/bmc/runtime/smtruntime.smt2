@@ -30,10 +30,10 @@
       (bsqterm_string (bsqterm_string_value String))
       (bsqterm_typedstring (bsqterm_typedstring_type String) (bsqterm_typedstring_value String))
       (bsqterm_validatedstring (bsqterm_validatedstring_type String) (bsqterm_validatedstring_value String))
-      (bsqterm_podbuffer (bsqterm_podbuffer_value (Array Int Int)))
+      (bsqterm_podbuffer (bsqterm_podbuffer_type String) (bsqterm_podbuffer_value (Array Int Int)))
       (bsqterm_guid (bsqterm_guid_value String))
-      (bsqterm_enum (bsqterm_enum_name String) (bsqterm_enum_value Int))
-      (bsqterm_idkey (bsqterm_idkey_value BTerm))
+      (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
+      (bsqterm_idkey (bsqterm_idkey_type String) (bsqterm_idkey_value BTerm))
       (bsqterm_regex (bsqterm_regex_value String))
       (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
       (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
@@ -65,6 +65,11 @@
 (declare-const bsqentity_array_empty (Array String BTerm))
 (assert (= bsqentity_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
 
+(declare-const mirconceptsubtypearray_empty (Array String Bool))
+(assert (= mirconceptsubtypearray_empty ((as const (Array String Bool)) false)))
+
+;;CONCEPT_SUBTYPE_RELATION_DECLARE;;
+
 ;;RECORD_PROPERTY_LIST_DECLS;;
 
 (declare-datatypes ( (ErrorCode 0) ) (
@@ -88,6 +93,8 @@
 (assert (= BINT_MIN -4503599627370496))
 
 (declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
+
+;;SUBTYPE_DECLS;;
 
 ;;FUNCTION_DECLS;;
 

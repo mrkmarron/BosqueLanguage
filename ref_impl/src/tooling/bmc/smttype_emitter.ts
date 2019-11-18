@@ -23,6 +23,8 @@ class SMTTypeEmitter {
     private tempconvctr = 0;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
+    conceptSubtypeRelation: Map<string, string[]> = new Map<string, string[]>();
+
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
 
@@ -100,7 +102,7 @@ class SMTTypeEmitter {
     }
 
     doDefaultEmitOnEntity(et: MIREntityTypeDecl): boolean {
-        if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::Regex") {
+        if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::GUID" || et.tkey === "NSCore::Regex") {
             return false;
         }
 
@@ -113,12 +115,6 @@ class SMTTypeEmitter {
         }
 
         return true;
-    }
-
-    isUConcept(tt: MIRType): boolean {
-        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
-
-        return ropts.length === 1 && ropts[0] instanceof MIRConceptType;
     }
 
     static getPrimitiveType(tt: MIRType): MIREntityType {
@@ -147,8 +143,19 @@ class SMTTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
     }
 
-    static getUConceptType(tt: MIRType): MIRConceptType {
-        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIRConceptType;
+    initializeConceptSubtypeRelation(): void {
+        this.assembly.typeMap.forEach((tt) => {
+           if(tt instanceof MIRConceptType) {
+               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
+               const keyarray = est.map((et) => et.trkey).sort();
+
+               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
+           } 
+        });
+    }
+
+    getSubtypesArrayCount(tt: MIRConceptType): number {
+        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
     generateRecordTypePropertyName(tt: MIRType): string {

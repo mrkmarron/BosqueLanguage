@@ -18,6 +18,8 @@ function NOT_IMPLEMENTED<T>(msg: string): T {
 type SMTCode = {
     typedecls_fwd: string,
     typedecls: string,
+    conceptSubtypeRelation: string,
+    typechecks: string,
     fixedtupledecls_fwd: string,
     fixedtupledecls: string,
     fixedrecorddecls_fwd: string,
@@ -32,6 +34,8 @@ type SMTCode = {
 class SMTEmitter {
     static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
+        typeemitter.initializeConceptSubtypeRelation();
+
         const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
 
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
@@ -164,6 +168,20 @@ class SMTEmitter {
             }
         }
 
+        let conceptSubtypes: string[] = [];
+        typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
+            const nemums = stv.map((ek) => typeemitter.mangleStringForSMT(ek)).sort();
+            const sta = `(declare-const MIRConceptSubtypeArray__${typeemitter.mangleStringForSMT(cpt)} (Array String Bool))`;
+            let iv = "mirconceptsubtypearray_empty";
+            for (let i = 0; i < nemums.length; ++i) {
+                iv = `(store ${iv} ${nemums[i]}, true)`;
+            }
+
+            conceptSubtypes.push(sta + "\n" + `(assert (= MIRConceptSubtypeArray__${typeemitter.mangleStringForSMT(cpt)} ${iv}))`);
+        });
+
+        const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
+
         const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
 
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
@@ -175,6 +193,8 @@ class SMTEmitter {
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n    "),
             typedecls: typedecls.sort().join("\n    "),
+            conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
+            typechecks: typechecks.join("\n    "),
             fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),
             fixedtupledecls: fixedtupledecls.sort().join("\n    "),
             fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n    "),

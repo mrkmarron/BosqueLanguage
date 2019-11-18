@@ -52,16 +52,6 @@ class CPPEmitter {
             }
         });
 
-        let conceptSubtypes: string[] = [];
-        typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
-            const nemums = stv.map((ek) => `MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(ek)}`).sort();
-            const sta = `constexpr MIRNominalTypeEnum MIRConceptSubtypeArray__${typeemitter.mangleStringForCpp(cpt)}[${nemums.length}] = {${nemums.join(", ")}};`;
-
-            conceptSubtypes.push(sta);
-        });
-
-        const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
-
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         const rcg = [...cginfo.topologicalOrder];
 
@@ -116,6 +106,16 @@ class CPPEmitter {
             }
         }
 
+        let conceptSubtypes: string[] = [];
+        typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
+            const nemums = stv.map((ek) => `MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(ek)}`).sort();
+            const sta = `constexpr MIRNominalTypeEnum MIRConceptSubtypeArray__${typeemitter.mangleStringForCpp(cpt)}[${nemums.length}] = {${nemums.join(", ")}};`;
+
+            conceptSubtypes.push(sta);
+        });
+
+        const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
+        
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {

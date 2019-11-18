@@ -231,8 +231,9 @@ class BSQValidatedString : public BSQRef
 public:
     const std::string sdata;
     const BSQValidator* validator;
+    const MIRNominalTypeEnum oftype;
 
-    BSQValidatedString(const std::string& str, const BSQValidator* validator) : BSQRef(), sdata(str), validator(validator) { ; }
+    BSQValidatedString(const std::string& str, const BSQValidator* validator, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), validator(validator), oftype(oftype) { ; }
     virtual ~BSQValidatedString() = default;
 };
 
@@ -240,8 +241,9 @@ class BSQPODBuffer : public BSQRef
 {
 public:
     const std::vector<uint8_t> sdata;
+    const MIRNominalTypeEnum oftype;
 
-    BSQPODBuffer(std::vector<uint8_t>&& sdata) : BSQRef(), sdata(move(sdata)) { ; }
+    BSQPODBuffer(std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(move(sdata)), oftype(oftype) { ; }
     virtual ~BSQPODBuffer() = default;
 };
 
@@ -305,7 +307,6 @@ public:
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
 };
-
 
 template <uint16_t k>
 class BSQTupleFixed
@@ -710,5 +711,31 @@ public:
 
 //%%VFIELD_DECLS
 //%%VMETHOD_DECLS
+
+    template<int32_t k>
+    inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
+    {
+        if(k < 16)
+        {
+            for(int32_t i = 0; i < k; ++i)
+            {
+                if(etypes[i] == tt)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else
+        {
+            return BSQObject::checkSubtypeSlow<k>(tt, etypes);
+        }
+    }
+
+    template<int32_t k>
+    static bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
+    {
+        return std::binary_search(&etypes[0], &etypes[k], tt) != &etypes[k]; 
+    }
 };
 } // namespace BSQ
