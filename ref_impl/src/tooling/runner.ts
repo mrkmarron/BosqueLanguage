@@ -11,7 +11,7 @@ import * as FS from "fs";
 import * as Path from "path";
 
 import * as Commander from "commander";
-import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl } from "../compiler/mir_assembly";
+import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl, MIRType } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
 import { CPPEmitter } from "./aot/cppdecls_emitter";
 import { SMTEmitter } from "./bmc/smtdecls_emitter";
@@ -72,8 +72,9 @@ if (Commander.verify !== undefined) {
         const smt_runtime = Path.join(__dirname, "bmc/runtime/smtruntime.smt2");
 
         const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
-        if (entrypoint.params.length !== 0) {
-            process.stderr.write("Entrypoint args are not currently supported!!!\n");
+        const PODType = massembly.typeMap.get("NSCore::POD") as MIRType;
+        if (entrypoint.params.some((p) => !massembly.subtypeOf(massembly.typeMap.get(p.type) as MIRType, PODType))) {
+            process.stderr.write("Only PODTypes are supported for symbolic testing!!!\n");
             process.exit(1);
         }
 

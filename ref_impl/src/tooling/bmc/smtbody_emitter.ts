@@ -60,12 +60,15 @@ class SMTBodyEmitter {
         const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`;
         if (!this.errorCodes.has(errorinfo)) {
             this.errorCodes.set(errorinfo, this.errorCodes.size);
-
-            console.log(`error #${this.errorCodes.size - 1} = ${errorinfo}`);
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
         return new SMTValue(`(result_error@${rtype} (result_error ${errid}))`);
+    }
+
+    getErrorIds(...sinfos: SourceInfo[]): number[] {
+        const ekeys = sinfos.map((sinfo) => `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`);
+        return [...new Set<number>(ekeys.map((k) => this.errorCodes.get(k) as number))].sort();
     }
 
     getGasForOperation(key: string): number {

@@ -31,6 +31,8 @@ type SMTCode = {
     main_info: string
 };
 
+const SymbolicArgTypecheckGas = 3;
+
 class SMTEmitter {
     static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
@@ -169,6 +171,21 @@ class SMTEmitter {
             }
         }
 
+        const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
+
+        let argscall: string[] = [];
+        let argsdecls: string[] = [];
+        for(let i = 0; i < entrypoint.params.length; ++i) {
+            const param = entrypoint.params[i];
+            const paramtype = typeemitter.getMIRType(param.type);
+
+            argscall.push(`@${param.name}`);
+            argsdecls.push(`(declare-const @${param.name} ${typeemitter.typeToSMTCategory(paramtype)})`);
+            if(typeemitter.typeToSMTCategory(paramtype) === "BTerm") {
+                argsdecls.push(`(assert ${bodyemitter.generateTypeCheck(param.name, typeemitter.anyType, typeemitter.getMIRType(param.type), true, SymbolicArgTypecheckGas)})`)
+            }
+        }
+
         let conceptSubtypes: string[] = [];
         typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
             const nemums = stv.map((ek) => typeemitter.mangleStringForSMT(ek)).sort();
@@ -183,11 +200,18 @@ class SMTEmitter {
 
         const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
 
-        const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
-
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
-        const cassert = `(assert (= @smtres@ ${bodyemitter.invokenameToSMT(entrypoint.key)}))`;
-        const chk = `(assert (is-result_error@${rrtype} @smtres@))`;
+        const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
+        const cassert = `(assert (= @smtres@ ${call}))`;
+
+        let chk = `(assert (is-result_error@${rrtype} @smtres@))`;
+
+        if(entrypoint.preconditions.length !== 0) {
+            const excludeprelines = entrypoint.preconditions.map((pre) => pre[0].sinfo);
+            const excludeerrorids = bodyemitter.getErrorIds(...excludeprelines).map((eid) => `(= (error_id (result_error_code@${rrtype} @smtres@)) ${eid})`);
+
+            chk = chk + "\n" + `(assert (or (not (is-result_error (result_error_code@${rrtype} @smtres@))) (not (or ${excludeerrorids.join("\n")})))`;
+        }
 
         const callinfo = resv + "\n" + cassert + "\n" + chk;
 
@@ -203,7 +227,7 @@ class SMTEmitter {
             resultdecls_fwd: resultdecls_fwd.sort().join("\n    "),
             resultdecls: resultdecls.sort().join("\n    "),
             function_decls: funcdecls.join("\n"),
-            args_info: "",
+            args_info: argsdecls.join("\n"),
             main_info: callinfo
         };
     }
