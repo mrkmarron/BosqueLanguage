@@ -79,91 +79,92 @@ class SMTEmitter {
             }
         });
 
+        let doneset = new Set<MIRBodyKey>();
         let funcdecls: string[] = [];
         let resultdecls_fwd: string[] = [];
         let resultdecls: string[] = [];
         for (let i = 0; i < rcg.length; ++i) {
             const cn = rcg[i];
+            if(doneset.has(cn.invoke)) {
+                continue;
+            }
 
             const cscc = cginfo.recursive.find((scc) => scc.has(cn.invoke));
+            const currentSCC = cscc !== undefined ? new Set<string>([...cscc].map((cc) => extractMirBodyKeyData(cc))) : new Set<string>();
             let worklist = cscc !== undefined ? [...cscc].sort() : [cn.invoke];
 
-            let lastgas = new Map<MIRBodyKey, number>();
-            while (worklist.length !== 0) {
-                const bbup = worklist.shift() as MIRBodyKey;
+            let gasmax: number | undefined = cscc !== undefined ? Math.max(...worklist.map((bbup) => bodyemitter.getGasForOperation(bbup))) : 1;
+            for (let gasctr = 1; gasctr <= gasmax; gasctr++) {
+                for (let mi = 0; mi < worklist.length; ++mi) {
+                    const bbup = worklist[mi];
 
-                let gas: number | undefined = undefined;
-                let gasdown: number | undefined = undefined;
-                let currentSCC = new Set<string>();
-                if (cscc !== undefined) {
-                    const gasctr = lastgas.get(bbup) || 1;
-                    const cgas = bodyemitter.getGasForOperation(bbup);
-                    if (gasctr <= cgas) {
+                    let gas: number | undefined = undefined;
+                    let gasdown: number | undefined = undefined;
+                    if(gasctr !== gasmax) {
                         gas = gasctr;
-                        lastgas.set(bbup, gas + 1);
+                        gasdown = gasctr - 1;
+                    }
+                    else {
+                        gasdown = gasmax - 1;
                     }
 
-                    gasdown = gas !== undefined ? gas - 1 : cgas;
+                    const tag = extractMirBodyKeyPrefix(bbup);
+                    if (tag === "invoke") {
+                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
+                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                        const finfo = bodyemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
 
-                    cscc.forEach((bc) => currentSCC.add(extractMirBodyKeyData(bc)));
-                }
+                        funcdecls.push(finfo);
 
-                const tag = extractMirBodyKeyPrefix(bbup);
-                if (tag === "invoke") {
-                    const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
-                    const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                    const finfo = bodyemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
-
-                    funcdecls.push(finfo);
-
-                    const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(idcl.resultType));
-                    if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
-                        resultdecls_fwd.push(`(Result@${rtype} 0)`);
-                        resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
-                    }
-                }
-                else if (tag === "pre") {
-                    NOT_IMPLEMENTED<void>("Pre");
-                }
-                else if (tag === "post") {
-                    NOT_IMPLEMENTED<void>("Post");
-                }
-                else if (tag === "invariant") {
-                    const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                    funcdecls.push(bodyemitter.generateSMTInv(bbup, edcl));
-                }
-                else if (tag === "const") {
-                    const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup) as MIRConstantKey) as MIRConstantDecl;
-                    const cdeclemit = bodyemitter.generateSMTConst(bbup, cdcl);
-                    if (cdeclemit !== undefined) {
-                        funcdecls.push(cdeclemit);
-
-                        const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(cdcl.declaredType));
+                        const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(idcl.resultType));
                         if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
                             resultdecls_fwd.push(`(Result@${rtype} 0)`);
                             resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
                         }
                     }
+                    else if (tag === "pre") {
+                        NOT_IMPLEMENTED<void>("Pre");
+                    }
+                    else if (tag === "post") {
+                        NOT_IMPLEMENTED<void>("Post");
+                    }
+                    else if (tag === "invariant") {
+                        const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup) as MIRNominalTypeKey) as MIREntityTypeDecl;
+                        funcdecls.push(bodyemitter.generateSMTInv(bbup, edcl));
+                    }
+                    else if (tag === "const") {
+                        const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup) as MIRConstantKey) as MIRConstantDecl;
+                        const cdeclemit = bodyemitter.generateSMTConst(bbup, cdcl);
+                        if (cdeclemit !== undefined) {
+                            funcdecls.push(cdeclemit);
 
-                }
-                else {
-                    assert(tag === "fdefault");
+                            const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(cdcl.declaredType));
+                            if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                                resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                                resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                            }
+                        }
 
-                    const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup) as MIRFieldKey) as MIRFieldDecl;
-                    const fdeclemit = bodyemitter.generateSMTFDefault(bbup, fdcl);
-                    if (fdeclemit !== undefined) {
-                        funcdecls.push(fdeclemit);
+                    }
+                    else {
+                        assert(tag === "fdefault");
 
-                        const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(fdcl.declaredType));
-                        if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
-                            resultdecls_fwd.push(`(Result@${rtype} 0)`);
-                            resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                        const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup) as MIRFieldKey) as MIRFieldDecl;
+                        const fdeclemit = bodyemitter.generateSMTFDefault(bbup, fdcl);
+                        if (fdeclemit !== undefined) {
+                            funcdecls.push(fdeclemit);
+
+                            const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(fdcl.declaredType));
+                            if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                                resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                                resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
+                            }
                         }
                     }
                 }
 
-                if (gas !== undefined) {
-                    worklist.push(bbup);
+                if(cscc !== undefined) {
+                    cscc.forEach((v) => doneset.add(v));
                 }
             }
         }

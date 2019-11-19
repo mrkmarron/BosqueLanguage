@@ -2285,6 +2285,7 @@ class Parser {
 
         if (!Parser.attributeSetContains("abstract", attributes)) {
             this.ensureAndConsumeToken("=");
+            
             value = this.parseExpression();
         }
 
@@ -2371,10 +2372,19 @@ class Parser {
         memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), attributes, mname, sig));
     }
 
-    private parseOOPMembersCommon(abstractOk: boolean, thisType: TypeSignature, invariants: Expression[], staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
+    private parseOOPMembersCommon(thisType: TypeSignature, invariants: Expression[], staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         while (this.testAndConsumeTokenIf("invariant")) {
-            invariants.push(this.parseExpression());
-            this.ensureAndConsumeToken(";");
+            try {
+                this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(["this"])));
+                const body = this.parseExpression();
+                this.ensureAndConsumeToken(";");
+                invariants.push(body);
+                this.m_penv.popFunctionScope();
+            }
+            catch (ex) {
+                this.m_penv.popFunctionScope();
+                throw ex;
+            }
         }
 
         let allMemberNames = new Set<string>();
@@ -2425,7 +2435,7 @@ class Parser {
             const staticFunctions = new Map<string, StaticFunctionDecl>();
             const memberFields = new Map<string, MemberFieldDecl>();
             const memberMethods = new Map<string, MemberMethodDecl>();
-            this.parseOOPMembersCommon(true, thisType, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+            this.parseOOPMembersCommon(thisType, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
 
             this.ensureAndConsumeToken("}");
 
@@ -2468,7 +2478,7 @@ class Parser {
             const staticFunctions = new Map<string, StaticFunctionDecl>();
             const memberFields = new Map<string, MemberFieldDecl>();
             const memberMethods = new Map<string, MemberMethodDecl>();
-            this.parseOOPMembersCommon(true, thisType, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+            this.parseOOPMembersCommon(thisType, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
 
             this.ensureAndConsumeToken("}");
 

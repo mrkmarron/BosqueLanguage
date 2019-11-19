@@ -296,10 +296,11 @@ class SMTTypeEmitter {
             let entarray = "bsqentity_array_empty";
             for (let i = 0; i < fromtype.fields.length; ++i) {
                 const fd = fromtype.fields[i];
-                entarray = `(store ${entarray} ${fd.name} (${this.generateEntityAccessor(fromtype.tkey, fd.name)} ${temp}))`;
+                const access = `(${this.generateEntityAccessor(fromtype.tkey, fd.name)} ${temp})`;
+                entarray = `(store ${entarray} "${fd.name}" ${this.coerce(new SMTValue(access), this.getMIRType(fd.declaredType), this.anyType).emit()})`;
             }
 
-            const nonnone = new SMTLet(temp, exp, new SMTValue(`(bsqterm_entity "${fromtype.tkey}" ${entarray})`));
+            const nonnone = new SMTLet(temp, exp, new SMTValue(`(bsqterm_object "${fromtype.tkey}" ${entarray})`));
             if (!this.assembly.subtypeOf(this.noneType, into)) {
                 return nonnone;
             }
@@ -341,14 +342,14 @@ class SMTTypeEmitter {
                 return new SMTLet(temp, new SMTValue(`(bsqterm_record_entries ${exp.emit()})`), new SMTValue(`(${this.generateRecordConstructor(into)} ${args.join(" ")})`));
             }
             else if (this.isUEntityType(into)) {
-                const fromtype = this.assembly.entityDecls.get(SMTTypeEmitter.getUEntityType(from).ekey) as MIREntityTypeDecl;
+                const intotype = this.assembly.entityDecls.get(SMTTypeEmitter.getUEntityType(into).ekey) as MIREntityTypeDecl;
 
                 let temp = `@tmpconv_${this.tempconvctr++}`;
                 let args: string[] = [];
-                for (let i = 0; i < fromtype.fields.length; ++i) {
-                   args.push(`(select ${temp} ${fromtype.fields[i].name})`);
+                for (let i = 0; i < intotype.fields.length; ++i) {
+                   args.push(this.coerce(new SMTValue(`(select ${temp} "${intotype.fields[i].name}")`), this.anyType, this.getMIRType(intotype.fields[i].declaredType)).emit());
                 }
-                const nonnone = new SMTLet(temp, new SMTValue(`(bsqterm_object_entries ${exp.emit()})`), new SMTValue(`(${this.generateEntityConstructor(fromtype.tkey)} ${args.join(" ")})`));
+                const nonnone = new SMTLet(temp, new SMTValue(`(bsqterm_object_entries ${exp.emit()})`), new SMTValue(`(${this.generateEntityConstructor(intotype.tkey)} ${args.join(" ")})`));
 
                 if (!this.assembly.subtypeOf(this.noneType, from)) {
                     return nonnone;

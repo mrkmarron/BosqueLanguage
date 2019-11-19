@@ -459,7 +459,15 @@ class CPPBodyEmitter {
             }
             else {
                 checks = checks.filter((chk) => chk !== "true");
-                op = checks.length === 0 ? "true" : `(${checks.join(" && ")})`;
+                if(checks.length === 0) {
+                    op = "true";
+                }
+                else if(checks.length === 1) {
+                    op = checks[0];
+                }
+                else {
+                    op = `(${checks.join(" && ")})`;
+                }
             }
 
             const decl = subtypesig
@@ -512,7 +520,15 @@ class CPPBodyEmitter {
             }
             else {
                 checks = checks.filter((chk) => chk !== "true");
-                op = checks.length === 0 ? "true" : `(${checks.join(" && ")})`;
+                if(checks.length === 0) {
+                    op = "true";
+                }
+                else if(checks.length === 1) {
+                    op = checks[0];
+                }
+                else {
+                    op = `(${checks.join(" && ")})`;
+                }
             }
 
             const decl = subtypesig
@@ -552,7 +568,15 @@ class CPPBodyEmitter {
                         }
                         else {
                             ttests = ttests.filter((chk) => chk !== "true");
-                            return ttests.length === 0 ? "true" : `(${ttests.join(" && ")})`;
+                            if(ttests.length === 0) {
+                                return "true";
+                            }
+                            else if(ttests.length === 1) {
+                                return ttests[0];
+                            }
+                            else {
+                                return `(${ttests.join(" && ")})`;
+                            }
                         }
                     }
                     else {
@@ -603,7 +627,15 @@ class CPPBodyEmitter {
                         }
                         else {
                             ttests = ttests.filter((chk) => chk !== "true");
-                            return ttests.length === 0 ? "true" : `(${ttests.join(" && ")})`;
+                            if(ttests.length === 0) {
+                                return "true";
+                            }
+                            else if(ttests.length === 1) {
+                                return ttests[0];
+                            }
+                            else {
+                                return `(${ttests.join(" && ")})`;
+                            }
                         }
                     }
                     else {
@@ -784,6 +816,9 @@ class CPPBodyEmitter {
         }
         else if(tests.length === 0) {
             return "false";
+        }
+        else if(tests.length === 1) {
+            return tests[0];
         }
         else {
             return `(${tests.join(" || ")})`;

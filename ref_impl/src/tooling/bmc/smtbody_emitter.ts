@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
@@ -27,6 +27,8 @@ class SMTBodyEmitter {
     private errorCodes = new Map<string, number>();
     private bmcCodes = new Map<string, number>();
     private bmcGas = new Map<string, number>();
+
+    private typecheckgas = DEFAULT_GAS;
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -58,6 +60,8 @@ class SMTBodyEmitter {
         const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`;
         if (!this.errorCodes.has(errorinfo)) {
             this.errorCodes.set(errorinfo, this.errorCodes.size);
+
+            console.log(`error #${this.errorCodes.size - 1} = ${errorinfo}`);
         }
         const errid = this.errorCodes.get(errorinfo) as number;
 
@@ -260,14 +264,18 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
         const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpce.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+
         if (ctype.name === "List") {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} bsqterm_none_const 0)`));
+            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
         }
         else if (ctype.name === "Set") {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} bsqterm_none_const 0)`));
+            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "set") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
         }
         else {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} bsqterm_none_const 0)`));
+            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "map") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
         }
     }
 
@@ -527,7 +535,15 @@ class SMTBodyEmitter {
             }
             else {
                 checks = checks.filter((chk) => chk !== "true");
-                op = checks.length === 0 ? "true" : `(and ${checks.join(" ")})`;
+                if(checks.length === 0) {
+                    op = "true";
+                }
+                else if(checks.length === 1) {
+                    op = checks[0];
+                }
+                else {
+                    op = `(and ${checks.join(" ")})`;
+                }
             }
 
             const decl = subtypesig
@@ -575,7 +591,15 @@ class SMTBodyEmitter {
             }
             else {
                 checks = checks.filter((chk) => chk !== "true");
-                op = checks.length === 0 ? "true" : `(and ${checks.join(" ")})`;
+                if(checks.length === 0) {
+                    op = "true";
+                }
+                else if(checks.length === 1) {
+                    op = checks[0];
+                }
+                else {
+                    op = `(and ${checks.join(" ")})`;
+                }
             }
 
             const decl = subtypesig
@@ -613,7 +637,15 @@ class SMTBodyEmitter {
                         }
                         else {
                             ttests = ttests.filter((chk) => chk !== "true");
-                            return ttests.length === 0 ? "true" : `(and ${ttests.join(" ")})`;
+                            if(ttests.length === 0) {
+                                return "true";
+                            }
+                            else if(ttests.length === 1) {
+                                return ttests[0];
+                            }
+                            else {
+                                return `(and ${ttests.join(" ")})`;
+                            }
                         }
                     }
                     else {
@@ -662,7 +694,15 @@ class SMTBodyEmitter {
                         }
                         else {
                             ttests = ttests.filter((chk) => chk !== "true");
-                            return ttests.length === 0 ? "true" : `(and ${ttests.join(" ")})`;
+                            if(ttests.length === 0) {
+                                return "true";
+                            }
+                            else if(ttests.length === 1) {
+                                return ttests[0];
+                            }
+                            else {
+                                return `(and ${ttests.join(" ")})`;
+                            }
                         }
                     }
                     else {
@@ -736,7 +776,7 @@ class SMTBodyEmitter {
                 return `(is-bsqterm_regex ${arg})`;
             }
             else {
-                return `(and (is-bsqterm_object ${arg}) (= (bsqterm_object_type ${arg}) "${this.typegen.mangleStringForSMT(oftype.ekey)}")`;
+                return `(and (is-bsqterm_object ${arg}) (= (bsqterm_object_type ${arg}) "${oftype.ekey}"))`;
             }
         }
     }
@@ -838,6 +878,9 @@ class SMTBodyEmitter {
         }
         else if(tests.length === 0) {
             return "false";
+        }
+        else if(tests.length === 1) {
+            return tests[0];
         }
         else {
             return `(or ${tests.join(" ")})`;
@@ -1072,7 +1115,8 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(tos.trgt), new SMTValue(`(not ${this.generateNoneCheck(tos.arg).emit()})`));
            }
             case MIROpTag.MIRIsTypeOf: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRIsTypeOf");
+                const top = op as MIRIsTypeOf;
+                return new SMTLet(this.varToSMTName(top.trgt), new SMTValue(this.generateTypeCheck(this.argToSMT(top.arg, this.getArgType(top.arg)).emit(), this.getArgType(top.arg), this.typegen.getMIRType(top.oftype), true, this.typecheckgas)));
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;
@@ -1224,41 +1268,29 @@ class SMTBodyEmitter {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
 
-        const args = `(this ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
-        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Result@Bool`;
+        const args = `(${this.typegen.mangleStringForSMT("this")} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
+        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Bool`;
 
-        if (idecl.invariants.length === 1) {
-            this.vtypes = new Map<string, MIRType>();
-            (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
+        this.vtypes = new Map<string, MIRType>();
+        (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
+            this.vtypes.set(name, this.typegen.getMIRType(tkey));
+        });
 
-            const blocks = idecl.invariants[0].body;
-            const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
-            return `${decl} \n${body.emit("  ")})`;
-        }
-        else {
-            this.vtypes = new Map<string, MIRType>();
-            (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
+        const decls = idecl.invariants.map((pc, i) => {
+            const blocksi = pc.body;
+            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
+            const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
+            const calli = (`(${this.invokenameToSMT(invkey)}$${i} ${this.typegen.mangleStringForSMT("this")})`);
 
-            const decls = idecl.invariants.map((pc, i) => {
-                const blocksi = pc.body;
-                const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
-                const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
-                const calli = (`(${this.invokenameToSMT(invkey)}${i} this)`);
+            return [decli, calli];
+        });
 
-                return [decli, calli];
-            });
+        const declsand = decls.map((cc) => {
+            const tv = `@tmpvarda@${this.tmpvarctr++}`;
+            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
+        });
 
-            const declsand = decls.map((cc) => {
-                const tv = `@tmpvarda@${this.tmpvarctr++}`;
-                return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
-            });
-
-            return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
-        }
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
     }
 
     generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {
@@ -1304,6 +1336,14 @@ class SMTBodyEmitter {
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
         switch (idecl.implkey) {
             case "_listcons": {
+                const mres = this.typegen.getMIRType(idecl.resultType);
+                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            }
+            case "_setcons": {
+                const mres = this.typegen.getMIRType(idecl.resultType);
+                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            }
+            case "_mapcons": {
                 const mres = this.typegen.getMIRType(idecl.resultType);
                 return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
             }
