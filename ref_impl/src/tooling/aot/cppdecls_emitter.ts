@@ -3,17 +3,13 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeBodyDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
-
-function NOT_IMPLEMENTED<T>(msg: string): T {
-    throw new Error(`Not Implemented: ${msg}`);
-}
 
 type CPPCode = {
     typedecls_fwd: string,
@@ -30,11 +26,11 @@ type CPPCode = {
     known_property_lists_declare: string,
     vfield_decls: string,
     vmethod_decls: string,
-    entryname: string
+    maincall: string
 };
 
 class CPPEmitter {
-    static emit(assembly: MIRAssembly, entrypoint: string): CPPCode {
+    static emit(assembly: MIRAssembly, entrypointname: string): CPPCode {
         const typeemitter = new CPPTypeEmitter(assembly);
         typeemitter.initializeConceptSubtypeRelation();
 
@@ -73,17 +69,24 @@ class CPPEmitter {
                 funcdecls.push(finfo.fulldecl);
             }
             else if (tag === "pre") {
-                NOT_IMPLEMENTED<void>("Pre");
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                const finfo = bodyemitter.generateCPPPre(bbup.invoke, idcl);
+
+                funcdecls.push(finfo);
             }
             else if (tag === "post") {
-                NOT_IMPLEMENTED<void>("Post");
+                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
+                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                const finfo = bodyemitter.generateCPPPost(bbup.invoke, idcl);
+
+                funcdecls.push(finfo);
             }
             else if (tag === "invariant") {
                 const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
                 const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
 
-                funcdecls_fwd.push(finfo.fwddecl);
-                funcdecls.push(finfo.fulldecl);
+                funcdecls.push(finfo);
             }
             else if (tag === "const") {
                 const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
@@ -148,6 +151,31 @@ class CPPEmitter {
             });
         });
 
+        const entrypoint = assembly.invokeDecls.get(entrypointname) as MIRInvokeBodyDecl;
+        const mainsig = `int main(int argc, char** argv)`;
+        const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
+        const convargs = entrypoint.params.map((p, i) => {
+            if(p.type === "NSCore::Bool") {
+                const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool\\n"); exit(1); }`;
+                const conv = `bool ${p.name} = std::string(argv[${i}+1]) == "true";`;
+                return "    " + fchk + "\n    " + conv;
+            }
+            else if(p.type === "NSCore::Int") {
+                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,10}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected Int\\n"); exit(1); }`;
+                const conv = `int64_t ${p.name} = std::stol(std::string(argv[${i}+1]));`;
+                return "    \n    " + fchk + "\n    " + conv;
+            } 
+            else  {
+                const conv = `BSQ::BSQString ${p.name}(std::string(argv[${i}+1]), 1);`;
+                return "    " + conv;
+            }
+        });
+        const callargs = entrypoint.params.map((p) => p.type !== "NSCore::String" ? p.name : `&${p.name}`);
+        const callv = `BSQ::${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
+        const fcall = `fprintf(stdout, "%s\\n", BSQ::Runtime::diagnostic_format(${typeemitter.coerce(callv, typeemitter.getMIRType(entrypoint.resultType), typeemitter.anyType)}).c_str())`;
+
+        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n    try { ${fcall}; fflush(stdout); return 0; } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
+
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
@@ -163,7 +191,7 @@ class CPPEmitter {
             known_property_lists_declare: known_property_lists_declare.sort().join("\n"),
             vfield_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-FIELD RESOLUTION",
             vmethod_decls: "//NOT IMPLEMENTED YET -- NEED TO UPDATE MIR TO DO EXACT V-METHOD RESOLUTION",
-            entryname: typeemitter.mangleStringForCpp(entrypoint)
+            maincall: maincall
         };
     }
 }

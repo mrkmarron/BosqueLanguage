@@ -12,6 +12,7 @@ import { CallGInfo, constructCallGraphInfo } from "../../compiler/mir_callg";
 import { CoreImplBodyText } from "./cppcore_impls";
 
 import * as assert from "assert";
+import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -1250,40 +1251,50 @@ class SMTBodyEmitter {
             else {
                 let cbody = body;
 
-                if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                    return `${decl} \n${cbody.emit("  ")})`;
+                if (idecl.postconditions.length !== 0) {
+                    //
+                    //TODO -- ref parms don't get expanded correctly here -- need to coordinate with def and call here
+                    //
+                    const tbody = this.generateTempName();
+                    const postinvoke = this.invokenameToSMT(MIRKeyGenerator.generateBodyKey("post", idecl.key));
+                    const callpost = new SMTValue(`(${postinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")} ${tbody})`);
+                    cbody = new SMTLet(tbody, new SMTValue(cbody.emit("  ")), new SMTCond(callpost, new SMTValue(tbody), this.generateErrorCreate(idecl.sourceLocation, restype)));
                 }
-                else {
-                    return NOT_IMPLEMENTED<string>("generateInvoke -- Pre/Post");
+
+                if (idecl.preconditions.length !== 0) {
+                    const preinvoke = this.invokenameToSMT(MIRKeyGenerator.generateBodyKey("pre", idecl.key));
+                    const callpre = new SMTValue(idecl.params.length !== 0 ? `(${preinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")})` : preinvoke);
+                    cbody = new SMTCond(callpre, cbody, this.generateErrorCreate(idecl.sourceLocation, restype));
                 }
+
+                return `${decl} \n${cbody.emit("  ")})`;
             }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
             const params = idecl.params.map((arg) => this.varNameToSMTName(arg.name));
-
             return `${decl} \n    ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)}\n)`;
         }
     }
 
-    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+    generateSMTPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
 
-        const args = `(${this.typegen.mangleStringForSMT("this")} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
-        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Bool`;
+        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
+        const decl = `(define-fun ${this.invokenameToSMT(prekey)} (${args.join(" ")}) Bool`;
 
-        this.vtypes = new Map<string, MIRType>();
-        (idecl.invariants[0].vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.typegen.getMIRType(tkey));
-        });
+        const decls = idecl.preconditions.map((pc, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (pc[0].vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
 
-        const decls = idecl.invariants.map((pc, i) => {
-            const blocksi = pc.body;
+            const blocksi = pc[0].body;
             const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
-            const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
-            const calli = (`(${this.invokenameToSMT(invkey)}$${i} ${this.typegen.mangleStringForSMT("this")})`);
+            const decli = `(define-fun ${this.invokenameToSMT(prekey)}$${i} (${args.join(" ")}) Result@Bool \n${bodyi.emit("  ")})`;
+            const calli = (`(${this.invokenameToSMT(prekey)}$${i} ${idecl.params.map((p) => this.varNameToSMTName(p.name)).join(" ")})`);
 
             return [decli, calli];
         });
@@ -1293,7 +1304,70 @@ class SMTBodyEmitter {
             return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
         });
 
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl} \n(and ${declsand.join(" ")}))`;
+        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody}\n)\n`;
+    }
+
+    generateSMTPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+        const restype = this.typegen.getMIRType(idecl.resultType);
+
+        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
+        args.push(`(__result__ ${this.typegen.typeToSMTCategory(restype)})`);
+        const decl = `(define-fun ${this.invokenameToSMT(postkey)} (${args.join(" ")}) Bool`;
+
+        const decls = idecl.postconditions.map((pc, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
+            const blocksi = pc.body;
+            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
+            const decli = `(define-fun ${this.invokenameToSMT(postkey)}$${i} (${args.join(" ")}) Result@Bool \n${bodyi.emit("  ")})`;
+            const calli = (`(${this.invokenameToSMT(postkey)}$${i} ${[idecl.params.map((p) => this.varNameToSMTName(p.name)), "__result__"].join(" ")})`);
+
+            return [decli, calli];
+        });
+
+        const declsand = decls.map((cc) => {
+            const tv = `@tmpvarda@${this.tmpvarctr++}`;
+            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
+        });
+
+        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody})\n`;
+    }
+
+    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+
+        const args = `(${this.varNameToSMTName("this")} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
+        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Bool`;
+
+        const decls = idecl.invariants.map((pc, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
+            const blocksi = pc.body;
+            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
+            const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
+            const calli = (`(${this.invokenameToSMT(invkey)}$${i} ${this.varNameToSMTName("this")})`);
+
+            return [decli, calli];
+        });
+
+        const declsand = decls.map((cc) => {
+            const tv = `@tmpvarda@${this.tmpvarctr++}`;
+            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
+        });
+
+        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody})\n`;
     }
 
     generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {

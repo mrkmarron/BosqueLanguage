@@ -142,7 +142,7 @@ entity Set<T where Indexable> provides Collection<T> {
             return Set<T>::_cons<T>(1, SetEntry<T>{value=v, tail=none});
         }
         else {
-            return Set<T>::_cons<T>(this.size + (ts->has[recursive](v) ? 1 : 0), ts->insert[recursive](v));
+            return Set<T>::_cons<T>(this.size + (!ts->has[recursive](v) ? 1 : 0), ts->insert[recursive](v));
         }
     }
 
@@ -229,7 +229,7 @@ entity Map<K where Indexable, V> provides Object {
             return Map<K, V>::_cons<K, V>(1, MapEntry<K, V>{key=k, value=v, tail=none});
         }
         else {
-            return Map<K, V>::_cons<K, V>(this.size + (tm->has[recursive](k) ? 1 : 0), tm->insert[recursive](k, v));
+            return Map<K, V>::_cons<K, V>(this.size + (!tm->has[recursive](k) ? 1 : 0), tm->insert[recursive](k, v));
         }
     }
 

@@ -71,6 +71,11 @@ if (Commander.verify !== undefined) {
     setImmediate(() => {
         const smt_runtime = Path.join(__dirname, "bmc/runtime/smtruntime.smt2");
 
+        if(massembly.invokeDecls.get(Commander.verify) === undefined) {
+            process.stderr.write("Could not find specified entrypoint!!!\n");
+            process.exit(1);
+        }
+
         const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
         const PODType = massembly.typeMap.get("NSCore::POD") as MIRType;
         if (entrypoint.params.some((p) => !massembly.subtypeOf(massembly.typeMap.get(p.type) as MIRType, PODType))) {
@@ -122,6 +127,17 @@ else {
             return { file: fname, contents: bcontents };
         });
 
+        if(massembly.invokeDecls.get(Commander.compile) === undefined) {
+            process.stderr.write("Could not find specified entrypoint!!!\n");
+            process.exit(1);
+        }
+
+        const entrypoint = massembly.invokeDecls.get(Commander.compile) as MIRInvokeBodyDecl;
+        if (entrypoint.params.some((p) => p.type !== "NSCore::Bool" && p.type !== "NSCore::Int" && p.type !== "NSCore::String")) {
+            process.stderr.write("Only Bool/Int/String are supported for compilation testing!!!\n");
+            process.exit(1);
+        }
+
         const maincpp = "#include \"bsqruntime.h\"\n"
             + "namespace BSQ\n"
             + "{\n/*forward type decls*/\n"
@@ -136,7 +152,7 @@ else {
             + cparams.funcdecls
             + "}\n\n"
             + "\n\n/*main decl*/\n"
-            + `int main(int argc, char** argv) { try { return BSQ::${cparams.entryname}(); } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) }\n`;
+            + cparams.maincall
         linked.push({ file: "main.cpp", contents: maincpp });
 
         linked.forEach((fp) => {

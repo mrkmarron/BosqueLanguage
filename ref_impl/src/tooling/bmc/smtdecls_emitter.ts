@@ -11,10 +11,6 @@ import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRNomina
 
 import * as assert from "assert";
 
-function NOT_IMPLEMENTED<T>(msg: string): T {
-    throw new Error(`Not Implemented: ${msg}`);
-}
-
 type SMTCode = {
     typedecls_fwd: string,
     typedecls: string,
@@ -125,10 +121,14 @@ class SMTEmitter {
                         }
                     }
                     else if (tag === "pre") {
-                        NOT_IMPLEMENTED<void>("Pre");
+                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
+                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                        funcdecls.push(bodyemitter.generateSMTPre(bbup, idcl));
                     }
                     else if (tag === "post") {
-                        NOT_IMPLEMENTED<void>("Post");
+                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
+                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                        funcdecls.push(bodyemitter.generateSMTPost(bbup, idcl));
                     }
                     else if (tag === "invariant") {
                         const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup) as MIRNominalTypeKey) as MIREntityTypeDecl;
@@ -207,10 +207,10 @@ class SMTEmitter {
         let chk = `(assert (is-result_error@${rrtype} @smtres@))`;
 
         if(entrypoint.preconditions.length !== 0) {
-            const excludeprelines = entrypoint.preconditions.map((pre) => pre[0].sinfo);
-            const excludeerrorids = bodyemitter.getErrorIds(...excludeprelines).map((eid) => `(= (error_id (result_error_code@${rrtype} @smtres@)) ${eid})`);
+            const eid = bodyemitter.getErrorIds(entrypoint.sourceLocation)[0];
+            const excludepreid = `(= (error_id (result_error_code@${rrtype} @smtres@)) ${eid})`;
 
-            chk = chk + "\n" + `(assert (or (not (is-result_error (result_error_code@${rrtype} @smtres@))) (not (or ${excludeerrorids.join("\n")})))`;
+            chk = chk + "\n" + `(assert (or (not (is-result_error (result_error_code@${rrtype} @smtres@))) (not ${excludepreid})))`;
         }
 
         const callinfo = resv + "\n" + cassert + "\n" + chk;

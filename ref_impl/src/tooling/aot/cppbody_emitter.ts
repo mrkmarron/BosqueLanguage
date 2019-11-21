@@ -1251,7 +1251,34 @@ class CPPBodyEmitter {
                 return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
             }
             else {
-                return NOT_IMPLEMENTED<{ fwddecl: string, fulldecl: string }>("generateInvoke -- Pre/Post");
+                let prestr = ";";
+                const preargs = idecl.params.map((arg) => this.varNameToCppName(arg.name));
+
+                let poststr = "   return _return_;";
+                const postargs = [...idecl.params.map((arg) => this.varNameToCppName(arg.name)), "_return_"];
+
+                if(idecl.preconditions.length !== 0) {
+                    const preinvoke = `${this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("pre", idecl.key))}(${preargs.join(", ")})`;
+                    prestr = `    ${preinvoke};`;
+                }
+                
+                if(idecl.postconditions.length !== 0) {
+                    const postinvoke = `${this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("post", idecl.key))}(${postargs.join(", ")})`;
+                    poststr = `    ${postinvoke};\n   return _return_;`;
+                }
+
+                const blockstrs = [...this.generatedBlocks].map((blck) => {
+                    const lbl = `${this.labelToCpp(blck[0])}:\n`;
+                    const stmts = blck[1].map((stmt) => "    " + stmt);
+                    if(blck[0] === "exit") {
+                        stmts[stmts.length - 1] = poststr;
+                    }
+                    return lbl + stmts.join("\n");
+                });
+
+                const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
+
+                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${prestr}\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
             }
         }
         else {
@@ -1267,56 +1294,119 @@ class CPPBodyEmitter {
         }
     }
 
-    generateSingleCPPInv(body: MIRBody, invname: string, idecl: MIREntityTypeDecl): { fulldecl: string } {
-        this.typegen.scopectr = 0;
-
-        const decl = `bool ${invname}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} this)`;
-
-        this.vtypes = new Map<string, MIRType>();
-        (body.vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
-        });
-
-        this.generatedBlocks = new Map<string, string[]>();
-
-        const blocks = topologicalOrder(body.body);
-        for (let i = 0; i < blocks.length; ++i) {
-            this.generateBlock(blocks[i]);
-        }
-
-        const blockstrs = [...this.generatedBlocks].map((blck) => {
-            const lbl = `${this.labelToCpp(blck[0])}:\n`;
-            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-            return lbl + stmts;
-        });
-
-        const scopestrs = this.generateCPPVarDecls(idecl.invariants[0], [new MIRFunctionParameter("this", idecl.tkey)]);
-
-        return { fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
-    }
-
-    generateCPPInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateCPPPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.boolType;
+        this.typegen.scopectr = 0;
 
-        const decl = `bool ${this.invokenameToCPP(invkey)}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} this)`;
+        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
 
-        if (idecl.invariants.length === 1) {
-            const icall = this.generateSingleCPPInv(idecl.invariants[0], this.invokenameToCPP(invkey), idecl);
-
-            return { fwddecl: decl + ";", fulldecl: icall.fulldecl };
-        }
-        else {
-            let supportcalls: string[] = [];
-            const decls = idecl.invariants.map((pc, i) => {
-                const icall = this.generateSingleCPPInv(idecl.invariants[0], `${this.invokenameToCPP(invkey)}_INV${i}`, idecl);
-
-                supportcalls = [...supportcalls, icall.fulldecl];
-                return `${this.invokenameToCPP(invkey)}}_INV${i}(this)`;
+        const decls = idecl.preconditions.map((pc, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (pc[0].vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
             });
 
-            return { fwddecl: decl + ";", fulldecl: `${supportcalls.join("\n")}\n${decl}\n{\n  return ${decls.join(" & ")};\n}\n` };
-        }
+            this.generatedBlocks = new Map<string, string[]>();
+
+            const blocks = topologicalOrder(pc[0].body);
+            for (let i = 0; i < blocks.length; ++i) {
+                this.generateBlock(blocks[i]);
+            }
+
+            const blockstrs = [...this.generatedBlocks].map((blck) => {
+                const lbl = `${this.labelToCpp(blck[0])}:\n`;
+                const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+                return lbl + stmts;
+            });
+
+            const decl = `bool ${this.invokenameToCPP(prekey)}${i}(${args.join(", ")})`;
+            const scopestrs = this.generateCPPVarDecls(pc[0], idecl.params);
+
+            const call = `${this.invokenameToCPP(prekey)}${i}(${idecl.params.map((p) => this.varNameToCppName(p.name)).join(", ")})`;
+
+            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, call];
+        });
+
+        const declroot = `void ${this.invokenameToCPP(prekey)}(${args.join(", ")})`;
+        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Pre-condition Failure: ${idecl.iname}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
+    }
+
+    generateCPPPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+        this.typegen.scopectr = 0;
+        const restype = this.typegen.getMIRType(idecl.resultType);
+
+        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
+        args.push(`${this.typegen.typeToCPPType(restype, "parameter")} __result__`);
+
+        const decls = idecl.postconditions.map((pc, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
+            this.generatedBlocks = new Map<string, string[]>();
+
+            const blocks = topologicalOrder(pc.body);
+            for (let i = 0; i < blocks.length; ++i) {
+                this.generateBlock(blocks[i]);
+            }
+
+            const blockstrs = [...this.generatedBlocks].map((blck) => {
+                const lbl = `${this.labelToCpp(blck[0])}:\n`;
+                const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+                return lbl + stmts;
+            });
+
+            const decl = `bool ${this.invokenameToCPP(postkey)}${i}(${args.join(", ")})`;
+            const scopestrs = this.generateCPPVarDecls(pc, idecl.params);
+
+            const call = `${this.invokenameToCPP(postkey)}${i}(${[...idecl.params.map((p) => this.varNameToCppName(p.name)), "__result__"].join(", ")})`;
+
+            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, call];
+        });
+
+        const declroot = `void ${this.invokenameToCPP(postkey)}(${args.join(", ")})`;
+        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Post-condition Failure: ${idecl.iname}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
+    }
+
+    generateCPPInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
+        this.currentFile = idecl.srcFile;
+        this.currentRType = this.typegen.boolType;
+        this.typegen.scopectr = 0;
+
+        const decls = idecl.invariants.map((ic, i) => {
+            this.vtypes = new Map<string, MIRType>();
+            (ic.vtypes as Map<string, string>).forEach((tkey, name) => {
+                this.vtypes.set(name, this.typegen.getMIRType(tkey));
+            });
+
+            this.generatedBlocks = new Map<string, string[]>();
+
+            const blocks = topologicalOrder(ic.body);
+            for (let i = 0; i < blocks.length; ++i) {
+                this.generateBlock(blocks[i]);
+            }
+
+            const blockstrs = [...this.generatedBlocks].map((blck) => {
+                const lbl = `${this.labelToCpp(blck[0])}:\n`;
+                const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
+                return lbl + stmts;
+            });
+
+            const decl = `bool ${this.invokenameToCPP(invkey)}${i}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} ${this.typegen.mangleStringForCpp("this")})`;
+            const scopestrs = this.generateCPPVarDecls(idecl.invariants[0], [new MIRFunctionParameter(this.typegen.mangleStringForCpp("this"), idecl.tkey)]);
+
+            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, `${this.invokenameToCPP(invkey)}${i}(${this.typegen.mangleStringForCpp("this")})`];
+        });
+
+        const declroot = `void ${this.invokenameToCPP(invkey)}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} ${this.typegen.mangleStringForCpp("this")})`;
+        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Invariant Failure: ${idecl.ns}::${idecl.name}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
+        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
     }
 
     generateCPPConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): { fwddecl: string, fulldecl: string } | undefined {
