@@ -103,7 +103,8 @@ class TestRunner {
     }
 
     loadTestSet(testdir: string) {
-        const tdata = JSON.parse(FS.readFileSync(Path.join(testdir, "test.json")).toString());
+        const testpath = Path.normalize(Path.join(__dirname, "tests", testdir, "test.json"));
+        const tdata = JSON.parse(FS.readFileSync(testpath).toString());
 
         for (let i = 0; i < tdata.length; ++i) {
             const testentry = tdata[i];
@@ -135,19 +136,19 @@ class TestRunner {
     }
 
     private runCompileTest(testsrc: string, test: CompileTestInfo): string {
-        const runnerapp = Path.join("./test/", "runner.js");
+        const runnerapp = Path.join(__dirname, "runner.js");
         try {
             return execSync(`node ${runnerapp} -c ${testsrc}`).toString().trim();
         }
         catch (ex) {
-            return ex.toString();
+            return ex.message + "\n" + ex.output[1].toString() + "\n" + ex.output[2].toString();
         }
     }
 
     private runAOTTest(testsrc: string, test: ExecuteTestInfo): string {
-        const runnerapp = Path.join("./test/", "runner.js");
+        const runnerapp = Path.join(__dirname, "runner.js");
         try {
-            execSync(`node ${runnerapp} -c "${test.entrypoint}" ${testsrc}`);
+            execSync(`node ${runnerapp} -c "NSTest::${test.entrypoint}" ${testsrc}`);
 
             process.chdir(cppscratch);
             execSync(`${clangpath} -Wall -g -DBDEBUG -o ${cppexe} *.cpp`);
@@ -155,21 +156,21 @@ class TestRunner {
             return res.toString().trim();
         }
         catch (ex) {
-            return ex.toString();
+            return ex.message + "\n" + ex.output[1].toString() + "\n" + ex.output[2].toString();
         }
     }
 
     private runSymbolicTest(testsrc: string, test: SymbolicCheckTestInfo): string {
-        const runnerapp = Path.join("./test/", "runner.js");
+        const runnerapp = Path.join(__dirname, "runner.js");
         try {
-            execSync(`node ${runnerapp} -c "${test.entrypoint}" ${testsrc}`);
+            execSync(`node ${runnerapp} -c "NStest::${test.entrypoint}" ${testsrc}`);
         
             process.chdir(smtscratch);
             const res = execSync(`${z3path} -smt2 scratch.smt2`);
             return res.toString().trim();
         }
         catch (ex) {
-            return ex.toString();
+            return ex.message + "\n" + ex.output[1].toString() + "\n" + ex.output[2].toString();
         }
     }
 
@@ -187,11 +188,12 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.compiler_tests.length; ++i) {
             const ctest = ts.tests.compiler_tests[i];
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
 
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
 
-            const cr = this.runCompileTest(ts.tests.src, ctest);
+            const cr = this.runCompileTest(testsrc, ctest);
             if (ctest.expected === cr) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${ctest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
@@ -208,11 +210,12 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.aot_tests.length; ++i) {
             const ctest = ts.tests.aot_tests[i];
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
 
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
 
-            const cr = this.runAOTTest(ts.tests.src, ctest);
+            const cr = this.runAOTTest(testsrc, ctest);
             if (ctest.expected === cr) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${ctest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
@@ -229,11 +232,12 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.symbolic_tests.length; ++i) {
             const vtest = ts.tests.symbolic_tests[i];
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
 
             process.stdout.write(`Running ${vtest.name}...`);
             const tstart = Date.now();
 
-            const cr = this.runSymbolicTest(ts.tests.src, vtest);
+            const cr = this.runSymbolicTest(testsrc, vtest);
             if (vtest.expected === cr) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${vtest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
@@ -295,7 +299,7 @@ function runAll() {
     runner.run();
 }
 
-export { runAll, TestInfo, TestSet };
+export { runAll };
 
 ////
 //Entrypoint

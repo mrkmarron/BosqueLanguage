@@ -54,12 +54,12 @@ Commander
 
 Commander.parse(process.argv);
 
-if (Commander.args.length === 0) {
+if (Commander.typecheck === undefined && Commander.args.length === 0) {
     process.stdout.write("Error -- Please specify at least one source file as an argument");
     process.exit(1);
 }
 
-const massembly = generateMASM(Commander.args, Commander.verify ? "src/core/direct/" : "src/core/direct/");
+const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", Commander.verify ? "core/direct/" : "core/direct/")));
 
 if(Commander.typecheck !== undefined) {
     ; //generate MASM will output errors and exit if there are any
