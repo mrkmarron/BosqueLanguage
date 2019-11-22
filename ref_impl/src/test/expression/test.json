@@ -1,0 +1,45 @@
+[
+    {
+        "src": "literals.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literalNone",
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literalTrue",
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literalFalse",
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literal1",
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literal3",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literalEmptyString",
+                "expected": "\"\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "literalHello",
+                "expected": "\"hello\""
+            }
+        ]
+    }
+]

@@ -3,30 +3,25 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-//
-//THIS IS A TEMPORARY RUNNER FILE FOR THE SMT AND COMPILER WHILE WE BOOTSTRAP -- DELETE LATER
-//
-
 import * as FS from "fs";
 import * as Path from "path";
 
 import * as Commander from "commander";
 import { MIRAssembly, PackageConfig, MIRInvokeBodyDecl, MIRType } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
-import { CPPEmitter } from "./aot/cppdecls_emitter";
-import { SMTEmitter } from "./bmc/smtdecls_emitter";
+import { CPPEmitter } from "../tooling/aot/cppdecls_emitter";
+import { SMTEmitter } from "../tooling/bmc/smtdecls_emitter";
+
+const scratchroot = Path.normalize(Path.join(__dirname, "../scratch/"));
+const binroot = Path.normalize(Path.join(__dirname, "../"));
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
-    process.stdout.write("Reading code...\n");
-
-    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
-
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, corelibpath, "/core.bsq");
+        const coredir = Path.join(corelibpath, "/core.bsq");
         const coredata = FS.readFileSync(coredir).toString();
 
-        const collectionsdir = Path.join(bosque_dir, corelibpath, "/collections.bsq");
+        const collectionsdir = Path.join(corelibpath, "/collections.bsq");
         const collectionsdata = FS.readFileSync(collectionsdir).toString();
 
         code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
@@ -39,8 +34,6 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
         process.stdout.write(`Read failed with exception -- ${ex}\n`);
         process.exit(1);
     }
-
-    process.stdout.write("Compiling assembly...\n");
 
     const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), true, true, true, code);
     if (errors.length !== 0) {
@@ -55,6 +48,7 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
 }
 
 Commander
+    .option("-t --typecheck", "Parse and Typecheck")
     .option("-v --verify <entrypoint>", "Check for errors reachable from specified entrypoint")
     .option("-c --compile <entrypoint>", "Compile the specified entrypoint");
 
@@ -67,9 +61,12 @@ if (Commander.args.length === 0) {
 
 const massembly = generateMASM(Commander.args, Commander.verify ? "src/core/direct/" : "src/core/direct/");
 
-if (Commander.verify !== undefined) {
+if(Commander.typecheck !== undefined) {
+    ; //generate MASM will output errors and exit if there are any
+}
+else if (Commander.verify !== undefined) {
     setImmediate(() => {
-        const smt_runtime = Path.join(__dirname, "bmc/runtime/smtruntime.smt2");
+        const smt_runtime = Path.join(binroot, "bmc/runtime/smtruntime.smt2");
 
         if(massembly.invokeDecls.get(Commander.verify) === undefined) {
             process.stderr.write("Could not find specified entrypoint!!!\n");
@@ -98,16 +95,18 @@ if (Commander.verify !== undefined) {
             .replace(";;SUBTYPE_DECLS;;", sparams.typechecks)
             .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls)
             .replace(";;ARG_VALUES;;", sparams.args_info)
-            .replace(";;INVOKE_ACTION;;", sparams.main_info)
-            .replace(";;GET_MODEL;;", "(get-model)");
+            .replace(";;INVOKE_ACTION;;", sparams.main_info);
 
-        const outfile = Path.join("c:\\Users\\marron\\Desktop\\smt_scratch\\", "scratch.smt2");
+        const smtpath = Path.join(scratchroot, "smt");
+        FS.mkdirSync(smtpath, { recursive: true });
+
+        const outfile = Path.join(smtpath, "scratch.smt2");
         FS.writeFileSync(outfile, contents);
     });
 }
 else {
     setImmediate(() => {
-        const cpp_runtime = Path.join(__dirname, "aot/runtime/");
+        const cpp_runtime = Path.join(binroot, "aot/runtime/");
 
         const cparams = CPPEmitter.emit(massembly, Commander.compile);
         const lsrc = FS.readdirSync(cpp_runtime);
@@ -155,8 +154,11 @@ else {
             + cparams.maincall
         linked.push({ file: "main.cpp", contents: maincpp });
 
+        const cpppath = Path.join(scratchroot, "cpp");
+        FS.mkdirSync(cpppath, { recursive: true });
+
         linked.forEach((fp) => {
-            const outfile = Path.join("c:\\Users\\marron\\Desktop\\cpp_scratch\\", fp.file);
+            const outfile = Path.join(cpppath, fp.file);
             FS.writeFileSync(outfile, fp.contents);
         });
     });
