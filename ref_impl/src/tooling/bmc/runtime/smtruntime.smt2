@@ -59,9 +59,6 @@
 (declare-const bsqrecord_array_empty (Array String bsqrecord_entry))
 (assert (= bsqrecord_array_empty ((as const (Array String bsqrecord_entry)) bsqrecord_entry@clear)))
 
-(declare-const bsqarray_array_empty (Array Int BTerm))
-(assert (= bsqarray_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
-
 (declare-const bsqentity_array_empty (Array String BTerm))
 (assert (= bsqentity_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))
 

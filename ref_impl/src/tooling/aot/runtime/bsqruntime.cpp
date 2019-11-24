@@ -18,11 +18,6 @@ constexpr const char* s_nominaltypenames[] = {
 //%%NOMINAL_TYPE_DISPLAY_NAMES
 };
 
-constexpr const char* s_arraytypenames[] = {
-    "[INVALID]",
-//%%ARRAY_TYPE_DISPLAY_NAMES
-};
-
 std::string Runtime::diagnostic_format(Value v)
 {
     if(BSQ_IS_VALUE_NONE(v))
@@ -42,7 +37,7 @@ std::string Runtime::diagnostic_format(Value v)
         const BSQRef* vv = BSQ_GET_VALUE_PTR(v, const BSQRef);
         if(dynamic_cast<const BSQString*>(vv) != nullptr)
         {
-            return dynamic_cast<const BSQString*>(vv)->sdata;
+            return std::string("\"") + dynamic_cast<const BSQString*>(vv)->sdata + std::string("\"");
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {
@@ -117,23 +112,6 @@ std::string Runtime::diagnostic_format(Value v)
                 rvals += std::string(Runtime::propertyNames[(int32_t)rv->entries.at(i).first]) + " " + Runtime::diagnostic_format(rv->entries.at(i).second);
             }
             rvals += "}";
-
-            return rvals;
-        }
-        else if(dynamic_cast<const BSQArray*>(vv) != nullptr)
-        {
-            auto arr = dynamic_cast<const BSQArray*>(vv);
-            std::string rvals("[|");
-            for (size_t i = 0; i < arr->contents.size(); ++i)
-            {
-                if(i != 0)
-                {
-                    rvals += ", ";
-                }
-
-                rvals += Runtime::diagnostic_format(arr->contents[i]);
-            }
-            rvals += "|]";
 
             return rvals;
         }

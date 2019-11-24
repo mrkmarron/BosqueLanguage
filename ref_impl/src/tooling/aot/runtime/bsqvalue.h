@@ -682,23 +682,6 @@ public:
     }
 };
 
-class BSQArray : public BSQRef
-{
-public:
-    const MIRArrayTypeEnum atype;
-    const std::vector<Value> contents;
-
-    BSQArray(MIRArrayTypeEnum atype, std::vector<Value>&& contents) : BSQRef(), atype(atype), contents(move(contents)) { ; }
-
-    virtual ~BSQArray()
-    {
-        for(size_t i = 0; i < this->contents.size(); ++i)
-        {
-            BSQRef::checkedDecrement(this->contents[i]);
-        }
-    }
-};
-
 class BSQObject : public BSQRef
 {
 public:

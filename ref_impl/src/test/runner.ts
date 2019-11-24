@@ -66,7 +66,7 @@ if(Commander.typecheck !== undefined) {
 }
 else if (Commander.verify !== undefined) {
     setImmediate(() => {
-        const smt_runtime = Path.join(binroot, "bmc/runtime/smtruntime.smt2");
+        const smt_runtime = Path.join(binroot, "tooling/bmc/runtime/smtruntime.smt2");
 
         if(massembly.invokeDecls.get(Commander.verify) === undefined) {
             process.stderr.write("Could not find specified entrypoint!!!\n");
@@ -106,10 +106,10 @@ else if (Commander.verify !== undefined) {
 }
 else {
     setImmediate(() => {
-        const cpp_runtime = Path.join(binroot, "aot/runtime/");
+        const cpp_runtime = Path.join(binroot, "tooling/aot/runtime/");
 
         const cparams = CPPEmitter.emit(massembly, Commander.compile);
-        const lsrc = FS.readdirSync(cpp_runtime);
+        const lsrc = FS.readdirSync(cpp_runtime).filter((name) => name.endsWith(".h") || name.endsWith(".cpp"));
         const linked = lsrc.map((fname) => {
             const contents = FS.readFileSync(Path.join(cpp_runtime, fname)).toString();
             const bcontents = contents

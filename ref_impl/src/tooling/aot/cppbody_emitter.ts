@@ -1243,7 +1243,13 @@ class CPPBodyEmitter {
                 const blockstrs = [...this.generatedBlocks].map((blck) => {
                     const lbl = `${this.labelToCpp(blck[0])}:\n`;
                     const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-                    return lbl + stmts;
+
+                    if(lbl.startsWith("entry:")) {
+                        return stmts;
+                    }
+                    else {
+                        return lbl + stmts;
+                    }
                 });
 
                 const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
@@ -1273,7 +1279,13 @@ class CPPBodyEmitter {
                     if(blck[0] === "exit") {
                         stmts[stmts.length - 1] = poststr;
                     }
-                    return lbl + stmts.join("\n");
+
+                    if(lbl.startsWith("entry:")) {
+                        return stmts.join("\n");
+                    }
+                    else {
+                        return lbl + stmts.join("\n");
+                    }
                 });
 
                 const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
@@ -1317,7 +1329,13 @@ class CPPBodyEmitter {
             const blockstrs = [...this.generatedBlocks].map((blck) => {
                 const lbl = `${this.labelToCpp(blck[0])}:\n`;
                 const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-                return lbl + stmts;
+
+                if(lbl.startsWith("entry:")) {
+                    return stmts;
+                }
+                else {
+                    return lbl + stmts;
+                }
             });
 
             const decl = `bool ${this.invokenameToCPP(prekey)}${i}(${args.join(", ")})`;
@@ -1358,7 +1376,13 @@ class CPPBodyEmitter {
             const blockstrs = [...this.generatedBlocks].map((blck) => {
                 const lbl = `${this.labelToCpp(blck[0])}:\n`;
                 const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-                return lbl + stmts;
+
+                if (lbl.startsWith("entry:")) {
+                    return stmts;
+                }
+                else {
+                    return lbl + stmts;
+                }
             });
 
             const decl = `bool ${this.invokenameToCPP(postkey)}${i}(${args.join(", ")})`;
@@ -1395,7 +1419,13 @@ class CPPBodyEmitter {
             const blockstrs = [...this.generatedBlocks].map((blck) => {
                 const lbl = `${this.labelToCpp(blck[0])}:\n`;
                 const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-                return lbl + stmts;
+
+                if(lbl.startsWith("entry:")) {
+                    return stmts;
+                }
+                else {
+                    return lbl + stmts;
+                }
             });
 
             const decl = `bool ${this.invokenameToCPP(invkey)}${i}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} ${this.typegen.mangleStringForCpp("this")})`;
@@ -1443,7 +1473,13 @@ class CPPBodyEmitter {
         const blockstrs = [...this.generatedBlocks].map((blck) => {
             const lbl = `${this.labelToCpp(blck[0])}:\n`;
             const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-            return lbl + stmts;
+
+            if(lbl.startsWith("entry:")) {
+                return stmts;
+            }
+            else {
+                return lbl + stmts;
+            }
         });
 
         const scopestrs = this.generateCPPVarDecls(cdecl.value, []);
@@ -1492,7 +1528,13 @@ class CPPBodyEmitter {
         const blockstrs = [...this.generatedBlocks].map((blck) => {
             const lbl = `${this.labelToCpp(blck[0])}:\n`;
             const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-            return lbl + stmts;
+
+            if(lbl.startsWith("entry:")) {
+                return stmts;
+            }
+            else {
+                return lbl + stmts;
+            }
         });
 
         const scopestrs = this.generateCPPVarDecls(fdbody, []);

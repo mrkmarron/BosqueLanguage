@@ -11,17 +11,21 @@ import chalk from "chalk";
 
 let platpathcpp: string | undefined = undefined;
 let platpathsmt: string | undefined = undefined;
+let platexe: string | undefined = undefined;
 if (process.platform === "win32") {
-    platpathcpp = Path.resolve("bin/win/clang.exe");
-    platpathsmt = Path.resolve("bin/win/z3.exe");
+    platpathcpp = "bin/win/clang.exe";
+    platpathsmt = "bin/win/z3.exe";
+    platexe = "doit.exe";
 }
 else if (process.platform === "linux") {
-    platpathcpp = Path.resolve("bin/linux/clang");
-    platpathsmt = Path.resolve("bin/win/z3");
+    platpathcpp = "bin/linux/clang";
+    platpathsmt = "bin/win/z3";
+    platexe = "doit.out";
 }
 else {
-    platpathcpp = Path.resolve("bin/macos/clang");
-    platpathsmt = Path.resolve("bin/win/z3");
+    platpathcpp = "bin/macos/clang";
+    platpathsmt = "bin/win/z3";
+    platexe = "doit.out";
 }
 
 const testxml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -88,12 +92,12 @@ type TestSet = {
 const scratchroot = Path.normalize(Path.join(__dirname, "../scratch/"));
 
 const cppscratch = Path.normalize(Path.join(scratchroot, "cpp/"));
-const cppexe = Path.normalize(Path.join(cppscratch, "doit"));
+const cppexe = Path.normalize(Path.join(cppscratch, platexe));
 
 const smtscratch = Path.normalize(Path.join(scratchroot, "smt/"));
 
-const clangpath = Path.normalize(Path.join(__dirname, "../bin/tooling/aot/runtime", platpathcpp));
-const z3path = Path.normalize(Path.join(__dirname, "../bin/tooling/bmc/runtime", platpathsmt));
+const clangpath = Path.normalize(Path.join(__dirname, "../tooling/aot/runtime", platpathcpp));
+const z3path = Path.normalize(Path.join(__dirname, "../tooling/bmc/runtime", platpathsmt));
 
 class TestRunner {
     tests: TestSet[];
@@ -138,7 +142,7 @@ class TestRunner {
     private runCompileTest(testsrc: string, test: CompileTestInfo): string {
         const runnerapp = Path.join(__dirname, "runner.js");
         try {
-            return execSync(`node ${runnerapp} -c ${testsrc}`).toString().trim();
+            return execSync(`node ${runnerapp} -t ${testsrc}`).toString().trim();
         }
         catch (ex) {
             return ex.message + "\n" + ex.output[1].toString() + "\n" + ex.output[2].toString();
@@ -163,7 +167,7 @@ class TestRunner {
     private runSymbolicTest(testsrc: string, test: SymbolicCheckTestInfo): string {
         const runnerapp = Path.join(__dirname, "runner.js");
         try {
-            execSync(`node ${runnerapp} -c "NStest::${test.entrypoint}" ${testsrc}`);
+            execSync(`node ${runnerapp} -v "NStest::${test.entrypoint}" ${testsrc}`);
         
             process.chdir(smtscratch);
             const res = execSync(`${z3path} -smt2 scratch.smt2`);
@@ -188,7 +192,7 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.compiler_tests.length; ++i) {
             const ctest = ts.tests.compiler_tests[i];
-            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
 
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
@@ -210,7 +214,7 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.aot_tests.length; ++i) {
             const ctest = ts.tests.aot_tests[i];
-            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
 
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
@@ -232,7 +236,7 @@ class TestRunner {
 
         for(let i = 0; i < ts.tests.symbolic_tests.length; ++i) {
             const vtest = ts.tests.symbolic_tests[i];
-            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.tests.src));
+            const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
 
             process.stdout.write(`Running ${vtest.name}...`);
             const tstart = Date.now();

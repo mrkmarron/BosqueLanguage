@@ -123,7 +123,7 @@ class CPPEmitter {
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
             conststring_declare.push(`static BSQString ${v};`);
-            conststring_create.push(`BSQString Runtime::${v}(move(std::string(${k})), 1);`);
+            conststring_create.push(`BSQString Runtime::${v}(std::string(${k}), 1);`);
         });
 
         let propertyenums: Set<string> = new Set<string>();
@@ -152,6 +152,7 @@ class CPPEmitter {
         });
 
         const entrypoint = assembly.invokeDecls.get(entrypointname) as MIRInvokeBodyDecl;
+        const restype = typeemitter.getMIRType(entrypoint.resultType);
         const mainsig = `int main(int argc, char** argv)`;
         const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
         const convargs = entrypoint.params.map((p, i) => {
@@ -170,11 +171,15 @@ class CPPEmitter {
                 return "    " + conv;
             }
         });
-        const callargs = entrypoint.params.map((p) => p.type !== "NSCore::String" ? p.name : `&${p.name}`);
+        let callargs = entrypoint.params.map((p) => p.type !== "NSCore::String" ? p.name : `&${p.name}`);
+        if(typeemitter.maybeRefableCountableType(restype)) {
+            callargs.push("__scopes__.getCallerSlot<0>()");
+        }
+        const scopev = typeemitter.maybeRefableCountableType(restype) ? "BSQ::BSQRefScope<1> __scopes__;" : "";
         const callv = `BSQ::${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
-        const fcall = `fprintf(stdout, "%s\\n", BSQ::Runtime::diagnostic_format(${typeemitter.coerce(callv, typeemitter.getMIRType(entrypoint.resultType), typeemitter.anyType)}).c_str())`;
+        const fcall = `fprintf(stdout, "%s\\n", BSQ::Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}).c_str())`;
 
-        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n    try { ${fcall}; fflush(stdout); return 0; } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
+        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
