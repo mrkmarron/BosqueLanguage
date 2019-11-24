@@ -18,8 +18,8 @@
         "chalk": "~2.4.2"
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json && xcopy \"src\\core\" \"bin\\core\" /s /i /y && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y && xcopy \"src\\tooling\\bmc\\runtime\" \"bin\\tooling\\bmc\\runtime\" /s /i /y",
-        "test": "tsc -p tsconfig.json && xcopy \"src\\core\" \"bin\\core\" /s /i /y && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y && xcopy \"src\\tooling\\bmc\\runtime\" \"bin\\tooling\\bmc\\runtime\" /s /i /y && node ./bin/test/test_runner.js"
+        "build": "tsc -p tsconfig.json && xcopy \"src\\core\" \"bin\\core\" /s /i /y && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y && xcopy \"src\\tooling\\bmc\\runtime\" \"bin\\tooling\\bmc\\runtime\" /s /i /y && xcopy \"src\\test\\tests\" \"bin\\test\\tests\" /s /i /y",
+        "test": "tsc -p tsconfig.json && xcopy \"src\\core\" \"bin\\core\" /s /i /y && xcopy \"src\\tooling\\aot\\runtime\" \"bin\\tooling\\aot\\runtime\" /s /i /y && xcopy \"src\\tooling\\bmc\\runtime\" \"bin\\tooling\\bmc\\runtime\" /s /i /y && xcopy \"src\\test\\tests\" \"bin\\test\\tests\" /s /i /y && node ./bin/test/test_runner.js"
     },
     "files": [
         "bin/*"

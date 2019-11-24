@@ -39,6 +39,10 @@
                 "kind": "aot",
                 "entrypoint": "literalHello",
                 "expected": "\"hello\""
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "literal1"
             }
         ]
     }

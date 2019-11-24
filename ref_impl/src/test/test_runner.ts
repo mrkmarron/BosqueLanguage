@@ -64,7 +64,7 @@ class SymbolicCheckTestInfo extends TestInfo {
     readonly entrypoint: string;
 
     constructor(name: string, entry: string, error: boolean | undefined) {
-        super(`${name}@symbolic_test--${entry}`, (error === true) ? "(sat)" : "(unsat)");
+        super(`${name}@symbolic_test--${entry}`, (error === true) ? "sat" : "unsat");
         this.entrypoint = entry;
     }
 }
@@ -126,7 +126,7 @@ class TestRunner {
                 else if (test.kind === "aot") {
                     aot_tests.push(new ExecuteTestInfo(src, test.entrypoint, test.expected, aot_tests.length, test.args));
                 }
-                else if (test.kind === "symtest") {
+                else if (test.kind === "sym") {
                     symbolic_tests.push(new SymbolicCheckTestInfo(src, test.entrypoint, test.error));
                 }
                 else {
@@ -167,7 +167,7 @@ class TestRunner {
     private runSymbolicTest(testsrc: string, test: SymbolicCheckTestInfo): string {
         const runnerapp = Path.join(__dirname, "runner.js");
         try {
-            execSync(`node ${runnerapp} -v "NStest::${test.entrypoint}" ${testsrc}`);
+            execSync(`node ${runnerapp} -v "NSTest::${test.entrypoint}" ${testsrc}`);
         
             process.chdir(smtscratch);
             const res = execSync(`${z3path} -smt2 scratch.smt2`);
@@ -302,8 +302,6 @@ function runAll() {
 
     runner.run();
 }
-
-export { runAll };
 
 ////
 //Entrypoint
