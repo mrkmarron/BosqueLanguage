@@ -27,6 +27,7 @@ class CPPBodyEmitter {
 
     readonly allPropertyNames: Set<string> = new Set<string>();
     readonly allConstStrings: Map<string, string> = new Map<string, string>();
+    readonly allConstBigInts: Map<string, string> = new Map<string, string>();
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -94,33 +95,38 @@ class CPPBodyEmitter {
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): string {
-        const isinlineable = this.typegen.isPrimitiveType(into);
-
         if (cval instanceof MIRConstantNone) {
             return this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, into);
         }
         else if (cval instanceof MIRConstantTrue) {
-            return isinlineable ? "true" : "BSQ_VALUE_TRUE";
+            return this.typegen.isSimpleBoolType(into) ? "true" : "BSQ_VALUE_TRUE";
         }
         else if (cval instanceof MIRConstantFalse) {
-            return isinlineable ? "false" : "BSQ_VALUE_FALSE";
+            return this.typegen.isSimpleBoolType(into) ? "false" : "BSQ_VALUE_FALSE";
         }
         else if (cval instanceof MIRConstantInt) {
-            if (isinlineable) {
-                return cval.value;
+            if (cval.value === "0") {
+                return "BSQ_VALUE_0";
+            }
+            else if (cval.value === "1") {
+                return "BSQ_VALUE_POS_1";
+            }
+            else if (cval.value === "-1") {
+                return "BSQ_VALUE_NEG_1";
             }
             else {
-                if (cval.value === "0") {
-                    return "BSQ_VALUE_0";
-                }
-                else if (cval.value === "1") {
-                    return "BSQ_VALUE_POS_1";
-                }
-                else if (cval.value === "-1") {
-                    return "BSQ_VALUE_NEG_1";
+                //TODO: we don't support really big constants yet -- will need to do like we do for strings
+                if((-2147483647 - 1) <= Number.parseFloat(cval.value) && Number.parseFloat(cval.value) <= 2147483647) {
+                    return `BSQ_BOX_VALUE_INT(${cval.value})`;
                 }
                 else {
-                    return `BSQ_BOX_VALUE_INT(${cval.value})`;
+                    const sname = "BIGINT__" + this.allConstStrings.size;
+                    if (!this.allConstBigInts.has(cval.value)) {
+                        this.allConstBigInts.set(cval.value, sname);
+                    }
+        
+                    return `(&Runtime::${this.allConstBigInts.get(cval.value) as string})`;
+
                 }
             }
         }
@@ -128,7 +134,7 @@ class CPPBodyEmitter {
             assert(cval instanceof MIRConstantString);
 
             const sval = (cval as MIRConstantString).value;
-            const sname = "str$" + this.allConstStrings.size;
+            const sname = "STR__" + this.allConstStrings.size;
             if (!this.allConstStrings.has(sval)) {
                 this.allConstStrings.set(sval, sname);
             }
@@ -221,9 +227,9 @@ class CPPBodyEmitter {
             return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
         });
 
-        const smtctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
+        const cppctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
         const scopevar = this.varNameToCppName("$scope$");
-        const cexp = `${this.varToCppName(cp.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${smtctype}>(new ${smtctype}(${fvals.join(", ")}));`;
+        const cexp = `${this.varToCppName(cp.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new ${cppctype}(${fvals.join(", ")}));`;
         if (ctype.invariants.length === 0) {
             return cexp;
         }
@@ -355,7 +361,22 @@ class CPPBodyEmitter {
         const rtype = this.typegen.getMIRType(ivop.resultType);
         if (this.typegen.maybeRefableCountableType(rtype)) {
             const scopevar = this.varNameToCppName("$scope$");
-            vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
+            if (this.typegen.isTupleType(rtype)) {
+                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(rtype);
+
+                for (let i = 0; i < maxlen; ++i) {
+                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
+                }
+            }
+            else if (this.typegen.isRecordType(rtype)) {
+                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(rtype);
+
+                for (let i = 0; i < allprops.length; ++i) {
+                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);                }
+            }
+            else {
+                vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
+            }
         }
 
         return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.mkey)}(${vals.join(", ")});`;
@@ -381,8 +402,8 @@ class CPPBodyEmitter {
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
             return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
         }
-        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
-            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
+        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
+            return op === "==" ? `BSQ_INT_EQ(${this.argToCpp(lhs, this.typegen.intType)}, ${this.argToCpp(rhs, this.typegen.intType)})` : `BSQ_INT_NEQ(${this.argToCpp(lhs, this.typegen.intType)}, ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
         else {
             return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
@@ -417,7 +438,18 @@ class CPPBodyEmitter {
             return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
         }
         else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
-            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
+            if(op === "<") {
+                return `BSQ_INT_LT(${this.argToCpp(lhs, this.typegen.boolType)}, ${this.argToCpp(rhs, this.typegen.boolType)})`
+            }
+            else if (op === "<=") {
+                return `BSQ_INT_LTEQ(${this.argToCpp(lhs, this.typegen.boolType)}, ${this.argToCpp(rhs, this.typegen.boolType)})`
+            }
+            else if (op === ">") {
+                return `BSQ_INT_LT(${this.argToCpp(rhs, this.typegen.boolType)}, ${this.argToCpp(lhs, this.typegen.boolType)})`
+            }
+            else {
+                return `BSQ_INT_LTEQ(${this.argToCpp(rhs, this.typegen.boolType)}, ${this.argToCpp(lhs, this.typegen.boolType)})`
+            }
         }
         else {
             return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
@@ -544,7 +576,7 @@ class CPPBodyEmitter {
     }
 
     generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType, inline: boolean): string {
-        if(this.typegen.isPrimitiveType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             return "false";
         }
         else if (this.typegen.isTupleType(argtype)) {
@@ -600,7 +632,7 @@ class CPPBodyEmitter {
     }
 
     generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType, inline: boolean): string {
-        if(this.typegen.isPrimitiveType(argtype) || this.typegen.isTupleType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype)) {
             return "false;"
         }
         else if (this.typegen.isRecordType(argtype)) {
@@ -661,7 +693,7 @@ class CPPBodyEmitter {
     }
 
     generateFastEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIREntityType): string {
-        if(this.typegen.isPrimitiveType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             return argtype.options[0].trkey === oftype.trkey ? "true" : "false";
         }
         else if(this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
@@ -726,7 +758,7 @@ class CPPBodyEmitter {
             tests.push("true");
         }
         else if(oftype.trkey === "NSCore::Some") {
-            if(this.typegen.isPrimitiveType(argtype) || this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
+            if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
                 tests.push("true");
             }
             else if (this.typegen.isUEntityType(argtype)) {
@@ -738,7 +770,7 @@ class CPPBodyEmitter {
                 tests.push(`BSQ_IS_VALUE_NONNONE(${arg})`);
             }
         }
-        else if(this.typegen.isPrimitiveType(argtype)) {
+        else if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             tests.push(...[this.typegen.boolType, this.typegen.intType, this.typegen.stringType].map((spe) => this.generateFastEntityTypeCheck(arg, argtype, spe.options[0] as MIREntityType)));
         }
         else if(this.typegen.isTupleType(argtype)) {
@@ -1160,9 +1192,10 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
+            xxxx;
             const cslotvar = this.varNameToCppName("$callerslot$");
             if (this.typegen.maybeRefableCountableType(this.currentRType)) {
-                if (!this.assembly.subtypeOf(this.typegen.boolType, this.currentRType) && !this.assembly.subtypeOf(this.typegen.intType, this.currentRType)) {
+                if (this.typegen.isUEntityType(this.currentRType)) {
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
                         gblock.push(`BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`);
                     }
@@ -1221,6 +1254,8 @@ class CPPBodyEmitter {
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
 
         if (this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
+            xxxx;
+
             const cslotvar = this.varNameToCppName("$callerslot$");
             args.push(`BSQRef** ${cslotvar}`);
         }

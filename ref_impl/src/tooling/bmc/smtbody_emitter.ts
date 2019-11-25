@@ -25,6 +25,8 @@ class SMTBodyEmitter {
     readonly typegen: SMTTypeEmitter;
     readonly callg: CallGInfo;
 
+    readonly allConstStrings: Map<string, string> = new Map<string, string>();
+
     private errorCodes = new Map<string, number>();
     private bmcCodes = new Map<string, number>();
     private bmcGas = new Map<string, number>();
@@ -126,24 +128,28 @@ class SMTBodyEmitter {
     }
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): SMTExp {
-        const isinlineable = this.typegen.isPrimitiveType(into);
-
         if (cval instanceof MIRConstantNone) {
             return this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, into);
         }
         else if (cval instanceof MIRConstantTrue) {
-            return new SMTValue(isinlineable ? "true" : "bsqterm_true_const");
+            return new SMTValue(this.typegen.isSimpleBoolType(into) ? "true" : "bsqterm_true_const");
         }
         else if (cval instanceof MIRConstantFalse) {
-            return new SMTValue(isinlineable ? "false" : "bsqterm_false_const");
+            return new SMTValue(this.typegen.isSimpleBoolType(into) ? "false" : "bsqterm_false_const");
         }
         else if (cval instanceof MIRConstantInt) {
-            return new SMTValue(isinlineable ? cval.value : `(bsqterm_int ${cval.value})`);
+            return new SMTValue(this.typegen.isSimpleIntType(into) ? cval.value : `(bsqterm_int ${cval.value})`);
         }
         else {
             assert(cval instanceof MIRConstantString);
 
-            return new SMTValue(isinlineable ? (cval as MIRConstantString).value : `(bsqterm_string ${(cval as MIRConstantString).value})`);
+            const sval = (cval as MIRConstantString).value;
+            const sname = "str@" + this.allConstStrings.size;
+            if (!this.allConstStrings.has(sval)) {
+                this.allConstStrings.set(sval, sname);
+            }
+
+            return new SMTValue(this.allConstStrings.get(sval) as string);
         }
     }
 
@@ -617,7 +623,7 @@ class SMTBodyEmitter {
     }
 
     generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType, inline: boolean, gas: number): string {
-        if(this.typegen.isPrimitiveType) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             return "false";
         }
         if (this.typegen.isTupleType(argtype)) {
@@ -673,7 +679,10 @@ class SMTBodyEmitter {
     }
 
     generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType, inline: boolean, gas: number): string {
-        if (this.typegen.isRecordType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype)) {
+            return "false";
+        }
+        else if (this.typegen.isRecordType(argtype)) {
             if (this.typegen.isKnownLayoutRecordType(argtype)) {
                 const arecord = SMTTypeEmitter.getKnownLayoutRecordType(argtype);
                 if(arecord.entries.length === 0) {
@@ -727,7 +736,7 @@ class SMTBodyEmitter {
     }
 
     generateFastEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIREntityType): string {
-        if(this.typegen.isPrimitiveType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             return argtype.options[0].trkey === oftype.trkey ? "true" : "false";
         }
         else if(this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
@@ -792,7 +801,7 @@ class SMTBodyEmitter {
             tests.push("true");
         }
         else if(oftype.trkey === "NSCore::Some") {
-            if(this.typegen.isPrimitiveType(argtype) || this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
+            if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
                 tests.push("true");
             }
             else if (this.typegen.isUEntityType(argtype)) {
@@ -804,7 +813,7 @@ class SMTBodyEmitter {
                 tests.push(`(= ${arg} bsqterm_none)`);
             }
         }
-        else if(this.typegen.isPrimitiveType(argtype)) {
+        else if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             tests.push(...[this.typegen.boolType, this.typegen.intType, this.typegen.stringType].map((spe) => this.generateFastEntityTypeCheck(arg, argtype, spe.options[0] as MIREntityType)));
         }
         else if(this.typegen.isTupleType(argtype)) {
@@ -1055,13 +1064,13 @@ class SMTBodyEmitter {
                 const bop = op as MIRBinOp;
 
                 const restmp = this.generateTempName();
-                let smtconds = [`(< ${restmp} BINT_MIN)`, `(< BINT_MAX ${restmp})`];
                 if (bop.op === "/" || bop.op === "%") {
-                    smtconds.push(`(= ${restmp} 0)`);
+                    const ite = new SMTCond(new SMTValue(`(= ${restmp} 0)`), this.generateErrorCreate(op.sinfo, this.typegen.typeToSMTCategory(this.currentRType)), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
+                    return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
                 }
-                const ite = new SMTCond(new SMTValue(`(or ${smtconds.join(" ")})`), this.generateErrorCreate(op.sinfo, this.typegen.typeToSMTCategory(this.currentRType)), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
-
-                return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
+                else {
+                    return new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`));
+                }
             }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;

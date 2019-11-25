@@ -194,6 +194,10 @@ class TestRunner {
             const ctest = ts.tests.compiler_tests[i];
             const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
 
+            if(singletest !== undefined && singletest != ctest.name) {
+                continue;
+            }
+
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
 
@@ -216,6 +220,10 @@ class TestRunner {
             const ctest = ts.tests.aot_tests[i];
             const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
 
+            if(singletest !== undefined && singletest != ctest.name) {
+                continue;
+            }
+
             process.stdout.write(`Running ${ctest.name}...`);
             const tstart = Date.now();
 
@@ -237,6 +245,10 @@ class TestRunner {
         for(let i = 0; i < ts.tests.symbolic_tests.length; ++i) {
             const vtest = ts.tests.symbolic_tests[i];
             const testsrc = Path.normalize(Path.join(__dirname, "tests", ts.dir, ts.tests.src));
+
+            if(singletest !== undefined && singletest != vtest.name) {
+                continue;
+            }
 
             process.stdout.write(`Running ${vtest.name}...`);
             const tstart = Date.now();
@@ -305,5 +317,7 @@ function runAll() {
 
 ////
 //Entrypoint
+
+const singletest = process.argv[2];
 
 setImmediate(() => runAll());

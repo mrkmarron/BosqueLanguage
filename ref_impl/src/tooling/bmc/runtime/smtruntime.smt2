@@ -15,6 +15,7 @@
 
 (declare-datatypes ( 
       (BTerm 0)
+      (bsqstring 0)
       (bsqtuple_entry 0)
       (bsqtuple_0 0)
     ;;FIXED_TUPLE_DECLS_FWD;;
@@ -27,9 +28,9 @@
       (bsqterm_none) 
       (bsqterm_bool (bsqterm_bool_value Bool))
       (bsqterm_int (bsqterm_int_value Int))
-      (bsqterm_string (bsqterm_string_value String))
-      (bsqterm_typedstring (bsqterm_typedstring_type String) (bsqterm_typedstring_value String))
-      (bsqterm_validatedstring (bsqterm_validatedstring_type String) (bsqterm_validatedstring_value String))
+      (bsqterm_string (bsqterm_string_value bsqstring))
+      (bsqterm_typedstring (bsqterm_typedstring_type String) (bsqterm_typedstring_value bsqstring))
+      (bsqterm_validatedstring (bsqterm_validatedstring_type String) (bsqterm_validatedstring_value bsqstring))
       (bsqterm_podbuffer (bsqterm_podbuffer_type String) (bsqterm_podbuffer_value (Array Int Int)))
       (bsqterm_guid (bsqterm_guid_value String))
       (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
@@ -40,6 +41,7 @@
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
+    ( (bsqstring@cons (bsqstring@length Int) (bsqstring@contents (Array Int Int))) )
     ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@term BTerm)) )
     ( (bsqtuple_0@cons) )
   ;;FIXED_TUPLE_DECLS;;
@@ -52,6 +54,9 @@
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))
 (declare-const bsqterm_true_const BTerm) (assert (= bsqterm_true_const (bsqterm_bool true)))
 (declare-const bsqterm_false_const BTerm) (assert (= bsqterm_false_const (bsqterm_bool false)))
+
+(declare-const bsqstring_array_empty (Array Int Int))
+(assert (= bsqstring_array_empty ((as const (Array Int Int)) 0)))
 
 (declare-const bsqtuple_array_empty (Array Int bsqtuple_entry))
 (assert (= bsqtuple_array_empty ((as const (Array Int bsqtuple_entry)) bsqtuple_entry@clear)))
@@ -82,12 +87,6 @@
     ;;FIXED_RECORD_RESULT;;
     ;;NOMINAL_RESULT;;
 ))
-
-(declare-const BINT_MAX Int)
-(assert (= BINT_MAX 4503599627370495))
-
-(declare-const BINT_MIN Int)
-(assert (= BINT_MIN -4503599627370496))
 
 (declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
 

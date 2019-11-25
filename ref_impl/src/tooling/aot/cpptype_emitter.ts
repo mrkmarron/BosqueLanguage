@@ -48,19 +48,18 @@ class CPPTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
-    isPrimitiveType(tt: MIRType): boolean {
-        if (tt.options.length !== 1) {
-            return false;
-        }
-
-        const uname = tt.options[0].trkey;
-        return (uname === "NSCore::Bool" || uname === "NSCore::Int" ||  uname === "NSCore::String");
+    isSimpleBoolType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Bool";
     }
 
-    isNoneable(tt: MIRType): boolean {
-        return tt.options.some((opt) => opt.trkey === "NSCore::None");
+    isSimpleIntType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Int";
     }
 
+    isSimpleStringType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::String";
+    }
+    
     isKnownLayoutTupleType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
             return false;
@@ -116,10 +115,6 @@ class CPPTypeEmitter {
         return true;
     }
 
-    static getPrimitiveType(tt: MIRType): MIREntityType {
-        return tt.options[0] as MIREntityType;
-    }
-
     static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
         return tt.options[0] as MIRTupleType;
     }
@@ -163,16 +158,14 @@ class CPPTypeEmitter {
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {
-        const allinlineable = tt.options.every((opt) => {
+        if(tt.options.every((opt) => {
             const uname = opt.trkey;
-            return (uname === "NSCore::None" || uname === "NSCore::Bool" || uname === "NSCore::Int");
-        });
-
-        if (allinlineable) {
+            return (uname === "NSCore::None" || uname === "NSCore::Bool");
+        })) {
             return false;
         }
 
-        if (this.isTupleType(tt) || this.isRecordType(tt)) {
+        if (tt.options.length === 1 && tt.options[0] instanceof MIREntityType && (this.assembly.entityDecls.get((tt.options[0] as MIREntityType).ekey) as MIREntityTypeDecl).provides.includes("NSCore::Enum")) {
             return false;
         }
 
@@ -180,16 +173,14 @@ class CPPTypeEmitter {
     }
 
     typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "decl"): string {
-        if (this.isPrimitiveType(ttype)) {
-            if (ttype.trkey === "NSCore::Bool") {
-                return "bool";
-            }
-            else if (ttype.trkey === "NSCore::Int") {
-                return "int64_t";
-            }
-            else {
-                return "BSQString" + (declspec !== "base" ? "*" : "");
-            }
+        if (this.isSimpleBoolType(ttype)) {
+            return "bool"
+        }
+        else if (this.isSimpleIntType(ttype)) {
+            return "BSQInt";
+        }
+        else if (this.isSimpleStringType(ttype)) {
+            return "BSQString" + (declspec !== "base" ? "*" : "");
         }
         else if (this.isTupleType(ttype)) {
             return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : "");
@@ -218,16 +209,14 @@ class CPPTypeEmitter {
         if (from.trkey === "NSCore::None") {
             return "BSQ_VALUE_NONE";
         }
-        else if (this.isPrimitiveType(from)) {
-            if (from.trkey === "NSCore::Bool") {
-                return `BSQ_BOX_VALUE_BOOL(${exp})`;
-            }
-            else if (from.trkey === "NSCore::Int") {
-                return `BSQ_BOX_VALUE_INT(${exp})`;
-            }
-            else {
-                return exp;
-            }
+        else if (this.isSimpleBoolType(from)) {
+            return `BSQ_BOX_VALUE_BOOL(${exp})`;
+        }
+        else if (this.isSimpleIntType(from)) {
+            return exp;
+        }
+        else if (this.isSimpleStringType(from)) {
+            return exp;
         }
         else if (this.isTupleType(from)) {
             assert(!(this.isKnownLayoutTupleType(from) && this.isKnownLayoutTupleType(into)), "Shoud be a type error or handled by equality case");
@@ -299,16 +288,14 @@ class CPPTypeEmitter {
         else {
             assert(this.typeToCPPType(from, "base") === "Value", "must be a Value mapped type");
 
-            if (this.isPrimitiveType(into)) {
-                if (into.trkey === "NSCore::Bool") {
-                    return `BSQ_GET_VALUE_BOOL(${exp})`;
-                }
-                else if (into.trkey === "NSCore::Int") {
-                    return `BSQ_GET_VALUE_INT(${exp})`;
-                }
-                else {
-                    return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
-                }
+            if (this.isSimpleBoolType(into)) {
+                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            }
+            else if (this.isSimpleIntType(into)) {
+                return exp;
+            }
+            else if (this.isSimpleStringType(into)) {
+                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
             }
             else if (this.isTupleType(into)) {
                 const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
@@ -354,7 +341,23 @@ class CPPTypeEmitter {
             return arg;
         }
 
-        if (!this.assembly.subtypeOf(this.boolType, argtype) && !this.assembly.subtypeOf(this.intType, argtype)) {
+        if(this.isTupleType(argtype)) {
+            if(this.isKnownLayoutTupleType(argtype)) {
+                return `${arg}.copyWithRefInc()`;
+            }
+            else {
+                return `${arg}.copyWithRefInc()`;
+            }
+        }
+        else if(this.isRecordType(argtype)) {
+            if(this.isKnownLayoutRecordType(argtype)) {
+                return `${arg}.copyWithRefInc()`;
+            }
+            else {
+                return `${arg}.copyWithRefInc()`;
+            }
+        }
+        else if (this.isUEntityType(argtype)) {
             if (this.assembly.subtypeOf(this.noneType, argtype)) {
                 return `BSQRef::checkedIncrementNoneable<${this.typeToCPPType(argtype, "base")}>(${arg})`;
             }
@@ -386,7 +389,23 @@ class CPPTypeEmitter {
                 return undefined;
             }
 
-            if (!this.assembly.subtypeOf(this.boolType, ftype) && !this.assembly.subtypeOf(this.intType, ftype)) {
+            if(this.isTupleType(ftype)) {
+                if(this.isKnownLayoutTupleType(ftype)) {
+                    return `this->${ftype}.allRefDec()`;
+                }
+                else {
+                    return `this->${ftype}.allRefDec()`;
+                }
+            }
+            else if(this.isRecordType(ftype)) {
+                if(this.isKnownLayoutRecordType(ftype)) {
+                    return `this->${ftype}.allRefDec()`;
+                }
+                else {
+                    return `this->${ftype}.allRefDec()`;
+                }
+            }
+            else if (this.isUEntityType(ftype)) {
                 if (this.assembly.subtypeOf(this.noneType, ftype)) {
                     return `BSQRef::checkedDecrementNoneable(this->${fd.name});`;
                 }
@@ -426,9 +445,28 @@ class CPPTypeEmitter {
 
                 const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`);
                 const cargs = rcall.params.map((fp) => fp.name);
+
                 if (this.maybeRefableCountableType(resulttype)) {
-                    vargs.push("BSQRef** $callerslot$");
-                    cargs.push("$callerslot$");
+                    if (this.isTupleType(resulttype)) {
+                        const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(resulttype);
+
+                        for (let i = 0; i < maxlen; ++i) {
+                            vargs.push(`BSQRef** $callerslot$${i}`);
+                            cargs.push(`$callerslot$${i}`);
+                        }
+                    }
+                    else if (this.isRecordType(resulttype)) {
+                        const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(resulttype);
+
+                        for (let i = 0; i < allprops.length; ++i) {
+                            vargs.push(`BSQRef** $callerslot$${allprops[i]}`);
+                            cargs.push(`$callerslot$${allprops[i]}`);
+                        }
+                    }
+                    else {
+                        vargs.push("BSQRef** $callerslot$");
+                        cargs.push("$callerslot$");
+                    }
                 }
 
                 return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`

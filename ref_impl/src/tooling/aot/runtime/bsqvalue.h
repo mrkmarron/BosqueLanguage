@@ -16,11 +16,11 @@
 #define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0xF) == 0)
 
 #define BSQ_GET_VALUE_BOOL(V) (((uintptr_t)(V)) & 0x1)
-#define BSQ_GET_VALUE_INT(V) (((int64_t)(V)) >> 0x4)
+#define BSQ_GET_VALUE_INT(V) (int32_t)(((int64_t)(V)) >> 0x32)
 #define BSQ_GET_VALUE_PTR(V, T) ((T*)(V))
 
 #define BSQ_BOX_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
-#define BSQ_BOX_VALUE_INT(I) ((void*)((((int64_t) I) << 0x4) | 0x4))
+#define BSQ_BOX_VALUE_INT(I) ((void*)((((int64_t) I) << 0x32) | 0x4))
 
 #define BSQ_GET_VALUE_TRUTHY(V) (((uintptr_t)(V)) & 0x1)
 
@@ -28,12 +28,17 @@
 #define BSQ_VALUE_TRUE ((void*)0x3)
 #define BSQ_VALUE_FALSE ((void*)0x2)
 
+#define BSQ_INT_FLATTEN_TO_BIG(X) (BSQ_IS_VALUE_PTR(X) ? BSQBigInt(*BSQ_GET_VALUE_PTR(X, BSQBigInt)) : BSQBigInt(BSQ_GET_VALUE_INT(X)))
+
+#define BSQ_INT_EQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X == Y) : BSQBigInt::eq(X, Y))
+#define BSQ_INT_NEQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X != Y) : BSQBigInt::neq(X, Y))
+
+#define BSQ_INT_LT(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X < Y) : BSQBigInt::lt(X, Y))
+#define BSQ_INT_LTEQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X <= Y) : BSQBigInt::lteq(X, Y))
+
 #define BSQ_VALUE_0 BSQ_BOX_VALUE_INT(0)
 #define BSQ_VALUE_POS_1 BSQ_BOX_VALUE_INT(1)
 #define BSQ_VALUE_NEG_1 BSQ_BOX_VALUE_INT(-1)
-
-#define BINT_MAX 4503599627370495
-#define BINT_MIN (-4503599627370496)
 
 namespace BSQ
 {
@@ -59,6 +64,7 @@ enum class MIRArrayTypeEnum
 //%%ARRAY_TYPE_ENUM_DECLARE
 };
 
+typedef void* BSQInt; //use same tagging as Value but just different name since we know a bit more about it
 typedef void* Value;
 
 class BSQRef
@@ -205,6 +211,49 @@ public:
     }
 };
 
+class BSQBigInt : public BSQRef
+{
+public:
+    const int64_t data; //TODO: we need to actually make this a bigint
+
+    BSQBigInt(const int64_t data) : BSQRef(), data(data) { ; }
+    BSQBigInt(const int64_t data, int64_t excount) : BSQRef(excount), data(data) { ; }
+
+    static bool eq(BSQInt x, BSQInt y)
+    {
+        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
+        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
+
+        return a.data == b.data;
+    }
+
+    static bool neq(BSQInt x, BSQInt y)
+    {
+        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
+        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
+
+        return a.data != b.data;
+    }
+
+    static bool lt(BSQInt x, BSQInt y)
+    {
+        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
+        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
+
+        return a.data < b.data;
+    }
+
+    static bool lteq(BSQInt x, BSQInt y)
+    {
+        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
+        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
+
+        return a.data <= b.data;
+    }
+
+    virtual ~BSQBigInt() = default;
+};
+
 class BSQString : public BSQRef
 {
 public:
@@ -325,6 +374,23 @@ public:
     {
         return (idx < this->size) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
+
+    inline BSQTupleFixed<k> copyWithRefInc()
+    {
+        for(uint16_t i = 0; i < this->size; ++i)
+        {
+            BSQRef::checkedIncrement(this->entries[i]);
+        }
+        return *this;
+    }
+
+    inline void allRefDec()
+    {
+        for(uint16_t i = 0; i < this->size; ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i]);
+        }
+    }
 };
 
 template <uint16_t k>
@@ -342,6 +408,23 @@ public:
     inline Value atVar(uint16_t idx)
     {
         return this->entries[idx];
+    }
+
+    inline BSQTupleKnown<k> copyWithRefInc()
+    {
+        for(uint16_t i = 0; i < k; ++i)
+        {
+            BSQRef::checkedIncrement(this->entries[i]);
+        }
+        return *this;
+    }
+
+    inline void allRefDec()
+    {
+        for(uint16_t i = 0; i < k; ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i]);
+        }
     }
 };
 
@@ -449,6 +532,23 @@ public:
 
         return BSQ_VALUE_NONE;
     }
+
+    inline BSQRecordFixed<k> copyWithRefInc()
+    {
+        for(uint16_t i = 0; i < this->size; ++i)
+        {
+            BSQRef::checkedIncrement(this->entries[i].second);
+        }
+        return *this;
+    }
+
+    inline void allRefDec()
+    {
+        for(uint16_t i = 0; i < this->size; ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i].second);
+        }
+    }
 };
 
 template <uint16_t k>
@@ -475,6 +575,23 @@ public:
         }
 
         return false;
+    }
+
+    inline BSQRecordKnown<k> copyWithRefInc()
+    {
+        for(uint16_t i = 0; i < k; ++i)
+        {
+            BSQRef::checkedIncrement(this->entries[i]);
+        }
+        return *this;
+    }
+
+    inline void allRefDec()
+    {
+        for(uint16_t i = 0; i < k; ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i]);
+        }
     }
 };
 

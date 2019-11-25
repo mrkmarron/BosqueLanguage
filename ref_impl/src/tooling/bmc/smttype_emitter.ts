@@ -49,17 +49,16 @@ class SMTTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
-    isPrimitiveType(tt: MIRType): boolean {
-        if (tt.options.length !== 1) {
-            return false;
-        }
-
-        const uname = tt.options[0].trkey;
-        return (uname === "NSCore::Bool" || uname === "NSCore::Int" || uname === "NSCore::String");
+    isSimpleBoolType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Bool";
     }
 
-    isNoneable(tt: MIRType): boolean {
-        return tt.options.some((opt) => opt.trkey === "NSCore::None");
+    isSimpleIntType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Int";
+    }
+
+    isSimpleStringType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::String";
     }
 
     isTupleType(tt: MIRType): boolean {
@@ -117,10 +116,6 @@ class SMTTypeEmitter {
         return true;
     }
 
-    static getPrimitiveType(tt: MIRType): MIREntityType {
-        return tt.options[0] as MIREntityType;
-    }
-
     static getTupleTypeMaxLength(tt: MIRType): number {
         return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
     }
@@ -169,16 +164,14 @@ class SMTTypeEmitter {
     }
 
     typeToSMTCategory(ttype: MIRType): string {
-        if (this.isPrimitiveType(ttype)) {
-            if (ttype.trkey === "NSCore::Bool") {
-                return "Bool";
-            }
-            else if (ttype.trkey === "NSCore::Int") {
-                return "Int";
-            }
-            else {
-                return "String";
-            }
+        if (this.isSimpleBoolType(ttype)) {
+            return "Bool";
+        }
+        else if (this.isSimpleIntType(ttype)) {
+            return "Int";
+        }
+        else if (this.isSimpleStringType(ttype)) {
+            return "bsqstring";
         }
         else if (this.isTupleType(ttype)) {
             return "bsqtuple_" + SMTTypeEmitter.getTupleTypeMaxLength(ttype);
@@ -207,16 +200,14 @@ class SMTTypeEmitter {
                 return new SMTValue("bsqterm_none_const");
             }
         }
-        else if (this.isPrimitiveType(from)) {
-            if (from.trkey === "NSCore::Bool") {
-                return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
-            }
-            else if (from.trkey === "NSCore::Int") {
-                return new SMTValue(`(bsqterm_int ${exp.emit()})`);
-            }
-            else {
-                return new SMTValue(`(bsqterm_string ${exp.emit()})`);
-            }
+        else if (this.isSimpleBoolType(from)) {
+            return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
+        }
+        else if (this.isSimpleIntType(from)) {
+            return new SMTValue(`(bsqterm_int ${exp.emit()})`);
+        }
+        else if (this.isSimpleStringType(from)) {
+            return new SMTValue(`(bsqterm_string ${exp.emit()})`);
         }
         else if (this.isTupleType(from)) {
             const fromsize = SMTTypeEmitter.getTupleTypeMaxLength(from);
@@ -312,16 +303,14 @@ class SMTTypeEmitter {
         else {
             assert(this.typeToSMTCategory(from) === "BTerm", "must be a BTerm mapped type");
 
-            if (this.isPrimitiveType(into)) {
-                if (into.trkey === "NSCore::Bool") {
-                    return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
-                }
-                else if (into.trkey === "NSCore::Int") {
-                    return new SMTValue(`(bsqterm_int_value ${exp.emit()})`);
-                }
-                else {
-                    return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
-                }
+            if (this.isSimpleBoolType(into)) {
+                return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
+            }
+            else if (this.isSimpleIntType(into)) {
+                return new SMTValue(`(bsqterm_int_value ${exp.emit()})`);
+            }
+            else if (this.isSimpleStringType(into)) {
+                return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
             }
             else if (this.isTupleType(into)) {
                 const intosize = SMTTypeEmitter.getTupleTypeMaxLength(into);
