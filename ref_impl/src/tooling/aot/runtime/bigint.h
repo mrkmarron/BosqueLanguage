@@ -57,17 +57,17 @@ public:
         return false;
     }
 
-    static BigInt* *add(const BigInt &l, const BigInt &r)
+    static BigInt* add(const BigInt &l, const BigInt &r)
     {
         return nullptr;
     }
 
-    static BigInt* *sub(const BigInt &l, const BigInt &r)
+    static BigInt* sub(const BigInt &l, const BigInt &r)
     {
         return nullptr;
     }
 
-    static BigInt* *mult(const BigInt &l, const BigInt &r)
+    static BigInt* mult(const BigInt &l, const BigInt &r)
     {
         return nullptr;
     }

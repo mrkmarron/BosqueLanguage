@@ -153,6 +153,7 @@ else {
             + "\n\n/*function decls*/\n"
             + cparams.funcdecls
             + "}\n\n"
+            + "using namespace BSQ;"
             + "\n\n/*main decl*/\n"
             + cparams.maincall
         linked.push({ file: "main.cpp", contents: maincpp });

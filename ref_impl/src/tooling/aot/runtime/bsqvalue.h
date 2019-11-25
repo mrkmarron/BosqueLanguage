@@ -31,6 +31,10 @@
 
 #define BIG_INT_VALUE(X) (X.isInt() ? BigInt(X.getInt()) : *((X).getBigInt()))
 
+#define BSQ_VALUE_0 BSQInt(0)
+#define BSQ_VALUE_POS_1 BSQInt(1)
+#define BSQ_VALUE_NEG_1 BSQInt(-1)
+
 namespace BSQ
 {
 enum class MIRPropertyEnum
@@ -60,14 +64,15 @@ class BSQInt
 private:
     void* data; 
 
+public:
     inline bool isInt() const
     {
-        return *(reinterpret_cast<int32_t*>(this->data) + 1) == 1;
+        return *(reinterpret_cast<const int32_t*>(&this->data) + 1) == 1;
     }
 
     inline int32_t getInt() const
     {
-        return *reinterpret_cast<int32_t*>(this->data);
+        return *reinterpret_cast<const int32_t*>(&this->data);
     }
 
     inline BigInt* getBigInt() const
@@ -77,15 +82,14 @@ private:
 
     inline int64_t getInt64() const
     {
-        return (int64_t)(*reinterpret_cast<int32_t*>(this->data));
+        return (int64_t)(*reinterpret_cast<const int32_t*>(&this->data));
     }
 
-public:
     BSQInt() : data((void*)((int64_t)1)) { ; }
 
     BSQInt(int32_t value) : data(nullptr) 
     { 
-        int32_t* id = reinterpret_cast<int32_t*>(this->data); 
+        int32_t* id = reinterpret_cast<int32_t*>(&this->data); 
         id[0] = value;
         id[1] = 1;
     }
@@ -201,42 +205,42 @@ public:
         } 
     }
 
-    inline friend BSQInt operator+(const BSQInt &l, const BSQInt &r)
+    inline friend BSQInt operator+(const BSQInt& l, const BSQInt& r)
     {
         if (l.isInt() && r.isInt())
         {
-            int64_t r = l.getInt64() + r.getInt64();
-            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+            int64_t res = l.getInt64() + r.getInt64();
+            return (INT32_MIN <= res && res < INT32_MAX) ? BSQInt(res) : BSQInt(new BigInt(res));
         }
         else
         {
-            return BigInt::add(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+            return BSQInt(BigInt::add(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
         }
     }
 
-    inline friend BSQInt operator-(const BSQInt &l, const BSQInt &r)
+    inline friend BSQInt operator-(const BSQInt& l, const BSQInt& r)
     {
        if (l.isInt() && r.isInt())
         {
-            int64_t r = l.getInt64() - r.getInt64();
-            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+            int64_t res = l.getInt64() - r.getInt64();
+            return (INT32_MIN <= res && res < INT32_MAX) ? BSQInt(res) : BSQInt(new BigInt(res));
         }
         else
         {
-            return BigInt::sub(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+            return BSQInt(BigInt::sub(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
         }
     }
 
-    inline friend BSQInt operator*(const BSQInt &l, const BSQInt &r)
+    inline friend BSQInt operator*(const BSQInt& l, const BSQInt& r)
     {
         if (l.isInt() && r.isInt())
         {
-            int64_t r = l.getInt64() * r.getInt64();
-            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+            int64_t res = l.getInt64() * r.getInt64();
+            return (INT32_MIN <= res && res < INT32_MAX) ? BSQInt(res) : BSQInt(new BigInt(res));
         }
         else
         {
-            return BigInt::mult(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+            return BSQInt(BigInt::mult(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
         }
     }
 };
@@ -404,7 +408,7 @@ public:
     const std::vector<uint8_t> sdata;
 
     BSQString(const std::vector<uint8_t>& str) : BSQRef(), sdata(str) { ; }
-    BSQString(std::vector<uint8_t>&& str, int64_t excount) : BSQRef(excount), sdata(move(str)) { ; }
+    BSQString(const std::string& str, int64_t excount) : BSQRef(excount), sdata(str.cbegin(), str.cend()) { ; }
 
     virtual ~BSQString() = default;
 };

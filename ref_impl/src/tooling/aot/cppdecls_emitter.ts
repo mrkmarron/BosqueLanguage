@@ -172,11 +172,11 @@ class CPPEmitter {
             }
             else if(p.type === "NSCore::Int") {
                 const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int\\n"); exit(1); }`;
-                const conv = `BSQ::BSQInt ${p.name}(std::stoi(std::string(argv[${i}+1])));`;
+                const conv = `BSQInt ${p.name}(std::stoi(std::string(argv[${i}+1])));`;
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
-                const conv = `BSQ::BSQString ${p.name}(std::string(argv[${i}+1]), 1);`;
+                const conv = `BSQString ${p.name}(std::string(argv[${i}+1]), 1);`;
                 return "    " + conv;
             }
         });
@@ -187,28 +187,36 @@ class CPPEmitter {
             if (typeemitter.maybeRefableCountableType(restype)) {
                 if (typeemitter.isTupleType(restype)) {
                     const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(restype);
-                    scopev = `BSQ::BSQRefScope<${maxlen}> __scopes__;`;
+                    scopev = `BSQRefScope<${maxlen}> __scopes__;`;
                     for (let i = 0; i < maxlen; ++i) {
                         callargs.push(`__scopes__.getCallerSlot<${i}>()`);
                     }
                 }
                 else if (typeemitter.isRecordType(restype)) {
                     const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(restype);
-                    scopev = `BSQ::BSQRefScope<${allprops.length}> __scopes__;`;
+                    scopev = `BSQRefScope<${allprops.length}> __scopes__;`;
                     for (let i = 0; i < allprops.length; ++i) {
                         callargs.push(`__scopes__.getCallerSlot<${i}>()`);                }
                 }
                 else {
-                    scopev = "BSQ::BSQRefScope<1> __scopes__;";
+                    scopev = "BSQRefScope<1> __scopes__;";
                     callargs.push("__scopes__.getCallerSlot<0>()");
                 }
             }
         }
         
-        const callv = `BSQ::${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
-        const fcall = `fprintf(stdout, "%s\\n", BSQ::Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}).c_str())`;
+        typeemitter.scopectr = 0;
+        const callv = `${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
+        const fcall = `fprintf(stdout, "%s\\n", Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}).c_str())`;
 
-        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQ::BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
+        if(typeemitter.scopectr !== 0) {
+            const scopevar = bodyemitter.varNameToCppName("$scope$");
+            const refscope = `BSQRefScope<${typeemitter.scopectr}> ${scopevar};`;
+
+            scopev = scopev + " " + refscope;
+        }
+
+        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),

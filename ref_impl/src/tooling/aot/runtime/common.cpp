@@ -10,7 +10,7 @@ void bsqassert(bool cond, const char* msg, const char* file, int32_t line)
 {
     if (!cond)
     {
-        printf("\"%s\" in %s on line %i\n", msg, file, line); assert(false);
+        printf("\"%s\" in %s on line %i\n", msg, file, line); exit(1);
     }
 }
 } // namespace BSQ

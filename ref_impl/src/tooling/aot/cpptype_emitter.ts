@@ -221,7 +221,7 @@ class CPPTypeEmitter {
             return `BSQ_BOX_VALUE_BOOL(${exp})`;
         }
         else if (this.isSimpleIntType(from)) {
-            return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQBoxedInt>(new BSQBoxedInt(${exp}))`;
+            return `${exp}.isInt() ? BSQ_BOX_VALUE_INT(${exp}.getInt()) : ${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQBoxedInt>(new BSQBoxedInt(${exp}))`;
         }
         else if (this.isSimpleStringType(from)) {
             return exp;
@@ -300,7 +300,7 @@ class CPPTypeEmitter {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
             else if (this.isSimpleIntType(into)) {
-                return `${exp}->data`;
+                return `BSQ_IS_VALUE_INT(${exp}) ? BSQInt(BSQ_GET_VALUE_INT(${exp})) : BSQ_GET_VALUE_PTR(${exp}, BSQBoxedInt)->sdata`;
             }
             else if (this.isSimpleStringType(into)) {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;

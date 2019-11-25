@@ -203,12 +203,12 @@ class SMTEmitter {
 
         let stringdecls: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
-            const decl = `(declare-const ${k} bsqstring)`
+            const decl = `(declare-const ${v} bsqstring)`
             let carr = "bsqstring_array_empty";
-            for(let i = 0; i < v.length; ++i) {
-                carr = `(store carr ${i} ${v.charCodeAt(i)})`;
+            for(let i = 0; i < k.length; ++i) {
+                carr = `(store ${carr} ${i} ${k.charCodeAt(i)})`;
             }
-            stringdecls.push(`${decl} (assert (= ${k} (bsqstring@cons ${v.length} ${carr})))`);
+            stringdecls.push(`${decl} (assert (= ${v} (bsqstring@cons ${k.length} ${carr})))`);
         });
 
         const resv = `(declare-const @smtres@ Result@${rrtype})`;

@@ -105,18 +105,19 @@ class CPPBodyEmitter {
             return this.typegen.isSimpleBoolType(into) ? "false" : "BSQ_VALUE_FALSE";
         }
         else if (cval instanceof MIRConstantInt) {
+            let bint = "";
             if (cval.value === "0") {
-                return "BSQ_VALUE_0";
+                bint = "BSQ_VALUE_0";
             }
             else if (cval.value === "1") {
-                return "BSQ_VALUE_POS_1";
+                bint = "BSQ_VALUE_POS_1";
             }
             else if (cval.value === "-1") {
-                return "BSQ_VALUE_NEG_1";
+                bint = "BSQ_VALUE_NEG_1";
             }
             else {
                 if(cval.value.length < 9 && -1000000000 <= Number.parseInt(cval.value) && Number.parseInt(cval.value) <= 1000000000) {
-                    return `BSQInt(${cval.value})`;
+                    bint = `BSQInt(${cval.value})`;
                 }
                 else {
                     const sname = "BIGINT__" + this.allConstStrings.size;
@@ -124,10 +125,11 @@ class CPPBodyEmitter {
                         this.allConstBigInts.set(cval.value, sname);
                     }
         
-                    return `(&Runtime::${this.allConstBigInts.get(cval.value) as string})`;
-
+                    bint = `(Runtime::${this.allConstBigInts.get(cval.value) as string})`;
                 }
             }
+
+            return this.typegen.isSimpleIntType(into) ? bint : this.typegen.coerce(bint, this.typegen.intType, into);
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -138,7 +140,8 @@ class CPPBodyEmitter {
                 this.allConstStrings.set(sval, sname);
             }
 
-            return `(&Runtime::${this.allConstStrings.get(sval) as string})`;
+            const strval = `(&Runtime::${this.allConstStrings.get(sval) as string})`;
+            return this.typegen.isSimpleBoolType(into) ? strval : this.typegen.coerce(strval, this.typegen.stringType, into);
         }
     }
 
