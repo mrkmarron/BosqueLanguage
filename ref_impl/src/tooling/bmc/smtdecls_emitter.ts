@@ -14,6 +14,7 @@ import * as assert from "assert";
 type SMTCode = {
     typedecls_fwd: string,
     typedecls: string,
+    stringdecls: string,
     conceptSubtypeRelation: string,
     typechecks: string,
     fixedtupledecls_fwd: string,
@@ -200,6 +201,16 @@ class SMTEmitter {
 
         const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
 
+        let stringdecls: string[] = [];
+        bodyemitter.allConstStrings.forEach((v, k) => {
+            const decl = `(declare-const ${k} bsqstring)`
+            let carr = "bsqstring_array_empty";
+            for(let i = 0; i < v.length; ++i) {
+                carr = `(store carr ${i} ${v.charCodeAt(i)})`;
+            }
+            stringdecls.push(`${decl} (assert (= ${k} (bsqstring@cons ${v.length} ${carr})))`);
+        });
+
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
@@ -218,6 +229,7 @@ class SMTEmitter {
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n    "),
             typedecls: typedecls.sort().join("\n    "),
+            stringdecls: stringdecls.sort().join("\n"),
             conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
             typechecks: typechecks.join("\n    "),
             fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),

@@ -115,9 +115,8 @@ class CPPBodyEmitter {
                 return "BSQ_VALUE_NEG_1";
             }
             else {
-                //TODO: we don't support really big constants yet -- will need to do like we do for strings
-                if((-2147483647 - 1) <= Number.parseFloat(cval.value) && Number.parseFloat(cval.value) <= 2147483647) {
-                    return `BSQ_BOX_VALUE_INT(${cval.value})`;
+                if(cval.value.length < 9 && -1000000000 <= Number.parseInt(cval.value) && Number.parseInt(cval.value) <= 1000000000) {
+                    return `BSQInt(${cval.value})`;
                 }
                 else {
                     const sname = "BIGINT__" + this.allConstStrings.size;
@@ -403,10 +402,12 @@ class CPPBodyEmitter {
             return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
         }
         else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
-            return op === "==" ? `BSQ_INT_EQ(${this.argToCpp(lhs, this.typegen.intType)}, ${this.argToCpp(rhs, this.typegen.intType)})` : `BSQ_INT_NEQ(${this.argToCpp(lhs, this.typegen.intType)}, ${this.argToCpp(rhs, this.typegen.intType)})`;
+            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
         else {
-            return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
+            const lexp = this.argToCpp(lhs, this.typegen.stringType);
+            const rexp = this.argToCpp(rhs, this.typegen.stringType);
+            return (op === "!=" ? "!" : "") + `std::equal(${lexp}->sdata.cbegin(), ${lexp}->sdata.cend(), ${rexp}->sdata.cbegin(), ${rexp}->sdata.cend())`;
         }
     }
 
@@ -437,22 +438,8 @@ class CPPBodyEmitter {
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
             return `(${this.argToCpp(lhs, this.typegen.boolType)} ${op} ${this.argToCpp(rhs, this.typegen.boolType)})`;
         }
-        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int"){
-            if(op === "<") {
-                return `BSQ_INT_LT(${this.argToCpp(lhs, this.typegen.boolType)}, ${this.argToCpp(rhs, this.typegen.boolType)})`
-            }
-            else if (op === "<=") {
-                return `BSQ_INT_LTEQ(${this.argToCpp(lhs, this.typegen.boolType)}, ${this.argToCpp(rhs, this.typegen.boolType)})`
-            }
-            else if (op === ">") {
-                return `BSQ_INT_LT(${this.argToCpp(rhs, this.typegen.boolType)}, ${this.argToCpp(lhs, this.typegen.boolType)})`
-            }
-            else {
-                return `BSQ_INT_LTEQ(${this.argToCpp(rhs, this.typegen.boolType)}, ${this.argToCpp(lhs, this.typegen.boolType)})`
-            }
-        }
         else {
-            return `(${this.argToCpp(lhs, this.typegen.stringType)}->sdata ${op} ${this.argToCpp(rhs, this.typegen.stringType)}->sdata)`;
+            return `(${this.argToCpp(lhs, this.typegen.intType)} ${op} ${this.argToCpp(rhs, this.typegen.intType)})`;
         }
     }
 
@@ -1020,7 +1007,7 @@ class CPPBodyEmitter {
                 }
                 else {
                     if (pfx.op === "-") {
-                        return `${this.varToCppName(pfx.trgt)} = -${this.argToCpp(pfx.arg, this.typegen.intType)};`;
+                        return `${this.varToCppName(pfx.trgt)} = (${this.argToCpp(pfx.arg, this.typegen.intType)}).negate();`;
                     }
                     else {
                         return `${this.varToCppName(pfx.trgt)} = ${this.argToCpp(pfx.arg, this.typegen.intType)};`;
@@ -1029,20 +1016,14 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                if (bop.op === "+") {
-                    return `BSQ_OP_ADD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
+                if (bop.op === "+" || bop.op === "-" || bop.op === "*") {
+                    return `${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
                 }
-                else if (bop.op === "-") {
-                    return `BSQ_OP_SUB(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
-                }
-                else if (bop.op === "-") {
-                    return `BSQ_OP_MULT(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
-                }
-                else if (bop.op === "-") {
-                    return `BSQ_OP_DIV(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
+                else if (bop.op === "/") {
+                    return `if(${this.argToCpp(bop.lhs, this.typegen.intType)}.isZero()) { BSQ_ABORT("Div by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); } ${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} / ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
                 }
                 else {
-                    return `BSQ_OP_MOD(${this.varToCppName(bop.trgt)}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, "${filenameClean(this.currentFile)}", ${op.sinfo.line})`;
+                    return `if(${this.argToCpp(bop.lhs, this.typegen.intType)}.isZero()) { BSQ_ABORT("Mod by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); } ${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} % ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
                 }
             }
             case MIROpTag.MIRBinEq: {
@@ -1050,7 +1031,9 @@ class CPPBodyEmitter {
 
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
-                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
+                if ((this.typegen.isSimpleBoolType(lhvtype) && this.typegen.isSimpleBoolType(rhvtype))
+                    || (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype))
+                    || (this.typegen.isSimpleStringType(lhvtype) && this.typegen.isSimpleStringType(rhvtype))) {
                     return `${this.varToCppName(beq.trgt)} = ${this.generateFastEquals(beq.op, beq.lhs, beq.rhs)};`;
                 }
                 else {
@@ -1067,7 +1050,8 @@ class CPPBodyEmitter {
                 const lhvtype = this.getArgType(bcmp.lhs);
                 const rhvtype = this.getArgType(bcmp.rhs);
 
-                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
+                if ((this.typegen.isSimpleBoolType(lhvtype) && this.typegen.isSimpleBoolType(rhvtype))
+                    || (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype))) {
                     return `${this.varToCppName(bcmp.trgt)} = ${this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)};`;
                 }
                 else {
@@ -1192,10 +1176,32 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
-            xxxx;
-            const cslotvar = this.varNameToCppName("$callerslot$");
             if (this.typegen.maybeRefableCountableType(this.currentRType)) {
-                if (this.typegen.isUEntityType(this.currentRType)) {
+                if(this.typegen.isTupleType(this.currentRType)) {
+                    const procs: string[] = [];
+                    const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
+                    for (let i = 0; i < maxlen; ++i) {
+                        const cvn = this.varNameToCppName(`$callerslot$${i}`);
+                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedTupleAccessor(i)});`);
+                    }
+                    gblock.push(procs.join(" "));
+                }
+                else if(this.typegen.isRecordType(this.currentRType)) {
+                    const procs: string[] = [];
+                    const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
+                    for (let i = 0; i < allprops.length; ++i) {
+                        const cvn = this.varNameToCppName(`$callerslot$${procs[i]}`);
+                        if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
+                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, procs[i])});`);
+                        }
+                        else {
+                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(procs[i])});`);
+                        }
+                    }
+                    gblock.push(procs.join(" "));
+                }
+                else if (this.typegen.isUEntityType(this.currentRType)) {
+                    const cslotvar = this.varNameToCppName("$callerslot$");
                     if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
                         gblock.push(`BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`);
                     }
@@ -1204,6 +1210,7 @@ class CPPBodyEmitter {
                     }
                 }
                 else {
+                    const cslotvar = this.varNameToCppName("$callerslot$");
                     gblock.push(`BSQRefScopeMgr::processCallRefAny(${cslotvar}, _return_);`);
                 }
             }
@@ -1233,11 +1240,8 @@ class CPPBodyEmitter {
         if (vdecls.has("bool")) {
             vdeclscpp.push(`bool ${(vdecls.get("bool") as string[]).join(", ")};`);
         }
-        if (vdecls.has("int64_t")) {
-            vdeclscpp.push(`int64_t ${(vdecls.get("int64_t") as string[]).join(", ")};`);
-        }
-        [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
-            if (kv[0] !== "bool" && kv[0] !== "int64_t") {
+       [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
+            if (kv[0] !== "bool") {
                 vdeclscpp.push(kv[1].map((vname) => `${kv[0]} ${vname}`).join("; ") + ";");
             }
         });
@@ -1254,10 +1258,24 @@ class CPPBodyEmitter {
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
 
         if (this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
-            xxxx;
-
-            const cslotvar = this.varNameToCppName("$callerslot$");
-            args.push(`BSQRef** ${cslotvar}`);
+            if (this.typegen.isTupleType(this.currentRType)) {
+                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
+                for (let i = 0; i < maxlen; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
+                    args.push(`BSQRef** ${cslotvar}`);
+                }
+            }
+            else if (this.typegen.isRecordType(this.currentRType)) {
+                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
+                for (let i = 0; i < allprops.length; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
+                    args.push(`BSQRef** ${cslotvar}`);
+                }
+            }
+            else {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                args.push(`BSQRef** ${cslotvar}`);
+            }
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;
 
@@ -1295,10 +1313,13 @@ class CPPBodyEmitter {
                 let prestr = ";";
                 const preargs = idecl.params.map((arg) => this.varNameToCppName(arg.name));
 
+                //
+                //TODO -- ref parms don't get expanded correctly here -- need to coordinate with def and call here
+                //
                 let poststr = "   return _return_;";
                 const postargs = [...idecl.params.map((arg) => this.varNameToCppName(arg.name)), "_return_"];
 
-                if(idecl.preconditions.length !== 0) {
+                if (idecl.preconditions.length !== 0) {
                     const preinvoke = `${this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("pre", idecl.key))}(${preargs.join(", ")})`;
                     prestr = `    ${preinvoke};`;
                 }
@@ -1486,9 +1507,35 @@ class CPPBodyEmitter {
         const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "decl");
         const flagname = `_flag_${this.invokenameToCPP(constkey)}`;
         const memoname = `_memo_${this.invokenameToCPP(constkey)}`;
-        const cslotvar = this.varNameToCppName("$callerslot$");
         const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }\n    ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** " + cslotvar + " = &$callerslot_dummy$;" : ""}`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
+
+        let rcvars = "";
+        if(this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType))) {
+            if (this.typegen.isTupleType(this.currentRType)) {
+                const procs: string[] = [];
+                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
+                for (let i = 0; i < maxlen; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
+                    procs.push(`BSQRef** ${cslotvar}`);
+                }
+                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join("; ")}`;
+            }
+            else if (this.typegen.isRecordType(this.currentRType)) {
+                const procs: string[] = [];
+                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
+                for (let i = 0; i < allprops.length; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
+                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i}`);
+                }
+                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join("; ")}`;
+            }
+            else {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                rcvars = `    BSQRef* __CS_DUMMY__ = nullptr; BSQRef** ${cslotvar} = &__CS_DUMMY__;`;
+            }
+        }
+
         const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
         const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
@@ -1523,7 +1570,7 @@ class CPPBodyEmitter {
         const rstart = jblockstrs.indexOf("return _return_");
         const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
 
-        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
+        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n${rcvars}\n\n${nblockstrs}\n}\n` };
     }
 
     generateCPPFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): { fwddecl: string, fulldecl: string } | undefined {
@@ -1540,9 +1587,35 @@ class CPPBodyEmitter {
         const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "decl");
         const flagname = `_flag_${this.invokenameToCPP(fdkey)}`;
         const memoname = `_memo_${this.invokenameToCPP(fdkey)}`;
-        const cslotvar = this.varNameToCppName("$callerslot$");
         const gdecl = `bool ${flagname} = false; ${decltype}; ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }\n    ${this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType)) ? "BSQRef* $callerslot_dummy$ = nullptr; BSQRef** " + cslotvar + " = &$callerslot_dummy$;" : ""}`;
+        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
+
+        let rcvars = "";
+        if(this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType))) {
+            if (this.typegen.isTupleType(this.currentRType)) {
+                const procs: string[] = [];
+                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
+                for (let i = 0; i < maxlen; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
+                    procs.push(`BSQRef** ${cslotvar}`);
+                }
+                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join("; ")}`;
+            }
+            else if (this.typegen.isRecordType(this.currentRType)) {
+                const procs: string[] = [];
+                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
+                for (let i = 0; i < allprops.length; ++i) {
+                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
+                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i}`);
+                }
+                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join("; ")}`;
+            }
+            else {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                rcvars = `    BSQRef* __CS_DUMMY__ = nullptr; BSQRef** ${cslotvar} = &__CS_DUMMY__;`;
+            }
+        }
+
         const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
 
         const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");
@@ -1578,7 +1651,7 @@ class CPPBodyEmitter {
         const rstart = jblockstrs.indexOf("return _return_;");
         const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
 
-        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n\n${nblockstrs}\n}\n` };
+        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n${rcvars}\n\n${nblockstrs}\n}\n` };
     }
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {

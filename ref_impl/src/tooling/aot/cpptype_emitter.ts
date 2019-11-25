@@ -160,12 +160,20 @@ class CPPTypeEmitter {
     maybeRefableCountableType(tt: MIRType): boolean {
         if(tt.options.every((opt) => {
             const uname = opt.trkey;
-            return (uname === "NSCore::None" || uname === "NSCore::Bool");
+            return (uname === "NSCore::None" || uname === "NSCore::Bool" || uname === "NSCore::Int");
         })) {
             return false;
         }
 
         if (tt.options.length === 1 && tt.options[0] instanceof MIREntityType && (this.assembly.entityDecls.get((tt.options[0] as MIREntityType).ekey) as MIREntityTypeDecl).provides.includes("NSCore::Enum")) {
+            return false;
+        }
+
+        if(this.isKnownLayoutTupleType(tt) && CPPTypeEmitter.getKnownLayoutTupleType(tt).entries.every((entry) => !this.maybeRefableCountableType(entry.type))) {
+            return false;
+        }
+
+        if(this.isKnownLayoutRecordType(tt) && CPPTypeEmitter.getKnownLayoutRecordType(tt).entries.every((entry) => !this.maybeRefableCountableType(entry.type))) {
             return false;
         }
 
@@ -213,7 +221,7 @@ class CPPTypeEmitter {
             return `BSQ_BOX_VALUE_BOOL(${exp})`;
         }
         else if (this.isSimpleIntType(from)) {
-            return exp;
+            return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQBoxedInt>(new BSQBoxedInt(${exp}))`;
         }
         else if (this.isSimpleStringType(from)) {
             return exp;
@@ -292,7 +300,7 @@ class CPPTypeEmitter {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
             else if (this.isSimpleIntType(into)) {
-                return exp;
+                return `${exp}->data`;
             }
             else if (this.isSimpleStringType(into)) {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;

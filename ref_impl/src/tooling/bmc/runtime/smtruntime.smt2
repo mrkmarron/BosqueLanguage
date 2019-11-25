@@ -90,6 +90,8 @@
 
 (declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
 
+;;STRING_DECLS;;
+
 ;;SUBTYPE_DECLS;;
 
 ;;FUNCTION_DECLS;;

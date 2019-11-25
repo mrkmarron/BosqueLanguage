@@ -8,6 +8,8 @@ namespace BSQ
 {
 //%%STATIC_STRING_CREATE%%
 
+//%%STATIC_INT_CREATE%%
+
 const char* Runtime::propertyNames[] = {
     "Invalid",
 //%%PROPERTY_NAMES
@@ -37,17 +39,18 @@ std::string Runtime::diagnostic_format(Value v)
         const BSQRef* vv = BSQ_GET_VALUE_PTR(v, const BSQRef);
         if(dynamic_cast<const BSQString*>(vv) != nullptr)
         {
-            return std::string("\"") + dynamic_cast<const BSQString*>(vv)->sdata + std::string("\"");
+            auto sstr = dynamic_cast<const BSQString*>(vv);
+            return std::string("\"") + std::string(sstr->sdata.cbegin(), sstr->sdata.cend()) + std::string("\"");
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {
             auto sof = dynamic_cast<const BSQStringOf*>(vv);
-            return std::string(s_nominaltypenames[(uint32_t)sof->oftype]) + std::string("'") + sof->sdata + std::string("'");
+            return std::string(s_nominaltypenames[(uint32_t)sof->oftype]) + std::string("'") + std::string(sof->sdata.cbegin(), sof->sdata.cend()) + std::string("'");
         }
         else if(dynamic_cast<const BSQValidatedString*>(vv) != nullptr)
         {
             auto vs = dynamic_cast<const BSQValidatedString*>(vv);
-            return std::string("<|") + std::string(vs->validator->strrep) + std::string("|>") + std::string("'") + vs->sdata + std::string("'");
+            return std::string("<|") + std::string(vs->validator->strrep) + std::string("|>") + std::string("'") + std::string(vs->sdata.cbegin(), vs->sdata.cend()) + std::string("'");
         }
         else if(dynamic_cast<const BSQPODBuffer*>(vv) != nullptr)
         {
@@ -69,7 +72,7 @@ std::string Runtime::diagnostic_format(Value v)
         else if(dynamic_cast<const BSQGUID*>(vv) != nullptr)
         {
             auto guid = dynamic_cast<const BSQGUID*>(vv);
-            return std::string("GUID@") + std::string(guid->sdata);
+            return std::string("GUID@") + std::string(guid->sdata.cbegin(), guid->sdata.cend());
         }
         else if(dynamic_cast<const BSQEnum*>(vv) != nullptr)
         {

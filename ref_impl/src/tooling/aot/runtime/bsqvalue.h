@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "bsqvalidator.h"
+#include "bigint.h"
 
 #pragma once
 
@@ -28,17 +29,7 @@
 #define BSQ_VALUE_TRUE ((void*)0x3)
 #define BSQ_VALUE_FALSE ((void*)0x2)
 
-#define BSQ_INT_FLATTEN_TO_BIG(X) (BSQ_IS_VALUE_PTR(X) ? BSQBigInt(*BSQ_GET_VALUE_PTR(X, BSQBigInt)) : BSQBigInt(BSQ_GET_VALUE_INT(X)))
-
-#define BSQ_INT_EQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X == Y) : BSQBigInt::eq(X, Y))
-#define BSQ_INT_NEQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X != Y) : BSQBigInt::neq(X, Y))
-
-#define BSQ_INT_LT(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X < Y) : BSQBigInt::lt(X, Y))
-#define BSQ_INT_LTEQ(X, Y) ((BSQ_IS_VALUE_INT(X) & BSQ_IS_VALUE_INT(Y)) ? (X <= Y) : BSQBigInt::lteq(X, Y))
-
-#define BSQ_VALUE_0 BSQ_BOX_VALUE_INT(0)
-#define BSQ_VALUE_POS_1 BSQ_BOX_VALUE_INT(1)
-#define BSQ_VALUE_NEG_1 BSQ_BOX_VALUE_INT(-1)
+#define BIG_INT_VALUE(X) (X.isInt() ? BigInt(X.getInt()) : *((X).getBigInt()))
 
 namespace BSQ
 {
@@ -64,7 +55,192 @@ enum class MIRArrayTypeEnum
 //%%ARRAY_TYPE_ENUM_DECLARE
 };
 
-typedef void* BSQInt; //use same tagging as Value but just different name since we know a bit more about it
+class BSQInt
+{
+private:
+    void* data; 
+
+    inline bool isInt() const
+    {
+        return *(reinterpret_cast<int32_t*>(this->data) + 1) == 1;
+    }
+
+    inline int32_t getInt() const
+    {
+        return *reinterpret_cast<int32_t*>(this->data);
+    }
+
+    inline BigInt* getBigInt() const
+    {
+        return reinterpret_cast<BigInt*>(this->data);
+    }
+
+    inline int64_t getInt64() const
+    {
+        return (int64_t)(*reinterpret_cast<int32_t*>(this->data));
+    }
+
+public:
+    BSQInt() : data((void*)((int64_t)1)) { ; }
+
+    BSQInt(int32_t value) : data(nullptr) 
+    { 
+        int32_t* id = reinterpret_cast<int32_t*>(this->data); 
+        id[0] = value;
+        id[1] = 1;
+    }
+
+    BSQInt(BigInt* value) : data((void*)value) 
+    { 
+        ; 
+    }
+
+    BSQInt(const BSQInt& src)
+    { 
+        this->data = src.isInt() == 0 ? src.data : src.getBigInt()->copy();
+    }
+
+    BSQInt& operator=(const BSQInt& src)
+    {
+        if (&src != this)
+        {
+            if (!this->isInt())
+            {
+                this->getBigInt()->release();
+            }
+            this->data = src.isInt() ? src.data : src.getBigInt()->copy();
+        }
+        return *this;
+    }
+
+    BSQInt(BSQInt&& src) : data(src.data)
+    { 
+        src.data = (void*)((int64_t)1);
+    }
+
+    BSQInt& operator=(BSQInt&& src)
+    {
+        if (&src != this)
+        {
+            if (!this->isInt())
+            {
+                this->getBigInt()->release();
+            }
+            this->data = src.data;
+
+            src.data = (void*)((int64_t)1);
+        }
+        return *this;
+    }
+
+    ~BSQInt()
+    {
+        if(!this->isInt())
+        {
+            this->getBigInt()->release();
+        }
+    }
+
+    inline bool isZero()
+    {
+        if(this->isInt())
+        {
+            return this->getInt() == 0;
+        }
+        else
+        {
+            return this->getBigInt()->isZero();
+        }
+    }
+
+    inline BSQInt negate(BSQInt& v)
+    {
+        if(v.isInt())
+        {
+            return BSQInt(-v.getInt());
+        }
+        else
+        {
+            return BSQInt(v.getBigInt()->negate());
+        }
+    }
+
+    inline friend bool operator==(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() == r.getInt();
+        }
+        else
+        {
+            return BigInt::eq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }    
+    }
+
+    inline friend bool operator<(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() < r.getInt();
+        }
+        else
+        {
+            return BigInt::lt(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }   
+    }
+
+    inline friend bool operator<=(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() <= r.getInt();
+        }
+        else
+        {
+            return BigInt::lteq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        } 
+    }
+
+    inline friend BSQInt operator+(const BSQInt &l, const BSQInt &r)
+    {
+        if (l.isInt() && r.isInt())
+        {
+            int64_t r = l.getInt64() + r.getInt64();
+            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+        }
+        else
+        {
+            return BigInt::add(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }
+    }
+
+    inline friend BSQInt operator-(const BSQInt &l, const BSQInt &r)
+    {
+       if (l.isInt() && r.isInt())
+        {
+            int64_t r = l.getInt64() - r.getInt64();
+            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+        }
+        else
+        {
+            return BigInt::sub(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }
+    }
+
+    inline friend BSQInt operator*(const BSQInt &l, const BSQInt &r)
+    {
+        if (l.isInt() && r.isInt())
+        {
+            int64_t r = l.getInt64() * r.getInt64();
+            return (INT32_MIN <= r && r < INT32_MAX) ? BSQInt(l.data + r.data) : BSQInt(new BigInt(r));
+        }
+        else
+        {
+            return BigInt::mult(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }
+    }
+};
+
 typedef void* Value;
 
 class BSQRef
@@ -211,56 +387,24 @@ public:
     }
 };
 
-class BSQBigInt : public BSQRef
+class BSQBoxedInt : public BSQRef
 {
 public:
-    const int64_t data; //TODO: we need to actually make this a bigint
+    const BSQInt data;
 
-    BSQBigInt(const int64_t data) : BSQRef(), data(data) { ; }
-    BSQBigInt(const int64_t data, int64_t excount) : BSQRef(excount), data(data) { ; }
+    BSQBoxedInt(const BSQInt idata) : BSQRef(), data(idata) { ; }
+    BSQBoxedInt(const BSQInt idata, int64_t excount) : BSQRef(excount), data(idata) { ; }
 
-    static bool eq(BSQInt x, BSQInt y)
-    {
-        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
-        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
-
-        return a.data == b.data;
-    }
-
-    static bool neq(BSQInt x, BSQInt y)
-    {
-        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
-        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
-
-        return a.data != b.data;
-    }
-
-    static bool lt(BSQInt x, BSQInt y)
-    {
-        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
-        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
-
-        return a.data < b.data;
-    }
-
-    static bool lteq(BSQInt x, BSQInt y)
-    {
-        BSQBigInt a = BSQ_INT_FLATTEN_TO_BIG(x);
-        BSQBigInt b = BSQ_INT_FLATTEN_TO_BIG(y);
-
-        return a.data <= b.data;
-    }
-
-    virtual ~BSQBigInt() = default;
+    virtual ~BSQBoxedInt() = default;
 };
 
 class BSQString : public BSQRef
 {
 public:
-    const std::string sdata;
+    const std::vector<uint8_t> sdata;
 
-    BSQString(const std::string& str) : BSQRef(), sdata(str) { ; }
-    BSQString(std::string&& str, int64_t excount) : BSQRef(excount), sdata(move(str)) { ; }
+    BSQString(const std::vector<uint8_t>& str) : BSQRef(), sdata(str) { ; }
+    BSQString(std::vector<uint8_t>&& str, int64_t excount) : BSQRef(excount), sdata(move(str)) { ; }
 
     virtual ~BSQString() = default;
 };
@@ -268,21 +412,21 @@ public:
 class BSQStringOf : public BSQRef
 {
 public:
-    const std::string sdata;
+    const std::vector<uint8_t> sdata;
     const MIRNominalTypeEnum oftype;
 
-    BSQStringOf(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    BSQStringOf(const std::vector<uint8_t>& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
     virtual ~BSQStringOf() = default;
 };
 
 class BSQValidatedString : public BSQRef
 {
 public:
-    const std::string sdata;
+    const std::vector<uint8_t> sdata;
     const BSQValidator* validator;
     const MIRNominalTypeEnum oftype;
 
-    BSQValidatedString(const std::string& str, const BSQValidator* validator, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), validator(validator), oftype(oftype) { ; }
+    BSQValidatedString(const std::vector<uint8_t>& str, const BSQValidator* validator, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), validator(validator), oftype(oftype) { ; }
     virtual ~BSQValidatedString() = default;
 };
 
@@ -299,9 +443,9 @@ public:
 class BSQGUID : public BSQRef
 {
 public:
-    const std::string sdata;
+    const std::vector<uint8_t> sdata;
 
-    BSQGUID(const std::string& sdata) : BSQRef(), sdata(sdata) { ; }
+    BSQGUID(const std::vector<uint8_t>& sdata) : BSQRef(), sdata(sdata) { ; }
     virtual ~BSQGUID() = default;
 };
 

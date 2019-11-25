@@ -21,6 +21,8 @@ type CPPCode = {
     funcdecls: string,
     conststring_declare: string,
     conststring_create: string,
+    constint_declare: string,
+    constint_create: string,
     propertyenums: string,
     propertynames: string,
     known_property_lists_declare: string,
@@ -126,6 +128,13 @@ class CPPEmitter {
             conststring_create.push(`BSQString Runtime::${v}(std::string(${k}), 1);`);
         });
 
+        let constint_declare: string[] = [];
+        let constint_create: string[] = [];
+        bodyemitter.allConstBigInts.forEach((v, k) => {
+            constint_declare.push(`static BSQInt ${v};`);
+            constint_create.push(`BSQInt Runtime::${v}(BigInt(std::string(${k})));`);
+        });
+
         let propertyenums: Set<string> = new Set<string>();
         let propertynames: Set<string> = new Set<string>();
         let known_property_lists_declare: string[] = [];
@@ -162,8 +171,8 @@ class CPPEmitter {
                 return "    " + fchk + "\n    " + conv;
             }
             else if(p.type === "NSCore::Int") {
-                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,10}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected Int\\n"); exit(1); }`;
-                const conv = `int64_t ${p.name} = std::stol(std::string(argv[${i}+1]));`;
+                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int\\n"); exit(1); }`;
+                const conv = `BSQ::BSQInt ${p.name}(std::stoi(std::string(argv[${i}+1])));`;
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
@@ -171,11 +180,31 @@ class CPPEmitter {
                 return "    " + conv;
             }
         });
+
+        let scopev = "";
         let callargs = entrypoint.params.map((p) => p.type !== "NSCore::String" ? p.name : `&${p.name}`);
         if(typeemitter.maybeRefableCountableType(restype)) {
-            callargs.push("__scopes__.getCallerSlot<0>()");
+            if (typeemitter.maybeRefableCountableType(restype)) {
+                if (typeemitter.isTupleType(restype)) {
+                    const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(restype);
+                    scopev = `BSQ::BSQRefScope<${maxlen}> __scopes__;`;
+                    for (let i = 0; i < maxlen; ++i) {
+                        callargs.push(`__scopes__.getCallerSlot<${i}>()`);
+                    }
+                }
+                else if (typeemitter.isRecordType(restype)) {
+                    const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(restype);
+                    scopev = `BSQ::BSQRefScope<${allprops.length}> __scopes__;`;
+                    for (let i = 0; i < allprops.length; ++i) {
+                        callargs.push(`__scopes__.getCallerSlot<${i}>()`);                }
+                }
+                else {
+                    scopev = "BSQ::BSQRefScope<1> __scopes__;";
+                    callargs.push("__scopes__.getCallerSlot<0>()");
+                }
+            }
         }
-        const scopev = typeemitter.maybeRefableCountableType(restype) ? "BSQ::BSQRefScope<1> __scopes__;" : "";
+        
         const callv = `BSQ::${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
         const fcall = `fprintf(stdout, "%s\\n", BSQ::Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}).c_str())`;
 
@@ -191,6 +220,8 @@ class CPPEmitter {
             funcdecls: funcdecls.join("\n"),
             conststring_declare: conststring_declare.sort().join("\n  "),
             conststring_create: conststring_create.sort().join("\n  "),
+            constint_declare: constint_declare.sort().join("\n  "),
+            constint_create: constint_create.sort().join("\n  "),
             propertyenums: [...propertyenums].sort().join(",\n  "),
             propertynames: [...propertynames].sort().join(",\n  "),
             known_property_lists_declare: known_property_lists_declare.sort().join("\n"),

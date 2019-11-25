@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 const CoreImplBodyText = new Map<string, (params: string[]) => string>()
-.set("int_tryparse", (params: string[]) => `return std::stol((${params[0]})->sdata);`)
+.set("int_tryparse", (params: string[]) => `return -1);`)
 ;
 
 export {

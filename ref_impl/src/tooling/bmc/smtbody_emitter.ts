@@ -496,11 +496,8 @@ class SMTBodyEmitter {
         if (lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") {
             return `(${op} ${this.argToSMT(lhs, this.typegen.boolType).emit()} ${this.argToSMT(rhs, this.typegen.boolType).emit()})`;
         }
-        else if (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int") {
-            return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()})`;
-        }
         else {
-            return NOT_IMPLEMENTED<string>("generateFastCompare -- string");
+            return `(${op} ${this.argToSMT(lhs, this.typegen.intType).emit()} ${this.argToSMT(rhs, this.typegen.intType).emit()})`;
         }
     }
 
@@ -1077,7 +1074,9 @@ class SMTBodyEmitter {
 
                 const lhvtype = this.getArgType(beq.lhs);
                 const rhvtype = this.getArgType(beq.rhs);
-                if (this.typegen.isPrimitiveType(lhvtype) && this.typegen.isPrimitiveType(rhvtype)) {
+                if ((this.typegen.isSimpleBoolType(lhvtype) && this.typegen.isSimpleBoolType(rhvtype))
+                    || (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype))
+                    || (this.typegen.isSimpleStringType(lhvtype) && this.typegen.isSimpleStringType(rhvtype))) {
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, beq.lhs, beq.rhs)));
                 }
                 else {
@@ -1094,7 +1093,8 @@ class SMTBodyEmitter {
                 const lhvtype = this.getArgType(bcmp.lhs);
                 const rhvtype = this.getArgType(bcmp.rhs);
 
-                if ((lhvtype.trkey === "NSCore::Bool" && rhvtype.trkey === "NSCore::Bool") || (lhvtype.trkey === "NSCore::Int" && rhvtype.trkey === "NSCore::Int")) {
+                if ((this.typegen.isSimpleBoolType(lhvtype) && this.typegen.isSimpleBoolType(rhvtype))
+                    || (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype))) {
                     return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)));
                 }
                 else {
