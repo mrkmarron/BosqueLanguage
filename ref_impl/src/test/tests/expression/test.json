@@ -45,5 +45,117 @@
                 "entrypoint": "literal1"
             }
         ]
+    },
+    {
+        "src": "tuples.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "emptyTuple",
+                "expected": "[]"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "oneTuple",
+                "expected": "[1]"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "fourTuple",
+                "expected": "[1, 2, none, true]"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "nestedTuples",
+                "expected": "[1, [none, []]]"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getIndex",
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getIndexOpt",
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getIndexBailout",
+                "args": ["true"],
+                "expected": "none"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "emptyTuple"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "nestedTuples"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "getIndexBailout"
+            }
+        ]
+    },
+    {
+        "src": "records.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "emptyRecord",
+                "expected": "{}"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "oneRecord",
+                "expected": "{f=1}"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "fourRecord",
+                "expected": "{f=1, g=2, h=none, k=true}"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "nestedRecords",
+                "expected": "{f=1, g={f=2, h={}}}"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getField",
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getFieldOpt",
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getFieldBailout",
+                "args": ["true"],
+                "expected": "none"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "emptyRecord"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "nestedRecords"
+            },
+            {
+                "kind": "sym",
+                "entrypoint": "getFieldBailout"
+            }
+        ]
     }
 ]

@@ -191,7 +191,12 @@ class CPPTypeEmitter {
             return "BSQString" + (declspec !== "base" ? "*" : "");
         }
         else if (this.isTupleType(ttype)) {
-            return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : "");
+            if(this.isKnownLayoutTupleType) {
+                return `BSQTupleKnown<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : "");
+            }
+            else {
+                return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : ""); 
+            }
         }
         else if (this.isRecordType(ttype)) {
             if (this.isKnownLayoutRecordType(ttype)) {
@@ -300,7 +305,7 @@ class CPPTypeEmitter {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
             else if (this.isSimpleIntType(into)) {
-                return `BSQ_IS_VALUE_INT(${exp}) ? BSQInt(BSQ_GET_VALUE_INT(${exp})) : BSQ_GET_VALUE_PTR(${exp}, BSQBoxedInt)->sdata`;
+                return `BSQ_IS_VALUE_INT(${exp}) ? BSQInt(BSQ_GET_VALUE_INT(${exp})) : BSQ_GET_VALUE_PTR(${exp}, BSQBoxedInt)->data`;
             }
             else if (this.isSimpleStringType(into)) {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
