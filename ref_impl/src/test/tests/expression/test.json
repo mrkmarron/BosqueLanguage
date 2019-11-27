@@ -199,5 +199,148 @@
                 "expected": "bsqterm_none"
             }
         ]
+    },
+    {
+        "src": "valueops.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "notBool",
+                "args": ["false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "notNoneable",
+                "args": ["false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "notNoneable",
+                "args": ["false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "notOpt",
+                "args": ["true"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "notOpt",
+                "args": ["false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "prefixPlus",
+                "args": ["2"],
+                "expected": "2"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "prefixNegate",
+                "args": ["1"],
+                "expected": "-1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "prefixNegate",
+                "args": ["-1"],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixAdd",
+                "args": ["2", "3"],
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixSub",
+                "args": ["1", "-2"],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixMult",
+                "args": ["1", "5"],
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixDiv",
+                "args": ["2", "2"],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixMod",
+                "args": ["3", "2"],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixPrecedence1",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "infixPrecedence2",
+                "expected": "2"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "notBoolC",
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "notNoneableC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "notOptC",
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "infixPrecedence1",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "infixPrecedence2",
+                "expected": "2"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "infixAdd"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "infixSub"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "infixMult"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "infixDiv",
+                "error": true
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "infixMod",
+                "error": true
+            }
+        ]
     }
 ]

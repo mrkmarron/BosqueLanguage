@@ -71,4 +71,14 @@ public:
     {
         return nullptr;
     }
+
+    static BigInt* div(const BigInt &l, const BigInt &r)
+    {
+        return nullptr;
+    }
+
+    static BigInt* mod(const BigInt &l, const BigInt &r)
+    {
+        return nullptr;
+    }
 };

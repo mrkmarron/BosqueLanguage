@@ -89,6 +89,7 @@
 ))
 
 (declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
+(declare-fun mod_op (Int Int) Int) ;;current implementation is simple uninterpreted function
 
 ;;STRING_DECLS;;
 

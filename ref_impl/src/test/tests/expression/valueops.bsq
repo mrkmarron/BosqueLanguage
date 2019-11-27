@@ -9,12 +9,20 @@ entrypoint function notBool(b: Bool): Bool {
     return !b;
 }
 
-entrypoint function notNoneable(b: Bool | None): Bool {
-    return !none;
+function notNoneableCall(b: Bool | None): Bool {
+    return !b;
 }
 
-entrypoint function notOpt(b?: Bool): Bool {
-    return !none;
+entrypoint function notNoneable(b: Bool): Bool {
+    return b ? notNoneableCall(true) : notNoneableCall(none);
+}
+
+function notOptCall(b?: Bool): Bool {
+    return !b;
+}
+
+entrypoint function notOpt(b: Bool): Bool {
+    return b ? notOptCall(true) : notOptCall();
 }
 
 entrypoint function prefixPlus(i: Int): Int {
@@ -51,4 +59,16 @@ entrypoint function infixPrecedence1(): Int {
 
 entrypoint function infixPrecedence2(): Int {
     return 1 + 2 / 2;
+}
+
+entrypoint function notBoolC(): Bool {
+    return notBool(true);
+}
+
+entrypoint function notNoneableC(): Bool {
+    return notNoneableCall(none);
+}
+
+entrypoint function notOptC(): Bool {
+    return notOptCall(true);
 }

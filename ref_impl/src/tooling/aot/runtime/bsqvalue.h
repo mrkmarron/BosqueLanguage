@@ -70,12 +70,12 @@ private:
 public:
     inline bool isInt() const
     {
-        return *(reinterpret_cast<const int32_t*>(&this->data) + 1) == 1;
+        return (((int64_t)this->data) & 0x1) == 1;
     }
 
     inline int32_t getInt() const
     {
-        return *reinterpret_cast<const int32_t*>(&this->data);
+        return (int32_t)(((int64_t)this->data) >> 32);
     }
 
     inline BigInt* getBigInt() const
@@ -85,16 +85,14 @@ public:
 
     inline int64_t getInt64() const
     {
-        return (int64_t)(*reinterpret_cast<const int32_t*>(&this->data));
+        return reinterpret_cast<int64_t>(this->data) >> 32;
     }
 
-    BSQInt() : data((void*)((int64_t)1)) { ; }
+    BSQInt() : data((void*)((int64_t)0x1)) { ; }
 
     BSQInt(int32_t value) : data(nullptr) 
     { 
-        int32_t* id = reinterpret_cast<int32_t*>(&this->data); 
-        id[0] = value;
-        id[1] = 1;
+        this->data = (void*)((((int64_t)value) << 32) | 0x1);
     }
 
     BSQInt(BigInt* value) : data((void*)value) 
@@ -104,7 +102,7 @@ public:
 
     BSQInt(const BSQInt& src)
     { 
-        this->data = src.isInt() == 0 ? src.data : src.getBigInt()->copy();
+        this->data = src.isInt() ? src.data : src.getBigInt()->copy();
     }
 
     BSQInt& operator=(const BSQInt& src)
@@ -122,7 +120,7 @@ public:
 
     BSQInt(BSQInt&& src) : data(src.data)
     { 
-        src.data = (void*)((int64_t)1);
+        src.data = (void*)((int64_t)0x1);
     }
 
     BSQInt& operator=(BSQInt&& src)
@@ -135,7 +133,7 @@ public:
             }
             this->data = src.data;
 
-            src.data = (void*)((int64_t)1);
+            src.data = (void*)((int64_t)0x1);
         }
         return *this;
     }
@@ -160,15 +158,15 @@ public:
         }
     }
 
-    inline BSQInt negate(BSQInt& v)
+    inline BSQInt negate()
     {
-        if(v.isInt())
+        if(this->isInt())
         {
-            return BSQInt(-v.getInt());
+            return BSQInt(-this->getInt());
         }
         else
         {
-            return BSQInt(v.getBigInt()->negate());
+            return BSQInt(this->getBigInt()->negate());
         }
     }
 
@@ -244,6 +242,32 @@ public:
         else
         {
             return BSQInt(BigInt::mult(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
+        }
+    }
+
+    inline friend BSQInt operator/(const BSQInt& l, const BSQInt& r)
+    {
+        if (l.isInt() && r.isInt())
+        {
+            int64_t res = l.getInt64() / r.getInt64();
+            return (INT32_MIN <= res && res < INT32_MAX) ? BSQInt(res) : BSQInt(new BigInt(res));
+        }
+        else
+        {
+            return BSQInt(BigInt::div(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
+        }
+    }
+
+    inline friend BSQInt operator%(const BSQInt& l, const BSQInt& r)
+    {
+        if (l.isInt() && r.isInt())
+        {
+            int64_t res = l.getInt64() % r.getInt64();
+            return (INT32_MIN <= res && res < INT32_MAX) ? BSQInt(res) : BSQInt(new BigInt(res));
+        }
+        else
+        {
+            return BSQInt(BigInt::mod(BIG_INT_VALUE(l), BIG_INT_VALUE(r)));
         }
     }
 };

@@ -1071,9 +1071,13 @@ class SMTBodyEmitter {
                 const bop = op as MIRBinOp;
 
                 const restmp = this.generateTempName();
-                if (bop.op === "/" || bop.op === "%") {
+                if (bop.op === "/") {
                     const ite = new SMTCond(new SMTValue(`(= ${restmp} 0)`), this.generateErrorCreate(op.sinfo, this.typegen.typeToSMTCategory(this.currentRType)), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
                     return new SMTLet(restmp, new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
+                }
+                else if (bop.op === "%") {
+                    const ite = new SMTCond(new SMTValue(`(= ${restmp} 0)`), this.generateErrorCreate(op.sinfo, this.typegen.typeToSMTCategory(this.currentRType)), new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(restmp), SMTFreeVar.generate()));
+                    return new SMTLet(restmp, new SMTValue(`(mod_op ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`), ite);
                 }
                 else {
                     return new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`));

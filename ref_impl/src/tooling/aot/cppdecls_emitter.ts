@@ -166,12 +166,12 @@ class CPPEmitter {
         const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
         const convargs = entrypoint.params.map((p, i) => {
             if(p.type === "NSCore::Bool") {
-                const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool\\n"); exit(1); }`;
+                const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
                 const conv = `bool ${p.name} = std::string(argv[${i}+1]) == "true";`;
                 return "    " + fchk + "\n    " + conv;
             }
             else if(p.type === "NSCore::Int") {
-                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int\\n"); exit(1); }`;
+                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
                 const conv = `BSQInt ${p.name}(std::stoi(std::string(argv[${i}+1])));`;
                 return "    \n    " + fchk + "\n    " + conv;
             } 
