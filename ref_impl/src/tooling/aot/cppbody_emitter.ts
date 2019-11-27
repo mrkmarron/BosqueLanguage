@@ -288,7 +288,7 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
             else {
-                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
             }
         }
         else if (this.typegen.isTupleType(tuptype)) {
@@ -298,7 +298,7 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
             else {
-                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
             }
         }
         else {
@@ -316,7 +316,7 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
             else {
-                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
             }
         }
         else if (this.typegen.isRecordType(rectype)) {
@@ -326,7 +326,7 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
             }
             else {
-                return `${this.varToCppName(op.trgt)} = BSQ_VALUE_NONE;`;
+                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
             }
         }
         else {
@@ -1193,12 +1193,12 @@ class CPPBodyEmitter {
                     const procs: string[] = [];
                     const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
                     for (let i = 0; i < allprops.length; ++i) {
-                        const cvn = this.varNameToCppName(`$callerslot$${procs[i]}`);
+                        const cvn = this.varNameToCppName(`$callerslot$${allprops[i]}`);
                         if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, procs[i])});`);
+                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, allprops[i])});`);
                         }
                         else {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(procs[i])});`);
+                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(allprops[i])});`);
                         }
                     }
                     gblock.push(procs.join(" "));

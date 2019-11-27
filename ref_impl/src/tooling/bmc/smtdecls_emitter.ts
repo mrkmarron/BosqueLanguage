@@ -56,25 +56,29 @@ class SMTEmitter {
         let fixedrecorddecls: string[] = [];
         assembly.typeMap.forEach((tt) => {
             if (typeemitter.isTupleType(tt) && SMTTypeEmitter.getTupleTypeMaxLength(tt) !== 0) {
-                fixedtupledecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
+                if (!fixedtupledecls_fwd.includes(`(${typeemitter.typeToSMTCategory(tt)} 0)`)) {
+                    fixedtupledecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
 
-                const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
-                let cargs: string[] = [];
-                for (let i = 0; i < maxlen; ++i) {
-                    cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} bsqtuple_entry)`);
+                    const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
+                    let cargs: string[] = [];
+                    for (let i = 0; i < maxlen; ++i) {
+                        cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} bsqtuple_entry)`);
+                    }
+                    fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
                 }
-                fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
             }
 
             if (typeemitter.isRecordType(tt) && SMTTypeEmitter.getRecordTypeMaxPropertySet(tt).length !== 0) {
-                fixedrecorddecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
+                if (!fixedrecorddecls_fwd.includes(`(${typeemitter.typeToSMTCategory(tt)} 0)`)) {
+                    fixedrecorddecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
 
-                const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
-                let cargs: string[] = [];
-                for (let i = 0; i < maxset.length; ++i) {
-                    cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} bsqrecord_entry)`);
+                    const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
+                    let cargs: string[] = [];
+                    for (let i = 0; i < maxset.length; ++i) {
+                        cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} bsqrecord_entry)`);
+                    }
+                    fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
                 }
-                fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
             }
         });
 

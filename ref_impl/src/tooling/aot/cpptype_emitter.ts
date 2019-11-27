@@ -160,8 +160,12 @@ class CPPTypeEmitter {
     maybeRefableCountableType(tt: MIRType): boolean {
         if(tt.options.every((opt) => {
             const uname = opt.trkey;
-            return (uname === "NSCore::None" || uname === "NSCore::Bool" || uname === "NSCore::Int");
+            return (uname === "NSCore::None" || uname === "NSCore::Bool");
         })) {
+            return false;
+        }
+
+        if (tt.options.length === 1 && tt.options[0] instanceof MIREntityType && tt.options[0].trkey === "NSCore::Int") {
             return false;
         }
 
@@ -169,11 +173,11 @@ class CPPTypeEmitter {
             return false;
         }
 
-        if(this.isKnownLayoutTupleType(tt) && CPPTypeEmitter.getKnownLayoutTupleType(tt).entries.every((entry) => !this.maybeRefableCountableType(entry.type))) {
+        if(this.isTupleType(tt) && CPPTypeEmitter.getTupleTypeMaxLength(tt) === 0) {
             return false;
         }
 
-        if(this.isKnownLayoutRecordType(tt) && CPPTypeEmitter.getKnownLayoutRecordType(tt).entries.every((entry) => !this.maybeRefableCountableType(entry.type))) {
+        if(this.isRecordType(tt) && CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).length === 0) {
             return false;
         }
 
@@ -226,7 +230,7 @@ class CPPTypeEmitter {
             return `BSQ_BOX_VALUE_BOOL(${exp})`;
         }
         else if (this.isSimpleIntType(from)) {
-            return `${exp}.isInt() ? BSQ_BOX_VALUE_INT(${exp}.getInt()) : ${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQBoxedInt>(new BSQBoxedInt(${exp}))`;
+            return `BSQ_BOX_VALUE_BSQINT(${exp}, ${this.mangleStringForCpp("$scope$")}, ${this.scopectr++})`;
         }
         else if (this.isSimpleStringType(from)) {
             return exp;
@@ -270,10 +274,20 @@ class CPPTypeEmitter {
             if (this.isKnownLayoutRecordType(from)) {
                 if (this.isRecordType(into)) {
                     const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
-                    return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                    if (intoset.length === 0) {
+                        return "BSQRecordFixed_empty";
+                    }
+                    else {
+                        return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                    }
                 }
                 else {
-                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
+                    if(fromset.length === 0) {
+                        return "BSQRecord::_empty";
+                    }
+                    else {
+                        return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
+                    }
                 }
             }
             else if (this.isKnownLayoutRecordType(into)) {
@@ -305,7 +319,7 @@ class CPPTypeEmitter {
                 return `BSQ_GET_VALUE_BOOL(${exp})`;
             }
             else if (this.isSimpleIntType(into)) {
-                return `BSQ_IS_VALUE_INT(${exp}) ? BSQInt(BSQ_GET_VALUE_INT(${exp})) : BSQ_GET_VALUE_PTR(${exp}, BSQBoxedInt)->data`;
+                return `BSQ_GET_VALUE_BSQINT(${exp})`;
             }
             else if (this.isSimpleStringType(into)) {
                 return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;

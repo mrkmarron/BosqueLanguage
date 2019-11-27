@@ -112,7 +112,7 @@ std::string Runtime::diagnostic_format(Value v)
                     rvals += ", ";
                 }
 
-                rvals += std::string(Runtime::propertyNames[(int32_t)rv->entries.at(i).first]) + " " + Runtime::diagnostic_format(rv->entries.at(i).second);
+                rvals += std::string(Runtime::propertyNames[(int32_t)rv->entries.at(i).first]) + "=" + Runtime::diagnostic_format(rv->entries.at(i).second);
             }
             rvals += "}";
 

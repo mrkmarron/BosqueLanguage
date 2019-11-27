@@ -86,6 +86,12 @@
                 "kind": "aot",
                 "entrypoint": "getIndexBailout",
                 "args": ["true"],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getIndexBailout",
+                "args": ["false"],
                 "expected": "none"
             },
             {
@@ -142,6 +148,12 @@
                 "kind": "aot",
                 "entrypoint": "getFieldBailout",
                 "args": ["true"],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "getFieldBailout",
+                "args": ["false"],
                 "expected": "none"
             },
             {

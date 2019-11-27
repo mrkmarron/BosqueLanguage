@@ -314,7 +314,7 @@ class SMTBodyEmitter {
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
         const tcons = this.typegen.generateTupleConstructor(this.typegen.getMIRType(op.resultTupleType));
         if (tcons === "bsqtuple_0@cons") {
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqtuple_empty_const"));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqtuple_0@cons"));
         }
         else {
             const argl = op.args.map((arg) => `(bsqtuple_entry@value ${this.argToSMT(arg, this.typegen.anyType).emit()})`);
@@ -325,7 +325,7 @@ class SMTBodyEmitter {
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
         const tcons = this.typegen.generateRecordConstructor(this.typegen.getMIRType(op.resultRecordType));
         if (tcons === "bsqrecord_empty@cons") {
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqrecord_empty_const"));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqrecord_empty@cons"));
         }
         else {
             const argl = op.args.map((arg) => `(bsqrecord_entry@value ${this.argToSMT(arg[1], this.typegen.anyType).emit()})`);
@@ -337,7 +337,12 @@ class SMTBodyEmitter {
         const tuptype = this.getArgType(op.arg);
         if (this.typegen.isTupleType(tuptype)) {
             if (this.typegen.isKnownLayoutTupleType(tuptype)) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term (${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()}))`), this.typegen.anyType, resultAccessType));
+                if(op.idx < SMTTypeEmitter.getKnownLayoutTupleType(tuptype).entries.length) {
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term (${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()}))`), this.typegen.anyType, resultAccessType));
+                }
+                else {
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                }
             }
             else {
                 const tmax = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
@@ -347,13 +352,13 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
                 }
             }
         }
         else {
             const avalue = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${op.idx})`;
-            const value = new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(avalue));
+            const value = new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(`(bsqtuple_entry@term ${avalue})`));
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
         }
     }
@@ -362,7 +367,12 @@ class SMTBodyEmitter {
         const rectype = this.getArgType(op.arg);
         if (this.typegen.isRecordType(rectype)) {
             if (this.typegen.isKnownLayoutRecordType(rectype)) {
+                if (SMTTypeEmitter.getKnownLayoutRecordType(rectype).entries.find((entry) => entry.name === op.property) !== undefined) {
                 return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term (${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()}))`), this.typegen.anyType, resultAccessType));
+                }
+                else {
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                }
             }
             else {
                 const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(rectype);
@@ -372,13 +382,13 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqterm_none_const"));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
                 }
             }
         }
         else {
             const avalue = `(select (bsqterm_record_entries ${this.argToSMT(op.arg, rectype).emit()}) "${op.property}")`;
-            const value = new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(avalue));
+            const value = new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(`(bsqrecord_entry@term ${avalue})`));
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
         }
     }

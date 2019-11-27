@@ -274,7 +274,7 @@ class SMTTypeEmitter {
                     let temp = `@tmpconv_${this.tempconvctr++}`;
                     let tuparray = "bsqrecord_array_empty";
                     for (let i = 0; i < fromset.length; ++i) {
-                        tuparray = `(store ${tuparray} ${i} (${this.generateRecordAccessor(from, fromset[i])} ${temp}))`;
+                        tuparray = `(store ${tuparray} "${fromset[i]}" (${this.generateRecordAccessor(from, fromset[i])} ${temp}))`;
                     }
                     return new SMTLet(temp, exp, new SMTValue(`(bsqterm_record ${tuparray})`));
                 }
@@ -326,7 +326,7 @@ class SMTTypeEmitter {
                 let temp = `@tmpconv_${this.tempconvctr++}`;
                 let args: string[] = [];
                 for (let i = 0; i < intoset.length; ++i) {
-                    args.push(`(select ${temp} ${intoset[i]})`);
+                    args.push(`(select ${temp} "${intoset[i]}")`);
                 }
                 return new SMTLet(temp, new SMTValue(`(bsqterm_record_entries ${exp.emit()})`), new SMTValue(`(${this.generateRecordConstructor(into)} ${args.join(" ")})`));
             }
