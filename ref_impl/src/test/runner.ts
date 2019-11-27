@@ -49,7 +49,8 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
 
 Commander
     .option("-t --typecheck", "Parse and Typecheck")
-    .option("-v --verify <entrypoint>", "Check for errors reachable from specified entrypoint")
+    .option("-s --symbolic <entrypoint>", "Symbolic testing from specified entrypoint (default to error finding)")
+    .option("-r --result <entrypoint>", "Symbolic execution with non-error result model")
     .option("-c --compile <entrypoint>", "Compile the specified entrypoint");
 
 Commander.parse(process.argv);
@@ -59,28 +60,28 @@ if (Commander.typecheck === undefined && Commander.args.length === 0) {
     process.exit(1);
 }
 
-const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", Commander.verify ? "core/direct/" : "core/direct/")));
+const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", (Commander.symbolic || Commander.result) ? "core/direct/" : "core/direct/")));
 
 if(Commander.typecheck !== undefined) {
     ; //generate MASM will output errors and exit if there are any
 }
-else if (Commander.verify !== undefined) {
+else if ((Commander.symbolic || Commander.result) !== undefined) {
     setImmediate(() => {
         const smt_runtime = Path.join(binroot, "tooling/bmc/runtime/smtruntime.smt2");
 
-        if(massembly.invokeDecls.get(Commander.verify) === undefined) {
+        if(massembly.invokeDecls.get((Commander.symbolic || Commander.result)) === undefined) {
             process.stderr.write("Could not find specified entrypoint!!!\n");
             process.exit(1);
         }
 
-        const entrypoint = massembly.invokeDecls.get(Commander.verify) as MIRInvokeBodyDecl;
+        const entrypoint = massembly.invokeDecls.get((Commander.symbolic || Commander.result)) as MIRInvokeBodyDecl;
         const PODType = massembly.typeMap.get("NSCore::POD") as MIRType;
         if (entrypoint.params.some((p) => !massembly.subtypeOf(massembly.typeMap.get(p.type) as MIRType, PODType))) {
             process.stderr.write("Only PODTypes are supported for symbolic testing!!!\n");
             process.exit(1);
         }
 
-        const sparams = SMTEmitter.emit(massembly, entrypoint);
+        const sparams = SMTEmitter.emit(massembly, entrypoint, Commander.symbolic !== undefined);
         const lsrc = FS.readFileSync(smt_runtime).toString();
         const contents = lsrc
             .replace(";;FIXED_TUPLE_DECLS_FWD;;", "  " + sparams.fixedtupledecls_fwd)
@@ -96,7 +97,8 @@ else if (Commander.verify !== undefined) {
             .replace(";;SUBTYPE_DECLS;;", sparams.typechecks)
             .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls)
             .replace(";;ARG_VALUES;;", sparams.args_info)
-            .replace(";;INVOKE_ACTION;;", sparams.main_info);
+            .replace(";;INVOKE_ACTION;;", sparams.main_info)
+            .replace(";;GET_MODEL;;", (Commander.result !== undefined) ? "(get-model)" : "");
 
         const smtpath = Path.join(scratchroot, "smt");
         FS.mkdirSync(smtpath, { recursive: true });

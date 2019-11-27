@@ -41,8 +41,18 @@
                 "expected": "\"hello\""
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "literal1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "literal1",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "literalFalse",
+                "expected": "false"
             }
         ]
     },
@@ -95,16 +105,26 @@
                 "expected": "none"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "emptyTuple"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "nestedTuples"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "getIndexBailout"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "getIndex",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "getIndexOpt",
+                "expected": "bsqterm_none"
             }
         ]
     },
@@ -157,16 +177,26 @@
                 "expected": "none"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "emptyRecord"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "nestedRecords"
             },
             {
-                "kind": "sym",
+                "kind": "symtest",
                 "entrypoint": "getFieldBailout"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "getField",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "getFieldOpt",
+                "expected": "bsqterm_none"
             }
         ]
     }

@@ -31,7 +31,7 @@ type SMTCode = {
 const SymbolicArgTypecheckGas = 3;
 
 class SMTEmitter {
-    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl): SMTCode {
+    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, errorcheck: boolean): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
         typeemitter.initializeConceptSubtypeRelation();
 
@@ -219,7 +219,7 @@ class SMTEmitter {
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
 
-        let chk = `(assert (is-result_error@${rrtype} @smtres@))`;
+        let chk = errorcheck ? `(assert (is-result_error@${rrtype} @smtres@))` : `(assert (not (is-result_error@${rrtype} @smtres@)))`;
 
         if(entrypoint.preconditions.length !== 0) {
             const eid = bodyemitter.getErrorIds(entrypoint.sourceLocation)[0];
