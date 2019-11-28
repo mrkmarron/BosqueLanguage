@@ -182,6 +182,18 @@ public:
         }    
     }
 
+    inline friend bool operator!=(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() != r.getInt();
+        }
+        else
+        {
+            return BigInt::neq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }    
+    }
+
     inline friend bool operator<(const BSQInt& l, const BSQInt& r)
     {
         if(l.isInt() && r.isInt())
@@ -203,6 +215,30 @@ public:
         else
         {
             return BigInt::lteq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        } 
+    }
+
+    inline friend bool operator>(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() > r.getInt();
+        }
+        else
+        {
+            return BigInt::gt(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }   
+    }
+
+    inline friend bool operator>=(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() >= r.getInt();
+        }
+        else
+        {
+            return BigInt::gteq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
         } 
     }
 

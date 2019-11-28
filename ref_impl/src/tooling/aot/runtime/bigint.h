@@ -47,12 +47,27 @@ public:
         return false;
     }
 
+    static bool neq(const BigInt& l, const BigInt& r)
+    {
+        return false;
+    }
+
     static bool lt(const BigInt& l, const BigInt& r)
     {
         return false;
     }
 
     static bool lteq(const BigInt& l, const BigInt& r)
+    {
+        return false;
+    }
+
+     static bool gt(const BigInt& l, const BigInt& r)
+    {
+        return false;
+    }
+
+    static bool gteq(const BigInt& l, const BigInt& r)
     {
         return false;
     }

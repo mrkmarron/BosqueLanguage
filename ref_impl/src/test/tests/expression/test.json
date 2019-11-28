@@ -342,5 +342,206 @@
                 "error": true
             }
         ]
+    },
+    {
+        "src": "equality.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqNoneExec",
+                "args": ["false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqNoneExec",
+                "args": ["true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqBool",
+                "args": ["true", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqBool",
+                "args": ["true", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqInt",
+                "args": ["2", "2"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqInt",
+                "args": ["2", "100"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqString",
+                "args": ["\"yes\"", "\"yes\""],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eqString",
+                "args": ["\"yes\"", "\"no\""],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "neqNoneExec",
+                "args": ["false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "neqBool",
+                "args": ["true", "false"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "neqInt",
+                "args": ["2", "100"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "neqString",
+                "args": ["\"yes\"", "\"yes\""],
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "eqIntC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "neqStringC",
+                "expected": "true"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "eqNoneExec"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "eqBool"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "eqInt"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "eqString"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "tripNone",
+                "error": true
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "tripInt",
+                "error": true
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "tripString",
+                "error": true
+            }
+        ]
+    },
+    {
+        "src": "compare.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ltInt",
+                "args": ["2", "3"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ltInt",
+                "args": ["2", "2"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ltInt",
+                "args": ["2", "1"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "lteqInt",
+                "args": ["2", "3"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "lteqInt",
+                "args": ["2", "2"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "lteqInt",
+                "args": ["2", "1"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "gtInt",
+                "args": ["2", "1"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "gteqInt",
+                "args": ["2", "3"],
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ltC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "lteqC",
+                "expected": "true"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "ltInt"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "tripIntLT",
+                "error": true
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "tripIntLTEQ",
+                "error": true
+            }
+        ]
     }
 ]
