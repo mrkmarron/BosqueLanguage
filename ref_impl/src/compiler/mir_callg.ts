@@ -101,18 +101,20 @@ function sccVisit(cn: CallGNode, scc: Set<MIRBodyKey>, marked: Set<MIRBodyKey>, 
 
     scc.add(cn.invoke);
     marked.add(cn.invoke);
-    cn.callees.forEach((pred) => sccVisit(invokes.get(pred) as CallGNode, scc, marked, invokes));
+    cn.callers.forEach((pred) => sccVisit(invokes.get(pred) as CallGNode, scc, marked, invokes));
 }
 
-function topoVisit(cn: CallGNode, tordered: CallGNode[], invokes: Map<MIRBodyKey, CallGNode>) {
-    if (tordered.findIndex((vn) => vn.invoke === cn.invoke) !== -1) {
+function topoVisit(cn: CallGNode, pending: CallGNode[], tordered: CallGNode[], invokes: Map<MIRBodyKey, CallGNode>) {
+    if (pending.findIndex((vn) => vn.invoke === cn.invoke) !== -1 || tordered.findIndex((vn) => vn.invoke === cn.invoke) !== -1) {
         return;
     }
 
-    tordered.push(cn);
+    pending.push(cn);
 
     cn.callees.forEach((succ) => (invokes.get(succ) as CallGNode).callers.add(cn.invoke));
-    cn.callees.forEach((succ) => topoVisit(invokes.get(succ) as CallGNode, tordered, invokes));
+    cn.callees.forEach((succ) => topoVisit(invokes.get(succ) as CallGNode, pending, tordered, invokes));
+
+    tordered.push(cn);
 }
 
 function processBodyInfo(bkey: MIRBodyKey, binfo: MIRBody[], assembly: MIRAssembly): CallGNode {
@@ -182,7 +184,7 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
         const ikey = MIRKeyGenerator.generateBodyKey("invoke", ivk);
 
         roots.push(invokes.get(ikey) as CallGNode);
-        topoVisit(invokes.get(ikey) as CallGNode, tordered, invokes);
+        topoVisit(invokes.get(ikey) as CallGNode, [], tordered, invokes);
     });
     tordered = tordered.reverse();
 
