@@ -84,8 +84,13 @@
     ;;NOMINAL_RESULT;;
 ))
 
-(declare-fun stroi (String) Int) ;;current implementation is simple uninterpreted function
-(declare-fun mod_op (Int Int) Int) ;;current implementation is simple uninterpreted function
+;;current implementation is simple uninterpreted function -- want to implement these in core runtime with bounded checkable impl
+(declare-fun stroi (String) Int)
+
+;;current implementation is simple uninterpreted function -- maybe want to make these return a non-decidable error (or have bounded checkable impl)
+(declare-fun mult_op (Int Int) Int) 
+(declare-fun div_op (Int Int) Int)
+(declare-fun mod_op (Int Int) Int)
 
 ;;STRING_DECLS;;
 
