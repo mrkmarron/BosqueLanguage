@@ -231,7 +231,7 @@ class SMTTypeEmitter {
             }
             else {
                 if (fromsize === 0) {
-                    return new SMTValue(`(bsqterm_tuple bsqtuple_array_empty)`);
+                    return new SMTValue(`(bsqterm_tuple 0 bsqtuple_array_empty)`);
                 }
                 else {
                     let temp = `@tmpconv_${this.tempconvctr++}`;
@@ -239,13 +239,13 @@ class SMTTypeEmitter {
                     for (let i = 0; i < fromsize; ++i) {
                         tuparray = `(store ${tuparray} ${i} (${this.generateTupleAccessor(from, i)} ${temp}))`;
                     }
-                    return new SMTLet(temp, exp, new SMTValue(`(bsqterm_tuple ${tuparray})`));
+                    return new SMTLet(temp, exp, new SMTValue(`(bsqterm_tuple ${fromsize} ${tuparray})`));
                 }
             }
         }
         else if (this.isRecordType(from)) {
             const fromset = SMTTypeEmitter.getRecordTypeMaxPropertySet(from);
-            if (this.isTupleType(into)) {
+            if (this.isRecordType(into)) {
                 const intoset = SMTTypeEmitter.getRecordTypeMaxPropertySet(into);
                 const intocons = this.generateRecordConstructor(into);
                 if (intoset.length === 0) {
@@ -268,15 +268,17 @@ class SMTTypeEmitter {
             }
             else {
                 if (fromset.length === 0) {
-                    return new SMTValue(`(bsqterm_record bsqrecord_array_empty)`);
+                    return new SMTValue(`(bsqterm_record 0 bsqrecord_prop_array_empty bsqrecord_array_empty)`);
                 }
                 else {
                     let temp = `@tmpconv_${this.tempconvctr++}`;
                     let tuparray = "bsqrecord_array_empty";
+                    let proparray = "bsqrecord_prop_array_empty"
                     for (let i = 0; i < fromset.length; ++i) {
                         tuparray = `(store ${tuparray} "${fromset[i]}" (${this.generateRecordAccessor(from, fromset[i])} ${temp}))`;
+                        proparray = `(store ${proparray} ${i} "${fromset[i]}")`;
                     }
-                    return new SMTLet(temp, exp, new SMTValue(`(bsqterm_record ${tuparray})`));
+                    return new SMTLet(temp, exp, new SMTValue(`(bsqterm_record ${fromset.length} ${proparray} ${tuparray})`));
                 }
             }
         }

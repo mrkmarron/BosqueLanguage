@@ -6,13 +6,6 @@
 (set-option :smt.auto-config false) ; disable automatic self configuration
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
-(declare-datatypes ( (RecordPropertyList 0) ) (
-    ( 
-      (property_list_nil)
-      (property_list_cons (property_list_head String) (property_list_tail RecordPropertyList)) 
-    )
-))
-
 (declare-datatypes ( 
       (BTerm 0)
       (bsqstring 0)
@@ -36,8 +29,8 @@
       (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
       (bsqterm_idkey (bsqterm_idkey_type String) (bsqterm_idkey_value BTerm))
       (bsqterm_regex (bsqterm_regex_value String))
-      (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
-      (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
+      (bsqterm_tuple (bsqterm_tuple_max_length Int) (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
+      (bsqterm_record (bsqterm_record_max_properties Int) (bsqterm_record_properties (Array Int String)) (bsqterm_record_entries (Array String bsqrecord_entry)))
       (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
     )
@@ -63,6 +56,9 @@
 
 (declare-const bsqrecord_array_empty (Array String bsqrecord_entry))
 (assert (= bsqrecord_array_empty ((as const (Array String bsqrecord_entry)) bsqrecord_entry@clear)))
+
+(declare-const bsqrecord_prop_array_empty (Array Int String))
+(assert (= bsqrecord_prop_array_empty ((as const (Array Int String)) "")))
 
 (declare-const bsqentity_array_empty (Array String BTerm))
 (assert (= bsqentity_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))

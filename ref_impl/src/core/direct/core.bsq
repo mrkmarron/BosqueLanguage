@@ -29,7 +29,6 @@ concept Some provides Any {
 concept Indexable provides Any {
     static eq(a: Indexable, b: Indexable): Bool # indexableeq
     static lt(a: Indexable, b: Indexable): Bool # indexablelt
-    static lteq(a: Indexable, b: Indexable): Bool # indexablelteq
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>

@@ -672,7 +672,7 @@ class SMTBodyEmitter {
             }
         }
         else if(this.typegen.isRecordType(argtype) || this.typegen.isUEntityType(argtype)) {
-            return "false;"
+            return "false"
         }
         else {
             assert(this.typegen.typeToSMTCategory(argtype) === "BTerm"); 
@@ -878,13 +878,15 @@ class SMTBodyEmitter {
                 tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Regex") as MIREntityType));
             }
 
+            //TODO: INDEXABLE HERE -- special case for tuples
+
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(is-bsqterm_tuple ${arg})`);
             }
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(is-bsqterm_record ${arg})`);
             }
-            //array, podX, Dict also here 
+            //TODO: podX
 
             tests.push(`(and (is-bsqterm_object ${arg}) (select MIRConceptSubtypeArray__${this.typegen.mangleStringForSMT(oftype.trkey)} (bsqterm_object_type ${arg})))`);
         }

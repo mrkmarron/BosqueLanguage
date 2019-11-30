@@ -543,5 +543,140 @@
                 "error": true
             }
         ]
+    },
+    {
+        "src": "logicops.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "impliesOp",
+                "args": ["false", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "impliesOp",
+                "args": ["true", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "impliesOp",
+                "args": ["true", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "orOp",
+                "args": ["false", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "orOp",
+                "args": ["true", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "orOp",
+                "args": ["false", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "andOp",
+                "args": ["false", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "andOp",
+                "args": ["true", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "andOp",
+                "args": ["true", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "logicPrecedenceImplies",
+                "args": ["false", "false", "true"],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "logicPrecedenceAndOr",
+                "args": ["false", "true", "false"],
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "impliesNoneC",
+                "args": [],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "orNoneC",
+                "args": [],
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "andNoneC",
+                "args": [],
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "impliesOpC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "orOpC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "andOpC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "impliesNoneC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "orNoneC",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "andNoneC",
+                "expected": "false"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "logicPrecedenceImplies"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "logicPrecedenceAndOr"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "puzzle",
+                "error": true
+            }
+        ]
     }
 ]

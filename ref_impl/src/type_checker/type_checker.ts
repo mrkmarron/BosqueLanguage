@@ -493,17 +493,14 @@ class TypeChecker {
 
     private appendIntoTupleAtom(sinfo: SourceInfo, t: ResolvedTupleAtomType, merge: ResolvedAtomType): ResolvedType {
         this.raiseErrorIf(sinfo, !(t instanceof ResolvedTupleAtomType), "Cannot append on 'Tuple' type");
-        const tuple = t as ResolvedTupleAtomType;
+        const tuple = merge as ResolvedTupleAtomType;
 
         let tentries: ResolvedTupleAtomTypeEntry[] = [];
         if (t.types.some((entry) => entry.isOptional)) {
             this.raiseError(sinfo, "Appending to tuple with optional entries creates ambigious result tuple");
         }
-        else if (t.types.length === 0 || tuple.types.length === 0) {
-            tentries = t.types.length !== 0 ? [...t.types] : [...tuple.types];
-        }
         else {
-            //not open and no optional entries so just copy everything along
+            //just copy everything along
             tentries = [...t.types, ...tuple.types];
         }
 
@@ -512,7 +509,7 @@ class TypeChecker {
 
     private mergeIntoRecordAtom(sinfo: SourceInfo, t: ResolvedRecordAtomType, merge: ResolvedAtomType): ResolvedType {
         this.raiseErrorIf(sinfo, !(t instanceof ResolvedRecordAtomType), "Cannot merge with 'Record' type");
-        const record = t as ResolvedRecordAtomType;
+        const record = merge as ResolvedRecordAtomType;
 
         let rentries: ResolvedRecordAtomTypeEntry[] = [...t.entries];
         for (let i = 0; i < record.entries.length; ++i) {
@@ -2118,6 +2115,8 @@ class TypeChecker {
         }
 
         const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, lhs);
+
+        //THIS IS WRONG -- in "true && x" the true is redundant but the rest of the expressions needs to be evaluated 
         this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || falseflow.length === 0, "Expression is always true/false rest of expression is infeasible");
 
         if (exp.op === "||") {
@@ -2132,7 +2131,9 @@ class TypeChecker {
             }
 
             const [rtflow, rfflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, rhs);
-            this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
+
+            //THIS IS WRONG -- in "x || false" the true is redundant but the rest of the expressions needs to be evaluated 
+            //this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
             return [...trueflow, ...rtflow, ...rfflow];
         }
         else if (exp.op === "&&") {
@@ -2147,7 +2148,9 @@ class TypeChecker {
             }
 
             const [rtflow, rfflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, rhs);
-            this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
+
+            //THIS IS WRONG -- in "x && true" the true is redundant but the rest of the expressions needs to be evaluated 
+            //this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
             return [...falseflow, ...rtflow, ...rfflow];
         }
         else {
@@ -2162,7 +2165,9 @@ class TypeChecker {
             }
 
             const [rtflow, rfflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, rhs);
-            this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
+
+            //THIS IS WRONG -- in "x => true" the true is redundant but the rest of the expressions needs to be evaluated 
+            //this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
             return [...falseflow.map((opt) => opt.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)), ...rtflow, ...rfflow];
         }
     }

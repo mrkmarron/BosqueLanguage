@@ -609,7 +609,7 @@ class CPPBodyEmitter {
             }
         }
         else if(this.typegen.isRecordType(argtype) || this.typegen.isUEntityType(argtype)) {
-            return "false;"
+            return "false"
         }
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
@@ -669,7 +669,7 @@ class CPPBodyEmitter {
             }
         }
         else if(this.typegen.isUEntityType(argtype)) {
-            return "false;"
+            return "false"
         }
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
@@ -819,13 +819,15 @@ class CPPBodyEmitter {
                 tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Regex") as MIREntityType));
             }
 
+            //TODO: INDEXABLE HERE -- special case for tuples
+
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
             }
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
             }
-            //array, podX, Dict also here 
+            //TODO: podX
 
             tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
         }
