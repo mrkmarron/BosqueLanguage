@@ -260,7 +260,7 @@ class SMTTypeEmitter {
                             args.push(`(${this.generateRecordAccessor(from, p)} ${temp})`);
                         }
                         else {
-                            args.push("bsqrecord_entry@empty");
+                            args.push("bsqrecord_entry@clear");
                         }
                     }
                     return new SMTLet(temp, exp, new SMTValue(`(${intocons} ${args.join(" ")})`));

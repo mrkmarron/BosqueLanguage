@@ -855,7 +855,7 @@ namespace StructuralCoercionOps
     template <uint16_t k, uint16_t j>
     inline BSQTupleFixed<k> projectTupleDownFixed(const BSQTupleFixed<j>& src)
     {
-        static_assert(k < j);
+        static_assert(k < j, "size error");
 
         BSQTupleFixed<k> res;
         res.size = src.size;
@@ -875,7 +875,7 @@ namespace StructuralCoercionOps
     template <uint16_t k, uint16_t j>
     inline BSQTupleFixed<k> projectTupleUpFixed(const BSQTupleFixed<j>& src)
     {
-        static_assert(k > j);
+        static_assert(k > j, "size error");
 
         BSQTupleFixed<k> res;
         res.size = src.size;
@@ -923,7 +923,7 @@ namespace StructuralCoercionOps
     template<uint16_t k, uint16_t j>
     inline BSQTupleFixed<k> convertTupleKnownToFixed(const BSQTupleKnown<j>& src)
     {
-        static_assert(k >= j);
+        static_assert(k >= j, "size error");
 
         BSQTupleFixed<k> res;
         res.size = j;
@@ -943,7 +943,7 @@ namespace StructuralCoercionOps
     template<uint16_t k, uint16_t j>
     inline BSQTupleKnown<k> convertTupleFixedToKnown(const BSQTupleFixed<j> src)
     {
-        static_assert(k <= j);
+        static_assert(k <= j, "size error");
 
         BSQTupleKnown<k> res;
         for(uint16_t i = 0; i < k; ++i)
@@ -997,7 +997,7 @@ namespace StructuralCoercionOps
     template <uint16_t k, uint16_t j>
     inline BSQRecordFixed<k> projectRecordDownFixed(const BSQTupleFixed<j>& src)
     {
-        static_assert(k < j);
+        static_assert(k < j, "size error");
 
         BSQRecordFixed<k> res;
         res.size = src.size;
@@ -1017,7 +1017,7 @@ namespace StructuralCoercionOps
     template <uint16_t k, uint16_t j>
     inline BSQRecordFixed<k> projectRecordUpFixed(const BSQTupleFixed<j>& src)
     {
-        static_assert(k > j);
+        static_assert(k > j, "size error");
 
         BSQRecordFixed<k> res;
         res.size = src.size;
@@ -1059,7 +1059,7 @@ namespace StructuralCoercionOps
     template<uint16_t k, uint16_t j>
     inline BSQRecordFixed<k> convertRecordKnownToFixed(const BSQRecordKnown<j>& src, const MIRPropertyEnum(&properties)[j])
     {
-        static_assert(k >= j);
+        static_assert(k >= j, "size error");
 
         BSQRecordFixed<k> res;
         res.size = j;
@@ -1073,7 +1073,7 @@ namespace StructuralCoercionOps
     template<uint16_t k, uint16_t j>
     inline BSQRecordKnown<k> convertRecordFixedToKnown(const BSQRecordFixed<j> src)
     {
-        static_assert(k <= j);
+        static_assert(k <= j, "size error");
 
         BSQRecordKnown<k> res;
         for(uint16_t i = 0; i < k; ++i)

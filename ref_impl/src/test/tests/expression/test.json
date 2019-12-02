@@ -1010,7 +1010,7 @@
             {
                 "kind": "aot",
                 "entrypoint": "enestif_abs1",
-                "args": [],
+                "args": ["false"],
                 "expected": "0"
             },
             {

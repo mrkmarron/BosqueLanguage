@@ -126,3 +126,9 @@ entrypoint function structuredDeclAndAssignIgnores(): Int {
     var {f=_, g=[y, _:Int]} = {f=1, g=[2, 3]};
     return y;
 }
+
+entrypoint function puzzle(a: Int, b: Bool): Int {
+    [var x: Int, var y] = [a, b ? 1 : -1];
+    assert x + y == 3;
+    return 1;
+}

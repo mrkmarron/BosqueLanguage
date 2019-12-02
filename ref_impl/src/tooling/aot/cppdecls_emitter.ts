@@ -155,7 +155,10 @@ class CPPEmitter {
                     const knownrec = CPPTypeEmitter.getKnownLayoutRecordType(tt);
                     const knownenum = knownrec.entries.map((entry) => `MIRPropertyEnum::${entry.name}`);
 
-                    known_property_lists_declare.push(`constexpr MIRPropertyEnum ${typeemitter.getKnownPropertyRecordArrayName(tt)}[${knownrec.entries.length}] = {${knownenum.join(", ")}};`);
+                    const decl = `constexpr MIRPropertyEnum ${typeemitter.getKnownPropertyRecordArrayName(tt)}[${knownrec.entries.length}] = {${knownenum.join(", ")}};`
+                    if (knownrec.entries.length !== 0 && !known_property_lists_declare.includes(decl)) {
+                        known_property_lists_declare.push(decl);
+                    }
                 }
             });
         });

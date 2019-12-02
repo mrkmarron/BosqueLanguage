@@ -7,52 +7,188 @@
             },
             {
                 "kind": "aot",
-                "entrypoint": "literalNone",
-                "expected": "none"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "literalTrue",
-                "expected": "true"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "literalFalse",
-                "expected": "false"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "literal1",
-                "expected": "1"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "literal3",
+                "entrypoint": "constDeclWithType",
                 "expected": "3"
             },
             {
                 "kind": "aot",
-                "entrypoint": "literalEmptyString",
-                "expected": "\"\""
+                "entrypoint": "constDeclWithUnionType",
+                "expected": "3"
             },
             {
                 "kind": "aot",
-                "entrypoint": "literalHello",
-                "expected": "\"hello\""
+                "entrypoint": "varDeclAndAssignWithType",
+                "expected": "4"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "varDeclAndAssignWithNoValue",
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclTuple",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclMutableTuple",
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredAssignTuple",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclMutableRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredAssignRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclAndAssign",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclGlobal",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclGlobalMutable",
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredRecordWithTuple",
+                "expected": "6"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredTupleWithRecord",
+                "expected": "6"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclAndAssignOptionalsMatch",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclAndAssignOptionalsDefault",
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "structuredDeclAndAssignIgnores",
+                "expected": "2"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "constDeclWithType",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "constDeclWithUnionType",
+                "expected": " (bsqterm_int 3)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "varDeclAndAssignWithType",
+                "expected": "4"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "varDeclAndAssignWithNoValue",
+                "expected": " (bsqterm_int 5)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclTuple",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclMutableTuple",
+                "expected": "5"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredAssignTuple",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclMutableRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredAssignRecord",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclAndAssign",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclGlobal",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclGlobalMutable",
+                "expected": "5"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredRecordWithTuple",
+                "expected": "6"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredTupleWithRecord",
+                "expected": "6"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclAndAssignOptionalsMatch",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclAndAssignOptionalsDefault",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "structuredDeclAndAssignIgnores",
+                "expected": "2"
             },
             {
                 "kind": "symtest",
-                "entrypoint": "literal1"
-            },
-            {
-                "kind": "symexec",
-                "entrypoint": "literal1",
-                "expected": "1"
-            },
-            {
-                "kind": "symexec",
-                "entrypoint": "literalFalse",
-                "expected": "false"
+                "entrypoint": "puzzle",
+                "error": true
             }
         ]
     }

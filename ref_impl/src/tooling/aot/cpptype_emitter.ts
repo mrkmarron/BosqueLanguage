@@ -278,7 +278,12 @@ class CPPTypeEmitter {
                         return "BSQRecordFixed_empty";
                     }
                     else {
-                        return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                        if(fromset.length === 0) {
+                            return `BSQRecordFixed<${intoset.length}>{0}`;
+                        }
+                        else {
+                            return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                        }
                     }
                 }
                 else {
