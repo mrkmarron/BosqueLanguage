@@ -35,9 +35,9 @@ const testxml = `<?xml version="1.0" encoding="UTF-8"?>
 
 abstract class TestInfo {
     readonly name: string;
-    readonly expected: string;
+    readonly expected: string | null;
 
-    constructor(name: string, expected: string) {
+    constructor(name: string, expected: string | null) {
         this.name = name;
         this.expected = expected;
     }
@@ -53,7 +53,7 @@ class ExecuteTestInfo extends TestInfo {
     readonly entrypoint: string;
     readonly args: string[];
 
-    constructor(name: string, entry: string, expected: string, ctr: number, args: string[] | undefined) {
+    constructor(name: string, entry: string, expected: string | null, ctr: number, args: string[] | undefined) {
         super(`${name}@aot--${entry}#${ctr}`, expected);
         this.entrypoint = entry;
         this.args = args || [];
@@ -72,7 +72,7 @@ class SymbolicCheckTestInfo extends TestInfo {
 class SymbolicExecTestInfo extends TestInfo {
     readonly entrypoint: string;
     
-    constructor(name: string, entry: string, expected: string) {
+    constructor(name: string, entry: string, expected: string | null) {
         super(`${name}@symbolic_exec--${entry}`, expected);
         this.entrypoint = entry;
     }
@@ -198,13 +198,13 @@ class TestRunner {
         const runnerapp = Path.join(__dirname, "runner.js");
         try {
             execSync(`node ${runnerapp} -r "NSTest::${test.entrypoint}" ${testsrc}`);
-        
+
             process.chdir(smtscratch);
             const res = execSync(`${z3path} -smt2 scratch.smt2`).toString().trim();
 
             const splits = res.split("\n");
             const ridx = splits.findIndex((str) => str.trim().startsWith(`(define-fun @smtres@`));
-            if(ridx === -1) {
+            if (ridx === -1) {
                 return "NO_MODEL";
             }
             else {
@@ -267,7 +267,7 @@ class TestRunner {
             const tstart = Date.now();
 
             const cr = this.runAOTTest(testsrc, ctest);
-            if (ctest.expected === cr) {
+            if (ctest.expected === cr || (ctest.expected === null && (cr.includes("abort") || cr.includes("assert") || cr.includes("check")))) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${ctest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
 
@@ -319,7 +319,7 @@ class TestRunner {
             const tstart = Date.now();
 
             const cr = this.runSymbolicExecTest(testsrc, vtest);
-            if (vtest.expected === cr) {
+            if (vtest.expected === cr || (vtest.expected === null && cr.includes("unsat"))) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${vtest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
 

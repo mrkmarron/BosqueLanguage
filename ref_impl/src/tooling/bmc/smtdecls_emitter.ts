@@ -223,6 +223,8 @@ class SMTEmitter {
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
 
+        const bmcchk = `(assert (not (and (is-result_error@${rrtype} @smtres@) (is-result_bmc (result_error_code@${rrtype} @smtres@)))))`
+
         let chk = errorcheck ? `(assert (is-result_error@${rrtype} @smtres@))` : `(assert (not (is-result_error@${rrtype} @smtres@)))`;
 
         if(entrypoint.preconditions.length !== 0) {
@@ -232,7 +234,7 @@ class SMTEmitter {
             chk = chk + "\n" + `(assert (or (not (is-result_error (result_error_code@${rrtype} @smtres@))) (not ${excludepreid})))`;
         }
 
-        const callinfo = resv + "\n" + cassert + "\n" + chk;
+        const callinfo = resv + "\n" + cassert + "\n" + bmcchk + "\n" + chk;
 
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n    "),

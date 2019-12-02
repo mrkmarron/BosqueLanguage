@@ -5,35 +5,38 @@
 
 namespace NSTest;
 
-entrypoint function abortOk(): Int {
-    if(1 < 2) {
+entrypoint function abortOp(b: Bool): Int {
+    if(b) {
         return 1;
     }
     else {
         abort;
     }
 }
-entrypoint function abortFail(): Int {
-    if(1 == 2) {
-        return 1;
-    }
-    else {
+
+entrypoint function assertOp(b: Bool): Int {
+    assert b;
+    return 1;
+}
+
+entrypoint function checkOp(b: Bool): Int {
+    check b;
+    return 1;
+}
+
+entrypoint function abortC(): Int {
+    if (1 == 1) {
         abort;
     }
-}
-entrypoint function assertOk(): Int {
-    assert 1 < 2;
     return 1;
 }
-entrypoint function assertFail(): Int {
-    assert 1 > 2;
+
+entrypoint function assertC(): Int {
+    assert 1 == 2;
     return 1;
 }
-entrypoint function checkOk(): Int {
-    check 1 < 2;
-    return 1;
-}
-entrypoint function checkFail(): Int {
-    check 1 > 2;
+
+entrypoint function checkC(): Int {
+    check 1 == 2;
     return 1;
 }

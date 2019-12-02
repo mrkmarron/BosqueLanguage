@@ -30,3 +30,19 @@ entrypoint function rec1(): Int {
 entrypoint function rec2(): Int {
     return recf2[recursive](2);
 }
+
+entrypoint function recchk(x: Int): Int {
+    return recf2[recursive](x);
+}
+
+entrypoint function recnope(x: Int): Int {
+    var r = recf2[recursive](x);
+    assert r != 2;
+    return 1;
+}
+
+entrypoint function recerr(x: Int): Int {
+    var r = recf2[recursive](x);
+    assert r != 3;
+    return 1;
+}
