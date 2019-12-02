@@ -1017,6 +1017,9 @@ class CPPBodyEmitter {
                     return `if(${this.argToCpp(bop.lhs, this.typegen.intType)}.isZero()) { BSQ_ABORT("Mod by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); } ${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} % ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
                 }
             }
+            case MIROpTag.MIRGetKey: {
+                return NOT_IMPLEMENTED<string>("MIRGetKey");
+            }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
 

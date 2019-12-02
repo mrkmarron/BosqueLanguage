@@ -313,6 +313,10 @@ class TypeChecker {
         const bothStringOf = (lhs.idStr.startsWith("NSCore::StringOf<") && rhs.idStr.startsWith("NSCore::StringOf<"));
         const orderok = this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
 
+        //
+        //TODO: should be like equality type checking on any KeyType
+        //
+
         return bothStringOf && orderok;
     }
 
@@ -1389,11 +1393,23 @@ class TypeChecker {
         this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
 
         if (this.m_emitEnabled) {
-            this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
-            const skey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.decl as StaticFunctionDecl, (fdecl.decl as StaticFunctionDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
+            const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
+            if (isindexableop && exp.name === "getKey") {
+                xxxx;
+            }
+            else if (isindexableop && exp.name === "equal") {
+                xxxx;
+            }
+            else if (isindexableop && exp.name === "less") {
+                xxxx;
+            }
+            else {
+                this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
+                const skey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.decl as StaticFunctionDecl, (fdecl.decl as StaticFunctionDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
-            const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, frtype, skey, margs.args, refinfo, trgt);
+                const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
+                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, frtype, skey, margs.args, refinfo, trgt);
+            }
         }
 
         return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];

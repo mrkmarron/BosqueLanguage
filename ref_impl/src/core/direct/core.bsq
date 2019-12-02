@@ -27,8 +27,9 @@ concept Some provides Any {
 
 //<summary>Types that can be used in equality operations or in key based containers.</summary>
 concept Indexable provides Any {
-    static eq(a: Indexable, b: Indexable): Bool # indexableeq
-    static lt(a: Indexable, b: Indexable): Bool # indexablelt
+    static getKey(a: Indexable): KeyType # special_method
+    static equal(a: Indexable, b: Indexable): Bool # special_method
+    static less(a: Indexable, b: Indexable): Bool # special_method
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>

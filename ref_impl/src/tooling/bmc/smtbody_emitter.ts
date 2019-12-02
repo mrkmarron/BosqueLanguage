@@ -1084,6 +1084,9 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(bop.trgt), new SMTValue(`(${bop.op} ${this.argToSMT(bop.lhs, this.typegen.intType).emit()} ${this.argToSMT(bop.rhs, this.typegen.intType).emit()})`));
                 }
             }
+            case MIROpTag.MIRGetKey: {
+                return NOT_IMPLEMENTED<SMTExp>("MIRGetKey");
+            }
             case MIROpTag.MIRBinEq: {
                 const beq = op as MIRBinEq;
 
