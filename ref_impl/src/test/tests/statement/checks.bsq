@@ -1,0 +1,39 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+namespace NSTest;
+
+entrypoint function abortOk(): Int {
+    if(1 < 2) {
+        return 1;
+    }
+    else {
+        abort;
+    }
+}
+entrypoint function abortFail(): Int {
+    if(1 == 2) {
+        return 1;
+    }
+    else {
+        abort;
+    }
+}
+entrypoint function assertOk(): Int {
+    assert 1 < 2;
+    return 1;
+}
+entrypoint function assertFail(): Int {
+    assert 1 > 2;
+    return 1;
+}
+entrypoint function checkOk(): Int {
+    check 1 < 2;
+    return 1;
+}
+entrypoint function checkFail(): Int {
+    check 1 > 2;
+    return 1;
+}

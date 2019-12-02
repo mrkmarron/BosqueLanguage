@@ -86,6 +86,10 @@ class SMTEmitter {
         let funcdecls: string[] = [];
         let resultdecls_fwd: string[] = [];
         let resultdecls: string[] = [];
+
+        resultdecls_fwd.push(`(Result@Bool 0)`);
+        resultdecls.push(`( (result_success@Bool (result_success_value@Bool Bool)) (result_error@Bool (result_error_code@Bool ErrorCode)) )`);
+
         for (let i = 0; i < rcg.length; ++i) {
             const cn = rcg[i];
             if(doneset.has(cn.invoke)) {
@@ -174,7 +178,7 @@ class SMTEmitter {
                     cscc.forEach((v) => doneset.add(v));
                 }
             }
-        }
+        }   
 
         const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
 

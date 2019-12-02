@@ -1053,7 +1053,8 @@ class CPPBodyEmitter {
                 const lhvtype = this.getArgType(bcmp.lhs);
                 const rhvtype = this.getArgType(bcmp.rhs);
 
-                if (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype)) {
+                if ((this.typegen.isSimpleBoolType(lhvtype) && this.typegen.isSimpleBoolType(rhvtype))
+                    || (this.typegen.isSimpleIntType(lhvtype) && this.typegen.isSimpleIntType(rhvtype))) {
                     return `${this.varToCppName(bcmp.trgt)} = ${this.generateFastCompare(bcmp.op, bcmp.lhs, bcmp.rhs)};`;
                 }
                 else {
@@ -1061,19 +1062,19 @@ class CPPBodyEmitter {
                     const rarg = this.argToCpp(bcmp.rhs, rhvtype);
 
                     if (bcmp.op === "<") {
-                        const compoundlt = `${this.registerCompoundLT(lhvtype, rhvtype)}(${larg} ${rarg})`;
+                        const compoundlt = `${this.registerCompoundLT(lhvtype, rhvtype)}(${larg}, ${rarg})`;
                         return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
                     }
                     else if (bcmp.op === ">") {
-                        const compoundlt = `(${this.registerCompoundLT(lhvtype, rhvtype)} ${rarg} ${larg})`;
+                        const compoundlt = `${this.registerCompoundLT(lhvtype, rhvtype)}(${rarg}, ${larg})`;
                         return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
                     }
                     else if (bcmp.op === "<=") {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${larg} ${rarg})`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)}(${larg}, ${rarg})`;
                         return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
                     }
                     else {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)} ${rarg} ${larg})`;
+                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtype, rhvtype)}(${rarg}, ${larg})`;
                         return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
                     }
                 }

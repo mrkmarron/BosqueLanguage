@@ -1291,7 +1291,7 @@ class SMTBodyEmitter {
                     //
                     const tbody = this.generateTempName();
                     const postinvoke = this.invokenameToSMT(MIRKeyGenerator.generateBodyKey("post", idecl.key));
-                    const callpost = new SMTValue(`(${postinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")} ${tbody})`);
+                    const callpost = new SMTValue(`(${postinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")} (result_success_value@${restype} ${tbody}))`);
                     cbody = new SMTLet(tbody, new SMTValue(cbody.emit("  ")), new SMTCond(callpost, new SMTValue(tbody), this.generateErrorCreate(idecl.sourceLocation, restype)));
                 }
 

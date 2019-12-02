@@ -678,5 +678,365 @@
                 "error": true
             }
         ]
+    },
+    {
+        "src": "sccops.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "noneCheckYes",
+                "args": [],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "noneCheckNo",
+                "args": [],
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "coalesceCheckYes",
+                "args": [],
+                "expected": "2"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "coalesceCheckNo",
+                "args": [],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "selectOpTrue",
+                "args": [],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "selectOpFalse",
+                "args": [],
+                "expected": "2"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "selectOpNone",
+                "args": [],
+                "expected": "2"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "noneCheckYes",
+                "expected": "(bsqterm_int 1)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "noneCheckNo",
+                "expected": "bsqterm_none"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "coalesceCheckYes",
+                "expected": "2"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "coalesceCheckNo",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "selectOpTrue",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "selectOpFalse",
+                "expected": "2"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "selectOpNone",
+               "expected": "2"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "selectCheck",
+                "error": true
+            }
+        ]
+    },
+    {
+        "src": "callargs.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "emptyArgsTest",
+                "args": [],
+                "expected": "0"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "requiredArgsTest",
+                "args": [],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "optionalArgsTest0",
+                "args": [],
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "optionalArgsTest1",
+                "args": [],
+                "expected": "none"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "optionalArgsTest2",
+                "args": [],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "mixedArgsTest1",
+                "args": [],
+                "expected": "-1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "mixedArgsTest2",
+                "args": [],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "optionalArgsNamedTest1",
+                "args": [],
+                "expected": "4"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "optionalArgsNamedTest2",
+                "args": [],
+                "expected": "4"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "mixedArgsNamedTest1",
+                "args": [],
+                "expected": "-1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "mixedArgsNamedTest2",
+                "args": [],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "identityAnyTest",
+                "args": [],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "identityIntTest",
+                "args": [],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "prePostTest",
+                "args": [],
+                "expected": "4"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "lambdaArgumentTest",
+                "args": [],
+                "expected": "6"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "emptyArgsTest",
+                "expected": "0"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "requiredArgsTest",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "optionalArgsTest0",
+                "expected": "bsqterm_none"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "optionalArgsTest1",
+                "expected": "bsqterm_none"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "optionalArgsTest2",
+                "expected": "(bsqterm_int 3)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "mixedArgsTest1",
+                "expected": "(- 1)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "mixedArgsTest2",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "optionalArgsNamedTest1",
+                "expected": "(bsqterm_int 4)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "optionalArgsNamedTest2",
+                "expected": "(bsqterm_int 4)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "mixedArgsNamedTest1",
+                "expected": "(- 1)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "mixedArgsNamedTest2",
+                "expected": "3"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "identityAnyTest",
+                "expected": "(bsqterm_int 1)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "identityIntTest",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "prePostTest",
+                "expected": "(bsqterm_int 4)"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "lambdaArgumentTest",
+                "expected": "6"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "puzzle",
+                "error": true
+            }
+        ]
+    },
+    {
+        "src": "ifexp.bsq",
+        "tests": [
+            {
+                "kind": "compile"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_abs1",
+                "args": ["5"],
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_abs1",
+                "args": ["-5"],
+                "expected": "5"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_abs2",
+                "args": ["2"],
+                "expected": "2"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_abs2",
+                "args": ["-2"],
+                "expected": "2"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_absy_none",
+                "args": ["true"],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_absy_none",
+                "args": ["false"],
+                "expected": "0"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_absy_1",
+                "args": ["true"],
+                "expected": "1"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "eif_absy_1",
+                "args": ["false"],
+                "expected": "0"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "enestif_abs1",
+                "args": ["true"],
+                "expected": "3"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "enestif_abs1",
+                "args": [],
+                "expected": "0"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "eif_absy_noneC",
+                "expected": "1"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "enestif_abs1C",
+                "expected": "3"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "check1"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "check2",
+                "error": true
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "puzzle",
+                "error": true
+            }
+        ]
     }
 ]

@@ -32,12 +32,12 @@ public:
         ;
     }
 
-    bool isZero()
+    bool isZero() const
     {
         return false;
     }
 
-    BigInt* negate()
+    BigInt* negate() const
     {
         return nullptr;
     }

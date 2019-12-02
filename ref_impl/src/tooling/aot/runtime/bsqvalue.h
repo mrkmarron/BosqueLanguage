@@ -146,7 +146,7 @@ public:
         }
     }
 
-    inline bool isZero()
+    inline bool isZero() const
     {
         if(this->isInt())
         {
@@ -158,7 +158,7 @@ public:
         }
     }
 
-    inline BSQInt negate()
+    inline BSQInt negate() const
     {
         if(this->isInt())
         {

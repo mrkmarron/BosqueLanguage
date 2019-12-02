@@ -1728,24 +1728,25 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 let cbindsonly = this.m_assembly.resolveBindsForCall(rootdecl.invoke.terms, op.terms.targs, new Map<string, ResolvedType>(), env.terms) as Map<string, ResolvedType>;
 
+                const specialm0type = this.m_emitter.registerResolvedTypeReference(margs.args.length === 1 ? env.getExpressionResult().etype : this.m_assembly.getSpecialNoneType()).trkey;
                 if (op.name === "isNone") {
-                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()).trkey, margs.args[0]);
+                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()).trkey, specialm0type, margs.args[0]);
                 }
                 else if (op.name === "isSome") {
-                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeType()).trkey, margs.args[0]);
+                    this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeType()).trkey, specialm0type, margs.args[0]);
                 }
                 else if (op.name === "is" || op.name === "as" || op.name === "tryAs" || op.name === "defaultAs") {
                     const ttype = rootbinds.get("T") as ResolvedType;
                     const mt = this.m_emitter.registerResolvedTypeReference(ttype);
 
                     if (op.name === "is") {
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, mt.trkey, margs.args[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, mt.trkey, specialm0type, margs.args[0]);
                     }
                     else if (op.name === "as") {
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Las_done");
                         const failblck = this.m_emitter.bodyEmitter.createNewBlock("Las_fail");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, failblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(failblck);
@@ -1761,7 +1762,7 @@ class TypeChecker {
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_done");
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
@@ -1776,7 +1777,7 @@ class TypeChecker {
                         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Ldefaultas_done");
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ldefaultas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, margs.args[0]);
+                        this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
                         this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
@@ -2023,14 +2024,14 @@ class TypeChecker {
             }
             else if (exp.lhs instanceof LiteralNoneExpression) {
                 const chktype = this.m_emitter.registerResolvedTypeReference(exp.op === "==" ? this.m_assembly.getSpecialNoneType() : this.m_assembly.getSpecialSomeType());
-                this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, trgt, chktype.trkey, rhsreg);
+                this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, trgt, chktype.trkey, this.m_emitter.registerResolvedTypeReference(rhs.getExpressionResult().etype).trkey, rhsreg);
             }
             else if (exp.rhs instanceof LiteralNoneExpression) {
                 const chktype = this.m_emitter.registerResolvedTypeReference(exp.op === "==" ? this.m_assembly.getSpecialNoneType() : this.m_assembly.getSpecialSomeType());
-                this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, trgt, chktype.trkey, lhsreg);
+                this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, trgt, chktype.trkey, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().etype).trkey, lhsreg);
             }
             else {
-                this.m_emitter.bodyEmitter.emitBinEq(exp.sinfo, lhsreg, exp.op, rhsreg, trgt);
+                this.m_emitter.bodyEmitter.emitBinEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().etype).trkey, lhsreg, exp.op, this.m_emitter.registerResolvedTypeReference(rhs.getExpressionResult().etype).trkey, rhsreg, trgt);
             }
         }
 
@@ -2071,7 +2072,7 @@ class TypeChecker {
         this.raiseErrorIf(exp.sinfo, !this.checkValueLess(lhs.getExpressionResult().etype, rhs.getExpressionResult().etype), "Types are incompatible for order compare");
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitBinCmp(exp.sinfo, lhsreg, exp.op, rhsreg, trgt);
+            this.m_emitter.bodyEmitter.emitBinCmp(exp.sinfo, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().etype).trkey, lhsreg, exp.op, this.m_emitter.registerResolvedTypeReference(rhs.getExpressionResult().etype).trkey, rhsreg, trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialBoolType())];
@@ -2735,8 +2736,9 @@ class TypeChecker {
         return creg;
     }
 
-    private generateEqualityOps(env: TypeEnvironment, sinfo: SourceInfo, ereg: MIRTempRegister, assign: {p: (string|number), t: ResolvedType}[], value: Expression): MIRTempRegister {
+    private generateEqualityOps(env: TypeEnvironment, sinfo: SourceInfo, ergtype: ResolvedType, ereg: MIRTempRegister, assign: {p: (string|number), t: ResolvedType}[], value: Expression): MIRTempRegister {
         let creg = ereg;
+        let ctype = ergtype;
         for (let i = 0; i < assign.length; ++i) {
             const nreg = this.m_emitter.bodyEmitter.generateTmpRegister();
             const lt = this.m_emitter.registerResolvedTypeReference(assign[i].t).trkey;
@@ -2747,13 +2749,14 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, lt, creg, assign[i].p as string, nreg);
             }
             creg = nreg;
+            ctype = assign[i].t;
         }
 
         const vreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        this.checkExpression(env, value, vreg);
+        const vrenv = this.checkExpression(env, value, vreg);
 
         const rreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        this.m_emitter.bodyEmitter.emitBinEq(sinfo, creg, "==", vreg, rreg);
+        this.m_emitter.bodyEmitter.emitBinEq(sinfo, this.m_emitter.registerResolvedTypeReference(ctype).trkey, creg, "==", this.m_emitter.registerResolvedTypeReference(vrenv.getExpressionResult().etype).trkey, vreg, rreg);
 
         return rreg;
     }
@@ -2935,7 +2938,7 @@ class TypeChecker {
 
             if (this.m_emitEnabled) {
                 const mt = this.m_emitter.registerResolvedTypeReference(tmatch);
-                this.m_emitter.bodyEmitter.emitTypeOf(sinfo, mreg, mt.trkey, vreg);
+                this.m_emitter.bodyEmitter.emitTypeOf(sinfo, mreg, mt.trkey, this.m_emitter.registerResolvedTypeReference(sexp).trkey, vreg);
             }
 
             if (svname === undefined) {
@@ -2969,7 +2972,7 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 const oft = this.m_emitter.registerResolvedTypeReference(oftype);
                 const tcreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                this.m_emitter.bodyEmitter.emitTypeOf(sinfo, tcreg, oft.trkey, vreg);
+                this.m_emitter.bodyEmitter.emitTypeOf(sinfo, tcreg, oft.trkey, this.m_emitter.registerResolvedTypeReference(sexp).trkey, vreg);
 
                 const filllabel = this.m_emitter.bodyEmitter.createNewBlock(`match${midx}_scfill`);
                 if (allEqChecks.length === 0) {
@@ -2984,7 +2987,7 @@ class TypeChecker {
                     this.m_emitter.bodyEmitter.emitLoadConstBool(sinfo, true, mreg);
 
                     for (let i = 0; i < allEqChecks.length; ++i) {
-                        const eqreg = this.generateEqualityOps(env, sinfo, vreg, allEqChecks[i][0], allEqChecks[i][1]);
+                        const eqreg = this.generateEqualityOps(env, sinfo, sexp, vreg, allEqChecks[i][0], allEqChecks[i][1]);
                         this.m_emitter.bodyEmitter.emitLogicStore(sinfo, mreg, mreg, "&", eqreg);
                     }
 

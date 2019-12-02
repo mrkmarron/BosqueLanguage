@@ -326,15 +326,15 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRBinOp(sinfo, lhs, op, rhs, trgt));
     }
 
-    emitBinEq(sinfo: SourceInfo, lhs: MIRArgument, op: string, rhs: MIRArgument, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRBinEq(sinfo, lhs, op, rhs, trgt));
+    emitBinEq(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRBinEq(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
     }
 
-    emitBinCmp(sinfo: SourceInfo, lhs: MIRArgument, op: string, rhs: MIRArgument, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRBinCmp(sinfo, lhs, op, rhs, trgt));
+    emitBinCmp(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRBinCmp(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
     }
 
-    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRResolvedTypeKey, src: MIRArgument) {
+    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRResolvedTypeKey, srcInferType: MIRResolvedTypeKey, src: MIRArgument) {
         if (chktype === "NSCore::None") {
             this.m_currentBlock.push(new MIRIsTypeOfNone(sinfo, src, trgt));
         }
@@ -342,7 +342,7 @@ class MIRBodyEmitter {
             this.m_currentBlock.push(new MIRIsTypeOfSome(sinfo, src, trgt));
         }
         else {
-            this.m_currentBlock.push(new MIRIsTypeOf(sinfo, src, chktype, trgt));
+            this.m_currentBlock.push(new MIRIsTypeOf(sinfo, srcInferType, src, chktype, trgt));
         }
     }
 

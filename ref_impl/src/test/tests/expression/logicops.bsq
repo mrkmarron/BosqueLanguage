@@ -25,15 +25,15 @@ entrypoint function logicPrecedenceAndOr(x: Bool, y: Bool, z: Bool): Bool {
     return x && y || z;
 }
 
-entrypoint function impliesNone(arg?: Bool): Bool {
+function impliesNone(arg?: Bool): Bool {
     return arg ==> true;
 }
 
-entrypoint function orNone(arg?: Bool): Bool {
+function orNone(arg?: Bool): Bool {
     return arg || false;
 }
 
-entrypoint function andNone(arg?: Bool): Bool {
+function andNone(arg?: Bool): Bool {
     return arg && true;
 }
 
