@@ -19,12 +19,12 @@ if (process.platform === "win32") {
 }
 else if (process.platform === "linux") {
     platpathcpp = "bin/linux/clang";
-    platpathsmt = "bin/win/z3";
+    platpathsmt = "bin/linux/z3";
     platexe = "doit.out";
 }
 else {
     platpathcpp = "bin/macos/clang";
-    platpathsmt = "bin/win/z3";
+    platpathsmt = "bin/macos/z3";
     platexe = "doit.out";
 }
 
