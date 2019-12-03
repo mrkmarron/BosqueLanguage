@@ -454,16 +454,25 @@ class SMTBodyEmitter {
         return fkey;
     }
 
-    generateFastEquals(op: string, lhstype: MIRType, lhs: string, rhstype: MIRType, rhs: string): string {
-       let coreop = "";
-        if (lhstype.trkey === "NSCore::Bool" && rhstype.trkey === "NSCore::Bool") {
-            coreop = `(= ${lhs} ${rhs})`;
+    generateFastEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+        const lhsargtype = this.getArgType(lhs);
+        const rhsargtype = this.getArgType(rhs);
+
+        let coreop = "";
+        if (lhsinfertype.trkey === "NSCore::Bool" && rhsinfertype.trkey === "NSCore::Bool") {
+            const lhsbool = (lhsargtype.trkey === "NSCore::Bool") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
+            const rhsbool = (rhsargtype.trkey === "NSCore::Bool") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
+            coreop = `(= ${lhsbool} ${rhsbool})`;
         }
-        else if (lhstype.trkey === "NSCore::Int" && rhstype.trkey === "NSCore::Int"){
-            coreop = `(= ${lhs} ${rhs})`;
+        else if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
+            const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
+            const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
+            coreop = `(= ${lhsint} ${rhsint})`;
         }
         else {
-            coreop = `(= ${lhs} ${rhs})`;
+            const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
+            const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
+            coreop = `(= ${lhsstring} ${rhsstring})`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
@@ -493,8 +502,13 @@ class SMTBodyEmitter {
         return fkey;
     }
 
-    generateFastCompare(op: string, lhstype: MIRType, lhs: string, rhstype: MIRType, rhs: string): string {
-        return `(${op} ${lhs} ${rhs})`;
+    generateFastCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+        const lhsargtype = this.getArgType(lhs);
+        const rhsargtype = this.getArgType(rhs);
+
+        const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
+        const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
+        return `(${op} ${lhsint} ${rhsint})`;
     }
 
     generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {
@@ -1093,18 +1107,16 @@ class SMTBodyEmitter {
                 const lhvtypeinfer = this.typegen.getMIRType(beq.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(beq.rhsInferType);
 
-                const larg = this.argToSMT(beq.lhs, lhvtypeinfer).emit();
-                const rarg = this.argToSMT(beq.rhs, rhvtypeinfer).emit();
-
                 if ((this.typegen.isSimpleBoolType(lhvtypeinfer) && this.typegen.isSimpleBoolType(rhvtypeinfer))
                     || (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer))
                     || (this.typegen.isSimpleStringType(lhvtypeinfer) && this.typegen.isSimpleStringType(rhvtypeinfer))) {
-                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, lhvtypeinfer, larg, rhvtypeinfer, rarg)));
+                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)));
                 }
                 else {
-                   
+                    const larg = this.argToSMT(beq.lhs, this.getArgType(beq.lhs));
+                    const rarg = this.argToSMT(beq.rhs, this.getArgType(beq.rhs));
 
-                    const compoundeq = `(${this.registerCompoundEquals(lhvtypeinfer, rhvtypeinfer)} ${larg} ${rarg})`;
+                    const compoundeq = `(${this.registerCompoundEquals(lhvtypeinfer, rhvtypeinfer)} ${larg.emit()} ${rarg.emit()})`;
                     return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${compoundeq})` : compoundeq));
                 }
             }
@@ -1114,13 +1126,13 @@ class SMTBodyEmitter {
                 const lhvtypeinfer = this.typegen.getMIRType(bcmp.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(bcmp.rhsInferType);
 
-                const larg = this.argToSMT(bcmp.lhs, lhvtypeinfer).emit();
-                const rarg = this.argToSMT(bcmp.rhs, rhvtypeinfer).emit();
-
                 if (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer)) {
-                    return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, lhvtypeinfer, larg, rhvtypeinfer, rarg)));
+                    return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, lhvtypeinfer, bcmp.lhs, rhvtypeinfer, bcmp.rhs)));
                 }
                 else {
+                    const larg = this.argToSMT(bcmp.lhs, lhvtypeinfer).emit();
+                    const rarg = this.argToSMT(bcmp.rhs, rhvtypeinfer).emit();
+
                     if (bcmp.op === "<") {
                         const compoundlt = `(${this.registerCompoundLT(lhvtypeinfer, rhvtypeinfer)} ${larg} ${rarg})`;
                         return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
@@ -1149,10 +1161,10 @@ class SMTBodyEmitter {
            }
             case MIROpTag.MIRIsTypeOf: {
                 const top = op as MIRIsTypeOf;
-                const infertype = this.typegen.getMIRType(top.argInferType);
                 const oftype = this.typegen.getMIRType(top.oftype);
+                const argtype = this.getArgType(top.arg);
 
-                return new SMTLet(this.varToSMTName(top.trgt), new SMTValue(this.generateTypeCheck(this.argToSMT(top.arg, infertype).emit(), infertype, oftype, true, this.typecheckgas)));
+                return new SMTLet(this.varToSMTName(top.trgt), new SMTValue(this.generateTypeCheck(this.argToSMT(top.arg, argtype).emit(), argtype, oftype, true, this.typecheckgas)));
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;

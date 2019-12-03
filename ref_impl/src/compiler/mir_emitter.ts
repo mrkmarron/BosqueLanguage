@@ -326,7 +326,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRBinOp(sinfo, lhs, op, rhs, trgt));
     }
 
-    emitMIRGetKey(sinfo: SourceInfo, argInferType: MIRResolvedTypeKey, arg: MIRArgument, resultKeyType: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+    emitGetKey(sinfo: SourceInfo, argInferType: MIRResolvedTypeKey, arg: MIRArgument, resultKeyType: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRGetKey(sinfo, argInferType, arg, resultKeyType, trgt));
     }
 

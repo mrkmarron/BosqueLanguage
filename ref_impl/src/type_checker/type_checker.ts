@@ -893,7 +893,7 @@ class TypeChecker {
         return ResolvedType.createSingle(oftype);
     }
 
-    private checkArgumentsSignature(sinfo: SourceInfo, env: TypeEnvironment, sig: ResolvedFunctionType, args: ExpandedArgument[]): { args: MIRArgument[], refs: string[], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
+    private checkArgumentsSignature(sinfo: SourceInfo, env: TypeEnvironment, sig: ResolvedFunctionType, args: ExpandedArgument[]): { args: MIRArgument[], types: ResolvedType[], refs: string[], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
         let filledLocations: FilledLocation[] = [];
 
         //figure out named parameter mapping first
@@ -1000,6 +1000,7 @@ class TypeChecker {
         //go through names and fill out info for any that should use the default value -- raise error if any are missing
         //check ref, pcode, and regular arg types -- plus build up emit data
         let margs: MIRArgument[] = [];
+        let mtypes: ResolvedType[] = [];
         let pcodes: PCode[] = [];
         let refs: string[] = [];
         for (let j = 0; j < sig.params.length; ++j) {
@@ -1025,12 +1026,14 @@ class TypeChecker {
 
                     refs.push(filledLocations[j].ref as string);
                     margs.push(filledLocations[j].trgt);
+                    mtypes.push(filledLocations[j].vtype as ResolvedType);
                 }
                 else {
                     this.raiseErrorIf(sinfo, filledLocations[j].ref !== undefined, `Parameter ${sig.params[j].name} reference parameter is not alloed in this position`);
                     this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(filledLocations[j].vtype as ResolvedType, paramtype as ResolvedType), `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
 
                     margs.push(filledLocations[j].trgt);
+                    mtypes.push(filledLocations[j].vtype as ResolvedType);
                 }
             }
         }
@@ -1056,6 +1059,7 @@ class TypeChecker {
             }
 
             margs.push(rtreg);
+            mtypes.push(ResolvedType.createSingle(oftype));
         }
 
         //take all the pcodes and pass the "captured" variables in as arguments in alpha order
@@ -1068,11 +1072,13 @@ class TypeChecker {
                 for (let i = 0; i < cnames.length; ++i) {
                     const vinfo = (env.lookupVar(cnames[i]) as VarInfo);
                     margs.push(new MIRVariable(vinfo.isCaptured ? this.m_emitter.bodyEmitter.generateCapturedVarName(cnames[i]) : cnames[i]));
+                    mtypes.push(vinfo.flowType);
+
                     cinfo.push([cnames[i], vinfo.flowType]);
             }
         }
 
-        return { args: margs, refs: refs, pcodes: pcodes, cinfo: cinfo };
+        return { args: margs, types: mtypes, refs: refs, pcodes: pcodes, cinfo: cinfo };
     }
 
     private generateRefInfoForCallEmit(fsig: ResolvedFunctionType, refs: string[]): [MIRType, [string, MIRType][]] {
@@ -1394,14 +1400,67 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
+            const keytype = this.m_assembly.getSpecialKeyedConcept();
+            const mirkeytype = this.m_emitter.registerResolvedTypeReference(keytype);
+
             if (isindexableop && exp.name === "getKey") {
-                xxxx;
+                const mirargtypeinfer = this.m_emitter.registerResolvedTypeReference(margs.types[0]);
+
+                if(this.m_assembly.subtypeOf(margs.types[0], keytype)) {
+                    this.m_emitter.bodyEmitter.emitRegAssign(exp.sinfo, margs.args[0], trgt);
+                }
+                else {
+                    //
+                    // TODO: we should infer the keytype from the Indexable info to do a better emit and type inference
+                    //
+                    this.m_emitter.bodyEmitter.emitGetKey(exp.sinfo, mirargtypeinfer.trkey, margs.args[0], mirkeytype.trkey, trgt);
+                }
             }
             else if (isindexableop && exp.name === "equal") {
-                xxxx;
+                let mirargtypeinferlhs = this.m_emitter.registerResolvedTypeReference(margs.types[0]);
+                let mirargtypeinferrhs = this.m_emitter.registerResolvedTypeReference(margs.types[1]);
+
+                let lhs = margs.args[0];
+                if (!this.m_assembly.subtypeOf(margs.types[0], keytype)) {
+                    lhs = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    this.m_emitter.bodyEmitter.emitGetKey(exp.sinfo, mirargtypeinferlhs.trkey, margs.args[0], mirkeytype.trkey, lhs as MIRTempRegister);
+                    mirargtypeinferlhs = mirkeytype;
+                }
+
+                let rhs = margs.args[0];
+                if (!this.m_assembly.subtypeOf(margs.types[1], keytype)) {
+                    rhs = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    this.m_emitter.bodyEmitter.emitGetKey(exp.sinfo, mirargtypeinferrhs.trkey, margs.args[1], mirkeytype.trkey, rhs as MIRTempRegister);
+                    mirargtypeinferrhs = mirkeytype;
+                }
+
+                //
+                // TODO: we should infer the keytype from the Indexable info to do a better emit and type inference
+                //
+                this.m_emitter.bodyEmitter.emitBinEq(exp.sinfo, mirargtypeinferlhs.trkey, lhs, mirargtypeinferrhs.trkey, "==", rhs, trgt);
             }
             else if (isindexableop && exp.name === "less") {
-                xxxx;
+                let mirargtypeinferlhs = this.m_emitter.registerResolvedTypeReference(margs.types[0]);
+                let mirargtypeinferrhs = this.m_emitter.registerResolvedTypeReference(margs.types[1]);
+
+                let lhs = margs.args[0];
+                if (!this.m_assembly.subtypeOf(margs.types[0], keytype)) {
+                    lhs = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    this.m_emitter.bodyEmitter.emitGetKey(exp.sinfo, mirargtypeinferlhs.trkey, margs.args[0], mirkeytype.trkey, lhs as MIRTempRegister);
+                    mirargtypeinferlhs = mirkeytype;
+                }
+
+                let rhs = margs.args[0];
+                if (!this.m_assembly.subtypeOf(margs.types[1], keytype)) {
+                    rhs = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    this.m_emitter.bodyEmitter.emitGetKey(exp.sinfo, mirargtypeinferrhs.trkey, margs.args[1], mirkeytype.trkey, rhs as MIRTempRegister);
+                    mirargtypeinferrhs = mirkeytype;
+                }
+
+                //
+                // TODO: we should infer the keytype from the Indexable info to do a better emit and type inference
+                //
+                this.m_emitter.bodyEmitter.emitBinCmp(exp.sinfo, mirargtypeinferlhs.trkey, lhs, mirargtypeinferrhs.trkey, "<", rhs, trgt);
             }
             else {
                 this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
@@ -1744,7 +1803,7 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 let cbindsonly = this.m_assembly.resolveBindsForCall(rootdecl.invoke.terms, op.terms.targs, new Map<string, ResolvedType>(), env.terms) as Map<string, ResolvedType>;
 
-                const specialm0type = this.m_emitter.registerResolvedTypeReference(margs.args.length === 1 ? env.getExpressionResult().etype : this.m_assembly.getSpecialNoneType()).trkey;
+                const specialm0type = this.m_emitter.registerResolvedTypeReference(margs.types.length === 1 ? margs.types[0] : this.m_assembly.getSpecialNoneType()).trkey;
                 if (op.name === "isNone") {
                     this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()).trkey, specialm0type, margs.args[0]);
                 }
