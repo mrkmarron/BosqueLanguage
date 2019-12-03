@@ -13,17 +13,17 @@ let platpathcpp: string | undefined = undefined;
 let platpathsmt: string | undefined = undefined;
 let platexe: string | undefined = undefined;
 if (process.platform === "win32") {
-    platpathcpp = "bin/win/clang.exe";
+    platpathcpp = "\"C:\\Program Files\\LLVM\\bin\\clang.exe\"";
     platpathsmt = "bin/win/z3.exe";
     platexe = "doit.exe";
 }
 else if (process.platform === "linux") {
-    platpathcpp = "bin/linux/clang";
+    platpathcpp = "clang";
     platpathsmt = "bin/linux/z3";
     platexe = "doit.out";
 }
 else {
-    platpathcpp = "bin/macos/clang";
+    platpathcpp = "clang";
     platpathsmt = "bin/macos/z3";
     platexe = "doit.out";
 }
@@ -107,7 +107,7 @@ const cppexe = Path.normalize(Path.join(cppscratch, platexe));
 
 const smtscratch = Path.normalize(Path.join(scratchroot, "smt/"));
 
-const clangpath = Path.normalize(Path.join(__dirname, "../tooling/aot/runtime", platpathcpp));
+const clangpath = platpathcpp;
 const z3path = Path.normalize(Path.join(__dirname, "../tooling/bmc/runtime", platpathsmt));
 
 class TestRunner {
