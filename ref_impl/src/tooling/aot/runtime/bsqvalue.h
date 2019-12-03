@@ -881,7 +881,7 @@ namespace StructuralCoercionOps
         res.size = src.size;
         for(uint16_t i = 0; i < j; ++i)
         {
-            res.entries[i] = entries[i];
+            res.entries[i] = res.entries[i];
         }
         return res;
     }
@@ -981,7 +981,7 @@ namespace StructuralCoercionOps
     {
         BSQTupleFixed<k> res;
         res.size = src->entries.size();
-        for(uint16_t i = 0; i < src->entires.size(); ++i)
+        for(uint16_t i = 0; i < src->entries.size(); ++i)
         {
             res.entries[i] = src->entries[i];
         }
@@ -1023,7 +1023,7 @@ namespace StructuralCoercionOps
         res.size = src.size;
         for(uint16_t i = 0; i < j; ++i)
         {
-            res.entries[i] = entries[i];
+            res.entries[i] = src.entries[i];
         }
         return res;
     }
