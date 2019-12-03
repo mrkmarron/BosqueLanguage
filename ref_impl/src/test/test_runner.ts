@@ -18,7 +18,7 @@ if (process.platform === "win32") {
     platexe = "doit.exe";
 }
 else if (process.platform === "linux") {
-    platpathcpp = "clang";
+    platpathcpp = "g++";
     platpathsmt = "bin/linux/z3";
     platexe = "doit.out";
 }
