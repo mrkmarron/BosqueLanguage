@@ -42,204 +42,189 @@ entity ListEntry<T> provides Object {
 
 //<summary>A List entity.</summary>
 entity List<T> provides Collection<T> {
-    field size: Int;
-    field list: ListEntry<T>?;
+    hidden static _size(l: List<T>): Int # _listsize
+    hidden static _unsafe_at(l: List<T>, i: Int): T # _listunsafe_at
+    hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # _listunsafe_set
+    hidden static _destructive_add(l: List<T>, v: T): List<T> # _listdestructive_add
 
-    hidden static _cons(size: Int, list: ListEntry<T>?): List<T> # _listcons
+    hidden recursive static _filter(l: List<T>, idx: Int, lp: List<T>, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
 
-    const empty: List<T> = List<T>::_cons<T>(0, none);
+        var val = List<T>::_unsafe_at(l, idx);
+        if(p[recursive?](val)) {
+            return List<T>::_filter[recursive](l, idx + 1, List<T>::_destructive_add(lp, val), p);
+        }
+        else {
+            return List<T>::_filter[recursive](l, idx + 1, lp, p);
+        }
+    }
+
+    hidden recursive static _map<U>(l: List<T>, idx: Int, lp: List<U>, f: recursive? fn(_: T) -> U): List<U> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+
+        var val = f[recursive?](List<T>::_unsafe_at(l, idx));
+        return List<T>::_map<U>[recursive](l, idx + 1, List<T>::_destructive_add(lp, val), p);
+    }
 
     method size(): Int {
-        return this.size;
+        return List<T>::_size(this);
     }
     
-    method at(idx: Int): T {
-        var tl = this.list;
-        check idx < this.size && tl != none;
+    method empty(): Bool {
+        return List<T>::_size(this) == 0;
+    }
 
-        return tl->at[recursive](idx);
+    method at(idx: Int): T {
+        check 0 <= idx && idx < List<T>::_size(this);
+
+        return List<T>::_unsafe_at(this, idx);
+    }
+
+    method set(idx: Int, v: T): List<T> {
+        check 0 <= idx && idx < List<T>::_size(this);
+
+        return List<T>::_unsafe_set(this, idx, v);
+    }
+
+    method filter(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<U>::_filter(this, 0, List<T>{}, p);
     }
 
     method map<U>(f: recursive? fn(_: T) -> U): List<U> {
-        var tl = this.list;
-        if(tl == none) {
-            return List<U>::empty;
-        }
-        else {
-            return List<U>::_cons(this.size, tl->map<U>[recursive](f));
-        }
-    }
-}
-
-entity SetEntry<T where Indexable> provides Object {
-    field value: T;
-    field tail: SetEntry<T>?;
-
-    recursive method has(v: T): Bool {
-        if(this.value == v) {
-            return true;
-        }
-        else {
-            var tl = this.tail;
-            return tl != none && tl->has[recursive](v);
-        }
-    }
-
-    recursive method insert(v: T): SetEntry<T> {
-        if(v == this.value) {
-            return SetEntry<T>{value=v, tail=this.tail}; //replace old value
-        }
-        elif(v > this.value || this.tail == none) {
-            return SetEntry<T>{value=v, tail=this};
-        }
-        else {
-            var tl = this.tail;
-            check tl != none;
-
-            var newtail = tl->insert[recursive](v);
-            return SetEntry<T>{value=this.value, tail=newtail};
-        }
-    }
-
-    recursive method remove(v: T): SetEntry<T>? {
-        if(v == this.value) {
-            return this.tail; 
-        }
-        elif(v > this.value || this.tail == none) {
-            return this;
-        }
-        else {
-            var tl = this.tail;
-            check tl != none;
-
-            var newtail = tl->remove[recursive](v);
-            return SetEntry<T>{value=this.value, tail=newtail};
-        }
+        return List<U>::_map(this, 0, List<U>{}, f);
     }
 }
 
 //<summary>A Set entity.</summary>
 entity Set<T where Indexable> provides Collection<T> {
-    field size: Int;
-    field set: SetEntry<T>?;
+    hidden static _size(s: Set<T>): Int # _setsize
+    hidden static _unsafe_at(s: Set<T>, i: Int): T # _setunsafe_at
+    hidden static _copy_set(s: Set<T>, i: Int, v: T): Set<T> # _setcopy_set
+    hidden static _destructive_set(s: Set<T>, i: Int, v: T): Set<T> # _setdestructive_set
+    hidden static _destructive_add(s: Set<T>, v: T): Set<T> # _setdestructive_add
 
-    hidden static _cons(size: Int, set: SetEntry<T>?): Set<T> # _setcons
+    hidden static _copy_insert(s: Set<T>, i: Int, v: T): Set<T> # _setcopy_insert
+    hidden static _copy_remove(s: Set<T>, i: Int): Set<T> # _setcopy_remove
 
-    const empty: Set<T> = Set<T>::_cons<T>(0, none);
+    hidden recursive static _find(s: Set<T>, idx: Int, v: T): {found: Bool, pos: Int} {
+        if(idx == Set<T>::_size(s)) {
+            return {found=false, pos=idx};
+        }
+
+        var val = Set<T>::_unsafe_at(s, idx);
+        if(Indexable::equal(val, v)) {
+            return {found=true, pos=idx};
+        }
+        elif (Indexable::less(val, v)) {
+            return {found=false, pos=idx};
+        }
+        else {
+            return Set<T>::_find[recursive](s, idx + 1, v);
+        }
+    }
 
     method size(): Int {
-        return this.size;
+        return Set<T>::_size(this);
+    }
+    
+    method empty(): Bool {
+        return Set<T>::_size(this) == 0;
     }
     
     method has(v: T): Bool {
-        var ts = this.set;
-        return ts != none && ts->has[recursive](v); 
+        return Set<T>::_find(this, 0, v).found;
     }
 
     method insert(v: T): Set<T> {
-        var ts = this.set;
-        if(ts == none) {
-            return Set<T>::_cons<T>(1, SetEntry<T>{value=v, tail=none});
+        var loc = Set<T>::_find(this, 0, v);
+        if(loc.found) {
+            return Set<T>::_copy_set(this, loc.pos, v);
         }
         else {
-            return Set<T>::_cons<T>(this.size + (!ts->has[recursive](v) ? 1 : 0), ts->insert[recursive](v));
+            return Set<T>::_copy_insert(this, loc.pos, v);
         }
     }
 
     method remove(v: T): Set<T> {
-        var ts = this.set;
-        if(ts == none || !this->has(v)) {
+        var loc = Set<T>::_find(this, 0, v);
+        if(!loc.found) {
             return this;
         }
         else {
-            return Set<T>::_cons<T>(this.size - 1, ts->remove[recursive](v));
-        }
-    }
-}
-
-entity MapEntry<K where Indexable, V> provides Object {
-    field key: K;
-    field value: V;
-    field tail: MapEntry<K, V>?;
-
-    recursive method has(k: K): Bool {
-        if(this.key == k) {
-            return true;
-        }
-        else {
-            var tl = this.tail;
-            return tl != none && tl->has[recursive](k);
-        }
-    }
-
-    recursive method insert(k: K, v: V): MapEntry<K, V> {
-        if(k == this.key) {
-            return MapEntry<K, V>{key=k, value=v, tail=this.tail}; //replace old value
-        }
-        elif(k > this.key || this.tail == none) {
-            return MapEntry<K, V>{key=k, value=v, tail=this};
-        }
-        else {
-            var tl = this.tail;
-            check tl != none;
-            
-            var newtail = tl->insert[recursive](k, v);
-            return MapEntry<K, V>{key=this.key, value=this.value, tail=newtail};
-        }
-    }
-
-    recursive method remove(k: K): MapEntry<K, V>? {
-        if(k == this.key) {
-            return this.tail; 
-        }
-        elif(k > this.key || this.tail == none) {
-            return this;
-        }
-        else {
-            var tl = this.tail;
-            check tl != none;
-
-            var newtail = tl->remove[recursive](k);
-            return MapEntry<K, V>{key=this.key, value=this.value, tail=newtail};
+            return Set<T>::_copy_remove(this, loc.pos, v);
         }
     }
 }
 
 //<summary>A Map entity.</summary>
 entity Map<K where Indexable, V> provides Object {
-    field size: Int;
-    field map: MapEntry<K, V>?;
+    hidden static _size(m: Map<K, V>): Int # _mapsize
+    hidden static _unsafe_at_key(m: Map<K, V>, i: Int): K # _mapunsafe_at_key
+    hidden static _unsafe_at_val(m: Map<K, V>, i: Int): V # _mapunsafe_at_val
+    hidden static _copy_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapcopy_set
+    hidden static _destructive_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapdestructive_set
+    hidden static _destructive_add(m: Map<K, V>, k: K, v: V): Map<K, V> # _mapdestructive_add
 
-    hidden static _cons(size: Int, map: MapEntry<K, V>?): Map<K, V> # _mapcons
+    hidden static _copy_insert(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapcopy_insert
+    hidden static _copy_remove(m: Map<K, V>, i: Int): Map<K, V> # _mapcopy_remove
 
-    const empty: Map<K, V> = Map<K, V>::_cons<K, V>(0, none);
+    hidden recursive static _find(m: Map<K, V>, idx: Int, k: K): {found: Bool, pos: Int} {
+        if(idx == Map<K, V>::_size(m)) {
+            return {found=false, pos=idx};
+        }
 
-    method size(): Int {
-        return this.size;
-    }
-    
-    method has(k: K): Bool {
-        var tm = this.map;
-        return tm != none && tm->has[recursive](k); 
-    }
-
-    method insert(k: K, v: V): Map<K, V> {
-        var tm = this.map;
-        if(tm == none) {
-            return Map<K, V>::_cons<K, V>(1, MapEntry<K, V>{key=k, value=v, tail=none});
+        var kv = Map<K, V>::_unsafe_at_key(m, idx);
+        if(Indexable::equal(kv, k)) {
+            return {found=true, pos=idx};
+        }
+        elif (Indexable::less(kv, k)) {
+            return {found=false, pos=idx};
         }
         else {
-            return Map<K, V>::_cons<K, V>(this.size + (!tm->has[recursive](k) ? 1 : 0), tm->insert[recursive](k, v));
+            return Map<K, V>::_find[recursive](m, idx + 1, k);
         }
     }
 
-    method remove(k: K): Map<K, V> {
-        var tm = this.map;
-        if(tm == none || !this->has(k)) {
+    method size(): Int {
+        return Map<K, V>::_size(this);
+    }
+    
+    method empty(): Bool {
+        return Map<K, V>::_size(this) == 0;
+    }
+    
+    method has(key: K): Bool {
+        return Map<K, V>::_find(this, 0, key).found;
+    }
+
+    method get(key: K): Bool {
+        var loc = Map<K, V>::_find(this, 0, key);
+        check loc.found;
+
+        return Map<K,V>::_unsafe_at_val(this, loc.pos);
+    }
+
+    method set(key: K, val: V): Map<K, V> {
+        var loc = Map<K, V>::_find(this, 0, key);
+        if(loc.found) {
+            return Map<K, V>::_copy_set(this, loc.pos, key, val);
+        }
+        else {
+            return Map<K, V>::_copy_insert(this, loc.pos, key, val);
+        }
+    }
+
+    method remove(key: K): Set<T> {
+        var loc = Map<K, V>::_find(this, 0, key);
+        if(!loc.found) {
             return this;
         }
         else {
-            return Map<K, V>::_cons<K, V>(this.size - 1, tm->remove[recursive](k));
+            return Map<K, V>::_copy_remove(this, loc.pos);
         }
     }
 }

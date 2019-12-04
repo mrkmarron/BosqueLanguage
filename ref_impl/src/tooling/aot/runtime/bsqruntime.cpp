@@ -121,9 +121,62 @@ std::string Runtime::diagnostic_format(Value v)
         else
         {
             auto obj = dynamic_cast<const BSQObject*>(vv);
-            return std::string(s_nominaltypenames[(uint32_t) obj->ntype]) + obj->display();
+            if (dynamic_cast<const BSQList*>(obj) != nullptr)
+            {
+                auto list = dynamic_cast<const BSQList*>(obj);
+                std::string ls("{");
+                for (size_t i = 0; i < list->entries.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        ls += ", ";
+                    }
+
+                    ls += Runtime::diagnostic_format(list->entries.at(i));
+                }
+                ls += "}";
+
+                return std::string(s_nominaltypenames[(uint32_t) obj->ntype]) + ls;
+            }
+            else if (dynamic_cast<const BSQSet*>(obj) != nullptr)
+            {
+                auto set = dynamic_cast<const BSQSet*>(obj);
+                std::string ss("{");
+                for (size_t i = 0; i < set->entries.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        ss += ", ";
+                    }
+
+                    ss += Runtime::diagnostic_format(set->entries.at(i));
+                }
+                ss += "}";
+
+                return std::string(s_nominaltypenames[(uint32_t) obj->ntype]) + ss;
+            }
+            else if (dynamic_cast<const BSQMap*>(obj) != nullptr)
+            {
+                auto map = dynamic_cast<const BSQMap*>(vv);
+                std::string ms("{");
+                for (size_t i = 0; i < map->entries.size(); ++i)
+                {
+                    if (i != 0)
+                    {
+                        ms += ", ";
+                    }
+
+                    ms += Runtime::diagnostic_format(map->entries.at(i).first) + "->" + Runtime::diagnostic_format(map->entries.at(i).second);
+                }
+                ms += "}";
+
+                return std::string(s_nominaltypenames[(uint32_t) obj->ntype]) + ms;
+            }
+            else
+            {
+                return std::string(s_nominaltypenames[(uint32_t) obj->ntype]) + obj->display();
+            }
         }
-        
     }
 }
 } // namespace BSQ

@@ -100,7 +100,11 @@ class SMTTypeEmitter {
         return this.doDefaultEmitOnEntity(tdecl);
     }
 
-    doDefaultEmitOnEntity(et: MIREntityTypeDecl): boolean {
+    isCollectionType(et: MIREntityTypeDecl): boolean {
+        xxxx;
+    }
+
+    doEmitOnEntity(et: MIREntityTypeDecl): boolean {
         if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::GUID" || et.tkey === "NSCore::Regex") {
             return false;
         }

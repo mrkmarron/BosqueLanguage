@@ -56,12 +56,6 @@ enum class MIRNominalTypeEnum
 
 //%%CONCEPT_SUBTYPE_RELATION_DECLARE
 
-enum class MIRArrayTypeEnum
-{
-    Invalid = 0x0,
-//%%ARRAY_TYPE_ENUM_DECLARE
-};
-
 class BSQInt
 {
 private:
@@ -1129,4 +1123,67 @@ public:
         return std::binary_search(&etypes[0], &etypes[k], tt) != &etypes[k]; 
     }
 };
+
+class BSQList : public BSQObject {
+public:
+    std::vector<Value> entries;
+
+    BSQList(MIRNominalTypeEnum ntype, const std::vector<Value>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    
+    virtual ~BSQList()
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i]);
+        }
+    }
+
+    virtual std::string display() const
+    {
+        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+    }
+};
+
+class BSQSet : public BSQObject {
+public:
+    std::vector<Value> entries;
+
+    BSQSet(MIRNominalTypeEnum ntype, const std::vector<Value>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    
+    virtual ~BSQSet() 
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i]);
+        }
+    }
+
+    virtual std::string display() const
+    {
+        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+    }
+};
+
+class BSQMap : public BSQObject {
+public:
+    std::vector<std::pair<Value, Value>> entries;
+
+    BSQMap(MIRNominalTypeEnum ntype, const std::vector<std::pair<Value, Value>>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+
+    virtual ~BSQMap() 
+    {
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::checkedDecrement(this->entries[i].first);
+            BSQRef::checkedDecrement(this->entries[i].second);
+        }
+    }
+
+    virtual std::string display() const
+    {
+        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+    }
+};
+
+
 } // namespace BSQ
