@@ -8,7 +8,6 @@ import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
-import { CoreImplBodyText } from "./cppcore_impls";
 
 import * as assert from "assert";
 
@@ -1667,9 +1666,56 @@ class CPPBodyEmitter {
     }
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
+        const rtype = this.typegen.getMIRType(idecl.resultType);
+
         switch (idecl.implkey) {
+            case "_listsize": {
+                return `${params[0]}->entries.size();`
+            }
+            case "_listunsafe_at": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_listunsafe_set": {
+                
+            }
+            case "_listdestructive_add": {
+
+            }
+            case "_setsize": {
+                return `${params[0]}->entries.size();`
+            }
+            case "_setunsafe_at": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_setcopy_set": {
+
+            }
+            case "_setdestructive_set": {
+
+            }
+            case "_setdestructive_add": {
+
+            }
+            case "_mapsize": {
+                return `${params[0]}->entries.size();`
+            }
+            case "_mapunsafe_at_key": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).first`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_mapunsafe_at_val": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).second`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_mapcopy_set": {
+
+            }
+            case "_mapdestructive_set": {
+
+            }
+            case "_mapdestructive_add": {
+
+            }
             default: {
-                return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);
+                return `[Builtin not defined -- ${idecl.iname}]`
             }
         }
     }

@@ -8,7 +8,6 @@ import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
-import { CoreImplBodyText } from "./cppcore_impls";
 
 import * as assert from "assert";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
@@ -1461,20 +1460,53 @@ class SMTBodyEmitter {
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
         switch (idecl.implkey) {
-            case "_listcons": {
-                const mres = this.typegen.getMIRType(idecl.resultType);
-                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            case "_listsize": {
+                return `${params[0]}->entries.size();`
             }
-            case "_setcons": {
-                const mres = this.typegen.getMIRType(idecl.resultType);
-                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            case "_listunsafe_at": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
             }
-            case "_mapcons": {
-                const mres = this.typegen.getMIRType(idecl.resultType);
-                return `(result_success@${this.typegen.typeToSMTCategory(mres)} (${this.typegen.generateEntityConstructor(idecl.resultType)} ${params[1]} ${params[0]}))`;
+            case "_listunsafe_set": {
+                
+            }
+            case "_listdestructive_add": {
+
+            }
+            case "_setsize": {
+                return `${params[0]}->entries.size();`
+            }
+            case "_setunsafe_at": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_setcopy_set": {
+
+            }
+            case "_setdestructive_set": {
+
+            }
+            case "_setdestructive_add": {
+
+            }
+            case "_mapsize": {
+                return `${params[0]}->entries.size();`
+            }
+            case "_mapunsafe_at_key": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).first`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_mapunsafe_at_val": {
+                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).second`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_mapcopy_set": {
+
+            }
+            case "_mapdestructive_set": {
+
+            }
+            case "_mapdestructive_add": {
+
             }
             default: {
-                return (CoreImplBodyText.get(idecl.implkey) as ((params: string[]) => string))(params);
+                return `[Builtin not defined -- ${idecl.iname}]`
             }
         }
     }
