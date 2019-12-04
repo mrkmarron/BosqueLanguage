@@ -754,7 +754,7 @@ class SMTBodyEmitter {
                 return `(is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${arg})`;
             }
             else {
-                return `(is-${this.typegen.mangleStringForSMT(oftype.ekey)} ${arg})`;
+                return `(is-${this.typegen.generateEntityConstructor(oftype.ekey)} ${arg})`;
             }
         }
         else {
@@ -813,11 +813,11 @@ class SMTBodyEmitter {
             }
             else if (this.typegen.isUEntityType(argtype)) {
                 if(this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
-                    tests.push(`(is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${arg})`)
+                    tests.push(`(is-${this.typegen.generateEntityConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${arg})`)
                 }
             }
             else {
-                tests.push(`(= ${arg} bsqterm_none)`);
+                tests.push(`(not (= ${arg} bsqterm_none))`);
             }
         }
         else if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
@@ -834,7 +834,8 @@ class SMTBodyEmitter {
                 tests.push(`(is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${arg})`)
             }
             else {
-                tests.push(`(select MIRConceptSubtypeArray__${this.typegen.mangleStringForSMT(oftype.trkey)} "${this.typegen.mangleStringForSMT(SMTTypeEmitter.getUEntityType(argtype).ekey)}")`);
+                const nonesafe = this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype) ? `and (not (is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${arg})) ` : "";
+                tests.push(`(${nonesafe}($select MIRConceptSubtypeArray__${this.typegen.mangleStringForSMT(oftype.trkey)} "${this.typegen.mangleStringForSMT(SMTTypeEmitter.getUEntityType(argtype).ekey)}"))`);
             }
         }
         else {
@@ -842,7 +843,7 @@ class SMTBodyEmitter {
 
             let allspecialentities: MIREntityType[] = [];
             this.typegen.assembly.entityDecls.forEach((etd) => {
-                if(!this.typegen.doDefaultEmitOnEntity(etd) && oftype.ckeys.every((ct) => this.assembly.subtypeOf(this.typegen.getMIRType(etd.tkey), this.typegen.getMIRType(ct)))) {
+                if(this.typegen.isSpecialRepType(etd) && oftype.ckeys.every((ct) => this.assembly.subtypeOf(this.typegen.getMIRType(etd.tkey), this.typegen.getMIRType(ct)))) {
                     allspecialentities.push(this.typegen.getMIRType(etd.tkey).options[0] as MIREntityType);
                 }
             });
@@ -881,17 +882,21 @@ class SMTBodyEmitter {
                 tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Regex") as MIREntityType));
             }
 
-            //TODO: INDEXABLE HERE -- special case for tuples
-
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(is-bsqterm_tuple ${arg})`);
             }
             if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), this.typegen.getMIRType(oftype.trkey))) {
                 tests.push(`(is-bsqterm_record ${arg})`);
             }
+
             //TODO: podX
 
-            tests.push(`(and (is-bsqterm_object ${arg}) (select MIRConceptSubtypeArray__${this.typegen.mangleStringForSMT(oftype.trkey)} (bsqterm_object_type ${arg})))`);
+            if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Object"), this.typegen.getMIRType(oftype.trkey))) {
+                tests.push(`(is-bsqterm_object ${arg})`);
+            }
+            else {
+                tests.push(`(and (is-bsqterm_object ${arg}) (select MIRConceptSubtypeArray__${this.typegen.mangleStringForSMT(oftype.trkey)} (bsqterm_object_type ${arg})))`);
+            }
         }
 
         tests = tests.filter((t) => t !== "false");

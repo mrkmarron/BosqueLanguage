@@ -6,42 +6,8 @@
 //The core namespace implements the primitive concepts used in the fluent core language
 namespace NSCore;
 
-//<summary>Type for representing all non-none values.</summary>
-concept Collection<T> provides Object {
-}
-
-entity ListEntry<T> provides Object {
-    field entry: T;
-    field tail: ListEntry<T>?;
-
-     recursive method at(idx: Int): T {
-        if(idx == 0) {
-            return this.entry;
-        }
-        else {
-            var tl = this.tail;
-            check tl != none;
-
-            return tl->at[recursive](idx - 1);
-        }
-    }
-
-    recursive method map<U>(f: recursive? fn(_: T) -> U): ListEntry<U> {
-        var nentry = f[recursive?](this.entry);
-
-        var tl = this.tail;
-        if(tl == none) {
-            return ListEntry<U>{entry=nentry, tail=none};
-        }
-        else {
-            var ntail = tl->map<U>[recursive](f);
-            return ListEntry<U>{entry=nentry, tail=ntail};
-        }
-    }
-}
-
 //<summary>A List entity.</summary>
-entity List<T> provides Collection<T> {
+entity List<T> provides Object {
     hidden static _size(l: List<T>): Int # _listsize
     hidden static _unsafe_at(l: List<T>, i: Int): T # _listunsafe_at
     hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # _listunsafe_set
@@ -100,7 +66,7 @@ entity List<T> provides Collection<T> {
 }
 
 //<summary>A Set entity.</summary>
-entity Set<T where Indexable> provides Collection<T> {
+entity Set<T where Indexable> provides Object {
     hidden static _size(s: Set<T>): Int # _setsize
     hidden static _unsafe_at(s: Set<T>, i: Int): T # _setunsafe_at
     hidden static _copy_set(s: Set<T>, i: Int, v: T): Set<T> # _setcopy_set

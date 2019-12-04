@@ -96,14 +96,30 @@ class CPPTypeEmitter {
         const et = ropts[0] as MIREntityType;
         const tdecl = this.assembly.entityDecls.get(et.ekey) as MIREntityTypeDecl;
 
-        return this.doDefaultEmitOnEntity(tdecl);
+        return !this.isSpecialRepType(tdecl);
     }
 
-    isCollectionType(et: MIREntityTypeDecl): boolean {
-        xxxx;
+    isCollectionType(tt: MIRType): boolean {
+        return (tt.trkey.startsWith("NSCore::List<") || tt.trkey.startsWith("NSCore::Set<") || tt.trkey.startsWith("NSCore::Map<"));
     }
 
-    doEmitOnEntity(et: MIREntityTypeDecl): boolean {
+    isSpecialCollectionRepType(et: MIREntityTypeDecl): boolean {
+        return (et.tkey.startsWith("NSCore::List<") || et.tkey.startsWith("NSCore::Set<") || et.tkey.startsWith("NSCore::Map<"));
+    }
+
+    isListType(tt: MIRType): boolean {
+        return tt.trkey.startsWith("NSCore::List<");
+    }
+
+    isSetType(tt: MIRType): boolean {
+        return tt.trkey.startsWith("NSCore::Set<");
+    }
+
+    isMapType(tt: MIRType): boolean {
+        return tt.trkey.startsWith("NSCore::Map<");
+    }
+
+    isSpecialRepType(et: MIREntityTypeDecl): boolean {
         if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::GUID" || et.tkey === "NSCore::Regex") {
             return false;
         }
@@ -407,7 +423,7 @@ class CPPTypeEmitter {
     }
 
     generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
-        if (!this.doDefaultEmitOnEntity(entity)) {
+        if (this.isSpecialRepType(entity) || this.isSpecialCollectionRepType(entity)) {
             return undefined;
         }
 
