@@ -38,51 +38,38 @@ concept KeyType provides Any, Indexable {
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
-    abstract static tryParse(str: String): Some?;
+    abstract static tryParse(str: String): Result<Any>;
 }
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
-concept POD provides Any {
-    static stringify<T where POD>(data: T): ValidatedString<T> # pod_stringify //note special case where T is ValidatedString<X> then type system should know identity -- ValidatedString<ValidatedString<ZipCode>> = ValidatedString<Zipcode>
-    static bufferify<T where POD>(data: T): PODBuffer<T> # pod_bufferify
+concept POD provides Any, Parsable {
+    static stringify<T where POD>(data: T): String # pod_stringify
+    static parseString<T where POD>(str: StringOf<T>): T # pod_tryparseas
 
-    static tryParseAs<T where POD>(data: String | PODBuffer<T>): Result<T> # pod_trypodparseas
+    static bufferify<T where POD>(data: T): PODBuffer<T> # pod_bufferify
+    static parseBuffer<T where POD>(data: PODBuffer<T>): T # pod_parsebuffer
+
+    override static tryParse(str: String): Result<Any> # pod_tryparse
 }
 
 //<summary>Type for representing the none-value.</summary>
 concept Truthy provides POD {
+    override static tryParse(str: String): Result<Any> # truthy_tryparse
 }
 
 //<summary>Type for representing the none-value.</summary>
-entity None provides KeyType, POD, Truthy {
+entity None provides KeyType, Truthy {
+    override static tryParse(str: String): Result<Any> # none_tryparse
 }
 
 //<summary>Primitive boolean value.</summary>
-entity Bool provides KeyType, Parsable, POD, Some, Truthy {
-    override static tryParse(str: String): Some? {
-        return Bool::tryParseAs(str);
-    }
-
-    static tryParseAs(str: String): Bool? {
-        if(str == "true") {
-            return true;
-        }
-        elif(str == "false") {
-            return false;
-        }
-        else {
-            return none;
-        }
-    }
+entity Bool provides KeyType, Some, Truthy {
+    override static tryParse(str: String): Result<Any> # bool_tryparse
 }
 
 //<summary>Primitive integer value.</summary>
-entity Int provides KeyType, Parsable, POD, Some {
-    override static tryParse(str: String): Some? {
-        return Int::tryParseAs(str);
-    }
-
-    static tryParseAs(str: String): Int? # int_tryparse
+entity Int provides KeyType, POD, Some {
+    override static tryParse(str: String): Result<Any> # int_tryparse
 
     static max(v1: Int, v2: Int): Int {
         return v1 > v2 ? v1 : v2;
@@ -95,43 +82,40 @@ entity Int provides KeyType, Parsable, POD, Some {
 
 //<summary>Primitive string value.</summary>
 entity String provides KeyType, POD, Some {
+    override static tryParse(str: String): Result<Any> # string_tryparse
 }
 
+//<summary>Primitive stringof value.</summary>
 entity StringOf<T where Parsable> provides KeyType, Some {
     method rawString(): String # stringof_rawstring
 
+    //
+    //TODO: this is where we want to use the when super/sub action
+    //
     method convert<U where Parsable>(): StringOf<U> # stringof_convert
     method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert
 }
 
-entity ValidatedString<T where Validator> provides KeyType, POD, Some {
-    method rawString(): String # validatedstring_rawstring
-
-    method convert<U where Validator>(): ValidatedString<U> # validatedstring_convert
-    method tryConvert<U where Validator>(): ValidatedString<U> # validatedstring_convert
-}
-
-//<summary>All actual format validators provide this concept.</summary>
-//
-//TODO: validator T = RegexLiteral | POD;
-//
-concept Validator provides Any {
-}
-
 //<summary>An efficient buffer encoding for POD data.</summary>
-entity PODBuffer<T where Validator> provides Some {
+entity PODBuffer<T where POD> provides Some {
+    //
+    //TODO: this is where we want to use the when super/sub action
+    //
+    method convert<U where POD>(): PODBuffer<U> # podbuffer_convert
+    method tryConvert<U where POD>(): PODBuffer<U>? # podbuffer_tryconvert
 }
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, POD, Some {
+    override static tryParse(str: String): Result<Any> # guid_tryparse
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
-concept Enum provides KeyType, POD, Some {
+concept Enum provides KeyType, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
-concept IdKey provides KeyType, POD, Some {
+concept IdKey provides KeyType, Some {
 }
 
 //<summary>Primitive regex value.</summary>
@@ -149,6 +133,7 @@ concept Tuple provides KeyType, Some {
 
 //<summary>All actual POD tuples implicitly provide this concept.</summary>
 concept PODTuple provides KeyType, POD, Tuple {
+    override static tryParse(str: String): Result<Any> # podtuple_tryparse
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
@@ -157,6 +142,7 @@ concept Record provides KeyType, Some {
 
 //<summary>All actual POD records implicitly provide this concept.</summary>
 concept PODRecord provides KeyType, POD, Record {
+    override static tryParse(str: String): Result<Any> # podrecord_tryparse
 }
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
@@ -164,7 +150,7 @@ concept Object provides Some {
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T> provides Some {
+entity Result<T> provides Some {
     hidden field _success: Bool;
     hidden field _result: T?;
 
@@ -188,6 +174,12 @@ concept Result<T> provides Some {
         check this.success;
         return this.result->as<T>();
     }
+
+    //
+    //TODO: this is where we want to use the when super/sub action
+    //
+    method convert<U>(): Result<U> # result_convert
+    method tryConvert<U>(): Result<U>? # result_tryconvert
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>

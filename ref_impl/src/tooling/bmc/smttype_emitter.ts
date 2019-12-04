@@ -125,7 +125,7 @@ class SMTTypeEmitter {
             return false;
         }
 
-        if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::ValidatedString<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
+        if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
             return false;
         }
 
@@ -319,13 +319,13 @@ class SMTTypeEmitter {
             if(this.isCollectionType(from)) {
                 let nonnone: SMTExp | undefined = undefined;
                 if(this.isListType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" bsqentity_array_empty (bsqlist@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqlist@size" (bsqlist@size ${exp})) (bsqlist@entries ${exp}))`);
                 }
                 else if(this.isSetType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" bsqentity_array_empty (bsqset@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqset@size" (bsqset@size ${exp})) (bsqset@entries ${exp}))`);
                 }
                 else {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" bsqentity_array_empty (bsqmap@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqmap@size" (bsqmap@size ${exp})) (bsqmap@entries ${exp}))`);
                 }
 
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
@@ -391,13 +391,13 @@ class SMTTypeEmitter {
                 if(this.isCollectionType(into)) {
                     let nonnone: SMTExp | undefined = undefined;
                     if(this.isListType(from)) {
-                        nonnone = new SMTValue(`(cons@bsqlist (bsqterm_object_collection ${exp}))`);
+                        nonnone = new SMTValue(`(cons@bsqlist (select (bsqterm_object_entries ${exp}) "bsqlist@size") (bsqterm_object_collection ${exp}))`);
                     }
                     else if(this.isSetType(from)) {
-                        nonnone = new SMTValue(`(cons@bsqset (bsqterm_object_collection ${exp}))`);
+                        nonnone = new SMTValue(`(cons@bsqset (select (bsqterm_object_entries ${exp}) "bsqset@size") (bsqterm_object_collection ${exp}))`);
                     }
                     else {
-                        nonnone = new SMTValue(`(cons@bsqmap (bsqterm_object_collection ${exp}))`);
+                        nonnone = new SMTValue(`(cons@bsqmap (select (bsqterm_object_entries ${exp}) "bsqmap@size") (bsqterm_object_collection ${exp}))`);
                     }
 
                     if (!this.assembly.subtypeOf(this.noneType, from)) {

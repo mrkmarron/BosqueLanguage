@@ -27,7 +27,6 @@
       (bsqterm_int (bsqterm_int_value Int))
       (bsqterm_string (bsqterm_string_value bsqstring))
       (bsqterm_typedstring (bsqterm_typedstring_type String) (bsqterm_typedstring_value bsqstring))
-      (bsqterm_validatedstring (bsqterm_validatedstring_type String) (bsqterm_validatedstring_value bsqstring))
       (bsqterm_podbuffer (bsqterm_podbuffer_type String) (bsqterm_podbuffer_value (Array Int Int)))
       (bsqterm_guid (bsqterm_guid_value String))
       (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
@@ -47,9 +46,9 @@
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
     ( (bsqcollection_data@single (bsqcollection_data@elem BTerm)) (bsqcollection_data@tuple (bsqcollection_data@key BTerm) (bsqcollection_data@value BTerm)) )
-    ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@entries (Array Int bsqcollection_data)) )
-    ( (cons@bsqset$none) (cons@bsqset (bsqset@entries (Array Int bsqcollection_data)) )
-    ( (cons@bsqset$none) (cons@bsqmap (bsqmap@entries (Array Int bsqcollection_data)) )
+    ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int bsqcollection_data)) )
+    ( (cons@bsqset$none) (cons@bsqset (bsqset@size Int) (bsqset@entries (Array Int bsqcollection_data)) )
+    ( (cons@bsqset$none) (cons@bsqmap (bsqmap@size Int) (bsqmap@entries (Array Int bsqcollection_data)) )
 ))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))

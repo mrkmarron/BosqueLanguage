@@ -7,6 +7,9 @@
 namespace NSCore;
 
 //<summary>A List entity.</summary>
+//
+//TODO: this is where we want to use POD when T POD
+//
 entity List<T> provides Object {
     hidden static _size(l: List<T>): Int # _listsize
     hidden static _unsafe_at(l: List<T>, i: Int): T # _listunsafe_at
@@ -66,15 +69,18 @@ entity List<T> provides Object {
 }
 
 //<summary>A Set entity.</summary>
+//
+//TODO: this is where we want to use POD when T POD
+//
 entity Set<T where Indexable> provides Object {
     hidden static _size(s: Set<T>): Int # _setsize
     hidden static _unsafe_at(s: Set<T>, i: Int): T # _setunsafe_at
-    hidden static _copy_set(s: Set<T>, i: Int, v: T): Set<T> # _setcopy_set
-    hidden static _destructive_set(s: Set<T>, i: Int, v: T): Set<T> # _setdestructive_set
+    hidden static _unsafe_set(s: Set<T>, i: Int, v: T): Set<T> # _setunsafe_set
+    hidden static _unsafe_add(s: Set<T>, v: T): Set<T> # _setunsafe_add
     hidden static _destructive_add(s: Set<T>, v: T): Set<T> # _setdestructive_add
 
-    hidden static _copy_insert(s: Set<T>, i: Int, v: T): Set<T> # _setcopy_insert
-    hidden static _copy_remove(s: Set<T>, i: Int): Set<T> # _setcopy_remove
+    hidden static _unsafe_insert(s: Set<T>, i: Int, v: T): Set<T> # _setunsafe_insert
+    hidden static _unsafe_remove(s: Set<T>, i: Int): Set<T> # _setunsafe_remove
 
     hidden recursive static _find(s: Set<T>, idx: Int, v: T): {found: Bool, pos: Int} {
         if(idx == Set<T>::_size(s)) {
@@ -108,10 +114,15 @@ entity Set<T where Indexable> provides Object {
     method insert(v: T): Set<T> {
         var loc = Set<T>::_find(this, 0, v);
         if(loc.found) {
-            return Set<T>::_copy_set(this, loc.pos, v);
+            return Set<T>::_unsafe_set(this, loc.pos, v);
         }
         else {
-            return Set<T>::_copy_insert(this, loc.pos, v);
+            if(loc.pos == Set<T>::_size(this)) {
+                return Set<T>::_unsafe_add(this, v);
+            }
+            else {
+                return Set<T>::_unsafe_insert(this, loc.pos, v);
+            }
         }
     }
 
@@ -121,22 +132,25 @@ entity Set<T where Indexable> provides Object {
             return this;
         }
         else {
-            return Set<T>::_copy_remove(this, loc.pos, v);
+            return Set<T>::_unsafe_remove(this, loc.pos, v);
         }
     }
 }
 
 //<summary>A Map entity.</summary>
+//
+//TODO: this is where we want to use POD when T POD
+//
 entity Map<K where Indexable, V> provides Object {
     hidden static _size(m: Map<K, V>): Int # _mapsize
     hidden static _unsafe_at_key(m: Map<K, V>, i: Int): K # _mapunsafe_at_key
     hidden static _unsafe_at_val(m: Map<K, V>, i: Int): V # _mapunsafe_at_val
-    hidden static _copy_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapcopy_set
-    hidden static _destructive_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapdestructive_set
+    hidden static _unsafe_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapunsafe_set
+    hidden static _unsafe_add(m: Map<K, V>, k: K, v: V): Map<K, V> # _mapunsafe_add
     hidden static _destructive_add(m: Map<K, V>, k: K, v: V): Map<K, V> # _mapdestructive_add
 
-    hidden static _copy_insert(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapcopy_insert
-    hidden static _copy_remove(m: Map<K, V>, i: Int): Map<K, V> # _mapcopy_remove
+    hidden static _unsafe_insert(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapunsafe_insert
+    hidden static _unsafe_remove(m: Map<K, V>, i: Int): Map<K, V> # _mapunsafe_remove
 
     hidden recursive static _find(m: Map<K, V>, idx: Int, k: K): {found: Bool, pos: Int} {
         if(idx == Map<K, V>::_size(m)) {
@@ -177,10 +191,15 @@ entity Map<K where Indexable, V> provides Object {
     method set(key: K, val: V): Map<K, V> {
         var loc = Map<K, V>::_find(this, 0, key);
         if(loc.found) {
-            return Map<K, V>::_copy_set(this, loc.pos, key, val);
+            return Map<K, V>::_unsafe_set(this, loc.pos, key, val);
         }
         else {
-            return Map<K, V>::_copy_insert(this, loc.pos, key, val);
+            if(loc.pos == Map<K, V>::_size(this)) {
+                return Map<K, V>::_unsafe_add(this, key, val);
+            }
+            else {
+                return Map<K, V>::_unsafe_insert(this, loc.pos, key, val);
+            }
         }
     }
 
@@ -190,7 +209,7 @@ entity Map<K where Indexable, V> provides Object {
             return this;
         }
         else {
-            return Map<K, V>::_copy_remove(this, loc.pos);
+            return Map<K, V>::_unsafe_remove(this, loc.pos);
         }
     }
 }

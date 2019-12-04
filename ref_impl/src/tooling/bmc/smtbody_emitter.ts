@@ -269,37 +269,31 @@ class SMTBodyEmitter {
     }
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
-        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpce.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
+        const cpcetype = this.typegen.getMIRType(cpce.tkey);
 
-        if (ctype.name === "List") {
-            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
+        if (this.typegen.isListType(cpcetype)) {
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqlist 0 bsqcollection_data_array_single_empty)"));
         }
-        else if (ctype.name === "Set") {
-            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "set") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
+        else if (this.typegen.isSetType(cpcetype)) {
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqset 0 bsqcollection_data_array_single_empty)"));
         }
         else {
-            const contentstype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "map") as MIRFieldDecl).declaredType).options[0] as MIREntityType;
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpce.tkey)} ${this.typegen.generateEntityNoneConstructor(contentstype.ekey)} 0)`));
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqmap 0 bsqcollection_data_array_tuple_empty)"));
         }
     }
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
-        const ctype = this.assembly.entityDecls.get((this.typegen.getMIRType(cpcs.tkey).options[0] as MIREntityType).ekey) as MIREntityTypeDecl;
-        if (ctype.name === "List") {
-            const clisttype = this.typegen.getMIRType((ctype.fields.find((fd) => fd.name === "list") as MIRFieldDecl).declaredType);
-            const clistcons = this.typegen.generateEntityConstructor(clisttype.options[0].trkey);
-            const contentstype = ctype.terms.get("T") as MIRType;
+        const cpcstype = this.typegen.getMIRType(cpcs.tkey);
 
-            let cons = this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, clisttype).emit();
-            for (let i = cpcs.args.length - 1; i >= 0; --i) {
-                cons = `(${clistcons} ${this.argToSMT(cpcs.args[i], contentstype).emit()} ${cons})`;
+        if (this.typegen.isListType(cpcstype)) {
+            let consv = "bsqcollection_data_array_single_empty";
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                consv = `(store consv ${i} ${this.argToSMT(cpcs.args[i], this.typegen.anyType)})`;
             }
 
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(cpcs.tkey)} ${cons} ${cpcs.args.length})`));
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(cons@bsqlist ${cpcs.args.length} ${consv})`));
         }
-        else if (ctype.name === "Set") {
+        else if (this.typegen.isSetType(cpcstype)) {
             return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
         }
         else {
@@ -776,9 +770,6 @@ class SMTBodyEmitter {
             else if(oftype.ekey.startsWith("NSCore::StringOf<")) {
                 return `(and (is-bsqterm_typedstring ${arg}) (= (bsqterm_typedstring_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
             }
-            else if(oftype.ekey.startsWith("NSCore::ValidatedString<")) {
-                return `(and (is-bsqterm_validatedstring ${arg}) (= (bsqterm_validatedstring_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
-            }
             else if(oftype.ekey.startsWith("NSCore::POBBuffer<")) {
                 return `(and (is-bsqterm_podbuffer ${arg}) (= (bsqterm_podbuffer_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
             }
@@ -861,9 +852,6 @@ class SMTBodyEmitter {
             }
             if(allspecialentities.find((stype) => stype.ekey.startsWith("NSCore::StringOf<")) !== undefined) {
                 tests.push(`(is-bsqterm_typedstring ${arg})`);
-            }
-            if(allspecialentities.find((stype) => stype.ekey.startsWith("NSCore::ValidatedString<")) !== undefined) {
-                tests.push(`(is-bsqterm_validatedstring ${arg})`);
             }
             if(allspecialentities.find((stype) => stype.ekey.startsWith("NSCore::POBBuffer<")) !== undefined) {
                 tests.push(`(is-bsqterm_podbuffer ${arg})`);
@@ -1458,55 +1446,63 @@ class SMTBodyEmitter {
         return `${decl} \n${body.emit("  ")})`;
     }
 
-    generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
+    generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): SMTExp {
+        const rtype = this.typegen.getMIRType(idecl.resultType);
+
         switch (idecl.implkey) {
             case "_listsize": {
-                return `${params[0]}->entries.size();`
+                return new SMTValue(`(bsqlist@size ${params[0]})`);
             }
             case "_listunsafe_at": {
-                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
+                return this.typegen.coerce(new SMTValue(`(bsqcollection_data@elem (select (bsqlist@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
             }
             case "_listunsafe_set": {
-                
+                const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
+                return new SMTValue(`(cons@bsqlist (bsqlist@size ${params[0]}) (store (bsqlist@entries ${params[0]}) ${params[1]} ${storeval}))`);
             }
             case "_listdestructive_add": {
-
+                const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
+                return new SMTValue(`(cons@bsqlist (bsqlist@size ${params[0]} + 1) (store (bsqlist@entries ${params[0]}) (bsqlist@size ${params[0]} + 1) ${storeval}))`);
             }
             case "_setsize": {
-                return `${params[0]}->entries.size();`
+                return new SMTValue(`(bsqset@size ${params[0]})`);
             }
             case "_setunsafe_at": {
-                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]})`, this.typegen.anyType, rtype) + ";";
+                 return this.typegen.coerce(new SMTValue(`(bsqcollection_data@elem (select (bsqset@entries ${params[0]}) ${params[0]}))`), this.typegen.anyType, rtype);
             }
-            case "_setcopy_set": {
-
+            case "_setunsafe_set": {
+                const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
+                return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]}) (store (bsqset@entries ${params[0]}) ${params[1]} ${storeval}))`);
             }
-            case "_setdestructive_set": {
-
-            }
+            case "_setunsafe_add": 
             case "_setdestructive_add": {
-
+                const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
+                return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]} + 1) (store (bsqset@entries ${params[0]}) (bsqset@size ${params[0]} + 1) ${storeval}))`);
             }
             case "_mapsize": {
-                return `${params[0]}->entries.size();`
+                return new SMTValue(`(bsqmap@size ${params[0]})`);
             }
             case "_mapunsafe_at_key": {
-                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).first`, this.typegen.anyType, rtype) + ";";
+                return this.typegen.coerce(new SMTValue(`(bsqcollection_data@key (select (bsqmap@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
             }
             case "_mapunsafe_at_val": {
-                return this.typegen.coerce(`${params[0]}->entries.at(${params[1]}).second`, this.typegen.anyType, rtype) + ";";
+                return this.typegen.coerce(new SMTValue(`(bsqcollection_data@value(select (bsqmap@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
             }
-            case "_mapcopy_set": {
-
+            case "_mapunsafe_set": {
+                const storekey = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
+                const storeval = this.typegen.coerce(new SMTValue(params[3]), this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType).emit();
+                const store = `(bsqcollection_data@pair ${storekey} ${storeval})`;
+                return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]}) (store (bsqset@entries ${params[0]}) (bsqset@size ${params[1]}) ${store}))`);
             }
-            case "_mapdestructive_set": {
-
-            }
+            case "_mapunsafe_add":
             case "_mapdestructive_add": {
-
+                const storekey = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
+                const storeval = this.typegen.coerce(new SMTValue(params[3]), this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType).emit();
+                const store = `(bsqcollection_data@pair ${storekey} ${storeval})`;
+                return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]} + 1) (store (bsqset@entries ${params[0]}) (bsqset@size ${params[0]} + 1) ${store}))`);
             }
             default: {
-                return `[Builtin not defined -- ${idecl.iname}]`
+                return new SMTValue(`[Builtin not defined -- ${idecl.iname}]`);
             }
         }
     }

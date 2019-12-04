@@ -146,7 +146,7 @@ Bosque provides _named arguments_ along with _rest_ and _spread_ operators. Thes
 
 ```none
 function nsum(d: Int, ...args: List<Int>): Int {
-    return args.sum(default=d);
+    return args->sum(default=d);
 }
 
 function np(p1: Int, p2: Int): {x: Int, y: Int} {
@@ -708,7 +708,7 @@ Bosque provides _named arguments_ along with _rest_ and _spread_ operators. Thes
 
 ```none
 function nsum(d: Int, ...args: List<Int>): Int {
-    return args.sum(default=d);
+    return args->sum(default=d);
 }
 
 function np(p1: Int, p2: Int): {x: Int, y: Int} {

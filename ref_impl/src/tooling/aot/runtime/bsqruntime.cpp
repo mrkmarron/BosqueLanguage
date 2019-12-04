@@ -47,11 +47,6 @@ std::string Runtime::diagnostic_format(Value v)
             auto sof = dynamic_cast<const BSQStringOf*>(vv);
             return std::string(s_nominaltypenames[(uint32_t)sof->oftype]) + std::string("'") + std::string(sof->sdata.cbegin(), sof->sdata.cend()) + std::string("'");
         }
-        else if(dynamic_cast<const BSQValidatedString*>(vv) != nullptr)
-        {
-            auto vs = dynamic_cast<const BSQValidatedString*>(vv);
-            return std::string("<|") + std::string(vs->validator->strrep) + std::string("|>") + std::string("'") + std::string(vs->sdata.cbegin(), vs->sdata.cend()) + std::string("'");
-        }
         else if(dynamic_cast<const BSQPODBuffer*>(vv) != nullptr)
         {
             auto pbuf = dynamic_cast<const BSQPODBuffer*>(vv);
