@@ -122,18 +122,18 @@ class SMTTypeEmitter {
 
     isSpecialRepType(et: MIREntityTypeDecl): boolean {
         if (et.tkey === "NSCore::None" || et.tkey === "NSCore::Bool" || et.tkey === "NSCore::Int" || et.tkey === "NSCore::String" || et.tkey === "NSCore::GUID" || et.tkey === "NSCore::Regex") {
-            return false;
+            return true;
         }
 
         if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
-            return false;
+            return true;
         }
 
         if (et.provides.includes("NSCore::Enum") || et.provides.includes("NSCore::IdKey")) {
-            return false;
+            return true;
         }
 
-        return true;
+        return false;
     }
 
     static getTupleTypeMaxLength(tt: MIRType): number {

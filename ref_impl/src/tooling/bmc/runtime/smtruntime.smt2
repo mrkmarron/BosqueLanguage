@@ -46,9 +46,9 @@
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
     ( (bsqcollection_data@single (bsqcollection_data@elem BTerm)) (bsqcollection_data@tuple (bsqcollection_data@key BTerm) (bsqcollection_data@value BTerm)) )
-    ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int bsqcollection_data)) )
-    ( (cons@bsqset$none) (cons@bsqset (bsqset@size Int) (bsqset@entries (Array Int bsqcollection_data)) )
-    ( (cons@bsqset$none) (cons@bsqmap (bsqmap@size Int) (bsqmap@entries (Array Int bsqcollection_data)) )
+    ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int bsqcollection_data))) )
+    ( (cons@bsqset$none) (cons@bsqset (bsqset@size Int) (bsqset@entries (Array Int bsqcollection_data))) )
+    ( (cons@bsqset$none) (cons@bsqmap (bsqmap@size Int) (bsqmap@entries (Array Int bsqcollection_data))) )
 ))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))

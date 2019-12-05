@@ -305,9 +305,6 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
         }
         else {
-            //
-            //TODO: this is performance terrible want to specialize once we split check/run core impls
-            //
             const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_map");
             const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
             const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
