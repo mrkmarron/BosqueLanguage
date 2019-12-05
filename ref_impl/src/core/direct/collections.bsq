@@ -77,7 +77,6 @@ entity Set<T where Indexable> provides Object {
     hidden static _unsafe_at(s: Set<T>, i: Int): T # _setunsafe_at
     hidden static _unsafe_set(s: Set<T>, i: Int, v: T): Set<T> # _setunsafe_set
     hidden static _unsafe_add(s: Set<T>, v: T): Set<T> # _setunsafe_add
-    hidden static _destructive_add(s: Set<T>, v: T): Set<T> # _setdestructive_add
 
     hidden static _unsafe_insert(s: Set<T>, i: Int, v: T): Set<T> # _setunsafe_insert
     hidden static _unsafe_remove(s: Set<T>, i: Int): Set<T> # _setunsafe_remove
@@ -96,6 +95,21 @@ entity Set<T where Indexable> provides Object {
         }
         else {
             return Set<T>::_find[recursive](s, idx + 1, v);
+        }
+    }
+
+    hidden static cons_insert(s: Set<T>, v: T): Set<T> {
+        var loc = Set<T>::_find(s, 0, v);
+        if(loc.found) {
+            return Set<T>::_unsafe_set(s, loc.pos, v);
+        }
+        else {
+            if(loc.pos == Set<T>::_size(s)) {
+                return Set<T>::_unsafe_add(s, v);
+            }
+            else {
+                return Set<T>::_unsafe_insert(s, loc.pos, v);
+            }
         }
     }
 
@@ -147,7 +161,6 @@ entity Map<K where Indexable, V> provides Object {
     hidden static _unsafe_at_val(m: Map<K, V>, i: Int): V # _mapunsafe_at_val
     hidden static _unsafe_set(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapunsafe_set
     hidden static _unsafe_add(m: Map<K, V>, k: K, v: V): Map<K, V> # _mapunsafe_add
-    hidden static _destructive_add(m: Map<K, V>, k: K, v: V): Map<K, V> # _mapdestructive_add
 
     hidden static _unsafe_insert(m: Map<K, V>, i: Int, k: K, v: V): Map<K, V> # _mapunsafe_insert
     hidden static _unsafe_remove(m: Map<K, V>, i: Int): Map<K, V> # _mapunsafe_remove
@@ -166,6 +179,21 @@ entity Map<K where Indexable, V> provides Object {
         }
         else {
             return Map<K, V>::_find[recursive](m, idx + 1, k);
+        }
+    }
+
+    hidden static cons_set(m: Map<K, V>, val: [K, V]): Map<K, V> {
+        var loc = Map<K, V>::_find(m, 0, val.0);
+        if(loc.found) {
+            return Map<K, V>::_unsafe_set(m, loc.pos, val.0, val.1);
+        }
+        else {
+            if(loc.pos == Map<K, V>::_size(m)) {
+                return Map<K, V>::_unsafe_add(m, val.0, val.1);
+            }
+            else {
+                return Map<K, V>::_unsafe_insert(m, loc.pos, val.0, val.1);
+            }
         }
     }
 

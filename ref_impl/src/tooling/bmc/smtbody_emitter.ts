@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
@@ -294,10 +294,31 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(cons@bsqlist ${cpcs.args.length} ${consv})`));
         }
         else if (this.typegen.isSetType(cpcstype)) {
-            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_set");
+            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+
+            let conscall = `(cons@bsqset 0 bsqcollection_data_array_single_empty)`;
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], vtype).emit()})`
+            }
+
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
         }
         else {
-            return NOT_IMPLEMENTED<SMTExp>("generateMIRConstructorPrimaryCollectionSingletons -- Map");
+            //
+            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_map");
+            const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
+            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
+            const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
+
+            let conscall = "(cons@bsqmap 0 bsqcollection_data_array_tuple_empty)";
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], ttype).emit()})`
+            }
+
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
         }
     }
 
@@ -1474,8 +1495,7 @@ class SMTBodyEmitter {
                 const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
                 return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]}) (store (bsqset@entries ${params[0]}) ${params[1]} ${storeval}))`);
             }
-            case "_setunsafe_add": 
-            case "_setdestructive_add": {
+            case "_setunsafe_add": {
                 const storeval = `(bsqcollection_data@single ${this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit()})`;
                 return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]} + 1) (store (bsqset@entries ${params[0]}) (bsqset@size ${params[0]} + 1) ${storeval}))`);
             }
@@ -1494,8 +1514,7 @@ class SMTBodyEmitter {
                 const store = `(bsqcollection_data@pair ${storekey} ${storeval})`;
                 return new SMTValue(`(cons@bsqset (bsqset@size ${params[0]}) (store (bsqset@entries ${params[0]}) (bsqset@size ${params[1]}) ${store}))`);
             }
-            case "_mapunsafe_add":
-            case "_mapdestructive_add": {
+            case "_mapunsafe_add": {
                 const storekey = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
                 const storeval = this.typegen.coerce(new SMTValue(params[3]), this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType).emit();
                 const store = `(bsqcollection_data@pair ${storekey} ${storeval})`;

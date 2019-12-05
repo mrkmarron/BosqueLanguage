@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -262,6 +262,7 @@ class CPPBodyEmitter {
         const cppctype = this.typegen.typeToCPPType(cpcstype, "base");
 
         let conscall = "";
+        const scopevar = this.varNameToCppName("$scope$");
         if (this.typegen.isListType(cpcstype)) {
             const cvals = cpcs.args.map((arg) => {
                 return this.typegen.generateConstructorArgInc(this.typegen.anyType, this.argToCpp(arg, this.typegen.anyType));
@@ -270,14 +271,33 @@ class CPPBodyEmitter {
             conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}});`;
         }
         else if (this.typegen.isSetType(cpcstype)) {
-            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Set");
+            //
+            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_set");
+            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+
+            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], vtype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
+            }
         }
         else {
-            return NOT_IMPLEMENTED<string>("generateMIRConstructorPrimaryCollectionSingletons -- Map");
+            //
+            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_map");
+            const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
+            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
+            const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
+
+            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], ttype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
+            }
         }
 
-        const scopevar = this.varNameToCppName("$scope$");
-        return `${this.varToCppName(cpcs.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(${conscall});`;
+        return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
@@ -1688,9 +1708,6 @@ class CPPBodyEmitter {
             case "_setunsafe_add": {
                 bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
             }
-            case "_setdestructive_add": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
-            }
             case "_mapsize": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
             }
@@ -1705,9 +1722,6 @@ class CPPBodyEmitter {
             }
             case "_mapunsafe_add": {
                 bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
-            }
-            case "_mapdestructive_add": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
             }
             default: {
                 bodystr = `[Builtin not defined -- ${idecl.iname}]`

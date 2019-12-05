@@ -1202,12 +1202,6 @@ public:
         return new BSQSet(this->ntype, move(nv));
     }
 
-    BSQSet* destructiveAdd(Value v)
-    {
-        this->entries.push_back(BSQRef::checkedIncrement(v));
-        return this;
-    }
-
     virtual std::string display() const
     {
         return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
@@ -1266,15 +1260,6 @@ public:
         nv[this->entries.size()] = std::make_pair(k, v);
 
         return new BSQMap(this->ntype, move(nv));
-    }
-
-    BSQMap* destructiveAdd(Value k, Value v)
-    {
-        BSQRef::checkedIncrement(k);
-        BSQRef::checkedIncrement(v);
-        this->entries.push_back(std::make_pair(k, v));
-
-        return this;
     }
 
     virtual std::string display() const
