@@ -27,9 +27,11 @@ concept Some provides Any {
 
 //<summary>Types that can be used in equality operations or in key based containers.</summary>
 concept Indexable provides Any {
+//
+//TODO: want to add type gen macro T % KeyType that expands to the type of getKey(v)
+//
     static getKey(a: Indexable): KeyType # special_method
     static equal(a: Indexable, b: Indexable): Bool # special_method
-    static less(a: Indexable, b: Indexable): Bool # special_method
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
@@ -128,21 +130,29 @@ entity Regex provides Some {
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
-concept Tuple provides KeyType, Some {
+concept Tuple provides Some {
 }
 
 //<summary>All actual POD tuples implicitly provide this concept.</summary>
-concept PODTuple provides KeyType, POD, Tuple {
+concept PODTuple provides POD, Tuple {
     override static tryParse(str: String): Result<Any> # podtuple_tryparse
 }
 
+//<summary>All actual KeyType tuples implicitly provide this concept.</summary>
+concept KeyTuple provides KeyType, Tuple {
+}
+
 //<summary>All actual records implicitly provide this concept.</summary>
-concept Record provides KeyType, Some {
+concept Record provides Some {
 }
 
 //<summary>All actual POD records implicitly provide this concept.</summary>
-concept PODRecord provides KeyType, POD, Record {
+concept PODRecord provides POD, Record {
     override static tryParse(str: String): Result<Any> # podrecord_tryparse
+}
+
+//<summary>All actual KeyType records implicitly provide this concept.</summary>
+concept KeyRecord provides KeyType, Record {
 }
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>

@@ -272,9 +272,9 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.isSetType(cpcstype)) {
             //
-            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //TODO: this is performance not good want to specialize once we split check/run core impls
             //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_set");
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
             const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
 
             conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
@@ -284,9 +284,9 @@ class CPPBodyEmitter {
         }
         else {
             //
-            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //TODO: this is performance not good want to specialize once we split check/run core impls
             //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_map");
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
             const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
             const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
             const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
@@ -435,7 +435,7 @@ class CPPBodyEmitter {
         else {
             const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
             const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-            return (op === "!=" ? "!" : "") + `std::equal(${lhsstring}->sdata.cbegin(), ${lhsstring}->sdata.cend(), ${rhsstring}->sdata.cbegin(), ${rhsstring}->sdata.cend())`;
+            return `(${lhsstring} ${op} ${rhsstring})`;
         }
     }
 
@@ -763,6 +763,10 @@ class CPPBodyEmitter {
 
     generateFastConceptTypeCheck(arg: string, argtype: MIRType, oftype: MIRConceptType): string {
         let tests: string[] = [];
+
+        //
+        //TODO: should flip this were we can lookup the possible entity->concept[] subtype relations and check inclusion of oftype in them
+        //
 
         if(oftype.trkey === "NSCore::Any") {
             tests.push("true");
@@ -1699,14 +1703,23 @@ class CPPBodyEmitter {
             case "_setsize": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
             }
-            case "_setunsafe_at": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()]`, this.typegen.anyType, rtype) + ";";
+            case "_setunsafe_at_key": {
+                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].first`, this.typegen.anyType, rtype) + ";";
+            }
+            case "_setunsafe_at_val": {
+                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].second`, this.typegen.anyType, rtype) + ";";
             }
             case "_setunsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
+            }
+            case "_setdestructive_set": {
+                bodystr = `auto _return_ = ${params[0]}->destructiveSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
             }
             case "_setunsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
+                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+            }
+            case "_setdestructive_add": {
+                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
             }
             case "_mapsize": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
@@ -1720,8 +1733,14 @@ class CPPBodyEmitter {
             case "_mapunsafe_set": {
                 bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
             }
+            case "_mapdestructive_set": {
+                bodystr = `auto _return_ = ${params[0]}->destructiveSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
+            }
             case "_mapunsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
+                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+            }
+            case "_mapdestructive_add": {
+                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
             }
             default: {
                 bodystr = `[Builtin not defined -- ${idecl.iname}]`

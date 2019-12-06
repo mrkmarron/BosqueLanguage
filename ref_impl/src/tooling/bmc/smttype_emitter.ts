@@ -191,7 +191,7 @@ class SMTTypeEmitter {
             return "Int";
         }
         else if (this.isSimpleStringType(ttype)) {
-            return "bsqstring";
+            return "String";
         }
         else if (this.isTupleType(ttype)) {
             return "bsqtuple_" + SMTTypeEmitter.getTupleTypeMaxLength(ttype);
@@ -319,13 +319,13 @@ class SMTTypeEmitter {
             if(this.isCollectionType(from)) {
                 let nonnone: SMTExp | undefined = undefined;
                 if(this.isListType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqlist@size" (bsqlist@size ${exp})) (bsqlist@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_list ${exp})`);
                 }
                 else if(this.isSetType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqset@size" (bsqset@size ${exp})) (bsqset@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_set ${exp})`);
                 }
                 else {
-                    nonnone = new SMTValue(`(bsqterm_object "${fromtype.tkey}" (store bsqentity_array_empty "bsqmap@size" (bsqmap@size ${exp})) (bsqmap@entries ${exp}))`);
+                    nonnone = new SMTValue(`(bsqterm_map ${exp})`);
                 }
 
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
@@ -345,7 +345,7 @@ class SMTTypeEmitter {
                     entarray = `(store ${entarray} "${fd.name}" ${this.coerce(new SMTValue(access), this.getMIRType(fd.declaredType), this.anyType).emit()})`;
                 }
 
-                const nonnone = new SMTLet(temp, exp, new SMTValue(`(bsqterm_object "${fromtype.tkey}" ${entarray} bsqcollection_data_array_single_empty)`));
+                const nonnone = new SMTLet(temp, exp, new SMTValue(`(bsqterm_object "${fromtype.tkey}" ${entarray})`));
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
                     return nonnone;
                 }
@@ -390,17 +390,17 @@ class SMTTypeEmitter {
 
                 if(this.isCollectionType(into)) {
                     let nonnone: SMTExp | undefined = undefined;
-                    if(this.isListType(from)) {
-                        nonnone = new SMTValue(`(cons@bsqlist (select (bsqterm_object_entries ${exp}) "bsqlist@size") (bsqterm_object_collection ${exp}))`);
+                    if(this.isListType(into)) {
+                        nonnone = new SMTValue(`(bsqterm_list_list ${exp})`);
                     }
-                    else if(this.isSetType(from)) {
-                        nonnone = new SMTValue(`(cons@bsqset (select (bsqterm_object_entries ${exp}) "bsqset@size") (bsqterm_object_collection ${exp}))`);
+                    else if(this.isSetType(into)) {
+                        nonnone = new SMTValue(`(bsqterm_set_set ${exp})`);
                     }
                     else {
-                        nonnone = new SMTValue(`(cons@bsqmap (select (bsqterm_object_entries ${exp}) "bsqmap@size") (bsqterm_object_collection ${exp}))`);
+                        nonnone = new SMTValue(`(bsqterm_map_map ${exp})`);
                     }
 
-                    if (!this.assembly.subtypeOf(this.noneType, from)) {
+                    if (!this.assembly.subtypeOf(this.noneType, into)) {
                         return nonnone;
                     }
                     else {

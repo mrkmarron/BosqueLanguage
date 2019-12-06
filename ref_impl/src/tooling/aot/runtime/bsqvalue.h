@@ -461,10 +461,10 @@ public:
 class BSQString : public BSQRef
 {
 public:
-    const std::vector<uint8_t> sdata;
+    const std::u32string sdata;
 
-    BSQString(const std::vector<uint8_t>& str) : BSQRef(), sdata(str) { ; }
-    BSQString(const std::string& str, int64_t excount) : BSQRef(excount), sdata(str.cbegin(), str.cend()) { ; }
+    BSQString(const std::u32string& str) : BSQRef(), sdata(str) { ; }
+    BSQString(const std::u32string& str, int64_t excount) : BSQRef(excount), sdata(str.cbegin(), str.cend()) { ; }
 
     virtual ~BSQString() = default;
 };
@@ -472,10 +472,10 @@ public:
 class BSQStringOf : public BSQRef
 {
 public:
-    const std::vector<uint8_t> sdata;
+    const std::u32string sdata;
     const MIRNominalTypeEnum oftype;
 
-    BSQStringOf(const std::vector<uint8_t>& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+    BSQStringOf(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
     virtual ~BSQStringOf() = default;
 };
 
@@ -1159,47 +1159,77 @@ public:
 
 class BSQSet : public BSQObject {
 public:
-    std::vector<Value> entries;
+    std::vector<std::pair<Value, Value>> entries;
 
     BSQSet(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
-    BSQSet(MIRNominalTypeEnum ntype, const std::vector<Value>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    BSQSet(MIRNominalTypeEnum ntype, const std::vector<std::pair<Value, Value>>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
     
     virtual ~BSQSet() 
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i]);
+            BSQRef::checkedDecrement(this->entries[i].first);
+            BSQRef::checkedDecrement(this->entries[i].second);
         }
     }
 
-    BSQSet* unsafeSet(const BSQInt& idx, Value v) const
+    BSQSet* unsafeSet(const BSQInt& idx, Value k, Value v) const
     {
-        std::vector<Value> nv(this->entries.size(), nullptr);
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            if(i == idx)
-            {
-                nv[i] = BSQRef::checkedIncrement(v);
-            }
-            else
-            {
-                nv[i] = BSQRef::checkedIncrement(this->entries[i]);
-            }
-        }
+        std::vector<std::pair<Value, Value>> nv(this->entries.size(), std::make_pair<Value, Value>(nullptr, nullptr));
+        std::transform(this->entries.cbegin(), this->entries.cbegin() + idx.getInt64(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
+
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        nv[idx.getInt64()] = std::make_pair(k, v);
+
+        std::transform(this->entries.cbegin() + idx.getInt64() + 1, this->entries.cend(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
 
         return new BSQSet(this->ntype, move(nv));
     }
 
-    BSQSet* unsafeAdd(const BSQInt& idx, Value v) const
+    BSQSet* destructiveSet(const BSQInt& idx, Value k, Value v)
     {
-        std::vector<Value> nv(this->entries.size() + 1, nullptr);
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            nv[i] = BSQRef::checkedIncrement(this->entries[i]);
-        }
-        nv[this->entries.size()] = BSQRef::checkedIncrement(v);
+        BSQRef::checkedDecrement(this->entries[idx.getInt64()].first);
+        BSQRef::checkedDecrement(this->entries[idx.getInt64()].second);
+
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        this->entries[idx.getInt64()] = std::make_pair(k, v);
+
+        return this;
+    }
+
+    BSQSet* unsafeAdd(Value k, Value v) const
+    {
+        std::vector<std::pair<Value, Value>> nv(this->entries.size() + 1, std::make_pair<Value, Value>(nullptr, nullptr));
+        std::transform(this->entries.cbegin(), this->entries.cend(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
+
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        nv[this->entries.size()] = std::make_pair(k, v);
 
         return new BSQSet(this->ntype, move(nv));
+    }
+
+    BSQSet* destructiveAdd(Value k, Value v)
+    {
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        this->entries.emplace_back(std::make_pair(k, v));
+
+        return this;
     }
 
     virtual std::string display() const
@@ -1227,39 +1257,60 @@ public:
     BSQMap* unsafeSet(const BSQInt& idx, Value k, Value v) const
     {
         std::vector<std::pair<Value, Value>> nv(this->entries.size(), std::make_pair<Value, Value>(nullptr, nullptr));
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            if(i == idx)
-            {
-                BSQRef::checkedIncrement(k);
-                BSQRef::checkedIncrement(v);
-                nv[i] = std::make_pair(k, v);
-            }
-            else
-            {
-                BSQRef::checkedIncrement(this->entries[i].first);
-                BSQRef::checkedIncrement(this->entries[i].second);
-                nv[i] = this->entries[i];
-            }
-        }
+        std::transform(this->entries.cbegin(), this->entries.cbegin() + idx.getInt64(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
+
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        nv[idx.getInt64()] = std::make_pair(k, v);
+
+        std::transform(this->entries.cbegin() + idx.getInt64() + 1, this->entries.cend(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
 
         return new BSQMap(this->ntype, move(nv));
     }
 
-    BSQMap* unsafeAdd(Value k, Value v)
+    BSQMap* destructiveSet(const BSQInt& idx, Value k, Value v)
     {
-       std::vector<std::pair<Value, Value>> nv(this->entries.size() + 1, std::make_pair<Value, Value>(nullptr, nullptr));
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            BSQRef::checkedIncrement(this->entries[i].first);
-            BSQRef::checkedIncrement(this->entries[i].second);
-            nv[i] = this->entries[i];
-        }
+        BSQRef::checkedDecrement(this->entries[idx.getInt64()].first);
+        BSQRef::checkedDecrement(this->entries[idx.getInt64()].second);
+
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        this->entries[idx.getInt64()] = std::make_pair(k, v);
+
+        return this;
+    }
+
+    BSQMap* unsafeAdd(Value k, Value v) const
+    {
+        std::vector<std::pair<Value, Value>> nv(this->entries.size() + 1, std::make_pair<Value, Value>(nullptr, nullptr));
+        std::transform(this->entries.cbegin(), this->entries.cend(), nv.begin(), [](const std::pair<Value, Value>& vv) {
+            BSQRef::checkedIncrement(vv.first);
+            BSQRef::checkedIncrement(vv.second);
+            return vv;
+        });
+
         BSQRef::checkedIncrement(k);
         BSQRef::checkedIncrement(v);
         nv[this->entries.size()] = std::make_pair(k, v);
 
         return new BSQMap(this->ntype, move(nv));
+    }
+
+    BSQMap* destructiveAdd(Value k, Value v)
+    {
+        BSQRef::checkedIncrement(k);
+        BSQRef::checkedIncrement(v);
+        this->entries.emplace_back(std::make_pair(k, v));
+
+        return this;
     }
 
     virtual std::string display() const
