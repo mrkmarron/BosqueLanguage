@@ -16,9 +16,9 @@
     ;;FIXED_RECORD_DECLS_FWD;;
     ;;NOMINAL_DECLS_FWD;;
       (bsqlist 0)
+      (bsqkeylist 0)
       (bsqkvp 0)
-      (bsqset 0)
-      (bsqmap 0)
+      (bsqkvcontainer 0)
     ) (
     (
       (bsqterm_none) 
@@ -31,13 +31,11 @@
       (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
       (bsqterm_idkey (bsqterm_idkey_type String) (bsqterm_idkey_value BTerm))
       (bsqterm_regex (bsqterm_regex_value String))
-      (bsqterm_tuple (bsqterm_tuple_max_length Int) (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
-      (bsqterm_record (bsqterm_record_max_properties Int) (bsqterm_record_properties (Array Int String)) (bsqterm_record_entries (Array String bsqrecord_entry)))
-      (bsqterm_array (bsqterm_array_length Int) (bsqterm_array_entries (Array Int BTerm)))
+      (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
+      (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
-      (bsqterm_list (bsqterm_list_type String) (bsqterm_list_list bsqlist))
-      (bsqterm_set (bsqterm_set_type String) (bsqterm_set_set bsqset))
-      (bsqterm_map (bsqterm_map_type String) (bsqterm_map_map bsqmap))
+      (bsqterm_list (bsqterm_list_type String) (bsqterm_list_entry bsqlist))
+      (bsqterm_kvcontainer (bsqterm_bsqkvcontainer_type String) (bsqterm_bsqkvcontainer_entry bsqkvcontainer))
     )
     ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@term BTerm)) )
     ( (bsqtuple_0@cons) )
@@ -47,9 +45,9 @@
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
     ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int BTerm))) )
-    ( (bsqkvp@clear) (bsqkvp@cons (bsqkvp@key BTerm) (bsqkvp@val BTerm)) )
-    ( (cons@bsqset$none) (cons@bsqset (bsqset@size Int) (bsqset@entries (Array Int bsqkvp))) )
-    ( (cons@bsqset$none) (cons@bsqmap (bsqmap@size Int) (bsqmap@entries (Array Int bsqkvp))) )
+    ( (cons@bsqkeylist$none) (cons@bsqkeylist (bsqkeylist@key BTerm) (bsqkeylist@tail bsqkeylist)) )
+    ( (bsqkvp@clear) (bsqkvp@value (bsqkvp@term BTerm)) )
+    ( (cons@bsqkvcontainer$none) (cons@bsqkvcontainer (bsqkvcontainer@size Int) (bsqkvcontainer@keylist bsqkeylist) (bsqkvcontainer@entries (Array BTerm bsqkvp))) )
 ))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))
@@ -71,8 +69,8 @@
 (declare-const bsqlist_data_array_empty (Array Int BTerm))
 (assert (= bsqlist_data_array_empty ((as const (Array Int BTerm)) bsqterm_none_const)))
 
-(declare-const bsqkvp_array_tuple_empty (Array Int bsqkvp))
-(assert (= bsqkvp_array_tuple_empty ((as const (Array Int bsqkvp)) bsqkvp@clear)))
+(declare-const bsqkvp_array_empty (Array Int bsqkvp))
+(assert (= bsqkvp_array_empty ((as const (Array Int bsqkvp)) bsqkvp@clear)))
 
 (declare-const mirconceptsubtypearray_empty (Array String Bool))
 (assert (= mirconceptsubtypearray_empty ((as const (Array String Bool)) false)))

@@ -36,10 +36,6 @@ class CPPBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    private compoundEqualityOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
-    private compoundLTOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
-    private compoundLTEQOps: { fkey: string, t1: MIRType, t2: MIRType }[] = [];
-
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
@@ -271,30 +267,10 @@ class CPPBodyEmitter {
             conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}});`;
         }
         else if (this.typegen.isSetType(cpcstype)) {
-            //
-            //TODO: this is performance not good want to specialize once we split check/run core impls
-            //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-
-            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], vtype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
-            }
+            xxxx;
         }
         else {
-            //
-            //TODO: this is performance not good want to specialize once we split check/run core impls
-            //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
-            const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
-            const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
-
-            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], ttype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
-            }
+           xxxx;
         }
 
         return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
@@ -395,7 +371,8 @@ class CPPBodyEmitter {
                 const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(rtype);
 
                 for (let i = 0; i < allprops.length; ++i) {
-                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);                }
+                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
+                }
             }
             else {
                 vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
@@ -405,20 +382,7 @@ class CPPBodyEmitter {
         return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.mkey)}(${vals.join(", ")});`;
     }
 
-    registerCompoundEquals(t1: MIRType, t2: MIRType): string {
-        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
-        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
-
-        const fkey = `EQUALS_${this.typegen.mangleStringForCpp(lt.trkey)}_${this.typegen.mangleStringForCpp(rt.trkey)}`;
-
-        if (this.compoundEqualityOps.findIndex((eop) => eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
-            this.compoundEqualityOps.push({ fkey: fkey, t1: lt, t2: rt });
-        }
-
-        return fkey;
-    }
-
-    generateFastEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 
@@ -432,34 +396,31 @@ class CPPBodyEmitter {
             const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
             return `(${lhsint} ${op} ${rhsint})`;
         }
-        else {
+        else if (lhsinfertype.trkey === "NSCore::String" && rhsinfertype.trkey === "NSCore::String"){
             const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
             const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
             return `(${lhsstring} ${op} ${rhsstring})`;
         }
-    }
-
-    registerCompoundLT(t1: MIRType, t2: MIRType): string {
-        const fkey = `LT_${this.typegen.mangleStringForCpp(t1.trkey)}_${this.typegen.mangleStringForCpp(t2.trkey)}`;
-
-        if (this.compoundLTOps.findIndex((eop) => eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTOps.push({ fkey: fkey, t1: t1, t2: t2 });
+        else if (lhsargtype === rhsargtype) {
+            if(this.typegen.isTupleType(lhsargtype)) {
+                xxxx;
+            }
+            else if (this.typegen.isRecordType(lhsargtype)) {
+                xxxx;
+            }
+            else if (this.typegen.isUEntityType(lhsargtype)) {
+                xxxx;
+            }
+            else {
+                return `BSQIndexableEqual(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
+            }
         }
-
-        return fkey;
-    }
-
-    registerCompoundLTEQ(t1: MIRType, t2: MIRType): string {
-        const fkey = `LTEQ_${this.typegen.mangleStringForCpp(t1.trkey)}_${this.typegen.mangleStringForCpp(t2.trkey)}`;
-
-        if (this.compoundLTEQOps.findIndex((eop) => eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTEQOps.push({ fkey: fkey, t1: t1, t2: t2 });
+        else {
+            return `BSQIndexableEqual(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
         }
-
-        return fkey;
     }
 
-    generateFastCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+    generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 
@@ -1061,50 +1022,14 @@ class CPPBodyEmitter {
 
                 const lhvtypeinfer = this.typegen.getMIRType(beq.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(beq.rhsInferType);
-
-                if ((this.typegen.isSimpleBoolType(lhvtypeinfer) && this.typegen.isSimpleBoolType(rhvtypeinfer))
-                    || (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer))
-                    || (this.typegen.isSimpleStringType(lhvtypeinfer) && this.typegen.isSimpleStringType(rhvtypeinfer))) {
-                    return `${this.varToCppName(beq.trgt)} = ${this.generateFastEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)};`;
-                }
-                else {
-                    const larg = this.argToCpp(beq.lhs, this.getArgType(beq.lhs));
-                    const rarg = this.argToCpp(beq.rhs, this.getArgType(beq.rhs));
-
-                    const compoundeq = `${this.registerCompoundEquals(lhvtypeinfer, rhvtypeinfer)}(${larg} ${rarg})`;
-                    return `${this.varToCppName(beq.trgt)} = ${beq.op === "!=" ? "!" : ""}${compoundeq};`;
-                }
+                return `${this.varToCppName(beq.trgt)} = ${this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)};`;
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
 
                 const lhvtypeinfer = this.typegen.getMIRType(bcmp.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(bcmp.rhsInferType);
-
-                if (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer)) {
-                    return `${this.varToCppName(bcmp.trgt)} = ${this.generateFastCompare(bcmp.op, lhvtypeinfer, bcmp.lhs, rhvtypeinfer, bcmp.rhs)};`;
-                }
-                else {
-                    const larg = this.argToCpp(bcmp.lhs, lhvtypeinfer);
-                    const rarg = this.argToCpp(bcmp.rhs, rhvtypeinfer);
-
-                    if (bcmp.op === "<") {
-                        const compoundlt = `${this.registerCompoundLT(lhvtypeinfer, rhvtypeinfer)}(${larg}, ${rarg})`;
-                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
-                    }
-                    else if (bcmp.op === ">") {
-                        const compoundlt = `${this.registerCompoundLT(lhvtypeinfer, rhvtypeinfer)}(${rarg}, ${larg})`;
-                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlt};`;
-                    }
-                    else if (bcmp.op === "<=") {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtypeinfer, rhvtypeinfer)}(${larg}, ${rarg})`;
-                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
-                    }
-                    else {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtypeinfer, rhvtypeinfer)}(${rarg}, ${larg})`;
-                        return `${this.varToCppName(bcmp.trgt)} = ${compoundlteq};`;
-                    }
-                }
+                return `${this.varToCppName(bcmp.trgt)} = ${this.generateCompare(bcmp.op, lhvtypeinfer, bcmp.lhs, rhvtypeinfer, bcmp.rhs)};`;
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;

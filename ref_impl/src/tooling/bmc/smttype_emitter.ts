@@ -104,6 +104,10 @@ class SMTTypeEmitter {
         return (tt.trkey.startsWith("NSCore::List<") || tt.trkey.startsWith("NSCore::Set<") || tt.trkey.startsWith("NSCore::Map<"));
     }
 
+    isKeyListType(tt: MIRType): boolean {
+        return tt.trkey === "NSCore::KeyList";
+    }
+
     isSpecialCollectionRepType(et: MIREntityTypeDecl): boolean {
         return (et.tkey.startsWith("NSCore::List<") || et.tkey.startsWith("NSCore::Set<") || et.tkey.startsWith("NSCore::Map<"));
     }
@@ -126,6 +130,10 @@ class SMTTypeEmitter {
         }
 
         if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
+            return true;
+        }
+
+        if (et.tkey === "NSCore::KeyList") {
             return true;
         }
 
@@ -204,14 +212,16 @@ class SMTTypeEmitter {
                 if (this.isListType(ttype)) {
                     return "bsqlist";
                 }
-                else if (this.isSetType(ttype)) {
-                    return "bsqset";
-                }
                 else {
-                    return "bsqmap";
+                    return "bsqkvcontainer";
                 }
             }
-            return this.mangleStringForSMT(SMTTypeEmitter.getUEntityType(ttype).ekey);
+            else if (this.isKeyListType(ttype)) {
+                return "bsqkeylist";
+            }
+            else {
+                return this.mangleStringForSMT(SMTTypeEmitter.getUEntityType(ttype).ekey);
+            }
         }
         else {
             return "BTerm";
@@ -321,11 +331,8 @@ class SMTTypeEmitter {
                 if(this.isListType(from)) {
                     nonnone = new SMTValue(`(bsqterm_list ${exp})`);
                 }
-                else if(this.isSetType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_set ${exp})`);
-                }
                 else {
-                    nonnone = new SMTValue(`(bsqterm_map ${exp})`);
+                    nonnone = new SMTValue(`(bsqterm_kvcontainer ${exp})`);
                 }
 
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
@@ -391,13 +398,10 @@ class SMTTypeEmitter {
                 if(this.isCollectionType(into)) {
                     let nonnone: SMTExp | undefined = undefined;
                     if(this.isListType(into)) {
-                        nonnone = new SMTValue(`(bsqterm_list_list ${exp})`);
-                    }
-                    else if(this.isSetType(into)) {
-                        nonnone = new SMTValue(`(bsqterm_set_set ${exp})`);
+                        nonnone = new SMTValue(`(bsqterm_list_entry ${exp})`);
                     }
                     else {
-                        nonnone = new SMTValue(`(bsqterm_map_map ${exp})`);
+                        nonnone = new SMTValue(`(bsqterm_bsqkvcontainer_entry ${exp})`);
                     }
 
                     if (!this.assembly.subtypeOf(this.noneType, into)) {

@@ -102,6 +102,10 @@ class CPPTypeEmitter {
     isCollectionType(tt: MIRType): boolean {
         return (tt.trkey.startsWith("NSCore::List<") || tt.trkey.startsWith("NSCore::Set<") || tt.trkey.startsWith("NSCore::Map<"));
     }
+    
+    isKeyListType(tt: MIRType): boolean {
+        return tt.trkey === "NSCore::KeyList";
+    }
 
     isSpecialCollectionRepType(et: MIREntityTypeDecl): boolean {
         return (et.tkey.startsWith("NSCore::List<") || et.tkey.startsWith("NSCore::Set<") || et.tkey.startsWith("NSCore::Map<"));
@@ -125,6 +129,10 @@ class CPPTypeEmitter {
         }
 
         if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
+            return true;
+        }
+        
+        if (et.tkey === "NSCore::KeyList") {
             return true;
         }
 
@@ -231,7 +239,23 @@ class CPPTypeEmitter {
             }
         }
         else if (this.isUEntityType(ttype)) {
-            return this.mangleStringForCpp(CPPTypeEmitter.getUEntityType(ttype).ekey) + (declspec !== "base" ? "*" : "");
+            if (this.isCollectionType(ttype)) {
+                if (this.isListType(ttype)) {
+                    return "BSQList" + (declspec !== "base" ? "*" : "");
+                }
+                else if (this.isSetType(ttype)) {
+                    return "BSQSet" + (declspec !== "base" ? "*" : "");
+                }
+                else {
+                    return "BSQMap" + (declspec !== "base" ? "*" : "");
+                }
+            }
+            else if (this.isKeyListType(ttype)) {
+                return "BSQKeyList" + (declspec !== "base" ? "*" : "");
+            }
+            else {
+                return this.mangleStringForCpp(CPPTypeEmitter.getUEntityType(ttype).ekey) + (declspec !== "base" ? "*" : "");
+            }
         }
         else {
             return "Value";

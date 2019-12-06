@@ -40,10 +40,6 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    private compoundEqualityOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
-    private compoundLTOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
-    private compoundLTEQOps: { fkey: string, gas: number, t1: MIRType, t2: MIRType }[] = [];
-
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
@@ -274,11 +270,8 @@ class SMTBodyEmitter {
         if (this.typegen.isListType(cpcetype)) {
             return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqlist 0 bsqlist_data_array_empty)"));
         }
-        else if (this.typegen.isSetType(cpcetype)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqset 0 bsqkvp_array_tuple_empty)"));
-        }
         else {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqmap 0 bsqkvp_array_tuple_empty)"));
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)"));
         }
     }
 
@@ -294,10 +287,10 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(cons@bsqlist ${cpcs.args.length} ${consv})`));
         }
         else if (this.typegen.isSetType(cpcstype)) {
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
             const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
 
-            let conscall = `(cons@bsqset 0 bsqkvp_array_tuple_empty)`;
+            let conscall = `(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)`;
             for (let i = 0; i < cpcs.args.length; ++i) {
                 conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], vtype).emit()})`
             }
@@ -305,12 +298,12 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
         }
         else {
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "cons_insert");
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
             const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
             const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
             const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
 
-            let conscall = "(cons@bsqmap 0 bsqkvp_array_tuple_empty)";
+            let conscall = "(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)";
             for (let i = 0; i < cpcs.args.length; ++i) {
                 conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], ttype).emit()})`
             }
@@ -450,22 +443,7 @@ class SMTBodyEmitter {
         }
     }
 
-    registerCompoundEquals(t1: MIRType, t2: MIRType): string {
-        const lt = (t1.trkey < t2.trkey) ? t1 : t2;
-        const rt = (t1.trkey < t2.trkey) ? t2 : t1;
-
-        const compoundname = `equals@${this.typegen.mangleStringForSMT(lt.trkey)}_${this.typegen.mangleStringForSMT(rt.trkey)}`;
-        const gas = this.getGasForOperation(compoundname);
-        const fkey = `${compoundname}@${gas}`;
-
-        if (this.compoundEqualityOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === lt.trkey && eop.t2.trkey === rt.trkey) === -1) {
-            this.compoundEqualityOps.push({ fkey: compoundname, gas: gas, t1: lt, t2: rt });
-        }
-
-        return fkey;
-    }
-
-    generateFastEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 
@@ -480,40 +458,22 @@ class SMTBodyEmitter {
             const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
             coreop = `(= ${lhsint} ${rhsint})`;
         }
-        else {
+        else if (lhsinfertype.trkey === "NSCore::String" && rhsinfertype.trkey === "NSCore::String") {
             const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
             const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
             coreop = `(= ${lhsstring} ${rhsstring})`;
+        }
+        else if(lhsargtype.trkey === rhsargtype.trkey) {
+            coreop = `(= ${this.argToSMT(lhs, lhsargtype).emit()} ${this.argToSMT(rhs, rhsargtype).emit()})`;
+        }
+        else {
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.anyType).emit()} ${this.argToSMT(rhs, this.typegen.anyType).emit()})`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
     }
 
-    registerCompoundLT(t1: MIRType, t2: MIRType): string {
-        const compoundname = `lt@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
-        const gas = this.getGasForOperation(compoundname);
-        const fkey = `${compoundname}@${gas}`;
-
-        if (this.compoundLTOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTOps.push({ fkey: compoundname, gas: gas, t1: t1, t2: t2 });
-        }
-
-        return fkey;
-    }
-
-    registerCompoundLTEQ(t1: MIRType, t2: MIRType): string {
-        const compoundname = `lteq@${this.typegen.mangleStringForSMT(t1.trkey)}_${this.typegen.mangleStringForSMT(t2.trkey)}`;
-        const gas = this.getGasForOperation(compoundname);
-        const fkey = `${compoundname}@${gas}`;
-
-        if (this.compoundLTEQOps.findIndex((eop) => eop.gas === gas && eop.t1.trkey === t1.trkey && eop.t2.trkey === t2.trkey) === -1) {
-            this.compoundLTEQOps.push({ fkey: compoundname, gas: gas, t1: t1, t2: t2 });
-        }
-
-        return fkey;
-    }
-
-    generateFastCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+    generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 
@@ -807,11 +767,8 @@ class SMTBodyEmitter {
                 if (oftype.ekey.startsWith("NSCore::List<")) {
                     return `(and (is-bsqterm_list ${arg}) (= (bsqterm_list_type ${arg}) "${oftype.ekey}"))`;
                 }
-                else if (oftype.ekey.startsWith("NSCore::Set<")) {
-                    return `(and (is-bsqterm_set ${arg}) (= (bsqterm_set_type ${arg}) "${oftype.ekey}"))`;
-                }
-                else if (oftype.ekey.startsWith("NSCore::Map<")) {
-                    return `(and (is-bsqterm_map ${arg}) (= (bsqterm_map_type ${arg}) "${oftype.ekey}"))`;
+                else if (oftype.ekey.startsWith("NSCore::Set<") || oftype.ekey.startsWith("NSCore::Map<")) {
+                    return `(and (is-bsqterm_kvcontainer ${arg}) (= (bsqterm_kvcontainer_type ${arg}) "${oftype.ekey}"))`;
                 }
                 else {
                     return `(and (is-bsqterm_object ${arg}) (= (bsqterm_object_type ${arg}) "${oftype.ekey}"))`;
@@ -1139,50 +1096,14 @@ class SMTBodyEmitter {
 
                 const lhvtypeinfer = this.typegen.getMIRType(beq.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(beq.rhsInferType);
-
-                if ((this.typegen.isSimpleBoolType(lhvtypeinfer) && this.typegen.isSimpleBoolType(rhvtypeinfer))
-                    || (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer))
-                    || (this.typegen.isSimpleStringType(lhvtypeinfer) && this.typegen.isSimpleStringType(rhvtypeinfer))) {
-                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateFastEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)));
-                }
-                else {
-                    const larg = this.argToSMT(beq.lhs, this.getArgType(beq.lhs));
-                    const rarg = this.argToSMT(beq.rhs, this.getArgType(beq.rhs));
-
-                    const compoundeq = `(${this.registerCompoundEquals(lhvtypeinfer, rhvtypeinfer)} ${larg.emit()} ${rarg.emit()})`;
-                    return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(beq.op === "!=" ? `(not ${compoundeq})` : compoundeq));
-                }
+                return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)));
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
 
                 const lhvtypeinfer = this.typegen.getMIRType(bcmp.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(bcmp.rhsInferType);
-
-                if (this.typegen.isSimpleIntType(lhvtypeinfer) && this.typegen.isSimpleIntType(rhvtypeinfer)) {
-                    return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateFastCompare(bcmp.op, lhvtypeinfer, bcmp.lhs, rhvtypeinfer, bcmp.rhs)));
-                }
-                else {
-                    const larg = this.argToSMT(bcmp.lhs, lhvtypeinfer).emit();
-                    const rarg = this.argToSMT(bcmp.rhs, rhvtypeinfer).emit();
-
-                    if (bcmp.op === "<") {
-                        const compoundlt = `(${this.registerCompoundLT(lhvtypeinfer, rhvtypeinfer)} ${larg} ${rarg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
-                    }
-                    else if (bcmp.op === ">") {
-                        const compoundlt = `(${this.registerCompoundLT(lhvtypeinfer, rhvtypeinfer)} ${rarg} ${larg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlt));
-                    }
-                    else if (bcmp.op === "<=") {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtypeinfer, rhvtypeinfer)} ${larg} ${rarg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
-                    }
-                    else {
-                        const compoundlteq = `(${this.registerCompoundLTEQ(lhvtypeinfer, rhvtypeinfer)} ${rarg} ${larg})`;
-                        return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(compoundlteq));
-                    }
-                }
+                return new SMTLet(this.varToSMTName(bcmp.trgt), new SMTValue(this.generateCompare(bcmp.op, lhvtypeinfer, bcmp.lhs, rhvtypeinfer, bcmp.rhs)));
             }
             case MIROpTag.MIRIsTypeOfNone: {
                 const ton = op as MIRIsTypeOfNone;
