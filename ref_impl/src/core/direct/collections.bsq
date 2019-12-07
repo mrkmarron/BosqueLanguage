@@ -73,7 +73,7 @@ entity KeyList provides Object {
     field key: KeyType;
     field tail: KeyList?;
 
-    removeKey(k: KeyType): KeyList? {
+    method removeKey(k: KeyType): KeyList? {
         if (this.tail == none || k == this.key) {
             return this.tail;
         }

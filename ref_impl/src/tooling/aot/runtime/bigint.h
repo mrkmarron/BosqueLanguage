@@ -15,7 +15,7 @@ class BigInt
 public:
     BigInt() { ; }
     BigInt(int64_t value) { ; }
-    BigInt(const char *bigstr) { ; }
+    BigInt(const char* bigstr) { ; }
 
     ~BigInt()
     {

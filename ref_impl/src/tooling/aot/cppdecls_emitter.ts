@@ -125,14 +125,14 @@ class CPPEmitter {
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
             conststring_declare.push(`static BSQString ${v};`);
-            conststring_create.push(`BSQString Runtime::${v}(std::string(${k}), 1);`);
+            conststring_create.push(`BSQString Runtime::${v}(${k}, 1);`);
         });
 
         let constint_declare: string[] = [];
         let constint_create: string[] = [];
         bodyemitter.allConstBigInts.forEach((v, k) => {
             constint_declare.push(`static BSQInt ${v};`);
-            constint_create.push(`BSQInt Runtime::${v}(BigInt(std::string(${k})));`);
+            constint_create.push(`BSQInt Runtime::${v}(BigInt(${k}));`);
         });
 
         let propertyenums: Set<string> = new Set<string>();

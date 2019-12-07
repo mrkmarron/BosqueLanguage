@@ -9,6 +9,8 @@
 #include <cstdint>
 
 #include <string>
+#include <codecvt>
+
 #include <regex>
 #include <vector>
 #include <set>

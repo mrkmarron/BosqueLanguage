@@ -19,6 +19,6 @@ public:
 
 static const char* propertyNames[];
 
-static std::string diagnostic_format(Value v);
+static std::u32string diagnostic_format(Value v);
 };
 } // namespace BSQ

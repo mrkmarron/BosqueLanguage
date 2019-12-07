@@ -466,7 +466,7 @@ public:
     const std::u32string sdata;
 
     BSQString(const std::u32string& str) : BSQRef(), sdata(str) { ; }
-    BSQString(const std::u32string& str, int64_t excount) : BSQRef(excount), sdata(str.cbegin(), str.cend()) { ; }
+    BSQString(const char* str, int64_t excount) : BSQRef(excount), sdata(std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t>().from_bytes(str)) { ; }
 
     virtual ~BSQString() = default;
 };
@@ -1082,7 +1082,7 @@ public:
     BSQObject(MIRNominalTypeEnum ntype) : BSQRef(), ntype(ntype) { ; }
     virtual ~BSQObject() = default;
 
-    virtual std::string display() const = 0;
+    virtual std::u32string display() const = 0;
 
 //%%VFIELD_DECLS
 //%%VMETHOD_DECLS
@@ -1153,9 +1153,9 @@ public:
         return this;
     }
 
-    virtual std::string display() const
+    virtual std::u32string display() const
     {
-        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+        return std::u32string(U"[SHOULD BE SPECIAL CASED IN DISPLAY]");
     }
 };
 
@@ -1172,9 +1172,9 @@ public:
         BSQRef::checkedDecrementNoneable(this->tail);
     }
 
-    virtual std::string display() const
+    virtual std::u32string display() const
     {
-        return std::string("[INTERNAL KEY LIST]");
+        return std::u32string(U"[INTERNAL KEY LIST]");
     }
 };
 
@@ -1276,7 +1276,7 @@ struct BSQIndexableEqual {
             }
             else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
             {
-                dynamic_cast<BSQStringOf*>(ptr1)->sdata == dynamic_cast<BSQStringOf*>(ptr2)->sdata;
+                return dynamic_cast<BSQStringOf*>(ptr1)->sdata == dynamic_cast<BSQStringOf*>(ptr2)->sdata;
             }
             else if(dynamic_cast<BSQGUID*>(ptr1) != nullptr && dynamic_cast<BSQGUID*>(ptr2) != nullptr)
             {
@@ -1424,9 +1424,9 @@ public:
         return new BSQSet(this->ntype, move(entries), nkeys);
     }
 
-    virtual std::string display() const
+    virtual std::u32string display() const
     {
-        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+        return std::u32string(U"[SHOULD BE SPECIAL CASED IN DISPLAY]");
     }
 };
 
@@ -1535,9 +1535,9 @@ public:
         return new BSQMap(this->ntype, move(entries), nkeys);
     }
 
-    virtual std::string display() const
+    virtual std::u32string display() const
     {
-        return std::string("[SHOULD BE SPECIAL CASED IN DISPLAY]");
+        return std::u32string(U"[SHOULD BE SPECIAL CASED IN DISPLAY]");
     }
 };
 

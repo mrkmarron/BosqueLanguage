@@ -555,10 +555,10 @@ class CPPTypeEmitter {
         this.scopectr = 0;
         const faccess = entity.fields.map((f) => this.coerce(`this->${f.name}`, this.getMIRType(f.declaredType), this.anyType));
         const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + \", \" + ") : "\" \"";
-        const display = "std::string display() const\n"
+        const display = "std::u32string display() const\n"
         + "    {\n"
         + (this.scopectr !== 0 ? `        BSQRefScope<${this.scopectr}> ${this.mangleStringForCpp("$scope$")};\n` : "")
-        + `        return std::string("${entity.tkey}{ ") + ${fjoins} + std::string(" }");\n`
+        + `        return std::u32string(U"${entity.tkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
         + "    }";
 
         return {
