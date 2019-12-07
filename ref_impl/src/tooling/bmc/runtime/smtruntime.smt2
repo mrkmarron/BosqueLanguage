@@ -7,6 +7,27 @@
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
 (declare-datatypes ( 
+      (BKeyValue 0)
+      (BKeyTuple_entry 0)
+    ) (
+    (
+      (bsqkey_none) 
+      (bsqkey_bool (bsqkey_bool_value Bool))
+      (bsqkey_int (bsqkey_int_value Int))
+      (bsqkey_string (bsqkey_string_value String))
+      (bsqkey_typedstring (bsqkey_typedstring_type String) (bsqkey_typedstring_value String))
+      (bsqkey_guid (bsqkey_guid_value String))
+      (bsqkey_enum (bsqkey_enum_type String) (bsqkey_enum_value Int))
+      (bsqkey_idkey (bsqkey_idkey_type String) (bsqkey_idkey_value BKeyValue))
+      (bsqkey_tuple (bsqkey_tuple_value (Array Int BKeyTuple_entry)))
+      (bsqkey_record (bsqkey_record_entries (Array String BKeyValue)))
+    )
+    (
+      (BKeyTuple_entry@clear) (BKeyTuple_entry@value (BKeyTuple_entry@term BKeyValue))
+    )
+))
+
+(declare-datatypes ( 
       (BTerm 0)
       (bsqtuple_entry 0)
       (bsqtuple_0 0)
@@ -29,7 +50,7 @@
       (bsqterm_podbuffer (bsqterm_podbuffer_type String) (bsqterm_podbuffer_value (Array Int Int)))
       (bsqterm_guid (bsqterm_guid_value String))
       (bsqterm_enum (bsqterm_enum_type String) (bsqterm_enum_value Int))
-      (bsqterm_idkey (bsqterm_idkey_type String) (bsqterm_idkey_value BTerm))
+      (bsqterm_idkey (bsqterm_idkey_type String) (bsqterm_idkey_value BKeyValue))
       (bsqterm_regex (bsqterm_regex_value String))
       (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
       (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
@@ -45,9 +66,9 @@
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
     ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int BTerm))) )
-    ( (cons@bsqkeylist$none) (cons@bsqkeylist (bsqkeylist@key BTerm) (bsqkeylist@tail bsqkeylist)) )
+    ( (cons@bsqkeylist$none) (cons@bsqkeylist (bsqkeylist@key BKeyValue) (bsqkeylist@tail bsqkeylist)) )
     ( (bsqkvp@clear) (bsqkvp@value (bsqkvp@term BTerm)) )
-    ( (cons@bsqkvcontainer$none) (cons@bsqkvcontainer (bsqkvcontainer@size Int) (bsqkvcontainer@keylist bsqkeylist) (bsqkvcontainer@entries (Array BTerm bsqkvp))) )
+    ( (cons@bsqkvcontainer$none) (cons@bsqkvcontainer (bsqkvcontainer@size Int) (bsqkvcontainer@keylist bsqkeylist) (bsqkvcontainer@entries (Array BKeyValue bsqkvp))) )
 ))
 
 (declare-const bsqterm_none_const BTerm) (assert (= bsqterm_none_const bsqterm_none))
@@ -59,9 +80,6 @@
 
 (declare-const bsqrecord_array_empty (Array String bsqrecord_entry))
 (assert (= bsqrecord_array_empty ((as const (Array String bsqrecord_entry)) bsqrecord_entry@clear)))
-
-(declare-const bsqrecord_prop_array_empty (Array Int String))
-(assert (= bsqrecord_prop_array_empty ((as const (Array Int String)) "")))
 
 (declare-const bsqentity_array_empty (Array String BTerm))
 (assert (= bsqentity_array_empty ((as const (Array String BTerm)) bsqterm_none_const)))

@@ -167,6 +167,7 @@ class CPPEmitter {
         const restype = typeemitter.getMIRType(entrypoint.resultType);
         const mainsig = `int main(int argc, char** argv)`;
         const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
+        const convdecl = "    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;";
         const convargs = entrypoint.params.map((p, i) => {
             if(p.type === "NSCore::Bool") {
                 const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
@@ -179,7 +180,7 @@ class CPPEmitter {
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
-                const conv = `BSQString ${p.name}(std::string(argv[${i}+1]), 1);`;
+                const conv = `BSQString ${p.name}(argv[${i}+1], 1);`;
                 return "    " + conv;
             }
         });
@@ -210,7 +211,7 @@ class CPPEmitter {
         
         typeemitter.scopectr = 0;
         const callv = `${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
-        const fcall = `fprintf(stdout, "%s\\n", Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}).c_str())`;
+        const fcall = `std::cout << conv.to_bytes(Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)})) << "\\n"`;
 
         if(typeemitter.scopectr !== 0) {
             const scopevar = bodyemitter.varNameToCppName("$scope$");
@@ -219,7 +220,7 @@ class CPPEmitter {
             scopev = scopev + " " + refscope;
         }
 
-        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
+        const maincall = `${mainsig} {\n${chkarglen}\n\n${convdecl}\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),

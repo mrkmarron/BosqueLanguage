@@ -9,6 +9,7 @@
 #include <cstdint>
 
 #include <string>
+#include <iostream>
 #include <codecvt>
 
 #include <regex>

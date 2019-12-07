@@ -1345,11 +1345,11 @@ public:
         {
             BSQRef::checkedIncrement(iter->first);
             BSQRef::checkedIncrement(iter->second);
-            entries.insert(iter->first, iter->second);
+            entries.insert(*iter);
         }
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         BSQRef::checkedIncrementNoneable(nkeys);
 
@@ -1360,7 +1360,7 @@ public:
     {
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         BSQRef::checkedDecrementNoneable(this->keys);
         BSQRef::checkedIncrementNoneable(nkeys);
@@ -1379,13 +1379,13 @@ public:
             {
                 BSQRef::checkedIncrement(key);
                 BSQRef::checkedIncrement(val);
-                entries.insert(key, val);
+                entries.insert(std::make_pair(key, val));
             }
             else
             {
                 BSQRef::checkedIncrement(iter->first);
                 BSQRef::checkedIncrement(iter->second);
-                entries.insert(iter->first, iter->second);
+                entries.insert(*iter);
             }
         }
         BSQRef::checkedIncrementNoneable(this->keys);
@@ -1401,7 +1401,7 @@ public:
 
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         return this;
     }
@@ -1416,7 +1416,7 @@ public:
             {
                 BSQRef::checkedIncrement(iter->first);
                 BSQRef::checkedIncrement(iter->second);
-                entries.insert(iter->first, iter->second);
+                entries.insert(*iter);
             }
         }
         BSQRef::checkedIncrementNoneable(nkeys);
@@ -1456,11 +1456,11 @@ public:
         {
             BSQRef::checkedIncrement(iter->first);
             BSQRef::checkedIncrement(iter->second);
-            entries.insert(iter->first, iter->second);
+            entries.insert(*iter);
         }
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         BSQRef::checkedIncrementNoneable(nkeys);
 
@@ -1471,7 +1471,7 @@ public:
     {
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         BSQRef::checkedDecrementNoneable(this->keys);
         BSQRef::checkedIncrementNoneable(nkeys);
@@ -1490,13 +1490,13 @@ public:
             {
                 BSQRef::checkedIncrement(key);
                 BSQRef::checkedIncrement(val);
-                entries.insert(key, val);
+                entries.insert(std::make_pair(key, val));
             }
             else
             {
                 BSQRef::checkedIncrement(iter->first);
                 BSQRef::checkedIncrement(iter->second);
-                entries.insert(iter->first, iter->second);
+                entries.insert(*iter);
             }
         }
         BSQRef::checkedIncrementNoneable(this->keys);
@@ -1512,7 +1512,7 @@ public:
 
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(key, val);
+        entries.insert(std::make_pair(key, val));
 
         return this;
     }
@@ -1527,7 +1527,7 @@ public:
             {
                 BSQRef::checkedIncrement(iter->first);
                 BSQRef::checkedIncrement(iter->second);
-                entries.insert(iter->first, iter->second);
+                entries.insert(*iter);
             }
         }
         BSQRef::checkedIncrementNoneable(nkeys);

@@ -93,7 +93,6 @@ else if ((Commander.symbolic || Commander.result) !== undefined) {
             .replace(";;CONCEPT_SUBTYPE_RELATION_DECLARE;;", sparams.conceptSubtypeRelation)
             .replace(";;NOMINAL_RESULT_FWD;;", "  " + sparams.resultdecls_fwd)
             .replace(";;NOMINAL_RESULT;;", "  " + sparams.resultdecls)
-            .replace(";;STRING_DECLS;;", "  " + sparams.stringdecls)
             .replace(";;SUBTYPE_DECLS;;", sparams.typechecks)
             .replace(";;FUNCTION_DECLS;;", "  " + sparams.function_decls)
             .replace(";;ARG_VALUES;;", sparams.args_info)

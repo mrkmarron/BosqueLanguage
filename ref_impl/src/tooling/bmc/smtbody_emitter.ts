@@ -22,8 +22,6 @@ class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
 
-    readonly allConstStrings: Map<string, string> = new Map<string, string>();
-
     private errorCodes = new Map<string, number>();
     private bmcCodes = new Map<string, number>();
     private bmcGas = new Map<string, number>();
@@ -135,13 +133,7 @@ class SMTBodyEmitter {
         else {
             assert(cval instanceof MIRConstantString);
 
-            const sval = (cval as MIRConstantString).value;
-            const sname = "str@" + this.allConstStrings.size;
-            if (!this.allConstStrings.has(sval)) {
-                this.allConstStrings.set(sval, sname);
-            }
-
-            return new SMTValue(this.allConstStrings.get(sval) as string);
+            return new SMTValue((cval as MIRConstantString).value);
         }
     }
 
