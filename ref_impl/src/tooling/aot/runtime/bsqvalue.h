@@ -1180,33 +1180,248 @@ public:
 
 struct BSQIndexableHash {
     size_t operator()(const Value& v) const {
-        return 0;
+        if(BSQ_IS_VALUE_NONE(v))
+        {
+            return 0;
+        }
+        else if(BSQ_IS_VALUE_INT(v))
+        {
+            return BSQ_GET_VALUE_INT(v);
+        }
+        else
+        {
+            auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef); 
+            if(dynamic_cast<BSQBoxedInt*>(ptr) != nullptr)
+            {
+                auto bi = dynamic_cast<BSQBoxedInt*>(ptr);
+                return bi->data.isInt() ? bi->data.getInt64() : bi->data.getBigInt()->hash();
+            }
+            else if(dynamic_cast<BSQStringOf*>(ptr) != nullptr)
+            {
+                return std::hash<std::u32string>{}(dynamic_cast<BSQStringOf*>(ptr)->sdata);
+            }
+            else if(dynamic_cast<BSQGUID*>(ptr) != nullptr)
+            {
+                //TODO: hashcode
+                return 0;
+            }
+            else if(dynamic_cast<BSQEnum*>(ptr) != nullptr)
+            {
+                //TODO: hashcode
+                return 0;
+            }
+            else if(dynamic_cast<BSQIdKey*>(ptr) != nullptr)
+            {
+                //TODO: hashcode
+                return 0;
+            }
+            else if(dynamic_cast<BSQTuple*>(ptr) != nullptr)
+            {
+                auto t = dynamic_cast<BSQTuple*>(ptr);
+                size_t h = t->entries.size();
+                for(size_t i = 0; i < t->entries.size(); ++i)
+                {
+                    BSQIndexableHash hh;
+                    h = h ^ (hh(t->entries[i]) << 1);
+                }
+                return h;
+            }
+            else 
+            {
+                auto r = dynamic_cast<BSQRecord*>(ptr);
+                size_t h = r->entries.size();
+                for(size_t i = 0; i < r->entries.size(); ++i)
+                {
+                    BSQIndexableHash hh;
+                    h = h ^ ((size_t)r->entries[i].first << 32) ^ (hh(r->entries[i].second) << 1);
+                }
+                return h;
+            }
+        }
     }
 };
 
-
 struct BSQIndexableEqual {
     bool operator()(const Value& v1, const Value& v2) const {
-        return 0;
+        if(BSQ_IS_VALUE_NONE(v1) || BSQ_IS_VALUE_NONE(v2))
+        {
+            return BSQ_IS_VALUE_NONE(v1) && BSQ_IS_VALUE_NONE(v2);
+        }
+        else if(BSQ_IS_VALUE_INT(v1) || BSQ_IS_VALUE_INT(v2))
+        {
+            if(BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_INT(v2))
+            {
+                return BSQ_GET_VALUE_INT(v1) == BSQ_GET_VALUE_INT(v2);
+            }
+            else if (BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_PTR(v2) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef)) != nullptr)
+            {
+                return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
+            }
+            else if (BSQ_IS_VALUE_PTR(v1) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef)) != nullptr && BSQ_IS_VALUE_INT(v2))
+            {
+                return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else
+        {
+            auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
+            auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef); 
+            if(dynamic_cast<BSQBoxedInt*>(ptr1) != nullptr && dynamic_cast<BSQBoxedInt*>(ptr2) != nullptr)
+            {
+                return dynamic_cast<BSQBoxedInt*>(ptr1)->data == dynamic_cast<BSQBoxedInt*>(ptr2)->data;
+            }
+            else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
+            {
+                dynamic_cast<BSQStringOf*>(ptr1)->sdata == dynamic_cast<BSQStringOf*>(ptr2)->sdata;
+            }
+            else if(dynamic_cast<BSQGUID*>(ptr1) != nullptr && dynamic_cast<BSQGUID*>(ptr2) != nullptr)
+            {
+                //TODO: equals
+                return false;
+            }
+            else if(dynamic_cast<BSQEnum*>(ptr1) != nullptr && dynamic_cast<BSQEnum*>(ptr2) != nullptr)
+            {
+                //TODO: equals
+                return false;
+            }
+            else if(dynamic_cast<BSQIdKey*>(ptr1) != nullptr && dynamic_cast<BSQIdKey*>(ptr2) != nullptr)
+            {
+                //TODO: equals
+                return false;
+            }
+            else if(dynamic_cast<BSQTuple*>(ptr1) != nullptr && dynamic_cast<BSQTuple*>(ptr2) != nullptr)
+            {
+                auto t1 = dynamic_cast<BSQTuple*>(ptr1);
+                auto t2 = dynamic_cast<BSQTuple*>(ptr2);
+                return std::equal(t1->entries.cbegin(), t1->entries.cend(), t2->entries.cbegin(), t2->entries.cend(), [](const Value& a, const Value& b) {
+                    BSQIndexableEqual eq;
+                    return eq(a, b); 
+                });
+            }
+            else if(dynamic_cast<BSQRecord*>(ptr1) != nullptr && dynamic_cast<BSQRecord*>(ptr2) != nullptr)
+            {
+                auto r1 = dynamic_cast<BSQRecord*>(ptr1);
+                auto r2 = dynamic_cast<BSQRecord*>(ptr2);
+                return std::equal(r1->entries.cbegin(), r1->entries.cend(), r2->entries.cbegin(), r2->entries.cend(), [](const std::pair<MIRPropertyEnum, Value>& a, const std::pair<MIRPropertyEnum, Value>& b) {
+                    BSQIndexableEqual eq;
+                    return a.first == b.first && eq(a.second, b.second); 
+                });
+            }
+            else 
+            {
+                return false;
+            }
+        }
     }
 };
 
 class BSQSet : public BSQObject {
 public:
-    std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> set;
+    std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
     BSQKeyList* keys;
 
-    BSQSet(MIRNominalTypeEnum ntype) : BSQObject(ntype), set(), keys(nullptr) { ; }
-    BSQSet(MIRNominalTypeEnum ntype, std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> set, BSQKeyList* keys) : BSQObject(ntype), set(move(set)), keys(keys) { ; }
+    BSQSet(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries(), keys(nullptr) { ; }
+    BSQSet(MIRNominalTypeEnum ntype, std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual>&& entries, BSQKeyList* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
 
     virtual ~BSQSet()
     {
-        for(auto iter = this->set.begin(); iter != this->set.end(); ++iter)
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
             BSQRef::checkedDecrement(iter->first);
             BSQRef::checkedDecrement(iter->second);
         }
         BSQRef::checkedDecrementNoneable(keys);
+    }
+
+    BSQSet* add(Value key, Value val, BSQKeyList* nkeys)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            BSQRef::checkedIncrement(iter->first);
+            BSQRef::checkedIncrement(iter->second);
+            entries.insert(iter->first, iter->second);
+        }
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        BSQRef::checkedIncrementNoneable(nkeys);
+
+        return new BSQSet(this->ntype, move(entries), nkeys);
+    }
+
+    BSQSet* destructiveAdd(Value key, Value val, BSQKeyList* nkeys)
+    {
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        BSQRef::checkedDecrementNoneable(this->keys);
+        BSQRef::checkedIncrementNoneable(nkeys);
+        this->keys = nkeys;
+
+        return this;
+    }
+
+    BSQSet* update(Value key, Value val)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            if(eq(key, iter->first))
+            {
+                BSQRef::checkedIncrement(key);
+                BSQRef::checkedIncrement(val);
+                entries.insert(key, val);
+            }
+            else
+            {
+                BSQRef::checkedIncrement(iter->first);
+                BSQRef::checkedIncrement(iter->second);
+                entries.insert(iter->first, iter->second);
+            }
+        }
+        BSQRef::checkedIncrementNoneable(this->keys);
+
+        return new BSQSet(this->ntype, move(entries), this->keys);
+    }
+
+    BSQSet* destructiveUpdate(Value key, Value val)
+    {
+        auto iter = this->entries.find(key);
+        BSQRef::checkedDecrement(iter->first);
+        BSQRef::checkedDecrement(iter->second);
+
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        return this;
+    }
+
+    BSQSet* clearKey(Value key, BSQKeyList* nkeys)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            if(!eq(key, iter->first)) 
+            {
+                BSQRef::checkedIncrement(iter->first);
+                BSQRef::checkedIncrement(iter->second);
+                entries.insert(iter->first, iter->second);
+            }
+        }
+        BSQRef::checkedIncrementNoneable(nkeys);
+
+        return new BSQSet(this->ntype, move(entries), nkeys);
     }
 
     virtual std::string display() const
@@ -1217,20 +1432,107 @@ public:
 
 class BSQMap : public BSQObject {
 public:
-    std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> map;
+    std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
     BSQKeyList* keys;
 
-    BSQMap(MIRNominalTypeEnum ntype) : BSQObject(ntype), map(), keys(nullptr) { ; }
-    BSQMap(MIRNominalTypeEnum ntype, std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> set, BSQKeyList* keys) : BSQObject(ntype), map(move(map)), keys(keys) { ; }
+    BSQMap(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries(), keys(nullptr) { ; }
+    BSQMap(MIRNominalTypeEnum ntype, std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual>&& entries, BSQKeyList* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
 
     virtual ~BSQMap()
     {
-        for(auto iter = this->map.begin(); iter != this->map.end(); ++iter)
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
             BSQRef::checkedDecrement(iter->first);
             BSQRef::checkedDecrement(iter->second);
         }
         BSQRef::checkedDecrementNoneable(keys);
+    }
+
+    BSQMap* add(Value key, Value val, BSQKeyList* nkeys)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            BSQRef::checkedIncrement(iter->first);
+            BSQRef::checkedIncrement(iter->second);
+            entries.insert(iter->first, iter->second);
+        }
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        BSQRef::checkedIncrementNoneable(nkeys);
+
+        return new BSQMap(this->ntype, move(entries), nkeys);
+    }
+
+    BSQMap* destructiveAdd(Value key, Value val, BSQKeyList* nkeys)
+    {
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        BSQRef::checkedDecrementNoneable(this->keys);
+        BSQRef::checkedIncrementNoneable(nkeys);
+        this->keys = nkeys;
+
+        return this;
+    }
+
+    BSQMap* update(Value key, Value val)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            if(eq(key, iter->first))
+            {
+                BSQRef::checkedIncrement(key);
+                BSQRef::checkedIncrement(val);
+                entries.insert(key, val);
+            }
+            else
+            {
+                BSQRef::checkedIncrement(iter->first);
+                BSQRef::checkedIncrement(iter->second);
+                entries.insert(iter->first, iter->second);
+            }
+        }
+        BSQRef::checkedIncrementNoneable(this->keys);
+
+        return new BSQMap(this->ntype, move(entries), this->keys);
+    }
+
+    BSQMap* destructiveUpdate(Value key, Value val)
+    {
+        auto iter = this->entries.find(key);
+        BSQRef::checkedDecrement(iter->first);
+        BSQRef::checkedDecrement(iter->second);
+
+        BSQRef::checkedIncrement(key);
+        BSQRef::checkedIncrement(val);
+        entries.insert(key, val);
+
+        return this;
+    }
+
+    BSQMap* clearKey(Value key, BSQKeyList* nkeys)
+    {
+        BSQIndexableEqual eq;
+        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
+        {
+            if(!eq(key, iter->first)) 
+            {
+                BSQRef::checkedIncrement(iter->first);
+                BSQRef::checkedIncrement(iter->second);
+                entries.insert(iter->first, iter->second);
+            }
+        }
+        BSQRef::checkedIncrementNoneable(nkeys);
+
+        return new BSQMap(this->ntype, move(entries), nkeys);
     }
 
     virtual std::string display() const

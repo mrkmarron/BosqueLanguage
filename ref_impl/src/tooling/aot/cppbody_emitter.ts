@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -267,7 +267,16 @@ class CPPBodyEmitter {
             conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}});`;
         }
         else if (this.typegen.isSetType(cpcstype)) {
-            xxxx;
+            //
+            //TODO: this is performance terrible want to specialize once we split check/run core impls
+            //
+            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
+            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+
+            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
+            for (let i = 0; i < cpcs.args.length; ++i) {
+                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], vtype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
+            }
         }
         else {
            xxxx;
@@ -403,15 +412,15 @@ class CPPBodyEmitter {
         }
         else if (lhsargtype === rhsargtype) {
             if(this.typegen.isTupleType(lhsargtype)) {
-                xxxx;
+                return NOT_IMPLEMENTED<string>("Not Implemented -- equals tuple");
             }
             else if (this.typegen.isRecordType(lhsargtype)) {
-                xxxx;
-            }
-            else if (this.typegen.isUEntityType(lhsargtype)) {
-                xxxx;
+                return NOT_IMPLEMENTED<string>("Not Implemented -- equals record");
             }
             else {
+                //
+                //TODO: there are a number of options here for things like enum or typed string that we can handle better
+                //
                 return `BSQIndexableEqual(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
             }
         }
@@ -1613,107 +1622,115 @@ class CPPBodyEmitter {
 
         let bodystr = ";";
         switch (idecl.implkey) {
-            case "_listsize": {
+            case "list_size": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
+                break;
             }
-            case "_listunsafe_at": {
+            case "list_unsafe_at": {
                 bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()]`, this.typegen.anyType, rtype) + ";";
+                break;
             }
-            case "_listunsafe_set": {
+            case "list_unsafe_set": {
                 bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+                break;
             }
-            case "_listdestructive_add": {
+            case "list_destructive_add": {
                 bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
+                break;
             }
-            case "_setsize": {
+            case "set_size":
+            case "map_size": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
+                break;
             }
-            case "_setunsafe_at_key": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].first`, this.typegen.anyType, rtype) + ";";
+            case "set_has_key":
+            case "map_has_key": {
+                bodystr = "auto _return_ = " + `${params[0]}->entries.find(${params[1]}) != ${params[0]}->entries.cend()` + ";";
+                break;
             }
-            case "_setunsafe_at_val": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].second`, this.typegen.anyType, rtype) + ";";
+            case "set_at_val":
+            case "map_at_val": {
+                bodystr = "auto _return_ = " + this.typegen.coerce(`(${params[0]}->entries.find(${params[1]}))->second`, this.typegen.anyType, rtype) + ";";
+                break;
             }
-            case "_setunsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
+            case "set_get_keylist":
+            case "map_get_keylist": {
+                bodystr = "auto _return_ = " + `${params[0]}->keys` + ";";
+                break;
             }
-            case "_setdestructive_set": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
+            case "set_clear_val": 
+            case "map_clear_val": {
+                bodystr = "auto _return_ = " + `${params[0]}->clearKey(${params[1]}, ${params[2]})` + ";";
+                break;
             }
-            case "_setunsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+            case "set_unsafe_update":  
+            case "map_unsafe_update": {
+                bodystr = "auto _return_ = " + `${params[0]}->update(${params[1]}, ${params[2]})` + ";";
+                break;
             }
-            case "_setdestructive_add": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+            case "set_destuctive_update":
+            case "map_destuctive_update": {
+                bodystr = "auto _return_ = " + `${params[0]}->destructiveUpdate(${params[1]}, ${params[2]})` + ";";
+                break;
             }
-            case "_mapsize": {
-                bodystr = `auto _return_ = ${params[0]}->entries.size();`
+            case "set_unsafe_add":  
+            case "map_unsafe_add": {
+                bodystr = "auto _return_ = " + `${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]})` + ";";
+                break;
             }
-            case "_mapunsafe_at_key": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].first`, this.typegen.anyType, rtype) + ";";
-            }
-            case "_mapunsafe_at_val": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()].second`, this.typegen.anyType, rtype) + ";";
-            }
-            case "_mapunsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
-            }
-            case "_mapdestructive_set": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${this.typegen.coerce(params[3], this.typegen.getMIRType(idecl.params[3].type), this.typegen.anyType)});`
-            }
-            case "_mapunsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
-            }
-            case "_mapdestructive_add": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
+            case "set_destuctive_add":
+            case "map_destuctive_add": {
+                bodystr = "auto _return_ = " + `${params[0]}->destructiveAdd(${params[1]}, ${params[2]}, ${params[3]})` + ";";
+                break;
             }
             default: {
-                bodystr = `[Builtin not defined -- ${idecl.iname}]`
+                bodystr = `[Builtin not defined -- ${idecl.iname}]`;
+                break;
             }
+        }
 
-            const refscope = (this.typegen.scopectr !== 0 ? `BSQRefScope<${this.typegen.scopectr}> ${scopevar};` : ";");
-            let returnmgr = "";
-            if (this.typegen.maybeRefableCountableType(this.currentRType)) {
-                if(this.typegen.isTupleType(this.currentRType)) {
-                    const procs: string[] = [];
-                    const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                    for (let i = 0; i < maxlen; ++i) {
-                        const cvn = this.varNameToCppName(`$callerslot$${i}`);
-                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedTupleAccessor(i)});`);
-                    }
-                    returnmgr = procs.join(" ");
+        const refscope = (this.typegen.scopectr !== 0 ? `BSQRefScope<${this.typegen.scopectr}> ${scopevar};` : ";");
+        let returnmgr = "";
+        if (this.typegen.maybeRefableCountableType(this.currentRType)) {
+            if (this.typegen.isTupleType(this.currentRType)) {
+                const procs: string[] = [];
+                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
+                for (let i = 0; i < maxlen; ++i) {
+                    const cvn = this.varNameToCppName(`$callerslot$${i}`);
+                    procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedTupleAccessor(i)});`);
                 }
-                else if(this.typegen.isRecordType(this.currentRType)) {
-                    const procs: string[] = [];
-                    const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                    for (let i = 0; i < allprops.length; ++i) {
-                        const cvn = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                        if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, allprops[i])});`);
-                        }
-                        else {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(allprops[i])});`);
-                        }
-                    }
-                    returnmgr = procs.join(" ");
-                }
-                else if (this.typegen.isUEntityType(this.currentRType)) {
-                    const cslotvar = this.varNameToCppName("$callerslot$");
-                    if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
-                        returnmgr = `BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`;
+                returnmgr = procs.join(" ");
+            }
+            else if (this.typegen.isRecordType(this.currentRType)) {
+                const procs: string[] = [];
+                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
+                for (let i = 0; i < allprops.length; ++i) {
+                    const cvn = this.varNameToCppName(`$callerslot$${allprops[i]}`);
+                    if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
+                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, allprops[i])});`);
                     }
                     else {
-                        returnmgr = `BSQRefScopeMgr::processCallReturnFast(${cslotvar}, _return_);`;
+                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(allprops[i])});`);
                     }
                 }
+                returnmgr = procs.join(" ");
+            }
+            else if (this.typegen.isUEntityType(this.currentRType)) {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
+                    returnmgr = `BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`;
+                }
                 else {
-                    const cslotvar = this.varNameToCppName("$callerslot$");
-                    returnmgr = `BSQRefScopeMgr::processCallRefAny(${cslotvar}, _return_);`;
+                    returnmgr = `BSQRefScopeMgr::processCallReturnFast(${cslotvar}, _return_);`;
                 }
             }
-
-            return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n";
+            else {
+                const cslotvar = this.varNameToCppName("$callerslot$");
+                returnmgr = `BSQRefScopeMgr::processCallRefAny(${cslotvar}, _return_);`;
+            }
         }
+
+        return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n";
     }
 }
 

@@ -137,14 +137,16 @@ std::string Runtime::diagnostic_format(Value v)
             {
                 auto set = dynamic_cast<const BSQSet*>(obj);
                 std::string ss("{");
-                for (size_t i = 0; i < set->entries.size(); ++i)
+                bool first = true;
+                for (auto iter = set->entries.cbegin(); iter != set->entries.cend(); ++iter)
                 {
-                    if (i != 0)
+                    if (!first)
                     {
                         ss += ", ";
                     }
+                    first = false;
 
-                    ss += Runtime::diagnostic_format(set->entries.at(i));
+                    ss += Runtime::diagnostic_format(iter->second);
                 }
                 ss += "}";
 
@@ -154,14 +156,16 @@ std::string Runtime::diagnostic_format(Value v)
             {
                 auto map = dynamic_cast<const BSQMap*>(vv);
                 std::string ms("{");
-                for (size_t i = 0; i < map->entries.size(); ++i)
+                bool first = true;
+                for (auto iter = map->entries.cbegin(); iter != map->entries.cend(); ++iter)
                 {
-                    if (i != 0)
+                    if (!first)
                     {
                         ms += ", ";
                     }
+                    first = false;
 
-                    ms += Runtime::diagnostic_format(map->entries.at(i).first) + "->" + Runtime::diagnostic_format(map->entries.at(i).second);
+                    ms += Runtime::diagnostic_format(iter->second);
                 }
                 ms += "}";
 

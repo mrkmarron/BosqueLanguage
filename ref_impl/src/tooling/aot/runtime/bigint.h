@@ -22,6 +22,11 @@ public:
         this->release();
     }
 
+    size_t hash() const
+    {
+        return 0;
+    }
+
     BigInt* copy() const
     {
         return nullptr;

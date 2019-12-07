@@ -11,10 +11,10 @@ namespace NSCore;
 //TODO: this is where we want to use POD when T POD
 //
 entity List<T> provides Object {
-    hidden static _size(l: List<T>): Int # _listsize
-    hidden static _unsafe_at(l: List<T>, i: Int): T # _listunsafe_at
-    hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # _listunsafe_set
-    hidden static _destructive_add(l: List<T>, v: T): List<T> # _listdestructive_add
+    hidden static _size(l: List<T>): Int # list_size
+    hidden static _unsafe_at(l: List<T>, i: Int): T # list_unsafe_at
+    hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # list_unsafe_set
+    hidden static _destructive_add(l: List<T>, v: T): List<T> # list_destructive_add
 
     hidden recursive static _filter(l: List<T>, idx: Int, lp: List<T>, p: recursive? fn(_: T) -> Bool): List<T> {
         if(idx == List<T>::_size(l)) {
