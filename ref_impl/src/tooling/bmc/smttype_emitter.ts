@@ -20,6 +20,8 @@ class SMTTypeEmitter {
     readonly intType: MIRType;
     readonly stringType: MIRType;
 
+    readonly keyType: MIRType;
+
     private tempconvctr = 0;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -34,6 +36,8 @@ class SMTTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+
+        this.keyType = assembly.typeMap.get("NSCore::KeyType") as MIRType;
     }
 
     mangleStringForSMT(name: string): string {
@@ -49,6 +53,10 @@ class SMTTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
+    isSimpleNoneType(tt: MIRType): boolean {
+        return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::None";
+    }
+
     isSimpleBoolType(tt: MIRType): boolean {
         return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Bool";
     }
@@ -59,6 +67,34 @@ class SMTTypeEmitter {
 
     isSimpleStringType(tt: MIRType): boolean {
         return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::String";
+    }
+
+    isKeyType(tt: MIRType): boolean {
+        return tt.options.every((topt) => {
+            if(topt.trkey === "NSCore::KeyType") {
+                return true;
+            }
+
+            if(!(topt instanceof MIREntityType)) {
+                return false;
+            }
+
+            const eopt = topt as MIREntityType;
+            if(eopt.ekey === "NSCore::None" || eopt.ekey === "NSCore::Bool" || eopt.ekey === "NSCore::Int" || eopt.ekey === "NSCore::String" || eopt.ekey === "NSCore::GUID") {
+                return true;
+            } 
+
+            if(eopt.ekey.startsWith("NSCore::StringOf<")) {
+                return true;
+            }
+
+            const edecl = this.assembly.entityDecls.get(eopt.ekey) as MIREntityTypeDecl;
+            if (edecl.provides.includes("NSCore::Enum") || edecl.provides.includes("NSCore::IdKey")) {
+                return true;
+            }
+
+            return false;
+        });
     }
 
     isTupleType(tt: MIRType): boolean {
@@ -207,6 +243,9 @@ class SMTTypeEmitter {
         else if (this.isRecordType(ttype)) {
             return "bsqrecord_" + this.generateRecordTypePropertyName(ttype);
         }
+        else if (this.isKeyType(ttype)) {
+            return "BKeyValue";
+        }
         else if (this.isUEntityType(ttype)) {
             if (this.isCollectionType(ttype)) {
                 if (this.isListType(ttype)) {
@@ -234,21 +273,57 @@ class SMTTypeEmitter {
         }
 
         if (from.trkey === "NSCore::None") {
-            if (this.isUEntityType(into)) {
+            if(this.isKeyType(into)) {
+                return new SMTValue(`bsqkey_none`);
+            }
+            else if (this.isUEntityType(into)) {
                 return new SMTValue(this.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(into).ekey));
             }
             else {
-                return new SMTValue("bsqterm_none_const");
+                return new SMTValue("(bsqterm_key bsqkey_none)");
             }
         }
         else if (this.isSimpleBoolType(from)) {
-            return new SMTValue(`(bsqterm_bool ${exp.emit()})`);
+            if(this.isKeyType(into)) {
+                return new SMTValue(`(bsqkey_bool ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_key (bsqkey_bool ${exp.emit()}))`);
+            }
         }
         else if (this.isSimpleIntType(from)) {
-            return new SMTValue(`(bsqterm_int ${exp.emit()})`);
+            if(this.isKeyType(into)) {
+                return new SMTValue(`(bsqkey_int ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_key (bsqkey_int ${exp.emit()}))`);
+            }
         }
         else if (this.isSimpleStringType(from)) {
-            return new SMTValue(`(bsqterm_string ${exp.emit()})`);
+            if(this.isKeyType(into)) {
+                return new SMTValue(`(bsqkey_string ${exp.emit()})`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()})`);
+            }
+        }
+        else if (this.isKeyType(from)) {
+            if (this.isSimpleBoolType(into)) {
+                return new SMTValue(`(bsqkey_bool_value ${exp.emit()})`);
+            }
+            else if (this.isSimpleIntType(into)) {
+                return new SMTValue(`(bsqkey_int_value ${exp.emit()})`);
+            }
+            else if (this.isSimpleStringType(into)) {
+                return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
+            }
+            else if (this.isUEntityType(into)) {
+                //the only possible overlap is in the none type so just provide that
+                return new SMTValue(`bsqkey_none`);
+            }
+            else {
+                return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            }
         }
         else if (this.isTupleType(from)) {
             const fromsize = SMTTypeEmitter.getTupleTypeMaxLength(from);
@@ -336,9 +411,13 @@ class SMTTypeEmitter {
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
                     return nonnone as SMTExp;
                 }
+                else if(this.isKeyType(into)) {
+                    //the only possible overlap is in the none type so just provide that
+                    return new SMTValue(`bsqkey_none`);
+                }
                 else {
                     const isnonetest = new SMTValue(`(is-${this.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(from).ekey)} ${exp})`);
-                    return new SMTCond(isnonetest, new SMTValue("bsqterm_none_const"), nonnone as SMTExp);
+                    return new SMTCond(isnonetest, this.coerce(new SMTValue("bsqkey_none"), this.anyType, into), nonnone as SMTExp);
                 }
             }
             else {
@@ -354,9 +433,13 @@ class SMTTypeEmitter {
                 if (!this.assembly.subtypeOf(this.noneType, into)) {
                     return nonnone;
                 }
+                else if(this.isKeyType(into)) {
+                    //the only possible overlap is in the none type so just provide that
+                    return new SMTValue(`bsqkey_none`);
+                }
                 else {
                     const isnonetest = new SMTValue(`(is-${this.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(from).ekey)} ${exp})`);
-                    return new SMTCond(isnonetest, new SMTValue("bsqterm_none_const"), nonnone);
+                    return new SMTCond(isnonetest, this.coerce(new SMTValue("bsqkey_none"), this.anyType, into), nonnone);
                 }
             }
         }
@@ -364,13 +447,16 @@ class SMTTypeEmitter {
             assert(this.typeToSMTCategory(from) === "BTerm", "must be a BTerm mapped type");
 
             if (this.isSimpleBoolType(into)) {
-                return new SMTValue(`(bsqterm_bool_value ${exp.emit()})`);
+                return new SMTValue(`(bsqkey_bool_value (bsqterm_key_value ${exp.emit()}))`);
             }
             else if (this.isSimpleIntType(into)) {
-                return new SMTValue(`(bsqterm_int_value ${exp.emit()})`);
+                return new SMTValue(`(bsqkey_int_value (bsqterm_key_value ${exp.emit()}))`);
             }
             else if (this.isSimpleStringType(into)) {
-                return new SMTValue(`(bsqterm_string_value ${exp.emit()})`);
+                return new SMTValue(`(bsqkey_string_value (bsqterm_key_value ${exp.emit()}))`);
+            }
+            else if (this.isKeyType(into)) {
+                return new SMTValue(`(bsqterm_key_value ${exp.emit()})`);
             }
             else if (this.isTupleType(into)) {
                 const intosize = SMTTypeEmitter.getTupleTypeMaxLength(into);
@@ -406,7 +492,7 @@ class SMTTypeEmitter {
                         return nonnone;
                     }
                     else {
-                        const isnonetest = new SMTValue(`(= ${exp} bsqterm_none_const)`);
+                        const isnonetest = new SMTValue(`(= (bsqterm_key_value ${exp}) bsqkey_none)`);
                         return new SMTCond(isnonetest, new SMTValue(this.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(into).ekey)), nonnone);
                     }
                 }
@@ -422,7 +508,7 @@ class SMTTypeEmitter {
                         return nonnone;
                     }
                     else {
-                        const isnonetest = new SMTValue(`(= ${exp} bsqterm_none_const)`);
+                        const isnonetest = new SMTValue(`(= (bsqterm_key_value ${exp}) bsqkey_none)`);
                         return new SMTCond(isnonetest, new SMTValue(this.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(into).ekey)), nonnone);
                     }
                 }

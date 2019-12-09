@@ -124,7 +124,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "getIndexOpt",
-                "expected": "bsqterm_none"
+                "expected": "(bsqterm_key bsqkey_none)"
             }
         ]
     },
@@ -196,7 +196,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "getFieldOpt",
-                "expected": "bsqterm_none"
+                "expected": "(bsqterm_key bsqkey_none)"
             }
         ]
     },
@@ -730,12 +730,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "noneCheckYes",
-                "expected": "(bsqterm_int 1)"
+                "expected": "(bsqkey_int 1)"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "noneCheckNo",
-                "expected": "bsqterm_none"
+                "expected": "(bsqterm_key bsqkey_none)"
             },
             {
                 "kind": "symexec",
@@ -878,17 +878,17 @@
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsTest0",
-                "expected": "bsqterm_none"
+                "expected": "(bsqterm_key bsqkey_none)"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsTest1",
-                "expected": "bsqterm_none"
+                "expected": "(bsqterm_key bsqkey_none)"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsTest2",
-                "expected": "(bsqterm_int 3)"
+                "expected": "(bsqkey_int 3)"
             },
             {
                 "kind": "symexec",
@@ -903,12 +903,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsNamedTest1",
-                "expected": "(bsqterm_int 4)"
+                "expected": "(bsqkey_int 4)"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsNamedTest2",
-                "expected": "(bsqterm_int 4)"
+                "expected": "(bsqkey_int 4)"
             },
             {
                 "kind": "symexec",
@@ -923,7 +923,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "identityAnyTest",
-                "expected": "(bsqterm_int 1)"
+                "expected": "(bsqkey_int 1)"
             },
             {
                 "kind": "symexec",
@@ -933,7 +933,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "prePostTest",
-                "expected": "(bsqterm_int 4)"
+                "expected": "(bsqkey_int 4)"
             },
             {
                 "kind": "symexec",

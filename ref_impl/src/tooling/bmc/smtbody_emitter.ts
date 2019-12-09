@@ -119,21 +119,21 @@ class SMTBodyEmitter {
 
     generateConstantExp(cval: MIRConstantArgument, into: MIRType): SMTExp {
         if (cval instanceof MIRConstantNone) {
-            return this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, into);
+            return this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, into);
         }
         else if (cval instanceof MIRConstantTrue) {
-            return new SMTValue(this.typegen.isSimpleBoolType(into) ? "true" : "bsqterm_true_const");
+            return this.typegen.coerce(new SMTValue("true"), this.typegen.boolType, into);
         }
         else if (cval instanceof MIRConstantFalse) {
-            return new SMTValue(this.typegen.isSimpleBoolType(into) ? "false" : "bsqterm_false_const");
+            return this.typegen.coerce(new SMTValue("false"), this.typegen.boolType, into);
         }
         else if (cval instanceof MIRConstantInt) {
-            return new SMTValue(this.typegen.isSimpleIntType(into) ? cval.value : `(bsqterm_int ${cval.value})`);
+            return this.typegen.coerce(new SMTValue(cval.value), this.typegen.intType, into);
         }
         else {
             assert(cval instanceof MIRConstantString);
 
-            return new SMTValue((cval as MIRConstantString).value);
+            return this.typegen.coerce(new SMTValue((cval as MIRConstantString).value), this.typegen.stringType, into);
         }
     }
 
@@ -156,7 +156,7 @@ class SMTBodyEmitter {
             return this.argToSMT(arg, this.typegen.boolType);
         }
         else {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} bsqterm_true_const)`);
+            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} (bsqkey_bool true))`);
         }
     }
 
@@ -173,7 +173,7 @@ class SMTBodyEmitter {
             return new SMTValue(`(is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${this.argToSMT(arg, argtype).emit()})`);
         }
         else {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} bsqterm_none_const)`);
+            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} bsqkey_none)`);
         }
     }
 
@@ -334,24 +334,24 @@ class SMTBodyEmitter {
                     return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term (${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()}))`), this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
                 }
             }
             else {
                 const tmax = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
                 if (op.idx < tmax) {
                     const recaccess = new SMTValue(`(${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`);
-                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqtuple_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqtuple_entry@term ${recaccess.emit()})`), new SMTValue("bsqterm_none_const"));
+                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqtuple_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqtuple_entry@term ${recaccess.emit()})`), new SMTValue("(bsqterm_key bsqkey_none)"));
                     return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
                 }
             }
         }
         else {
             const avalue = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${op.idx})`;
-            const value = new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(`(bsqtuple_entry@term ${avalue})`));
+            const value = new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), new SMTValue("bsqkey_none"), new SMTValue(`(bsqtuple_entry@term ${avalue})`));
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
         }
     }
@@ -364,24 +364,24 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term (${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()}))`), this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("(bsqterm_key bsqkey_none)"), this.typegen.noneType, resultAccessType));
                 }
             }
             else {
                 const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(rectype);
                 if (maxset.includes(op.property)) {
                     const recaccess = new SMTValue(`(${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()})`);
-                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqrecord_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqrecord_entry@term ${recaccess.emit()})`), new SMTValue("bsqterm_none_const"));
+                    const iteaccess = new SMTCond(new SMTValue(`(is-bsqrecord_entry@value ${recaccess.emit()})`), new SMTValue(`(bsqrecord_entry@term ${recaccess.emit()})`), new SMTValue("(bsqterm_key bsqkey_none)"));
                     return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(iteaccess, this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqterm_none_const"), this.typegen.noneType, resultAccessType));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("(bsqterm_key bsqkey_none)"), this.typegen.noneType, resultAccessType));
                 }
             }
         }
         else {
             const avalue = `(select (bsqterm_record_entries ${this.argToSMT(op.arg, rectype).emit()}) "${op.property}")`;
-            const value = new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), new SMTValue("bsqterm_none"), new SMTValue(`(bsqrecord_entry@term ${avalue})`));
+            const value = new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), new SMTValue("(bsqterm_key bsqkey_none)"), new SMTValue(`(bsqrecord_entry@term ${avalue})`));
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
         }
     }
@@ -459,7 +459,7 @@ class SMTBodyEmitter {
             coreop = `(= ${this.argToSMT(lhs, lhsargtype).emit()} ${this.argToSMT(rhs, rhsargtype).emit()})`;
         }
         else {
-            coreop = `(= ${this.argToSMT(lhs, this.typegen.anyType).emit()} ${this.argToSMT(rhs, this.typegen.anyType).emit()})`;
+            coreop = `(= ${this.argToSMT(lhs, this.typegen.keyType).emit()} ${this.argToSMT(rhs, this.typegen.keyType).emit()})`;
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
@@ -593,7 +593,7 @@ class SMTBodyEmitter {
     }
 
     generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType, inline: boolean, gas: number): string {
-        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isKeyType(argtype)) {
             return "false";
         }
         if (this.typegen.isTupleType(argtype)) {
@@ -649,7 +649,7 @@ class SMTBodyEmitter {
     }
 
     generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType, inline: boolean, gas: number): string {
-        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype)) {
+        if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isKeyType(argtype) || this.typegen.isTupleType(argtype)) {
             return "false";
         }
         else if (this.typegen.isRecordType(argtype)) {
@@ -709,6 +709,37 @@ class SMTBodyEmitter {
         if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
             return argtype.options[0].trkey === oftype.trkey ? "true" : "false";
         }
+        else if (this.typegen.isKeyType(argtype)) {
+            const ofdecl = this.typegen.assembly.entityDecls.get(oftype.ekey) as MIREntityTypeDecl;
+
+            if(oftype.ekey === "NSCore::None") {
+                return `(= ${arg} bsqkey_none)`;
+            }
+            else if(oftype.ekey === "NSCore::Bool") {
+                return `(is-bsqkey_bool ${arg})`;
+            }
+            else if(oftype.ekey === "NSCore::Int") {
+                return `(is-bsqkey_int ${arg})`;
+            }
+            else if(oftype.ekey === "NSCore::String") {
+                return `(is-bsqkey_string ${arg})`;
+            }
+            else if(oftype.ekey.startsWith("NSCore::StringOf<")) {
+                return `(and (is-bsqkey_typedstring ${arg}) (= (bsqkey_typedstring_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+            }
+            else if(oftype.ekey === "NSCore::GUID") {
+                return `(is-bsqkey_guid ${arg})`;
+            }
+            else if (ofdecl.provides.includes("NSCore::Enum")) {
+                return `(and (is-bsqkey_enum ${arg}) (= (bsqkey_enum_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+            }
+            else if (ofdecl.provides.includes("NSCore::IdKey")) {
+                return `(and (is-bsqkey_idkey ${arg}) (= (bsqkey_idkey_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+            }
+            else {
+                return "false";
+            }
+        }
         else if(this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
             return "false";
         }
@@ -726,31 +757,31 @@ class SMTBodyEmitter {
             const ofdecl = this.typegen.assembly.entityDecls.get(oftype.ekey) as MIREntityTypeDecl;
 
             if(oftype.ekey === "NSCore::None") {
-                return `(= ${arg} bsqterm_none)`;
+                return `(and (is-bsqterm_key ${arg}) (= (bsqterm_key_value ${arg}) bsqkey_none))`;
             }
             else if(oftype.ekey === "NSCore::Bool") {
-                return `(is-bsqterm_bool ${arg})`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_bool (bsqterm_key_value ${arg})))`;
             }
             else if(oftype.ekey === "NSCore::Int") {
-                return `(is-bsqterm_int ${arg})`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_int (bsqterm_key_value ${arg})))`;
             }
             else if(oftype.ekey === "NSCore::String") {
-                return `(is-bsqterm_string ${arg})`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_string (bsqterm_key_value ${arg})))`;
             }
             else if(oftype.ekey.startsWith("NSCore::StringOf<")) {
-                return `(and (is-bsqterm_typedstring ${arg}) (= (bsqterm_typedstring_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_typedstring (bsqterm_key_value ${arg})) (= (bsqkey_typedstring_type (bsqterm_key_value ${arg})) "${this.typegen.mangleStringForSMT(oftype.ekey)}"))`;
             }
             else if(oftype.ekey.startsWith("NSCore::POBBuffer<")) {
                 return `(and (is-bsqterm_podbuffer ${arg}) (= (bsqterm_podbuffer_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
             }
             else if(oftype.ekey === "NSCore::GUID") {
-                return `(is-bsqterm_guid ${arg})`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_guid (bsqterm_key_value ${arg})))`;
             }
             else if (ofdecl.provides.includes("NSCore::Enum")) {
-                return `(and (is-bsqterm_enum ${arg}) (= (bsqterm_enum_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_enum (bsqterm_key_value ${arg})) (= (bsqkey_enum_type (bsqterm_key_value ${arg})) "${this.typegen.mangleStringForSMT(oftype.ekey)}"))`;
             }
             else if (ofdecl.provides.includes("NSCore::IdKey")) {
-                return `(and (is-bsqterm_idkey ${arg}) (= (bsqterm_idkey_type ${arg}) ${this.typegen.mangleStringForSMT(oftype.ekey)}))`;
+                return `(and (is-bsqterm_key ${arg}) (is-bsqkey_idkey (bsqterm_key_value ${arg})) (= (bsqkey_idkey_type (bsqterm_key_value ${arg})) "${this.typegen.mangleStringForSMT(oftype.ekey)}"))`;
             }
             else if(oftype.ekey === "NSCore::Regex") {
                 return `(is-bsqterm_regex ${arg})`;
@@ -789,7 +820,7 @@ class SMTBodyEmitter {
                 }
             }
             else {
-                tests.push(`(not (= ${arg} bsqterm_none))`);
+                tests.push(`(not (= ${arg} (bsqterm_key bsqkey_none)))`);
             }
         }
         else if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {

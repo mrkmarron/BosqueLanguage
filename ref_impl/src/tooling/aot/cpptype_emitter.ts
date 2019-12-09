@@ -60,6 +60,34 @@ class CPPTypeEmitter {
         return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::String";
     }
     
+    isKeyType(tt: MIRType): boolean {
+        return tt.options.every((topt) => {
+            if(topt.trkey === "NSCore::KeyType") {
+                return true;
+            }
+
+            if(!(topt instanceof MIREntityType)) {
+                return false;
+            }
+
+            const eopt = topt as MIREntityType;
+            if(eopt.ekey === "NSCore::None" || eopt.ekey === "NSCore::Bool" || eopt.ekey === "NSCore::Int" || eopt.ekey === "NSCore::String" || eopt.ekey === "NSCore::GUID") {
+                return true;
+            } 
+
+            if(eopt.ekey.startsWith("NSCore::StringOf<")) {
+                return true;
+            }
+
+            const edecl = this.assembly.entityDecls.get(eopt.ekey) as MIREntityTypeDecl;
+            if (edecl.provides.includes("NSCore::Enum") || edecl.provides.includes("NSCore::IdKey")) {
+                return true;
+            }
+
+            return false;
+        });
+    } 
+    
     isKnownLayoutTupleType(tt: MIRType): boolean {
         if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
             return false;

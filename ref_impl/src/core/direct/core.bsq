@@ -138,10 +138,6 @@ concept PODTuple provides POD, Tuple {
     override static tryParse(str: String): Result<Any> # podtuple_tryparse
 }
 
-//<summary>All actual KeyType tuples implicitly provide this concept.</summary>
-concept KeyTuple provides KeyType, Tuple {
-}
-
 //<summary>All actual records implicitly provide this concept.</summary>
 concept Record provides Some {
 }
@@ -149,10 +145,6 @@ concept Record provides Some {
 //<summary>All actual POD records implicitly provide this concept.</summary>
 concept PODRecord provides POD, Record {
     override static tryParse(str: String): Result<Any> # podrecord_tryparse
-}
-
-//<summary>All actual KeyType records implicitly provide this concept.</summary>
-concept KeyRecord provides KeyType, Record {
 }
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>

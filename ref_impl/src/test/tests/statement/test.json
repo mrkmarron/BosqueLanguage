@@ -103,7 +103,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "constDeclWithUnionType",
-                "expected": "(bsqterm_int 3)"
+                "expected": "(bsqkey_int 3)"
             },
             {
                 "kind": "symexec",
@@ -113,7 +113,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "varDeclAndAssignWithNoValue",
-                "expected": "(bsqterm_int 5)"
+                "expected": "(bsqkey_int 5)"
             },
             {
                 "kind": "symexec",
@@ -313,7 +313,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "ifAssignInBranchesC",
-                "expected": "(bsqterm_int 1)"
+                "expected": "(bsqkey_int 1)"
             },
             {
                 "kind": "symexec",
@@ -437,7 +437,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "returnor1",
-                "expected": "(bsqterm_int 5)"
+                "expected": "(bsqkey_int 5)"
             },
             {
                 "kind": "symexec",
@@ -452,7 +452,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "returnor3",
-                "expected": "(bsqterm_int 5)"
+                "expected": "(bsqkey_int 5)"
             },
             {
                 "kind": "symexec",
