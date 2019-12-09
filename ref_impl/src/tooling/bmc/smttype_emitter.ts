@@ -340,7 +340,7 @@ class SMTTypeEmitter {
                         args.push(`(${this.generateTupleAccessor(from, i)} ${temp})`);
                     }
                     for (let i = Math.min(intosize, fromsize); i < intosize; ++i) {
-                        args.push("bsqtuple_entry@empty");
+                        args.push("bsqterm@clear");
                     }
                     return new SMTLet(temp, exp, new SMTValue(`(${intocons} ${args.join(" ")})`));
                 }
@@ -376,7 +376,7 @@ class SMTTypeEmitter {
                             args.push(`(${this.generateRecordAccessor(from, p)} ${temp})`);
                         }
                         else {
-                            args.push("bsqrecord_entry@clear");
+                            args.push("bsqterm@clear");
                         }
                     }
                     return new SMTLet(temp, exp, new SMTValue(`(${intocons} ${args.join(" ")})`));

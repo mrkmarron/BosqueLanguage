@@ -61,7 +61,7 @@ class SMTEmitter {
                     const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
                     let cargs: string[] = [];
                     for (let i = 0; i < maxlen; ++i) {
-                        cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} bsqtuple_entry)`);
+                        cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} BTerm)`);
                     }
                     fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
                 }
@@ -74,7 +74,7 @@ class SMTEmitter {
                     const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
                     let cargs: string[] = [];
                     for (let i = 0; i < maxset.length; ++i) {
-                        cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} bsqrecord_entry)`);
+                        cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} BTerm)`);
                     }
                     fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
                 }

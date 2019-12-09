@@ -23,45 +23,40 @@
 
 (declare-datatypes ( 
       (BTerm 0)
-      (bsqtuple_entry 0)
       (bsqtuple_0 0)
     ;;FIXED_TUPLE_DECLS_FWD;;
-      (bsqrecord_entry 0)
       (bsqrecord_empty 0)
     ;;FIXED_RECORD_DECLS_FWD;;
     ;;NOMINAL_DECLS_FWD;;
       (bsqlist 0)
       (bsqkeylist 0)
-      (bsqkvp 0)
       (bsqkvcontainer 0)
     ) (
     (
+      (bsqterm@clear)
       (bsqterm_key (bsqterm_key_value BKeyValue))
       (bsqterm_regex (bsqterm_regex_value String))
-      (bsqterm_tuple (bsqterm_tuple_entries (Array Int bsqtuple_entry)))
-      (bsqterm_record (bsqterm_record_entries (Array String bsqrecord_entry)))
+      (bsqterm_tuple (bsqterm_tuple_entries (Array Int BTerm)))
+      (bsqterm_record (bsqterm_record_entries (Array String BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_entries (Array String BTerm)))
       (bsqterm_list (bsqterm_list_type String) (bsqterm_list_entry bsqlist))
       (bsqterm_kvcontainer (bsqterm_bsqkvcontainer_type String) (bsqterm_bsqkvcontainer_entry bsqkvcontainer))
     )
-    ( (bsqtuple_entry@clear) (bsqtuple_entry@value (bsqtuple_entry@term BTerm)) )
     ( (bsqtuple_0@cons) )
   ;;FIXED_TUPLE_DECLS;;
-    ( (bsqrecord_entry@clear) (bsqrecord_entry@value (bsqrecord_entry@term BTerm)) )
     ( (bsqrecord_empty@cons) )
   ;;FIXED_RECORD_DECLS;;
   ;;NOMINAL_DECLS;;
     ( (cons@bsqlist$none) (cons@bsqlist (bsqlist@size Int) (bsqlist@entries (Array Int BTerm))) )
     ( (cons@bsqkeylist$none) (cons@bsqkeylist (bsqkeylist@key BKeyValue) (bsqkeylist@tail bsqkeylist)) )
-    ( (bsqkvp@clear) (bsqkvp@value (bsqkvp@term BTerm)) )
-    ( (cons@bsqkvcontainer$none) (cons@bsqkvcontainer (bsqkvcontainer@size Int) (bsqkvcontainer@keylist bsqkeylist) (bsqkvcontainer@entries (Array BKeyValue bsqkvp))) )
+    ( (cons@bsqkvcontainer$none) (cons@bsqkvcontainer (bsqkvcontainer@size Int) (bsqkvcontainer@keylist bsqkeylist) (bsqkvcontainer@entries (Array BKeyValue BTerm))) )
 ))
 
-(declare-const bsqtuple_array_empty (Array Int bsqtuple_entry))
-(assert (= bsqtuple_array_empty ((as const (Array Int bsqtuple_entry)) bsqtuple_entry@clear)))
+(declare-const bsqtuple_array_empty (Array Int BTerm))
+(assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
 
-(declare-const bsqrecord_array_empty (Array String bsqrecord_entry))
-(assert (= bsqrecord_array_empty ((as const (Array String bsqrecord_entry)) bsqrecord_entry@clear)))
+(declare-const bsqrecord_array_empty (Array String BTerm))
+(assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm@clear)))
 
 (declare-const bsqentity_array_empty (Array String BTerm))
 (assert (= bsqentity_array_empty ((as const (Array String BTerm)) (bsqterm_key bsqkey_none))))
@@ -69,8 +64,8 @@
 (declare-const bsqlist_data_array_empty (Array Int BTerm))
 (assert (= bsqlist_data_array_empty ((as const (Array Int BTerm)) (bsqterm_key bsqkey_none))))
 
-(declare-const bsqkvp_array_empty (Array Int bsqkvp))
-(assert (= bsqkvp_array_empty ((as const (Array Int bsqkvp)) bsqkvp@clear)))
+(declare-const bsqkvp_array_empty (Array Int BTerm))
+(assert (= bsqkvp_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
 
 (declare-const mirconceptsubtypearray_empty (Array String Bool))
 (assert (= mirconceptsubtypearray_empty ((as const (Array String Bool)) false)))
