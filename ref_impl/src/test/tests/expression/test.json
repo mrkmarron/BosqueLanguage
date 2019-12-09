@@ -124,7 +124,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "getIndexOpt",
-                "expected": "(bsqterm_key bsqkey_none)"
+                "expected": "bsqkey_none"
             }
         ]
     },
@@ -196,7 +196,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "getFieldOpt",
-                "expected": "(bsqterm_key bsqkey_none)"
+                "expected": "bsqkey_none"
             }
         ]
     },
@@ -735,7 +735,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "noneCheckNo",
-                "expected": "(bsqterm_key bsqkey_none)"
+                "expected": "bsqkey_none"
             },
             {
                 "kind": "symexec",
@@ -878,12 +878,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsTest0",
-                "expected": "(bsqterm_key bsqkey_none)"
+                "expected": "bsqkey_none"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "optionalArgsTest1",
-                "expected": "(bsqterm_key bsqkey_none)"
+                "expected": "bsqkey_none"
             },
             {
                 "kind": "symexec",

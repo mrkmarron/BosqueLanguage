@@ -351,8 +351,14 @@ class SMTBodyEmitter {
         }
         else {
             const avalue = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${op.idx})`;
-            const value = new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), new SMTValue("bsqkey_none"), new SMTValue(`(bsqtuple_entry@term ${avalue})`));
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
+            if(!this.typegen.assembly.subtypeOf(this.typegen.noneType, resultAccessType)) {
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term ${avalue})`), this.typegen.anyType, resultAccessType));
+            }
+            else {
+                const nval = this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType);
+                const rval = this.typegen.coerce(new SMTValue(`(bsqtuple_entry@term ${avalue})`), this.typegen.anyType, resultAccessType);
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(new SMTValue(`(is-bsqtuple_entry@clear ${avalue})`), nval, rval));
+            }
         }
     }
 
@@ -364,7 +370,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term (${this.typegen.generateRecordAccessor(rectype, op.property)} ${this.argToSMT(op.arg, rectype).emit()}))`), this.typegen.anyType, resultAccessType));
                 }
                 else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("(bsqterm_key bsqkey_none)"), this.typegen.noneType, resultAccessType));
+                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
                 }
             }
             else {
@@ -381,8 +387,14 @@ class SMTBodyEmitter {
         }
         else {
             const avalue = `(select (bsqterm_record_entries ${this.argToSMT(op.arg, rectype).emit()}) "${op.property}")`;
-            const value = new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), new SMTValue("(bsqterm_key bsqkey_none)"), new SMTValue(`(bsqrecord_entry@term ${avalue})`));
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(value, this.typegen.anyType, resultAccessType));
+            if(!this.typegen.assembly.subtypeOf(this.typegen.noneType, resultAccessType)) {
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term ${avalue})`), this.typegen.anyType, resultAccessType));
+            }
+            else {
+                const nval = this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType);
+                const rval = this.typegen.coerce(new SMTValue(`(bsqrecord_entry@term ${avalue})`), this.typegen.anyType, resultAccessType);
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(new SMTValue(`(is-bsqrecord_entry@clear ${avalue})`), nval, rval));
+            }
         }
     }
 

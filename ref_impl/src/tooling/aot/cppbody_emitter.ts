@@ -419,7 +419,7 @@ class CPPBodyEmitter {
         else if (lhsinfertype.trkey === "NSCore::String" && rhsinfertype.trkey === "NSCore::String"){
             const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
             const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-            return `(${lhsstring} ${op} ${rhsstring})`;
+            return `(${lhsstring}->sdata ${op} ${rhsstring}->sdata)`;
         }
         else if (lhsargtype === rhsargtype) {
             if(this.typegen.isTupleType(lhsargtype)) {

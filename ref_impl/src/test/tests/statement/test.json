@@ -442,7 +442,7 @@
             {
                 "kind": "symexec",
                 "entrypoint": "returnor11",
-                "expected": "bsqterm_none"
+                "expected": "bsqkey_none"
             },
             {
                 "kind": "symexec",
