@@ -32,16 +32,6 @@
             },
             {
                 "kind": "aot",
-                "entrypoint": "restCallMixedList1",
-                "expected": "2"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "restCallMixedList2",
-                "expected": "2"
-            },
-            {
-                "kind": "aot",
                 "entrypoint": "lfilter",
                 "expected": "2"
             },
@@ -73,16 +63,6 @@
             {
                 "kind": "symexec",
                 "entrypoint": "restCallSimpleArgsList",
-                "expected": "2"
-            },
-            {
-                "kind": "symexec",
-                "entrypoint": "restCallMixedList1",
-                "expected": "2"
-            },
-            {
-                "kind": "symexec",
-                "entrypoint": "restCallMixedList2",
                 "expected": "2"
             },
             {
