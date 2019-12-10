@@ -708,7 +708,7 @@ class Assembly {
     getSpecialCustomKeyType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
 
     getSpecialParsableConcept(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
-    getSpecialKeyedConcept(): ResolvedType { return this.internSpecialConceptType("Keyed"); }
+    getSpecialKeyTypeConcept(): ResolvedType { return this.internSpecialConceptType("KeyType"); }
 
     ensureNominalRepresentation(t: ResolvedType): ResolvedType {
         const opts = t.options.map((opt) => {

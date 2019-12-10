@@ -377,8 +377,9 @@ class TestRunner {
 function runAll() {
     const runner = new TestRunner();
 
-    runner.loadTestSet("expression");
-    runner.loadTestSet("statement");
+    //runner.loadTestSet("expression");
+    //runner.loadTestSet("statement");
+    runner.loadTestSet("library");
 
     runner.run();
 }

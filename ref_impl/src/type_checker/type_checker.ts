@@ -1277,19 +1277,9 @@ class TypeChecker {
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
         if (oodecl.isTypeACollectionEntity()) {
-            if (this.m_emitEnabled) {
-                this.m_emitter.registerPendingConstProcessing(oodecl, oodecl.staticMembers.get("empty") as StaticMemberDecl, oobinds);
-                this.m_emitter.registerStaticCall(oodecl, oodecl.staticFunctions.get("_cons") as StaticFunctionDecl, "_cons", oobinds, [], []);
-            }
-
             return [env.setExpressionResult(this.m_assembly, this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, oobinds.get("T") as ResolvedType, eargs, trgt))];
         }
         else if (oodecl.isTypeAMapEntity()) {
-            if (this.m_emitEnabled) {
-                this.m_emitter.registerPendingConstProcessing(oodecl, oodecl.staticMembers.get("empty") as StaticMemberDecl, oobinds);
-                this.m_emitter.registerStaticCall(oodecl, oodecl.staticFunctions.get("_cons") as StaticFunctionDecl, "_cons", oobinds, [], []);
-            }
-
             const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
             return [env.setExpressionResult(this.m_assembly, this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, contentstype, eargs, trgt))];
         }
@@ -1400,7 +1390,7 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
-            const keytype = this.m_assembly.getSpecialKeyedConcept();
+            const keytype = this.m_assembly.getSpecialKeyTypeConcept();
             const mirkeytype = this.m_emitter.registerResolvedTypeReference(keytype);
 
             if (isindexableop && exp.name === "getKey") {

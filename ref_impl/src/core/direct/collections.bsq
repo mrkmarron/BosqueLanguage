@@ -13,6 +13,7 @@ namespace NSCore;
 entity List<T> provides Object {
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_at(l: List<T>, i: Int): T # list_unsafe_at
+    hidden static _unsafe_add(l: List<T>, v: T): List<T> # list_unsafe_add
     hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # list_unsafe_set
     hidden static _destructive_add(l: List<T>, v: T): List<T> # list_destructive_add
 
@@ -36,7 +37,7 @@ entity List<T> provides Object {
         }
 
         var val = f[recursive?](List<T>::_unsafe_at(l, idx));
-        return List<T>::_map<U>[recursive](l, idx + 1, List<T>::_destructive_add(lp, val), p);
+        return List<T>::_map<U>[recursive](l, idx + 1, List<U>::_destructive_add(lp, val), f);
     }
 
     method size(): Int {
@@ -53,6 +54,10 @@ entity List<T> provides Object {
         return List<T>::_unsafe_at(this, idx);
     }
 
+    method push(v: T): List<T> {
+        return List<T>::_unsafe_add(this, v);
+    }
+
     method set(idx: Int, v: T): List<T> {
         check 0 <= idx && idx < List<T>::_size(this);
 
@@ -60,11 +65,11 @@ entity List<T> provides Object {
     }
 
     method filter(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<U>::_filter(this, 0, List<T>{}, p);
+        return List<T>::_filter[recursive](this, 0, List<T>{}, p);
     }
 
     method map<U>(f: recursive? fn(_: T) -> U): List<U> {
-        return List<U>::_map(this, 0, List<U>{}, f);
+        return List<T>::_map<U>[recursive](this, 0, List<U>{}, f);
     }
 }
 

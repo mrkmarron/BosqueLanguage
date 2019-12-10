@@ -1129,6 +1129,18 @@ public:
         }
     }
 
+    BSQList* unsafeAdd(const BSQInt& idx, Value v) const
+    {
+        std::vector<Value> nv(this->entries.size(), nullptr);
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            nv[i] = BSQRef::checkedIncrement(this->entries[i]);
+        }
+        nv.push_back(BSQRef::checkedIncrement(v));
+
+        return new BSQList(this->ntype, move(nv));
+    }
+
     BSQList* unsafeSet(const BSQInt& idx, Value v) const
     {
         std::vector<Value> nv(this->entries.size(), nullptr);
