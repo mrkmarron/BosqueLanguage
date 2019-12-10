@@ -64,8 +64,8 @@
 (declare-const bsqlist_data_array_empty (Array Int BTerm))
 (assert (= bsqlist_data_array_empty ((as const (Array Int BTerm)) (bsqterm_key bsqkey_none))))
 
-(declare-const bsqkvp_array_empty (Array Int BTerm))
-(assert (= bsqkvp_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
+(declare-const bsqkvp_array_empty (Array BKeyValue BTerm))
+(assert (= bsqkvp_array_empty ((as const (Array BKeyValue BTerm)) bsqterm@clear)))
 
 (declare-const mirconceptsubtypearray_empty (Array String Bool))
 (assert (= mirconceptsubtypearray_empty ((as const (Array String Bool)) false)))

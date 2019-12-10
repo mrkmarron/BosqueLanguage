@@ -1408,12 +1408,17 @@ public:
     BSQSet* destructiveUpdate(Value key, Value val)
     {
         auto iter = this->entries.find(key);
-        BSQRef::checkedDecrement(iter->first);
-        BSQRef::checkedDecrement(iter->second);
+        auto oldkey = iter->first;
+        auto oldval = iter->second;
 
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(std::make_pair(key, val));
+
+        entries.erase(iter);
+        entries.emplace(std::make_pair(key, val));
+
+        BSQRef::checkedDecrement(oldkey);
+        BSQRef::checkedDecrement(oldval);
 
         return this;
     }
@@ -1519,12 +1524,17 @@ public:
     BSQMap* destructiveUpdate(Value key, Value val)
     {
         auto iter = this->entries.find(key);
-        BSQRef::checkedDecrement(iter->first);
-        BSQRef::checkedDecrement(iter->second);
+        auto oldkey = iter->first;
+        auto oldval = iter->second;
 
         BSQRef::checkedIncrement(key);
         BSQRef::checkedIncrement(val);
-        entries.insert(std::make_pair(key, val));
+
+        entries.erase(iter);
+        entries.emplace(std::make_pair(key, val));
+
+        BSQRef::checkedDecrement(oldkey);
+        BSQRef::checkedDecrement(oldval);
 
         return this;
     }

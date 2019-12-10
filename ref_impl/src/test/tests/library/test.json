@@ -208,12 +208,12 @@
             {
                 "kind": "aot",
                 "entrypoint": "restCallSimpleArgsMap",
-                "expected": "4"
+                "expected": "2"
             },
             {
                 "kind": "aot",
                 "entrypoint": "restCallOverlapArgsMap",
-                "expected": "3"
+                "expected": "1"
             },
             {
                 "kind": "aot",
@@ -264,12 +264,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "restCallSimpleArgsMap",
-                "expected": "4"
+                "expected": "2"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "restCallOverlapArgsMap",
-                "expected": "3"
+                "expected": "1"
             },
             {
                 "kind": "symexec",
@@ -294,12 +294,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "removeCyes",
-                "expected": "true"
+                "expected": "2"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "removeCno",
-                "expected": "false"
+                "expected": "3"
             },
             {
                 "kind": "symtest",

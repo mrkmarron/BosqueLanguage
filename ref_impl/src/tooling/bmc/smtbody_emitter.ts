@@ -284,7 +284,7 @@ class SMTBodyEmitter {
 
             let conscall = `(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)`;
             for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], vtype).emit()})`
+                conscall = `(result_success_value@bsqkvcontainer (${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], vtype).emit()}))`
             }
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
@@ -297,7 +297,7 @@ class SMTBodyEmitter {
 
             let conscall = "(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)";
             for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `(${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], ttype).emit()})`
+                conscall = `(result_success_value@bsqkvcontainer (${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], ttype).emit()}))`
             }
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
@@ -1487,7 +1487,7 @@ class SMTBodyEmitter {
             }
             case "set_at_val":
             case "map_at_val": {
-                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
+                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqkvcontainer@entries ${params[0]}) ${params[1]})`), this.typegen.anyType, rtype);
                 break;
             }
             case "set_get_keylist":
@@ -1497,7 +1497,7 @@ class SMTBodyEmitter {
             } 
             case "set_clear_val": 
             case "map_clear_val": {
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (- (bsqkvcontainer@size ${params[0]}) 1) ${params[2]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} cons@bsqkeylist$none))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (- (bsqkvcontainer@size ${params[0]}) 1) ${params[2]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} bsqterm@clear))`);
                 break;
             }
             case "set_unsafe_update":  

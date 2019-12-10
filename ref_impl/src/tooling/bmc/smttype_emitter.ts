@@ -566,15 +566,48 @@ class SMTTypeEmitter {
     }
 
     generateEntityNoneConstructor(ekey: MIRNominalTypeKey): string {
-        return `cons@${this.mangleStringForSMT(ekey)}$none`;
+        if (ekey.startsWith("NSCore::List<")) {
+            return "cons@bsqlist$none";
+        }
+        else if (ekey.startsWith("NSCore::Set<")) {
+            return "cons@bsqkvcontainer$none";
+        }
+        else if (ekey.startsWith("NSCore::Map<")) {
+            return "cons@bsqkvcontainer$none";
+        }
+        else if (ekey === "NSCore::KeyList") {
+            return "cons@bsqkeylist$none";
+        }
+        else {
+            return `cons@${this.mangleStringForSMT(ekey)}$none`;
+        }
     }
 
     generateEntityConstructor(ekey: MIRNominalTypeKey): string {
-        return `cons@${this.mangleStringForSMT(ekey)}`;
+        if (ekey.startsWith("NSCore::List<")) {
+            return "cons@bsqlist";
+        }
+        else if (ekey.startsWith("NSCore::Set<")) {
+            return "cons@bsqkvcontainer";
+        }
+        else if (ekey.startsWith("NSCore::Map<")) {
+            return "cons@bsqkvcontainer";
+        }
+        else if (ekey === "NSCore::KeyList") {
+            return "cons@bsqkeylist";
+        }
+        else {
+            return `cons@${this.mangleStringForSMT(ekey)}`;
+        }
     }
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: string): string {
-        return `${this.mangleStringForSMT(ekey)}@${f}`;
+        if(ekey === "NSCore::KeyList") {
+            return "bsqkeylist@" + f;
+        }
+        else {
+            return `${this.mangleStringForSMT(ekey)}@${f}`;
+        }
     }
 }
 

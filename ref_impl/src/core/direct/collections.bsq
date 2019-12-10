@@ -217,7 +217,7 @@ entity Map<K where Indexable, V> provides Object {
 
     method remove(key: K): Map<K, V> {
         var k = Indexable::getKey(key);
-        if(Map<K, V>::_has_key(this, k)) {
+        if(!Map<K, V>::_has_key(this, k)) {
             return this;
         }
         else {
