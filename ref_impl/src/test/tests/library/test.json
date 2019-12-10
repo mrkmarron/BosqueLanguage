@@ -100,12 +100,12 @@
             {
                 "kind": "aot",
                 "entrypoint": "restCallSimpleArgsSet",
-                "expected": "4"
+                "expected": "2"
             },
             {
                 "kind": "aot",
                 "entrypoint": "restCallOverlapArgsSet",
-                "expected": "3"
+                "expected": "1"
             },
             {
                 "kind": "aot",
@@ -145,12 +145,12 @@
             {
                 "kind": "symexec",
                 "entrypoint": "restCallSimpleArgsSet",
-                "expected": "4"
+                "expected": "2"
             },
             {
                 "kind": "symexec",
                 "entrypoint": "restCallOverlapArgsSet",
-                "expected": "3"
+                "expected": "1"
             },
             {
                 "kind": "symexec",

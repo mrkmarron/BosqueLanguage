@@ -62,11 +62,11 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                         //all handled inline
                     }
                     else if (ctype.name === "Set") {
-                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "cons_set"));
+                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons_insert"));
                         invokeNode.callees.add(invkey);
                     }
                     else {
-                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "cons_map"));
+                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons_insert"));
                         invokeNode.callees.add(invkey);
                     }
                     break;

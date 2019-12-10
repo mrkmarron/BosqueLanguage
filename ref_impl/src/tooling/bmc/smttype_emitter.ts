@@ -136,12 +136,30 @@ class SMTTypeEmitter {
         return !this.isSpecialRepType(tdecl);
     }
 
-    isCollectionType(tt: MIRType): boolean {
-        return (tt.trkey.startsWith("NSCore::List<") || tt.trkey.startsWith("NSCore::Set<") || tt.trkey.startsWith("NSCore::Map<"));
+    isUCollectionType(tt: MIRType): boolean {
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
+
+        if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
+            return false;
+        }
+
+        const et = ropts[0] as MIREntityType;
+        return (et.ekey.startsWith("NSCore::List<") || et.ekey.startsWith("NSCore::Set<") || et.ekey.startsWith("NSCore::Map<"));
+    }
+    
+    isUKeyListType(tt: MIRType): boolean {
+        const ropts = tt.options.filter((opt) => opt.trkey !== "NSCore::None");
+
+        if (ropts.length !== 1 || !(ropts[0] instanceof MIREntityType)) {
+            return false;
+        }
+
+        const et = ropts[0] as MIREntityType;
+        return et.ekey === "NSCore::KeyList";
     }
 
-    isKeyListType(tt: MIRType): boolean {
-        return tt.trkey === "NSCore::KeyList";
+    isSpecialKeyListRepType(et: MIREntityTypeDecl): boolean {
+        return et.tkey === "NSCore::KeyList";
     }
 
     isSpecialCollectionRepType(et: MIREntityTypeDecl): boolean {
@@ -166,10 +184,6 @@ class SMTTypeEmitter {
         }
 
         if (et.tkey.startsWith("NSCore::StringOf<") || et.tkey.startsWith("NSCore::PODBuffer<")) {
-            return true;
-        }
-
-        if (et.tkey === "NSCore::KeyList") {
             return true;
         }
 
@@ -247,7 +261,7 @@ class SMTTypeEmitter {
             return "BKeyValue";
         }
         else if (this.isUEntityType(ttype)) {
-            if (this.isCollectionType(ttype)) {
+            if (this.isUCollectionType(ttype)) {
                 if (this.isListType(ttype)) {
                     return "bsqlist";
                 }
@@ -255,7 +269,7 @@ class SMTTypeEmitter {
                     return "bsqkvcontainer";
                 }
             }
-            else if (this.isKeyListType(ttype)) {
+            else if (this.isUKeyListType(ttype)) {
                 return "bsqkeylist";
             }
             else {
@@ -399,7 +413,7 @@ class SMTTypeEmitter {
         else if (this.isUEntityType(from)) {
             const fromtype = this.assembly.entityDecls.get(SMTTypeEmitter.getUEntityType(from).ekey) as MIREntityTypeDecl;
 
-            if(this.isCollectionType(from)) {
+            if(this.isUCollectionType(from)) {
                 let nonnone: SMTExp | undefined = undefined;
                 if(this.isListType(from)) {
                     nonnone = new SMTValue(`(bsqterm_list ${exp})`);
@@ -479,7 +493,7 @@ class SMTTypeEmitter {
             else if (this.isUEntityType(into)) {
                 const intotype = this.assembly.entityDecls.get(SMTTypeEmitter.getUEntityType(into).ekey) as MIREntityTypeDecl;
 
-                if(this.isCollectionType(into)) {
+                if(this.isUCollectionType(into)) {
                     let nonnone: SMTExp | undefined = undefined;
                     if(this.isListType(into)) {
                         nonnone = new SMTValue(`(bsqterm_list_entry ${exp})`);
@@ -536,7 +550,7 @@ class SMTTypeEmitter {
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
-        if (this.isSpecialRepType(entity) || this.isSpecialCollectionRepType(entity)) {
+        if (this.isSpecialRepType(entity) || this.isSpecialCollectionRepType(entity) || this.isSpecialKeyListRepType(entity)) {
             return undefined;
         }
 

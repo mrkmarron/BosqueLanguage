@@ -16,7 +16,7 @@ function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
 }
 
-const DEFAULT_GAS = 3;
+const DEFAULT_GAS = 4;
 
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
@@ -1482,7 +1482,7 @@ class SMTBodyEmitter {
             }
             case "set_has_key":
             case "map_has_key": {
-                bodyres = new SMTValue(`(not (is-bsqterm@clear (select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))))`);
+                bodyres = new SMTValue(`(not (is-bsqterm@clear (select (bsqkvcontainer@entries ${params[0]}) ${params[1]})))`);
                 break;
             }
             case "set_at_val":
@@ -1505,7 +1505,7 @@ class SMTBodyEmitter {
             case "set_destuctive_update":
             case "map_destuctive_update": {
                 const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) (bsqkvcontainer@keylist ${params[0]}) (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqkvcontainer@size ${params[0]}) (bsqkvcontainer@keylist ${params[0]}) (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
                 break;
             }
             case "set_unsafe_add":  
@@ -1513,7 +1513,7 @@ class SMTBodyEmitter {
             case "set_destuctive_add":
             case "map_destuctive_add": {
                 const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) ${params[3]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (+ (bsqkvcontainer@size ${params[0]}) 1) ${params[3]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
                 break;
             }
             default: {

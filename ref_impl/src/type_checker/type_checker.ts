@@ -218,84 +218,9 @@ class TypeChecker {
             return this.m_assembly.subtypeOf(lhs, rhs) && this.m_assembly.subtypeOf(rhs, lhs); //types are equal
         }
 
-        const bothTuple = (lhs.options[0] instanceof ResolvedTupleAtomType) && (rhs.options[0] instanceof ResolvedTupleAtomType);
-        if (bothTuple) {
-            const tup1 = lhs.options[0] as ResolvedTupleAtomType;
-            const tup2 = rhs.options[0] as ResolvedTupleAtomType;
-
-            for (let i = 0; i < Math.max(tup1.types.length, tup2.types.length); ++i) {
-                const t1 = (i < tup1.types.length) ? tup1.types[i] : undefined;
-                const t2 = (i < tup2.types.length) ? tup2.types[i] : undefined;
-
-                if (t1 !== undefined && !t1.isOptional && t2 !== undefined && !t2.isOptional) {
-                    if (!this.checkValueEq(t1.type, t2.type)) {
-                        return false;
-                    }
-                }
-                else {
-                    if (t1 !== undefined && t2 === undefined) {
-                        if (!t1.isOptional) {
-                            return false;
-                        }
-                    }
-
-                    if (t1 === undefined && t2 !== undefined) {
-                        if (!t2.isOptional) {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        const bothTupleConcept = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialTupleConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialTupleConceptType()));
-        if (bothTupleConcept) {
-            return true;
-        }
-
-        const bothRecord = (lhs.options[0] instanceof ResolvedRecordAtomType) && (rhs.options[0] instanceof ResolvedRecordAtomType);
-        if (bothRecord) {
-            const rec1 = lhs.options[0] as ResolvedRecordAtomType;
-            const rec2 = rhs.options[0] as ResolvedRecordAtomType;
-
-            let allprops = new Set<string>();
-            rec1.entries.forEach((e) => allprops.add(e.name));
-            rec2.entries.forEach((e) => allprops.add(e.name));
-
-            let pl: string[] = [];
-            allprops.forEach((se) => pl.push(se));
-
-            for (let i = 0; i < pl.length; ++i) {
-                const t1 = rec1.entries.find((v) => v.name === pl[i]);
-                const t2 = rec2.entries.find((v) => v.name === pl[i]);
-
-                if (t1 !== undefined && !t1.isOptional && t2 !== undefined && !t2.isOptional) {
-                    if (!this.checkValueEq(t1.type, t2.type)) {
-                        return false;
-                    }
-                }
-                else {
-                    if (t1 !== undefined && t2 === undefined) {
-                        if (!t1.isOptional) {
-                            return false;
-                        }
-                    }
-
-                    if (t1 === undefined && t2 !== undefined) {
-                        if (!t2.isOptional) {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        const bothRecordConcept = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialRecordConceptType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialRecordConceptType()));
-        if (bothRecordConcept) {
+        const lhskeytype = lhs.idStr === "NSCore::KeyType" && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConcept());
+        const rhskeytype = this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConcept()) && rhs.idStr === "NSCore::KeyType";
+        if (lhskeytype || rhskeytype) {
             return true;
         }
 
@@ -304,20 +229,11 @@ class TypeChecker {
 
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
         const bothInt = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
-        const bothString = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()));
-
-        if (bothInt || bothString) {
+        if (bothInt) {
             return true;
         }
 
-        const bothStringOf = (lhs.idStr.startsWith("NSCore::StringOf<") && rhs.idStr.startsWith("NSCore::StringOf<"));
-        const orderok = this.m_assembly.subtypeOf(lhs, rhs) || this.m_assembly.subtypeOf(rhs, lhs); //types are compatible
-
-        //
-        //TODO: should be like equality type checking on any KeyType
-        //
-
-        return bothStringOf && orderok;
+        return false;
     }
 
     private getInfoForLoadFromIndex(rtype: ResolvedType, idx: number): ResolvedType {
@@ -801,6 +717,16 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
             }
             else {
+                if(oftype.object.name === "Set") {
+                    const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
+                    this.m_emitter.registerStaticCall(oftype.object, sdecl, "_cons_insert", oftype.binds, [], []);
+                }
+                
+                if(oftype.object.name === "Map") {
+                    const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
+                    this.m_emitter.registerStaticCall(oftype.object, sdecl, "_cons_insert", oftype.binds, [], []);
+                }
+
                 if (args.every((v) => !v.expando)) {
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg.treg), trgt);
                 }

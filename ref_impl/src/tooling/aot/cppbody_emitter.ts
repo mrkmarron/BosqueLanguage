@@ -217,10 +217,15 @@ class CPPBodyEmitter {
 
     generateMIRConstructorPrimary(cp: MIRConstructorPrimary): string {
         const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
-        const fvals = cp.args.map((arg, i) => {
+        let fvals = cp.args.map((arg, i) => {
             const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
             return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
         });
+
+        //super special case
+        if(cp.tkey === "NSCore::KeyList") {
+            fvals = [`MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(ctype.tkey)}`, ...fvals];
+        }
 
         const cppctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
         const scopevar = this.varNameToCppName("$scope$");
@@ -432,11 +437,11 @@ class CPPBodyEmitter {
                 //
                 //TODO: there are a number of options here for things like enum or typed string that we can handle better
                 //
-                return `BSQIndexableEqual(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
+                return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
             }
         }
         else {
-            return `BSQIndexableEqual(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
+            return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
         }
     }
 
@@ -1680,22 +1685,22 @@ class CPPBodyEmitter {
             }
             case "set_unsafe_update":  
             case "map_unsafe_update": {
-                bodystr = "auto _return_ = " + `${params[0]}->update(${params[1]}, ${params[2]})` + ";";
+                bodystr = "auto _return_ = " + `${params[0]}->update(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)})` + ";";
                 break;
             }
             case "set_destuctive_update":
             case "map_destuctive_update": {
-                bodystr = "auto _return_ = " + `${params[0]}->destructiveUpdate(${params[1]}, ${params[2]})` + ";";
+                bodystr = "auto _return_ = " + `${params[0]}->destructiveUpdate(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)})` + ";";
                 break;
             }
             case "set_unsafe_add":  
             case "map_unsafe_add": {
-                bodystr = "auto _return_ = " + `${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]})` + ";";
+                bodystr = "auto _return_ = " + `${params[0]}->add(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${params[3]})` + ";";
                 break;
             }
             case "set_destuctive_add":
             case "map_destuctive_add": {
-                bodystr = "auto _return_ = " + `${params[0]}->destructiveAdd(${params[1]}, ${params[2]}, ${params[3]})` + ";";
+                bodystr = "auto _return_ = " + `${params[0]}->destructiveAdd(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${params[3]})` + ";";
                 break;
             }
             default: {

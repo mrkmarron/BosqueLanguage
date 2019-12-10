@@ -38,7 +38,7 @@ entrypoint function hasCno(): Int {
     return hasop(2);
 }
 
-entrypoint function insertop(x: Int, y: Int): Int {
+entrypoint function insertOp(x: Int, y: Int): Int {
     var mint = Map<Int, Int>{[1, 1], [3, 3], [2, 2]};
     var mup = mint->insert(x);
 
@@ -54,7 +54,7 @@ entrypoint function insertCno(): Int {
     return insertOp(2, 11);
 }
 
-entrypoint function removeCop(x: Int): Int {
+entrypoint function removeOp(x: Int): Int {
     var mint = Map<Int, Int>{[1, 1], [2, 2], [3, 3]};
     var mup = mint->remove(x);
 

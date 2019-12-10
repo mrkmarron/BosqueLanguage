@@ -83,7 +83,7 @@ entity KeyList provides Object {
             return this.tail;
         }
         else {
-            return KeyList{key=this.key, this.tail->as<KeyList>()->removeKey(k)};
+            return KeyList{key=this.key, tail=this.tail->as<KeyList>()->removeKey(k)};
         }
     }
 }
