@@ -240,13 +240,13 @@ class CPPBodyEmitter {
 
         let conscall = "";
         if (this.typegen.isListType(cpetype)) {
-            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)});`;
+            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
         }
         else if (this.typegen.isSetType(cpetype)) {
-            conscall = `new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)});`;
+            conscall = `new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
         }
         else {
-            conscall = `new BSQMap(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)});`;
+            conscall = `new BSQMap(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
         }
 
         const scopevar = this.varNameToCppName("$scope$");
@@ -264,7 +264,7 @@ class CPPBodyEmitter {
                 return this.typegen.generateConstructorArgInc(this.typegen.anyType, this.argToCpp(arg, this.typegen.anyType));
             });
 
-            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}});`;
+            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}})`;
         }
         else if (this.typegen.isSetType(cpcstype)) {
             //
@@ -1745,7 +1745,7 @@ class CPPBodyEmitter {
             }
         }
 
-        return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n";
+        return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n    " + "return _return_;\n";
     }
 }
 

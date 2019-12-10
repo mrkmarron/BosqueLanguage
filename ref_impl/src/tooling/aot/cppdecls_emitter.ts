@@ -46,6 +46,9 @@ class CPPEmitter {
             if (cppdecl !== undefined) {
                 typedecls_fwd.push(cppdecl.fwddecl);
                 typedecls.push(cppdecl.fulldecl);
+            }
+
+            if(!typeemitter.isSpecialRepType(edecl)) {
                 nominalenums.push(typeemitter.mangleStringForCpp(edecl.tkey));
             }
         });

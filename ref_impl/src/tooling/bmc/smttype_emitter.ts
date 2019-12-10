@@ -304,7 +304,7 @@ class SMTTypeEmitter {
                 return new SMTValue(`(bsqkey_string ${exp.emit()})`);
             }
             else {
-                return new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()})`);
+                return new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()}))`);
             }
         }
         else if (this.isKeyType(from)) {

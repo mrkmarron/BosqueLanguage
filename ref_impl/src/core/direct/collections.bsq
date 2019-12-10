@@ -94,7 +94,7 @@ entity KeyList provides Object {
 //TODO: want to add type gen macro T % KeyType that expands to the type of getKey(v) -- also should update the sig of Indexable::getKey
 //
 entity Set<T where Indexable> provides Object {
-    hidden static _size(s: Set<T>, key: KeyType): Int # set_size
+    hidden static _size(s: Set<T>): Int # set_size
     hidden static _has_key(s: Set<T>, key: KeyType): Bool # set_has_key
     hidden static _at_val(s: Set<T>, key: KeyType): T # set_at_val
 
@@ -157,7 +157,7 @@ entity Set<T where Indexable> provides Object {
 //TODO: this is where we want to use POD when T POD
 //
 entity Map<K where Indexable, V> provides Object {
-    hidden static _size(m: Map<K, V>, key: KeyType): Int # map_size
+    hidden static _size(m: Map<K, V>): Int # map_size
     hidden static _has_key(m: Map<K, V>, key: KeyType): Bool # map_has_key
     hidden static _at_val(m: Map<K, V>, key: KeyType): [K, V] # map_at_val
 

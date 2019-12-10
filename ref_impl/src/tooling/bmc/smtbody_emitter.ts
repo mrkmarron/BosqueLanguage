@@ -273,7 +273,7 @@ class SMTBodyEmitter {
         if (this.typegen.isListType(cpcstype)) {
             let consv = "bsqlist_data_array_empty";
             for (let i = 0; i < cpcs.args.length; ++i) {
-                consv = `(store consv ${i} ${this.argToSMT(cpcs.args[i], this.typegen.anyType)})`;
+                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], this.typegen.anyType).emit()})`;
             }
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(cons@bsqlist ${cpcs.args.length} ${consv})`));
@@ -1309,7 +1309,7 @@ class SMTBodyEmitter {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
             const params = idecl.params.map((arg) => this.varNameToSMTName(arg.name));
-            return `${decl} \n    ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)}\n)`;
+            return `${decl} \n  ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params).emit("  ")}\n)`;
         }
     }
 
@@ -1448,63 +1448,85 @@ class SMTBodyEmitter {
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): SMTExp {
         const rtype = this.typegen.getMIRType(idecl.resultType);
 
+        let bodyres: SMTExp | undefined = undefined;
+        let autowrap = true;
         switch (idecl.implkey) {
             case "list_size": {
-                return new SMTValue(`(bsqlist@size ${params[0]})`);
+                bodyres = new SMTValue(`(bsqlist@size ${params[0]})`);
+                break;
             }
             case "list_unsafe_at": {
-                return this.typegen.coerce(new SMTValue(`(select (bsqlist@entries ${params[0]}) ${params[1]})`), this.typegen.anyType, rtype);
+                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqlist@entries ${params[0]}) ${params[1]})`), this.typegen.anyType, rtype);
+                break;
             }
-            case "list_unsafe_set": {
+            case "list_unsafe_add": {
                 const storeval = this.typegen.coerce(new SMTValue(params[1]), this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType).emit();
                 const idx = `(bsqlist@size ${params[0]})`;
-                return new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) ${idx} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) ${idx} ${storeval}))`);
+                break;
             }
             case "list_unsafe_set": {
                 const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                return new SMTValue(`(cons@bsqlist (bsqlist@size ${params[0]}) (store (bsqlist@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqlist (bsqlist@size ${params[0]}) (store (bsqlist@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                break;
             }
             case "list_destructive_add": {
-                const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                return new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) (bsqlist@size ${params[0]}) ${storeval}))`);
+                const storeval = this.typegen.coerce(new SMTValue(params[1]), this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType).emit();
+                bodyres = new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) (bsqlist@size ${params[0]}) ${storeval}))`);
+                break;
             }
             case "set_size":
             case "map_size": {
-                return new SMTValue(`(bsqkvcontainer@size ${params[0]})`);
+                bodyres = new SMTValue(`(bsqkvcontainer@size ${params[0]})`);
+                break;
             }
             case "set_has_key":
             case "map_has_key": {
-                return new SMTValue(`(not (is-bsqterm@clear (select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))))`);
+                bodyres = new SMTValue(`(not (is-bsqterm@clear (select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))))`);
+                break;
             }
             case "set_at_val":
             case "map_at_val": {
-                return this.typegen.coerce(new SMTValue(`(select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
+                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqkvcontainer@entries ${params[0]}) ${params[1]}))`), this.typegen.anyType, rtype);
+                break;
             }
             case "set_get_keylist":
             case "map_get_keylist": {
-                return new SMTValue(`(bsqkvcontainer@keylist ${params[0]})`);
+                bodyres = new SMTValue(`(bsqkvcontainer@keylist ${params[0]})`);
+                break;
             } 
             case "set_clear_val": 
             case "map_clear_val": {
-                return new SMTValue(`(cons@bsqkvcontainer (- (bsqkvcontainer@size ${params[0]}) 1) ${params[2]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} cons@bsqkeylist$none))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (- (bsqkvcontainer@size ${params[0]}) 1) ${params[2]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} cons@bsqkeylist$none))`);
+                break;
             }
             case "set_unsafe_update":  
             case "map_unsafe_update":
             case "set_destuctive_update":
             case "map_destuctive_update": {
                 const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                return new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) (bsqkvcontainer@keylist ${params[0]}) (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) (bsqkvcontainer@keylist ${params[0]}) (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                break;
             }
             case "set_unsafe_add":  
             case "map_unsafe_add": 
             case "set_destuctive_add":
             case "map_destuctive_add": {
                 const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                return new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) ${params[3]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqset@bsqkvcontainer ${params[0]}) ${params[3]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+                break;
             }
             default: {
-                return new SMTValue(`[Builtin not defined -- ${idecl.iname}]`);
+                bodyres = new SMTValue(`[Builtin not defined -- ${idecl.iname}]`);
+                break;
             }
+        }
+
+        if(!autowrap) {
+            return bodyres;
+        }
+        else {
+            return new SMTValue(`(result_success@${this.typegen.typeToSMTCategory(rtype)} ${bodyres.emit()})`)
         }
     }
 }

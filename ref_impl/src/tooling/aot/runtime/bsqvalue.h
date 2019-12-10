@@ -1129,7 +1129,7 @@ public:
         }
     }
 
-    BSQList* unsafeAdd(const BSQInt& idx, Value v) const
+    BSQList* unsafeAdd(Value v) const
     {
         std::vector<Value> nv(this->entries.size(), nullptr);
         for(size_t i = 0; i < this->entries.size(); ++i)
