@@ -17,6 +17,20 @@ entity List<T> provides Object {
     hidden static _unsafe_set(l: List<T>, i: Int, v: T): List<T> # list_unsafe_set
     hidden static _destructive_add(l: List<T>, v: T): List<T> # list_destructive_add
 
+    hidden recursive static _all(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
+        if(idx == List<T>::_size(l)) {
+            return true;
+        }
+
+        var val = List<T>::_unsafe_at(l, idx);
+        if(!p[recursive?](val)) {
+            return false;
+        }
+        else {
+            return List<T>::_all[recursive](l, idx + 1, p);
+        }
+    }
+
     hidden recursive static _filter(l: List<T>, idx: Int, lp: List<T>, p: recursive? fn(_: T) -> Bool): List<T> {
         if(idx == List<T>::_size(l)) {
             return lp;
@@ -62,6 +76,10 @@ entity List<T> provides Object {
         check 0 <= idx && idx < List<T>::_size(this);
 
         return List<T>::_unsafe_set(this, idx, v);
+    }
+
+    method all(p: recursive? fn(_: T) -> Bool): Bool {
+        return List<T>::_all[recursive](this, 0, p);
     }
 
     method filter(p: recursive? fn(_: T) -> Bool): List<T> {

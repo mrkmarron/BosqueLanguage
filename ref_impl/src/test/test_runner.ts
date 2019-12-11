@@ -380,6 +380,7 @@ function runAll() {
     runner.loadTestSet("expression");
     runner.loadTestSet("statement");
     runner.loadTestSet("library");
+    runner.loadTestSet("doc_examples");
 
     runner.run();
 }

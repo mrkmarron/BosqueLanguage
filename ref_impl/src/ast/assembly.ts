@@ -1203,8 +1203,7 @@ class Assembly {
             }
         }
 
-        //co-variant is cool on the return type -- useful if we have a known target in overload
-        return this.subtypeOf(t1.resultType, t2.resultType);
+        return t1.resultType.idStr === t2.resultType.idStr;
     }
 
     functionSubtypeOf(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
