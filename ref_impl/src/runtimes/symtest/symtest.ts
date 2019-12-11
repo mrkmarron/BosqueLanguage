@@ -126,6 +126,7 @@ setImmediate(() => {
                 else {
                     console.log("Attempting to extract inputs...");
 
+                    console.log(res);
                     const splits = res.split("\n");
                     const inputs = entrypoint.params.map((p) => {
                         const ridx = splits.findIndex((str) => str.trim().startsWith(`(define-fun @${p.name}`));
@@ -134,7 +135,7 @@ setImmediate(() => {
                         }
                         else {
                             const mres = splits[ridx + 1].trim();
-                            return `${p.name} = ${mres.substring(mres.indexOf(" "), mres.length - 2).trim()}`;
+                            return `${p.name} = ${mres.substring(0, mres.length - 1).trim()}`;
                         }
                     });
 
