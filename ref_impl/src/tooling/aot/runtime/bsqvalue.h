@@ -22,7 +22,7 @@
 #define BSQ_GET_VALUE_PTR(V, T) (reinterpret_cast<T*>(V))
 
 #define BSQ_BOX_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
-#define BSQ_BOX_VALUE_INT(I) ((void*)((((int64_t) I) << 0x32) | 0x4))
+#define BSQ_BOX_VALUE_INT(I) ((void*)((((uint64_t) I) << 0x32) | 0x4))
 
 #define BSQ_GET_VALUE_TRUTHY(V) (((uintptr_t)(V)) & 0x1)
 
@@ -87,7 +87,7 @@ public:
 
     BSQInt(int32_t value) : data(nullptr) 
     { 
-        this->data = (void*)((((int64_t)value) << 32) | 0x1);
+        this->data = (void*)((((uint64_t)value) << 32) | 0x1);
     }
 
     BSQInt(BigInt* value) : data((void*)value) 
