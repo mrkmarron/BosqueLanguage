@@ -27,7 +27,7 @@ else {
     platpathsmt = "bin/macos/z3";
 }
 
-const z3path = Path.normalize(Path.join(__dirname, "../tooling/bmc/runtime", platpathsmt));
+const z3path = Path.normalize(Path.join(__dirname, "../../tooling/bmc/runtime", platpathsmt));
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     let code: { relativePath: string, contents: string }[] = [];
@@ -92,7 +92,7 @@ setImmediate(() => {
             process.exit(1);
         }
 
-        const sparams = SMTEmitter.emit(massembly, entrypoint, Commander.bound, false);
+        const sparams = SMTEmitter.emit(massembly, entrypoint, Commander.bound, true);
         const lsrc = FS.readFileSync(smt_runtime).toString();
         const contents = lsrc
             .replace(";;FIXED_TUPLE_DECLS_FWD;;", "  " + sparams.fixedtupledecls_fwd)
@@ -112,29 +112,42 @@ setImmediate(() => {
 
         console.log(`Running z3 on SMT encoding...`);
 
-        const res = execSync(`${z3path} -smt2 -in`, { input: contents }).toString().trim();
+        try {
+            const res = execSync(`${z3path} -smt2 -in`, { input: contents }).toString().trim();
 
-        if(res === "(unsat)") {
-            console.log(chalk.green("Verified up to bound -- no errors found!"));
+            if (res === "unsat") {
+                console.log(chalk.green("Verified up to bound -- no errors found!"));
+            }
+            else {
+                console.log(chalk.red("Detected possible errors!"));
+                if (!Commander.model) {
+                    console.log("Rerun with '-m' flag to attempt to generate failing inputs.")
+                }
+                else {
+                    console.log("Attempting to extract inputs...");
+
+                    const splits = res.split("\n");
+                    const inputs = entrypoint.params.map((p) => {
+                        const ridx = splits.findIndex((str) => str.trim().startsWith(`(define-fun @${p.name}`));
+                        if (ridx === -1) {
+                            return `${p.name} = ??`;
+                        }
+                        else {
+                            const mres = splits[ridx + 1].trim();
+                            return `${p.name} = ${mres.substring(mres.indexOf(" "), mres.length - 2).trim()}`;
+                        }
+                    });
+
+                    console.log(inputs.join("\n"));
+                }
+            }
         }
-        else {
-            console.log(chalk.red("Detected possible errors!"));
+        catch (exx) {
             if(Commander.model) {
-                console.log("Attempting to extract inputs...");
-
-                const splits = res.split("\n");
-                const inputs = entrypoint.params.map((p) => {
-                    const ridx = splits.findIndex((str) => str.trim().startsWith(`(define-fun ${p.name}`));
-                    if (ridx === -1) {
-                        return `${p.name} = ??`;
-                    }
-                    else {
-                        const mres = splits[ridx + 1].trim();
-                        return `${p.name} = ${mres.substring(mres.indexOf(" "), mres.length - 2).trim()}`;
-                    }
-                });
-
-                console.log(inputs.join("\n"));
+                console.log("Cannot generate model '-m' as errors were not found?")
+            }
+            else {
+                throw exx;
             }
         }
     }

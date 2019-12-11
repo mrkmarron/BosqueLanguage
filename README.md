@@ -113,17 +113,31 @@ The `ref_impl` directory contains the reference implementation parser, type chec
 npm install && npm test
 ```
 
-### Command Line Execution
+### Executable Generation
 
-XXXXXX
+Bosque supports the generation of standalone command-line executables via the `ExeGen` tool. Details on this tool can be found in the [readme](./ref_impl/src/runtimes/exegen/README.md).
 
-The `ref_impl` directory contains a simple command line runner for standalone Bosque (`.bsq`) files. These files must have a single `entrypoint` function called `main()` (see [some examples](ref_impl/src/test/apps)). The code in the file can be parsed, type checked, and executed with:
-
-```none
-node bin/test/app_runner.js FILE.bsq
+A simple example use is to create a file called "max.bsq" with the following code:
 ```
+namespace NSMain;
 
-We also provide a compiler (to bytecode only right now) in the directory `compiler\bcgen.js` and a way to execute the code in the resulting bytecode assemblies with the executor in `interpreter\exec.js`. 
+entrypoint function main(x: Int, y: Int): Int {
+    return (x > y) ? x : y;
+}
+```
+Then run the following command to produce the `max.exe` (on Windows executable) which can then be invoked with:
+```
+> node ref_impl\bin\runtimes\exegen\exegen.js -o max.exe max.bsq
+```
+Which will create an executable named `max.exe` in the current directory.
+
+Running this executable:
+```
+> max.exe 1 5
+```
+Will output `5`.
+
+### Symbolic Testing
 
 ### Visual Studio Code Integration
 
