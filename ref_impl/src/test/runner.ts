@@ -82,7 +82,7 @@ else if ((Commander.symbolic || Commander.result) !== undefined) {
             process.exit(1);
         }
 
-        const sparams = SMTEmitter.emit(massembly, entrypoint, Commander.symbolic !== undefined);
+        const sparams = SMTEmitter.emit(massembly, entrypoint, 4, Commander.symbolic !== undefined);
         const lsrc = FS.readFileSync(smt_runtime).toString();
         const contents = lsrc
             .replace(";;FIXED_TUPLE_DECLS_FWD;;", "  " + sparams.fixedtupledecls_fwd)

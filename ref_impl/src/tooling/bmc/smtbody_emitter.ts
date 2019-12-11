@@ -16,17 +16,17 @@ function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
 }
 
-const DEFAULT_GAS = 4;
-
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
+
+    private default_gas = 4;
 
     private errorCodes = new Map<string, number>();
     private bmcCodes = new Map<string, number>();
     private bmcGas = new Map<string, number>();
 
-    private typecheckgas = DEFAULT_GAS;
+    private typecheckgas = 4;
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -38,9 +38,12 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
+    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, default_gas: number) {
         this.assembly = assembly;
         this.typegen = typegen;
+
+        this.default_gas = default_gas;
+        this.typecheckgas = default_gas;
 
         this.currentRType = typegen.noneType;
     }
@@ -66,7 +69,7 @@ class SMTBodyEmitter {
 
     getGasForOperation(key: string): number {
         if (!this.bmcGas.has(key)) {
-           this.bmcGas.set(key, DEFAULT_GAS);
+           this.bmcGas.set(key, this.default_gas);
         }
         return this.bmcGas.get(key) as number;
     }

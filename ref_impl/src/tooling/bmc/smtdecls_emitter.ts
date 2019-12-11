@@ -30,11 +30,11 @@ type SMTCode = {
 const SymbolicArgTypecheckGas = 3;
 
 class SMTEmitter {
-    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, errorcheck: boolean): SMTCode {
+    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, default_gas: number, errorcheck: boolean): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
         typeemitter.initializeConceptSubtypeRelation();
 
-        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
+        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter, default_gas);
 
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         const rcg = [...cginfo.topologicalOrder].reverse();

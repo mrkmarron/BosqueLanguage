@@ -129,7 +129,7 @@ setImmediate(() => {
         });
 
         console.log(`Compiling C++ code with ${Commander.compiler} into exe file "${chalk.bold(Commander.outfile)}"...`);
-        execSync(`${Commander.compiler}${Commander.debug ? " -g -DBDEBUG" : "-Os"} -o ${Commander.outfile} ${cpppath}/*.cpp`);
+        execSync(`${Commander.compiler}${Commander.debug ? " -g -DBDEBUG" : " -Os"} -o ${Commander.outfile} ${cpppath}/*.cpp`);
     }
     catch (ex) {
         process.stderr.write(chalk.red(`Error -- ${ex}\n`));

@@ -171,7 +171,7 @@ class TestRunner {
             execSync(`node ${runnerapp} -c "NSTest::${test.entrypoint}" ${testsrc}`);
 
             process.chdir(cppscratch);
-            execSync(`${clangpath} -fsanitize=undefined${process.platform === "linux" ? ",memory" : ",address"} -g -DBDEBUG -o ${cppexe} *.cpp`);
+            execSync(`${clangpath} -fsanitize=undefined -g -DBDEBUG -o ${cppexe} *.cpp`);
             const res = execSync(`${cppexe} ${test.args.join(" ")}`).toString().trim();
             return res;
         }

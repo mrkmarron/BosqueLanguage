@@ -23,6 +23,12 @@ entrypoint function main(x: Int, y: Int): Int {
 
 Then run the following command to produce the `max.exe` (on Windows executable) which can then be invoked with:
 ```
-> node bin\
+> node ref_impl\bin\runtimes\exegen\exegen.js -o max.exe max.bsq
 ```
-Which will output `5`.
+Which will create an executable named `max.exe` in the current directory.
+
+Running this executable:
+```
+> max.exe 1 5
+```
+Will output `5`.
