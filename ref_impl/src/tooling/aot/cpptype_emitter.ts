@@ -494,11 +494,11 @@ class CPPTypeEmitter {
         }
 
         const constructor_args = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.name}`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.fname}`;
         });
 
         const constructor_initializer = entity.fields.map((fd) => {
-            return `${fd.name}(${fd.name})`;
+            return `${this.mangleStringForCpp(fd.fkey)}(${fd.name})`;
         });
 
         const destructor_list = entity.fields.map((fd) => {
@@ -509,36 +509,36 @@ class CPPTypeEmitter {
 
             if(this.isTupleType(ftype)) {
                 if(this.isKnownLayoutTupleType(ftype)) {
-                    return `this->${ftype}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
                 }
                 else {
-                    return `this->${ftype}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
                 }
             }
             else if(this.isRecordType(ftype)) {
                 if(this.isKnownLayoutRecordType(ftype)) {
-                    return `this->${ftype}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
                 }
                 else {
-                    return `this->${ftype}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
                 }
             }
             else if (this.isUEntityType(ftype)) {
                 if (this.assembly.subtypeOf(this.noneType, ftype)) {
-                    return `BSQRef::checkedDecrementNoneable(this->${fd.name});`;
+                    return `BSQRef::checkedDecrementNoneable(this->${this.mangleStringForCpp(fd.fkey)});`;
                 }
                 else {
-                    return `BSQRef::checkedDecrementFast(this->${fd.name});`;
+                    return `BSQRef::checkedDecrementFast(this->${this.mangleStringForCpp(fd.fkey)});`;
                 }
             }
             else {
-                return `BSQRef::checkedDecrement(this->${fd.name});`;
+                return `BSQRef::checkedDecrement(this->${this.mangleStringForCpp(fd.fkey)});`;
             }
         })
         .filter((fd) => fd !== undefined);
 
         const fields = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${fd.name};`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${this.mangleStringForCpp(fd.fkey)};`;
         });
 
         const vfield_accessors = entity.fields.map((fd) => {

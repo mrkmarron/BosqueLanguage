@@ -224,7 +224,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, pname, trgt));
     }
 
-    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, fname: string, trgt: MIRTempRegister) {
+    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, fname: MIRFieldKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessFromField(sinfo, resultAccessType, arg, fname, trgt));
     }
 
@@ -232,7 +232,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRProjectFromProperties(sinfo, resultProjectType, arg, properties, trgt));
     }
 
-    emitProjectFields(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, fields: string[], trgt: MIRTempRegister) {
+    emitProjectFields(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, fields: MIRFieldKey[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRProjectFromFields(sinfo, resultProjectType, arg, fields, trgt));
     }
 
@@ -256,7 +256,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRModifyWithProperties(sinfo, resultRecordType, arg, updates, trgt));
     }
 
-    emitModifyWithFields(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [string, MIRArgument][], trgt: MIRTempRegister) {
+    emitModifyWithFields(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, updates: [MIRFieldKey, MIRArgument][], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRModifyWithFields(sinfo, resultNominalType, arg, updates, trgt));
     }
 
@@ -268,8 +268,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRStructuredExtendRecord(sinfo, resultRecordType, arg, update, trgt));
     }
 
-    emitStructuredExtendObject(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, update: MIRArgument, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, resultNominalType, arg, update, trgt));
+    emitStructuredExtendObject(sinfo: SourceInfo, resultNominalType: MIRResolvedTypeKey, arg: MIRArgument, update: MIRArgument, fieldResolves: [string, MIRFieldKey][], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRStructuredExtendObject(sinfo, resultNominalType, arg, update, fieldResolves, trgt));
     }
 
     emitInvokeFixedFunction(masm: MIRAssembly, sinfo: SourceInfo, rtkey: MIRType, ikey: MIRInvokeKey, args: MIRArgument[], refs: [string, MIRType][], trgt: MIRTempRegister) {

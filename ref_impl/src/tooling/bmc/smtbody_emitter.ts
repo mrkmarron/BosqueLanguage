@@ -411,10 +411,10 @@ class SMTBodyEmitter {
 
         if (this.typegen.isUEntityType(argtype)) {
             const etype = SMTTypeEmitter.getUEntityType(argtype);
+            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype).emit()})`);
+            
             const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
             const field = entity.fields.find((f) => f.name === op.field) as MIRFieldDecl;
-
-            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype).emit()})`);
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType));
         }
         else {
@@ -1479,6 +1479,18 @@ class SMTBodyEmitter {
             case "list_destructive_add": {
                 const storeval = this.typegen.coerce(new SMTValue(params[1]), this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType).emit();
                 bodyres = new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) (bsqlist@size ${params[0]}) ${storeval}))`);
+                break;
+            }
+            case "_cons": {
+                bodyres = new SMTValue(`(cons@bsqkeylist ${params[0]} ${params[1]})`);
+                break;
+            }
+            case "_get_key": {
+                bodyres = new SMTValue(`(bsqkeylist@key ${params[0]})`);
+                break;
+            }
+            case "_get_tail": {
+                bodyres = new SMTValue(`(bsqkeylist@tail ${params[0]})`);
                 break;
             }
             case "set_size":

@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType } from "../../compiler/mir_assembly";
 
-import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
+import { MIRResolvedTypeKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTLet, SMTCond } from "./smt_exp";
 
 import * as assert from "assert";
@@ -556,7 +556,7 @@ class SMTTypeEmitter {
 
         const ename = this.mangleStringForSMT(entity.tkey);
         const fargs = entity.fields.map((fd) => {
-            return `(${ename}@${fd.name} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
+           return `(${ename}@${this.mangleStringForSMT(fd.fkey)} ${this.typeToSMTCategory(this.getMIRType(fd.declaredType))})`;
         });
 
         return {
@@ -601,13 +601,8 @@ class SMTTypeEmitter {
         }
     }
 
-    generateEntityAccessor(ekey: MIRNominalTypeKey, f: string): string {
-        if(ekey === "NSCore::KeyList") {
-            return "bsqkeylist@" + f;
-        }
-        else {
-            return `${this.mangleStringForSMT(ekey)}@${f}`;
-        }
+    generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
+        return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
     }
 }
 

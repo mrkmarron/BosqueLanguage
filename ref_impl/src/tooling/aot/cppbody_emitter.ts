@@ -222,11 +222,6 @@ class CPPBodyEmitter {
             return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
         });
 
-        //super special case
-        if(cp.tkey === "NSCore::KeyList") {
-            fvals = [`MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(ctype.tkey)}`, ...fvals];
-        }
-
         const cppctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
         const scopevar = this.varNameToCppName("$scope$");
         const cexp = `${this.varToCppName(cp.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new ${cppctype}(${fvals.join(", ")}));`;
@@ -362,14 +357,14 @@ class CPPBodyEmitter {
 
         if (this.typegen.isUEntityType(argtype)) {
             const etype = CPPTypeEmitter.getUEntityType(argtype);
+            const access = `${this.argToCpp(op.arg, argtype)}->${this.typegen.mangleStringForCpp(op.field)}`;
+
             const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
             const field = entity.fields.find((f) => f.name === op.field) as MIRFieldDecl;
-
-            const access = `${this.argToCpp(op.arg, argtype)}->${op.field}`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType)};`;
         }
         else {
-            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRef)->get$${op.field}()`;
+            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRef)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.anyType, resultAccessType)};`;
         }
     }
@@ -1656,6 +1651,20 @@ class CPPBodyEmitter {
             }
             case "list_destructive_add": {
                 bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
+                break;
+            }
+            case "_cons": {
+                const klparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[0].type), params[0]);
+                const vparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[1].type), params[1]);
+                bodystr = `auto _return_ = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, BSQKeyList>(new BSQKeyList(${klparam}, ${vparam});`
+                break;
+            }
+            case "_get_key": {
+                bodystr = `auto _return_ = ${params[0]}->key;`
+                break;
+            }
+            case "_get_tail": {
+                bodystr = `auto _return_ = ${params[0]}->tail;`
                 break;
             }
             case "set_size":
