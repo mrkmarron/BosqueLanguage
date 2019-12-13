@@ -494,7 +494,7 @@ class CPPTypeEmitter {
         }
 
         const constructor_args = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.fname}`;
+            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.name}`;
         });
 
         const constructor_initializer = entity.fields.map((fd) => {
@@ -546,9 +546,8 @@ class CPPTypeEmitter {
                 return "NA";
             }
             else {
-                const fn = `this->${fd.name}`;
-                const fdv = this.coerce(fn, this.getMIRType(fd.declaredType), this.anyType);
-                return `Value get$${fd.name}() const { return ${fdv}; };`;
+                const fn = `this->${this.mangleStringForCpp(fd.fkey)}`;
+                return `${this.typeToCPPType(this.getMIRType(fd.declaredType) , "return")} get$${this.mangleStringForCpp(fd.fkey)}() const { return ${fn}; };`;
             }
         });
 
@@ -595,7 +594,7 @@ class CPPTypeEmitter {
         });
 
         this.scopectr = 0;
-        const faccess = entity.fields.map((f) => this.coerce(`this->${f.name}`, this.getMIRType(f.declaredType), this.anyType));
+        const faccess = entity.fields.map((f) => this.coerce(`this->${this.mangleStringForCpp(f.fkey)}`, this.getMIRType(f.declaredType), this.anyType));
         const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
         const display = "std::u32string display() const\n"
         + "    {\n"

@@ -360,7 +360,7 @@ class CPPBodyEmitter {
             const access = `${this.argToCpp(op.arg, argtype)}->${this.typegen.mangleStringForCpp(op.field)}`;
 
             const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
-            const field = entity.fields.find((f) => f.name === op.field) as MIRFieldDecl;
+            const field = entity.fields.find((f) => f.fkey === op.field) as MIRFieldDecl;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType)};`;
         }
         else {
@@ -1653,17 +1653,18 @@ class CPPBodyEmitter {
                 bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
                 break;
             }
-            case "_cons": {
+            case "keylist_cons": {
+                const tag = `MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(rtype.trkey)}`;
                 const klparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[0].type), params[0]);
                 const vparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[1].type), params[1]);
-                bodystr = `auto _return_ = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, BSQKeyList>(new BSQKeyList(${klparam}, ${vparam});`
+                bodystr = `auto _return_ = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, BSQKeyList>(new BSQKeyList(${tag}, ${klparam}, ${vparam}));`
                 break;
             }
-            case "_get_key": {
+            case "keylist_getkey": {
                 bodystr = `auto _return_ = ${params[0]}->key;`
                 break;
             }
-            case "_get_tail": {
+            case "keylist_gettail": {
                 bodystr = `auto _return_ = ${params[0]}->tail;`
                 break;
             }
