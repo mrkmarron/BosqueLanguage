@@ -354,18 +354,16 @@ class CPPBodyEmitter {
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
         const argtype = this.getArgType(op.arg);
+        const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
+        const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
         if (this.typegen.isUEntityType(argtype)) {
-            const etype = CPPTypeEmitter.getUEntityType(argtype);
             const access = `${this.argToCpp(op.arg, argtype)}->${this.typegen.mangleStringForCpp(op.field)}`;
-
-            const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
-            const field = entity.fields.find((f) => f.fkey === op.field) as MIRFieldDecl;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType)};`;
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
         else {
-            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRef)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, this.typegen.anyType, resultAccessType)};`;
+            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, argtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
     }
 
@@ -1490,18 +1488,18 @@ class CPPBodyEmitter {
                 const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
                 for (let i = 0; i < maxlen; ++i) {
                     const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
-                    procs.push(`BSQRef** ${cslotvar}`);
+                    procs.push(`BSQRef** ${cslotvar};`);
                 }
-                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join("; ")}`;
+                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join(" ")}`;
             }
             else if (this.typegen.isRecordType(this.currentRType)) {
                 const procs: string[] = [];
                 const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
                 for (let i = 0; i < allprops.length; ++i) {
                     const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i}`);
+                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i};`);
                 }
-                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join("; ")}`;
+                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join(" ")}`;
             }
             else {
                 const cslotvar = this.varNameToCppName("$callerslot$");
@@ -1560,7 +1558,7 @@ class CPPBodyEmitter {
         const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "decl");
         const flagname = `_flag_${this.invokenameToCPP(fdkey)}`;
         const memoname = `_memo_${this.invokenameToCPP(fdkey)}`;
-        const gdecl = `bool ${flagname} = false; ${decltype}; ${memoname};`;
+        const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
         const qcheck = `    if (${flagname}) { return ${memoname}; }`;
 
         let rcvars = "";
@@ -1570,18 +1568,18 @@ class CPPBodyEmitter {
                 const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
                 for (let i = 0; i < maxlen; ++i) {
                     const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
-                    procs.push(`BSQRef** ${cslotvar}`);
+                    procs.push(`BSQRef** ${cslotvar};`);
                 }
-                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join("; ")}`;
+                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join(" ")}`;
             }
             else if (this.typegen.isRecordType(this.currentRType)) {
                 const procs: string[] = [];
                 const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
                 for (let i = 0; i < allprops.length; ++i) {
                     const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i}`);
+                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i};`);
                 }
-                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join("; ")}`;
+                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join(" ")}`;
             }
             else {
                 const cslotvar = this.varNameToCppName("$callerslot$");

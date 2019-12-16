@@ -6,7 +6,7 @@
 namespace NSTest;
 
 concept Bar {
-    field x: Any;
+    field x: Indexable;
     field y: Int = 3;
 }
 
@@ -20,7 +20,7 @@ entity E0 provides Bar {
 entity E1 provides Bar, Baz {
     field f: Int;
 
-    factory static create(arg: Int): {x: Any, y: Int, z: Bool, f: Int} {
+    factory static create(arg: Int): {x: Indexable, y: Int, z: Bool, f: Int} {
         return { x=none, y=1, z=true, f=3 };
     }
     factory static creat<T>(arg: T): {x: T, y: Int, z: Bool, f: Int} {
@@ -30,12 +30,12 @@ entity E1 provides Bar, Baz {
 
 entity E2<T> {
     field f: T;
-    field g: Any;
+    field g: Indexable;
     
     factory static create(arg: T): {f: T, g: Int} {
         return { f=arg, g=1 };
     }
-    factory static creat<U>(x: T, y: U): {f: T, g: U} {
+    factory static creat<U where Indexable>(x: T, y: U): {f: T, g: U} {
         return { f=x, g=y };
     }
 }
@@ -77,21 +77,21 @@ entrypoint function createObjFactory(): Bool {
 entrypoint function createObjFactoryTemplate(): Bool {
     var o = E1@creat<String>("ok");
 
-    check o.x == "ok" && o.y == 1 && o.z && o.f == 3;
+    check o.x->as<String>() == "ok" && o.y == 1 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjTFactory(): Bool {
     var o = E2<Int>@create(3);
 
-    check o.f == 3 && o.g == 1;
+    check o.f == 3 && o.g->as<Int>() == 1;
     return true;
 }
 
 entrypoint function createObjTFactoryTemplate(): Bool {
     var o = E2<Int>@creat<String>(3, "ok");
 
-    check o.f == 3 && o.g == "ok";
+    check o.f == 3 && o.g->as<String>() == "ok";
     return true;
 }
 

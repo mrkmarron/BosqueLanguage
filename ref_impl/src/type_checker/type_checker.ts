@@ -1677,7 +1677,9 @@ class TypeChecker {
     private checkInvoke(env: TypeEnvironment, op: PostfixInvoke, arg: MIRTempRegister, trgt: MIRTempRegister, optArgVar: string | undefined, refok: boolean): TypeEnvironment[] {
         const texp = env.getExpressionResult().etype;
 
-        if (op.specificResolve !== undefined || (texp.isUniqueCallTargetType() && this.m_assembly.tryGetOOMemberDeclUnique(texp, "method", op.name))) {
+        const specialcall = (op.name === "isNone" || op.name === "isSome" || op.name === "is" || op.name === "as" || op.name === "tryAs" || op.name === "defaultAs");
+
+        if (!specialcall && (op.specificResolve !== undefined || (texp.isUniqueCallTargetType() && this.m_assembly.tryGetOOMemberDeclUnique(texp, "method", op.name)))) {
             const resolveType = op.specificResolve !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.specificResolve, env.terms) : texp;
 
             this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, resolveType), "This is not a subtype of specified resolve type");
@@ -3436,7 +3438,7 @@ class TypeChecker {
             const genv = TypeEnvironment.createInitialEnvForCall(gscope, emptybinds, [], new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>());
             const vbody = this.checkExpressionAsBody(genv, gscope, gdecl.value, ddecltype);
 
-            const mirglobal = new MIRConstantDecl(`${gdecl.ns}::${gdecl.name}`, gkey, pragmas, gdecl.sourceLocation, gdecl.srcFile, dtype.trkey, vbody);
+            const mirglobal = new MIRConstantDecl(undefined, `${gdecl.ns}::${gdecl.name}`, gkey, pragmas, gdecl.sourceLocation, gdecl.srcFile, dtype.trkey, vbody);
             this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
         }
         catch (ex) {
@@ -3456,7 +3458,7 @@ class TypeChecker {
             const cenv = TypeEnvironment.createInitialEnvForCall(cscope, binds, [], new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>());
             const vbody = this.checkExpressionAsBody(cenv, cscope, cdecl.value as Expression, ddecltype);
 
-            const mirconst = new MIRConstantDecl(`${enclosingType}::${cdecl.name}`, ckey, pragmas, cdecl.sourceLocation, cdecl.srcFile, dtype.trkey, vbody);
+            const mirconst = new MIRConstantDecl(enclosingType, `${enclosingType}::${cdecl.name}`, ckey, pragmas, cdecl.sourceLocation, cdecl.srcFile, dtype.trkey, vbody);
             this.m_emitter.masm.constantDecls.set(ckey, mirconst);
         }
         catch (ex) {
@@ -3465,7 +3467,7 @@ class TypeChecker {
         }
     }
 
-    private processInvokeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+    private processInvokeInfo(enclosingDecl: MIRNominalTypeKey | undefined, iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
         this.checkInvokeDecl(sinfo, invoke, binds, pcodes);
 
         let terms = new Map<string, MIRType>();
@@ -3548,13 +3550,13 @@ class TypeChecker {
             let mbinds = new Map<string, MIRResolvedTypeKey>();
             binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
 
-            return new MIRInvokePrimitiveDecl(iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, mbinds, params, resultType.trkey, preconds, postconds, (invoke.body as BodyImplementation).body as string, mpc);
+            return new MIRInvokePrimitiveDecl(enclosingDecl, iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, mbinds, params, resultType.trkey, preconds, postconds, (invoke.body as BodyImplementation).body as string, mpc);
         }
         else {
             const mirbody = this.checkBody(env, invoke.body as BodyImplementation, argTypes, resolvedResult);
             this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
 
-            return new MIRInvokeBodyDecl(iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, preconds, postconds, mirbody as MIRBody);
+            return new MIRInvokeBodyDecl(enclosingDecl, iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, params, resultType.trkey, preconds, postconds, mirbody as MIRBody);
         }
     }
 
@@ -3609,14 +3611,14 @@ class TypeChecker {
         const mirbody = this.checkBody(env, pci.body as BodyImplementation, argTypes, fsig.resultType);
         this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
 
-        return new MIRInvokeBodyDecl(iname, ikey, pci.attributes, pci.recursive === "yes", pragmas, sinfo, pci.srcFile, params, resultType.trkey, [], [], mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, iname, ikey, pci.attributes, pci.recursive === "yes", pragmas, sinfo, pci.srcFile, params, resultType.trkey, [], [], mirbody as MIRBody);
     }
 
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = f.srcFile;
             const iname = `${f.ns}::${f.name}`;
-            const invinfo = this.processInvokeInfo(iname, fkey, f.sourceLocation, f.invoke, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(undefined, iname, fkey, f.sourceLocation, f.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(fkey, invinfo);
@@ -3657,8 +3659,9 @@ class TypeChecker {
     processStaticFunction(skey: MIRInvokeKey, ctype: OOPTypeDecl, sfdecl: StaticFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = sfdecl.srcFile;
+            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, binds);
             const iname = `${ctype.ns}::${ctype.name}::${sfdecl.name}`;
-            const invinfo = this.processInvokeInfo(iname, skey, sfdecl.sourceLocation, sfdecl.invoke, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(enclosingdecl, iname, skey, sfdecl.sourceLocation, sfdecl.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(skey, invinfo);
@@ -3680,8 +3683,9 @@ class TypeChecker {
 
         try {
             this.m_file = mdecl.srcFile;
+            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, binds);
             const iname = `${ctype.ns}::${ctype.name}->${mdecl.name}`;
-            const invinfo = this.processInvokeInfo(iname, mkey, mdecl.sourceLocation, mdecl.invoke, binds, pcodes, cargs);
+            const invinfo = this.processInvokeInfo(enclosingdecl, iname, mkey, mdecl.sourceLocation, mdecl.invoke, binds, pcodes, cargs);
 
             if (invinfo instanceof MIRInvokePrimitiveDecl) {
                 this.m_emitter.masm.primitiveInvokeDecls.set(mkey, invinfo);

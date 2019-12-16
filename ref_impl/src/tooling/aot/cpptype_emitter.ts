@@ -266,18 +266,18 @@ class CPPTypeEmitter {
         }
         else if (this.isTupleType(ttype)) {
             if(this.isKnownLayoutTupleType(ttype)) {
-                return `BSQTupleKnown<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : "");
+                return `BSQTupleKnown<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>`;
             }
             else {
-                return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>` + (declspec === "parameter" ? "&" : ""); 
+                return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>`; 
             }
         }
         else if (this.isRecordType(ttype)) {
             if (this.isKnownLayoutRecordType(ttype)) {
-                return `BSQRecordKnown<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>` + (declspec === "parameter" ? "&" : "");
+                return `BSQRecordKnown<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>`;
             }
             else {
-                return `BSQRecordFixed<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>` + (declspec === "parameter" ? "&" : "");
+                return `BSQRecordFixed<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>`;
             }
         }
         else if (this.isUEntityType(ttype)) {
@@ -301,6 +301,40 @@ class CPPTypeEmitter {
         }
         else {
             return "Value";
+        }
+    }
+
+    typeToCPPDefaultValue(ttype: MIRType): string {
+        if (this.isSimpleBoolType(ttype)) {
+            return "false"
+        }
+        else if (this.isSimpleIntType(ttype)) {
+            return "BSQ_VALUE_0";
+        }
+        else if (this.isSimpleStringType(ttype)) {
+            return "nullptr";
+        }
+        else if (this.isTupleType(ttype)) {
+            {if(this.isKnownLayoutTupleType(ttype)) {
+                return "{nullptr}";
+            }
+            else {
+                return "{nullptr}";
+            }}
+        }
+        else if (this.isRecordType(ttype)) {
+            if (this.isKnownLayoutRecordType(ttype)) {
+                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
+            }
+            else {
+                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
+            }
+        }
+        else if (this.isUEntityType(ttype)) {
+            return "nullptr";
+        }
+        else {
+            return "nullptr";
         }
     }
 
@@ -509,18 +543,18 @@ class CPPTypeEmitter {
 
             if(this.isTupleType(ftype)) {
                 if(this.isKnownLayoutTupleType(ftype)) {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
                 }
                 else {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
                 }
             }
             else if(this.isRecordType(ftype)) {
                 if(this.isKnownLayoutRecordType(ftype)) {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
                 }
                 else {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec()`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
                 }
             }
             else if (this.isUEntityType(ftype)) {
@@ -542,18 +576,18 @@ class CPPTypeEmitter {
         });
 
         const vfield_accessors = entity.fields.map((fd) => {
-            if (!fd.attributes.includes("virtual") && !fd.attributes.includes("override")) {
+            if (fd.enclosingDecl === entity.tkey) {
                 return "NA";
             }
             else {
                 const fn = `this->${this.mangleStringForCpp(fd.fkey)}`;
-                return `${this.typeToCPPType(this.getMIRType(fd.declaredType) , "return")} get$${this.mangleStringForCpp(fd.fkey)}() const { return ${fn}; };`;
+                return `${this.typeToCPPType(this.getMIRType(fd.declaredType) , "return")} get$${this.mangleStringForCpp(fd.fkey)}() { return ${fn}; };`;
             }
         });
 
         const vcalls = [...entity.vcallMap].map((callp) => {
             const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-            if (!rcall.attributes.includes("override")) {
+            if (rcall.enclosingDecl === entity.tkey) {
                 return "NA";
             }
             else {
@@ -609,7 +643,7 @@ class CPPTypeEmitter {
             + "public:\n"
             + `    ${fields.join("\n    ")}\n\n`
             + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
-            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join("; ")} }\n\n`
+            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
             + `    ${display}\n\n`
             + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
             + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`

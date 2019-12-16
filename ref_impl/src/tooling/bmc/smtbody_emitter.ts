@@ -408,17 +408,16 @@ class SMTBodyEmitter {
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
         const argtype = this.getArgType(op.arg);
+        const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
 
         if (this.typegen.isUEntityType(argtype)) {
             const etype = SMTTypeEmitter.getUEntityType(argtype);
             const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype).emit()})`);
-            
-            const entity = this.assembly.entityDecls.get(etype.ekey) as MIREntityTypeDecl;
-            const field = entity.fields.find((f) => f.fkey === op.field) as MIRFieldDecl;
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(field.declaredType), resultAccessType));
+
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(fdecl.declaredType), resultAccessType));
         }
         else {
-            const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType)}) "${op.field}")`);
+            const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) "${op.field}")`);
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.anyType, resultAccessType));
         }
     }
