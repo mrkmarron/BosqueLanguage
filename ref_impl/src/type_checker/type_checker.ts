@@ -702,12 +702,12 @@ class TypeChecker {
             else {
                 if(oftype.object.name === "Set") {
                     const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
-                    this.m_emitter.registerStaticCall(oftype.object, sdecl, "_cons_insert", oftype.binds, [], []);
+                    this.m_emitter.registerStaticCall(oftype.object, oftype.binds, sdecl, "_cons_insert", oftype.binds, [], []);
                 }
                 
                 if(oftype.object.name === "Map") {
                     const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
-                    this.m_emitter.registerStaticCall(oftype.object, sdecl, "_cons_insert", oftype.binds, [], []);
+                    this.m_emitter.registerStaticCall(oftype.object, oftype.binds, sdecl, "_cons_insert", oftype.binds, [], []);
                 }
 
                 if (args.every((v) => !v.expando)) {
@@ -1079,7 +1079,7 @@ class TypeChecker {
 
             const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
-            const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+            const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
             //
             //TODO -- should emit parse checking code here
@@ -1101,7 +1101,7 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(...aoftype.oftype);
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-            const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+            const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
             this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);
@@ -1226,7 +1226,7 @@ class TypeChecker {
         const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
         if (this.m_emitEnabled) {
             this.m_emitter.registerTypeInstantiation(oodecl, oobinds);
-            const skey = this.m_emitter.registerStaticCall(oodecl, fdecl as StaticFunctionDecl, exp.factoryName, binds as Map<string, ResolvedType>, rargs.pcodes, rargs.cinfo);
+            const skey = this.m_emitter.registerStaticCall(oodecl, oobinds, fdecl as StaticFunctionDecl, exp.factoryName, binds as Map<string, ResolvedType>, rargs.pcodes, rargs.cinfo);
 
             const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
             this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, frtype, skey, rargs.args, refinfo, etreg);
@@ -1363,7 +1363,7 @@ class TypeChecker {
             }
             else {
                 this.m_emitter.registerTypeInstantiation(fdecl.contiainingType, fdecl.binds);
-                const skey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.decl as StaticFunctionDecl, (fdecl.decl as StaticFunctionDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
+                const skey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.binds, fdecl.decl as StaticFunctionDecl, (fdecl.decl as StaticFunctionDecl).name, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
 
                 const [frtype, refinfo] = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
                 this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, frtype, skey, margs.args, refinfo, trgt);
@@ -3656,10 +3656,10 @@ class TypeChecker {
         }
     }
 
-    processStaticFunction(skey: MIRInvokeKey, ctype: OOPTypeDecl, sfdecl: StaticFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
+    processStaticFunction(skey: MIRInvokeKey, ctype: OOPTypeDecl, cbinds: Map<string, ResolvedType>, sfdecl: StaticFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
         try {
             this.m_file = sfdecl.srcFile;
-            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, binds);
+            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, cbinds);
             const iname = `${ctype.ns}::${ctype.name}::${sfdecl.name}`;
             const invinfo = this.processInvokeInfo(enclosingdecl, iname, skey, sfdecl.sourceLocation, sfdecl.invoke, binds, pcodes, cargs);
 
@@ -3683,7 +3683,7 @@ class TypeChecker {
 
         try {
             this.m_file = mdecl.srcFile;
-            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, binds);
+            const enclosingdecl = MIRKeyGenerator.generateTypeKey(ctype, cbinds);
             const iname = `${ctype.ns}::${ctype.name}->${mdecl.name}`;
             const invinfo = this.processInvokeInfo(enclosingdecl, iname, mkey, mdecl.sourceLocation, mdecl.invoke, binds, pcodes, cargs);
 
