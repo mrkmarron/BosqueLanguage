@@ -416,10 +416,10 @@ class SMTTypeEmitter {
             if(this.isUCollectionType(from)) {
                 let nonnone: SMTExp | undefined = undefined;
                 if(this.isListType(from)) {
-                    nonnone = new SMTValue(`(bsqterm_list ${exp.emit()})`);
+                    nonnone = new SMTValue(`(bsqterm_list "${fromtype.tkey}" ${exp.emit()})`);
                 }
                 else {
-                    nonnone = new SMTValue(`(bsqterm_kvcontainer ${exp.emit()})`);
+                    nonnone = new SMTValue(`(bsqterm_kvcontainer "${fromtype.tkey}" ${exp.emit()})`);
                 }
 
                 if (!this.assembly.subtypeOf(this.noneType, into)) {

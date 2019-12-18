@@ -417,8 +417,16 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(fdecl.declaredType), resultAccessType));
         }
         else {
-            const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) "${op.field}")`);
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.anyType, resultAccessType));
+            if (this.typegen.getMIRType(fdecl.enclosingDecl).options[0] instanceof MIREntityType) {
+                const etype = SMTTypeEmitter.getUEntityType(this.typegen.getMIRType(fdecl.enclosingDecl));
+                const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, this.typegen.getMIRType(fdecl.enclosingDecl)).emit()})`);
+                
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(fdecl.declaredType), resultAccessType));
+            }
+            else {
+                const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) "${op.field}")`);
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.anyType, resultAccessType));
+            }
         }
     }
 
