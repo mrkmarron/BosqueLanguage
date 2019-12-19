@@ -629,10 +629,7 @@ class SMTBodyEmitter {
         if (this.typegen.isTupleType(argtype)) {
             if (this.typegen.isKnownLayoutTupleType(argtype)) {
                 const atuple = SMTTypeEmitter.getKnownLayoutTupleType(argtype);
-                if(atuple.entries.length === 0) {
-                    return "true";
-                }
-                else if(oftype.entries.length < atuple.entries.length) {
+                if(oftype.entries.length < atuple.entries.length) {
                     return "false";
                 }
                 else if(oftype.entries.length > atuple.entries.length && !oftype.entries[atuple.entries.length].isOptional) {
@@ -685,10 +682,7 @@ class SMTBodyEmitter {
         else if (this.typegen.isRecordType(argtype)) {
             if (this.typegen.isKnownLayoutRecordType(argtype)) {
                 const arecord = SMTTypeEmitter.getKnownLayoutRecordType(argtype);
-                if(arecord.entries.length === 0) {
-                    return "true";
-                }
-                else if(arecord.entries.some((entry) => oftype.entries.find((oe) => entry.name ===  oe.name) === undefined)) {
+                if(arecord.entries.some((entry) => oftype.entries.find((oe) => entry.name ===  oe.name) === undefined)) {
                     return "false";
                 }
                 else if(oftype.entries.some((entry) => !entry.isOptional && arecord.entries.find((ae) => entry.name ===  ae.name) === undefined)) {
