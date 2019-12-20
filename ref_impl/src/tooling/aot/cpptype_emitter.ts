@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType } from "../../compiler/mir_assembly";
-import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
+import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
 
@@ -22,7 +22,7 @@ class CPPTypeEmitter {
 
     scopectr: number = 0;
 
-    conceptSubtypeRelation: Map<string, string[]> = new Map<string, string[]>();
+    entitySuperTypeMap: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -62,26 +62,30 @@ class CPPTypeEmitter {
     
     isKeyType(tt: MIRType): boolean {
         return tt.options.every((topt) => {
-            if(topt.trkey === "NSCore::KeyType") {
-                return true;
+            if (topt instanceof MIREntityType) {
+                const eopt = topt as MIREntityType;
+                if (eopt.ekey === "NSCore::None" || eopt.ekey === "NSCore::Bool" || eopt.ekey === "NSCore::Int" || eopt.ekey === "NSCore::String" || eopt.ekey === "NSCore::GUID") {
+                    return true;
+                }
+
+                if (eopt.ekey.startsWith("NSCore::StringOf<")) {
+                    return true;
+                }
+
+                const edecl = this.assembly.entityDecls.get(eopt.ekey) as MIREntityTypeDecl;
+                if (edecl.provides.includes("NSCore::Enum") || edecl.provides.includes("NSCore::IdKey")) {
+                    return true;
+                }
             }
+            
+            if (topt instanceof MIRConceptType) {
+                if (topt.trkey === "NSCore::KeyType") {
+                    return true;
+                }
 
-            if(!(topt instanceof MIREntityType)) {
-                return false;
-            }
-
-            const eopt = topt as MIREntityType;
-            if(eopt.ekey === "NSCore::None" || eopt.ekey === "NSCore::Bool" || eopt.ekey === "NSCore::Int" || eopt.ekey === "NSCore::String" || eopt.ekey === "NSCore::GUID") {
-                return true;
-            } 
-
-            if(eopt.ekey.startsWith("NSCore::StringOf<")) {
-                return true;
-            }
-
-            const edecl = this.assembly.entityDecls.get(eopt.ekey) as MIREntityTypeDecl;
-            if (edecl.provides.includes("NSCore::Enum") || edecl.provides.includes("NSCore::IdKey")) {
-                return true;
+                if (topt.trkey === "NSCore::Enum" || topt.trkey === "NSCore::IdKey") {
+                    return true;
+                }
             }
 
             return false;
@@ -185,6 +189,42 @@ class CPPTypeEmitter {
         return false;
     }
 
+    maybeOfType_StringOf(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (etype.trkey.startsWith("NSCore::StringOf<") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
+    maybeOfType_PODBuffer(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (etype.trkey.startsWith("NSCore::PODBuffer<") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
+    maybeOfType_Enum(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.provides.includes("NSCore::Enum") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
+    maybeOfType_IdKey(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.provides.includes("NSCore::IdKey") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
     static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
         return tt.options[0] as MIRTupleType;
     }
@@ -212,19 +252,15 @@ class CPPTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
     }
 
-    initializeConceptSubtypeRelation(): void {
+    initializeNominalSubtypeRelation(): void {
         this.assembly.typeMap.forEach((tt) => {
-           if(tt instanceof MIRConceptType) {
-               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
-               const keyarray = est.map((et) => et.trkey).sort();
+           if(tt instanceof MIREntityType) {
+               const cpts = [...this.assembly.conceptDecls].map((cpt) => this.getMIRType(cpt[0])).filter((ct) => this.assembly.subtypeOf(tt, ct));
+               const keyarray = cpts.map((ct) => ct.trkey).sort();
 
-               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
+               this.entitySuperTypeMap.set(tt.trkey, keyarray);
            } 
         });
-    }
-
-    getSubtypesArrayCount(tt: MIRConceptType): number {
-        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {

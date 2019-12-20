@@ -1096,30 +1096,15 @@ public:
 //%%VFIELD_DECLS
 //%%VMETHOD_DECLS
 
-    template<int32_t k>
-    inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
+    inline static bool checkSubtype(MIRNominalTypeEnum cpt, const MIRNominalTypeEnum et)
     {
-        if(k < 16)
+        const MIRNominalTypeEnum* curr = etypes;
+        while(*curr != MIRNominalTypeEnum::Invalid && *curr != cpt)
         {
-            for(int32_t i = 0; i < k; ++i)
-            {
-                if(etypes[i] == tt)
-                {
-                    return true;
-                }
-            }
-            return false;
+            curr++;
         }
-        else
-        {
-            return BSQObject::checkSubtypeSlow<k>(tt, etypes);
-        }
-    }
 
-    template<int32_t k>
-    static bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
-    {
-        return std::binary_search(&etypes[0], &etypes[k], tt) != &etypes[k]; 
+        return *curr == cpt;
     }
 };
 

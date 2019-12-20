@@ -724,7 +724,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.isUEntityType(argtype)) {
             if(oftype.ekey === "NSCore::None") {
-                return `${arg} == nullptr`;
+                return `BSQ_IS_VALUE_NONE(${arg})`;
             }
             else {
                 return `(${arg})->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)}`;
@@ -774,6 +774,14 @@ class CPPBodyEmitter {
     generateFastConceptTypeCheck(arg: string, argtype: MIRType, oftype: MIRConceptType): string {
         const cpttype = this.typegen.getMIRType(oftype.trkey);
 
+        if(oftype.trkey === "NSCore::Any") {
+            return "true";
+        }
+
+        if(oftype.trkey === "NSCore::Some") {
+            return !this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype) ? "true" : `BSQ_IS_VALUE_NONNONE(${arg})`;
+        }
+
         if(this.typegen.isSimpleBoolType(argtype)) {
             return this.typegen.assembly.subtypeOf(this.typegen.boolType, cpttype) ? "true" : "false";
         }
@@ -784,7 +792,69 @@ class CPPBodyEmitter {
             return this.typegen.assembly.subtypeOf(this.typegen.stringType, cpttype) ? "true" : "false";
         }
         else if(this.typegen.isKeyType(argtype)) {
-            xxxx;
+            if(oftype.trkey === "NSCore::KeyType") {
+                return "true";
+            }
+            
+            let checks: string[] = [];
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.noneType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_NONE(${arg})`);
+                }
+            }
+
+            if(this.typegen.assembly.subtypeOf(this.typegen.boolType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.boolType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_BOOL(${arg})`);
+                }
+            }
+
+            if(this.typegen.assembly.subtypeOf(this.typegen.intType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.intType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_INT(${arg})`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.stringType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.stringType, argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQString*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_StringOf(cpttype)) {
+                if (this.typegen.maybeOfType_StringOf(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype)`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::GUID"), cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::GUID"), argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQGUID*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_Enum(cpttype)) {
+                if (this.typegen.maybeOfType_Enum(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_IdKey(cpttype)) {
+                if (this.typegen.maybeOfType_IdKey(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype)`);
+                }
+            }
+
+            if (checks.length === 0) {
+                return "false";
+            }
+            else if (checks.length === 1) {
+                return checks[0];
+            }
+            else {
+                return `(${checks.join(" || ")})`;
+            }
         }
         else if(this.typegen.isTupleType(argtype)) {
             return this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), cpttype) ? "true" : "false";
@@ -793,118 +863,109 @@ class CPPBodyEmitter {
             return this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), cpttype) ? "true" : "false";
         }
         else if (this.typegen.isUEntityType(argtype)) {
-            if(oftype.ekey === "NSCore::None") {
-                return `${arg} == nullptr`;
+            const etype = this.typegen.getMIRType(CPPTypeEmitter.getUEntityType(argtype).trkey);
+            if (this.typegen.assembly.subtypeOf(this.typegen.noneType, cpttype) && this.typegen.assembly.subtypeOf(etype, cpttype)) {
+                return `true`
             }
-            else {
-                return `(${arg})->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)}`;
-            }
-        }
-        else {
-            xxxx;
-        }
-
-
-        if(oftype.trkey === "NSCore::Any") {
-            tests.push("true");
-        }
-        else if(oftype.trkey === "NSCore::Some") {
-            if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype) || this.typegen.isTupleType(argtype) || this.typegen.isRecordType(argtype)) {
-                tests.push("true");
-            }
-            else if (this.typegen.isUEntityType(argtype)) {
+            else if(!this.typegen.assembly.subtypeOf(this.typegen.noneType, cpttype) && this.typegen.assembly.subtypeOf(etype, cpttype)) {
                 if(this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
-                    tests.push(`${arg} != nullptr`)
+                    return `BSQ_IS_VALUE_PTR(${arg})`;
+                }
+                else {
+                    return `true`;
                 }
             }
-            else {
-                tests.push(`BSQ_IS_VALUE_NONNONE(${arg})`);
-            }
-        }
-        else if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)) {
-            tests.push(...[this.typegen.boolType, this.typegen.intType, this.typegen.stringType].map((spe) => this.generateFastEntityTypeCheck(arg, argtype, spe.options[0] as MIREntityType)));
-        }
-        else if(this.typegen.isTupleType(argtype)) {
-            tests.push(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), this.typegen.getMIRType(oftype.trkey)) ? "true" : "false");
-        }
-        else if(this.typegen.isRecordType(argtype)) {
-            tests.push(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), this.typegen.getMIRType(oftype.trkey)) ? "true" : "false");
-        }
-        else if (this.typegen.isUEntityType(argtype)) {
-            if(this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype) && this.typegen.assembly.subtypeOf(this.typegen.noneType, this.typegen.getMIRType(oftype.trkey))) {
-                tests.push(`${arg} == nullptr`)
+            else if (this.typegen.assembly.subtypeOf(this.typegen.noneType, cpttype) && !this.typegen.assembly.subtypeOf(etype, cpttype)) {
+                return `BSQ_IS_VALUE_NONE(${arg})`;
             }
             else {
-                const nonesafe = this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype) ? `${arg} != nullptr && ` : ""; 
-                tests.push(`(${nonesafe}BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>((${arg})->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                return "false";
             }
         }
         else {
-            assert(this.typegen.typeToCPPType(argtype, "base") === "Value");
+            let checks: string[] = [];
 
-            let allspecialentities: MIREntityType[] = [];
-            this.typegen.assembly.entityDecls.forEach((etd) => {
-                if(this.typegen.isSpecialRepType(etd) && oftype.ckeys.every((ct) => this.assembly.subtypeOf(this.typegen.getMIRType(etd.tkey), this.typegen.getMIRType(ct)))) {
-                    allspecialentities.push(this.typegen.getMIRType(etd.tkey).options[0] as MIREntityType);
+            if (this.typegen.assembly.subtypeOf(this.typegen.noneType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.noneType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_NONE(${arg})`);
                 }
-            });
-
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::None") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::None") as MIREntityType));
-            }
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::Bool") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Bool") as MIREntityType));
-            }
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::Int") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Int") as MIREntityType));
-            }
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::String") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::String") as MIREntityType));
-            }
-            if(allspecialentities.find((stype) => stype.ekey.startsWith("NSCore::StringOf<")) !== undefined) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
-            }
-            if(allspecialentities.find((stype) => stype.ekey.startsWith("NSCore::POBBuffer<")) !== undefined) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
-            }
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::GUID") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::GUID") as MIREntityType));
-            }
-            if(allspecialentities.find((stype) => (this.assembly.entityDecls.get(stype.ekey) as MIREntityTypeDecl).provides.includes("NSCore::Enum")) !== undefined) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
-            }
-            if(allspecialentities.find((stype) => (this.assembly.entityDecls.get(stype.ekey) as MIREntityTypeDecl).provides.includes("NSCore::IdKey")) !== undefined) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
-            }
-            if(allspecialentities.find((stype) => stype.ekey === "NSCore::Regex") !== undefined) {
-                tests.push(this.generateFastEntityTypeCheck(arg, argtype, allspecialentities.find((stype) => stype.trkey === "NSCore::Regex") as MIREntityType));
             }
 
-            //TODO: INDEXABLE HERE -- special case for tuples
-
-            if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), this.typegen.getMIRType(oftype.trkey))) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+            if(this.typegen.assembly.subtypeOf(this.typegen.boolType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.boolType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_BOOL(${arg})`);
+                }
             }
-            if(this.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), this.typegen.getMIRType(oftype.trkey))) {
-                tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+
+            if(this.typegen.assembly.subtypeOf(this.typegen.intType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.intType, argtype)) {
+                    checks.push(`BSQ_IS_VALUE_INT(${arg})`);
+                }
             }
-            //TODO: podX
 
-            tests.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
-        }
+            if (this.typegen.assembly.subtypeOf(this.typegen.stringType, cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.stringType, argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQString*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
 
-        tests = tests.filter((t) => t !== "false");
-        if(tests.includes("true")) {
-            return "true";
-        }
-        else if(tests.length === 0) {
-            return "false";
-        }
-        else if(tests.length === 1) {
-            return tests[0];
-        }
-        else {
-            return `(${tests.join(" || ")})`;
+            if (this.typegen.maybeOfType_StringOf(cpttype)) {
+                if (this.typegen.maybeOfType_StringOf(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_PODBuffer(cpttype)) {
+                if (this.typegen.maybeOfType_PODBuffer(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQPODBuffer)->oftype)`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::GUID"), cpttype)) {
+                if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::GUID"), argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQGUID*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_Enum(cpttype)) {
+                if (this.typegen.maybeOfType_Enum(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype)`);
+                }
+            }
+
+            if (this.typegen.maybeOfType_IdKey(cpttype)) {
+                if (this.typegen.maybeOfType_IdKey(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype)`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Tuple"), cpttype)) {
+                if (argtype.options.some((topt) => topt instanceof MIRTupleType)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Record"), cpttype)) {
+                if (argtype.options.some((topt) => topt instanceof MIRTupleType)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr)`);
+                }
+            }
+
+            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Object"), cpttype)) {
+                if (argtype.options.some((topt) => topt instanceof MIREntityType || topt instanceof MIRConceptType)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype)`);
+                }
+            }
+
+            if (checks.length === 0) {
+                return "false";
+            }
+            else if (checks.length === 1) {
+                return checks[0];
+            }
+            else {
+                return `(${checks.join(" || ")})`;
+            }
         }
     }
 
