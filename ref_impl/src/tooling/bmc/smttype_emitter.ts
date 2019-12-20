@@ -688,7 +688,7 @@ class SMTTypeEmitter {
     }
 
     generateCheckSubtype(ekey: MIRNominalTypeKey, ckey: MIRNominalTypeKey): string {
-        return `(select bsq_subtype_relation (bsq_subtype_tuple "${ekey}" "${ckey}"))`;
+        return `(select MIRConceptSubtypeArray__${this.mangleStringForSMT(ckey)} "${ekey}")`;
     }
 }
 
