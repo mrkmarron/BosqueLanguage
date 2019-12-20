@@ -628,7 +628,7 @@ class CPPBodyEmitter {
 
     generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType, inline: boolean): string {
         if(this.typegen.isSimpleBoolType(argtype) || this.typegen.isSimpleIntType(argtype) || this.typegen.isSimpleStringType(argtype)  || this.typegen.isKeyType(argtype) || this.typegen.isTupleType(argtype)) {
-            return "false;"
+            return "false"
         }
         else if (this.typegen.isRecordType(argtype)) {
             if (this.typegen.isKnownLayoutRecordType(argtype)) {

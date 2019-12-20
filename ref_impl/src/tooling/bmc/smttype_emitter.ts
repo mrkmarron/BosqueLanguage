@@ -292,15 +292,13 @@ class SMTTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
     }
 
-
     initializeConceptSubtypeRelation(): void {
-        this.assembly.typeMap.forEach((tt) => {
-           if(tt instanceof MIRConceptType) {
-               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
-               const keyarray = est.map((et) => et.trkey).sort();
+        this.assembly.conceptDecls.forEach((tt) => {
+            const cctype = this.getMIRType(tt.tkey);
+            const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, cctype));
+            const keyarray = est.map((et) => et.trkey).sort();
 
-               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
-           } 
+            this.conceptSubtypeRelation.set(tt.tkey, keyarray);
         });
     }
 
