@@ -1,0 +1,175 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+namespace NSTest;
+
+function makeOrNone<T>(v: T): T? {
+    return v;
+}
+
+function makeValue<T>(v: T): Any {
+    return v;
+}
+
+function checkerAny<U>(v: Any): Bool {
+    return v->is<U>();
+}
+
+function checker<T, U>(v: T): Bool {
+    return v->is<U>();
+}
+
+entrypoint function noneTests(): Int {
+    var nv = makeValue<None>(none);
+
+    check checkerAny<None>(nv);
+    check checkerAny<Any>(nv);
+    check checkerAny<Truthy>(nv);
+    check checkerAny<KeyValue>(nv);
+
+    check !checkerAny<Some>(nv);
+    check !checkerAny<Int>(nv);
+    check !checkerAny<[Int, Int]>(nv);
+    check !checkerAny<{f:Int, g:Int}>(nv);
+    check !checkerAny<Object>(nv);
+    check !checkerAny<List<Int>>(nv);
+
+    check checkerAny<KeyValue | Int>(nv);
+    check !checkerAny<Int | String>(nv);
+
+    return 1;
+}
+
+entrypoint function boolTests(): Int {
+    var nv = makeValue<Bool>(true);
+
+    check checkerAny<Bool>(nv);
+    check checkerAny<Any>(nv);
+    check checkerAny<Some>(nv);
+    check checkerAny<Truthy>(nv);
+    check checkerAny<KeyValue>(nv);
+
+    check !checkerAny<None>(nv);
+    check !checkerAny<Int>(nv);
+    check !checkerAny<[Int, Int]>(nv);
+    check !checkerAny<{f:Int, g:Int}>(nv);
+    check !checkerAny<Object>(nv);
+    check !checkerAny<List<Int>>(nv);
+
+    check checkerAny<KeyValue | Int>(nv);
+    check !checkerAny<Int | String>(nv);
+
+    return 1;
+}
+
+entrypoint function intTests(): Int {
+    var nv = makeValue<Int>(5);
+
+    check checkerAny<Int>(nv);
+    check checkerAny<Any>(nv);
+    check checkerAny<Some>(nv);
+    check checkerAny<Truthy>(nv);
+    check checkerAny<KeyValue>(nv);
+
+    check !checkerAny<None>(nv);
+    check !checkerAny<Bool>(nv);
+    check !checkerAny<[Int, Int]>(nv);
+    check !checkerAny<{f:Int, g:Int}>(nv);
+    check !checkerAny<Object>(nv);
+    check !checkerAny<List<Int>>(nv);
+
+    check checkerAny<KeyValue | Int>(nv);
+    check !checkerAny<Int | String>(nv);
+
+    return 1;
+}
+
+entrypoint function stringTests(): Int {
+    var nv = makeValue<String>("ok");
+
+    check checkerAny<String>(nv);
+    check checkerAny<Any>(nv);
+    check checkerAny<Some>(nv);
+    check checkerAny<Truthy>(nv);
+    check checkerAny<KeyValue>(nv);
+
+    check !checkerAny<None>(nv);
+    check !checkerAny<Bool>(nv);
+    check !checkerAny<[Int, Int]>(nv);
+    check !checkerAny<{f:Int, g:Int}>(nv);
+    check !checkerAny<Object>(nv);
+    check !checkerAny<List<Int>>(nv);
+
+    check checkerAny<KeyValue | Int>(nv);
+    check !checkerAny<Int | Bool>(nv);
+
+    return 1;
+}
+
+entrypoint function intOrNoneTests(): Int {
+    var nv = makeOrNone<Int>(5);
+
+    check checker<Int?, Int>(nv);
+    check checker<Int?, Any>(nv);
+    check checker<Int?, Some>(nv);
+    check checker<Int?, Truthy>(nv);
+    check checker<Int?, KeyValue>(nv);
+
+    check !checker<Int?, None>(nv);
+    check !checker<Int?, Bool>(nv);
+    check !checker<Int?, [Int, Int]>(nv);
+    check !checker<Int?, {f:Int, g:Int}>(nv);
+    check !checker<Int?, Object>(nv);
+    check !checker<Int?, List<Int>>(nv);
+
+    check checker<Int?, KeyValue | Int>(nv);
+    check !checker<Int?, Int | String>(nv);
+
+    return 1;
+}
+
+entrypoint function boolTruthyTests(): Int {
+    var nv = makeOrNone<Bool>(true);
+
+    check checker<Bool?, Bool>(nv);
+    check checker<Bool?, Any>(nv);
+    check checker<Bool?, Some>(nv);
+    check checker<Bool?, Truthy>(nv);
+    check checker<Bool?, KeyValue>(nv);
+
+    check !checker<Bool?, None>(nv);
+    check !checker<Bool?, Int>(nv);
+    check !checker<Bool?, [Int, Int]>(nv);
+    check !checker<Bool?, {f:Int, g:Int}>(nv);
+    check !checker<Bool?, Object>(nv);
+    check !checker<Bool?, List<Int>>(nv);
+
+    check checker<Bool?, KeyValue | Int>(nv);
+    check !checker<Bool?, Int | String>(nv);
+
+    return 1;
+}
+
+entrypoint function intKeyValueTests(): Int {
+    var nv = makeValue<KeyValue>(5);
+
+    check checker<KeyValue, Int>(nv);
+    check checker<KeyValue, Any>(nv);
+    check checker<KeyValue, Some>(nv);
+    check checker<KeyValue, Truthy>(nv);
+    check checker<KeyValue, KeyValue>(nv);
+
+    check !checker<KeyValue, None>(nv);
+    check !checker<KeyValue, Bool>(nv);
+    check !checker<KeyValue, [Int, Int]>(nv);
+    check !checker<KeyValue, {f:Int, g:Int}>(nv);
+    check !checker<KeyValue, Object>(nv);
+    check !checker<KeyValue, List<Int>>(nv);
+
+    check checker<KeyValue, KeyValue | Int>(nv);
+    check !checker<KeyValue, Int | String>(nv);
+
+    return 1;
+}
