@@ -25,7 +25,7 @@ class SMTTypeEmitter {
     private tempconvctr = 0;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
-    entitySuperTypeMap: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
+    conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -234,6 +234,42 @@ class SMTTypeEmitter {
         return maybe;
     }
 
+    maybeOfType_Object(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.provides.includes("NSCore::Object") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+    
+    maybeOfType_List(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.tkey.startsWith("NSCore::List<") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
+    maybeOfType_Set(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.tkey.startsWith("NSCore::Set<") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
+    maybeOfType_Map(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.tkey.startsWith("NSCore::Map<") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
     static getTupleTypeMaxLength(tt: MIRType): number {
         return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
     }
@@ -256,15 +292,20 @@ class SMTTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
     }
 
-    initializeNominalSubtypeRelation(): void {
-        this.assembly.typeMap.forEach((tt) => {
-           if(tt instanceof MIREntityType) {
-               const cpts = [...this.assembly.conceptDecls].map((cpt) => this.getMIRType(cpt[0])).filter((ct) => this.assembly.subtypeOf(tt, ct));
-               const keyarray = cpts.map((ct) => ct.trkey).sort();
 
-               this.entitySuperTypeMap.set(tt.trkey, keyarray);
+    initializeConceptSubtypeRelation(): void {
+        this.assembly.typeMap.forEach((tt) => {
+           if(tt instanceof MIRConceptType) {
+               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
+               const keyarray = est.map((et) => et.trkey).sort();
+
+               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
            } 
         });
+    }
+
+    getSubtypesArrayCount(tt: MIRConceptType): number {
+        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
     generateRecordTypePropertyName(tt: MIRType): string {
@@ -644,6 +685,10 @@ class SMTTypeEmitter {
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
         return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
+    }
+
+    generateCheckSubtype(ekey: MIRNominalTypeKey, ckey: MIRNominalTypeKey): string {
+        return `(select bsq_subtype_relation (bsq_subtype_tuple "${ekey}" "${ckey}"))`;
     }
 }
 

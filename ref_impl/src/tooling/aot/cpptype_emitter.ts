@@ -22,7 +22,7 @@ class CPPTypeEmitter {
 
     scopectr: number = 0;
 
-    entitySuperTypeMap: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
+    conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -225,6 +225,15 @@ class CPPTypeEmitter {
         return maybe;
     }
 
+    maybeOfType_Object(tt: MIRType): boolean {
+        let maybe = false;
+        this.assembly.entityDecls.forEach((v) => {
+            const etype = this.getMIRType(v.tkey);
+            maybe = maybe || (v.provides.includes("NSCore::Object") && this.assembly.subtypeOf(etype, tt));
+        });
+        return maybe;
+    }
+
     static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
         return tt.options[0] as MIRTupleType;
     }
@@ -252,15 +261,19 @@ class CPPTypeEmitter {
         return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
     }
 
-    initializeNominalSubtypeRelation(): void {
+    initializeConceptSubtypeRelation(): void {
         this.assembly.typeMap.forEach((tt) => {
-           if(tt instanceof MIREntityType) {
-               const cpts = [...this.assembly.conceptDecls].map((cpt) => this.getMIRType(cpt[0])).filter((ct) => this.assembly.subtypeOf(tt, ct));
-               const keyarray = cpts.map((ct) => ct.trkey).sort();
+           if(tt instanceof MIRConceptType) {
+               const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, tt));
+               const keyarray = est.map((et) => et.trkey).sort();
 
-               this.entitySuperTypeMap.set(tt.trkey, keyarray);
+               this.conceptSubtypeRelation.set(tt.trkey, keyarray);
            } 
         });
+    }
+
+    getSubtypesArrayCount(tt: MIRConceptType): number {
+        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {

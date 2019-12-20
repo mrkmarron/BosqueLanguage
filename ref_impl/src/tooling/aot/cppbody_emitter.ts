@@ -824,7 +824,7 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
@@ -836,13 +836,13 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
@@ -911,13 +911,13 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_PODBuffer(cpttype)) {
                 if (this.typegen.maybeOfType_PODBuffer(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQPODBuffer)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQPODBuffer)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
@@ -929,13 +929,13 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype)`);
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
@@ -951,9 +951,9 @@ class CPPBodyEmitter {
                 }
             }
 
-            if (this.typegen.assembly.subtypeOf(this.typegen.getMIRType("NSCore::Object"), cpttype)) {
-                if (argtype.options.some((topt) => topt instanceof MIREntityType || topt instanceof MIRConceptType)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && && BSQObject::checkSubtype(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.trkey)}, BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype)`);
+            if (this.typegen.maybeOfType_Object(cpttype)) {
+                if (this.typegen.maybeOfType_Object(argtype)) {
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)})`);
                 }
             }
 
