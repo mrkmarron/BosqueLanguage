@@ -507,7 +507,7 @@ class SMTBodyEmitter {
     generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {
         const subtypesig = `(@subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((atuple ${argt})) Bool`;
 
-        if (this.subtypeFMap.has(subtypesig)) {
+        if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
 
             let reqlen = oftype.entries.findIndex((entry) => entry.isOptional);
@@ -569,7 +569,7 @@ class SMTBodyEmitter {
     generateSubtypeRecordCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRRecordType, gas: number): string {
         const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((arecord ${argt})) Bool`;
 
-        if (this.subtypeFMap.has(subtypesig)) {
+        if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
 
             let checks: string[] = [];

@@ -74,11 +74,11 @@ entrypoint function intTests(): Int {
     check checkerAny<Int>(nv);
     check checkerAny<Any>(nv);
     check checkerAny<Some>(nv);
-    check checkerAny<Truthy>(nv);
     check checkerAny<KeyType>(nv);
 
     check !checkerAny<None>(nv);
     check !checkerAny<Bool>(nv);
+    check !checkerAny<Truthy>(nv);
     check !checkerAny<[Int, Int]>(nv);
     check !checkerAny<{f:Int, g:Int}>(nv);
     check !checkerAny<Object>(nv);
@@ -96,11 +96,11 @@ entrypoint function stringTests(): Int {
     check checkerAny<String>(nv);
     check checkerAny<Any>(nv);
     check checkerAny<Some>(nv);
-    check checkerAny<Truthy>(nv);
     check checkerAny<KeyType>(nv);
 
     check !checkerAny<None>(nv);
     check !checkerAny<Bool>(nv);
+    check !checkerAny<Truthy>(nv);
     check !checkerAny<[Int, Int]>(nv);
     check !checkerAny<{f:Int, g:Int}>(nv);
     check !checkerAny<Object>(nv);
@@ -118,11 +118,11 @@ entrypoint function intOrNoneTests(): Int {
     check checker<Int?, Int>(nv);
     check checker<Int?, Any>(nv);
     check checker<Int?, Some>(nv);
-    check checker<Int?, Truthy>(nv);
     check checker<Int?, KeyType>(nv);
 
     check !checker<Int?, None>(nv);
     check !checker<Int?, Bool>(nv);
+    check !checker<Int?, Truthy>(nv);
     check !checker<Int?, [Int, Int]>(nv);
     check !checker<Int?, {f:Int, g:Int}>(nv);
     check !checker<Int?, Object>(nv);
@@ -162,11 +162,11 @@ entrypoint function intKeyTypeTests(): Int {
     check checker<KeyType, Int>(nv);
     check checker<KeyType, Any>(nv);
     check checker<KeyType, Some>(nv);
-    check checker<KeyType, Truthy>(nv);
     check checker<KeyType, KeyType>(nv);
 
     check !checker<KeyType, None>(nv);
     check !checker<KeyType, Bool>(nv);
+    check !checker<KeyType, Truthy>(nv);
     check !checker<KeyType, [Int, Int]>(nv);
     check !checker<KeyType, {f:Int, g:Int}>(nv);
     check !checker<KeyType, Object>(nv);

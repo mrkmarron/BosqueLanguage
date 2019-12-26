@@ -457,7 +457,7 @@ class CPPBodyEmitter {
     generateSubtypeTupleCheck(argv: string, argt: string, size_macro: string, accessor_macro: string, argtype: MIRType, oftype: MIRTupleType): string {
         const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argt} atuple)`;
 
-        if (this.subtypeFMap.has(subtypesig)) {
+        if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
 
             let reqlen = oftype.entries.findIndex((entry) => entry.isOptional);
@@ -515,12 +515,12 @@ class CPPBodyEmitter {
     generateSubtypeRecordCheck(argv: string, argt: string, size_macro: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRRecordType): string {
         const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argt} arecord)`;
 
-        if (this.subtypeFMap.has(subtypesig)) {
+        if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
 
             let reqlen = oftype.entries.filter((entry) => !entry.isOptional);
             const alength = size_macro.replace("ARG", "arecord");
-            const lenchk = `if(${alength} < ${reqlen} || ${oftype.entries.length} < ${alength}) return false;`;
+            const lenchk = `if(${alength} < ${reqlen.length} || ${oftype.entries.length} < ${alength}) return false;`;
 
             let checks: string[] = [];
             for (let i = 0; i < oftype.entries.length; ++i) {
@@ -621,7 +621,7 @@ class CPPBodyEmitter {
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
 
-            const tsc = this.generateSubtypeTupleCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQTuple)`, "BSQTuple*", "ARG->size", "ARG->atFixed<IDX>()", argtype, oftype);
+            const tsc = this.generateSubtypeTupleCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQTuple)`, "BSQTuple*", "ARG->entries.size()", "ARG->atFixed<IDX>()", argtype, oftype);
             return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`
         }
     }
@@ -663,13 +663,13 @@ class CPPBodyEmitter {
                         }
                     }
                     else {
-                        const pmacro = `${this.typegen.typeToCPPType(argtype, "base")}::hasProperty<PNAME>(${this.typegen.getKnownPropertyRecordArrayName(argtype)})`;
-                        return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutRecordType(argtype).entries.length.toString(), "ARG.atFixed<PNAME>()", pmacro, argtype, oftype);
+                        const pmacro = `${this.typegen.typeToCPPType(argtype, "base")}::hasProperty<MIRPropertyEnum::PNAME>(${this.typegen.getKnownPropertyRecordArrayName(argtype)})`;
+                        return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), CPPTypeEmitter.getKnownLayoutRecordType(argtype).entries.length.toString(), "ARG.atFixed<MIRPropertyEnum::PNAME>()", pmacro, argtype, oftype);
                     }
                 }
             }
             else {
-                return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), "ARG.size", "ARG.atFixed<PNAME>()", "ARG.hasProperty<PNAME>()", argtype, oftype);
+                return this.generateSubtypeRecordCheck(arg, this.typegen.typeToCPPType(argtype, "parameter"), "ARG.size", "ARG.atFixed<MIRPropertyEnum::PNAME>()", "ARG.hasProperty<MIRPropertyEnum::PNAME>()", argtype, oftype);
             }
         }
         else if(this.typegen.isUEntityType(argtype)) {
@@ -678,7 +678,7 @@ class CPPBodyEmitter {
         else {
             assert(this.typegen.typeToCPPType(argtype, "base") === "Value"); 
 
-            const tsc = this.generateSubtypeRecordCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`, "BSQRecord*", "ARG->size", "ARG->atFixed<PNAME>()", "ARG->hasProperty<PNAME>()", argtype, oftype);
+            const tsc = this.generateSubtypeRecordCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`, "BSQRecord*", "ARG->entries.size()", "ARG->atFixed<MIRPropertyEnum::PNAME>()", "ARG->hasProperty<MIRPropertyEnum::PNAME>()", argtype, oftype);
             return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`
 
         }
