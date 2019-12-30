@@ -40,7 +40,7 @@ entrypoint function recordTests(): Int {
 }
 
 entrypoint function recordAnyTests(): Int {
-    var nv = makeValue<Any>([1, 2]);
+    var nv = makeValue<Any>({f=1, g=2});
 
     check checkerAny<{f:Int, g:Int}>(nv);
     check checkerAny<{f:Int, g?:Int}>(nv);
@@ -71,7 +71,7 @@ entrypoint function recordContentsTests(): Int {
     check checkerAny<{f:Int, g:Bool, h:Any}>(nv);
     check checkerAny<{f:Int, g:Any, h:Any}>(nv);
 
-    check checker<{f:Int, g:Any, h?:Int, k?:Int}, {f:Int, g:Bool, h:Any}>(nv);
+    check checker<{f:Int, g:Any, h?:Int, k?:String}, {f:Int, g:Bool, h:Any}>(nv);
     check checker<{f:Int, g:Any, h?:Any, k?:Any}, {f:Any, g:Any, h?:Any}>(nv);
 
     check !checker<{f:Int, g:Bool, h?:Int, k?:String}, {f:Int, g:Int, h:Any}>(nv);

@@ -537,11 +537,11 @@ class SMTBodyEmitter {
             }
 
             if(maxlength === -1) {
-                let nv = "(bsqterm_tuple_entries atuple)";
+                let nv = "bsqtuple_array_empty";
                 for (let i = 0; i < oftype.entries.length; ++i) {
-                    nv = `(store ${nv} ${i} bsqterm@clear)`;
+                    nv = `(store ${nv} ${i} (select (bsqterm_tuple_entries atuple) ${i}))`;
                 }
-                checks.push(`(= ${nv} bsqtuple_array_empty)`);
+                checks.push(`(= ${nv} (bsqterm_tuple_entries atuple))`);
             }
             else {
                 if (maxlength > oftype.entries.length) {
@@ -593,8 +593,10 @@ class SMTBodyEmitter {
                     }
                 }
                 else {
-                    const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "arecord").replace("PNAME", pname)}`, this.typegen.anyType, oftype.entries[i].type, true, gas - 1);
-                    checks.push(`(or ${nothas_macro.replace("ARG", "arecord").replace("PNAME", pname)} ${chk})`);
+                    if (!this.typegen.isRecordType(argtype) || SMTTypeEmitter.getRecordTypeMaxPropertySet(argtype).includes(pname)) {
+                        const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "arecord").replace("PNAME", pname)}`, this.typegen.anyType, oftype.entries[i].type, true, gas - 1);
+                        checks.push(`(or ${nothas_macro.replace("ARG", "arecord").replace("PNAME", pname)} ${chk})`);
+                    }
                 }
             }
 
@@ -608,12 +610,12 @@ class SMTBodyEmitter {
                 }
             }
             else {
-                let nv = "(bsqterm_record_entries arecord)";
+                let nv = "bsqrecord_array_empty";
                 for(let i = 0; i < oftype.entries.length; ++i) {
                     const pname = oftype.entries[i].name;
-                    nv = `(store ${nv} "${pname}" bsqterm@clear)`;
+                    nv = `(store ${nv} "${pname}" (select (bsqterm_record_entries arecord) "${pname}"))`;
                 }
-                checks.push(`(= ${nv} bsqrecord_array_empty)`);
+                checks.push(`(= ${nv} (bsqterm_record_entries arecord))`);
             }
 
             let op = "";

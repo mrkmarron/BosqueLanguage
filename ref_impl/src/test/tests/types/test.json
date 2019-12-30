@@ -99,9 +99,8 @@
                 "expected": "1"
             },
             {
-                "kind": "symexec",
-                "entrypoint": "tupleAnyTests",
-                "expected": "1"
+                "kind": "symtest",
+                "entrypoint": "tupleAnyTests"
             }
         ]
     },
@@ -127,9 +126,8 @@
                 "expected": "1"
             },
             {
-                "kind": "symexec",
-                "entrypoint": "recordAnyTests",
-                "expected": "1"
+                "kind": "symtest",
+                "entrypoint": "recordAnyTests"
             }
         ]
     },
