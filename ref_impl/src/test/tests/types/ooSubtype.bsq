@@ -25,25 +25,25 @@ function checker<T, U>(v: T): Bool {
     return v->is<U>();
 }
 
-concept A {
+concept TA {
 }
 
-concept B provides A {
+concept TB provides TA {
 }
 
-concept C provides A {
+concept TC provides TA {
 }
 
-concept D provides B, C {
+concept TD provides TB, T {
 }
 
 entity Simple {
 }
 
-entity EB provides B {
+entity TEB provides TB {
 }
 
-entity ED provides D {
+entity TED provides TD {
 }
 
 entrypoint function simpleEntityAnyTests(): Int {
@@ -59,7 +59,7 @@ entrypoint function simpleEntityAnyTests(): Int {
     check !checkerAny<[Int, Int]>(nv);
     check !checkerAny<{f:Int, g:Int}>(nv);
     check !checkerAny<List<Int>>(nv);
-    check !checkerAny<B>(nv);
+    check !checkerAny<TB>(nv);
 
     check checkerAny<Simple | Int>(nv);
     check !checkerAny<None | Int>(nv);
@@ -81,7 +81,7 @@ entrypoint function simpleEntityOrNoneTests(): Int {
     check !checker<Simple?, [Int, Int]>(nv);
     check !checker<Simple?, {f:Int, g:Int}>(nv);
     check !checker<Simple?, List<Int>>(nv);
-    check !checker<Simple?, B>(nv);
+    check !checker<Simple?, TB>(nv);
 
     check checker<Simple?, Simple | Int>(nv);
     check !checker<Simple?, None | Int>(nv);
@@ -91,68 +91,68 @@ entrypoint function simpleEntityOrNoneTests(): Int {
 }
 
 entrypoint function ebEntityAnyTests(): Int {
-    var nv = makeOrNone(EB{});
+    var nv = makeOrNone(TEB{});
 
-    check checkerAny<EB>(nv);
+    check checkerAny<TEB>(nv);
     check checkerAny<Any>(nv);
     check checkerAny<Some>(nv);
     check checkerAny<Object>(nv);
-    check checkerAny<B>(nv);
-    check checkerAny<A>(nv);
+    check checkerAny<TB>(nv);
+    check checkerAny<TA>(nv);
 
     check !checkerAny<None>(nv);
     check !checkerAny<Int>(nv);
     check !checkerAny<[Int, Int]>(nv);
     check !checkerAny<{f:Int, g:Int}>(nv);
     check !checkerAny<List<Int>>(nv);
-    check !checkerAny<C>(nv);
-    check !checkerAny<B+C>(nv);
-    check !checkerAny<D>(nv);
+    check !checkerAny<TC>(nv);
+    check !checkerAny<TB+TC>(nv);
+    check !checkerAny<TD>(nv);
 
-    check checkerAny<B | Simple | Int>(nv);
+    check checkerAny<TB | Simple | Int>(nv);
     check !checkerAny<None | Int>(nv);
-    check !checkerAny<Int | C>(nv);
+    check !checkerAny<Int | TC>(nv);
 
     return 1;
 }
 
 entrypoint function ebEntityOrNoneTests(): Int {
-    var nv = makeOrNone<EB>(EB{});
+    var nv = makeOrNone<TEB>(TEB{});
 
-    check checker<EB?, EB>(nv);
-    check checker<EB?, Any>(nv);
-    check checker<EB?, Some>(nv);
-    check checker<EB?, Object>(nv);
-    check checker<EB?, B>(nv);
-    check checker<EB?, A>(nv);
+    check checker<TEB?, TEB>(nv);
+    check checker<TEB?, Any>(nv);
+    check checker<TEB?, Some>(nv);
+    check checker<TEB?, Object>(nv);
+    check checker<TEB?, TB>(nv);
+    check checker<TEB?, TA>(nv);
 
-    check !checker<EB?, None>(nv);
-    check !checker<EB?, Int>(nv);
-    check !checker<EB?, [Int, Int]>(nv);
-    check !checker<EB?, {f:Int, g:Int}>(nv);
-    check !checker<EB?, List<Int>>(nv);
-    check !checker<EB?, C>(nv);
-    check !checker<EB?, B+C>(nv);
-    check !checker<EB?, D>(nv);
+    check !checker<TEB?, None>(nv);
+    check !checker<TEB?, Int>(nv);
+    check !checker<TEB?, [Int, Int]>(nv);
+    check !checker<TEB?, {f:Int, g:Int}>(nv);
+    check !checker<TEB?, List<Int>>(nv);
+    check !checker<TEB?, TC>(nv);
+    check !checker<TEB?, TB+TC>(nv);
+    check !checker<TEB?, TD>(nv);
 
-    check checker<EB?, B | Simple | Int>(nv);
-    check !checker<EB?, None | Int>(nv);
-    check !checker<EB?, Int | C>(nv);
+    check checker<TEB?, TB | Simple | Int>(nv);
+    check !checker<TEB?, None | Int>(nv);
+    check !checker<TEB?, Int | TC>(nv);
 
     return 1;
 }
 
 entrypoint function edEntityAnyTests(): Int {
-    var nv = makeValue<Any>(ED{});
+    var nv = makeValue<Any>(TED{});
 
-    check checkerAny<ED>(nv);
+    check checkerAny<TED>(nv);
     check checkerAny<Any>(nv);
     check checkerAny<Some>(nv);
     check checkerAny<Object>(nv);
-    check checkerAny<B>(nv);
-    check checkerAny<A>(nv);
-    check checkerAny<B+C>(nv);
-    check checkerAny<D>(nv);
+    check checkerAny<TB>(nv);
+    check checkerAny<TA>(nv);
+    check checkerAny<TB+TC>(nv);
+    check checkerAny<TD>(nv);
 
     check !checkerAny<None>(nv);
     check !checkerAny<Int>(nv);
@@ -160,7 +160,7 @@ entrypoint function edEntityAnyTests(): Int {
     check !checkerAny<{f:Int, g:Int}>(nv);
     check !checkerAny<List<Int>>(nv);
 
-    check checkerAny<B | Simple | Int>(nv);
+    check checkerAny<TB | Simple | Int>(nv);
     check !checkerAny<None | Int>(nv);
     check !checkerAny<Int | String>(nv);
 
@@ -168,52 +168,52 @@ entrypoint function edEntityAnyTests(): Int {
 }
 
 entrypoint function ebConceptTests(): Int {
-    var nv = makeConcept<A>(EB{});
+    var nv = makeConcept<TA>(TEB{});
 
-    check checker<A, EB>(nv);
-    check checker<A, Any>(nv);
-    check checker<A, Some>(nv);
-    check checker<All, Object>(nv);
-    check checker<A, B>(nv);
-    check checker<A, A>(nv);
+    check checker<TA, EB>(nv);
+    check checker<TA, Any>(nv);
+    check checker<TA, Some>(nv);
+    check checker<TA, Object>(nv);
+    check checker<TA, TB>(nv);
+    check checker<TA, TA>(nv);
 
-    check !checker<A, None>(nv);
-    check !checker<A, Int>(nv);
-    check !checker<A, [Int, Int]>(nv);
-    check !checker<A, {f:Int, g:Int}>(nv);
-    check !checker<A, List<Int>>(nv);
-    check !checker<A, C>(nv);
-    check !checker<A, B+C>(nv);
-    check !checker<A, D>(nv);
+    check !checker<TA, None>(nv);
+    check !checker<TA, Int>(nv);
+    check !checker<TA, [Int, Int]>(nv);
+    check !checker<TA, {f:Int, g:Int}>(nv);
+    check !checker<TA, List<Int>>(nv);
+    check !checker<TA, TC>(nv);
+    check !checker<TA, TB+TC>(nv);
+    check !checker<TA, TD>(nv);
 
-    check checker<A, B | Simple | Int>(nv);
-    check !checker<A, None | Int>(nv);
-    check !checker<A, Int | C>(nv);
+    check checker<TA, TB | Simple | Int>(nv);
+    check !checker<TA, None | Int>(nv);
+    check !checker<TA, Int | TC>(nv);
 
     return 1;
 }
 
 entrypoint function edConceptTests(): Int {
-    var nv = makeConcept<B+C, Any>(ED{});
+    var nv = makeConcept<TB+TC, Any>(TED{});
 
-    check checker<B+C, ED>(nv);
-    check checker<B+C, Any>(nv);
-    check checker<B+C, Some>(nv);
-    check checker<B+C, Object>(nv);
-    check checker<B+C, B>(nv);
-    check checker<B+C, A>(nv);
-    check checker<B+C, B+C>(nv);
-    check checker<B+C, D>(nv);
+    check checker<TB+TC, TED>(nv);
+    check checker<TB+TC, Any>(nv);
+    check checker<TB+TC, Some>(nv);
+    check checker<TB+TC, Object>(nv);
+    check checker<TB+TC, B>(nv);
+    check checker<TB+TC, A>(nv);
+    check checker<TB+TC, B+C>(nv);
+    check checker<TB+TC, D>(nv);
 
-    check !checker<B+C, None>(nv);
-    check !checker<B+C, Int>(nv);
-    check !checker<B+C, [Int, Int]>(nv);
-    check !checker<B+C, {f:Int, g:Int}>(nv);
-    check !checker<B+C, List<Int>>(nv);
+    check !checker<TB+TC, None>(nv);
+    check !checker<TB+TC, Int>(nv);
+    check !checker<TB+TC, [Int, Int]>(nv);
+    check !checker<TB+TC, {f:Int, g:Int}>(nv);
+    check !checker<TB+TC, List<Int>>(nv);
 
-    check checker<B+C, B | Simple | Int>(nv);
-    check !checker<B+C, None | Int>(nv);
-    check !checker<B+C, Int | String>(nv);
+    check checker<TB+TC, TB | Simple | Int>(nv);
+    check !checker<TB+TC, None | Int>(nv);
+    check !checker<TB+TC, Int | String>(nv);
 
     return 1;
 }
