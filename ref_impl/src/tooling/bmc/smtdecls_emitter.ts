@@ -196,12 +196,12 @@ class SMTEmitter {
 
         let conceptSubtypes: string[] = [];
         typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
-            const nemums = stv.map((ek) => typeemitter.mangleStringForSMT(ek)).sort();
+            const nemums = stv.map((ek) => `"${ek}"`).sort();
             if (nemums.length !== 0) {
                 const sta = `(declare-const MIRConceptSubtypeArray__${typeemitter.mangleStringForSMT(cpt)} (Array String Bool))`;
                 let iv = "mirconceptsubtypearray_empty";
                 for (let i = 0; i < nemums.length; ++i) {
-                    iv = `(store ${iv} ${nemums[i]}, true)`;
+                    iv = `(store ${iv} ${nemums[i]} true)`;
                 }
 
                 conceptSubtypes.push(sta + "\n" + `(assert (= MIRConceptSubtypeArray__${typeemitter.mangleStringForSMT(cpt)} ${iv}))`);

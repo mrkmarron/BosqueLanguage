@@ -505,7 +505,7 @@ class SMTBodyEmitter {
     }
 
     generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {
-        const subtypesig = `(@subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((atuple ${argt})) Bool`;
+        const subtypesig = `subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((atuple ${argt})) Bool`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
@@ -516,9 +516,12 @@ class SMTBodyEmitter {
             }
 
             let checks: string[] = [];
-            const maxlength = SMTTypeEmitter.getTupleTypeMaxLength(argtype);
+            const maxlength = this.typegen.isTupleType(argtype) ? SMTTypeEmitter.getTupleTypeMaxLength(argtype) : -1;
 
-            checks.push(`(not (< ${maxlength} ${reqlen}))`);
+            if (maxlength !== -1) {
+                checks.push(`(not (< ${maxlength} ${reqlen}))`);
+            }
+
             for (let i = 0; i < oftype.entries.length; ++i) {
                 if (!oftype.entries[i].isOptional) {
                     if (!(this.typegen.isKnownLayoutTupleType(argtype) && this.typegen.assembly.subtypeOf(SMTTypeEmitter.getKnownLayoutTupleType(argtype).entries[i].type, oftype.entries[i].type))) {
@@ -533,9 +536,18 @@ class SMTBodyEmitter {
                 }
             }
 
-            if (maxlength > oftype.entries.length) {
-                for (let i = oftype.entries.length; i < maxlength; ++i) {
-                    checks.push(`(not ${has_macro.replace("ARG", "atuple").replace("IDX", i.toString())})`);
+            if(maxlength === -1) {
+                let nv = "(bsqterm_tuple_entries atuple)";
+                for (let i = 0; i < oftype.entries.length; ++i) {
+                    nv = `(store ${nv} ${i} bsqterm@clear)`;
+                }
+                checks.push(`(= ${nv} bsqtuple_array_empty)`);
+            }
+            else {
+                if (maxlength > oftype.entries.length) {
+                    for (let i = oftype.entries.length; i < maxlength; ++i) {
+                        checks.push(`(not ${has_macro.replace("ARG", "atuple").replace("IDX", i.toString())})`);
+                    }
                 }
             }
 
@@ -556,8 +568,8 @@ class SMTBodyEmitter {
                 }
             }
 
-            const decl = subtypesig
-            + "\n  " + op;
+            const decl = "(define-fun " + subtypesig
+            + "\n  " + op
             + ")\n"; 
 
             this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
@@ -567,7 +579,7 @@ class SMTBodyEmitter {
     }
 
     generateSubtypeRecordCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRRecordType, gas: number): string {
-        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((arecord ${argt})) Bool`;
+        const subtypesig = `subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((arecord ${argt})) Bool`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
@@ -586,13 +598,22 @@ class SMTBodyEmitter {
                 }
             }
 
-            const possibleargproperties = SMTTypeEmitter.getRecordTypeMaxPropertySet(argtype);
-
-            for(let i = 0; i < possibleargproperties.length; ++i) {
-                const pname = possibleargproperties[i];
-                if(oftype.entries.find((p) => p.name === pname) === undefined) {
-                    checks.push(`(not ${has_macro.replace("ARG", "arecord").replace("PNAME", pname)})`);
+            if (this.typegen.isRecordType(argtype)) {
+                const possibleargproperties = SMTTypeEmitter.getRecordTypeMaxPropertySet(argtype);
+                for (let i = 0; i < possibleargproperties.length; ++i) {
+                    const pname = possibleargproperties[i];
+                    if (oftype.entries.find((p) => p.name === pname) === undefined) {
+                        checks.push(`(not ${has_macro.replace("ARG", "arecord").replace("PNAME", pname)})`);
+                    }
                 }
+            }
+            else {
+                let nv = "(bsqterm_record_entries arecord)";
+                for(let i = 0; i < oftype.entries.length; ++i) {
+                    const pname = oftype.entries[i].name;
+                    nv = `(store ${nv} "${pname}" bsqterm@clear)`;
+                }
+                checks.push(`(= ${nv} bsqrecord_array_empty)`);
             }
 
             let op = "";
@@ -612,8 +633,8 @@ class SMTBodyEmitter {
                 }
             }
 
-            const decl = subtypesig
-            + "\n  " + op;
+            const decl = "(define-fun " + subtypesig
+            + "\n  " + op
             + ")\n"; 
 
             this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
@@ -670,7 +691,7 @@ class SMTBodyEmitter {
         else {
             assert(this.typegen.typeToSMTCategory(argtype) === "BTerm"); 
 
-            const tsc = this.generateSubtypeTupleCheck(`(bsqterm_tuple_entries ${arg})`, "BTerm", "(select ARG IDX)", "(is-bsqterm@clear (select ARG IDX))", argtype, oftype, gas);
+            const tsc = this.generateSubtypeTupleCheck(arg, "BTerm", "(select (bsqterm_tuple_entries ARG) IDX)", "(is-bsqterm@clear (select (bsqterm_tuple_entries ARG) IDX))", argtype, oftype, gas);
             return `(and (is-bsqterm_tuple ${arg}) ${tsc})`
         }
     }
@@ -724,7 +745,7 @@ class SMTBodyEmitter {
         else {
             assert(this.typegen.typeToSMTCategory(argtype) === "BTerm"); 
 
-            const tsc = this.generateSubtypeTupleCheck(`(bsqterm_record_entries ${arg})`, "BTerm", "(select ARG PNAME)", "(is-bsqterm@clear (select ARG PNAME))", argtype, oftype, gas);
+            const tsc = this.generateSubtypeRecordCheck(arg, "BTerm", "(select (bsqterm_record_entries ARG) \"PNAME\")", "(is-bsqterm@clear (select (bsqterm_record_entries ARG) \"PNAME\"))", argtype, oftype, gas);
             return `(and (is-bsqterm_record ${arg}) ${tsc})`
         }
     }
@@ -921,7 +942,7 @@ class SMTBodyEmitter {
                 return checks[0];
             }
             else {
-                return `(${checks.join(" || ")})`;
+                return `(or ${checks.join(" ")})`;
             }
         }
         else if(this.typegen.isTupleType(argtype)) {
@@ -1058,7 +1079,7 @@ class SMTBodyEmitter {
                 return checks[0];
             }
             else {
-                return `(${checks.join(" || ")})`;
+                return `(or ${checks.join(" ")})`;
             }
         }
     }
@@ -1089,8 +1110,14 @@ class SMTBodyEmitter {
         })
         .filter((test) => test !== "false");
 
-        if(tests.includes("true") || tests.length === 0) {
+        if(tests.length === 0) {
+            return "false";
+        }
+        else if(tests.includes("true")) {
             return "true";
+        }
+        else if(tests.length === 1) {
+            return tests[0];
         }
         else {
             return `(or ${tests.join(" ")})`

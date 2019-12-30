@@ -85,7 +85,7 @@ entrypoint function intTests(): Int {
     check !checkerAny<List<Int>>(nv);
 
     check checkerAny<KeyType | Int>(nv);
-    check !checkerAny<Int | String>(nv);
+    check !checkerAny<Bool | String>(nv);
 
     return 1;
 }
@@ -129,7 +129,7 @@ entrypoint function intOrNoneTests(): Int {
     check !checker<Int?, List<Int>>(nv);
 
     check checker<Int?, KeyType | Int>(nv);
-    check !checker<Int?, Int | String>(nv);
+    check !checker<Int?, Bool | String>(nv);
 
     return 1;
 }
@@ -173,7 +173,7 @@ entrypoint function intKeyTypeTests(): Int {
     check !checker<KeyType, List<Int>>(nv);
 
     check checker<KeyType, KeyType | Int>(nv);
-    check !checker<KeyType, Int | String>(nv);
+    check !checker<KeyType, Bool | String>(nv);
 
     return 1;
 }

@@ -995,8 +995,14 @@ class CPPBodyEmitter {
         })
         .filter((test) => test !== "false");
 
-        if(tests.includes("true") || tests.length === 0) {
+        if(tests.length === 0) {
+            return "false";
+        }
+        else if(tests.includes("true")) {
             return "true";
+        }
+        else if(tests.length === 1) {
+            return tests[0];
         }
         else {
             return `(${tests.join(" || ")})`
