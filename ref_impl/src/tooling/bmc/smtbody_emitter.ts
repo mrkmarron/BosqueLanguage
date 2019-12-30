@@ -504,7 +504,7 @@ class SMTBodyEmitter {
         return `(${op} ${lhsint} ${rhsint})`;
     }
 
-    generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {
+    generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, nothas_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {
         const subtypesig = `subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((atuple ${argt})) Bool`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
@@ -531,7 +531,7 @@ class SMTBodyEmitter {
                 else {
                     if (maxlength <= i) {
                         const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "atuple").replace("IDX", i.toString())}`, this.typegen.anyType, oftype.entries[i].type, true, gas - 1);
-                        checks.push(`(or (not ${has_macro.replace("ARG", "atuple").replace("IDX", i.toString())}) ${chk})`);
+                        checks.push(`(or ${nothas_macro.replace("ARG", "atuple").replace("IDX", i.toString())} ${chk})`);
                     }
                 }
             }
@@ -546,7 +546,7 @@ class SMTBodyEmitter {
             else {
                 if (maxlength > oftype.entries.length) {
                     for (let i = oftype.entries.length; i < maxlength; ++i) {
-                        checks.push(`(not ${has_macro.replace("ARG", "atuple").replace("IDX", i.toString())})`);
+                        checks.push(nothas_macro.replace("ARG", "atuple").replace("IDX", i.toString()));
                     }
                 }
             }
@@ -578,7 +578,7 @@ class SMTBodyEmitter {
         return `(subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ${argv})`;
     }
 
-    generateSubtypeRecordCheck(argv: string, argt: string, accessor_macro: string, has_macro: string, argtype: MIRType, oftype: MIRRecordType, gas: number): string {
+    generateSubtypeRecordCheck(argv: string, argt: string, accessor_macro: string, nothas_macro: string, argtype: MIRType, oftype: MIRRecordType, gas: number): string {
         const subtypesig = `subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)}@gas${gas} ((arecord ${argt})) Bool`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
@@ -594,7 +594,7 @@ class SMTBodyEmitter {
                 }
                 else {
                     const chk = this.generateTypeCheck(`${accessor_macro.replace("ARG", "arecord").replace("PNAME", pname)}`, this.typegen.anyType, oftype.entries[i].type, true, gas - 1);
-                    checks.push(`(or (not${has_macro.replace("ARG", "arecord").replace("PNAME", pname)}) ${chk})`);
+                    checks.push(`(or ${nothas_macro.replace("ARG", "arecord").replace("PNAME", pname)} ${chk})`);
                 }
             }
 
@@ -603,7 +603,7 @@ class SMTBodyEmitter {
                 for (let i = 0; i < possibleargproperties.length; ++i) {
                     const pname = possibleargproperties[i];
                     if (oftype.entries.find((p) => p.name === pname) === undefined) {
-                        checks.push(`(not ${has_macro.replace("ARG", "arecord").replace("PNAME", pname)})`);
+                        checks.push(nothas_macro.replace("ARG", "arecord").replace("PNAME", pname));
                     }
                 }
             }

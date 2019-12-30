@@ -5,11 +5,7 @@
 
 namespace NSTest;
 
-function makeOrNone<T>(v: T): T? {
-    return v;
-}
-
-function makeValue<T>(v: T): Any {
+function makeValue<T>(v: T): T {
     return v;
 }
 
@@ -68,23 +64,23 @@ entrypoint function tupleAnyTests(): Int {
 entrypoint function tupleContentsTests(): Int {
     var nv = makeValue<[Int, Bool, ?:Int, ?:String]>([1, true, 3]);
 
-    check checker<[Int, Bool, ?:Int], [Int, Bool, Any, Int]>(nv);
-    check checker<[Int, Bool, ?:Int], [Int, Any, Any]>(nv);
+    check checker<[Int, Bool, ?:Int, ?:String], [Int, Bool, Any, Int]>(nv);
+    check checker<[Int, Bool, ?:Int, ?:String], [Int, Any, Any]>(nv);
 
     check checkerAny<[Int, Bool, Any]>(nv);
     check checkerAny<[Int, Any, Any]>(nv);
 
-    check checker<[Int, Any, ?:Int], [Int, Bool, Any]>(nv);
-    check checker<[Any, Bool, ?:Int], [Any, Any, ?:Any]>(nv);
+    check checker<[Int, Any, ?:Int, ?:String], [Int, Bool, Any]>(nv);
+    check checker<[Any, Bool, ?:Int, ?:String], [Any, Any, ?:Any]>(nv);
 
-    check !checker<[Int, Bool, ?:Int], [Int, Int, Any]>(nv);
-    check !checker<[Int, Bool, ?:Int], [Int, Any]>(nv);
+    check !checker<[Int, Bool, ?:Int, ?:String], [Int, Int, Any]>(nv);
+    check !checker<[Int, Bool, ?:Int, ?:String], [Int, Any]>(nv);
 
     check !checkerAny<[Int, Int, Any]>(nv);
     check !checkerAny<[Int, Any]>(nv);
 
-    check !checker<[Int, Any, ?:Int], [Int, Int, Any]>(nv);
-    check !checker<[Any, Bool, ?:Int], [Any, Any]>(nv);
+    check !checker<[Int, Any, ?:Int, ?:String], [Int, Int, Any]>(nv);
+    check !checker<[Any, Bool, ?:Int, ?:String], [Any, Any]>(nv);
 
     return 1;
 }

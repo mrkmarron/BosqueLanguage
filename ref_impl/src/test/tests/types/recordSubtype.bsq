@@ -5,11 +5,7 @@
 
 namespace NSTest;
 
-function makeOrNone<T>(v: T): T? {
-    return v;
-}
-
-function makeValue<T>(v: T): Any {
+function makeValue<T>(v: T): T {
     return v;
 }
 
@@ -67,7 +63,7 @@ entrypoint function recordAnyTests(): Int {
 }
 
 entrypoint function recordContentsTests(): Int {
-    var nv = makeValue<{f:Int, g:Bool, h?:Int, k?:String}>([1, true, 3]);
+    var nv = makeValue<{f:Int, g:Bool, h?:Int, k?:String}>({f=1, g=true, h=3});
 
     check checker<{f:Int, g:Bool, h?:Int, k?:String}, {f:Int, g:Bool, h:Any, k?:Int}>(nv);
     check checker<{f:Int, g:Bool, h?:Int, k?:String}, {f:Int, g:Any, h:Any}>(nv);
