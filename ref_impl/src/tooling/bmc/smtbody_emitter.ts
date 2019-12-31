@@ -744,6 +744,9 @@ class SMTBodyEmitter {
                 return this.generateSubtypeRecordCheck(arg, this.typegen.typeToSMTCategory(argtype), `(bsqrecord_${this.typegen.generateRecordTypePropertyName(argtype)}@PNAME ARG)`, `(is-bsqterm@clear  (bsqrecord_${this.typegen.generateRecordTypePropertyName(argtype)}@PNAME ARG))`, argtype, oftype, gas);
             }
         }
+        else if(this.typegen.isUEntityType(argtype)) {
+            return "false"
+        }
         else {
             assert(this.typegen.typeToSMTCategory(argtype) === "BTerm"); 
 
@@ -791,11 +794,22 @@ class SMTBodyEmitter {
             return "false";
         }
         else if (this.typegen.isUEntityType(argtype)) {
+            const ut = SMTTypeEmitter.getUEntityType(argtype);
             if(oftype.ekey === "NSCore::None") {
-                return `(is-${this.typegen.generateEntityNoneConstructor(oftype.ekey)} ${arg})`;
+                return `(is-${this.typegen.generateEntityNoneConstructor(ut.ekey)} ${arg})`;
             }
             else {
-                return `(is-${this.typegen.generateEntityConstructor(oftype.ekey)} ${arg})`;
+                if(ut.ekey !== oftype.ekey) {
+                    return "false";
+                }
+                else {
+                    if(argtype.options.length === 1) {
+                        return "true";
+                    }
+                    else {
+                        return `(is-${this.typegen.generateEntityConstructor(ut.ekey)} ${arg})`;
+                    }
+                }
             }
         }
         else {
@@ -912,7 +926,7 @@ class SMTBodyEmitter {
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
                     const taccess = `(bsqkey_typedstring_type ${arg})`;
-                    checks.push(`(and (is-bsqkey_typedstring ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqkey_typedstring ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
@@ -925,14 +939,14 @@ class SMTBodyEmitter {
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
                     const taccess = `(bsqkey_enum_type ${arg})`;
-                    checks.push(`(and (is-bsqkey_enum ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqkey_enum ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
                     const taccess = `(bsqkey_idkey_type ${arg})`;
-                    checks.push(`(and (is-bsqkey_idkey ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqkey_idkey ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
@@ -1003,14 +1017,14 @@ class SMTBodyEmitter {
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
                     const taccess = `(bsqkey_typedstring_type (bsqterm_key_value ${arg}))`;
-                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_typedstring (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_typedstring (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_PODBuffer(cpttype)) {
                 if (this.typegen.maybeOfType_PODBuffer(argtype)) {
                     const taccess = `(bsqkey_podbuffer_type (bsqterm_key_value ${arg}))`;
-                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_podbuffer (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_podbuffer (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
@@ -1023,14 +1037,14 @@ class SMTBodyEmitter {
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
                     const taccess = `(bsqkey_enum_type (bsqterm_key_value ${arg}))`;
-                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_enum (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_enum (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
                     const taccess = `(bsqkey_idkey_type (bsqterm_key_value ${arg}))`;
-                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_idkey (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_key ${arg}) (is-bsqkey_idkey (bsqterm_key_value ${arg})) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
@@ -1049,28 +1063,28 @@ class SMTBodyEmitter {
             if (this.typegen.maybeOfType_Object(cpttype)) {
                 if (this.typegen.maybeOfType_Object(argtype)) {
                     const taccess = `(bsqterm_object_type ${arg})`;
-                    checks.push(`(and (is-bsqterm_object ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_object ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_List(cpttype)) {
                 if (this.typegen.maybeOfType_List(argtype)) {
                     const taccess = `(bsqterm_list_type ${arg})`;
-                    checks.push(`(and (is-bsqterm_list ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_list ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_Set(cpttype)) {
                 if (this.typegen.maybeOfType_Set(argtype)) {
                     const taccess = `(bsqterm_kvcontainer_type ${arg})`;
-                    checks.push(`(and (is-bsqterm_kvcontainer ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_kvcontainer ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_Map(cpttype)) {
                 if (this.typegen.maybeOfType_Map(argtype)) {
                     const taccess = `(bsqterm_kvcontainer_type ${arg})`;
-                    checks.push(`(and (is-bsqterm_kvcontainer ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype.trkey)})`);
+                    checks.push(`(and (is-bsqterm_kvcontainer ${arg}) ${this.typegen.generateCheckSubtype(taccess, oftype)})`);
                 }
             }
 

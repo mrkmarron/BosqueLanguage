@@ -238,7 +238,7 @@ class SMTTypeEmitter {
         let maybe = false;
         this.assembly.entityDecls.forEach((v) => {
             const etype = this.getMIRType(v.tkey);
-            maybe = maybe || (v.provides.includes("NSCore::Object") && this.assembly.subtypeOf(etype, tt));
+            maybe = maybe || (this.assembly.subtypeOf(etype, this.getMIRType("NSCore::Object")) && this.assembly.subtypeOf(etype, tt));
         });
         return maybe;
     }
@@ -685,8 +685,17 @@ class SMTTypeEmitter {
         return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
     }
 
-    generateCheckSubtype(ekey: MIRNominalTypeKey, ckey: MIRNominalTypeKey): string {
-        return `(select MIRConceptSubtypeArray__${this.mangleStringForSMT(ckey)} "${ekey}")`;
+    generateCheckSubtype(ekey: MIRNominalTypeKey, oftype: MIRConceptType): string {
+        const lookups = oftype.ckeys.map((ckey) => {
+            return `(select MIRConceptSubtypeArray__${this.mangleStringForSMT(ckey)} ${ekey})`;
+        });
+
+        if(lookups.length === 1) {
+            return lookups[0];
+        }
+        else {
+            return lookups.join(" ");
+        }
     }
 }
 

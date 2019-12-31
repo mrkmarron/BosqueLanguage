@@ -229,7 +229,7 @@ class CPPTypeEmitter {
         let maybe = false;
         this.assembly.entityDecls.forEach((v) => {
             const etype = this.getMIRType(v.tkey);
-            maybe = maybe || (v.provides.includes("NSCore::Object") && this.assembly.subtypeOf(etype, tt));
+            maybe = maybe || (this.assembly.subtypeOf(etype, this.getMIRType("NSCore::Object")) && this.assembly.subtypeOf(etype, tt));
         });
         return maybe;
     }
@@ -271,8 +271,8 @@ class CPPTypeEmitter {
         });
     }
 
-    getSubtypesArrayCount(tt: MIRConceptType): number {
-        return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
+    getSubtypesArrayCount(ckey: MIRNominalTypeKey): number {
+        return (this.conceptSubtypeRelation.get(ckey) as string[]).length;
     }
 
     maybeRefableCountableType(tt: MIRType): boolean {

@@ -723,11 +723,22 @@ class CPPBodyEmitter {
             return "false";
         }
         else if (this.typegen.isUEntityType(argtype)) {
+            const ut = CPPTypeEmitter.getUEntityType(argtype);
             if(oftype.ekey === "NSCore::None") {
                 return `BSQ_IS_VALUE_NONE(${arg})`;
             }
             else {
-                return `(${arg})->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)}`;
+                if(ut.ekey !== oftype.ekey) {
+                    return "false";
+                }
+                else {
+                    if(argtype.options.length === 1) {
+                        return "true";
+                    }
+                    else {
+                        return `BSQ_IS_VALUE_NONNONE(${arg})`;
+                    }
+                }
             }
         }
         else {
@@ -768,6 +779,22 @@ class CPPBodyEmitter {
             else {
                 return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
             }
+        }
+    }
+
+    generateConceptArrayLookup(access: string, oftype: MIRConceptType): string {
+        const lookups = oftype.ckeys.map((ckey) => {
+            const sizestr = this.typegen.getSubtypesArrayCount(ckey);
+            const arraystr = `MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(ckey)}`;
+
+            return `BSQObject::checkSubtype<${sizestr}>(${access}, ${arraystr})`;
+        });
+
+        if(lookups.length === 1) {
+            return lookups[0];
+        }
+        else {
+            return lookups.join(" && ");
         }
     }
 
@@ -824,7 +851,8 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
@@ -836,13 +864,15 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
@@ -911,13 +941,15 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_StringOf(cpttype)) {
                 if (this.typegen.maybeOfType_StringOf(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQStringOf)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQStringOf*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_PODBuffer(cpttype)) {
                 if (this.typegen.maybeOfType_PODBuffer(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQPODBuffer)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQPODBuffer)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQPODBuffer*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
@@ -929,13 +961,15 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_Enum(cpttype)) {
                 if (this.typegen.maybeOfType_Enum(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQEnum)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQEnum*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
             if (this.typegen.maybeOfType_IdKey(cpttype)) {
                 if (this.typegen.maybeOfType_IdKey(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQIdKey)->oftype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQIdKey*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
@@ -953,7 +987,8 @@ class CPPBodyEmitter {
 
             if (this.typegen.maybeOfType_Object(cpttype)) {
                 if (this.typegen.maybeOfType_Object(argtype)) {
-                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && BSQObject::checkSubtype<${this.typegen.getSubtypesArrayCount(oftype)}>(BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype, MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}))`);
+                    const access = `BSQ_GET_VALUE_PTR(${arg}, BSQObject)->ntype`;
+                    checks.push(`(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQObject*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${this.generateConceptArrayLookup(access, oftype)})`);
                 }
             }
 
