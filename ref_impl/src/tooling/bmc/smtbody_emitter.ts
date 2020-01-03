@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -370,6 +370,111 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(new SMTValue(`(is-bsqterm@clear ${avalue})`), nval, rval));
             }
         }
+    }
+
+    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): SMTExp { 
+        const tuptype = this.getArgType(op.arg);
+        let vals: string[] = [];
+
+        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+            const ftuptype = SMTTypeEmitter.getKnownLayoutTupleType(tuptype);
+            vals = op.indecies.map((idx) => {
+                if (idx < ftuptype.entries.length) {
+                    return `(${this.typegen.generateTupleAccessor(tuptype, idx)} ${this.argToSMT(op.arg, tuptype).emit()})`;
+                }
+                else {
+                    return "(bsqterm_key bsqkey_none)";
+                }
+            });
+        }
+        else if (this.typegen.isTupleType(tuptype)) {
+            const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
+            vals = op.indecies.map((idx) => {
+                if (idx < maxlen) {
+                    const avalue = `(${this.typegen.generateTupleAccessor(tuptype, idx)} ${this.argToSMT(op.arg, tuptype).emit()})`;
+                    return new SMTCond(new SMTValue(`(is-bsqterm@clear ${avalue})`), new SMTValue("(bsqterm_key bsqkey_none)"), new SMTValue(avalue)).emit();
+                }
+                else {
+                    return "(bsqterm_key bsqkey_none)";
+                }
+            });
+        }
+        else {
+            vals = op.indecies.map((idx) => {
+                const avalue = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${idx})`;
+                return new SMTCond(new SMTValue(`(is-bsqterm@clear ${avalue})`), new SMTValue("(bsqterm_key bsqkey_none)"), new SMTValue(avalue)).emit();
+            });
+        }
+
+        assert(this.typegen.isTupleType(resultAccessType));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateTupleConstructor(resultAccessType)} ${vals.join(" ")})`));
+    }
+    
+    generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): SMTExp {
+        const tuptype = this.getArgType(op.arg);
+
+        const rmax = SMTTypeEmitter.getTupleTypeMaxLength(resultTupleType);
+        let vals: string[] = [];
+        for (let i = 0; i < rmax; ++i) {
+            vals[i] = "(bsqterm_key bsqkey_none)";
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+            const ftuptype = SMTTypeEmitter.getKnownLayoutTupleType(tuptype);
+            for (let i = 0; i < ftuptype.entries.length; ++i) {
+                vals[i] = `(${this.typegen.generateTupleAccessor(tuptype, i)} ${this.argToSMT(op.arg, tuptype).emit()})`;
+            }
+        }
+        else {
+            for (let i = 0; i < rmax; ++i) {
+                vals[i] = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${i})`;
+            }
+        }
+
+        for (let i = 0; i < op.updates.length; ++i) {
+            const update = op.updates[i];
+            vals[update[0]] = this.argToSMT(update[1], this.typegen.anyType).emit();
+        }
+
+        assert(this.typegen.isTupleType(resultTupleType));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateTupleConstructor(resultTupleType)} ${vals.join(" ")})`));
+    }
+
+    generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): SMTExp {
+        const rmax = SMTTypeEmitter.getTupleTypeMaxLength(resultTupleType);
+        let vals: string[] = [];
+        for (let i = 0; i < rmax; ++i) {
+            vals[i] = "(bsqterm_key bsqkey_none)";
+        }
+
+        const intotype = this.getArgType(op.arg);
+        const intolen = SMTTypeEmitter.getTupleTypeMaxLength(intotype); //type checker ensures this is not optional and always the same
+        if (this.typegen.isTupleType(intotype)) {
+            for (let i = 0; i < intolen; ++i) {
+                vals[i] = `(${this.typegen.generateTupleAccessor(intotype, i)} ${this.argToSMT(op.arg, intotype).emit()})`;
+            }
+        }
+        else {
+            for (let i = 0; i < intolen; ++i) {
+                vals[i] = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, intotype).emit()}) ${i})`;
+            }
+        }
+
+        const exttype = this.getArgType(op.update);
+        if (this.typegen.isTupleType(exttype)) {
+            const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(exttype);
+            for (let i = 0; i < maxlen; ++i) {
+                vals[i + intolen] = `(${this.typegen.generateTupleAccessor(exttype, i)} ${this.argToSMT(op.arg, exttype).emit()})`;
+            }
+        }
+        else {
+            for (let i = 0; i < rmax - intolen; ++i) {
+                vals[i + intolen] = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, exttype).emit()}) ${i})`;
+            }
+        }
+
+        assert(this.typegen.isTupleType(resultTupleType));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateTupleConstructor(resultTupleType)} ${vals.join(" ")})`));
     }
 
     generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): SMTExp {
@@ -1196,7 +1301,8 @@ class SMTBodyEmitter {
                 return this.generateMIRAccessFromIndex(ai, this.typegen.getMIRType(ai.resultAccessType));
             }
             case MIROpTag.MIRProjectFromIndecies: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromIndecies");
+                const pi = op as MIRProjectFromIndecies;
+                return this.generateMIRProjectFromIndecies(pi, this.typegen.getMIRType(pi.resultProjectType));
             }
             case MIROpTag.MIRAccessFromProperty: {
                 const ap = op as MIRAccessFromProperty;
@@ -1222,7 +1328,8 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromTypeConcept");
             }
             case MIROpTag.MIRModifyWithIndecies: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithIndecies");
+                const mi = op as MIRModifyWithIndecies;
+                return this.generateMIRModifyWithIndecies(mi, this.typegen.getMIRType(mi.resultTupleType));
             }
             case MIROpTag.MIRModifyWithProperties: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithProperties");
@@ -1231,7 +1338,8 @@ class SMTBodyEmitter {
                 return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithFields");
             }
             case MIROpTag.MIRStructuredExtendTuple: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendTuple");
+                const si = op as MIRStructuredExtendTuple;
+                return this.generateMIRStructuredExtendTuple(si, this.typegen.getMIRType(si.resultTupleType));
             }
             case MIROpTag.MIRStructuredExtendRecord: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendRecord");
