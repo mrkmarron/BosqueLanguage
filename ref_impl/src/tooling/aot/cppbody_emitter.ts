@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -373,22 +373,26 @@ class CPPBodyEmitter {
             vals[i] = "BSQ_VALUE_NONE";
         }
 
+        let lenval = "-1";
         if (this.typegen.isKnownLayoutTupleType(tuptype)) {
             const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
             for (let i = 0; i < ftuptype.entries.length; ++i) {
                 vals[i] = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(i)}`;
             }
+            lenval = ftuptype.entries.length.toString();
         }
         else if (this.typegen.isTupleType(tuptype)) {
             const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
             for (let i = 0; i < maxlen; ++i) {
                 vals[i] = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(i)}`;
             }
+            lenval = `(${this.argToCpp(op.arg, tuptype)}).size`;
         }
         else {
             for (let i = 0; i < rmax; ++i) {
                 vals[i] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
             }
+            lenval = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->size`;
         }
 
         for (let i = 0; i < op.updates.length; ++i) {
@@ -400,7 +404,7 @@ class CPPBodyEmitter {
             return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
         }
         else {
-            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
+            return `${this.varToCppName(op.trgt)} = {${lenval}, ${vals.join(", ")} };`;
         }
     }
 
@@ -430,29 +434,33 @@ class CPPBodyEmitter {
         }
 
         const exttype = this.getArgType(op.update);
+        let lenval = "-1";
         if (this.typegen.isKnownLayoutTupleType(exttype)) {
             const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(exttype);
             for (let i = 0; i < ftuptype.entries.length; ++i) {
                 vals[i + intolen] = `(${this.argToCpp(op.update, exttype)})${this.typegen.generateFixedTupleAccessor(i)}`;
             }
+            lenval = ftuptype.entries.length.toString();
         }
         else if (this.typegen.isTupleType(exttype)) {
             const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(exttype);
             for (let i = 0; i < maxlen; ++i) {
                 vals[i + intolen] = `(${this.argToCpp(op.update, exttype)})${this.typegen.generateFixedTupleAccessor(i)}`;
             }
+            lenval = `(${this.argToCpp(op.update, exttype)}).size`;
         }
         else {
             for (let i = 0; i < rmax - intolen; ++i) {
                 vals[i + intolen] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.update, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
             }
+            lenval = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.update, this.typegen.anyType)}, BSQTuple)->size`;
         }
 
         if (this.typegen.isKnownLayoutTupleType(resultTupleType)) {
             return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
         }
         else {
-            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
+            return `${this.varToCppName(op.trgt)} = {${intolen} + ${lenval}, ${vals.join(", ")} };`;
         }
     }
 
@@ -482,6 +490,101 @@ class CPPBodyEmitter {
             const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRecord)->atFixed<MIRPropertyEnum::${op.property}>()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
         }
+    }
+
+    generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): string {
+        const rectype = this.getArgType(op.arg);
+        let vals: string[] = [];
+
+        if (this.typegen.isKnownLayoutRecordType(rectype)) {
+            const frectype = CPPTypeEmitter.getKnownLayoutRecordType(rectype);
+            vals = op.properties.map((p) => {
+                if (frectype.entries.findIndex((entry) => entry.name === p) !== -1) {
+                    return `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateKnownRecordAccessor(rectype, p)}`;
+                }
+                else {
+                    return "BSQ_VALUE_NONE";
+                }
+            });
+        }
+        else if (this.typegen.isRecordType(rectype)) {
+            const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(rectype);
+            vals = op.properties.map((p) => {
+                if (allprops.includes(p)) {
+                    return `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(p)}`;
+                }
+                else {
+                    return "BSQ_VALUE_NONE";
+                }
+            });
+        }
+        else {
+            vals = op.properties.map((p) => {
+                return `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRecord)->atFixed<MIRPropertyEnum::${p}>()`;
+            });
+        }
+
+        if (this.typegen.isKnownLayoutRecordType(resultAccessType)) {
+            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        }
+        else {
+            const args: string[] = [];
+            for(let i = 0; i < op.properties.length; ++i) {
+                const pkey = this.typegen.mangleStringForCpp(op.properties[i]);
+                args.push(`std::make_pair(MIRPropertyEnum::${pkey}, ${vals[i]})`);
+            }
+            return `${this.varToCppName(op.trgt)} = { ${[args.length, ...args].join(", ")} };`;
+        }
+    }
+
+    generateMIRModifyWithProperties(op: MIRModifyWithProperties, resultRecordType: MIRType): string {
+        const rectype = this.getArgType(op.arg);
+
+        const rprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(resultRecordType);
+        let vals: string[] = [];
+        for (let i = 0; i < rprops.length; ++i) {
+            vals[i] = "BSQ_VALUE_NONE";
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(rectype)) {
+            const frectype = CPPTypeEmitter.getKnownLayoutRecordType(rectype);
+            for (let i = 0; i < frectype.entries.length; ++i) {
+                const pidx = rprops.findIndex((p) => p == frectype.entries[i].name)
+                vals[pidx] = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateKnownRecordAccessor(rectype, frectype.entries[i].name)}`;
+            }
+        }
+        else if (this.typegen.isTupleType(tuptype)) {
+            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
+            for (let i = 0; i < maxlen; ++i) {
+                vals[i] = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else {
+            for (let i = 0; i < rmax; ++i) {
+                vals[i] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
+            }
+        }
+
+        for (let i = 0; i < op.updates.length; ++i) {
+            const update = op.updates[i];
+            vals[update[0]] = this.argToCpp(update[1], this.typegen.anyType);
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(resultTupleType)) {
+            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        }
+        else {
+            const args: string[] = [];
+            const resprop = 
+            for(let i = 0; i < o.length; ++i) {
+                const pkey = this.typegen.mangleStringForCpp(op.properties[i]);
+                args.push(`std::make_pair(MIRPropertyEnum::${pkey}, ${vals[i]})`);
+            }
+            return `${this.varToCppName(op.trgt)} = { ${[args.length, ...args].join(", ")} };`;
+        }
+    }
+
+    generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultTupleType: MIRType): string {
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
@@ -1255,7 +1358,8 @@ class CPPBodyEmitter {
                 return this.generateMIRAccessFromProperty(ap, this.typegen.getMIRType(ap.resultAccessType));
             }
             case MIROpTag.MIRProjectFromProperties: {
-                return NOT_IMPLEMENTED<string>("MIRProjectFromProperties");
+                const pp = op as MIRProjectFromProperties;
+                return this.generateMIRProjectFromProperties(pp, this.typegen.getMIRType(pp.resultProjectType));
             }
             case MIROpTag.MIRAccessFromField: {
                 const af = op as MIRAccessFromField;
@@ -1278,7 +1382,8 @@ class CPPBodyEmitter {
                 return this.generateMIRModifyWithIndecies(mi, this.typegen.getMIRType(mi.resultTupleType));
             }
             case MIROpTag.MIRModifyWithProperties: {
-                return NOT_IMPLEMENTED<string>("MIRModifyWithProperties");
+                const mp = op as MIRModifyWithProperties;
+                return this.generateMIRModifyWithProperties(mp, this.typegen.getMIRType(mp.resultRecordType));
             }
             case MIROpTag.MIRModifyWithFields: {
                 return NOT_IMPLEMENTED<string>("MIRModifyWithFields");
@@ -1288,7 +1393,8 @@ class CPPBodyEmitter {
                 return this.generateMIRStructuredExtendTuple(si, this.typegen.getMIRType(si.resultTupleType));
             }
             case MIROpTag.MIRStructuredExtendRecord: {
-                return NOT_IMPLEMENTED<string>("MIRStructuredExtendRecord");
+                const sp = op as MIRStructuredExtendRecord;
+                return this.generateMIRStructuredExtendRecord(sp, this.typegen.getMIRType(sp.resultRecordType));
             }
             case MIROpTag.MIRStructuredExtendObject: {
                 return NOT_IMPLEMENTED<string>("MIRStructuredExtendObject");
