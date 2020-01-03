@@ -464,12 +464,12 @@ class SMTBodyEmitter {
         if (this.typegen.isTupleType(exttype)) {
             const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(exttype);
             for (let i = 0; i < maxlen; ++i) {
-                vals[i + intolen] = `(${this.typegen.generateTupleAccessor(exttype, i)} ${this.argToSMT(op.arg, exttype).emit()})`;
+                vals[i + intolen] = `(${this.typegen.generateTupleAccessor(exttype, i)} ${this.argToSMT(op.update, exttype).emit()})`;
             }
         }
         else {
             for (let i = 0; i < rmax - intolen; ++i) {
-                vals[i + intolen] = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, exttype).emit()}) ${i})`;
+                vals[i + intolen] = `(select (bsqterm_tuple_entries ${this.argToSMT(op.update, exttype).emit()}) ${i})`;
             }
         }
 
