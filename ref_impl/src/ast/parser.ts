@@ -1388,7 +1388,7 @@ class Parser {
                     const indecies = this.parseListOf<number>("[", "]", ",", () => {
                         this.ensureToken(TokenStrings.Int);
                         return Number.parseInt(this.consumeTokenAndGetValue());
-                    })[0].sort();
+                    })[0];
 
                     ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, indecies));
                 }

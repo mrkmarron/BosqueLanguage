@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -321,6 +321,138 @@ class CPPBodyEmitter {
         else {
             const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${op.idx}>()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
+        }
+    }
+
+    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string { 
+        const tuptype = this.getArgType(op.arg);
+        let vals: string[] = [];
+
+        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
+            vals = op.indecies.map((idx) => {
+                if (idx < ftuptype.entries.length) {
+                    return `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(idx)}`;
+                }
+                else {
+                    return "BSQ_VALUE_NONE";
+                }
+            });
+        }
+        else if (this.typegen.isTupleType(tuptype)) {
+            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
+            vals = op.indecies.map((idx) => {
+                if (idx < maxlen) {
+                    return `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(idx)}`;
+                }
+                else {
+                    return "BSQ_VALUE_NONE";
+                }
+            });
+        }
+        else {
+            vals = op.indecies.map((idx) => {
+                return `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${idx}>()`;
+            });
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(resultAccessType)) {
+            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        }
+        else {
+            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
+        }
+    }
+
+    generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): string {
+        const tuptype = this.getArgType(op.arg);
+
+        const rmax = CPPTypeEmitter.getTupleTypeMaxLength(resultTupleType);
+        let vals: string[] = [];
+        for (let i = 0; i < rmax; ++i) {
+            vals[i] = "BSQ_VALUE_NONE";
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
+            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
+            for (let i = 0; i < ftuptype.entries.length; ++i) {
+                vals[i] = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else if (this.typegen.isTupleType(tuptype)) {
+            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
+            for (let i = 0; i < maxlen; ++i) {
+                vals[i] = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else {
+            for (let i = 0; i < rmax; ++i) {
+                vals[i] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
+            }
+        }
+
+        for (let i = 0; i < op.updates.length; ++i) {
+            const update = op.updates[i];
+            vals[update[0]] = this.argToCpp(update[1], this.typegen.anyType);
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(resultTupleType)) {
+            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        }
+        else {
+            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
+        }
+    }
+
+    generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): string {
+        const rmax = CPPTypeEmitter.getTupleTypeMaxLength(resultTupleType);
+        let vals: string[] = [];
+        for (let i = 0; i < rmax; ++i) {
+            vals[i] = "BSQ_VALUE_NONE";
+        }
+
+        const intotype = this.getArgType(op.arg);
+        const intolen = CPPTypeEmitter.getTupleTypeMaxLength(intotype); //type checker ensures this is not optional and always the same
+        if (this.typegen.isKnownLayoutTupleType(intotype)) {
+            for (let i = 0; i < intolen; ++i) {
+                vals[i] = `(${this.argToCpp(op.arg, intotype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else if (this.typegen.isTupleType(intotype)) {
+            for (let i = 0; i < intolen; ++i) {
+                vals[i] = `(${this.argToCpp(op.arg, intotype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else {
+            for (let i = 0; i < intolen; ++i) {
+                vals[i] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
+            }
+        }
+
+        const exttype = this.getArgType(op.update);
+        if (this.typegen.isKnownLayoutTupleType(exttype)) {
+            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(exttype);
+            for (let i = 0; i < ftuptype.entries.length; ++i) {
+                vals[i + intolen] = `(${this.argToCpp(op.update, exttype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else if (this.typegen.isTupleType(exttype)) {
+            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(exttype);
+            for (let i = 0; i < maxlen; ++i) {
+                vals[i + intolen] = `(${this.argToCpp(op.update, exttype)})${this.typegen.generateFixedTupleAccessor(i)}`;
+            }
+        }
+        else {
+            for (let i = 0; i < rmax - intolen; ++i) {
+                vals[i + intolen] = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.update, this.typegen.anyType)}, BSQTuple)->atFixed<${i}>()`;
+            }
+        }
+
+        if (this.typegen.isKnownLayoutTupleType(resultTupleType)) {
+            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        }
+        else {
+            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
         }
     }
 
@@ -1115,7 +1247,8 @@ class CPPBodyEmitter {
                 return this.generateMIRAccessFromIndex(ai, this.typegen.getMIRType(ai.resultAccessType));
             }
             case MIROpTag.MIRProjectFromIndecies: {
-                return NOT_IMPLEMENTED<string>("MIRProjectFromIndecies");
+                const pi = op as MIRProjectFromIndecies;
+                return this.generateMIRProjectFromIndecies(pi, this.typegen.getMIRType(pi.resultProjectType));
             }
             case MIROpTag.MIRAccessFromProperty: {
                 const ap = op as MIRAccessFromProperty;
@@ -1141,7 +1274,8 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromTypeConcept");
             }
             case MIROpTag.MIRModifyWithIndecies: {
-                return NOT_IMPLEMENTED<string>("MIRModifyWithIndecies");
+                const mi = op as MIRModifyWithIndecies;
+                return this.generateMIRModifyWithIndecies(mi, this.typegen.getMIRType(mi.resultTupleType));
             }
             case MIROpTag.MIRModifyWithProperties: {
                 return NOT_IMPLEMENTED<string>("MIRModifyWithProperties");
@@ -1150,7 +1284,8 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRModifyWithFields");
             }
             case MIROpTag.MIRStructuredExtendTuple: {
-                return NOT_IMPLEMENTED<string>("MIRStructuredExtendTuple");
+                const si = op as MIRStructuredExtendTuple;
+                return this.generateMIRStructuredExtendTuple(si, this.typegen.getMIRType(si.resultTupleType));
             }
             case MIROpTag.MIRStructuredExtendRecord: {
                 return NOT_IMPLEMENTED<string>("MIRStructuredExtendRecord");
