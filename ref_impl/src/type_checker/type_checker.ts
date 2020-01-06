@@ -1619,7 +1619,7 @@ class TypeChecker {
 
             const minarglen = Math.min(...texp.options.map((topt) => (topt as ResolvedTupleAtomType).types.length));
             const maxarglen = Math.min(...texp.options.map((topt) => (topt as ResolvedTupleAtomType).types.length));
-            this.raiseErrorIf(op.sinfo, minarglen !== maxarglen, "Appending into tuples with differnt lengths creates an ambigious result tuple");
+            this.raiseErrorIf(op.sinfo, minarglen !== maxarglen, "Appending into tuples with different lengths creates an ambigious result tuple");
 
             resultOptions = resultOptions.concat(...texp.options.map((topt) => {
                 return mergeValue.options.map((tmerge) => this.appendIntoTupleAtom(op.sinfo, topt as ResolvedTupleAtomType, tmerge));
@@ -1634,17 +1634,6 @@ class TypeChecker {
         }
         else if (this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
             this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(mergeValue, this.m_assembly.getSpecialRecordConceptType()), "Must be two Records to merge");
-
-            const minarglen = Math.min(...texp.options.map((topt) => (topt as ResolvedRecordAtomType).entries.length));
-            const maxarglen = Math.min(...texp.options.map((topt) => (topt as ResolvedRecordAtomType).entries.length));
-            let allnames = new Set<string>();
-            texp.options.forEach((opt) => {
-                const record = opt as ResolvedRecordAtomType;
-                record.entries.forEach((entry) => {
-                    allnames.add(entry.name);
-                });
-            });
-            this.raiseErrorIf(op.sinfo, minarglen !== maxarglen || allnames.size !== maxarglen, "Appending into records with differnt property sets creates an ambigious result tuple");
 
             resultOptions = resultOptions.concat(...texp.options.map((topt) => {
                 return mergeValue.options.map((tmerge) => this.mergeIntoRecordAtom(op.sinfo, topt as ResolvedRecordAtomType, tmerge));
