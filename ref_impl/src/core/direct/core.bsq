@@ -155,94 +155,6 @@ enum BufferCompression {
 entity Buffer<T where PODType | APIType> provides APIValue, Some {
 }
 
-//<summary>An efficient buffer encoding for data.</summary>
-entity PODReadBuffer provides Some {
-    static fromBuffer<T where PODType>(data: Buffer<T>): PODReadBuffer # podreadbuffer_frombuffer
-    static fromStringOf<T where PODType(data: StringOf<T>): PODReadBuffer # podreadbuffer_fromstringof
-    static fromString(data: String): PODReadBuffer # podreadbuffer_fromstring
-
-    static read<T where PODType>(ref buf: PODReadBuffer): T # podreadbuffer_read
-    static tryRead<T where PODType>(ref buf: PODReadBuffer): Result<T> # podreadbuffer_tryread
-
-    static isArrayStart(buf: PODReadBuffer): Bool # podreadbuffer_isliststart
-    static isArrayEnd(buf: PODReadBuffer): Bool # podreadbuffer_islistend
-    static tryReadArrayStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadliststart
-    static tryReadArrayEntry(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadlistentry
-    static tryReadArrayEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadlistend
-    static readListAction<T>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> T): List<T> # podreadbuffer_readlistaction
-
-    static isDictStart(buf: PODReadBuffer): Bool # podreadbuffer_ismapstart
-    static isDictEnd(buf: PODReadBuffer): Bool # podreadbuffer_ismapend
-    static tryReadDictStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadmapstart
-    static tryReadDictKey(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadmapkey
-    static tryReadDictValue(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadmapvalue
-    static tryReadDictEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadmapend
-    static readMapAction<K where Indexable, V>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> MapEntry<K, V>): Map<K, V> # podreadbuffer_readmapaction
-}
-
-//<summary>An efficient buffer encoding for data.</summary>
-entity PODWriteBuffer provides Some {
-    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): PODWriteBuffer # podwritebuffer_create
-    complete<T where PODType>(): Buffer<T> # podwritebuffer_complete
-
-    write<T where PODType>(data: T): PODWriteBuffer # podwritebuffer_write
-
-    writeArrayStart(): PODWriteBuffer # podwritebuffer_writeliststart
-    writeArrayEntry(): PODWriteBuffer # podwritebuffer_writelistentry
-    writeArrayEnd(): PODWriteBuffer # podwritebuffer_writelistend
-    writeListAction<T>(l: List<T>, fn(_: T, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writelistaction
-
-    writeDictStart(): PODWriteBuffer # podwritebuffer_writemapstart
-    writeDictKey(): PODWriteBuffer # podwritebuffer_writemapkey
-    writeDictValue(): PODWriteBuffer # podwritebuffer_writemapvalue
-    writeDictEnd(): PODWriteBuffer # podwritebuffer_writemapend
-    writeMapAction<K where Indexable, V>(m: Map<K, V>, fn(_: MapEnty<K, V>, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writemapaction
-}
-
-//<summary>An efficient buffer encoding for data.</summary>
-entity APIReadBuffer provides Some {
-    static fromBuffer<T where APIType>(data: Buffer<T>): APIReadBuffer # apireadbuffer_frombuffer
-    static fromStringOf<T where APIType>(data: StringOf<T>): APIReadBuffer # apireadbuffer_fromstringof
-    static fromString(data: String): APIReadBuffer # apireadbuffer_fromstring
-
-    static read<T where APIType>(ref buf: APIReadBuffer): T # apireadbuffer_read
-    static tryRead<T where APIType>(ref buf: APIReadBuffer): Result<T> # apireadbuffer_tryread
-
-    static isArrayStart(buf: APIReadBuffer): Bool # apireadbuffer_isliststart
-    static isArrayEnd(buf: APIReadBuffer): Bool # apireadbuffer_islistend
-    static tryReadArrayStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadliststart
-    static tryReadArrayEntry(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadlistentry
-    static tryReadArrayEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadlistend
-    static readListAction<T>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> T): List<T> # apireadbuffer_readlistaction
-
-    static isDictStart(buf: APIReadBuffer): Bool # apireadbuffer_ismapstart
-    static isDictEnd(buf: APIReadBuffer): Bool # apireadbuffer_ismapend
-    static tryReadDictStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadmapstart
-    static tryReadDictKey(ref buf: APIReadBuffer): K # apireadbuffer_readmapkey
-    static tryReadDictValue(ref buf: APIReadBuffer): V # apireadbuffer_readmapvalue
-    static tryReadDictEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadmapend
-    static readMapAction<K where Indexable, V>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> MapEntry<K, V>): Map<K, V> # apireadbuffer_readmapaction
-}
-
-//<summary>An efficient buffer encoding for data.</summary>
-entity APIWriteBuffer provides Some {
-    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): APIWriteBuffer # apiwritebuffer_create
-    complete<T where APIType>(): Buffer<T> # apiwritebuffer_complete
-
-    write<T where APIType>(data: T): APIWriteBuffer # apiwritebuffer_write
-
-    writeListStart(): APIWriteBuffer # apiwritebuffer_writeliststart
-    writeListEntry(): APIWriteBuffer # podwritebuffer_writelistentry
-    writeListEnd(): APIWriteBuffer # apiwritebuffer_writelistend
-    writeListAction<T>(l: List<T>, fn(_: T, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writelistaction
-
-    writeDictStart(): APIWriteBuffer # apiwritebuffer_writemapstart
-    writeDictKey(): APIWriteBuffer # apiwritebuffer_writemapkey
-    writeDictValue(): APIWriteBuffer # apiwritebuffer_writemapvalue
-    writeDictEnd(): APIWriteBuffer # apiwritebuffer_writemapend
-    writeMapAction<K where Indexable, V>(m: Map<K, V>, fn(_: MapEnty<K, V>, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writemapaction
-}
-
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # guid_tryparse
@@ -350,10 +262,10 @@ entity Result<T> provides Some {
         return this._err;
     }
 
-    method convertUp<U where T provides U>(): Result<U> # result_convertsub
-
-    method convertDown<U where U provides T>(): Result<U> # result_convertsuper
-    method tryConvertDown<U where U provides T>(): Result<U>? # result_tryconvertsuper
+    method convert<U>(): Result<U> {
+        check !this._success || this._result->is<U>();
+        return Result<U>{ _success=this._success, _result=this._result->as<U>(), _err=this._err };
+    }
 }
 
 //<summary>A pure concept defining useful static numerical operations.</summary>

@@ -1,0 +1,139 @@
+//<summary>An efficient buffer encoding for data.</summary>
+entity PODReadBuffer provides Some {
+    static fromBuffer<T where PODType>(data: Buffer<T>): PODReadBuffer # podreadbuffer_frombuffer
+    static fromStringOf<T where PODType(data: StringOf<T>): PODReadBuffer # podreadbuffer_fromstringof
+    static fromString(data: String): PODReadBuffer # podreadbuffer_fromstring
+
+    static read<T where PODType>(ref buf: PODReadBuffer): T # podreadbuffer_read
+    static tryRead<T where PODType>(ref buf: PODReadBuffer): Result<T> # podreadbuffer_tryread
+
+    static isTupleStart(buf: PODReadBuffer): Bool # podreadbuffer_istuplestart
+    static isTupleEnd(buf: PODReadBuffer): Bool # podreadbuffer_istupleend
+    static tryReadTupleStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtuplestart
+    static tryReadTupleEntry(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleentry
+    static tryReadTupleEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleend
+    static readTupleAction<T where PODTuple>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> PODType): T # podreadbuffer_readtupleaction
+
+    static isRecordStart(buf: PODReadBuffer): Bool # podreadbuffer_isrecordstart
+    static isRecordEnd(buf: PODReadBuffer): Bool # podreadbuffer_isrecordend
+    static tryReadRecordStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordstart
+    static tryReadRecordKey(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordkey
+    static tryReadRecordValue(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordvalue
+    static tryReadRecordEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordend
+    static readRecordAction<T where PODRecord>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> PODType): T # podreadbuffer_readrecordaction
+
+    static isArrayStart(buf: PODReadBuffer): Bool # podreadbuffer_isarraystart
+    static isArrayEnd(buf: PODReadBuffer): Bool # podreadbuffer_isarrayend
+    static tryReadArrayStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarraystart
+    static tryReadArrayEntry(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayentry
+    static tryReadArrayEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayend
+    static readArrayAction<T>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> T): List<T> # podreadbuffer_readarrayaction
+
+    static isKVStoreStart(buf: PODReadBuffer): Bool # podreadbuffer_iskvstorestart
+    static isKVStoreEnd(buf: PODReadBuffer): Bool # podreadbuffer_iskvstoreend
+    static tryReadKVStoreStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorestart
+    static tryReadKVStoreKey(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorekey
+    static tryReadKVStoreValue(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorevalue
+    static tryReadKVStoreEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstoreend
+    static readKVStoreAction<K where Indexable, V>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> MapEntry<K, V>): Map<K, V> # podreadbuffer_readkvstoreaction
+}
+
+//<summary>An efficient buffer encoding for data.</summary>
+entity PODWriteBuffer provides Some {
+    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): PODWriteBuffer # podwritebuffer_create
+    complete<T where PODType>(): Buffer<T> # podwritebuffer_complete
+
+    write<T where PODType>(data: T): PODWriteBuffer # podwritebuffer_write
+
+    writeTupleStart(): PODWriteBuffer # podwritebuffer_writetuplestart
+    writeTupleEntry(): PODWriteBuffer # podwritebuffer_writetupleentry
+    writeTupleEnd(): PODWriteBuffer # podwritebuffer_writetupleend
+    writeTupleAction<T where PODTuple>(t: T, fn(_: PODType, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writetupleaction
+
+    writeRecordStart(): PODWriteBuffer # podwritebuffer_writerecordstart
+    writeRecordKey(): PODWriteBuffer # podwritebuffer_writerecordkey
+    writeRecordValue(): PODWriteBuffer # podwritebuffer_writerecordvalue
+    writeRecordEnd(): PODWriteBuffer # podwritebuffer_writerecordend
+    writeRecordAction<T where PODRecord>(r: T, fn(_: PODType, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writerecordaction
+
+    writeArrayStart(): PODWriteBuffer # podwritebuffer_writearraystart
+    writeArrayEntry(): PODWriteBuffer # podwritebuffer_writearrayentry
+    writeArrayEnd(): PODWriteBuffer # podwritebuffer_writearrayend
+    writeArrayAction<T>(l: List<T>, fn(_: T, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writearrayaction
+
+    writeKVStoreStart(): PODWriteBuffer # podwritebuffer_writekvstorestart
+    writeKVStoreKey(): PODWriteBuffer # podwritebuffer_writekvstorekey
+    writeKVStoreValue(): PODWriteBuffer # podwritebuffer_writekvstorevalue
+    writeKVStoreEnd(): PODWriteBuffer # podwritebuffer_writekvstoreend
+    writeKVStoreAction<K where Indexable, V>(m: Map<K, V>, fn(_: MapEnty<K, V>, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writekvstoreaction
+}
+
+//<summary>An efficient buffer encoding for data.</summary>
+entity APIReadBuffer provides Some {
+    static fromBuffer<T where APIType>(data: Buffer<T>): APIReadBuffer # apireadbuffer_frombuffer
+    static fromStringOf<T where APIType>(data: StringOf<T>): APIReadBuffer # apireadbuffer_fromstringof
+    static fromString(data: String): APIReadBuffer # apireadbuffer_fromstring
+
+    static read<T where APIType>(ref buf: APIReadBuffer): T # apireadbuffer_read
+    static tryRead<T where APIType>(ref buf: APIReadBuffer): Result<T> # apireadbuffer_tryread
+
+    static isTupleStart(buf: APIReadBuffer): Bool # apireadbuffer_istuplestart
+    static isTupleEnd(buf: APIReadBuffer): Bool # apireadbuffer_istupleend
+    static tryReadTupleStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadtuplestart
+    static tryReadTupleEntry(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadtupleentry
+    static tryReadTupleEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadtupleend
+    static readTupleAction<T where APITuple>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> APIType): T # apireadbuffer_readtupleaction
+
+    static isRecordStart(buf: APIReadBuffer): Bool # apireadbuffer_isrecordstart
+    static isRecordEnd(buf: APIReadBuffer): Bool # apireadbuffer_isrecordend
+    static tryReadRecordStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadrecordstart
+    static tryReadRecordKey(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadrecordkey
+    static tryReadRecordValue(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadrecordvalue
+    static tryReadRecordEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadrecordend
+    static readRecordAction<T where APIRecord>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> APIType): T # apireadbuffer_readrecordaction
+
+    static isArrayStart(buf: APIReadBuffer): Bool # apireadbuffer_isarraystart
+    static isArrayEnd(buf: APIReadBuffer): Bool # apireadbuffer_isarrayend
+    static tryReadArrayStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadarraystart
+    static tryReadArrayEntry(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadarrayentry
+    static tryReadArrayEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadarrayend
+    static readArrayAction<T>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> T): List<T> # apireadbuffer_readarrayaction
+
+    static isKVStoreStart(buf: APIReadBuffer): Bool # apireadbuffer_iskvstorestart
+    static isKVStoreEnd(buf: APIReadBuffer): Bool # apireadbuffer_iskvstoreend
+    static tryReadKVStoreStart(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadkvstorestart
+    static tryReadKVStoreKey(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadkvstorekey
+    static tryReadKVStoreValue(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadkvstorevalue
+    static tryReadKVStoreEnd(ref buf: APIReadBuffer): Bool # apireadbuffer_tryreadkvstoreend
+    static readKVStoreAction<K where Indexable, V>(ref buf: APIReadBuffer, f: fn(ref _: APIReadBuffer) -> MapEntry<K, V>): Map<K, V> # apireadbuffer_readkvstoreaction
+}
+
+//<summary>An efficient buffer encoding for data.</summary>
+entity APIWriteBuffer provides Some {
+    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): APIWriteBuffer # apiwritebuffer_create
+    complete<T where APIType>(): Buffer<T> # apiwritebuffer_complete
+
+    write<T where APIType>(data: T): APIWriteBuffer # apiwritebuffer_write
+
+    writeTupleStart(): APIWriteBuffer # apiwritebuffer_writetuplestart
+    writeTupleEntry(): APIWriteBuffer # apiwritebuffer_writetupleentry
+    writeTupleEnd(): APIWriteBuffer # apiwritebuffer_writetupleend
+    writeTupleAction<T where APITuple>(t: T, fn(_: APIType, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writetupleaction
+
+    writeRecordStart(): APIWriteBuffer # apiwritebuffer_writerecordstart
+    writeRecordKey(): APIWriteBuffer # apiwritebuffer_writerecordkey
+    writeRecordValue(): APIWriteBuffer # apiwritebuffer_writerecordvalue
+    writeRecordEnd(): APIWriteBuffer # apiwritebuffer_writerecordend
+    writeRecordAction<T where APIRecord>(r: T, fn(_: APIType, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writerecordaction
+
+    writeArrayStart(): APIWriteBuffer # apiwritebuffer_writearraystart
+    writeArrayEntry(): APIWriteBuffer # apiwritebuffer_writearrayentry
+    writeArrayEnd(): APIWriteBuffer # apiwritebuffer_writearrayend
+    writeArrayAction<T>(l: List<T>, fn(_: T, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writearrayaction
+
+    writeKVStoreStart(): APIWriteBuffer # apiwritebuffer_writekvstorestart
+    writeKVStoreKey(): APIWriteBuffer # apiwritebuffer_writekvstorekey
+    writeKVStoreValue(): APIWriteBuffer # apiwritebuffer_writekvstorevalue
+    writeKVStoreEnd(): APIWriteBuffer # apiwritebuffer_writekvstoreend
+    writeKVStoreAction<K where Indexable, V>(m: Map<K, V>, fn(_: MapEnty<K, V>, _: APIWriteBuffer) -> APIWriteBuffer): APIWriteBuffer # apiwritebuffer_writekvstoreaction
+}
