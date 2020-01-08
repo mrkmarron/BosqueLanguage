@@ -26,7 +26,6 @@ type CPPCode = {
     constint_create: string,
     propertyenums: string,
     propertynames: string,
-    known_property_lists_declare: string,
     vfield_decls: string,
     vmethod_decls: string,
     maincall: string

@@ -83,7 +83,6 @@ setImmediate(() => {
                 .replace("//%%STATIC_INT_CREATE%%", "  " + cparams.constint_create)
                 .replace("//%%PROPERTY_ENUM_DECLARE", "    " + cparams.propertyenums)
                 .replace("//%%PROPERTY_NAMES", "  " + cparams.propertynames)
-                .replace("//%%KNOWN_PROPERTY_LIST_DECLARE", "    " + cparams.known_property_lists_declare)
                 .replace("//%%VFIELD_DECLS", "    " + cparams.vfield_decls)
                 .replace("//%%VMETHOD_DECLS", "  " + cparams.vmethod_decls);
 

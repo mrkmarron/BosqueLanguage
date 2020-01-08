@@ -149,15 +149,15 @@ entity List<T> provides Object {
     }
 }
 
-//TODO: this is where we want to use POD when T POD
-entity KeyList provides Object {
-    hidden static _cons(k: KeyType, kl: KeyList?): KeyList # keylist_cons
-    hidden static _get_key(kl: KeyList): KeyType # keylist_getkey
-    hidden static _get_tail(kl: KeyList): KeyList? # keylist_gettail
 
-    recursive static removeKey(kl: KeyList, k: KeyType): KeyList? {
-        var tkey = KeyList::_get_key(kl);
-        var ttail = KeyList::_get_tail(kl);
+entity KeyList<K where KeyType> provides Object {
+    hidden static _cons(k: K, kl: KeyList<K>?): KeyList<K> # keylist_cons
+    hidden static _get_key(kl: KeyList<K>): K # keylist_getkey
+    hidden static _get_tail(kl: KeyList<K>): K? # keylist_gettail
+
+    recursive static removeKey(kl: KeyList<K>, k: K): KeyList<K>? {
+        var tkey = KeyList<K>::_get_key(kl);
+        var ttail = KeyList<K>::_get_tail(kl);
 
         if (ttail == none) {
             return none;
@@ -166,8 +166,8 @@ entity KeyList provides Object {
             return ttail;
         }
         else {
-            var newtail = KeyList::removeKey[recursive](ttail, k);
-            return KeyList::_cons(tkey, newtail);
+            var newtail = KeyList<K>::removeKey[recursive](ttail, k);
+            return KeyList<K>::_cons(tkey, newtail);
         }
     }
 }
@@ -175,15 +175,15 @@ entity KeyList provides Object {
 //<summary>A Set entity.</summary>
 //
 //TODO: this is where we want to use POD when T POD
-//TODO: want to add type gen macro T % KeyType that expands to the type of getKey(v) -- also should update the sig of Indexable::getKey
+//TODO: want to add type gen macro T % KeyType that expands to the type of getKey(v) -- also should update the handling of Indexable::getKey
 //
 entity Set<T where Indexable> provides Object {
     hidden static _size(s: Set<T>): Int # set_size
-    hidden static _has_key(s: Set<T>, key: KeyType): Bool # set_has_key
-    hidden static _at_val(s: Set<T>, key: KeyType): T # set_at_val
+    hidden static _has_key(s: Set<T>, key: <(T % KeyType)>): Bool # set_has_key
+    hidden static _at_val(s: Set<T>, key: <|T % KeyType|>): T # set_at_val
 
-    hidden static _get_keylist(s: Set<T>): KeyList? # set_get_keylist
-    hidden static _clear_val(s: Set<T>, key: KeyType, newkl: KeyList?): Set<T> # set_clear_val
+    hidden static _get_keylist(s: Set<T>): KeyList<<|T % KeyType|>>? # set_get_keylist
+    hidden static _clear_val(s: Set<T>, key: <|T % KeyType|>, newkl: KeyList<<|T % KeyType|>>?): Set<T> # set_clear_val
     
     hidden static _unsafe_update(s: Set<T>, k: KeyType, v: T): Set<T> # set_unsafe_update
     hidden static _destructive_update(s: Set<T>, k: KeyType, v: T): Set<T> # set_destuctive_update
@@ -242,6 +242,11 @@ entity Set<T where Indexable> provides Object {
             return Set<T>::_clear_val(this, key, kle != none ? KeyList::removeKey[recursive](kle, key) : none);
         }
     }
+}
+
+entity MapEntry<K where Indexable, V> {
+    field key: K;
+    field value: V;
 }
 
 //<summary>A Map entity.</summary>
