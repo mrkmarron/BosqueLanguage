@@ -141,7 +141,7 @@ entity List<T> provides Object, PODType when T subtype POD, APIType when T subty
         return List<T>::_map<U>[recursive](this, 0, List<U>{}, f);
     }
 
-    method {when T Int} sum(): Int {
+    method {when T subtype Int} sum(): Int {
         return IntList::_sum[recursive](this, 0, 0);
     }
 }

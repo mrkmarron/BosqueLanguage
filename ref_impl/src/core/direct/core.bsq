@@ -126,8 +126,8 @@ entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType wh
     static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
     static tryAsString<T>(str: String): StringOf<T>? # stringof_tryasstring
 
-    method convert<U>(): StringOf<U> # stringof_convert
-    method tryConvert<U>(): StringOf<U>? # stringof_tryconvert
+    method convert<U where Parsable | Validator>(): StringOf<U> # stringof_convert
+    method tryConvert<U where Parsable | Validator>(): StringOf<U>? # stringof_tryconvert
 }
 
 enum BufferFormat {
@@ -174,8 +174,8 @@ concept Enum provides KeyType, APIType, Some {
 concept IdKey provides KeyType, APIType, Some {
 }
 
-//<summary>Special category of IdKey for state hashes or Ids (to mirror event time option for state management).</summary>
-concept StateIdKey provides IdKey {
+//<summary>A specialized version of idkey for dealing with hashes (either content addressable or optimistic).</summary>
+concept HashIdKey provides IdKey {
 }
 
 //<summary>Primitive regex value.</summary>

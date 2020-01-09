@@ -12,21 +12,21 @@ type BuildLevel = "debug" | "test" | "release";
 
 class TemplateTermDecl {
     readonly name: string;
-    readonly constraints: TypeSignature[];
+    readonly constraint: TypeSignature;
 
-    constructor(name: string, constraints: TypeSignature[]) {
+    constructor(name: string, constraint: TypeSignature) {
         this.name = name;
-        this.constraints = constraints;
+        this.constraint = constraint;
     }
 }
 
 class TemplateTermRestriction {
     readonly name: string;
-    readonly ttype: TypeSignature;
+    readonly constraint: TypeSignature;
 
-    constructor(name: string, ttype: TypeSignature) {
+    constructor(name: string, constraint: TypeSignature) {
         this.name = name;
-        this.ttype = ttype;
+        this.constraint = constraint;
     }
 }
 
@@ -49,7 +49,7 @@ class PostConditionDecl {
     readonly level: BuildLevel;
     readonly exp: Expression;
 
-    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression, err: Expression | undefined) {
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression) {
         this.sinfo = sinfo;
         this.level = level;
         this.exp = exp;
@@ -61,7 +61,7 @@ class InvariantDecl {
     readonly level: BuildLevel;
     readonly exp: Expression;
 
-    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression, err: Expression | undefined) {
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression) {
         this.sinfo = sinfo;
         this.level = level;
         this.exp = exp;
@@ -153,7 +153,7 @@ class StaticMemberDecl implements OOMemberDecl {
     readonly declaredType: TypeSignature;
     readonly value: Expression | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: Expression | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
         this.pragmas = pragmas;
@@ -250,7 +250,7 @@ class OOPTypeDecl {
 
     readonly terms: TemplateTermDecl[];
 
-    readonly provides: TypeSignature[];
+    readonly provides: [TypeSignature, TemplateTermRestriction[] | undefined][];
 
     readonly invariants: Expression[];
 
@@ -259,7 +259,7 @@ class OOPTypeDecl {
     readonly memberFields: Map<string, MemberFieldDecl>;
     readonly memberMethods: Map<string, MemberMethodDecl>;
 
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TemplateTermRestriction[] | undefined][],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
@@ -300,7 +300,7 @@ class OOPTypeDecl {
 }
 
 class ConceptTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TemplateTermRestriction[] | undefined][],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
@@ -309,17 +309,11 @@ class ConceptTypeDecl extends OOPTypeDecl {
 }
 
 class EntityTypeDecl extends OOPTypeDecl {
-    readonly isEnum: boolean;
-    readonly isKey: boolean;
-
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: TypeSignature[],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TemplateTermRestriction[] | undefined][],
         invariants: Expression[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
-        isEnum: boolean, isKey: boolean) {
+        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         super(sourceLocation, srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
-        this.isEnum = isEnum;
-        this.isKey = isKey;
     }
 }
 
