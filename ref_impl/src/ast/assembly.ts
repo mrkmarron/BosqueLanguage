@@ -8,13 +8,15 @@ import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSi
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
 
+type BuildLevel = "debug" | "test" | "release";
+
 class TemplateTermDecl {
     readonly name: string;
-    readonly ttype: TypeSignature;
+    readonly constraints: TypeSignature[];
 
-    constructor(name: string, ttype: TypeSignature) {
+    constructor(name: string, constraints: TypeSignature[]) {
         this.name = name;
-        this.ttype = ttype;
+        this.constraints = constraints;
     }
 }
 
@@ -25,6 +27,44 @@ class TemplateTermRestriction {
     constructor(name: string, ttype: TypeSignature) {
         this.name = name;
         this.ttype = ttype;
+    }
+}
+
+class PreConditionDecl {
+    readonly sinfo: SourceInfo;
+    readonly level: BuildLevel;
+    readonly exp: Expression;
+    readonly err: Expression | undefined;
+
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression, err: Expression | undefined) {
+        this.sinfo = sinfo;
+        this.level = level;
+        this.exp = exp;
+        this.err = err;
+    }
+}
+
+class PostConditionDecl {
+    readonly sinfo: SourceInfo;
+    readonly level: BuildLevel;
+    readonly exp: Expression;
+
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression, err: Expression | undefined) {
+        this.sinfo = sinfo;
+        this.level = level;
+        this.exp = exp;
+    }
+}
+
+class InvariantDecl {
+    readonly sinfo: SourceInfo;
+    readonly level: BuildLevel;
+    readonly exp: Expression;
+
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression, err: Expression | undefined) {
+        this.sinfo = sinfo;
+        this.level = level;
+        this.exp = exp;
     }
 }
 
@@ -42,16 +82,19 @@ class InvokeDecl {
     readonly params: FunctionParameter[];
     readonly optRestName: string | undefined;
     readonly optRestType: TypeSignature | undefined;
-    readonly resultType: TypeSignature;
+    readonly optRestOwnerSpecs: [boolean, boolean] | undefined;
 
-    readonly preconditions: [Expression, boolean][];
-    readonly postconditions: Expression[];
+    readonly resultType: TypeSignature;
+    readonly isResultUnique: boolean;
+
+    readonly preconditions: PreConditionDecl[];
+    readonly postconditions: PostConditionDecl[];
 
     readonly isLambda: boolean;
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: [Expression, boolean][], postconds: Expression[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
@@ -65,7 +108,10 @@ class InvokeDecl {
         this.params = params;
         this.optRestName = optRestName;
         this.optRestType = optRestType;
+        this.optRestOwnerSpecs = optRestOwnerSpecs;
+
         this.resultType = resultType;
+        this.isResultUnique = isResultUnique;
 
         this.preconditions = preconds;
         this.postconditions = postconds;
@@ -76,19 +122,19 @@ class InvokeDecl {
     }
 
     generateSig(): TypeSignature {
-        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultType);
+        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.optRestOwnerSpecs, this.resultType, this.isResultUnique);
     }
 
-    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, captureSet: Set<string>, body: BodyImplementation) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], [], params, optRestName, optRestType, resultType, [], [], true, captureSet, body);
+    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean, captureSet: Set<string>, body: BodyImplementation) {
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], [], params, optRestName, optRestType, optRestOwnerSpecs, resultType, isResultUnique, [], [], true, captureSet, body);
     }
 
-    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: [Expression, boolean][], postconds: Expression[], body: BodyImplementation | undefined) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultType, preconds, postconds, false, new Set<string>(), body);
+    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, optRestOwnerSpecs, resultType, isResultUnique, preconds, postconds, false, new Set<string>(), body);
     }
 
-    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: [Expression, boolean][], postconds: Expression[], body: BodyImplementation | undefined) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultType, preconds, postconds, false, new Set<string>(), body);
+    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, optRestOwnerSpecs, resultType, isResultUnique, preconds, postconds, false, new Set<string>(), body);
     }
 }
 
@@ -1223,8 +1269,9 @@ class Assembly {
 }
 
 export {
-    TemplateTermDecl, TemplateTermRestriction, InvokeDecl,
-    OOMemberDecl, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
+    BuildLevel,
+    TemplateTermDecl, TemplateTermRestriction, PreConditionDecl, PostConditionDecl, InvokeDecl,
+    OOMemberDecl, InvariantDecl, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
     NamespaceConstDecl, NamespaceFunctionDecl, NamespaceTypedef, NamespaceUsing, NamespaceDeclaration,
     OOMemberLookupInfo, Assembly
 };

@@ -120,17 +120,14 @@ entity String provides KeyType, PODType, APIType, Orderable, Some {
 }
 
 //<summary>Primitive stringof value.</summary>
-entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType when T provides PODType, APIType when T provides APIType {
+entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType when T subtype PODType, APIType when T subtype APIType {
     method rawString(): String # stringof_rawstring
 
     static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
     static tryAsString<T>(str: String): StringOf<T>? # stringof_tryasstring
 
-    method convertUp<U where T provides U>(): StringOf<U> # stringof_convertsub
-    method tryConvertUp<U where T provides U>(): StringOf<U>? # stringof_tryconvertsub
-
-    method convertDown<U where U provides T>(): StringOf<U> # stringof_convertsuper
-    method tryConvertDown<U where U provides T>(): StringOf<U>? # stringof_tryconvertsuper
+    method convert<U>(): StringOf<U> # stringof_convert
+    method tryConvert<U>(): StringOf<U>? # stringof_tryconvert
 }
 
 enum BufferFormat {

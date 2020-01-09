@@ -35,6 +35,15 @@ class PositionalArgument extends InvokeArgument {
     }
 }
 
+class MapArgument extends InvokeArgument {
+    readonly key: Expression;
+
+    constructor(key: Expression, value: Expression) {
+        super(value, false);
+        this.key = key;
+    }
+}
+
 class Arguments {
     readonly argList: InvokeArgument[];
 
@@ -133,6 +142,7 @@ enum ExpressionTag {
     LiteralBoolExpression = "LiteralBoolExpression",
     LiteralIntegerExpression = "LiteralIntegerExpression",
     LiteralStringExpression = "LiteralStringExpression",
+    LiteralRegexExpression = "LiteralRegexExpression",
     LiteralTypedStringExpression = "LiteralTypedStringExpression",
     LiteralTypedStringConstructorExpression = "LiteralTypedStringConstructorExpression",
 
@@ -152,6 +162,8 @@ enum ExpressionTag {
 
     PostfixOpExpression = "PostfixOpExpression",
 
+    DupExpression = "DupExpression",
+    DestructiveReadExpression = "DestructiveReadExpression",
     PrefixOpExpression = "PrefixOpExpression",
 
     BinOpExpression = "BinOpExpression",
@@ -168,8 +180,7 @@ enum ExpressionTag {
     BlockStatementExpression = "BlockStatementExpression",
     IfExpression = "IfExpression",
     MatchExpression = "MatchExpression",
-    //    ProroguedExpression,
-    //    MLExpression
+    //    ProroguedExpression
 }
 
 abstract class Expression {
@@ -217,6 +228,15 @@ class LiteralStringExpression extends Expression {
 
     constructor(sinfo: SourceInfo, value: string) {
         super(ExpressionTag.LiteralStringExpression, sinfo);
+        this.value = value;
+    }
+}
+
+class LiteralRegexExpression extends Expression {
+    readonly value: string;
+
+    constructor(sinfo: SourceInfo, value: string) {
+        super(ExpressionTag.LiteralRegexExpression, sinfo);
         this.value = value;
     }
 }
@@ -457,10 +477,12 @@ class PostfixProjectFromNames extends PostfixOperation {
 }
 
 class PostfixProjectFromType extends PostfixOperation {
+    readonly istry: boolean;
     readonly ptype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, ptype: TypeSignature) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, istry: boolean, ptype: TypeSignature) {
         super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromType);
+        this.istry = istry;
         this.ptype = ptype;
     }
 }
@@ -506,6 +528,24 @@ class PostfixInvoke extends PostfixOperation {
         this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
+    }
+}
+
+class DupOp extends Expression {
+    readonly exp: Expression;
+
+    constructor(sinfo: SourceInfo, exp: Expression) {
+        super(ExpressionTag.DupExpression, sinfo);
+        this.exp = exp;
+    }
+}
+
+class DestructiveReadOp extends Expression {
+    readonly exp: Expression;
+
+    constructor(sinfo: SourceInfo, exp: Expression) {
+        super(ExpressionTag.DestructiveReadExpression, sinfo);
+        this.exp = exp;
     }
 }
 
@@ -670,8 +710,10 @@ enum StatementTag {
     AbortStatement = "AbortStatement",
     AssertStatement = "AssertStatement", //assert(x > 0)
     CheckStatement = "CheckStatement", //check(x > 0)
+    ValidateStatement = "ValidateStatement", //validate exp or err -> if (!exp) return Result<INVOKE_RESULT>@error(err);
 
     DebugStatement = "DebugStatement", //print an arg or if empty attach debugger
+    NakedCallStatement = "NakedCallStatement",
 
     BlockStatement = "BlockStatement"
 }
@@ -864,12 +906,32 @@ class CheckStatement extends Statement {
     }
 }
 
+class ValidateStatement extends Statement {
+    readonly cond: Expression;
+    readonly err: Expression;
+
+    constructor(sinfo: SourceInfo, cond: Expression, err: Expression) {
+        super(StatementTag.ValidateStatement, sinfo);
+        this.cond = cond;
+        this.err = err;
+    }
+}
+
 class DebugStatement extends Statement {
     readonly value: Expression | undefined;
 
     constructor(sinfo: SourceInfo, value: Expression | undefined) {
         super(StatementTag.DebugStatement, sinfo);
         this.value = value;
+    }
+}
+
+class NakedCallStatement extends Statement {
+    readonly call: CallNamespaceFunctionExpression | CallStaticFunctionExpression;
+
+    constructor(sinfo: SourceInfo, call: CallNamespaceFunctionExpression | CallStaticFunctionExpression) {
+        super(StatementTag.NakedCallStatement, sinfo);
+        this.call = call;
     }
 }
 
@@ -895,14 +957,15 @@ class BodyImplementation {
 }
 
 export {
-    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
+    InvokeArgument, NamedArgument, PositionalArgument, MapArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
-    LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
+    LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
+    DupOp, DestructiveReadOp,
     PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
@@ -910,7 +973,7 @@ export {
     VariableDeclarationStatement, VariableAssignmentStatement,
     StructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, StructuredVariableAssignmentStatement,
     ReturnStatement, YieldStatement,
-    IfElseStatement, AbortStatement, AssertStatement, CheckStatement, DebugStatement,
+    IfElseStatement, AbortStatement, AssertStatement, CheckStatement, ValidateStatement, DebugStatement, NakedCallStatement,
     MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
     BlockStatement, BodyImplementation
 };

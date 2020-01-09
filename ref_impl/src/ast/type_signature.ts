@@ -56,13 +56,17 @@ class FunctionParameter {
     readonly name: string;
     readonly type: TypeSignature;
     readonly isRef: boolean;
+    readonly isUnique: boolean;
+    readonly isBorrow: boolean;
     readonly isOptional: boolean;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, isUnique: boolean, isBorrow: boolean) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
+        this.isUnique = isUnique;
+        this.isBorrow = isBorrow;
     }
 }
 
@@ -71,15 +75,30 @@ class FunctionTypeSignature extends TypeSignature {
     readonly params: FunctionParameter[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: TypeSignature | undefined;
+    readonly optRestOwnerSpecs: [boolean, boolean] | undefined;
     readonly resultType: TypeSignature;
+    readonly isResultUnique: boolean;
 
-    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, resultType: TypeSignature) {
+    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean) {
         super();
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
+        this.optRestOwnerSpecs = optRestOwnerSpecs;
         this.resultType = resultType;
+        this.isResultUnique = isResultUnique;
+    }
+}
+
+class ProjectTypeSignature extends TypeSignature {
+    readonly fromtype: TypeSignature;
+    readonly oftype: TypeSignature;
+
+    constructor(fromtype: TypeSignature, oftype: TypeSignature) {
+        super();
+        this.fromtype = fromtype;
+        this.oftype = oftype;
     }
 }
 
@@ -101,4 +120,4 @@ class UnionTypeSignature extends TypeSignature {
     }
 }
 
-export { TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, TemplateTypeSignature, NominalTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionParameter, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature };
+export { TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, TemplateTypeSignature, NominalTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, IntersectionTypeSignature, UnionTypeSignature };

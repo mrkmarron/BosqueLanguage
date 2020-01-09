@@ -20,10 +20,7 @@ hidden entity IntList provides Object {
 }
 
 //<summary>A List entity.</summary>
-//
-//TODO: this is where we want to use POD when T POD
-//
-entity List<T> provides Object {
+entity List<T> provides Object, PODType when T subtype POD, APIType when T subtype APIType {
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_at(l: List<T>, i: Int): T # list_unsafe_at
     hidden static _unsafe_add(l: List<T>, v: T): List<T> # list_unsafe_add
@@ -173,7 +170,7 @@ entity KeyList<K where KeyType> provides Object {
 }
 
 //<summary>A Set entity.</summary>
-entity Set<T where Indexable> provides Object, PODType when T provides POD, APIType when T provides APIType {
+entity Set<T where Indexable> provides Object, PODType when T subtype POD, APIType when T subtype APIType {
     hidden static _size(s: Set<T>): Int # set_size
     hidden static _has_key(s: Set<T>, key: T!KeyType): Bool # set_has_key
     hidden static _at_val(s: Set<T>, key: T!KeyType): T # set_at_val
@@ -246,7 +243,7 @@ value entity MapEntry<K where Indexable, V> {
 }
 
 //<summary>A Map entity.</summary>
-entity Map<K where Indexable, V> provides Object, PODType when K provides POD && V provides POD, APIType when K provides APIType && V provides APIType {
+entity Map<K where Indexable, V> provides Object, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
     hidden static _size(m: Map<K, V>): Int # map_size
     hidden static _has_key(m: Map<K, V>, key: K!KeyType): Bool # map_has_key
     hidden static _at_key(m: Map<K, V>, key: K!KeyType): K # map_at_key

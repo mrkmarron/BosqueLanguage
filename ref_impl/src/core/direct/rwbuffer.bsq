@@ -1,71 +1,71 @@
 //<summary>An efficient buffer encoding for data.</summary>
 entity PODReadBuffer provides Some {
-    static fromBuffer<T where PODType>(data: Buffer<T>): PODReadBuffer # podreadbuffer_frombuffer
-    static fromStringOf<T where PODType(data: StringOf<T>): PODReadBuffer # podreadbuffer_fromstringof
-    static fromString(data: String): PODReadBuffer # podreadbuffer_fromstring
+    static fromBuffer<T where PODType>(data: Buffer<T>): *PODReadBuffer # podreadbuffer_frombuffer
+    static fromStringOf<T where PODType(data: StringOf<T>): *PODReadBuffer # podreadbuffer_fromstringof
+    static fromString(data: String): *PODReadBuffer # podreadbuffer_fromstring
 
-    static read<T where PODType>(ref buf: PODReadBuffer): T # podreadbuffer_read
-    static tryRead<T where PODType>(ref buf: PODReadBuffer): Result<T> # podreadbuffer_tryread
+    static read<T where PODType>(ref *buf: PODReadBuffer): T # podreadbuffer_read
+    static tryRead<T where PODType>(ref *buf: PODReadBuffer): Result<T> # podreadbuffer_tryread
 
-    static isTupleStart(buf: PODReadBuffer): Bool # podreadbuffer_istuplestart
-    static isTupleEnd(buf: PODReadBuffer): Bool # podreadbuffer_istupleend
-    static tryReadTupleStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtuplestart
-    static tryReadTupleEntry(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleentry
-    static tryReadTupleEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleend
-    static readTupleAction<T where PODTuple>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> PODType): T # podreadbuffer_readtupleaction
+    static isTupleStart(^buf: PODReadBuffer): Bool # podreadbuffer_istuplestart
+    static isTupleEnd(^buf: PODReadBuffer): Bool # podreadbuffer_istupleend
+    static tryReadTupleStart(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadtuplestart
+    static tryReadTupleEntry(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleentry
+    static tryReadTupleEnd(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadtupleend
+    static readTupleAction<T where PODTuple>(ref *buf: PODReadBuffer, f: fn(ref *_: PODReadBuffer) -> PODType): T # podreadbuffer_readtupleaction
 
-    static isRecordStart(buf: PODReadBuffer): Bool # podreadbuffer_isrecordstart
-    static isRecordEnd(buf: PODReadBuffer): Bool # podreadbuffer_isrecordend
-    static tryReadRecordStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordstart
-    static tryReadRecordKey(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordkey
-    static tryReadRecordValue(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordvalue
-    static tryReadRecordEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordend
-    static readRecordAction<T where PODRecord>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> PODType): T # podreadbuffer_readrecordaction
+    static isRecordStart(^buf: PODReadBuffer): Bool # podreadbuffer_isrecordstart
+    static isRecordEnd(^buf: PODReadBuffer): Bool # podreadbuffer_isrecordend
+    static tryReadRecordStart(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordstart
+    static tryReadRecordKey(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordkey
+    static tryReadRecordValue(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordvalue
+    static tryReadRecordEnd(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordend
+    static readRecordAction<T where PODRecord>(ref *buf: PODReadBuffer, f: fn(ref *_: PODReadBuffer) -> PODType): T # podreadbuffer_readrecordaction
 
-    static isArrayStart(buf: PODReadBuffer): Bool # podreadbuffer_isarraystart
-    static isArrayEnd(buf: PODReadBuffer): Bool # podreadbuffer_isarrayend
-    static tryReadArrayStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarraystart
-    static tryReadArrayEntry(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayentry
-    static tryReadArrayEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayend
-    static readArrayAction<T>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> T): List<T> # podreadbuffer_readarrayaction
+    static isArrayStart(^buf: PODReadBuffer): Bool # podreadbuffer_isarraystart
+    static isArrayEnd(^buf: PODReadBuffer): Bool # podreadbuffer_isarrayend
+    static tryReadArrayStart(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadarraystart
+    static tryReadArrayEntry(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayentry
+    static tryReadArrayEnd(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadarrayend
+    static readArrayAction<T>(ref *buf: PODReadBuffer, f: fn(ref *_: PODReadBuffer) -> T): List<T> # podreadbuffer_readarrayaction
 
-    static isKVStoreStart(buf: PODReadBuffer): Bool # podreadbuffer_iskvstorestart
-    static isKVStoreEnd(buf: PODReadBuffer): Bool # podreadbuffer_iskvstoreend
-    static tryReadKVStoreStart(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorestart
-    static tryReadKVStoreKey(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorekey
-    static tryReadKVStoreValue(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorevalue
-    static tryReadKVStoreEnd(ref buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstoreend
-    static readKVStoreAction<K where Indexable, V>(ref buf: PODReadBuffer, f: fn(ref _: PODReadBuffer) -> MapEntry<K, V>): Map<K, V> # podreadbuffer_readkvstoreaction
+    static isKVStoreStart(^buf: PODReadBuffer): Bool # podreadbuffer_iskvstorestart
+    static isKVStoreEnd(^buf: PODReadBuffer): Bool # podreadbuffer_iskvstoreend
+    static tryReadKVStoreStart(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorestart
+    static tryReadKVStoreKey(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorekey
+    static tryReadKVStoreValue(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstorevalue
+    static tryReadKVStoreEnd(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadkvstoreend
+    static readKVStoreAction<K where Indexable, V>(ref *buf: PODReadBuffer, f: fn(ref *_: PODReadBuffer) -> MapEntry<K, V>): Map<K, V> # podreadbuffer_readkvstoreaction
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
 entity PODWriteBuffer provides Some {
-    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): PODWriteBuffer # podwritebuffer_create
-    complete<T where PODType>(): Buffer<T> # podwritebuffer_complete
+    static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): *PODWriteBuffer # podwritebuffer_create
+    static complete<T where PODType>(*buf: PODWriteBuffer): Buffer<T> # podwritebuffer_complete
 
-    write<T where PODType>(data: T): PODWriteBuffer # podwritebuffer_write
+    static write<T where PODType>(ref *buf: PODWriteBuffer, data: T): None # podwritebuffer_write
 
-    writeTupleStart(): PODWriteBuffer # podwritebuffer_writetuplestart
-    writeTupleEntry(): PODWriteBuffer # podwritebuffer_writetupleentry
-    writeTupleEnd(): PODWriteBuffer # podwritebuffer_writetupleend
-    writeTupleAction<T where PODTuple>(t: T, fn(_: PODType, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writetupleaction
+    static writeTupleStart(ref *buf: PODWriteBuffer): None # podwritebuffer_writetuplestart
+    static writeTupleEntry(ref *buf: PODWriteBuffer): None # podwritebuffer_writetupleentry
+    static writeTupleEnd(ref *buf: PODWriteBuffer): None # podwritebuffer_writetupleend
+    static writeTupleAction<T where PODTuple>(ref *buf: PODWriteBuffer, t: T, fn(_: PODType, ref *_: PODWriteBuffer) -> None): None # podwritebuffer_writetupleaction
 
-    writeRecordStart(): PODWriteBuffer # podwritebuffer_writerecordstart
-    writeRecordKey(): PODWriteBuffer # podwritebuffer_writerecordkey
-    writeRecordValue(): PODWriteBuffer # podwritebuffer_writerecordvalue
-    writeRecordEnd(): PODWriteBuffer # podwritebuffer_writerecordend
-    writeRecordAction<T where PODRecord>(r: T, fn(_: PODType, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writerecordaction
+    static writeRecordStart(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordstart
+    static writeRecordKey(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordkey
+    static writeRecordValue(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordvalue
+    static writeRecordEnd(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordend
+    static writeRecordAction<T where PODRecord>(ref *buf: PODWriteBuffer, r: T, fn(_: PODType, ref* _: PODWriteBuffer) -> None): None # podwritebuffer_writerecordaction
 
-    writeArrayStart(): PODWriteBuffer # podwritebuffer_writearraystart
-    writeArrayEntry(): PODWriteBuffer # podwritebuffer_writearrayentry
-    writeArrayEnd(): PODWriteBuffer # podwritebuffer_writearrayend
-    writeArrayAction<T>(l: List<T>, fn(_: T, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writearrayaction
+    static writeArrayStart(ref *buf: PODWriteBuffer): None # podwritebuffer_writearraystart
+    static writeArrayEntry(ref *buf: PODWriteBuffer): None # podwritebuffer_writearrayentry
+    static writeArrayEnd(ref *buf: PODWriteBuffer): None # podwritebuffer_writearrayend
+    static writeArrayAction<T>(ref *buf: PODWriteBuffer, l: List<T>, fn(_: T, ref *_: PODWriteBuffer) -> None): None # podwritebuffer_writearrayaction
 
-    writeKVStoreStart(): PODWriteBuffer # podwritebuffer_writekvstorestart
-    writeKVStoreKey(): PODWriteBuffer # podwritebuffer_writekvstorekey
-    writeKVStoreValue(): PODWriteBuffer # podwritebuffer_writekvstorevalue
-    writeKVStoreEnd(): PODWriteBuffer # podwritebuffer_writekvstoreend
-    writeKVStoreAction<K where Indexable, V>(m: Map<K, V>, fn(_: MapEnty<K, V>, _: PODWriteBuffer) -> PODWriteBuffer): PODWriteBuffer # podwritebuffer_writekvstoreaction
+    static writeKVStoreStart(ref *buf: PODWriteBuffer): None # podwritebuffer_writekvstorestart
+    static writeKVStoreKey(ref *buf: PODWriteBuffer): None # podwritebuffer_writekvstorekey
+    static writeKVStoreValue(ref *buf: PODWriteBuffer): None # podwritebuffer_writekvstorevalue
+    static writeKVStoreEnd(ref *buf: PODWriteBuffer): None # podwritebuffer_writekvstoreend
+    static writeKVStoreAction<K where Indexable, V>(ref *buf: PODWriteBuffer, m: Map<K, V>, fn(_: MapEnty<K, V>, ref *_: None) -> None): None # podwritebuffer_writekvstoreaction
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
