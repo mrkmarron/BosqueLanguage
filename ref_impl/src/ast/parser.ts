@@ -6,7 +6,7 @@
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
 import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, DupOp, DestructiveReadOp, ValidateStatement, NakedCallStatement } from "./body";
-import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, TemplateTermRestriction, PreConditionDecl, PostConditionDecl, BuildLevel } from "./assembly";
+import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction } from "./assembly";
 
 const KeywordStrings = [
     "pragma",
@@ -28,6 +28,7 @@ const KeywordStrings = [
     "clock",
     "concept",
     "const",
+    "cryptographic",
     "elif",
     "else",
     "enum",
@@ -39,7 +40,7 @@ const KeywordStrings = [
     "from",
     "function",
     "global",
-    "hash",
+    "hashkey",
     "identifier",
     "if",
     "invariant",
@@ -678,7 +679,7 @@ class Parser {
         return [isunique, isborrow];
     }
 
-    private parseInvokableCommon(ispcode: boolean, isMember: boolean, noBody: boolean, attributes: string[], isrecursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TemplateTermRestriction[], optSelfType?: TypeSignature): InvokeDecl {
+    private parseInvokableCommon(ispcode: boolean, isMember: boolean, noBody: boolean, attributes: string[], isrecursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], optSelfType?: TypeSignature): InvokeDecl {
         const sinfo = this.getCurrentSrcInfo();
         const srcFile = this.m_penv.getCurrentFile();
         const line = this.getCurrentLine();
@@ -2009,8 +2010,10 @@ class Parser {
             this.consumeToken();
 
             const exp = this.parseExpression();
-            this.ensureAndConsumeToken("or");
-            const err = this.parseExpression();
+            let err = new LiteralNoneExpression(sinfo);
+            if (this.testAndConsumeTokenIf("or")) {
+                err = this.parseExpression();
+            }
 
             this.ensureAndConsumeToken(";");
             return new ValidateStatement(sinfo, exp, err);
@@ -2252,17 +2255,17 @@ class Parser {
         return terms;
     }
 
-    private parseSingleTermRestriction(): TemplateTermRestriction {
+    private parseSingleTermRestriction(): TypeConditionRestriction {
         this.ensureToken(TokenStrings.Template);
         const templatename = this.consumeTokenAndGetValue();
 
         this.ensureAndConsumeToken("subtype");
         const oftype = this.parseTypeSignature();
 
-        return new TemplateTermRestriction(templatename, oftype);
+        return new TypeConditionRestriction(templatename, oftype);
     }
 
-    private parseTermRestrictions(): TemplateTermRestriction[] {
+    private parseTermRestrictions(): TypeConditionRestriction[] {
         const trl = this.parseSingleTermRestriction();
         if (this.testAndConsumeTokenIf("&&")) {
             const ands = this.parseTermRestrictions();
@@ -2278,26 +2281,25 @@ class Parser {
         try {
             this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames)));
             while (this.testToken("requires") || this.testToken("validate")) {
-                const isvaliate = this.testAndConsumeTokenIf("validate");
+                const isvalidate = this.testToken("validate");
                 this.consumeToken();
 
-                let level: BuildLevel = isvaliate ? "release" : "debug";
-                if(this.testAndConsumeTokenIf("#")) {
+                let level: BuildLevel = isvalidate ? "release" : "debug";
+                if(!isvalidate && this.testAndConsumeTokenIf("#")) {
                     level = this.consumeTokenAndGetValue() as BuildLevel;
                 }
 
                 const exp = this.parseExpression();
 
                 let err: Expression | undefined = undefined;
-                if(this.testAndConsumeTokenIf("or")) {
-                    err = this.parseExpression();
-                }
-
-                if(isvaliate && (level !== "release" || err === undefined)) {
-                    this.raiseError(this.getCurrentLine(), "When using validate on requires then level must be 'release' and an error result must be given");
+                if (isvalidate) {
+                    err = new LiteralNoneExpression(sinfo);
+                    if (this.testAndConsumeTokenIf("or")) {
+                        err = this.parseExpression();
+                    }
                 }
                     
-                preconds.push(new PreConditionDecl(sinfo, level, exp, err));
+                preconds.push(new PreConditionDecl(sinfo, isvalidate, level, exp, err));
                 
                 this.ensureAndConsumeToken(";");
             }
@@ -2370,7 +2372,7 @@ class Parser {
             this.consumeToken();
 
             const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, vregex));
-            const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [], currentDecl.ns, tyname, [], [new NominalTypeSignature("NSCore", "Validator") as TypeSignature, undefined] as [TypeSignature, TemplateTermRestriction[] | undefined][], [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>());
+            const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [], currentDecl.ns, tyname, [], [new NominalTypeSignature("NSCore", "Validator") as TypeSignature, undefined] as [TypeSignature, TypeConditionRestriction[] | undefined][], [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>());
 
             currentDecl.objects.set(tyname, validatortype);
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, 0, currentDecl.objects.get(tyname) as EntityTypeDecl);
@@ -2387,8 +2389,8 @@ class Parser {
         }
     }
 
-    private parseProvides(iscorens: boolean): [TypeSignature, TemplateTermRestriction[] | undefined][] {
-        let provides: [TypeSignature, TemplateTermRestriction[] | undefined][] = [];
+    private parseProvides(iscorens: boolean): [TypeSignature, TypeConditionRestriction[] | undefined][] {
+        let provides: [TypeSignature, TypeConditionRestriction[] | undefined][] = [];
         if (this.testToken("provides")) {
             this.consumeToken();
 
@@ -2396,7 +2398,7 @@ class Parser {
                 this.consumeTokenIf(",");
 
                 const pv = this.parseTypeSignature();
-                let res: TemplateTermRestriction[] | undefined = undefined;
+                let res: TypeConditionRestriction[] | undefined = undefined;
                 if(this.testAndConsumeTokenIf("when")) {
                     res = this.parseTermRestrictions();
                 }
@@ -2652,18 +2654,18 @@ class Parser {
             this.raiseError(line, "Collision between object and other names");
         }
 
+        const etimeType = new NominalTypeSignature(currentDecl.ns, ename);
         const membertime = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "vtime", new NominalTypeSignature("NSCore", "Int"), undefined);
+        const initialtime = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "zero", etimeType, new ConstructorPrimaryExpression(sinfo, etimeType, new Arguments([new NamedArgument(false, "tick", new LiteralIntegerExpression(sinfo, "0"))])));
 
-        xxxx; //need static initial time
-
-        const param = new FunctionParameter("tick", new NominalTypeSignature(currentDecl.ns, ename), false, false, false, true);
+        const param = new FunctionParameter("tick", etimeType, false, false, false, true);
         const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_nexttick");
         const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, new NominalTypeSignature(currentDecl.ns, ename), false, [], [], false, new Set<string>(), body);
         const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "nextEventTick", tickdecl);
 
-        const provides = [new NominalTypeSignature("NSCore", "EventTime") as TypeSignature, undefined] as [TypeSignature, TemplateTermRestriction[] | undefined][];
+        const provides = [[new NominalTypeSignature("NSCore", "EventTime"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
         const invariants: Expression[] = [];
-        const staticMembers = new Map<string, StaticMemberDecl>();
+        const staticMembers = new Map<string, StaticMemberDecl>().set("zero", initialtime);
         const staticFunctions = new Map<string, StaticFunctionDecl>().set("nextEventTick", nexttick);
         const memberFields = new Map<string, MemberFieldDecl>().set("vtime", membertime);
         const memberMethods = new Map<string, MemberMethodDecl>();
@@ -2685,20 +2687,29 @@ class Parser {
         this.ensureToken(TokenStrings.Type);
 
         const ename = this.consumeTokenAndGetValue();
+        const etype = new NominalTypeSignature(currentDecl.ns, ename);
         try {
             this.setRecover(this.scanCodeParens());
-            this.ensureAndConsumeToken("{");
 
-            const provides = [new NominalTypeSignature("NSCore", "Enum") as TypeSignature, undefined] as [TypeSignature, TemplateTermRestriction[] | undefined][];
+            const enums = this.parseListOf("{", "}", ",", () => {
+                this.ensureToken(TokenStrings.Identifier);
+                return this.consumeTokenAndGetValue();
+            })[0];
+
+            const enumvalue = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "value", new NominalTypeSignature("NSCore", "Int"), undefined);
+        
+            const provides = [[new NominalTypeSignature("NSCore", "Enum"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>();
-            const memberFields = new Map<string, MemberFieldDecl>();
+            const memberFields = new Map<string, MemberFieldDecl>().set("value", enumvalue);
             const memberMethods = new Map<string, MemberMethodDecl>();
-            
-            xxxx;
 
-            this.ensureAndConsumeToken("}");
+            for(let i = 0; i < enums.length; ++i) {
+                const enminit = new ConstructorPrimaryExpression(sinfo, etype, new Arguments([new PositionalArgument(false, false, new LiteralIntegerExpression(sinfo, i.toString()))]));
+                const enm = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], enums[i], etype, enminit);
+                staticMembers.set(enums[i], enm);
+            }
 
             if (currentDecl.checkDeclNameClash(currentDecl.ns, ename)) {
                 this.raiseError(line, "Collision between object and other names");
@@ -2730,36 +2741,48 @@ class Parser {
             this.raiseError(line, "Collision between object and other names");
         }
 
-        if(ishash) {
-            this.ensureAndConsumeToken(";");
+        this.ensureAndConsumeToken("=");
+        const idval = this.parseTypeSignature();
+        this.ensureAndConsumeToken(";");
+
+        const itype = new NominalTypeSignature(currentDecl.ns, iname);
+        if(ishash) {  
+            const iscrypto = this.testAndConsumeTokenIf("cryptographic");
+            const htype = iscrypto ? new NominalTypeSignature("NSCore", "HashCrypto") : new NominalTypeSignature("NSCore", "HashData");
             
-            xxxx; //need static create
+            const memberhash = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "hashvalue", htype, undefined);
 
-            const memberhash = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "hashkey", new NominalTypeSignature("NSCore", "Int"), undefined);
+            const param = new FunctionParameter("value", itype, false, false, false, true);
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "hashkey_create");
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, itype, false, [], [], false, new Set<string>(), body);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
-            const provides = [new NominalTypeSignature("NSCore", "HashIdKey") as TypeSignature, undefined] as [TypeSignature, TemplateTermRestriction[] | undefined][];
+
+            const provides = [
+                [new NominalTypeSignature("NSCore", "HashIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined],
+                [new NominalTypeSignature("NSCore", "APIType"), [new TypeConditionRestriction(itype, new NominalTypeSignature("NSCore", "APIType"))]] as [TypeSignature, TypeConditionRestriction[] | undefined],
+            ];
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>();
-            const memberFields = new Map<string, MemberFieldDecl>().set("hashkey", memberhash);
+            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+            const memberFields = new Map<string, MemberFieldDecl>().set("hashvalue", memberhash);
             const memberMethods = new Map<string, MemberMethodDecl>();
             
             currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
         }
         else {
-            this.ensureAndConsumeToken("=");
-            const idval = this.parseTypeSignature();
-            this.ensureAndConsumeToken(";");
-
-            xxxx; //need static create
-
             const memberkey = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "idkey", idval, undefined);
 
-            const provides = [new NominalTypeSignature("NSCore", "IdKey") as TypeSignature, undefined] as [TypeSignature, TemplateTermRestriction[] | undefined][];
+            const param = new FunctionParameter("value", itype, false, false, false, true);
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_create");
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, itype, false, [], [], false, new Set<string>(), body);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+
+            const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>();
+            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
             const memberFields = new Map<string, MemberFieldDecl>().set("idkey", memberkey);
             const memberMethods = new Map<string, MemberMethodDecl>();
 
@@ -2839,7 +2862,7 @@ class Parser {
         let parseok = true;
         while (this.m_cpos < this.m_epos) {
             try {
-                this.m_cpos = this.scanTokenOptions("function", "global", "typedef", "concept", "entity", "enum", "identifier");
+                this.m_cpos = this.scanTokenOptions("function", "global", "typedef", "concept", "entity", "clock", "enum", "hash", "identifier");
                 if (this.m_cpos === this.m_epos) {
                     const tokenIndexBeforeEOF = this.m_cpos - 2;
                     if (tokenIndexBeforeEOF >= 0 && tokenIndexBeforeEOF < this.m_tokens.length) {
@@ -2861,7 +2884,7 @@ class Parser {
 
                     nsdecl.declaredNames.add(ns + "::" + fname);
                 }
-                else if (this.testToken("typedef") || this.testToken("concept") || this.testToken("entity") || this.testToken("enum") || this.testToken("identifier")) {
+                else if (this.testToken("typedef") || this.testToken("concept") || this.testToken("entity") || this.testToken("clock") || this.testToken("enum") || this.testToken("hash") || this.testToken("identifier")) {
                     this.consumeToken();
                     this.ensureToken(TokenStrings.Type);
                     const tname = this.consumeTokenAndGetValue();
@@ -2901,7 +2924,7 @@ class Parser {
         let usingok = true;
         let parseok = true;
         while (this.m_cpos < this.m_epos) {
-            const rpos = this.scanTokenOptions("function", "global", "using", "typedef", "concept", "entity", "enum", "identifier", TokenStrings.EndOfStream);
+            const rpos = this.scanTokenOptions("function", "global", "using", "typedef", "concept", "entity", "clock", "enum", "hash", "identifier", TokenStrings.EndOfStream);
 
             try {
                 if (rpos === this.m_epos) {
@@ -2932,12 +2955,20 @@ class Parser {
                 else if (tk === "entity") {
                     this.parseObject(nsdecl);
                 }
+                else if (tk === "clock") {
+                    this.parseEventTime(nsdecl);
+                }
+                else if (tk === "enum") {
+                    this.parseEnum(nsdecl);
+                }
+                else if (tk === "hash" || tk === "identifier") {
+                    this.parseIdentifier(nsdecl);
+                }
                 else if (tk === TokenStrings.EndOfStream) {
                     this.parseEndOfStream();
                 }
                 else {
-                    //enum or identifier
-                    this.raiseError(this.getCurrentLine(), "enum and identifier not implemented yet");
+                    this.raiseError(this.getCurrentLine(), "Invalid top-level definiton");
                 }
             }
             catch (ex) {

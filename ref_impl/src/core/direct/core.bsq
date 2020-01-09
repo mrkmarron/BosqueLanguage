@@ -154,12 +154,22 @@ entity Buffer<T where PODType | APIType> provides APIValue, Some {
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, PODType, APIType, Some {
+    static create(guid: String): GUID # guid_create 
+
     override static tryParse(str: String): Result<Any> # guid_tryparse
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
 entity ISOTime provides KeyType, PODType, APIType, Orderable, Some {
     override static tryParse(str: String): Result<Any> # time_tryparse
+}
+
+entity DataHash provides KeyType, PODType, APIType, Some {
+    static compute<T>(T: value): DataHash # datahash_compute
+}
+
+entity CryptoHash provides provides KeyType, PODType, APIType, Some {
+    static compute<T>(T: value): CryptoHash # cryptohash_compute
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
@@ -174,8 +184,8 @@ concept Enum provides KeyType, APIType, Some {
 concept IdKey provides KeyType, APIType, Some {
 }
 
-//<summary>A specialized version of idkey for dealing with hashes (either content addressable or optimistic).</summary>
-concept HashIdKey provides IdKey {
+//<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
+concept HashIdKey provides KeyType, Some {
 }
 
 //<summary>Primitive regex value.</summary>
@@ -280,4 +290,9 @@ concept Keyed<T where KeyType> provides Indexable, Some {
 //<summary>A lightweight tagging class for values.</summary>
 entity Tagged<T where KeyType, U> provides Keyed<T>, Object {
     field value: U;
+}
+
+entity MapEntry<K where Indexable, V> provides Some {
+    field key: K;
+    field value: V;
 }

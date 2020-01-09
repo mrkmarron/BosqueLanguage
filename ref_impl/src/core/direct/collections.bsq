@@ -121,15 +121,15 @@ entity List<T> provides Object, PODType when T subtype POD, APIType when T subty
         return List<T>::_unsafe_set(this, idx, v);
     }
 
-    method exists(p: recursive? fn(_: T) -> Bool): Bool {
+    method recursive? exists(p: recursive? fn(_: T) -> Bool): Bool {
         return List<T>::_exists[recursive](this, 0, p);
     }
 
-    method all(p: recursive? fn(_: T) -> Bool): Bool {
+    method recursive? all(p: recursive? fn(_: T) -> Bool): Bool {
         return List<T>::_all[recursive](this, 0, p);
     }
 
-    method filter(p: recursive? fn(_: T) -> Bool): List<T> {
+    method recursive? filter(p: recursive? fn(_: T) -> Bool): List<T> {
         return List<T>::_filter[recursive](this, 0, List<T>{}, p);
     }
 
@@ -137,7 +137,7 @@ entity List<T> provides Object, PODType when T subtype POD, APIType when T subty
         return List<T>::_ofType<U>[recursive](this, 0, List<U>{});
     }
 
-    method map<U>(f: recursive? fn(_: T) -> U): List<U> {
+    method recursive? map<U>(f: recursive? fn(_: T) -> U): List<U> {
         return List<T>::_map<U>[recursive](this, 0, List<U>{}, f);
     }
 
@@ -235,11 +235,6 @@ entity Set<T where Indexable> provides Object, PODType when T subtype POD, APITy
             return Set<T>::_clear_val(this, key, kle != none ? KeyList<T!KeyType>::removeKey[recursive](kle, key) : none);
         }
     }
-}
-
-value entity MapEntry<K where Indexable, V> {
-    field key: K;
-    field value: V;
 }
 
 //<summary>A Map entity.</summary>
