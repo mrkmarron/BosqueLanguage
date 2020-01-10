@@ -2371,7 +2371,7 @@ class Parser {
             const vregex = this.consumeTokenAndGetValue();
             this.consumeToken();
 
-            const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, vregex));
+            const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, vregex));
             const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [], currentDecl.ns, tyname, [], [new NominalTypeSignature("NSCore", "Validator") as TypeSignature, undefined] as [TypeSignature, TypeConditionRestriction[] | undefined][], [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>());
 
             currentDecl.objects.set(tyname, validatortype);
@@ -2655,24 +2655,25 @@ class Parser {
         }
 
         const etimeType = new NominalTypeSignature(currentDecl.ns, ename);
-        const membertime = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "vtime", new NominalTypeSignature("NSCore", "Int"), undefined);
-        const initialtime = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "zero", etimeType, new ConstructorPrimaryExpression(sinfo, etimeType, new Arguments([new NamedArgument(false, "tick", new LiteralIntegerExpression(sinfo, "0"))])));
+
+        const zerobody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_zero");
+        const zerodecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [], undefined, undefined, undefined, etimeType, false, [], [], false, new Set<string>(), zerobody);
+        const zero = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "zero", zerodecl);
 
         const param = new FunctionParameter("tick", etimeType, false, false, false, true);
         const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_nexttick");
-        const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, new NominalTypeSignature(currentDecl.ns, ename), false, [], [], false, new Set<string>(), body);
+        const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, etimeType, false, [], [], false, new Set<string>(), body);
         const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "nextEventTick", tickdecl);
 
         const provides = [[new NominalTypeSignature("NSCore", "EventTime"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
         const invariants: Expression[] = [];
-        const staticMembers = new Map<string, StaticMemberDecl>().set("zero", initialtime);
-        const staticFunctions = new Map<string, StaticFunctionDecl>().set("nextEventTick", nexttick);
-        const memberFields = new Map<string, MemberFieldDecl>().set("vtime", membertime);
+        const staticMembers = new Map<string, StaticMemberDecl>();
+        const staticFunctions = new Map<string, StaticFunctionDecl>().set("zero", zero).set("nextEventTick", nexttick);
+        const memberFields = new Map<string, MemberFieldDecl>();
         const memberMethods = new Map<string, MemberMethodDecl>();
 
         currentDecl.objects.set(ename, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, ename, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
         this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + ename, 0, currentDecl.objects.get(ename) as EntityTypeDecl);
-
     }
 
     private parseEnum(currentDecl: NamespaceDeclaration) {
@@ -2696,13 +2697,16 @@ class Parser {
                 return this.consumeTokenAndGetValue();
             })[0];
 
-            const enumvalue = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "value", new NominalTypeSignature("NSCore", "Int"), undefined);
-        
+            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "Int"), false, false, false, false);
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_create");
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, etype, false, [], [], false, new Set<string>(), body);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", createdecl);
+
             const provides = [[new NominalTypeSignature("NSCore", "Enum"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>();
-            const memberFields = new Map<string, MemberFieldDecl>().set("value", enumvalue);
+            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+            const memberFields = new Map<string, MemberFieldDecl>();
             const memberMethods = new Map<string, MemberMethodDecl>();
 
             for(let i = 0; i < enums.length; ++i) {
@@ -2748,15 +2752,11 @@ class Parser {
         const itype = new NominalTypeSignature(currentDecl.ns, iname);
         if(ishash) {  
             const iscrypto = this.testAndConsumeTokenIf("cryptographic");
-            const htype = iscrypto ? new NominalTypeSignature("NSCore", "HashCrypto") : new NominalTypeSignature("NSCore", "HashData");
             
-            const memberhash = new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), [], ["hidden"], "hashvalue", htype, undefined);
-
             const param = new FunctionParameter("value", itype, false, false, false, true);
-            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "hashkey_create");
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), iscrypto ? "hashkey_data_create" : "hashkey_crypto_create");
             const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, undefined, itype, false, [], [], false, new Set<string>(), body);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
-
 
             const provides = [
                 [new NominalTypeSignature("NSCore", "HashIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined],
@@ -2765,7 +2765,7 @@ class Parser {
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
-            const memberFields = new Map<string, MemberFieldDecl>().set("hashvalue", memberhash);
+            const memberFields = new Map<string, MemberFieldDecl>();
             const memberMethods = new Map<string, MemberMethodDecl>();
             
             currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));

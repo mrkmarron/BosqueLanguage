@@ -7,6 +7,7 @@ import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTu
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
+import { type } from "os";
 
 type BuildLevel = "debug" | "test" | "release";
 
@@ -456,6 +457,238 @@ class Assembly {
         return fullbinds;
     }
 
+    private intersectConceptTypes(c1: ResolvedConceptAtomType, c2: ResolvedConceptAtomType): ResolvedConceptAtomType | undefined {
+        if(c1.idStr === c2.idStr) {
+            return c1;
+        }
+
+        const itypes = [...c1.conceptTypes, ...c2.conceptTypes].sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
+
+        //do a simplification based on A & B when A \Subtypeeq B is A
+        let simplifiedTypes: ResolvedConceptAtomTypeEntry[] = [];
+        for (let i = 0; i < itypes.length; ++i) {
+            let docopy = true;
+            for (let j = 0; j < itypes.length; ++j) {
+                if (i === j) {
+                    continue; //ignore check on same element
+                }
+
+                //if \exists a Tj s.t. Ti \Subtypeeq Tj then we discard Tj
+                if (this.atomSubtypeOf(ResolvedConceptAtomType.create([itypes[j]]), ResolvedConceptAtomType.create([itypes[i]]))) {
+                    docopy = (itypes[i].idStr === itypes[j].idStr) && i < j; //if same type only keep one copy
+                    break;
+                }
+            }
+
+            if (docopy) {
+                simplifiedTypes.push(itypes[i]);
+            }
+        }
+
+        if (simplifiedTypes.length === 0) {
+            return undefined;
+        }
+
+        return ResolvedConceptAtomType.create(simplifiedTypes);
+    }
+
+    private intersectEntityConceptTypes(e1: ResolvedEntityAtomType, c2: ResolvedConceptAtomType): ResolvedEntityAtomType | undefined {
+        return this.atomSubtypeOf(e1, c2) ? e1 : undefined;
+    }
+
+    private intersectEntityTypes(e1: ResolvedEntityAtomType, e2: ResolvedEntityAtomType): ResolvedEntityAtomType | undefined {
+        return (e1.idStr === e2.idStr) ? e1 : undefined;
+    }
+
+    private intersectTupleTypes(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): ResolvedTupleAtomType | undefined {
+        let imax = Math.min(t1.types.length, t2.types.length);
+        if((imax < t1.types.length && !t1.types[imax].isOptional) || (imax < t2.types.length && !t2.types[imax].isOptional)) {
+            return undefined;
+        }
+
+        let itypes: ResolvedTupleAtomTypeEntry[] = [];
+        for(let i = 0; i < imax; ++i) {
+            const t1e = t1.types[i];
+            const t2e = t2.types[i];
+
+            const isopt = t1e.isOptional && t2e.isOptional;
+            const etype = this.intersectTypes(t1e.type, t2e.type);
+            if (!etype.isEmptyType()) {
+                itypes.push(new ResolvedTupleAtomTypeEntry(etype, isopt));
+            }
+            else {
+                if (!isopt) {
+                    return undefined; //this entry is not optional and no valid types inhabit it so intersection is empty
+                }
+                else {
+                    break; //this entry is optional but must not exist so truncate the tuple here
+                }
+            }
+        }
+
+        return ResolvedTupleAtomType.create(itypes);
+    }
+
+    private intersectRecordTypes(r1: ResolvedRecordAtomType, r2: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
+        let itypes: ResolvedRecordAtomTypeEntry[] = [];
+        for(let i = 0; i < r1.entries.length; ++i) {
+            const r1e = r1.entries[i];
+            const r2e = r2.entries.find((entry) => entry.name === r1e.name);
+
+            if(r2e === undefined) {
+                if (!r1e.isOptional) {
+                    return undefined; //we have a requrired type in r1 that is not in r2
+                }
+                //else it just can't be in the intersection
+            }
+            else {
+                const isopt = r1e.isOptional && r2e.isOptional;
+                const etype = this.intersectTypes(r1e.type, r2e.type);
+                if (!etype.isEmptyType()) {
+                    itypes.push(new ResolvedRecordAtomTypeEntry(r1e.name, etype, isopt));
+                }
+                else {
+                    if (!isopt) {
+                        return undefined; //this entry is not optional and no valid types inhabit it so intersection is empty
+                    }
+                    //this entry is optional but must not exist so it can't be in the intersection
+                }
+            }
+        }
+
+        for(let i = 0; i < r2.entries.length; ++i) {
+            const r2e = r2.entries[i];
+            const r1e = r1.entries.find((entry) => entry.name === r2e.name);
+            if(r1e === undefined) {
+                if (!r2e.isOptional) {
+                    return undefined; //we have a requrired type in r2 that is not in the intersection
+                }
+                //else it just can't be in the intersection
+            }
+        }
+
+        return ResolvedRecordAtomType.create(itypes);
+    }
+
+    private intersectAtomTypes(a1: ResolvedAtomType, a2: ResolvedAtomType): ResolvedAtomType | undefined {
+        if(a1.idStr === a2.idStr) {
+            return a1;
+        }
+
+        if(a1 instanceof ResolvedConceptAtomType) {
+            if(a2 instanceof ResolvedConceptAtomType) {
+                return this.intersectConceptTypes(a1, a2);
+            }
+            else if (a2 instanceof ResolvedEntityAtomType) {
+                return this.intersectEntityConceptTypes(a2, a1);
+            }
+            else if (a2 instanceof ResolvedTupleAtomType) {
+                xxxx; //check tuple types -- Tuple, KeyTuple, PODTuple, APITuple -- if any concepts work for both a1, a2 then return a2
+                return this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(a1)) ? a2 : undefined;
+            }
+            else {
+                const a2r = a2 as ResolvedRecordAtomType;
+            }
+        }
+        else if (a1 instanceof ResolvedEntityAtomType) {
+            if(a2 instanceof ResolvedConceptAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedEntityAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedTupleAtomType) {
+    
+            }
+            else {
+                const a2r = a2 as ResolvedRecordAtomType;
+            }
+
+        }
+        else if (a1 instanceof ResolvedTupleAtomType) {
+            if(a2 instanceof ResolvedConceptAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedEntityAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedTupleAtomType) {
+    
+            }
+            else {
+                const a2r = a2 as ResolvedRecordAtomType;
+            }
+
+        }
+        else {
+            const a1r = a1 as ResolvedRecordAtomType;
+
+            if(a2 instanceof ResolvedConceptAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedEntityAtomType) {
+
+            }
+            else if (a2 instanceof ResolvedTupleAtomType) {
+    
+            }
+            else {
+                const a2r = a2 as ResolvedRecordAtomType;
+            }
+        }
+    }
+
+    private intersectAllAtomTypes(types: ResolvedAtomType[]): ResolvedAtomType | undefined {
+        if (types.length === 0) {
+            return undefined;
+        }
+        else if (types.length === 1) {
+            return types[0];
+        }
+        else {
+            let itype = types[0];
+            for (let i = 1; i < types.length; ++i) {
+                const nitype = this.intersectAtomTypes(itype, types[i]);
+                if (nitype === undefined) {
+                    return undefined;
+                }
+                itype = nitype;
+            }
+            return itype;
+        }
+    }
+
+    private intersectTypes(t1: ResolvedType, t2: ResolvedType): ResolvedType {
+        if (t1.idStr === t2.idStr) {
+            return t1;
+        }
+
+        if (t1.isEmptyType() || t2.isEmptyType()) {
+            return ResolvedType.createEmpty();
+        }
+
+        xxxx;
+    }
+
+    private intersectAllTypes(types: ResolvedType[]): ResolvedType {
+        if (types.length === 0) {
+            return ResolvedType.createEmpty();
+        }
+        else if (types.length === 1) {
+            return types[0];
+        }
+        else {
+            let itype = types[0];
+            for (let i = 1; i < types.length; ++i) {
+                itype = this.intersectTypes(itype, types[i]);
+                if (itype.isEmptyType()) {
+                    return ResolvedType.createEmpty();
+                }
+            }
+            return itype;
+        }
+    }
+
     private normalizeType_Template(t: TemplateTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         return binds.has(t.name) ? binds.get(t.name) as ResolvedType : ResolvedType.createEmpty();
     }
@@ -540,32 +773,7 @@ class Assembly {
         const ctypes = flattened.map((arg) => (arg as ResolvedConceptAtomType).conceptTypes);
         const itypes = (([] as ResolvedConceptAtomTypeEntry[]).concat(...ctypes)).sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
 
-        //do a simplification based on A & B when A \Subtypeeq B is A
-        let simplifiedTypes: ResolvedConceptAtomTypeEntry[] = [];
-        for (let i = 0; i < itypes.length; ++i) {
-            let docopy = true;
-            for (let j = 0; j < itypes.length; ++j) {
-                if (i === j) {
-                    continue; //ignore check on same element
-                }
-
-                //if \exists a Tj s.t. Ti \Subtypeeq Tj then we discard Tj
-                if (this.atomSubtypeOf(ResolvedConceptAtomType.create([itypes[j]]), ResolvedConceptAtomType.create([itypes[i]]))) {
-                    docopy = (itypes[i].idStr === itypes[j].idStr) && i < j; //if same type only keep one copy
-                    break;
-                }
-            }
-
-            if (docopy) {
-                simplifiedTypes.push(itypes[i]);
-            }
-        }
-
-        if (simplifiedTypes.length === 0) {
-            return ResolvedType.createEmpty();
-        }
-
-        return ResolvedType.createSingle(ResolvedConceptAtomType.create(simplifiedTypes));
+        xxxx;
     }
 
     private normalizeType_Union(t: UnionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {

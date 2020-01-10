@@ -199,15 +199,19 @@ class ResolvedType {
 
 class ResolvedFunctionTypeParam {
     readonly name: string;
-    readonly isOptional: boolean;
-    readonly isRef: boolean;
     readonly type: ResolvedType | ResolvedFunctionType;
+    readonly isRef: boolean;
+    readonly isUnique: boolean;
+    readonly isBorrow: boolean;
+    readonly isOptional: boolean;
 
-    constructor(name: string, isOptional: boolean, isRef: boolean, type: ResolvedType | ResolvedFunctionType) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isUnique: boolean, isBorrow: boolean) {
         this.name = name;
-        this.isOptional = isOptional;
-        this.isRef = isRef;
         this.type = type;
+        this.isOptional = isOpt;
+        this.isRef = isRef;
+        this.isUnique = isUnique;
+        this.isBorrow = isBorrow;
     }
 }
 
@@ -217,29 +221,33 @@ class ResolvedFunctionType {
     readonly params: ResolvedFunctionTypeParam[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: ResolvedType | undefined;
+    readonly optRestOwnerSpecs: [boolean, boolean] | undefined;
     readonly resultType: ResolvedType;
+    readonly isResultUnique: boolean;
 
     readonly allParamNames: Set<string>;
 
-    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType, allParamNames: Set<string>) {
+    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: ResolvedType, isResultUnique: boolean, allParamNames: Set<string>) {
         this.idStr = rstr;
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
+        this.optRestOwnerSpecs = optRestOwnerSpecs;
         this.resultType = resultType;
+        this.isResultUnique = isResultUnique;
 
         this.allParamNames = new Set<string>();
     }
 
-    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionType {
+    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: ResolvedType, isResultUnique: boolean): ResolvedFunctionType {
         let cvalues: string[] = [];
         let allNames = new Set<string>();
         params.forEach((param) => {
             if (param.name !== "_") {
                 allNames.add(param.name);
             }
-            cvalues.push((param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
+            cvalues.push((param.isRef ? "ref " : "") + (param.isUnique ? "*" : "") + (param.isBorrow ? "^" : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
         });
         let cvalue = cvalues.join(", ");
 
@@ -255,7 +263,7 @@ class ResolvedFunctionType {
             cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.idStr));
         }
 
-        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + resultType.idStr, recursive, params, optRestParamName, optRestParamType, resultType, allNames);
+        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + (isResultUnique ? "*" : "") + resultType.idStr, recursive, params, optRestParamName, optRestParamType, optRestOwnerSpecs, resultType, isResultUnique, allNames);
     }
 }
 
