@@ -32,11 +32,6 @@ concept Indexable provides Any {
     static equal(a: Indexable, b: Indexable): Bool # special_method
 }
 
-//<summary>Types that can be ordered meaningfully operations.</summary>
-concept Orderable provides Any {
-    static compare<T where Orderable>(a: T, b: T): Bool # orderable_compare
-}
-
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
     abstract static tryParse(str: String): Result<Any>;
@@ -44,6 +39,7 @@ concept Parsable provides Any {
 
 //<summary>Special type that all Validator (regex etc.) types provide.</summary>
 concept Validator provides Any {
+    abstract static validate(str: String): Bool; 
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
@@ -102,7 +98,7 @@ entity Bool provides Some, Truthy {
 }
 
 //<summary>Primitive integer value.</summary>
-entity Int provides KeyType, PODType, APIType, Orderable, Some {
+entity Int provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # int_tryparse
 
     static max(v1: Int, v2: Int): Int {
@@ -115,7 +111,7 @@ entity Int provides KeyType, PODType, APIType, Orderable, Some {
 }
 
 //<summary>Primitive string value.</summary>
-entity String provides KeyType, PODType, APIType, Orderable, Some {
+entity String provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # string_tryparse
 }
 
@@ -131,7 +127,8 @@ entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType wh
 }
 
 enum BufferFormat {
-    Structured,
+    Fluent,
+    JSON,
     Binary
 }
 
@@ -160,20 +157,26 @@ entity GUID provides KeyType, PODType, APIType, Some {
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
-entity ISOTime provides KeyType, PODType, APIType, Orderable, Some {
+entity ISOTime provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # time_tryparse
 }
 
+//<summary>Primitive hash value suitable for keys in maps or other associative containers.</summary>
 entity DataHash provides KeyType, PODType, APIType, Some {
     static compute<T>(T: value): DataHash # datahash_compute
+
+    override static tryParse(str: String): Result<Any> # datahash_tryparse
 }
 
+//<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 entity CryptoHash provides provides KeyType, PODType, APIType, Some {
     static compute<T>(T: value): CryptoHash # cryptohash_compute
+
+    override static tryParse(str: String): Result<Any> # cryptohash_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
-concept EventTime provides KeyType, APIType, Orderable, Some {
+concept EventTime provides KeyType, APIType, Some {
 }
 
 //<summary>All actual enums implicitly provide this.</summary>

@@ -1,5 +1,5 @@
 //<summary>An efficient buffer encoding for data.</summary>
-entity PODReadBuffer provides Some {
+entity PODReadBuffer provides Object {
     static fromBuffer<T where PODType>(data: Buffer<T>): *PODReadBuffer # podreadbuffer_frombuffer
     static fromStringOf<T where PODType(data: StringOf<T>): *PODReadBuffer # podreadbuffer_fromstringof
     static fromString(data: String): *PODReadBuffer # podreadbuffer_fromstring
@@ -39,7 +39,7 @@ entity PODReadBuffer provides Some {
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity PODWriteBuffer provides Some {
+entity PODWriteBuffer provides Object {
     static create(format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): *PODWriteBuffer # podwritebuffer_create
     static complete<T where PODType>(*buf: PODWriteBuffer): Buffer<T> # podwritebuffer_complete
 

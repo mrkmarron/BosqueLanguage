@@ -10,6 +10,9 @@
 
 #pragma once
 
+////
+//Value ops
+
 #define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
 
@@ -34,8 +37,19 @@
 #define BSQ_VALUE_POS_1 BSQInt(1)
 #define BSQ_VALUE_NEG_1 BSQInt(-1)
 
-#define BSQ_BOX_VALUE_BSQINT(E, SCOPE, SC) ((E).isInt() ? BSQ_ENCODE_VALUE_INT((E).getInt()) : (SCOPE).addAllocRef<SC, BSQBoxedInt>(new BSQBoxedInt(E)))
-#define BSQ_GET_VALUE_BSQINT(E) (BSQ_IS_VALUE_INT(E) ? BSQInt(BSQ_GET_VALUE_INT(E)) : BSQ_GET_VALUE_PTR(E, BSQBoxedInt)->data)
+////
+//Int ops
+#define BSQ_BOX_VALUE_BSQINT(E, SCOPE, SC) ((SCOPE).addAllocRefChecked<SC>(BSQBoxedInt::box(E)))
+#define BSQ_GET_VALUE_BSQINT(E) (BSQBoxedInt::unbox(E))
+
+////
+//Reference counting ops
+
+#define INC_REF_DIRECT(T, V) ((T) BSQRef::incrementDirect(V))
+#define INC_REF_NONEABLE(T, V) ((T) BSQRef::incrementNoneable(V))
+#define INC_REF_CHECK(T, V) ((T) BSQRef::incrementChecked(V))
+
+#define ADD_ALLOC_REF(T, E, SCOPE, SC) ((T) (SCOPE).addAllocRef<SC>(E))
 
 namespace BSQ
 {
@@ -65,75 +79,66 @@ public:
     BSQRef(int64_t excount) : count(excount) { ; }
     virtual ~BSQRef() { ; }
 
-    inline static void increment(BSQRef* rcb)
+    virtual void destroy() = 0;
+
+    inline void increment()
     {
-        rcb->count++;
+        this->count++;
     }
 
-    inline static void decrement(BSQRef* rcb)
+    inline void decrement()
     {
-        rcb->count--;
+        this->count--;
 
-        if(rcb->count == 0)
+        if(this->count == 0)
         {
-            delete rcb;    
+            this->destroy();
+            delete this;    
         }
     }
 
-    template <typename T>
-    inline static T* checkedIncrementFast(T* v)
+    inline static BSQRef* incrementDirect(BSQRef* v)
     {
-        BSQRef::increment(v);
+        v->increment();
         return v;
     }
 
-    template <typename T>
-    inline static T* checkedIncrementNoneable(T* v)
+    inline static BSQRef* incrementNoneable(BSQRef* v)
     {
         if(BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
+            v->increment();
         }
         return v;
     }
 
-    inline static void checkedIncrementNop(Value v)
+    inline static Value incrementChecked(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
+            BSQ_GET_VALUE_PTR(v, BSQRef)->increment();
         }
-    }
-
-    template <typename T>
-    inline static T checkedIncrementOf(T v)
-    {
-        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(v, BSQRef));
-        }
-
         return v;
     }
 
-    inline static void checkedDecrementFast(Value v)
+    inline static void decrementDirect(BSQRef* v)
     {
-        BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
+        v->decrement();
     }
 
-    inline static void checkedDecrementNoneable(Value v)
+    inline static void decrementNoneable(BSQRef* v)
     {
         if(BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
+            v->decrement();
         }
     }
 
-    inline static void checkedDecrement(Value v)
+    inline static void decrementChecked(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::decrement(BSQ_GET_VALUE_PTR(v, BSQRef));
+            BSQ_GET_VALUE_PTR(v, BSQRef)->decrement();
         }
     }
 
@@ -170,40 +175,48 @@ public:
         return this->opts + pos; 
     }
 
-    template <uint16_t pos, typename T>
-    inline T* addAllocRef(T* ptr)
+    template <uint16_t pos>
+    inline BSQRef* addAllocRef(BSQRef* ptr)
     {
-        BSQRef::increment(ptr);
+        ptr->increment();
         this->opts[pos] = ptr;
 
         return ptr;
     }
-};
 
-class BSQRefScopeMgr
-{
-public:
-    inline static void processCallReturnFast(BSQRef** callerslot, BSQRef* ptr)
+    template <uint16_t pos>
+    inline Value addAllocRefChecked(Value v)
     {
-        BSQRef::increment(ptr);
+        if (BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
+        {
+            ptr->increment();
+            this->opts[pos] = ptr;
+        }
+
+        return ptr;
+    }
+
+    inline static void callReturnDirect(BSQRef** callerslot, BSQRef* ptr)
+    {
+        ptr->increment();
         *callerslot = ptr;
     }
 
-    inline static void processCallRefNoneable(BSQRef** callerslot, Value ptr)
+    inline static void processReturnNoneable(BSQRef** callerslot, BSQRef* ptr)
     {
         if(BSQ_IS_VALUE_NONNONE(ptr))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
-            *callerslot = BSQ_GET_VALUE_PTR(ptr, BSQRef);
+            ptr->increment();
+            *callerslot = ptr;
         }
     }
 
-    inline static void processCallRefAny(BSQRef** callerslot, Value ptr)
+    inline static void processReturnChecked(BSQRef** callerslot, Value v)
     {
-        if(BSQ_IS_VALUE_PTR(ptr) & BSQ_IS_VALUE_NONNONE(ptr))
+        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQRef::increment(BSQ_GET_VALUE_PTR(ptr, BSQRef));
-            *callerslot = BSQ_GET_VALUE_PTR(ptr, BSQRef);
+            BSQ_GET_VALUE_PTR(v, BSQRef)->increment();
+            *callerslot = BSQ_GET_VALUE_PTR(v, BSQRef);
         }
     }
 };
@@ -217,6 +230,32 @@ public:
     BSQBoxedInt(const BSQInt idata, int64_t excount) : BSQRef(excount), data(idata) { ; }
 
     virtual ~BSQBoxedInt() = default;
+    virtual void destroy() { ; }
+    
+    static inline Value box(BSQInt v)
+    {
+        if(v.isInt())
+        {
+            return BSQ_ENCODE_VALUE_INT(v.getInt());
+        }
+        else
+        {
+            return new BSQBoxedInt(v);
+        }
+        
+    }
+
+    static inline BSQInt unbox(Value v)
+    {
+        if(BSQ_IS_VALUE_INT(v))
+        {
+            return BSQInt(BSQ_GET_VALUE_INT(v));
+        }
+        else
+        {
+            return BSQ_GET_VALUE_PTR(v, BSQBoxedInt)->data;
+        }
+    }
 };
 
 class BSQString : public BSQRef
@@ -228,6 +267,7 @@ public:
     BSQString(const char* str, int64_t excount) : BSQRef(excount), sdata(std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t>().from_bytes(str)) { ; }
 
     virtual ~BSQString() = default;
+    virtual void destroy() { ; }
 };
 
 class BSQStringOf : public BSQRef
@@ -237,61 +277,137 @@ public:
     const MIRNominalTypeEnum oftype;
   
     BSQStringOf(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+
     virtual ~BSQStringOf() = default;
+    virtual void destroy() { ; }
 };
 
-class BSQValidatedString : public BSQRef
-{
-public:
-    const std::u32string sdata;
-    const std::basic_regex<char32_t> ofpattern;
+enum class BSQBufferFormat {
+    Fluent,
+    JSON,
+    Binary
+};
 
-    BSQValidatedString(const std::u32string& str, std::basic_regex<char32_t> ofpattern) : BSQRef(), sdata(str), ofpattern(ofpattern) { ; }
-    virtual ~BSQValidatedString() = default;
+enum class BSQBufferEncoding {
+    UTF8,
+    URI,
+    Base64
+};
+
+enum class BSQBufferCompression {
+    None,
+    RLE,
+    Time,
+    Space
 };
 
 class BSQBuffer : public BSQRef
 {
 public:
+    const BSQBufferFormat format;
+    const BSQBufferEncoding encoding;
+    const BSQBufferCompression compression;
+
     const std::vector<uint8_t> sdata;
     const MIRNominalTypeEnum oftype;
 
-    BSQBuffer(std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(move(sdata)), oftype(oftype) { ; }
+    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQBufferCompression compression, std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(), format(format), encoding(encoding), compression(compression), sdata(move(sdata)), oftype(oftype) { ; }
+    
     virtual ~BSQBuffer() = default;
+    virtual void destroy() { ; }
 };
 
 class BSQGUID : public BSQRef
 {
 public:
-    const std::vector<uint8_t> sdata;
+    const uint8_t sdata[16];
 
-    BSQGUID(const std::vector<uint8_t>& sdata) : BSQRef(), sdata(sdata) { ; }
+    BSQGUID(const uint8_t sdata[16]) : BSQRef(), sdata() { memcpy_s((void*)this->sdata, 16, sdata, 16); }
+
     virtual ~BSQGUID() = default;
+    virtual void destroy() { ; }
+};
+
+class BSQDataHash : public BSQRef
+{
+public:
+    const uint64_t hdata;
+
+    BSQDataHash(uint64_t hdata) : BSQRef(), hdata(hdata) { ; }
+    virtual ~BSQDataHash() = default;
+    virtual void destroy() { ; }
+};
+
+class BSQCryptoHash : public BSQRef
+{
+public:
+    const uint8_t hdata[64];
+
+    BSQCryptoHash(const uint8_t sdata[64]) : BSQRef(), hdata() { memcpy_s((void*)this->hdata, 64, hdata, 64); }
+    virtual ~BSQCryptoHash() = default;
+    virtual void destroy() { ; }
+};
+
+class BSQEventTime : public BSQRef
+{
+public:
+    const uint64_t timestamp;
+
+    BSQEventTime(uint64_t timestamp) : BSQRef(), timestamp(timestamp) { ; }
+    virtual ~BSQEventTime() = default;
+    virtual void destroy() { ; }
 };
 
 class BSQEnum : public BSQRef
 {
 public:
-    const char* ename;
-    const int64_t value;
+    const uint32_t value;
     const MIRNominalTypeEnum oftype;
 
-    BSQEnum(const char* ename, int64_t value, MIRNominalTypeEnum oftype) : BSQRef(), ename(ename), value(value), oftype(oftype) { ; }
+    BSQEnum(uint32_t value, MIRNominalTypeEnum oftype) : BSQRef(), value(value), oftype(oftype) { ; }
     virtual ~BSQEnum() = default;
+    virtual void destroy() { ; }
 };
 
+template <typename T, typename FDecOp>
 class BSQIdKey : public BSQRef
 {
 public:
-    const Value sdata;
+    const T sdata;
     const MIRNominalTypeEnum oftype;
 
-    BSQIdKey(Value sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(sdata), oftype(oftype) { ; }
+    BSQIdKey(const T& sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(sdata), oftype(oftype) { ; }
 
-    virtual ~BSQIdKey()
-    {
-        BSQRef::checkedDecrement(this->sdata);
+    virtual ~BSQIdKey() = default;
+
+    virtual void destroy() 
+    { 
+        FDecOp(this->sdata); 
     }
+};
+
+class BSQDataHashIdKey : public BSQRef
+{
+public:
+    const BSQDataHash hdata;
+    const MIRNominalTypeEnum oftype;
+
+    BSQDataHashIdKey(const BSQDataHash& hdata, MIRNominalTypeEnum oftype) : BSQRef(), hdata(hdata), oftype(oftype) { ; }
+
+    virtual ~BSQDataHashIdKey() = default;
+    virtual void destroy() { ; }
+};
+
+class BSQCryptoHashIdKey : public BSQRef
+{
+public:
+    const BSQCryptoHash hdata;
+    const MIRNominalTypeEnum oftype;
+
+    BSQCryptoHashIdKey(const BSQCryptoHash& hdata, MIRNominalTypeEnum oftype) : BSQRef(), hdata(hdata), oftype(oftype) { ; }
+
+    virtual ~BSQCryptoHashIdKey() = default;
+    virtual void destroy() { ; }
 };
 
 class BSQTuple : public BSQRef
@@ -300,12 +416,13 @@ public:
     const std::vector<Value> entries;
 
     BSQTuple(std::vector<Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
+    virtual ~BSQTuple() = default;
 
-    virtual ~BSQTuple()
+    virtual void destroy()
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i]);
+            BSQRef::decrementChecked(this->entries[i]);
         }
     }
 
@@ -313,11 +430,6 @@ public:
 
     template <uint16_t idx>
     Value atFixed() const
-    {
-        return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
-    }
-
-    Value atVar(uint16_t idx) const
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
@@ -330,11 +442,13 @@ public:
 
     BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(), entries(move(entries)) { ; }
 
-    virtual ~BSQRecord()
+    virtual ~BSQRecord() = default;
+
+    virtual void destroy()
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            BSQRef::checkedDecrement(this->entries[i].second);
+            BSQRef::decrementChecked(this->entries[i].second);
         }
     }
 
@@ -356,19 +470,6 @@ public:
 
     template <MIRPropertyEnum p>
     Value atFixed() const
-    {
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            if(this->entries[i].first == p)
-            {
-                return this->entries[i].second;
-            }
-        }
-
-        return BSQ_VALUE_NONE;
-    }
-
-    Value atVar(MIRPropertyEnum p) const
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
@@ -422,12 +523,15 @@ public:
     }
 };
 
+template<typename T, typename FIncOp, typename FDecOp, typename FDisplay>
 class BSQList : public BSQObject {
 public:
-    std::vector<Value> entries;
+    std::vector<T> entries;
 
     BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
-    BSQList(MIRNominalTypeEnum ntype, std::vector<Value>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+
+    xxxx;
 
     virtual ~BSQList()
     {
@@ -437,7 +541,7 @@ public:
         }
     }
 
-    BSQList* unsafeAdd(Value v) const
+    BSQList* unsafeAdd(const T& v) const
     {
         std::vector<Value> nv(this->entries.size(), nullptr);
         for(size_t i = 0; i < this->entries.size(); ++i)
@@ -449,7 +553,7 @@ public:
         return new BSQList(this->ntype, move(nv));
     }
 
-    BSQList* unsafeSet(const BSQInt& idx, Value v) const
+    BSQList* unsafeSet(const BSQInt& idx, const T& v) const
     {
         std::vector<Value> nv(this->entries.size(), nullptr);
         for(size_t i = 0; i < this->entries.size(); ++i)
@@ -467,7 +571,7 @@ public:
         return new BSQList(this->ntype, move(nv));
     }
 
-    BSQList* destructiveAdd(Value v)
+    BSQList* destructiveAdd(const T& v)
     {
         this->entries.push_back(BSQRef::checkedIncrementOf<Value>(v));
         return this;
