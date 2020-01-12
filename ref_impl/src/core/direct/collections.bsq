@@ -146,7 +146,6 @@ entity List<T> provides Object, PODType when T subtype POD, APIType when T subty
     }
 }
 
-
 entity KeyList<K where KeyType> provides Object {
     hidden static _cons(k: K, kl: KeyList<K>?): KeyList<K> # keylist_cons
     hidden static _get_key(kl: KeyList<K>): K # keylist_getkey

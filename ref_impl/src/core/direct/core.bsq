@@ -187,8 +187,16 @@ concept Enum provides KeyType, APIType, Some {
 concept IdKey provides KeyType, APIType, Some {
 }
 
+//<summary>A concept for dealing with guids.</summary>
+concept GUIDIdKey provides KeyType, APIType, Some {
+}
+
 //<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
-concept HashIdKey provides KeyType, Some {
+concept DataHashIdKey provides KeyType, Some {
+}
+
+//<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
+concept CryptoHashIdKey provides KeyType, Some {
 }
 
 //<summary>Primitive regex value.</summary>

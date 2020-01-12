@@ -189,6 +189,18 @@ public:
         }
     }
 
+    static bool keyEqual(const BSQInt& l, const BSQInt& r)
+    {
+        if(l.isInt() && r.isInt())
+        {
+            return l.getInt() == r.getInt();
+        }
+        else
+        {
+            return BigInt::eq(BIG_INT_VALUE(l), BIG_INT_VALUE(r));
+        }
+    }
+
     inline bool isZero() const
     {
         if(this->isInt())

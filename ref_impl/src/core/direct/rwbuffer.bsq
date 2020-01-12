@@ -17,7 +17,7 @@ entity PODReadBuffer provides Object {
     static isRecordStart(^buf: PODReadBuffer): Bool # podreadbuffer_isrecordstart
     static isRecordEnd(^buf: PODReadBuffer): Bool # podreadbuffer_isrecordend
     static tryReadRecordStart(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordstart
-    static tryReadRecordKey(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordkey
+    static tryReadRecordKey(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordkey //--------------next read is a string which was the property name
     static tryReadRecordValue(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordvalue
     static tryReadRecordEnd(ref *buf: PODReadBuffer): Bool # podreadbuffer_tryreadrecordend
     static recursive? readRecordAction<T where PODRecord>(ref *buf: PODReadBuffer, f: recursive? fn(ref *_: PODReadBuffer) -> PODType): T # podreadbuffer_readrecordaction
@@ -51,7 +51,7 @@ entity PODWriteBuffer provides Object {
     static recursive? writeTupleAction<T where PODTuple>(ref *buf: PODWriteBuffer, t: T, f: recursive? fn(_: PODType, ref *_: PODWriteBuffer) -> None): None # podwritebuffer_writetupleaction
 
     static writeRecordStart(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordstart
-    static writeRecordKey(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordkey
+    static writeRecordKey(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordkey //--------------next write is a string which is used as the record property
     static writeRecordValue(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordvalue
     static writeRecordEnd(ref *buf: PODWriteBuffer): None # podwritebuffer_writerecordend
     static recursive? writeRecordAction<T where PODRecord>(ref *buf: PODWriteBuffer, r: T, f: recursive? fn(_: PODType, ref* _: PODWriteBuffer) -> None): None # podwritebuffer_writerecordaction

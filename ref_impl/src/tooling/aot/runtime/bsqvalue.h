@@ -42,14 +42,16 @@
 #define BSQ_BOX_VALUE_BSQINT(E, SCOPE, SC) ((SCOPE).addAllocRefChecked<SC>(BSQBoxedInt::box(E)))
 #define BSQ_GET_VALUE_BSQINT(E) (BSQBoxedInt::unbox(E))
 
+#define HASH_COMBINE(H1, H2) (((527 + H1) * 31) + H2)
+
 ////
 //Reference counting ops
 
-#define INC_REF_DIRECT(T, V) ((T) BSQRef::incrementDirect(V))
-#define INC_REF_NONEABLE(T, V) ((T) BSQRef::incrementNoneable(V))
-#define INC_REF_CHECK(T, V) ((T) BSQRef::incrementChecked(V))
+#define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
+#define INC_REF_NONEABLE(T, V) ((T*) BSQRef::incrementNoneable(V))
+#define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
 
-#define ADD_ALLOC_REF(T, E, SCOPE, SC) ((T) (SCOPE).addAllocRef<SC>(E))
+#define ADD_ALLOC_REF(T, E, SCOPE, SC) ((T*) (SCOPE).addAllocRef<SC>(E))
 
 namespace BSQ
 {
@@ -67,6 +69,8 @@ enum class MIRNominalTypeEnum
 
 //%%CONCEPT_SUBTYPE_RELATION_DECLARE
 
+
+typedef void* KeyValue;
 typedef void* Value;
 
 class BSQRef
@@ -146,6 +150,9 @@ public:
 
     //%%ALL_VCALL_DECLS
 };
+
+size_t bsqKeyValueHash(Value v);
+bool bsqKeyValueEqual(Value v1, Value v2);
 
 template <uint16_t k>
 class BSQRefScope
@@ -268,6 +275,16 @@ public:
 
     virtual ~BSQString() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQString* str)
+    {
+        return std::hash<std::u32string>{}(str->sdata);
+    }
+    
+    static bool keyEqual(const BSQString* l, const BSQString* r)
+    {
+        return l->sdata == r->sdata;
+    }
 };
 
 class BSQStringOf : public BSQRef
@@ -280,6 +297,16 @@ public:
 
     virtual ~BSQStringOf() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQStringOf* str)
+    {
+        return HASH_COMBINE((size_t)str->oftype, std::hash<std::u32string>{}(str->sdata));
+    }
+
+    static bool keyEqual(const BSQStringOf* l, const BSQStringOf* r)
+    {
+        return l->oftype == r->oftype && l->sdata == r->sdata;
+    }
 };
 
 enum class BSQBufferFormat {
@@ -326,6 +353,17 @@ public:
 
     virtual ~BSQGUID() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQGUID* guid)
+    {
+        auto sdb = (uint64_t*)guid->sdata;
+        return HASH_COMBINE(sdb[0], sdb[1]);
+    }
+
+    static bool keyEqual(const BSQGUID* l, const BSQGUID* r)
+    {
+        return memcmp(l->sdata, r->sdata, 16) == 0;
+    }
 };
 
 class BSQDataHash : public BSQRef
@@ -336,6 +374,16 @@ public:
     BSQDataHash(uint64_t hdata) : BSQRef(), hdata(hdata) { ; }
     virtual ~BSQDataHash() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQDataHash* h)
+    {
+        return (size_t)h->hdata;
+    }
+
+    static bool keyEqual(const BSQDataHash* l, const BSQDataHash* r)
+    {
+        l->hdata == r->hdata;
+    }
 };
 
 class BSQCryptoHash : public BSQRef
@@ -346,6 +394,19 @@ public:
     BSQCryptoHash(const uint8_t sdata[64]) : BSQRef(), hdata() { memcpy_s((void*)this->hdata, 64, hdata, 64); }
     virtual ~BSQCryptoHash() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQCryptoHash* h)
+    {
+        auto sdb = (uint64_t*)h->hdata;
+        size_t lhh = HASH_COMBINE(HASH_COMBINE(sdb[0], sdb[1]), HASH_COMBINE(sdb[4], sdb[5]));
+        size_t rhh = HASH_COMBINE(HASH_COMBINE(sdb[2], sdb[3]), HASH_COMBINE(sdb[7], sdb[8]));
+        return HASH_COMBINE(lhh, rhh);
+    }
+
+    static bool keyEqual(const BSQCryptoHash* l, const BSQCryptoHash* r)
+    {
+        return memcmp(l->hdata, r->hdata, 64) == 0;
+    }
 };
 
 class BSQEventTime : public BSQRef
@@ -356,6 +417,16 @@ public:
     BSQEventTime(uint64_t timestamp) : BSQRef(), timestamp(timestamp) { ; }
     virtual ~BSQEventTime() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQEventTime* t)
+    {
+        return (size_t)t->timestamp;
+    }
+
+    static bool keyEqual(const BSQEventTime* l, const BSQEventTime* r)
+    {
+        return l->timestamp == r->timestamp;
+    }
 };
 
 class BSQEnum : public BSQRef
@@ -367,22 +438,63 @@ public:
     BSQEnum(uint32_t value, MIRNominalTypeEnum oftype) : BSQRef(), value(value), oftype(oftype) { ; }
     virtual ~BSQEnum() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQEnum* e)
+    {
+        return HASH_COMBINE((size_t)e->oftype, (size_t)e->value);
+    }
+
+    static bool keyEqual(const BSQEnum* l, const BSQEnum* r)
+    {
+        return (l->oftype == r->oftype) & (l->value == r->value);
+    }
 };
 
-template <typename T, typename FDecOp>
 class BSQIdKey : public BSQRef
 {
 public:
-    const T sdata;
     const MIRNominalTypeEnum oftype;
+    const KeyValue key;
 
-    BSQIdKey(const T& sdata, MIRNominalTypeEnum oftype) : BSQRef(), sdata(sdata), oftype(oftype) { ; }
+    BSQIdKey(KeyValue key, MIRNominalTypeEnum oftype) : BSQRef(), oftype(oftype), key(key) { ; }
 
     virtual ~BSQIdKey() = default;
 
     virtual void destroy() 
     { 
-        FDecOp(this->sdata); 
+        BSQRef::decrementChecked(this->key); 
+    }
+
+    static size_t hash(const BSQIdKey* k)
+    {
+        return HASH_COMBINE((size_t)k->oftype, bsqKeyValueHash(k->key));
+    }
+
+    static bool keyEqual(const BSQIdKey* l, const BSQIdKey* r)
+    {
+        return l->oftype == r->oftype && bsqKeyValueEqual(l->key, r->key);
+    }
+};
+
+class BSQGUIDIdKey : public BSQRef
+{
+public:
+    const BSQGUID gdata;
+    const MIRNominalTypeEnum oftype;
+
+    BSQGUIDIdKey(const BSQGUID& gdata, MIRNominalTypeEnum oftype) : BSQRef(), gdata(gdata), oftype(oftype) { ; }
+
+    virtual ~BSQGUIDIdKey() = default;
+    virtual void destroy() { ; }
+
+    static size_t hash(const BSQGUIDIdKey* g)
+    {
+        return HASH_COMBINE((size_t)g->oftype, BSQGUID::hash(&g->gdata));
+    }
+
+    static bool keyEqual(const BSQGUIDIdKey* l, const BSQGUIDIdKey* r)
+    {
+        return l->oftype == r->oftype && memcmp(l->gdata.sdata, r->gdata.sdata, 16) == 0;
     }
 };
 
@@ -396,6 +508,16 @@ public:
 
     virtual ~BSQDataHashIdKey() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQDataHashIdKey* k)
+    {
+        return HASH_COMBINE((size_t)k->oftype, BSQDataHash::hash(&k->hdata));
+    }
+
+    static bool keyEqual(const BSQDataHashIdKey* l, const BSQDataHashIdKey* r)
+    {
+        return (l->oftype == r->oftype) & (l->hdata.hdata == r->hdata.hdata);
+    }
 };
 
 class BSQCryptoHashIdKey : public BSQRef
@@ -408,6 +530,16 @@ public:
 
     virtual ~BSQCryptoHashIdKey() = default;
     virtual void destroy() { ; }
+
+    static size_t hash(const BSQCryptoHashIdKey* k)
+    {
+        return HASH_COMBINE((size_t)k->oftype, BSQCryptoHash::hash(&k->hdata));
+    }
+
+    static bool keyEqual(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r)
+    {
+        return l->oftype == r->oftype && memcmp(l->hdata.hdata, r->hdata.hdata, 64) == 0;
+    }
 };
 
 class BSQTuple : public BSQRef
@@ -433,22 +565,49 @@ public:
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
+
+    static size_t hash(const BSQTuple* t)
+    {
+        size_t hash = t->entries.size();
+        for(size_t i = 0; i < t->entries.size(); ++i)
+        {
+            hash = HASH_COMBINE(hash, bsqKeyValueHash(t->entries[i]));
+        }
+        return hash;
+    }
+
+    static bool keyEqual(const BSQTuple* l, const BSQTuple* r)
+    {
+        if(l->entries.size() != r->entries.size())
+        {
+            return false;
+        }
+
+        for(size_t i = 0; i < l->entries.size(); ++i)
+        {
+            if(!bsqKeyValueEqual(l->entries[i], r->entries[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 class BSQRecord : public BSQRef
 {
 public:
-    const std::vector<std::pair<MIRPropertyEnum, Value>> entries;
+    const std::map<MIRPropertyEnum, Value> entries;
 
-    BSQRecord(std::vector<std::pair<MIRPropertyEnum, Value>>&& entries) : BSQRef(), entries(move(entries)) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
 
     virtual ~BSQRecord() = default;
 
     virtual void destroy()
     {
-        for(size_t i = 0; i < this->entries.size(); ++i)
+        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
-            BSQRef::decrementChecked(this->entries[i].second);
+            BSQRef::decrementChecked(iter->second);
         }
     }
 
@@ -457,29 +616,42 @@ public:
     template <MIRPropertyEnum p>
     bool hasProperty() const
     {
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            if(this->entries[i].first == p)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return this->entries.find(p) != this->entries.end();
     }
 
     template <MIRPropertyEnum p>
     Value atFixed() const
     {
-        for(size_t i = 0; i < this->entries.size(); ++i)
+        auto iter = this->entries.find(p);
+        return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
+    }
+
+    static size_t hash(const BSQRecord* r)
+    {
+        size_t hash = r->entries.size();
+        for(auto iter = r->entries.begin(); iter != r->entries.end(); ++iter)
         {
-            if(this->entries[i].first == p)
-            {
-                return this->entries[i].second;
-            }
+            hash = HASH_COMBINE(hash, HASH_COMBINE((size_t)iter->first, bsqKeyValueHash(iter->second)));
+        }
+        return hash;
+    }
+
+    static bool keyEqual(const BSQRecord* l, const BSQRecord* r)
+    {
+        if(l->entries.size() != r->entries.size())
+        {
+            return false;
         }
 
-        return BSQ_VALUE_NONE;
+        for(auto liter = l->entries.begin(); liter != l->entries.end(); ++liter)
+        {
+            auto riter = r->entries.find(liter->first);
+            if(riter == r->entries.end() || !bsqKeyValueEqual(liter->second, riter->second))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 };
 
@@ -523,7 +695,7 @@ public:
     }
 };
 
-template<typename T, typename FIncOp, typename FDecOp, typename FDisplay>
+template<typename T>
 class BSQList : public BSQObject {
 public:
     std::vector<T> entries;
@@ -531,9 +703,9 @@ public:
     BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
     BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
-    xxxx;
+    virtual ~BSQList() = default;
 
-    virtual ~BSQList()
+    virtual void destroy()
     {
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
@@ -599,155 +771,6 @@ public:
     virtual std::u32string display() const
     {
         return std::u32string(U"[INTERNAL KEY LIST]");
-    }
-};
-
-struct BSQIndexableHash {
-    size_t operator()(const Value& v) const {
-        if(BSQ_IS_VALUE_NONE(v))
-        {
-            return 0;
-        }
-        else if(BSQ_IS_VALUE_INT(v))
-        {
-            return BSQ_GET_VALUE_INT(v);
-        }
-        else
-        {
-            auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef); 
-            if(dynamic_cast<BSQBoxedInt*>(ptr) != nullptr)
-            {
-                auto bi = dynamic_cast<BSQBoxedInt*>(ptr);
-                return bi->data.isInt() ? bi->data.getInt64() : bi->data.getBigInt()->hash();
-            }
-            else if(dynamic_cast<BSQString*>(ptr) != nullptr)
-            {
-                return std::hash<std::u32string>{}(dynamic_cast<BSQString*>(ptr)->sdata);
-            }
-            else if(dynamic_cast<BSQStringOf*>(ptr) != nullptr)
-            {
-                return std::hash<std::u32string>{}(dynamic_cast<BSQStringOf*>(ptr)->sdata);
-            }
-            else if(dynamic_cast<BSQGUID*>(ptr) != nullptr)
-            {
-                //TODO: hashcode
-                return 0;
-            }
-            else if(dynamic_cast<BSQEnum*>(ptr) != nullptr)
-            {
-                //TODO: hashcode
-                return 0;
-            }
-            else if(dynamic_cast<BSQIdKey*>(ptr) != nullptr)
-            {
-                //TODO: hashcode
-                return 0;
-            }
-            else if(dynamic_cast<BSQTuple*>(ptr) != nullptr)
-            {
-                auto t = dynamic_cast<BSQTuple*>(ptr);
-                size_t h = t->entries.size();
-                for(size_t i = 0; i < t->entries.size(); ++i)
-                {
-                    BSQIndexableHash hh;
-                    h = h ^ (hh(t->entries[i]) << 1);
-                }
-                return h;
-            }
-            else 
-            {
-                auto r = dynamic_cast<BSQRecord*>(ptr);
-                size_t h = r->entries.size();
-                for(size_t i = 0; i < r->entries.size(); ++i)
-                {
-                    BSQIndexableHash hh;
-                    h = h ^ ((size_t)r->entries[i].first << 32) ^ (hh(r->entries[i].second) << 1);
-                }
-                return h;
-            }
-        }
-    }
-};
-
-struct BSQIndexableEqual {
-    bool operator()(const Value& v1, const Value& v2) const {
-        if(BSQ_IS_VALUE_NONE(v1) || BSQ_IS_VALUE_NONE(v2))
-        {
-            return BSQ_IS_VALUE_NONE(v1) && BSQ_IS_VALUE_NONE(v2);
-        }
-        else if(BSQ_IS_VALUE_INT(v1) || BSQ_IS_VALUE_INT(v2))
-        {
-            if(BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_INT(v2))
-            {
-                return BSQ_GET_VALUE_INT(v1) == BSQ_GET_VALUE_INT(v2);
-            }
-            else if (BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_PTR(v2) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef)) != nullptr)
-            {
-                return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
-            }
-            else if (BSQ_IS_VALUE_PTR(v1) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef)) != nullptr && BSQ_IS_VALUE_INT(v2))
-            {
-                return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else
-        {
-            auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
-            auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef); 
-            if(dynamic_cast<BSQBoxedInt*>(ptr1) != nullptr && dynamic_cast<BSQBoxedInt*>(ptr2) != nullptr)
-            {
-                return dynamic_cast<BSQBoxedInt*>(ptr1)->data == dynamic_cast<BSQBoxedInt*>(ptr2)->data;
-            }
-            else if(dynamic_cast<BSQString*>(ptr1) != nullptr && dynamic_cast<BSQString*>(ptr2) != nullptr)
-            {
-                return dynamic_cast<BSQString*>(ptr1)->sdata == dynamic_cast<BSQString*>(ptr2)->sdata;
-            }
-            else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
-            {
-                return dynamic_cast<BSQStringOf*>(ptr1)->sdata == dynamic_cast<BSQStringOf*>(ptr2)->sdata;
-            }
-            else if(dynamic_cast<BSQGUID*>(ptr1) != nullptr && dynamic_cast<BSQGUID*>(ptr2) != nullptr)
-            {
-                //TODO: equals
-                return false;
-            }
-            else if(dynamic_cast<BSQEnum*>(ptr1) != nullptr && dynamic_cast<BSQEnum*>(ptr2) != nullptr)
-            {
-                //TODO: equals
-                return false;
-            }
-            else if(dynamic_cast<BSQIdKey*>(ptr1) != nullptr && dynamic_cast<BSQIdKey*>(ptr2) != nullptr)
-            {
-                //TODO: equals
-                return false;
-            }
-            else if(dynamic_cast<BSQTuple*>(ptr1) != nullptr && dynamic_cast<BSQTuple*>(ptr2) != nullptr)
-            {
-                auto t1 = dynamic_cast<BSQTuple*>(ptr1);
-                auto t2 = dynamic_cast<BSQTuple*>(ptr2);
-                return std::equal(t1->entries.cbegin(), t1->entries.cend(), t2->entries.cbegin(), t2->entries.cend(), [](const Value& a, const Value& b) {
-                    BSQIndexableEqual eq;
-                    return eq(a, b); 
-                });
-            }
-            else if(dynamic_cast<BSQRecord*>(ptr1) != nullptr && dynamic_cast<BSQRecord*>(ptr2) != nullptr)
-            {
-                auto r1 = dynamic_cast<BSQRecord*>(ptr1);
-                auto r2 = dynamic_cast<BSQRecord*>(ptr2);
-                return std::equal(r1->entries.cbegin(), r1->entries.cend(), r2->entries.cbegin(), r2->entries.cend(), [](const std::pair<MIRPropertyEnum, Value>& a, const std::pair<MIRPropertyEnum, Value>& b) {
-                    BSQIndexableEqual eq;
-                    return a.first == b.first && eq(a.second, b.second); 
-                });
-            }
-            else 
-            {
-                return false;
-            }
-        }
     }
 };
 
