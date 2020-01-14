@@ -9,6 +9,8 @@
 
 #define BIG_INT_VALUE(X) (X.isInt() ? BigInt(X.getInt()) : *((X).getBigInt()))
 
+namespace BSQ
+{
 //A big integer class for supporting Bosque -- right now it does not do much
 class BigInt
 {
@@ -37,6 +39,11 @@ public:
     void release()
     {
         ;
+    }
+
+    std::u32string display() const
+    {
+        return U"[NOT IMPLEMENTED]";
     }
 
     bool isZero() const
@@ -362,3 +369,21 @@ public:
         }
     }
 };
+
+struct BSQIntHashFunctor
+{
+    size_t operator()(const BSQInt& i) { return i.isInt() ? i.getInt64() : i.getBigInt()->hash(); }
+};
+struct BSQIntEqualFunctor
+{
+    bool operator()(const BSQInt& l, const BSQInt& r) { return l == r; }
+};
+struct BSQIntDisplayFunctor
+{
+    std::u32string operator()(const BSQInt& i) 
+    { 
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+        return i.isInt() ? conv.from_bytes(std::to_string(i.getInt())) : i.getBigInt()->display();
+    }
+};
+}

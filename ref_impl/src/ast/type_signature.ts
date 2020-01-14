@@ -3,6 +3,26 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+class StorageDeclarator {
+    isValue: boolean;
+    isUnique: boolean;
+    isBorrow: boolean;
+
+    constructor(isValue: boolean, isUnique: boolean, isBorrow: boolean) {
+        this.isValue = isValue;
+        this.isUnique = isUnique;
+        this.isBorrow = isBorrow;
+    }
+
+    static createSimple(): StorageDeclarator {
+        return new StorageDeclarator(false, false, false);
+    }
+
+    isSimpleStorage(): boolean {
+        return !(this.isValue || this.isUnique || this.isBorrow);
+    }
+}
+
 class TypeSignature {
 }
 
@@ -56,17 +76,15 @@ class FunctionParameter {
     readonly name: string;
     readonly type: TypeSignature;
     readonly isRef: boolean;
-    readonly isUnique: boolean;
-    readonly isBorrow: boolean;
+    readonly storage: StorageDeclarator; 
     readonly isOptional: boolean;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, isUnique: boolean, isBorrow: boolean) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, storage: StorageDeclarator) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
-        this.isUnique = isUnique;
-        this.isBorrow = isBorrow;
+        this.storage = storage;
     }
 }
 
@@ -75,19 +93,15 @@ class FunctionTypeSignature extends TypeSignature {
     readonly params: FunctionParameter[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: TypeSignature | undefined;
-    readonly optRestOwnerSpecs: [boolean, boolean] | undefined;
-    readonly resultType: TypeSignature;
-    readonly isResultUnique: boolean;
+    readonly resultInfo: [TypeSignature, StorageDeclarator][];
 
-    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: TypeSignature, isResultUnique: boolean) {
+    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, resultInfo: [TypeSignature, StorageDeclarator][]) {
         super();
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
-        this.optRestOwnerSpecs = optRestOwnerSpecs;
-        this.resultType = resultType;
-        this.isResultUnique = isResultUnique;
+        this.resultInfo = resultInfo;
     }
 }
 
@@ -120,4 +134,9 @@ class UnionTypeSignature extends TypeSignature {
     }
 }
 
-export { TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, TemplateTypeSignature, NominalTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, IntersectionTypeSignature, UnionTypeSignature };
+export { 
+    StorageDeclarator, TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, 
+    TemplateTypeSignature, NominalTypeSignature, 
+    TupleTypeSignature, RecordTypeSignature, 
+    FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, IntersectionTypeSignature, UnionTypeSignature
+};
