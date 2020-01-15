@@ -4,6 +4,11 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ConceptTypeDecl, EntityTypeDecl } from "./assembly";
+import { StorageDeclarator } from "./type_signature";
+
+function formatStorageInfo(storage: StorageDeclarator): string {
+    return (storage.isValue ? "#" : "") + (storage.isUnique ? "*" : "") + (storage.isBorrow ? "^" : "");
+}
 
 class ResolvedAtomType {
     readonly idStr: string;
@@ -124,6 +129,31 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
     }
 }
 
+class ResolvedEphemeralListTypeEntry {
+    readonly storage: StorageDeclarator;
+    readonly type: ResolvedType;
+
+    constructor(storage: StorageDeclarator, type: ResolvedType) {
+        this.storage = storage;
+        this.type = type;
+    }
+}
+
+class ResolvedEphemeralListType extends ResolvedAtomType {
+    readonly types: ResolvedEphemeralListTypeEntry[];
+
+    constructor(rstr: string, types: ResolvedEphemeralListTypeEntry[]) {
+        super(rstr);
+        this.types = types;
+    }
+
+    static create(entries: ResolvedEphemeralListTypeEntry[]): ResolvedEphemeralListType {
+        const simplifiedEntries = [...entries];
+        const cvalue = simplifiedEntries.map((entry) => formatStorageInfo(entry.storage) + entry.type.idStr).join(", ");
+        return new ResolvedEphemeralListType("(|" + cvalue + "|)", simplifiedEntries);
+    }
+}
+
 class ResolvedType {
     readonly idStr: string;
     readonly options: ResolvedAtomType[];
@@ -195,23 +225,25 @@ class ResolvedType {
     isAnyType(): boolean {
         return this.options.length === 1 && this.options[0].idStr === "NSCore::Any";
     }
+
+    isEphemeralListType(): boolean {
+        return this.options.length === 1 && this.options[0] instanceof ResolvedEphemeralListType;
+    }
 }
 
 class ResolvedFunctionTypeParam {
     readonly name: string;
     readonly type: ResolvedType | ResolvedFunctionType;
     readonly isRef: boolean;
-    readonly isUnique: boolean;
-    readonly isBorrow: boolean;
+    readonly storage: StorageDeclarator;
     readonly isOptional: boolean;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isUnique: boolean, isBorrow: boolean) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, storage: StorageDeclarator) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
-        this.isUnique = isUnique;
-        this.isBorrow = isBorrow;
+        this.storage = storage;
     }
 }
 
@@ -221,34 +253,23 @@ class ResolvedFunctionType {
     readonly params: ResolvedFunctionTypeParam[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: ResolvedType | undefined;
-    readonly optRestOwnerSpecs: [boolean, boolean] | undefined;
-    readonly resultType: ResolvedType;
-    readonly isResultUnique: boolean;
+    readonly resultInfo: [ResolvedType, StorageDeclarator][];
 
     readonly allParamNames: Set<string>;
 
-    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: ResolvedType, isResultUnique: boolean, allParamNames: Set<string>) {
+    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: [ResolvedType, StorageDeclarator][]) {
         this.idStr = rstr;
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
-        this.optRestOwnerSpecs = optRestOwnerSpecs;
-        this.resultType = resultType;
-        this.isResultUnique = isResultUnique;
+        this.resultInfo = resultInfo;
 
         this.allParamNames = new Set<string>();
     }
 
-    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, optRestOwnerSpecs: [boolean, boolean] | undefined, resultType: ResolvedType, isResultUnique: boolean): ResolvedFunctionType {
-        let cvalues: string[] = [];
-        let allNames = new Set<string>();
-        params.forEach((param) => {
-            if (param.name !== "_") {
-                allNames.add(param.name);
-            }
-            cvalues.push((param.isRef ? "ref " : "") + (param.isUnique ? "*" : "") + (param.isBorrow ? "^" : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
-        });
+    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: [ResolvedType, StorageDeclarator][]): ResolvedFunctionType {
+        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + formatStorageInfo(param.storage) + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
         let cvalue = cvalues.join(", ");
 
         let recstr = "";
@@ -263,8 +284,17 @@ class ResolvedFunctionType {
             cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.idStr));
         }
 
-        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + (isResultUnique ? "*" : "") + resultType.idStr, recursive, params, optRestParamName, optRestParamType, optRestOwnerSpecs, resultType, isResultUnique, allNames);
+        let rformat = resultInfo.length === 1 ? (formatStorageInfo(resultInfo[0][1]) + resultInfo[0][0].idStr) : ("(|" + resultInfo.map((ri) => formatStorageInfo(ri[1]) + ri[0].idStr).join(", ") + "|)");
+        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + rformat, recursive, params, optRestParamName, optRestParamType, resultInfo);
     }
 }
 
-export { ResolvedAtomType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, ResolvedRecordAtomTypeEntry, ResolvedRecordAtomType, ResolvedType, ResolvedFunctionTypeParam, ResolvedFunctionType };
+export { 
+    ResolvedAtomType, 
+    ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
+    ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, 
+    ResolvedRecordAtomTypeEntry, ResolvedRecordAtomType, 
+    ResolvedEphemeralListTypeEntry, ResolvedEphemeralListType,
+    ResolvedType, 
+    ResolvedFunctionTypeParam, ResolvedFunctionType
+};

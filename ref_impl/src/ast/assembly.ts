@@ -3,11 +3,12 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType } from "./resolved_type";
-import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, StorageDeclarator } from "./type_signature";
+import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedEphemeralListTypeEntry } from "./resolved_type";
+import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, StorageDeclarator, ProjectTypeSignature } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
-import { type } from "os";
+
+import * as assert from "assert";
 
 type BuildLevel = "debug" | "test" | "release";
 
@@ -453,12 +454,12 @@ class Assembly {
         return fullbinds;
     }
 
-    private intersectConceptTypes(c1: ResolvedConceptAtomType, c2: ResolvedConceptAtomType): ResolvedConceptAtomType | undefined {
-        if(c1.idStr === c2.idStr) {
-            return c1;
+    private restrictConceptTypes(ofc: ResolvedConceptAtomType, withc: ResolvedConceptAtomType): ResolvedConceptAtomType | undefined {
+        if(ofc.idStr === withc.idStr) {
+            return ofc;
         }
 
-        const itypes = [...c1.conceptTypes, ...c2.conceptTypes].sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
+        const itypes = [...ofc.conceptTypes, ...withc.conceptTypes].sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
 
         //do a simplification based on A & B when A \Subtypeeq B is A
         let simplifiedTypes: ResolvedConceptAtomTypeEntry[] = [];
@@ -488,27 +489,27 @@ class Assembly {
         return ResolvedConceptAtomType.create(simplifiedTypes);
     }
 
-    private intersectEntityConceptTypes(e1: ResolvedEntityAtomType, c2: ResolvedConceptAtomType): ResolvedEntityAtomType | undefined {
-        return this.atomSubtypeOf(e1, c2) ? e1 : undefined;
+    private restrictEntityConceptTypes(ofe: ResolvedEntityAtomType, withc: ResolvedConceptAtomType): ResolvedEntityAtomType | undefined {
+        return this.atomSubtypeOf(ofe, withc) ? ofe : undefined;
     }
 
-    private intersectEntityTypes(e1: ResolvedEntityAtomType, e2: ResolvedEntityAtomType): ResolvedEntityAtomType | undefined {
-        return (e1.idStr === e2.idStr) ? e1 : undefined;
+    private restrictEntityTypes(ofe: ResolvedEntityAtomType, withe: ResolvedEntityAtomType): ResolvedEntityAtomType | undefined {
+        return (ofe.idStr === withe.idStr) ? ofe : undefined;
     }
 
-    private intersectTupleTypes(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): ResolvedTupleAtomType | undefined {
-        let imax = Math.min(t1.types.length, t2.types.length);
-        if((imax < t1.types.length && !t1.types[imax].isOptional) || (imax < t2.types.length && !t2.types[imax].isOptional)) {
+    private restrictTupleTypes(oft: ResolvedTupleAtomType, witht: ResolvedTupleAtomType): ResolvedTupleAtomType | undefined {
+        let imax = Math.min(oft.types.length, witht.types.length);
+        if((imax < oft.types.length && !oft.types[imax].isOptional) || (imax < witht.types.length && !witht.types[imax].isOptional)) {
             return undefined;
         }
 
         let itypes: ResolvedTupleAtomTypeEntry[] = [];
         for(let i = 0; i < imax; ++i) {
-            const t1e = t1.types[i];
-            const t2e = t2.types[i];
+            const t1e = oft.types[i];
+            const t2e = witht.types[i];
 
             const isopt = t1e.isOptional && t2e.isOptional;
-            const etype = this.intersectTypes(t1e.type, t2e.type);
+            const etype = this.restrictTypes(t1e.type, t2e.type);
             if (!etype.isEmptyType()) {
                 itypes.push(new ResolvedTupleAtomTypeEntry(etype, isopt));
             }
@@ -525,11 +526,44 @@ class Assembly {
         return ResolvedTupleAtomType.create(itypes);
     }
 
-    private intersectRecordTypes(r1: ResolvedRecordAtomType, r2: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
+    private restrictTupleEntries(oft: ResolvedTupleAtomType, witht: ResolvedType): ResolvedTupleAtomType | undefined {
+        const rentries = oft.types.map((entry) => new ResolvedTupleAtomTypeEntry(witht, entry.isOptional));
+        const rtuple = ResolvedTupleAtomType.create(rentries);
+
+        return this.restrictTupleTypes(oft, rtuple);
+    }
+
+    private restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
+        let res: ResolvedTupleAtomType | undefined = oft;
+
+        if(!this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
+            return undefined;
+        }
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::KeyType" || cpt.idStr === "NSCore::KeyTuple")) {
+            res = this.restrictTupleEntries(oft, this.getSpecialKeyTypeConceptType());
+        }
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::PODType" || cpt.idStr === "NSCore::PODTuple")) {
+            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::APIType" || cpt.idStr === "NSCore::APITuple")) {
+            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if(res === undefined) {
+            return undefined;
+        }
+        
+        return res;
+    }
+
+    private restrictRecordTypes(ofr: ResolvedRecordAtomType, withr: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
         let itypes: ResolvedRecordAtomTypeEntry[] = [];
-        for(let i = 0; i < r1.entries.length; ++i) {
-            const r1e = r1.entries[i];
-            const r2e = r2.entries.find((entry) => entry.name === r1e.name);
+        for(let i = 0; i < ofr.entries.length; ++i) {
+            const r1e = ofr.entries[i];
+            const r2e = withr.entries.find((entry) => entry.name === r1e.name);
 
             if(r2e === undefined) {
                 if (!r1e.isOptional) {
@@ -539,7 +573,7 @@ class Assembly {
             }
             else {
                 const isopt = r1e.isOptional && r2e.isOptional;
-                const etype = this.intersectTypes(r1e.type, r2e.type);
+                const etype = this.restrictTypes(r1e.type, r2e.type);
                 if (!etype.isEmptyType()) {
                     itypes.push(new ResolvedRecordAtomTypeEntry(r1e.name, etype, isopt));
                 }
@@ -552,9 +586,9 @@ class Assembly {
             }
         }
 
-        for(let i = 0; i < r2.entries.length; ++i) {
-            const r2e = r2.entries[i];
-            const r1e = r1.entries.find((entry) => entry.name === r2e.name);
+        for(let i = 0; i < withr.entries.length; ++i) {
+            const r2e = withr.entries[i];
+            const r1e = withr.entries.find((entry) => entry.name === r2e.name);
             if(r1e === undefined) {
                 if (!r2e.isOptional) {
                     return undefined; //we have a requrired type in r2 that is not in the intersection
@@ -566,123 +600,143 @@ class Assembly {
         return ResolvedRecordAtomType.create(itypes);
     }
 
-    private intersectAtomTypes(a1: ResolvedAtomType, a2: ResolvedAtomType): ResolvedAtomType | undefined {
-        if(a1.idStr === a2.idStr) {
-            return a1;
-        }
+    private restrictRecordEntries(oft: ResolvedRecordAtomType, witht: ResolvedType): ResolvedRecordAtomType | undefined {
+        const rentries = oft.entries.map((entry) => new ResolvedRecordAtomTypeEntry(entry.name, witht, entry.isOptional));
+        const rrecord = ResolvedRecordAtomType.create(rentries);
 
-        if(a1 instanceof ResolvedConceptAtomType) {
-            if(a2 instanceof ResolvedConceptAtomType) {
-                return this.intersectConceptTypes(a1, a2);
-            }
-            else if (a2 instanceof ResolvedEntityAtomType) {
-                return this.intersectEntityConceptTypes(a2, a1);
-            }
-            else if (a2 instanceof ResolvedTupleAtomType) {
-                xxxx; //check tuple types -- Tuple, KeyTuple, PODTuple, APITuple -- if any concepts work for both a1, a2 then return a2
-                return this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(a1)) ? a2 : undefined;
-            }
-            else {
-                const a2r = a2 as ResolvedRecordAtomType;
-            }
-        }
-        else if (a1 instanceof ResolvedEntityAtomType) {
-            if(a2 instanceof ResolvedConceptAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedEntityAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedTupleAtomType) {
-    
-            }
-            else {
-                const a2r = a2 as ResolvedRecordAtomType;
-            }
-
-        }
-        else if (a1 instanceof ResolvedTupleAtomType) {
-            if(a2 instanceof ResolvedConceptAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedEntityAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedTupleAtomType) {
-    
-            }
-            else {
-                const a2r = a2 as ResolvedRecordAtomType;
-            }
-
-        }
-        else {
-            const a1r = a1 as ResolvedRecordAtomType;
-
-            if(a2 instanceof ResolvedConceptAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedEntityAtomType) {
-
-            }
-            else if (a2 instanceof ResolvedTupleAtomType) {
-    
-            }
-            else {
-                const a2r = a2 as ResolvedRecordAtomType;
-            }
-        }
+        return this.restrictRecordTypes(oft, rrecord);
     }
 
-    private intersectAllAtomTypes(types: ResolvedAtomType[]): ResolvedAtomType | undefined {
-        if (types.length === 0) {
+    private restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
+        let res: ResolvedRecordAtomType | undefined = oft;
+
+        if(!this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
             return undefined;
         }
-        else if (types.length === 1) {
-            return types[0];
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::KeyType" || cpt.idStr === "NSCore::KeyRecord")) {
+            res = this.restrictRecordEntries(oft, this.getSpecialKeyTypeConceptType());
+        }
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::PODType" || cpt.idStr === "NSCore::PODRecord")) {
+            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::APIType" || cpt.idStr === "NSCore::APIRecord")) {
+            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if(res === undefined) {
+            return undefined;
+        }
+        
+        return res;
+    }
+
+    private restrictEphemeralListTypes(oft: ResolvedEphemeralListType, witht: ResolvedEphemeralListType): ResolvedEphemeralListType | undefined {
+        if(oft.types.length !== witht.types.length) {
+            return undefined;
+        }
+
+        let itypes: ResolvedEphemeralListTypeEntry[] = [];
+        for(let i = 0; i < oft.types.length; ++i) {
+            const t1e = oft.types[i];
+            const t2e = witht.types[i];
+
+            const etype = this.restrictTypes(t1e.type, t2e.type);
+            if (!StorageDeclarator.checkDeclsMatch(t1e.storage, t2e.storage) || etype.isEmptyType()) {
+                return undefined;
+            }
+            else {
+                itypes.push(new ResolvedEphemeralListTypeEntry(t1e.storage, etype));
+            }
+        }
+
+        return ResolvedEphemeralListType.create(itypes);
+    }
+
+    private restrictAtomTypes(ofa: ResolvedAtomType, witha: ResolvedAtomType): ResolvedAtomType | undefined {
+        if(ofa.idStr === witha.idStr) {
+            return ofa;
+        }
+
+        if(ofa instanceof ResolvedConceptAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictConceptTypes(ofa, witha);
+            }
+            else if (witha instanceof ResolvedEntityAtomType) {
+                return this.restrictEntityConceptTypes(witha, ofa);
+            }
+            else if (witha instanceof ResolvedTupleAtomType) {
+                return this.restrictTupleConcept(witha, ofa);
+            }
+            else if (witha instanceof ResolvedRecordAtomType) {
+                return this.restrictRecordConcept(witha, ofa);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedEntityAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictEntityConceptTypes(ofa, witha);
+            }
+            else if (witha instanceof ResolvedEntityAtomType) {
+                return this.restrictEntityTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedTupleAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictTupleConcept(ofa, witha);
+            }
+            else if (witha instanceof ResolvedTupleAtomType) {
+                return this.restrictTupleTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedRecordAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                this.restrictRecordConcept(ofa, witha);
+            }
+            else if (witha instanceof ResolvedRecordAtomType) {
+                return this.restrictRecordTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
         }
         else {
-            let itype = types[0];
-            for (let i = 1; i < types.length; ++i) {
-                const nitype = this.intersectAtomTypes(itype, types[i]);
-                if (nitype === undefined) {
-                    return undefined;
-                }
-                itype = nitype;
+            const ofaeph = ofa as ResolvedEphemeralListType;
+            if(witha instanceof ResolvedEphemeralListType) {
+                return this.restrictEphemeralListTypes(ofaeph, witha);
             }
-            return itype;
+            else {
+                return undefined;
+            }
         }
     }
 
-    private intersectTypes(t1: ResolvedType, t2: ResolvedType): ResolvedType {
-        if (t1.idStr === t2.idStr) {
-            return t1;
-        }
-
-        if (t1.isEmptyType() || t2.isEmptyType()) {
-            return ResolvedType.createEmpty();
-        }
-
-        xxxx;
+    private restrictAtomWithType(ofa: ResolvedAtomType, witht: ResolvedType): ResolvedType {
+        const types = witht.options.map((opt) => this.restrictAtomTypes(ofa, opt)).filter((opt) => opt !== undefined) as ResolvedAtomType[];
+        return ResolvedType.create(types);
     }
 
-    private intersectAllTypes(types: ResolvedType[]): ResolvedType {
-        if (types.length === 0) {
+    private restrictTypes(oft: ResolvedType, witht: ResolvedType): ResolvedType {
+        if (oft.idStr === witht.idStr) {
+            return oft;
+        }
+
+        if (oft.isEmptyType() || witht.isEmptyType()) {
             return ResolvedType.createEmpty();
         }
-        else if (types.length === 1) {
-            return types[0];
-        }
-        else {
-            let itype = types[0];
-            for (let i = 1; i < types.length; ++i) {
-                itype = this.intersectTypes(itype, types[i]);
-                if (itype.isEmptyType()) {
-                    return ResolvedType.createEmpty();
-                }
-            }
-            return itype;
-        }
+
+        const opttypes = oft.options.map((opt) => this.restrictAtomWithType(opt, witht));
+        return this.typeUnion(opttypes);
     }
 
     private normalizeType_Template(t: TemplateTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -754,6 +808,41 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedRecordAtomType.create(entries));
     }
 
+    private normalizeType_Projection(t: ProjectTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+        const fromt = this.normalizeTypeOnly(t.fromtype, binds);
+        const oft = this.normalizeTypeOnly(t.oftype, binds);
+
+        if(fromt.isEmptyType() || oft.isEmptyType()) {
+            return ResolvedType.createEmpty();
+        }
+
+        if(oft.idStr === "KeyType") {
+            if(this.subtypeOf(fromt, this.getSpecialKeyTypeConceptType())) {
+                return fromt;
+            }
+            else if(this.subtypeOf(fromt, this.getSpecialIndexableConceptType())) {
+                //
+                //NOT IMPLEMENTED YET -- we will need to look up the "key" field value and resolve it
+                //
+                assert(false);
+                return ResolvedType.createEmpty();    
+            }
+            else {
+                return ResolvedType.createEmpty();    
+            }
+        }
+        else if(oft.idStr === "APIRecord") {
+            //
+            //NOT IMPLEMENTED YET
+            //
+            assert(false);
+            return ResolvedType.createEmpty();
+        }
+        else {
+            return ResolvedType.createEmpty();
+        }
+    }
+
     private normalizeType_Intersection(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         if (t.types.some((opt) => this.normalizeTypeOnly(opt, binds).isEmptyType())) {
             return ResolvedType.createEmpty();
@@ -769,7 +858,32 @@ class Assembly {
         const ctypes = flattened.map((arg) => (arg as ResolvedConceptAtomType).conceptTypes);
         const itypes = (([] as ResolvedConceptAtomTypeEntry[]).concat(...ctypes)).sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
 
-        xxxx;
+        //do a simplification based on A & B when A \Subtypeeq B is A
+        let simplifiedTypes: ResolvedConceptAtomTypeEntry[] = [];
+        for (let i = 0; i < itypes.length; ++i) {
+            let docopy = true;
+            for (let j = 0; j < itypes.length; ++j) {
+                if (i === j) {
+                    continue; //ignore check on same element
+                }
+
+                //if \exists a Tj s.t. Ti \Subtypeeq Tj then we discard Tj
+                if (this.atomSubtypeOf(ResolvedConceptAtomType.create([itypes[j]]), ResolvedConceptAtomType.create([itypes[i]]))) {
+                    docopy = (itypes[i].idStr === itypes[j].idStr) && i < j; //if same type only keep one copy
+                    break;
+                }
+            }
+
+            if (docopy) {
+                simplifiedTypes.push(itypes[i]);
+            }
+        }
+
+        if (simplifiedTypes.length === 0) {
+            return ResolvedType.createEmpty();
+        }
+
+        return ResolvedType.createSingle(ResolvedConceptAtomType.create(simplifiedTypes));
     }
 
     private normalizeType_Union(t: UnionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -788,7 +902,7 @@ class Assembly {
 
         //check for Some | None and add Any if needed
         if (flattened.some((atom) => atom.idStr === "NSCore::None") && flattened.some((atom) => atom.idStr === "NSCore::Some")) {
-            flattened.push(this.getSpecialAnyType().options[0]);
+            flattened.push(this.getSpecialAnyConceptType().options[0]);
         }
         const utypes = flattened.sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
 
@@ -817,15 +931,15 @@ class Assembly {
     }
 
     private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedFunctionType | undefined {
-        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, param.isOptional, param.isRef, this.normalizeTypeGeneral(param.type, binds)));
+        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, this.normalizeTypeGeneral(param.type, binds), param.isOptional, param.isRef, param.storage));
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeTypeOnly(t.optRestParamType, binds) : undefined;
-        const resType = this.normalizeTypeOnly(t.resultType, binds);
+        const resInfo = t.resultInfo.map((ri) => [this.normalizeTypeOnly(ri[0], binds), ri[1]] as [ResolvedType, StorageDeclarator]);
 
-        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || resType.isEmptyType()) {
+        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || resInfo.some((ri) => ri[0].isEmptyType())) {
             return undefined;
         }
 
-        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, resType);
+        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, resInfo);
     }
 
     private atomSubtypeOf_EntityEntity(t1: ResolvedEntityAtomType, t2: ResolvedEntityAtomType): boolean {
@@ -844,6 +958,54 @@ class Assembly {
             const tt = this.normalizeTypeOnly(provide, t1.binds);
             return !tt.isEmptyType() && this.subtypeOf(tt, t2type);
         });
+    }
+
+    private checkAllTupleEntriesOfType(t1: ResolvedTupleAtomType, t2: ResolvedType): boolean {
+        return t1.types.every((entry) => this.subtypeOf(entry.type, t2));
+    }
+
+    private atomSubtypeOf_TupleConcept(t1: ResolvedTupleAtomType, t2: ResolvedConceptAtomType): boolean {
+        if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(t2))) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialKeyTupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialAPITupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private checkAllRecordEntriesOfType(t1: ResolvedRecordAtomType, t2: ResolvedType): boolean {
+        return t1.entries.every((entry) => this.subtypeOf(entry.type, t2));
+    }
+
+    private atomSubtypeOf_RecordConcept(t1: ResolvedRecordAtomType, t2: ResolvedConceptAtomType): boolean {
+        if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(t2))) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialKeyRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialPODRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+            return true;
+        }
+
+        if (this.subtypeOf(this.getSpecialAPIRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+            return true;
+        }
+
+        return false;
     }
 
     private atomSubtypeOf_ConceptConcept(t1: ResolvedConceptAtomType, t2: ResolvedConceptAtomType): boolean {
@@ -912,6 +1074,20 @@ class Assembly {
         return true;
     }
 
+    private atomSubtypeOf_EphemeralEphemeral(t1: ResolvedEphemeralListType, t2: ResolvedEphemeralListType): boolean {
+        if(t1.types.length !== t2.types.length) {
+            return false;
+        }
+
+        for (let i = 0; i < t1.types.length; ++i) {
+            if(!StorageDeclarator.checkDeclsMatch(t1.types[i].storage, t2.types[i].storage) || !this.subtypeOf(t1.types[i].type, t2.types[i].type)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private internSpecialConceptType(name: string, terms?: TypeSignature[], binds?: Map<string, ResolvedType>): ResolvedType {
         if (this.m_specialTypeMap.has("NSCore::" + name)) {
             return this.m_specialTypeMap.get("NSCore::" + name) as ResolvedType;
@@ -938,23 +1114,56 @@ class Assembly {
         return rtype;
     }
 
-    getSpecialAnyType(): ResolvedType { return this.internSpecialConceptType("Any"); }
     getSpecialNoneType(): ResolvedType { return this.internSpecialObjectType("None"); }
-    getSpecialSomeType(): ResolvedType { return this.internSpecialConceptType("Some"); }
     getSpecialBoolType(): ResolvedType { return this.internSpecialObjectType("Bool"); }
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
-    getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
     getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
+    getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType("ISOTime"); }
+    getSpecialDataHashType(): ResolvedType { return this.internSpecialObjectType("DataHash"); }
+    getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
+    getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
+    
+    getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType("Any"); }
+    getSpecialSomeConceptType(): ResolvedType { return this.internSpecialConceptType("Some"); }
+
+    getSpecialIndexableConceptType(): ResolvedType { return this.internSpecialConceptType("Indexable"); }
+    getSpecialParsableConceptType(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
+    getSpecialValidatorConceptType(): ResolvedType { return this.internSpecialConceptType("Validator"); }
+    getSpecialKeyTypeConceptType(): ResolvedType { return this.internSpecialConceptType("KeyType"); }
+    getSpecialPODTypeConceptType(): ResolvedType { return this.internSpecialConceptType("PODType"); }
+    getSpecialAPIValueConceptType(): ResolvedType { return this.internSpecialConceptType("APIValue"); }
+    getSpecialAPITypeConceptType(): ResolvedType { return this.internSpecialConceptType("APIType"); }
+    getSpecialTruthyConceptType(): ResolvedType { return this.internSpecialConceptType("Truthy"); }
+    getSpecialEventTimeConceptType(): ResolvedType { return this.internSpecialConceptType("EventTime"); }
+    getSpecialEnumConceptType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
+    getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
+    getSpecialGUIDIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("GUIDIdKey"); }
+    getSpecialDataHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("DataHashIdKey"); }
+    getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
-    getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
-    getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
-    getSpecialEnumType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
-    getSpecialCustomKeyType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
+    getSpecialKeyTupleConceptType(): ResolvedType { return this.internSpecialConceptType("KeyTuple"); }
+    getSpecialPODTupleConceptType(): ResolvedType { return this.internSpecialConceptType("PODTuple"); }
+    getSpecialAPITupleConceptType(): ResolvedType { return this.internSpecialConceptType("APITuple"); }
 
-    getSpecialParsableConcept(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
-    getSpecialKeyTypeConcept(): ResolvedType { return this.internSpecialConceptType("KeyType"); }
+    getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
+    getSpecialKeyRecordConceptType(): ResolvedType { return this.internSpecialConceptType("KeyRecord"); }
+    getSpecialPODRecordConceptType(): ResolvedType { return this.internSpecialConceptType("PODRecord"); }
+    getSpecialAPIRecordConceptType(): ResolvedType { return this.internSpecialConceptType("APIRecord"); }
+
+    getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
+
+    isStringOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::StringOf<"); }
+    isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }
+    isResultType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<"); }
+    isKeyedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Keyed<"); }
+    isTaggedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Tagged<"); }
+    
+    isListType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::List<"); }
+    isSetType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Set<"); }
+    isMapEntryType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::MapEntry<"); }
+    isMapType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Map<"); }
 
     ensureNominalRepresentation(t: ResolvedType): ResolvedType {
         const opts = t.options.map((opt) => {
@@ -1237,19 +1446,22 @@ class Assembly {
             return this.normalizeTypeFunction(t, binds) || ResolvedType.createEmpty();
         }
         else if (t instanceof TemplateTypeSignature) {
-            return this.normalizeType_Template(t as TemplateTypeSignature, binds);
+            return this.normalizeType_Template(t, binds);
         }
         else if (t instanceof NominalTypeSignature) {
-            return this.normalizeType_Nominal(t as NominalTypeSignature, binds);
+            return this.normalizeType_Nominal(t, binds);
         }
         else if (t instanceof TupleTypeSignature) {
-            return this.normalizeType_Tuple(t as TupleTypeSignature, binds);
+            return this.normalizeType_Tuple(t, binds);
         }
         else if (t instanceof RecordTypeSignature) {
-            return this.normalizeType_Record(t as RecordTypeSignature, binds);
+            return this.normalizeType_Record(t, binds);
+        }
+        else if(t instanceof ProjectTypeSignature) {
+            return this.normalizeType_Projection(t, binds);
         }
         else if (t instanceof IntersectionTypeSignature) {
-            return this.normalizeType_Intersection(t as IntersectionTypeSignature, binds);
+            return this.normalizeType_Intersection(t, binds);
         }
         else {
             return this.normalizeType_Union(t as UnionTypeSignature, binds);
@@ -1286,33 +1498,15 @@ class Assembly {
     }
 
     restrictNone(from: ResolvedType): ResolvedType {
-        return (this.subtypeOf(this.getSpecialNoneType(), from)) ? this.getSpecialNoneType() : ResolvedType.createEmpty();
+        return this.restrictTypes(from, this.getSpecialNoneType());
     }
 
     restrictSome(from: ResolvedType): ResolvedType {
-        const hasany = from.options.some((atom) => ResolvedType.createSingle(atom).isAnyType());
-        const sometypes = from.options.filter((atom) => this.subtypeOf(ResolvedType.createSingle(atom), this.getSpecialSomeType()));
-        if (hasany) {
-            return this.getSpecialSomeType();
-        }
-        else if (sometypes.length !== 0) {
-            return ResolvedType.create(sometypes);
-        }
-        else {
-            return ResolvedType.createEmpty();
-        }
+        return this.restrictTypes(from, this.getSpecialSomeConceptType());
     }
 
     restrictT(from: ResolvedType, t: ResolvedType): ResolvedType {
-        if (t.isNoneType()) {
-            return this.restrictNone(from);
-        }
-        else if (t.isSomeType()) {
-            return this.restrictSome(from);
-        }
-        else {
-            return t;
-        }
+        return this.restrictTypes(from, t);
     }
 
     restrictNotT(from: ResolvedType, t: ResolvedType): ResolvedType {
@@ -1357,13 +1551,16 @@ class Assembly {
         }
         else if (t2 instanceof ResolvedConceptAtomType) {
             if (t1 instanceof ResolvedEntityAtomType) {
-                res = this.atomSubtypeOf_EntityConcept(t1, t2 as ResolvedConceptAtomType);
+                res = this.atomSubtypeOf_EntityConcept(t1, t2);
             }
             else if (t1 instanceof ResolvedTupleAtomType) {
-                res = this.atomSubtypeOf_ConceptConcept(this.getSpecialTupleConceptType().options[0] as ResolvedConceptAtomType, t2 as ResolvedConceptAtomType);
+                res = this.atomSubtypeOf_TupleConcept(t1, t2);
+            }
+            else if (t1 instanceof ResolvedRecordAtomType) {
+                res = this.atomSubtypeOf_RecordConcept(t1, t2);
             }
             else {
-                res = this.atomSubtypeOf_ConceptConcept(this.getSpecialRecordConceptType().options[0] as ResolvedConceptAtomType, t2 as ResolvedConceptAtomType);
+                //fall-through
             }
         }
         else {
@@ -1375,6 +1572,9 @@ class Assembly {
             }
             else if (t1 instanceof ResolvedRecordAtomType && t2 instanceof ResolvedRecordAtomType) {
                 res = this.atomSubtypeOf_RecordRecord(t1, t2);
+            }
+            else if (t1 instanceof ResolvedEphemeralListType && t2 instanceof ResolvedEphemeralListType) {
+                res = this.atomSubtypeOf_EphemeralEphemeral(t1, t2);
             }
             else {
                 //fall-through
@@ -1412,7 +1612,7 @@ class Assembly {
             return false; //should both have rest or not
         }
 
-        if (t2.optRestParamType !== undefined && !this.subtypeOf(t2.optRestParamType, t1.optRestParamType as ResolvedType)) {
+        if (t2.optRestParamType !== undefined && t2.optRestParamType.idStr !== (t1.optRestParamType as ResolvedType).idStr) {
             return false; //variance
         }
 
@@ -1420,6 +1620,10 @@ class Assembly {
             const t2p = t2.params[i];
             const t1p = t1.params[i];
             if ((t2p.isOptional !== t1p.isOptional) || (t2p.isRef !== t1p.isRef)) {
+                return false;
+            }
+
+            if(!StorageDeclarator.checkDeclsMatch(t1p.storage, t2p.storage)) {
                 return false;
             }
 
@@ -1446,7 +1650,17 @@ class Assembly {
             }
         }
 
-        return t1.resultType.idStr === t2.resultType.idStr;
+        if(t1.resultInfo.length != t2.resultInfo.length) {
+            return false;
+        }
+
+        for(let i = 0; i < t1.resultInfo.length; ++i) {
+            if(!StorageDeclarator.checkDeclsMatch(t1.resultInfo[i][1], t2.resultInfo[i][1]) || t1.resultInfo[i][0].idStr !== t2.resultInfo[i][0].idStr) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     functionSubtypeOf(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {

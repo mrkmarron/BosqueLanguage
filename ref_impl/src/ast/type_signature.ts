@@ -21,6 +21,10 @@ class StorageDeclarator {
     isSimpleStorage(): boolean {
         return !(this.isValue || this.isUnique || this.isBorrow);
     }
+
+    static checkDeclsMatch(d1: StorageDeclarator, d2: StorageDeclarator): boolean {
+        return (d1.isValue === d2.isValue) && (d1.isBorrow === d2.isBorrow) && (d1.isUnique === d2.isUnique);
+    }
 }
 
 class TypeSignature {
