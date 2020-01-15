@@ -26,10 +26,17 @@ concept Some provides Any {
     method tryProject<T>(): Some? # special_method
 }
 
+//<summary>Special concept that indicates a type can be given a by-value storage specifier.</summary>
+concept ValueTypeable {
+}
+
+//<summary>Special concept that indicates a type can be given a uniqueness or borrow storage specifier.</summary>
+concept UniquenessTypeable {
+}
+
 //<summary>Types that can be used in equality operations or in key based containers.</summary>
 concept Indexable provides Any {
     static getKey(a: Indexable): KeyType # special_method
-    static equal(a: Indexable, b: Indexable): Bool # special_method
 }
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
@@ -44,6 +51,7 @@ concept Validator provides Any {
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
 concept KeyType provides Any, Indexable {
+    static equal(a: KeyType, b: KeyType): Bool # special_method
 }
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>

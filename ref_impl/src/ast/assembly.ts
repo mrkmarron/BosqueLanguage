@@ -533,30 +533,26 @@ class Assembly {
         return this.restrictTupleTypes(oft, rtuple);
     }
 
-    private restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
-        let res: ResolvedTupleAtomType | undefined = oft;
+    restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
+        let opts: ResolvedType[] = [];
 
-        if(!this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
-            return undefined;
+        if (this.subtypeOf(this.getSpecialKeyTupleConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialKeyTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::KeyType" || cpt.idStr === "NSCore::KeyTuple")) {
-            res = this.restrictTupleEntries(oft, this.getSpecialKeyTypeConceptType());
+        if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::PODType" || cpt.idStr === "NSCore::PODTuple")) {
-            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        if (this.subtypeOf(this.getSpecialAPITupleConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::APIType" || cpt.idStr === "NSCore::APITuple")) {
-            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
+            return oft;
         }
 
-        if(res === undefined) {
-            return undefined;
-        }
-        
-        return res;
+        return opts.length !== 0 ? this.restrictTupleEntries(oft, this.typeUnion(opts)) : undefined;
     }
 
     private restrictRecordTypes(ofr: ResolvedRecordAtomType, withr: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
@@ -607,30 +603,26 @@ class Assembly {
         return this.restrictRecordTypes(oft, rrecord);
     }
 
-    private restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
-        let res: ResolvedRecordAtomType | undefined = oft;
+    restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
+        let opts: ResolvedType[] = [];
 
-        if(!this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
-            return undefined;
+        if (this.subtypeOf(this.getSpecialKeyRecordConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialKeyTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::KeyType" || cpt.idStr === "NSCore::KeyRecord")) {
-            res = this.restrictRecordEntries(oft, this.getSpecialKeyTypeConceptType());
+        if (this.subtypeOf(this.getSpecialPODRecordConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::PODType" || cpt.idStr === "NSCore::PODRecord")) {
-            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        if (this.subtypeOf(this.getSpecialAPIRecordConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
-        if (res !== undefined && withc.conceptTypes.some((cpt) => cpt.idStr === "NSCore::APIType" || cpt.idStr === "NSCore::APIRecord")) {
-            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
+            return oft;
         }
 
-        if(res === undefined) {
-            return undefined;
-        }
-        
-        return res;
+        return opts.length !== 0 ? this.restrictRecordEntries(oft, this.typeUnion(opts)) : undefined;
     }
 
     private restrictEphemeralListTypes(oft: ResolvedEphemeralListType, witht: ResolvedEphemeralListType): ResolvedEphemeralListType | undefined {
@@ -701,7 +693,7 @@ class Assembly {
         }
         else if (ofa instanceof ResolvedRecordAtomType) {
             if(witha instanceof ResolvedConceptAtomType) {
-                this.restrictRecordConcept(ofa, witha);
+                return this.restrictRecordConcept(ofa, witha);
             }
             else if (witha instanceof ResolvedRecordAtomType) {
                 return this.restrictRecordTypes(ofa, witha);
@@ -816,7 +808,7 @@ class Assembly {
             return ResolvedType.createEmpty();
         }
 
-        if(oft.idStr === "KeyType") {
+        if(oft.idStr === "NSCore::KeyType") {
             if(this.subtypeOf(fromt, this.getSpecialKeyTypeConceptType())) {
                 return fromt;
             }
@@ -831,7 +823,14 @@ class Assembly {
                 return ResolvedType.createEmpty();    
             }
         }
-        else if(oft.idStr === "APIRecord") {
+        else if(oft.idStr === "NSCore::APIRecord") {
+            //
+            //NOT IMPLEMENTED YET
+            //
+            assert(false);
+            return ResolvedType.createEmpty();
+        }
+        else if(oft.idStr === "NSCore::Record") {
             //
             //NOT IMPLEMENTED YET
             //
@@ -1153,6 +1152,9 @@ class Assembly {
     getSpecialAPIRecordConceptType(): ResolvedType { return this.internSpecialConceptType("APIRecord"); }
 
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
+
+    getSpecialValueTypeableConceptType(): ResolvedType { return this.internSpecialConceptType("ValueTypeable"); }
+    getSpecialUniqunessTypeableConceptType(): ResolvedType { return this.internSpecialConceptType("UniquenessTypeable"); }
 
     isStringOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::StringOf<"); }
     isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }

@@ -18,12 +18,35 @@ class StorageDeclarator {
         return new StorageDeclarator(false, false, false);
     }
 
+    static createInvlaid(): StorageDeclarator {
+        return new StorageDeclarator(true, true, true);
+    }
+
     isSimpleStorage(): boolean {
         return !(this.isValue || this.isUnique || this.isBorrow);
     }
 
+    isInvalidStorage(): boolean {
+        return (this.isValue && this.isUnique && this.isBorrow);
+    }
+
     static checkDeclsMatch(d1: StorageDeclarator, d2: StorageDeclarator): boolean {
         return (d1.isValue === d2.isValue) && (d1.isBorrow === d2.isBorrow) && (d1.isUnique === d2.isUnique);
+    }
+
+    static allDeclsMatch(...decls: StorageDeclarator[]): boolean {
+        if(decls.length === 0) {
+            return false;
+        }
+        else {
+            const ddcl = decls[0];
+            for(let i = 1; i < decls.length; ++i) {
+                if(!StorageDeclarator.checkDeclsMatch(ddcl, decls[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 }
 
