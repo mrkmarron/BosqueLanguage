@@ -4,11 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ConceptTypeDecl, EntityTypeDecl } from "./assembly";
-import { StorageDeclarator } from "./type_signature";
-
-function formatStorageInfo(storage: StorageDeclarator): string {
-    return (storage.isValue ? "#" : "") + (storage.isUnique ? "*" : "") + (storage.isBorrow ? "^" : "");
-}
 
 class ResolvedAtomType {
     readonly idStr: string;
@@ -130,11 +125,9 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
 }
 
 class ResolvedEphemeralListTypeEntry {
-    readonly storage: StorageDeclarator;
     readonly type: ResolvedType;
 
-    constructor(storage: StorageDeclarator, type: ResolvedType) {
-        this.storage = storage;
+    constructor(type: ResolvedType) {
         this.type = type;
     }
 }
@@ -149,7 +142,7 @@ class ResolvedEphemeralListType extends ResolvedAtomType {
 
     static create(entries: ResolvedEphemeralListTypeEntry[]): ResolvedEphemeralListType {
         const simplifiedEntries = [...entries];
-        const cvalue = simplifiedEntries.map((entry) => formatStorageInfo(entry.storage) + entry.type.idStr).join(", ");
+        const cvalue = simplifiedEntries.map((entry) => entry.type.idStr).join(", ");
         return new ResolvedEphemeralListType("(|" + cvalue + "|)", simplifiedEntries);
     }
 }
@@ -235,15 +228,13 @@ class ResolvedFunctionTypeParam {
     readonly name: string;
     readonly type: ResolvedType | ResolvedFunctionType;
     readonly isRef: boolean;
-    readonly storage: StorageDeclarator;
     readonly isOptional: boolean;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, storage: StorageDeclarator) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
-        this.storage = storage;
     }
 }
 
@@ -253,11 +244,11 @@ class ResolvedFunctionType {
     readonly params: ResolvedFunctionTypeParam[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: ResolvedType | undefined;
-    readonly resultInfo: [ResolvedType, StorageDeclarator][];
+    readonly resultInfo: ResolvedType[];
 
     readonly allParamNames: Set<string>;
 
-    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: [ResolvedType, StorageDeclarator][]) {
+    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: ResolvedType[]) {
         this.idStr = rstr;
         this.recursive = recursive;
         this.params = params;
@@ -268,8 +259,8 @@ class ResolvedFunctionType {
         this.allParamNames = new Set<string>();
     }
 
-    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: [ResolvedType, StorageDeclarator][]): ResolvedFunctionType {
-        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + formatStorageInfo(param.storage) + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
+    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: ResolvedType[]): ResolvedFunctionType {
+        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
         let cvalue = cvalues.join(", ");
 
         let recstr = "";
@@ -284,7 +275,7 @@ class ResolvedFunctionType {
             cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.idStr));
         }
 
-        let rformat = resultInfo.length === 1 ? (formatStorageInfo(resultInfo[0][1]) + resultInfo[0][0].idStr) : ("(|" + resultInfo.map((ri) => formatStorageInfo(ri[1]) + ri[0].idStr).join(", ") + "|)");
+        let rformat = resultInfo.length === 1 ? resultInfo[0].idStr : ("(|" + resultInfo.map((ri) => ri.idStr).join(", ") + "|)");
         return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + rformat, recursive, params, optRestParamName, optRestParamType, resultInfo);
     }
 }

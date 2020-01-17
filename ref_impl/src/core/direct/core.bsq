@@ -26,14 +26,6 @@ concept Some provides Any {
     method tryProject<T>(): Some? # special_method
 }
 
-//<summary>Special concept that indicates a type can be given a by-value storage specifier.</summary>
-concept ValueTypeable {
-}
-
-//<summary>Special concept that indicates a type can be given a uniqueness or borrow storage specifier.</summary>
-concept UniquenessTypeable {
-}
-
 //<summary>Types that can be used in equality operations or in key based containers.</summary>
 concept Indexable provides Any {
     static getKey(a: Indexable): KeyType # special_method
@@ -314,4 +306,8 @@ entity Tagged<T where KeyType, U> provides Keyed<T>, Object {
 entity MapEntry<K where Indexable, V> provides Some {
     field key: K;
     field value: V;
+
+    static create(k: K, v: V) {
+        return MapEntry<K, V>@{key=k, value=v};
+    }
 }

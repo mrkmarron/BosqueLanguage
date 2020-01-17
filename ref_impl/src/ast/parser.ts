@@ -4,8 +4,8 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
-import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature, StorageDeclarator } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, DupOp, DestructiveReadOp, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment } from "./body";
+import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -84,8 +84,6 @@ const SymbolStrings = [
     "|}",
 
     "#",
-    "*",
-    "^",
     "&",
     "&&",
     "@",
@@ -677,39 +675,24 @@ class Parser {
 
     ////
     //Misc parsing
-    private parseStorageDeclaration(): StorageDeclarator {
-        let isvalue = false;
-        let isunique = false;
-        let isborrow = false;
 
-        if(this.testToken("#") || this.testToken("*") || this.testToken("^")) {
-            isvalue = this.testToken("#");
-            isunique = this.testToken("*");
-            isborrow = this.testToken("^");
-            this.consumeToken();
-        }
-
-        return new StorageDeclarator(isvalue, isunique, isborrow);
-    } 
-
-    private parseInvokableCommon(ispcode: boolean, isMember: boolean, noBody: boolean, attributes: string[], isrecursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], optSelfType?: TypeSignature, optThisStorage?: StorageDeclarator): InvokeDecl {
+    private parseInvokableCommon(ispcode: boolean, isMember: boolean, noBody: boolean, attributes: string[], isrecursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], optSelfType?: TypeSignature): InvokeDecl {
         const sinfo = this.getCurrentSrcInfo();
         const srcFile = this.m_penv.getCurrentFile();
         const line = this.getCurrentLine();
 
         let fparams: FunctionParameter[] = [];
         if (isMember) {
-            fparams.push(new FunctionParameter("this", optSelfType as TypeSignature, false, false, optThisStorage as StorageDeclarator));
+            fparams.push(new FunctionParameter("this", optSelfType as TypeSignature, false, false));
         }
 
         let restName: string | undefined = undefined;
         let restType: TypeSignature | undefined = undefined;
-        let resultInfo = [[this.m_penv.SpecialAutoSignature, new StorageDeclarator(false, false, false)]] as [TypeSignature, StorageDeclarator][];
+        let resultInfo = [this.m_penv.SpecialAutoSignature];
 
-        const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean, StorageDeclarator]>("(", ")", ",", () => {
+        const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean]>("(", ")", ",", () => {
             const isrest = this.testAndConsumeTokenIf("...");
             const isref = this.testAndConsumeTokenIf("ref");
-            const storageDecl = this.parseStorageDeclaration();
 
             this.ensureToken(TokenStrings.Identifier);
             const pname = this.consumeTokenAndGetValue();
@@ -729,16 +712,12 @@ class Parser {
                 this.raiseError(line, "Cannot use ref/borrow parameters here");
             }
 
-            if (isrest && !storageDecl.isSimpleStorage()) {
-                this.raiseError(line, "Cannot have storage specifiers on rest parameter");
-            }
-
-            return [pname, argtype, isopt, isrest, isref, storageDecl];
+            return [pname, argtype, isopt, isrest, isref];
         })[0];
 
         for (let i = 0; i < params.length; i++) {
             if (!params[i][3]) {
-                fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], params[i][4], params[i][5]));
+                fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], params[i][4]));
             }
             else {
                 if (i + 1 !== params.length) {
@@ -807,21 +786,19 @@ class Parser {
     ////
     //Type parsing
 
-    private parseEphemeralListTypeSignature(): [TypeSignature, StorageDeclarator][] {
+    private parseEphemeralListTypeSignature(): TypeSignature[] {
         if (this.testAndConsumeTokenIf("(|")) {
             const decls = this.parseEphemeralListOf(() => {
-                const sdecl = this.parseStorageDeclaration();
                 const tdecl = this.parseTypeSignature();
-                return [tdecl, sdecl] as [TypeSignature, StorageDeclarator];
+                return tdecl;
             });
             this.ensureAndConsumeToken("|)");
 
             return decls;
         }
         else {
-            const sdecl = this.parseStorageDeclaration();
             const tdecl = this.parseTypeSignature();
-            return [[tdecl, sdecl]] as [TypeSignature, StorageDeclarator][];
+            return [tdecl];
         }
     }
 
@@ -1015,10 +992,9 @@ class Parser {
             let restName: string | undefined = undefined;
             let restType: TypeSignature | undefined = undefined;
 
-            const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean, StorageDeclarator]>("(", ")", ",", () => {
+            const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean]>("(", ")", ",", () => {
                 const isrest = this.testAndConsumeTokenIf("...");
                 const isref = this.testAndConsumeTokenIf("ref");
-                const storageDecl = this.parseStorageDeclaration();
 
                 this.ensureToken(TokenStrings.Identifier);
                 const pname = this.consumeTokenAndGetValue();
@@ -1030,17 +1006,13 @@ class Parser {
                 if (isref && (isopt || isrest)) {
                     this.raiseError(this.getCurrentLine(), "Cannot use ref/borrow parameters here");
                 }
-    
-                if (isrest && !storageDecl.isSimpleStorage()) {
-                    this.raiseError(this.getCurrentLine(), "Cannot have storage specifiers on rest parameter");
-                }
 
-                return [pname, argtype, isopt, isrest, isref, storageDecl];
+                return [pname, argtype, isopt, isrest, isref];
             })[0];
 
             for (let i = 0; i < params.length; i++) {
                 if (!params[i][3]) {
-                    fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], params[i][4], params[i][5]));
+                    fparams.push(new FunctionParameter(params[i][0], params[i][1], params[i][2], params[i][4]));
                 }
                 else {
                     if (i + 1 !== params.length) {
@@ -1265,8 +1237,8 @@ class Parser {
 
         this.ensureAndConsumeToken("fn");
         const sig = this.parseInvokableCommon(true, false, false, [], isrecursive ? "yes" : "no", [], [], []);
-        const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || (sig.resultInfo.length === 1 && sig.resultInfo[0][0] instanceof AutoTypeSignature);
-        const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && (sig.resultInfo.length === 1 && sig.resultInfo[0][0] instanceof AutoTypeSignature);
+        const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || (sig.resultInfo.length === 1 && sig.resultInfo[0] instanceof AutoTypeSignature);
+        const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && (sig.resultInfo.length === 1 && sig.resultInfo[0] instanceof AutoTypeSignature);
         if (someAuto && !allAuto) {
             this.raiseError(line, "Cannot have mixed of auto propagated and explicit types on lambda arguments/return");
         }
@@ -1490,26 +1462,9 @@ class Parser {
         }
     }
 
-    private parseOwnerExpression(): Expression {
-        const sinfo = this.getCurrentSrcInfo();
-
-        if (this.testAndConsumeTokenIf("@")) {
-            return new DupOp(sinfo, false, this.parsePrimaryExpression());
-        }
-        else if (this.testAndConsumeTokenIf("#")) {
-            return new DupOp(sinfo, true, this.parsePrimaryExpression());
-        }
-        else if (this.testAndConsumeTokenIf("*")) {
-            return new DestructiveReadOp(sinfo, this.parsePrimaryExpression());
-        }
-        else {
-            return this.parsePrimaryExpression();
-        }
-    }
-
     private parsePostfixExpression(): Expression {
         const rootinfo = this.getCurrentSrcInfo();
-        let rootexp = this.parseOwnerExpression();
+        let rootexp = this.parsePrimaryExpression();
 
         let ops: PostfixOperation[] = [];
         while (true) {
@@ -2653,9 +2608,6 @@ class Parser {
         this.ensureAndConsumeToken("method");
         const termRestrictions = this.parseTermRestrictions();
 
-
-        const thisStorage = this.parseStorageDeclaration();
-
         this.ensureToken(TokenStrings.Identifier);
         const mname = this.consumeTokenAndGetValue();
         const terms = this.parseTermDeclarations();
@@ -2663,7 +2615,7 @@ class Parser {
         if (Parser.attributeSetContains("recursive", attributes) || Parser.attributeSetContains("recursive?", attributes)) {
             recursive = Parser.attributeSetContains("recursive", attributes) ? "yes" : "cond";
         }
-        const sig = this.parseInvokableCommon(false, true, Parser.attributeSetContains("abstract", attributes), attributes, recursive, pragmas, terms, termRestrictions, thisType, thisStorage);
+        const sig = this.parseInvokableCommon(false, true, Parser.attributeSetContains("abstract", attributes), attributes, recursive, pragmas, terms, termRestrictions, thisType);
 
         if (allMemberNames.has(mname)) {
             this.raiseError(this.getCurrentLine(), "Collision between static and other names");
@@ -2814,13 +2766,13 @@ class Parser {
         }
 
         const etimeType = new NominalTypeSignature(currentDecl.ns, ename);
-        const simpleETimeResult = [[etimeType, StorageDeclarator.createSimple()]] as [TypeSignature, StorageDeclarator][];
+        const simpleETimeResult = [etimeType];
 
         const zerobody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_zero");
         const zerodecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [], undefined, undefined, simpleETimeResult, [], [], false, new Set<string>(), zerobody);
         const zero = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "zero", zerodecl);
 
-        const param = new FunctionParameter("tick", etimeType, false, false, StorageDeclarator.createSimple());
+        const param = new FunctionParameter("tick", etimeType, false, false);
         const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_nexttick");
         const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleETimeResult, [], [], false, new Set<string>(), body);
         const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "nextEventTick", tickdecl);
@@ -2849,7 +2801,7 @@ class Parser {
 
         const ename = this.consumeTokenAndGetValue();
         const etype = new NominalTypeSignature(currentDecl.ns, ename);
-        const simpleETypeResult = [[etype, new StorageDeclarator(true, false, false)]] as [TypeSignature, StorageDeclarator][];
+        const simpleETypeResult = [etype];
 
         try {
             this.setRecover(this.scanCodeParens());
@@ -2859,7 +2811,7 @@ class Parser {
                 return this.consumeTokenAndGetValue();
             })[0];
 
-            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "Int"), false, false, StorageDeclarator.createSimple());
+            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "Int"), false, false);
             const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_create");
             const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleETypeResult, [], [], false, new Set<string>(), body);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", createdecl);
@@ -2912,11 +2864,11 @@ class Parser {
         }
 
         const itype = new NominalTypeSignature(currentDecl.ns, iname);
-        const simpleITypeResult = [[itype, StorageDeclarator.createSimple()]] as [TypeSignature, StorageDeclarator][];
+        const simpleITypeResult = [itype];
         if (isguid) {
             this.ensureAndConsumeToken(";");
 
-            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "GUID"), false, false, new StorageDeclarator(true, false, false));
+            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "GUID"), false, false);
             const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "gidkey_create");
             const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
@@ -2940,7 +2892,7 @@ class Parser {
             if (ishash) {
                 const iscrypto = this.testAndConsumeTokenIf("cryptographic");
 
-                const param = new FunctionParameter("value", idval, false, false, StorageDeclarator.createSimple());
+                const param = new FunctionParameter("value", idval, false, false);
                 const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), iscrypto ? "hashkey_data_create" : "hashkey_crypto_create");
                 const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
                 const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
@@ -2959,7 +2911,7 @@ class Parser {
                 this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
             }
             else {
-                const param = new FunctionParameter("value", idval, false, false, StorageDeclarator.createSimple());
+                const param = new FunctionParameter("value", idval, false, false);
                 const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_create");
                 const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
                 const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);

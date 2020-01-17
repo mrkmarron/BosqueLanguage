@@ -9,7 +9,6 @@ import { Assembly } from "../ast/assembly";
 import { ResolvedType } from "../ast/resolved_type";
 import { MIRTempRegister, MIRBodyKey } from "../compiler/mir_ops";
 import { PCode } from "../compiler/mir_emitter";
-import { StorageDeclarator } from "../ast/type_signature";
 
 enum FlowTypeTruthValue {
     True = "True",
@@ -58,35 +57,33 @@ class VarInfo {
     readonly isCaptured: boolean;
     readonly mustDefined: boolean;
     readonly flowType: ResolvedType;
-    readonly storage: StorageDeclarator;
 
-    constructor(dtype: ResolvedType, isConst: boolean, isCaptured: boolean, mustDefined: boolean, ftype: ResolvedType, storage: StorageDeclarator) {
+    constructor(dtype: ResolvedType, isConst: boolean, isCaptured: boolean, mustDefined: boolean, ftype: ResolvedType) {
         this.declaredType = dtype;
         this.flowType = ftype;
         this.isConst = isConst;
         this.isCaptured = isCaptured;
         this.mustDefined = mustDefined;
-        this.storage = storage;
     }
 
     assign(ftype: ResolvedType): VarInfo {
         assert(!this.isConst);
-        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype, this.storage);
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
     }
 
     infer(ftype: ResolvedType): VarInfo {
-        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype, this.storage);
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
     }
 
     static join(assembly: Assembly, ...values: VarInfo[]): VarInfo {
         assert(values.length !== 0);
-        return new VarInfo(values[0].declaredType, values[0].isConst, values[0].isCaptured, values.every((vi) => vi.mustDefined), assembly.typeUnion(values.map((vi) => vi.flowType)), values[0].storage);
+
+        return new VarInfo(values[0].declaredType, values[0].isConst, values[0].isCaptured, values.every((vi) => vi.mustDefined), assembly.typeUnion(values.map((vi) => vi.flowType)));
     }
 }
 
 type ExpressionReturnResult = {
     etype: ResolvedType,
-    storage: StorageDeclarator,
     value: FlowTypeTruthValue
 };
 
@@ -154,34 +151,34 @@ class TypeEnvironment {
         return this.expressionResult as ExpressionReturnResult;
     }
 
-    setExpressionResult(etype: ResolvedType, storage: StorageDeclarator, value?: FlowTypeTruthValue): TypeEnvironment {
+    setExpressionResult(etype: ResolvedType, value?: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
         let rvalue = value;
         if (rvalue === undefined) {
             rvalue = etype.isNoneType() ? FlowTypeTruthValue.False : FlowTypeTruthValue.Unknown;
         }
 
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, { etype: etype, storage: storage, value: rvalue }, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, { etype: etype, value: rvalue }, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
     static convertToBoolFlowsOnExpressionResult(assembly: Assembly, options: TypeEnvironment[]): [TypeEnvironment[], TypeEnvironment[]] {
         assert(options.every((opt) => assembly.subtypeOf(opt.getExpressionResult().etype, assembly.typeUnion([assembly.getSpecialNoneType(), assembly.getSpecialBoolType()]))));
 
         const tvals = options.filter((opt) => opt.getExpressionResult().value !== FlowTypeTruthValue.False)
-            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), StorageDeclarator.createSimple(), FlowTypeTruthValue.True));
+            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
 
         const fvals = options.filter((opt) => opt.getExpressionResult().value !== FlowTypeTruthValue.True)
-            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), StorageDeclarator.createSimple(), FlowTypeTruthValue.False));
+            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
 
         return [tvals, fvals];
     }
 
     static convertToNoneSomeFlowsOnExpressionResult(assembly: Assembly, options: TypeEnvironment[]): [TypeEnvironment[], TypeEnvironment[]] {
         const nvals = options.filter((opt) => !assembly.restrictNone(opt.getExpressionResult().etype).isEmptyType())
-            .map((opt) => opt.setExpressionResult(assembly.restrictNone(opt.getExpressionResult().etype), StorageDeclarator.createSimple(), FlowTypeTruthValue.False));
+            .map((opt) => opt.setExpressionResult(assembly.restrictNone(opt.getExpressionResult().etype), FlowTypeTruthValue.False));
 
         const svals = options.filter((opt) => !assembly.restrictSome(opt.getExpressionResult().etype).isEmptyType())
-            .map((opt) => opt.setExpressionResult(assembly.restrictSome(opt.getExpressionResult().etype), opt.getExpressionResult().storage, opt.getExpressionResult().value));
+            .map((opt) => opt.setExpressionResult(assembly.restrictSome(opt.getExpressionResult().etype), opt.getExpressionResult().value));
 
         return [nvals, svals];
     }
@@ -255,9 +252,9 @@ class TypeEnvironment {
         return this.pcodes.get(pc);
     }
 
-    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, ftype: ResolvedType, storage: StorageDeclarator): TypeEnvironment {
+    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, ftype: ResolvedType): TypeEnvironment {
         let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
-        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, false, isDefined, ftype, storage));
+        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, false, isDefined, ftype));
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
@@ -268,12 +265,12 @@ class TypeEnvironment {
         return this.updateVarInfo(name, newv);
     }
 
-    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType, StorageDeclarator][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][]): TypeEnvironment {
+    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][]): TypeEnvironment {
         let nenv: TypeEnvironment = this;
 
         for (let i = 0; i < allDeclared.length; ++i) {
             const declv = allDeclared[i];
-            nenv = nenv.addVar(declv[1], declv[0], declv[2], true, declv[4], declv[5]);
+            nenv = nenv.addVar(declv[1], declv[0], declv[2], true, declv[4]);
         }
 
         for (let i = 0; i < allAssigned.length; ++i) {
@@ -350,13 +347,12 @@ class TypeEnvironment {
 
         const expresall = fopts.filter((opt) => opt.expressionResult !== undefined).map((opt) => opt.getExpressionResult());
         assert(expresall.length === 0 || expresall.length === fopts.length);
-    
+
         let expres: ExpressionReturnResult | undefined = undefined;
         if(expresall.length !== 0) {
             const retype = assembly.typeUnion(expresall.map((opt) => opt.etype));
-            const rstore = StorageDeclarator.allDeclsMatch(...expresall.map((opt) => opt.storage)) ? expresall[0].storage : StorageDeclarator.createInvlaid();
             const rflow = FlowTypeTruthOps.join(...expresall.map((opt) => opt.value));
-            expres = { etype: retype, storage: rstore, value: rflow };
+            expres = { etype: retype, value: rflow };
         }
 
         const rflow = opts.filter((opt) => opt.returnResult !== undefined).map((opt) => opt.returnResult as ResolvedType);

@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedEphemeralListTypeEntry } from "./resolved_type";
-import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, StorageDeclarator, ProjectTypeSignature } from "./type_signature";
+import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
 
@@ -87,7 +87,7 @@ class InvokeDecl {
     readonly optRestName: string | undefined;
     readonly optRestType: TypeSignature | undefined;
 
-    readonly resultInfo: [TypeSignature, StorageDeclarator][];
+    readonly resultInfo: TypeSignature[];
 
     readonly preconditions: PreConditionDecl[];
     readonly postconditions: PostConditionDecl[];
@@ -96,7 +96,7 @@ class InvokeDecl {
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: [TypeSignature, StorageDeclarator][], preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
@@ -125,15 +125,15 @@ class InvokeDecl {
         return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultInfo);
     }
 
-    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: [TypeSignature, StorageDeclarator][], captureSet: Set<string>, body: BodyImplementation) {
+    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], captureSet: Set<string>, body: BodyImplementation) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], [], params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
     }
 
-    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: [TypeSignature, StorageDeclarator][], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 
-    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: [TypeSignature, StorageDeclarator][], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 }
@@ -636,12 +636,7 @@ class Assembly {
             const t2e = witht.types[i];
 
             const etype = this.restrictTypes(t1e.type, t2e.type);
-            if (!StorageDeclarator.checkDeclsMatch(t1e.storage, t2e.storage) || etype.isEmptyType()) {
-                return undefined;
-            }
-            else {
-                itypes.push(new ResolvedEphemeralListTypeEntry(t1e.storage, etype));
-            }
+            itypes.push(new ResolvedEphemeralListTypeEntry(etype));
         }
 
         return ResolvedEphemeralListType.create(itypes);
@@ -930,11 +925,11 @@ class Assembly {
     }
 
     private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedFunctionType | undefined {
-        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, this.normalizeTypeGeneral(param.type, binds), param.isOptional, param.isRef, param.storage));
+        const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, this.normalizeTypeGeneral(param.type, binds), param.isOptional, param.isRef));
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeTypeOnly(t.optRestParamType, binds) : undefined;
-        const resInfo = t.resultInfo.map((ri) => [this.normalizeTypeOnly(ri[0], binds), ri[1]] as [ResolvedType, StorageDeclarator]);
+        const resInfo = t.resultInfo.map((ri) => this.normalizeTypeOnly(ri, binds));
 
-        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || resInfo.some((ri) => ri[0].isEmptyType())) {
+        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || resInfo.some((ri) => ri.isEmptyType())) {
             return undefined;
         }
 
@@ -1079,7 +1074,7 @@ class Assembly {
         }
 
         for (let i = 0; i < t1.types.length; ++i) {
-            if(!StorageDeclarator.checkDeclsMatch(t1.types[i].storage, t2.types[i].storage) || !this.subtypeOf(t1.types[i].type, t2.types[i].type)) {
+            if(!this.subtypeOf(t1.types[i].type, t2.types[i].type)) {
                 return false;
             }
         }
@@ -1152,9 +1147,6 @@ class Assembly {
     getSpecialAPIRecordConceptType(): ResolvedType { return this.internSpecialConceptType("APIRecord"); }
 
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
-
-    getSpecialValueTypeableConceptType(): ResolvedType { return this.internSpecialConceptType("ValueTypeable"); }
-    getSpecialUniqunessTypeableConceptType(): ResolvedType { return this.internSpecialConceptType("UniquenessTypeable"); }
 
     isStringOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::StringOf<"); }
     isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }
@@ -1625,10 +1617,6 @@ class Assembly {
                 return false;
             }
 
-            if(!StorageDeclarator.checkDeclsMatch(t1p.storage, t2p.storage)) {
-                return false;
-            }
-
             //We want the argument types to be the same for all cases -- no clear reason to overload to more general types
             if (t2p.type instanceof ResolvedFunctionType && t1p.type instanceof ResolvedFunctionType) {
                 if (t2p.type.idStr !== t1p.type.idStr) {
@@ -1657,7 +1645,7 @@ class Assembly {
         }
 
         for(let i = 0; i < t1.resultInfo.length; ++i) {
-            if(!StorageDeclarator.checkDeclsMatch(t1.resultInfo[i][1], t2.resultInfo[i][1]) || t1.resultInfo[i][0].idStr !== t2.resultInfo[i][0].idStr) {
+            if(t1.resultInfo[i].idStr !== t2.resultInfo[i].idStr) {
                 return false;
             }
         }

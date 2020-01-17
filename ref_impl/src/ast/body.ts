@@ -162,8 +162,6 @@ enum ExpressionTag {
 
     PostfixOpExpression = "PostfixOpExpression",
 
-    DupExpression = "DupExpression",
-    DestructiveReadExpression = "DestructiveReadExpression",
     PrefixOpExpression = "PrefixOpExpression",
 
     BinOpExpression = "BinOpExpression",
@@ -534,26 +532,6 @@ class PostfixInvoke extends PostfixOperation {
         this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
-    }
-}
-
-class DupOp extends Expression {
-    readonly asValue: boolean;
-    readonly exp: Expression;
-
-    constructor(sinfo: SourceInfo, asValue: boolean, exp: Expression) {
-        super(ExpressionTag.DupExpression, sinfo);
-        this.asValue = asValue;
-        this.exp = exp;
-    }
-}
-
-class DestructiveReadOp extends Expression {
-    readonly exp: Expression;
-
-    constructor(sinfo: SourceInfo, exp: Expression) {
-        super(ExpressionTag.DestructiveReadExpression, sinfo);
-        this.exp = exp;
     }
 }
 
@@ -995,7 +973,6 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
-    DupOp, DestructiveReadOp,
     PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
