@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -1486,22 +1486,56 @@ class Parser {
                         return Number.parseInt(this.consumeTokenAndGetValue());
                     })[0];
 
-                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, indecies));
+                    if(indecies.length === 0) {
+                        this.raiseError(sinfo.line, "You must have at least one index when projecting");
+                    }
+
+                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, false, indecies));
                 }
                 else if (this.testToken(TokenStrings.Identifier)) {
                     const name = this.consumeTokenAndGetValue();
 
                     ops.push(new PostfixAccessFromName(sinfo, isElvis, name));
                 }
-                else {
-                    this.ensureToken("{");
-
+                else if (this.testToken("{")) {
                     const names = this.parseListOf<string>("{", "}", ",", () => {
                         this.ensureToken(TokenStrings.Identifier);
                         return this.consumeTokenAndGetValue();
                     })[0].sort();
 
-                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, names));
+                    if(names.length === 0) {
+                        this.raiseError(sinfo.line, "You must have at least one index when projecting");
+                    }
+
+                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, false, names));
+                }
+                else {
+                    this.ensureToken("(|");
+
+                    if (this.testFollows("(|", TokenStrings.Int)) {
+                        const indecies = this.parseListOf<number>("(|", "|)", ",", () => {
+                            this.ensureToken(TokenStrings.Int);
+                            return Number.parseInt(this.consumeTokenAndGetValue());
+                        })[0];
+
+                        if (indecies.length <= 1) {
+                            this.raiseError(sinfo.line, "You must have at least two indecies when projecting out a Ephemeral value pack (otherwise just access the index directly)");
+                        }
+
+                        ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, true, indecies));
+                    }
+                    else {
+                        const names = this.parseListOf<string>("(|", "|)", ",", () => {
+                            this.ensureToken(TokenStrings.Identifier);
+                            return this.consumeTokenAndGetValue();
+                        })[0].sort();
+
+                        if (names.length <= 1) {
+                            this.raiseError(sinfo.line, "You must have at least two names when projecting out a Ephemeral value pack (otherwise just access the property/field directly)");
+                        }
+
+                        ops.push(new PostfixProjectFromNames(sinfo, isElvis, true, names));
+                    }
                 }
             }
             else if (tk === "->" || tk === "?->") {
@@ -1899,6 +1933,10 @@ class Parser {
                         if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
                             this.raiseError(sinfo.line, "Variable is not defined in scope");
                         }
+                        
+                        if(!(itype instanceof AutoTypeSignature)) {
+                            this.raiseError(sinfo.line, "Cannot redeclare type of variable on assignment");
+                        }
 
                         return new VariableAssignmentStructuredAssignment(isopt, name);
                     }
@@ -1992,23 +2030,60 @@ class Parser {
                 return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
             }
             else {
-                this.ensureToken(TokenStrings.Identifier);
-                const name = this.consumeTokenAndGetValue();
+                let decls = new Set<string>();
+                const assigns = this.parseEphemeralListOf(() => {
+                    return this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "var" : "var!", false, decls);
+                });
 
-                if (this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
-                    this.raiseError(line, "Variable is already defined in scope");
+                if(assigns.length === 0 || (assigns.length === 1 && !(assigns[0] instanceof VariableDeclarationStructuredAssignment))) {
+                    this.raiseError(sinfo.line, "Vacuous variable declaration");
                 }
-                this.m_penv.getCurrentFunctionScope().defineLocalVar(name);
+                
+                let vars: {name: string, vtype: TypeSignature}[] = [];
+                for(let i = 0; i < assigns.length; ++i) {
+                    if (assigns[i] instanceof IgnoreTermStructuredAssignment) {
+                        vars.push({name: "_", vtype: (assigns[i] as IgnoreTermStructuredAssignment).termType});
+                    }
+                    else if(assigns[i] instanceof VariableDeclarationStructuredAssignment) {
+                        const dv = assigns[i] as VariableDeclarationStructuredAssignment;
 
-                const vtype = this.testAndConsumeTokenIf(":") ? this.parseTypeSignature() : this.m_penv.SpecialAutoSignature;
-                const exp = this.testAndConsumeTokenIf("=") ? this.parseExpression() : undefined;
+                        if (this.m_penv.getCurrentFunctionScope().isVarNameDefined(dv.vname)) {
+                            this.raiseError(line, "Variable name is already defined");
+                        }
+                        this.m_penv.getCurrentFunctionScope().defineLocalVar(dv.vname);
 
-                if (exp === undefined && isConst) {
+                        vars.push({name: dv.vname, vtype: dv.vtype});
+                    }
+                }
+
+                let exp: Expression[] | undefined = undefined;
+                if(this.testAndConsumeTokenIf("=")) {
+                    exp = this.parseEphemeralListOf(() => {
+                        return this.parseExpression();
+                    });
+                }
+
+                if ((exp === undefined && isConst)) {
                     this.raiseError(line, "Const variable declaration must include an assignment to the variable");
                 }
 
                 this.ensureAndConsumeToken(";");
-                return new VariableDeclarationStatement(sinfo, name, isConst, vtype, exp);
+
+                if(vars.length === 1) {
+                    if (exp !== undefined && exp.length !== 1) {
+                        this.raiseError(line, "Mismatch between variables declared and values provided");
+                    }
+
+                    const sexp = exp !== undefined ? exp[0] : undefined;
+                    return new VariableDeclarationStatement(sinfo, vars[0].name, isConst, vars[0].vtype, sexp); 
+                }
+                else {
+                    if (exp !== undefined && (exp.length !== 1 || exp.length !== vars.length)) {
+                        this.raiseError(line, "Mismatch between variables declared and values provided");
+                    }
+
+                    return new VariablePackDeclarationStatement(sinfo, isConst, vars, exp);
+                }
             }
         }
         else if (tk === "[" || tk === "{" || tk === "(|") {
@@ -2028,23 +2103,55 @@ class Parser {
             return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
         }
         else if (tk === TokenStrings.Identifier) {
-            const name = this.consumeTokenAndGetValue();
-            if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
-                this.raiseError(line, "Variable is not defined in scope");
+            let decls = new Set<string>();
+            const assigns = this.parseEphemeralListOf(() => {
+                return this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
+            });
+
+            if(assigns.length === 0 || (assigns.length === 1 && !(assigns[0] instanceof VariableAssignmentStructuredAssignment))) {
+                this.raiseError(sinfo.line, "Vacuous variable assignment");
+            }
+            
+            let vars: string[] = [];
+            for(let i = 0; i < assigns.length; ++i) {
+                if (assigns[i] instanceof IgnoreTermStructuredAssignment) {
+                    vars.push("_");
+                }
+                else if(assigns[i] instanceof VariableAssignmentStructuredAssignment) {
+                    const av = assigns[i] as VariableAssignmentStructuredAssignment;
+
+                    if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(av.vname)) {
+                        this.raiseError(line, "Variable name is not defined");
+                    }
+
+                    vars.push(av.vname);
+                }
             }
 
-            this.ensureAndConsumeToken("=");
-            const exp = this.parseExpression();
-
+            let exps: Expression[] = this.parseEphemeralListOf(() => {
+                return this.parseExpression();
+            });
             this.ensureAndConsumeToken(";");
-            return new VariableAssignmentStatement(sinfo, name, exp);
+
+            if(vars.length === 1) {
+                if (exps.length !== 1) {
+                    this.raiseError(line, "Mismatch between variables assigned and values provided");
+                }
+
+                return new VariableAssignmentStatement(sinfo, vars[0], exps[0]); 
+            }
+            else {
+                if (exps.length !== 1 || exps.length !== vars.length) {
+                    this.raiseError(line, "Mismatch between variables declared and values provided");
+                }
+
+                return new VariablePackAssignmentStatement(sinfo, vars, exps);
+            }
         }
         else if (tk === "return") {
             this.consumeToken();
 
-            this.ensureAndConsumeToken("(|");
             const exps = this.parseEphemeralListOf(() => this.parseExpression());
-            this.ensureAndConsumeToken("|)");
 
             this.ensureAndConsumeToken(";");
             return new ReturnStatement(sinfo, exps);
@@ -2052,9 +2159,7 @@ class Parser {
         else if (tk === "yield") {
             this.consumeToken();
 
-            this.ensureAndConsumeToken("(|");
-            const exps = this.parseEphemeralListOf(() => this.parseExpression());
-            this.ensureAndConsumeToken("|)");
+           const exps = this.parseEphemeralListOf(() => this.parseExpression());
 
             this.ensureAndConsumeToken(";");
             return new YieldStatement(sinfo, exps);

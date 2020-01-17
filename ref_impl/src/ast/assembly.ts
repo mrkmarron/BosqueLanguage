@@ -933,7 +933,8 @@ class Assembly {
             return undefined;
         }
 
-        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, resInfo);
+        const rtype = resInfo.length === 1 ? resInfo[0] : ResolvedType.createSingle(ResolvedEphemeralListType.create(resInfo.map((ri) => new ResolvedEphemeralListTypeEntry(ri))));
+        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
     }
 
     private atomSubtypeOf_EntityEntity(t1: ResolvedEntityAtomType, t2: ResolvedEntityAtomType): boolean {
@@ -1640,14 +1641,8 @@ class Assembly {
             }
         }
 
-        if(t1.resultInfo.length != t2.resultInfo.length) {
+        if(t1.resultType.idStr !== t2.resultType.idStr) {
             return false;
-        }
-
-        for(let i = 0; i < t1.resultInfo.length; ++i) {
-            if(t1.resultInfo[i].idStr !== t2.resultInfo[i].idStr) {
-                return false;
-            }
         }
 
         return true;

@@ -244,22 +244,22 @@ class ResolvedFunctionType {
     readonly params: ResolvedFunctionTypeParam[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: ResolvedType | undefined;
-    readonly resultInfo: ResolvedType[];
+    readonly resultType: ResolvedType;
 
     readonly allParamNames: Set<string>;
 
-    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: ResolvedType[]) {
+    constructor(rstr: string, recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType) {
         this.idStr = rstr;
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
-        this.resultInfo = resultInfo;
+        this.resultType = resultType;
 
         this.allParamNames = new Set<string>();
     }
 
-    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultInfo: ResolvedType[]): ResolvedFunctionType {
+    static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionType {
         const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
         let cvalue = cvalues.join(", ");
 
@@ -275,8 +275,7 @@ class ResolvedFunctionType {
             cvalue += ((cvalues.length !== 0 ? ", " : "") + ("..." + optRestParamName + ": " + optRestParamType.idStr));
         }
 
-        let rformat = resultInfo.length === 1 ? resultInfo[0].idStr : ("(|" + resultInfo.map((ri) => ri.idStr).join(", ") + "|)");
-        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + rformat, recursive, params, optRestParamName, optRestParamType, resultInfo);
+        return new ResolvedFunctionType(recstr + "(" + cvalue + ") -> " + resultType.idStr, recursive, params, optRestParamName, optRestParamType, resultType);
     }
 }
 

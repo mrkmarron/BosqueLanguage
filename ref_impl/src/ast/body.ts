@@ -454,10 +454,12 @@ class PostfixAccessFromIndex extends PostfixOperation {
 }
 
 class PostfixProjectFromIndecies extends PostfixOperation {
+    readonly isEphemeralListResult: boolean;
     readonly indecies: number[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, indecies: number[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, isEphemeralListResult: boolean ,indecies: number[]) {
         super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromIndecies);
+        this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
     }
 }
@@ -472,10 +474,12 @@ class PostfixAccessFromName extends PostfixOperation {
 }
 
 class PostfixProjectFromNames extends PostfixOperation {
+    readonly isEphemeralListResult: boolean;
     readonly names: string[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, names: string[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, isEphemeralListResult: boolean, names: string[]) {
         super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromNames);
+        this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
     }
 }
@@ -684,7 +688,9 @@ enum StatementTag {
     EmptyStatement = "EmptyStatement",
 
     VariableDeclarationStatement = "VariableDeclarationStatement",
+    VariablePackDeclarationStatement = "VariablePackDeclarationStatement",
     VariableAssignmentStatement = "VariableAssignmentStatement",
+    VariablePackAssignmentStatement = "VariablePackAssignmentStatement",
     StructuredVariableAssignmentStatement = "StructuredVariableAssignmentStatement",
 
     ReturnStatement = "ReturnStatement",
@@ -741,6 +747,19 @@ class VariableDeclarationStatement extends Statement {
     }
 }
 
+class VariablePackDeclarationStatement extends Statement {
+    readonly isConst: boolean;
+    readonly vars: {name: string, vtype: TypeSignature /*may be auto*/}[];
+    readonly exp: Expression[] | undefined; //may be undef
+
+    constructor(sinfo: SourceInfo, isConst: boolean, vars: {name: string, vtype: TypeSignature /*may be auto*/}[], exp: Expression[] | undefined) {
+        super(StatementTag.VariablePackDeclarationStatement, sinfo);
+        this.isConst = isConst;
+        this.vars = vars;
+        this.exp = exp;
+    }
+}
+
 class VariableAssignmentStatement extends Statement {
     readonly name: string;
     readonly exp: Expression;
@@ -748,6 +767,17 @@ class VariableAssignmentStatement extends Statement {
     constructor(sinfo: SourceInfo, name: string, exp: Expression) {
         super(StatementTag.VariableAssignmentStatement, sinfo);
         this.name = name;
+        this.exp = exp;
+    }
+}
+
+class VariablePackAssignmentStatement extends Statement {
+    readonly names: string[];
+    readonly exp: Expression[];
+
+    constructor(sinfo: SourceInfo, names: string[], exp: Expression[]) {
+        super(StatementTag.VariablePackAssignmentStatement, sinfo);
+        this.names = names;
         this.exp = exp;
     }
 }
@@ -977,7 +1007,7 @@ export {
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
     StatementTag, Statement, InvalidStatement, EmptyStatement,
-    VariableDeclarationStatement, VariableAssignmentStatement,
+    VariableDeclarationStatement, VariablePackDeclarationStatement, VariableAssignmentStatement, VariablePackAssignmentStatement,
     StructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, StructuredVariableAssignmentStatement, 
     TupleStructuredAssignment, RecordStructuredAssignment, NominalStructuredAssignment, ValueListStructuredAssignment,
     ReturnStatement, YieldStatement,

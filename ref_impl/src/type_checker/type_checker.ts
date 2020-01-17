@@ -165,11 +165,6 @@ class TypeChecker {
         for (let i = firstOptIndex; i < fsig.params.length; ++i) {
             this.raiseErrorIf(sinfo, !fsig.params[i].isOptional, "Cannot have required paramaters following optional parameters");
         }
-
-        for (let i = 0; i < fsig.resultInfo.length; ++i) {
-            const rtype = fsig.resultInfo[i];
-            this.raiseErrorIf(sinfo, rtype.isEmptyType(), "Bad type signature");
-        }
     }
 
     private checkRecursion(sinfo: SourceInfo, fsig: ResolvedFunctionType, pcodes: PCode[], crec: "yes" | "no" | "cond") {
@@ -645,8 +640,11 @@ class TypeChecker {
                     if (arg instanceof NamedArgument) {
                         eargs.push({ name: arg.name, argtype: earg.etype, ref: undefined, expando: false, pcode: undefined, treg: treg });
                     }
+                    else if (arg instanceof PositionalArgument) {
+                        eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: arg.isSpread, pcode: undefined, treg: treg });
+                    }
                     else {
-                        eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
+                        xxxx;
                     }
                 }
             }
@@ -1163,7 +1161,7 @@ class TypeChecker {
 
             const rtreg = this.m_emitter.bodyEmitter.generateTmpRegister();
             if (oodecl.isTypeACollectionEntity()) {
-                this.checkArgumentsCollectionConstructor(sinfo, oftype, oobinds.get("T") as ResolvedType, rargs, rtreg);
+                this.checkArgumentsListOrSetConstructor(sinfo, oftype, oobinds.get("T") as ResolvedType, rargs, rtreg);
             }
             else {
                 const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
@@ -1223,7 +1221,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitLoadConstNone(exp.sinfo, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialNoneType(), FlowTypeTruthValue.False)];
+        return [env.setExpressionResult(this.m_assembly.getSpecialNoneType(), FlowTypeTruthValue.False)];
     }
 
     private checkLiteralBoolExpression(env: TypeEnvironment, exp: LiteralBoolExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1231,7 +1229,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitLoadConstBool(exp.sinfo, exp.value, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialBoolType(), exp.value ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
+        return [env.setExpressionResult(this.m_assembly.getSpecialBoolType(), exp.value ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
     }
 
     private checkLiteralIntegerExpression(env: TypeEnvironment, exp: LiteralIntegerExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1239,7 +1237,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitLoadConstInt(exp.sinfo, exp.value, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialIntType())];
+        return [env.setExpressionResult(this.m_assembly.getSpecialIntType())];
     }
 
     private checkLiteralStringExpression(env: TypeEnvironment, exp: LiteralStringExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1247,7 +1245,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialStringType())];
+        return [env.setExpressionResult(this.m_assembly.getSpecialStringType())];
     }
 
     private checkTypedStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
@@ -1353,7 +1351,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitAccessConstant(exp.sinfo, skey, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, rtype)];
+        return [env.setExpressionResult(rtype)];
     }
 
     private checkAccessVariable(env: TypeEnvironment, exp: AccessVariableExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1376,7 +1374,7 @@ class TypeChecker {
         const vinfo = env.lookupVar(exp.name) as VarInfo;
         this.raiseErrorIf(exp.sinfo, !vinfo.mustDefined, "Var may not be defined at use");
 
-        return [env.setExpressionResult(this.m_assembly, vinfo.flowType)];
+        return [env.setExpressionResult(vinfo.flowType)];
     }
 
     private checkConstructorPrimary(env: TypeEnvironment, exp: ConstructorPrimaryExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1404,7 +1402,7 @@ class TypeChecker {
         }
     }
 
-    private checkConstructorPrimaryWithFactory(env: TypeEnvironment, exp: ConstructorPrimaryWithFactoryExpression, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
+    private checkConstructorPrimaryWithFactory(env: TypeEnvironment, exp: ConstructorPrimaryWithFactoryExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const baseType = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.ctype, env.terms);
         const objtype = ResolvedType.tryGetOOTypeInfo(baseType);
         this.raiseErrorIf(exp.sinfo, objtype === undefined || !(objtype instanceof ResolvedEntityAtomType), "Invalid constructor type");
@@ -1425,7 +1423,7 @@ class TypeChecker {
         const fsig = this.m_assembly.normalizeTypeFunction((fdecl as StaticFunctionDecl).invoke.generateSig(), binds as Map<string, ResolvedType>);
         this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
 
-        const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
+        const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, false);
         const rargs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
 
         this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, rargs.pcodes, exp.pragmas.recursive);
@@ -1442,7 +1440,7 @@ class TypeChecker {
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
         const returntype = (fsig as ResolvedFunctionType).resultType;
-        return [env.setExpressionResult(this.m_assembly, this.checkArgumentsConstructor(exp.sinfo, oftype, [{ name: undefined, argtype: returntype, expando: true, ref: undefined, pcode: undefined, treg: etreg }], trgt))];
+        return [env.setExpressionResult(this.checkArgumentsEntityConstructor(exp.sinfo, oftype, [{ name: undefined, argtype: returntype, expando: true, ref: undefined, pcode: undefined, treg: etreg }], trgt))];
     }
 
     private checkTupleConstructor(env: TypeEnvironment, exp: ConstructorTupleExpression, trgt: MIRTempRegister): TypeEnvironment[] {
