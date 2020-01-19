@@ -160,27 +160,60 @@ public:
 
 class BSQIdKey : public BSQRef
 {
+private:
+    static size_t hh(MIRNominalTypeEnum oftype, const std::vector<std::pair<MIRPropertyEnum, KeyValue>>& keys)
+    {
+        size_t hv = (size_t)oftype;
+        for(size_t i = 0; i < keys.size(); ++i)
+        {
+            hv = HASH_COMBINE(hv, HASH_COMBINE((size_t)keys[i].first, bsqKeyValueHash(keys[i].second)));
+        }
+        return hv;
+    }
+
 public:
     const MIRNominalTypeEnum oftype;
-    const KeyValue key;
+    const size_t hash;
+    const std::vector<std::pair<MIRPropertyEnum, KeyValue>> keys;
 
-    BSQIdKey(KeyValue key, MIRNominalTypeEnum oftype) : BSQRef(), oftype(oftype), key(key) { ; }
-
+    BSQIdKey(KeyValue key, MIRNominalTypeEnum oftype) : BSQRef(), oftype(oftype), hash(HASH_COMBINE((size_t)oftype, bsqKeyValueHash(key))), keys({std::make_pair(MIRPropertyEnum::Invalid, key)}) { ; }
+    BSQIdKey(std::vector<std::pair<MIRPropertyEnum, KeyValue>>&& keys, MIRNominalTypeEnum oftype) : BSQRef(), oftype(oftype), hash(hh(oftype, keys)), keys(move(keys)) { ; }
     virtual ~BSQIdKey() = default;
 
     virtual void destroy() 
-    { 
-        BSQRef::decrementChecked(this->key); 
+    {
+        for(size_t i = 0; i < this->keys.size(); ++i)
+        {
+            BSQRef::decrementChecked(this->keys[i].second); 
+        }
     }
 
     static size_t hash(const BSQIdKey* k)
     {
-        return HASH_COMBINE((size_t)k->oftype, bsqKeyValueHash(k->key));
+       return k->hash;
     }
 
     static bool keyEqual(const BSQIdKey* l, const BSQIdKey* r)
     {
-        return l->oftype == r->oftype && bsqKeyValueEqual(l->key, r->key);
+        if(l->hash != r->hash)
+        {
+            return false;
+        }
+
+        if(l->oftype != r->oftype || l->keys.size() != r->keys.size())
+        {
+            return false;
+        }
+        
+        for(size_t i = 0; i < l->keys.size(); ++i)
+        {
+            if(l->keys[i].first != r->keys[i].first || !bsqKeyValueEqual(l->keys[i].second, r->keys[i].second))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 };
 

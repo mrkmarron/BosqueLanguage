@@ -536,10 +536,6 @@ class Assembly {
     restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
         let opts: ResolvedType[] = [];
 
-        if (this.subtypeOf(this.getSpecialKeyTupleConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialKeyTypeConceptType());
-        }
-
         if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(withc))) {
             opts.push(this.getSpecialPODTypeConceptType());
         }
@@ -605,10 +601,6 @@ class Assembly {
 
     restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
         let opts: ResolvedType[] = [];
-
-        if (this.subtypeOf(this.getSpecialKeyRecordConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialKeyTypeConceptType());
-        }
 
         if (this.subtypeOf(this.getSpecialPODRecordConceptType(), ResolvedType.createSingle(withc))) {
             opts.push(this.getSpecialPODTypeConceptType());
@@ -964,10 +956,6 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialKeyTupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
-            return true;
-        }
-
         if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
             return true;
         }
@@ -985,10 +973,6 @@ class Assembly {
 
     private atomSubtypeOf_RecordConcept(t1: ResolvedRecordAtomType, t2: ResolvedConceptAtomType): boolean {
         if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(t2))) {
-            return true;
-        }
-
-        if (this.subtypeOf(this.getSpecialKeyRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
             return true;
         }
 
@@ -1138,12 +1122,10 @@ class Assembly {
     getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
-    getSpecialKeyTupleConceptType(): ResolvedType { return this.internSpecialConceptType("KeyTuple"); }
     getSpecialPODTupleConceptType(): ResolvedType { return this.internSpecialConceptType("PODTuple"); }
     getSpecialAPITupleConceptType(): ResolvedType { return this.internSpecialConceptType("APITuple"); }
 
     getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
-    getSpecialKeyRecordConceptType(): ResolvedType { return this.internSpecialConceptType("KeyRecord"); }
     getSpecialPODRecordConceptType(): ResolvedType { return this.internSpecialConceptType("PODRecord"); }
     getSpecialAPIRecordConceptType(): ResolvedType { return this.internSpecialConceptType("APIRecord"); }
 

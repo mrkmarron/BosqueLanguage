@@ -217,10 +217,6 @@ class TypeChecker {
                 const catom = ResolvedType.createSingle(atom);
                 let lopts: ResolvedType[] = [];
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialKeyTupleConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialKeyTypeConceptType());
-                }
-
                 if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTupleConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialPODTypeConceptType());
                 }
@@ -260,10 +256,6 @@ class TypeChecker {
             if (atom instanceof ResolvedEntityAtomType) {
                 const catom = ResolvedType.createSingle(atom);
                 let lopts: ResolvedType[] = [];
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialKeyRecordConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialKeyTypeConceptType());
-                }
 
                 if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODRecordConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialPODTypeConceptType());

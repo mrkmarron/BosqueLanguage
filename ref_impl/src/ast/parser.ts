@@ -26,6 +26,7 @@ const KeywordStrings = [
     "case",
     "check",
     "clock",
+    "composite",
     "concept",
     "const",
     "cryptographic",
@@ -39,7 +40,6 @@ const KeywordStrings = [
     "fn",
     "from",
     "function",
-    "identifier",
     "global",
     "hashkey",
     "identifier",
@@ -2957,8 +2957,9 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const ishash = this.testAndConsumeTokenIf("hashkey");
         const isguid = this.testAndConsumeTokenIf("gidentifier");
-        if (ishash && isguid) {
-            this.raiseError(sinfo.line, "Cannot have a hashkey and GIUD identifier");
+        const iscomposite = this.testAndConsumeTokenIf("composite");
+        if ((ishash && isguid) || (ishash && iscomposite) || (iscomposite && isguid)) {
+            this.raiseError(sinfo.line, "Cannot have multiple of hashkey, GIUD, composite identifier");
         }
 
         this.ensureAndConsumeToken("identifier");
@@ -2970,15 +2971,24 @@ class Parser {
 
         const itype = new NominalTypeSignature(currentDecl.ns, iname);
         const simpleITypeResult = [itype];
-        if (isguid) {
-            this.ensureAndConsumeToken(";");
 
-            const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "GUID"), false, false);
+        if(iscomposite) {
+            const components = this.parseListOf("{", "}", ";", () => {
+                this.ensureToken(TokenStrings.Identifier);
+                const cname = this.consumeTokenAndGetValue();
+                
+                this.ensureAndConsumeToken(":");
+                const ctype = this.parseTypeSignature();
+
+                return {cname: cname, ctype: ctype};
+            })[0];
+
+            const consparams = components.map((cmp) => new FunctionParameter(cmp.cname, cmp.ctype, false, false));
             const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "gidkey_create");
-            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], consparams, undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
-            const provides = [[new NominalTypeSignature("NSCore", "GUIDIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
+            const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
 
             const invariants: Expression[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
@@ -2990,22 +3000,16 @@ class Parser {
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
         }
         else {
-            this.ensureAndConsumeToken("=");
-            const idval = this.parseTypeSignature();
-            this.ensureAndConsumeToken(";");
+            if (isguid) {
+                this.ensureAndConsumeToken(";");
 
-            if (ishash) {
-                const iscrypto = this.testAndConsumeTokenIf("cryptographic");
-
-                const param = new FunctionParameter("value", idval, false, false);
-                const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), iscrypto ? "hashkey_data_create" : "hashkey_crypto_create");
+                const param = new FunctionParameter("value", new NominalTypeSignature("NSCore", "GUID"), false, false);
+                const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "gidkey_create");
                 const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
                 const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
-                const provides = [
-                    [new NominalTypeSignature("NSCore", iscrypto ? "CryptoHashIdKey" : "DataHashIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined],
-                    [new NominalTypeSignature("NSCore", "APIType"), [new TypeConditionRestriction(idval, new NominalTypeSignature("NSCore", "APIType"))]] as [TypeSignature, TypeConditionRestriction[] | undefined],
-                ];
+                const provides = [[new NominalTypeSignature("NSCore", "GUIDIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
+
                 const invariants: Expression[] = [];
                 const staticMembers = new Map<string, StaticMemberDecl>();
                 const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
@@ -3016,20 +3020,47 @@ class Parser {
                 this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
             }
             else {
-                const param = new FunctionParameter("value", idval, false, false);
-                const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_create");
-                const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
-                const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+                this.ensureAndConsumeToken("=");
+                const idval = this.parseTypeSignature();
+                this.ensureAndConsumeToken(";");
 
-                const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
-                const invariants: Expression[] = [];
-                const staticMembers = new Map<string, StaticMemberDecl>();
-                const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
-                const memberFields = new Map<string, MemberFieldDecl>();
-                const memberMethods = new Map<string, MemberMethodDecl>();
+                if (ishash) {
+                    const iscrypto = this.testAndConsumeTokenIf("cryptographic");
 
-                currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-                this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
+                    const param = new FunctionParameter("value", idval, false, false);
+                    const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), iscrypto ? "hashkey_data_create" : "hashkey_crypto_create");
+                    const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+                    const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+
+                    const provides = [
+                        [new NominalTypeSignature("NSCore", iscrypto ? "CryptoHashIdKey" : "DataHashIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined],
+                        [new NominalTypeSignature("NSCore", "APIType"), [new TypeConditionRestriction(idval, new NominalTypeSignature("NSCore", "APIType"))]] as [TypeSignature, TypeConditionRestriction[] | undefined],
+                    ];
+                    const invariants: Expression[] = [];
+                    const staticMembers = new Map<string, StaticMemberDecl>();
+                    const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+                    const memberFields = new Map<string, MemberFieldDecl>();
+                    const memberMethods = new Map<string, MemberMethodDecl>();
+
+                    currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+                    this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
+                }
+                else {
+                    const param = new FunctionParameter("value", idval, false, false);
+                    const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_create");
+                    const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+                    const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+
+                    const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
+                    const invariants: Expression[] = [];
+                    const staticMembers = new Map<string, StaticMemberDecl>();
+                    const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+                    const memberFields = new Map<string, MemberFieldDecl>();
+                    const memberMethods = new Map<string, MemberMethodDecl>();
+
+                    currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+                    this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
+                }
             }
         }
     }

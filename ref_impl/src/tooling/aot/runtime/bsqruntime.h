@@ -16,7 +16,5 @@ public:
 //%%STATIC_STRING_DECLARE%%
 
 //%%STATIC_INT_DECLARE%%
-
-static const char* propertyNames[];
 };
 } // namespace BSQ

@@ -69,17 +69,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQDataHashIdKey::hash(dynamic_cast<BSQDataHashIdKey*>(ptr));
         }
-        else if(dynamic_cast<BSQCryptoHashIdKey*>(ptr) != nullptr)
+        else
         {
             return BSQCryptoHashIdKey::hash(dynamic_cast<BSQCryptoHashIdKey*>(ptr));
-        }
-        else if(dynamic_cast<BSQTuple*>(ptr) != nullptr)
-        {
-            return BSQTuple::hash(dynamic_cast<BSQTuple*>(ptr));
-        }
-        else 
-        {
-            return BSQRecord::hash(dynamic_cast<BSQRecord*>(ptr));
         }
     }
 }
@@ -160,14 +152,6 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         else if(dynamic_cast<BSQCryptoHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQCryptoHashIdKey*>(ptr2) != nullptr)
         {
             return BSQCryptoHashIdKey::keyEqual(dynamic_cast<BSQCryptoHashIdKey*>(ptr1), dynamic_cast<BSQCryptoHashIdKey*>(ptr2));
-        }
-        else if(dynamic_cast<BSQTuple*>(ptr1) != nullptr && dynamic_cast<BSQTuple*>(ptr2) != nullptr)
-        {
-            return BSQTuple::keyEqual(dynamic_cast<BSQTuple*>(ptr1), dynamic_cast<BSQTuple*>(ptr2));
-        }
-        else if(dynamic_cast<BSQRecord*>(ptr1) != nullptr && dynamic_cast<BSQRecord*>(ptr2) != nullptr)
-        {
-            return BSQRecord::keyEqual(dynamic_cast<BSQRecord*>(ptr1), dynamic_cast<BSQRecord*>(ptr2));
         }
         else
         {

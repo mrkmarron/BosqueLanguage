@@ -21,9 +21,7 @@
       (bsqkey_isotime (bsqkey_isotime_value Int))
       (bsqkey_eventtime (bsqkey_eventtime_type String) (bsqkey_eventtime_value Int))
       (bsqkey_enum (bsqkey_enum_type String) (bsqkey_enum_value Int))
-      (bsqkey_idkey (bsqkey_idkey_type String) (bsqkey_idkey_value BKeyValue))
-      (bsqkey_tuple (bsqkey_tuple_entries (Array Int BKeyValue)))
-      (bsqkey_record (bsqkey_record_entries (Array String BKeyValue)))
+      (bsqkey_idkey (bsqkey_idkey_type String) (bsqkey_idkey_value (Array String BKeyValue)))
     )
 ))
 

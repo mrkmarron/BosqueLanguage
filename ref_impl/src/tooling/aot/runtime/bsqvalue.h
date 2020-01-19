@@ -61,18 +61,18 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE
 };
 
-const char* Runtime::propertyNames[] = {
-    "Invalid",
-//%%PROPERTY_NAMES
-};
-
 enum class MIRNominalTypeEnum
 {
     Invalid = 0x0,
 //%%NOMINAL_TYPE_ENUM_DECLARE
 };
 
-constexpr const char* s_nominaltypenames[] = {
+constexpr char* propertyNames[] = {
+    "Invalid",
+//%%PROPERTY_NAMES
+};
+
+constexpr const char* nominaltypenames[] = {
     "[INVALID]",
 //%%NOMINAL_TYPE_DISPLAY_NAMES
 };
@@ -335,33 +335,6 @@ public:
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
-
-    static size_t hash(const BSQTuple* t)
-    {
-        size_t hash = t->entries.size();
-        for(size_t i = 0; i < t->entries.size(); ++i)
-        {
-            hash = HASH_COMBINE(hash, bsqKeyValueHash(t->entries[i]));
-        }
-        return hash;
-    }
-
-    static bool keyEqual(const BSQTuple* l, const BSQTuple* r)
-    {
-        if(l->entries.size() != r->entries.size())
-        {
-            return false;
-        }
-
-        for(size_t i = 0; i < l->entries.size(); ++i)
-        {
-            if(!bsqKeyValueEqual(l->entries[i], r->entries[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
 };
 
 class BSQRecord : public BSQRef
@@ -394,34 +367,6 @@ public:
     {
         auto iter = this->entries.find(p);
         return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
-    }
-
-    static size_t hash(const BSQRecord* r)
-    {
-        size_t hash = r->entries.size();
-        for(auto iter = r->entries.begin(); iter != r->entries.end(); ++iter)
-        {
-            hash = HASH_COMBINE(hash, HASH_COMBINE((size_t)iter->first, bsqKeyValueHash(iter->second)));
-        }
-        return hash;
-    }
-
-    static bool keyEqual(const BSQRecord* l, const BSQRecord* r)
-    {
-        if(l->entries.size() != r->entries.size())
-        {
-            return false;
-        }
-
-        for(auto liter = l->entries.begin(); liter != l->entries.end(); ++liter)
-        {
-            auto riter = r->entries.find(liter->first);
-            if(riter == r->entries.end() || !bsqKeyValueEqual(liter->second, riter->second))
-            {
-                return false;
-            }
-        }
-        return true;
     }
 };
 
