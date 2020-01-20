@@ -164,6 +164,10 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantString(sv), trgt));
     }
 
+    emitLoadLiteralRegex(sinfo: SourceInfo, restr: string, trgt: MIRTempRegister) {
+        xxxx;
+    }
+
     emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey, pfunckey, trgt));
     }
@@ -184,8 +188,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRAccessLocalVariable(sinfo, new MIRVariable(name), trgt));
     }
 
-    emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, tkey, args, trgt));
+    emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, asValue: boolean, args: MIRArgument[], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, tkey, asValue, args, trgt));
     }
 
     emitConstructorPrimaryCollectionEmpty(sinfo: SourceInfo, tkey: MIRNominalTypeKey, trgt: MIRTempRegister) {

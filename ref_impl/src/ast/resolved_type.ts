@@ -124,25 +124,17 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
     }
 }
 
-class ResolvedEphemeralListTypeEntry {
-    readonly type: ResolvedType;
-
-    constructor(type: ResolvedType) {
-        this.type = type;
-    }
-}
-
 class ResolvedEphemeralListType extends ResolvedAtomType {
-    readonly types: ResolvedEphemeralListTypeEntry[];
+    readonly types: ResolvedType[];
 
-    constructor(rstr: string, types: ResolvedEphemeralListTypeEntry[]) {
+    constructor(rstr: string, types: ResolvedType[]) {
         super(rstr);
         this.types = types;
     }
 
-    static create(entries: ResolvedEphemeralListTypeEntry[]): ResolvedEphemeralListType {
+    static create(entries: ResolvedType[]): ResolvedEphemeralListType {
         const simplifiedEntries = [...entries];
-        const cvalue = simplifiedEntries.map((entry) => entry.type.idStr).join(", ");
+        const cvalue = simplifiedEntries.map((entry) => entry.idStr).join(", ");
         return new ResolvedEphemeralListType("(|" + cvalue + "|)", simplifiedEntries);
     }
 }
@@ -284,7 +276,7 @@ export {
     ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
     ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, 
     ResolvedRecordAtomTypeEntry, ResolvedRecordAtomType, 
-    ResolvedEphemeralListTypeEntry, ResolvedEphemeralListType,
+    ResolvedEphemeralListType,
     ResolvedType, 
     ResolvedFunctionTypeParam, ResolvedFunctionType
 };

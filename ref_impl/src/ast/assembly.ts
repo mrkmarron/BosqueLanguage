@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedEphemeralListTypeEntry } from "./resolved_type";
+import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
@@ -622,13 +622,13 @@ class Assembly {
             return undefined;
         }
 
-        let itypes: ResolvedEphemeralListTypeEntry[] = [];
+        let itypes: ResolvedType[] = [];
         for(let i = 0; i < oft.types.length; ++i) {
             const t1e = oft.types[i];
             const t2e = witht.types[i];
 
-            const etype = this.restrictTypes(t1e.type, t2e.type);
-            itypes.push(new ResolvedEphemeralListTypeEntry(etype));
+            const etype = this.restrictTypes(t1e, t2e);
+            itypes.push(etype);
         }
 
         return ResolvedEphemeralListType.create(itypes);
@@ -925,7 +925,7 @@ class Assembly {
             return undefined;
         }
 
-        const rtype = resInfo.length === 1 ? resInfo[0] : ResolvedType.createSingle(ResolvedEphemeralListType.create(resInfo.map((ri) => new ResolvedEphemeralListTypeEntry(ri))));
+        const rtype = resInfo.length === 1 ? resInfo[0] : ResolvedType.createSingle(ResolvedEphemeralListType.create(resInfo.map((ri) => ri)));
         return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
     }
 
@@ -1059,7 +1059,7 @@ class Assembly {
         }
 
         for (let i = 0; i < t1.types.length; ++i) {
-            if(!this.subtypeOf(t1.types[i].type, t2.types[i].type)) {
+            if(!this.subtypeOf(t1.types[i], t2.types[i])) {
                 return false;
             }
         }

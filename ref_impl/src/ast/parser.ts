@@ -2984,7 +2984,7 @@ class Parser {
             })[0];
 
             const consparams = components.map((cmp) => new FunctionParameter(cmp.cname, cmp.ctype, false, false));
-            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "gidkey_create");
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "compositekey_create");
             const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], consparams, undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
@@ -3136,7 +3136,7 @@ class Parser {
         let parseok = true;
         while (this.m_cpos < this.m_epos) {
             try {
-                this.m_cpos = this.scanTokenOptions("function", "global", "typedef", "concept", "entity", "clock", "enum", "hashkey", "gidentifier", "identifier");
+                this.m_cpos = this.scanTokenOptions("function", "global", "typedef", "concept", "entity", "clock", "enum", "hashkey", "gidentifier", "composite", "identifier");
                 if (this.m_cpos === this.m_epos) {
                     const tokenIndexBeforeEOF = this.m_cpos - 2;
                     if (tokenIndexBeforeEOF >= 0 && tokenIndexBeforeEOF < this.m_tokens.length) {
@@ -3158,7 +3158,7 @@ class Parser {
 
                     nsdecl.declaredNames.add(ns + "::" + fname);
                 }
-                else if (this.testToken("typedef") || this.testToken("concept") || this.testToken("entity") || this.testToken("clock") || this.testToken("enum") || this.testToken("hashkey") || this.testToken("gidentifier") || this.testToken("identifier")) {
+                else if (this.testToken("typedef") || this.testToken("concept") || this.testToken("entity") || this.testToken("clock") || this.testToken("enum") || this.testToken("hashkey") || this.testToken("gidentifier") || this.testToken("composite") || this.testToken("identifier")) {
                     this.consumeToken();
                     this.ensureToken(TokenStrings.Type);
                     const tname = this.consumeTokenAndGetValue();
@@ -3198,7 +3198,7 @@ class Parser {
         let usingok = true;
         let parseok = true;
         while (this.m_cpos < this.m_epos) {
-            const rpos = this.scanTokenOptions("function", "global", "using", "typedef", "concept", "entity", "clock", "enum", "hashkey", "gidentifier", "identifier", TokenStrings.EndOfStream);
+            const rpos = this.scanTokenOptions("function", "global", "using", "typedef", "concept", "entity", "clock", "enum", "hashkey", "gidentifier", "composite", "identifier", TokenStrings.EndOfStream);
 
             try {
                 if (rpos === this.m_epos) {
@@ -3235,7 +3235,7 @@ class Parser {
                 else if (tk === "enum") {
                     this.parseEnum(nsdecl);
                 }
-                else if (tk === "hashkey" || tk === "gidentifier" || tk === "identifier") {
+                else if (tk === "hashkey" || tk === "gidentifier" || tk === "composite" || tk === "identifier") {
                     this.parseIdentifier(nsdecl);
                 }
                 else if (tk === TokenStrings.EndOfStream) {

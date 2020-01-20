@@ -3,15 +3,15 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedFunctionTypeParam } from "../ast/resolved_type";
+import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedFunctionTypeParam, ResolvedEphemeralListType } from "../ast/resolved_type";
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl, BuildLevel } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, InvokeArgument, LiteralRegexExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRBodyKey, MIRFieldKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRTupleType, MIRTupleTypeEntry } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRTupleType, MIRTupleTypeEntry, MIREntityType } from "../compiler/mir_assembly";
 
 class TypeError extends Error {
     readonly file: string;
@@ -32,7 +32,10 @@ type ExpandedArgument = {
     expando: boolean,
     ref: string | undefined,
     pcode: PCode | undefined,
-    treg: MIRTempRegister
+    treg: MIRTempRegister,
+
+    etype?: ResolvedType,
+    ereg?: MIRTempRegister
 };
 
 type FilledLocation = {
@@ -208,7 +211,10 @@ class TypeChecker {
     }
     
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
-        return (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
+        const bothint = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
+        const bothstring = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()));
+
+        return bothint || bothstring;
     }
 
     private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
@@ -627,16 +633,23 @@ class TypeChecker {
                     }
                 }
                 else {
-                    const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-
                     if (arg instanceof NamedArgument) {
+                        const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
                         eargs.push({ name: arg.name, argtype: earg.etype, ref: undefined, expando: false, pcode: undefined, treg: treg });
                     }
                     else if (arg instanceof PositionalArgument) {
+                        const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
                         eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: arg.isSpread, pcode: undefined, treg: treg });
                     }
                     else {
-                        xxxx;
+                        const maparg = arg as MapArgument;
+
+                        const keyexp = this.checkExpression(env, maparg.key, treg).getExpressionResult();
+
+                        const vreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                        const valexp = this.checkExpression(env, maparg.value, vreg).getExpressionResult();
+                        
+                        eargs.push({ name: undefined, argtype: keyexp.etype, ref: undefined, expando: false, pcode: undefined, treg: treg, etype: valexp.etype, ereg: vreg });
                     }
                 }
             }
@@ -829,7 +842,7 @@ class TypeChecker {
                 if(this.m_emitEnabled) {
                     const entrykey = this.m_emitter.registerResolvedTypeReference(mentry);
                     this.m_emitter.registerTypeInstantiation(entryobj, entrybinds);
-                    this.m_emitter.bodyEmitter.emitConstructorPrimary(arg.value.sinfo, entrykey.trkey, [kreg, vreg], treg);
+                    this.m_emitter.bodyEmitter.emitConstructorPrimary(arg.value.sinfo, entrykey.trkey, true, [kreg, vreg], treg);
                 }
 
                 eargs.push([mentry, false, treg]);
@@ -917,7 +930,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsEntityConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, args: ExpandedArgument[], trgt: MIRTempRegister): ResolvedType {
+    private checkArgumentsEntityConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, asValue: boolean, args: ExpandedArgument[], trgt: MIRTempRegister): ResolvedType {
         const fieldInfo = this.m_assembly.getAllOOFields(oftype.object, oftype.binds);
         let fields: string[] = [];
         fieldInfo.forEach((v, k) => {
@@ -989,7 +1002,7 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
-            this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, tkey, filledLocations.map((fl) => fl.trgt), trgt);
+            this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, tkey, asValue, filledLocations.map((fl) => fl.trgt), trgt);
         }
 
         return ResolvedType.createSingle(oftype);
@@ -1153,11 +1166,18 @@ class TypeChecker {
 
             const rtreg = this.m_emitter.bodyEmitter.generateTmpRegister();
             if (oodecl.isTypeACollectionEntity()) {
-                this.checkArgumentsListOrSetConstructor(sinfo, oftype, oobinds.get("T") as ResolvedType, rargs, rtreg);
+                const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg] as [ResolvedType, boolean, MIRTempRegister]);
+
+                this.checkArgumentsListOrSetConstructor(sinfo, oftype, oobinds.get("T") as ResolvedType, cargs, rtreg);
             }
             else {
-                const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
-                this.checkArgumentsCollectionConstructor(sinfo, oftype, contentstype, rargs, rtreg);
+                const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
+                const entrybinds = new Map<string, ResolvedType>().set("K", oobinds.get("K") as ResolvedType).set("V", oobinds.get("V") as ResolvedType);
+                const mentry = ResolvedType.createSingle(ResolvedEntityAtomType.create(entryobj, entrybinds));
+
+                const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg] as [ResolvedType, boolean, MIRTempRegister]);
+
+                this.checkArgumentsMapConstructor(sinfo, oftype, mentry, cargs, rtreg);
             }
 
             margs.push(rtreg);
@@ -1199,12 +1219,9 @@ class TypeChecker {
             return undefined;
         }
         else {
-            const entries = [
-                new ResolvedTupleAtomTypeEntry(rtype, false),
-                ...env.refparams.map((rn) => new ResolvedTupleAtomTypeEntry((env.lookupVar(rn) as VarInfo).declaredType, false))
-            ];
+            const entries = [rtype, ...env.refparams.map((rn) => (env.lookupVar(rn) as VarInfo).declaredType)];
 
-            return this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedTupleAtomType.create(entries))).trkey;
+            return this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEphemeralListType.create(entries))).trkey;
         }
     }
 
@@ -1240,15 +1257,23 @@ class TypeChecker {
         return [env.setExpressionResult(this.m_assembly.getSpecialStringType())];
     }
 
+    private checkLiteralRegexExpression(env: TypeEnvironment, exp: LiteralRegexExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+        if (this.m_emitEnabled) {
+            this.m_emitter.bodyEmitter.emitLoadLiteralRegex(exp.sinfo, exp.value, trgt);
+        }
+
+        return [env.setExpressionResult(this.m_assembly.getSpecialRegexType())];
+    }
+
     private checkTypedStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
 
-        //do dynamic check to see if string is valid of format
-        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialParsableConcept()), "Type must provide 'Parsable' concept");
-
-        const fdecltry = this.m_assembly.tryGetOOMemberDeclUnique(oftype, "static", "tryParse");
-        this.raiseErrorIf(sinfo, fdecltry === undefined, `Constant value not defined for type '${oftype.idStr}'`);
-
+        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialParsableConceptType()) && !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialValidatorConceptType()), "Type must provide 'Validator' concept");
+        if(this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialParsableConceptType())) {
+            const fdecltry = this.m_assembly.tryGetOOMemberDeclUnique(oftype, "static", "tryParse");
+            this.raiseErrorIf(sinfo, fdecltry === undefined, `Constant value not defined for type '${oftype.idStr}'`);
+        }
+        
         const aoftype = ResolvedType.tryGetOOTypeInfo(oftype);
         this.raiseErrorIf(sinfo, aoftype === undefined, "Can only make string type using concept or object types");
 
@@ -1271,24 +1296,31 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(...aoftype.oftype);
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-            const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
-            this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
-            const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+            if (this.m_assembly.subtypeOf(aoftype.ofresolved, this.m_assembly.getSpecialValidatorConceptType())) {
+                const sdecl = aoftype.oftype[0].staticFunctions.get("validate");
+                this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'validate'");
+                const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "validate", aoftype.oftype[1], [], []);
 
-            //
-            //TODO -- should emit parse checking code here
-            //
+                this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
+            }
+            else {
+                const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
+                this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
+                const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
-            this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
+                this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
+            }
         }
 
-        return [env.setExpressionResult(this.m_assembly, aoftype.stringtype)];
+        return [env.setExpressionResult(aoftype.stringtype)];
     }
 
     private checkTypedStringConstructor(env: TypeEnvironment, exp: LiteralTypedStringConstructorExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const aoftype = this.checkTypedStringCommon(exp.sinfo, env, exp.stype);
 
-        const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
+        this.raiseErrorIf(exp.sinfo, this.m_assembly.subtypeOf(aoftype.ofresolved, this.m_assembly.getSpecialValidatorConceptType()), "Cannot construct a validated StringOf");
+
+        const sdecl = aoftype.oftype[0].staticFunctions.get(exp.asValue ? "tryParseValue" : "tryParse");
         this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
 
         if (this.m_emitEnabled) {
@@ -1301,13 +1333,9 @@ class TypeChecker {
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
             this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);
             this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, stype, skey, [tmpr], [], trgt);
-
-            //
-            //TODO -- should emit parse checking code here
-            //
         }
 
-        return [env.setExpressionResult(this.m_assembly, aoftype.ofresolved)];
+        return [env.setExpressionResult(aoftype.ofresolved)];
     }
 
     private checkAccessNamespaceConstant(env: TypeEnvironment, exp: AccessNamespaceConstantExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1324,7 +1352,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitAccessConstant(exp.sinfo, gkey, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, rtype)];
+        return [env.setExpressionResult(rtype)];
     }
 
     private checkAccessStaticField(env: TypeEnvironment, exp: AccessStaticFieldExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1380,17 +1408,25 @@ class TypeChecker {
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
         if (oodecl.isTypeACollectionEntity()) {
+            this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
+
             const eargs = this.checkArgumentsEvaluationListOrSet(env, exp.args);
             return [env.setExpressionResult(this.checkArgumentsListOrSetConstructor(exp.sinfo, oftype, oobinds.get("T") as ResolvedType, eargs, trgt))];
         }
         else if (oodecl.isTypeAMapEntity()) {
+            this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
+
             const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
             const eargs = this.checkArgumentsEvaluationMap(env, exp.args, oobinds.get("K") as ResolvedType, oobinds.get("V") as ResolvedType);
             return [env.setExpressionResult(this.checkArgumentsMapConstructor(exp.sinfo, oftype, contentstype, eargs, trgt))];
         }
         else {
+            //
+            //TODO: check if oftype is a subtype of ValueType here and validate any asValue spec is ok
+            //
+
             const eargs = this.checkArgumentsEvaluationEntity(env, exp.args);
-            return [env.setExpressionResult(this.checkArgumentsEntityConstructor(exp.sinfo, oftype, eargs, trgt))];
+            return [env.setExpressionResult(this.checkArgumentsEntityConstructor(exp.sinfo, oftype, exp.asValue, eargs, trgt))];
         }
     }
 
@@ -1432,7 +1468,12 @@ class TypeChecker {
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
         const returntype = (fsig as ResolvedFunctionType).resultType;
-        return [env.setExpressionResult(this.checkArgumentsEntityConstructor(exp.sinfo, oftype, [{ name: undefined, argtype: returntype, expando: true, ref: undefined, pcode: undefined, treg: etreg }], trgt))];
+
+        //
+        //TODO: check if oftype is a subtype of ValueType here and validate any asValue spec is ok
+        //
+
+        return [env.setExpressionResult(this.checkArgumentsEntityConstructor(exp.sinfo, oftype, exp.asValue, [{ name: undefined, argtype: returntype, expando: true, ref: undefined, pcode: undefined, treg: etreg }], trgt))];
     }
 
     private checkTupleConstructor(env: TypeEnvironment, exp: ConstructorTupleExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1452,6 +1493,11 @@ class TypeChecker {
         this.raiseErrorIf(exp.sinfo, !nsdecl.functions.has(exp.name), `Function named '${exp.name}' is not defined`);
         const fdecl = nsdecl.functions.get(exp.name) as NamespaceFunctionDecl;
 
+        //
+        //TODO: if we want to do template inference this is a key point -- see the assertion in check args to figure out how to pre-check the body and get a result type
+        //
+        this.raiseErrorIf(exp.sinfo, fdecl.invoke.terms.length !== exp.terms.targs.length, "Missing template arguments that cannot be inferred");
+
         const binds = this.m_assembly.resolveBindsForCall(fdecl.invoke.terms, exp.terms.targs, new Map<string, ResolvedType>(), env.terms);
         this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
 
@@ -1459,10 +1505,6 @@ class TypeChecker {
 
         const fsig = this.m_assembly.normalizeTypeFunction(fdecl.invoke.generateSig(), binds as Map<string, ResolvedType>);
         this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
-
-        //
-        //TODO: if we want to do template inference this is a key point -- see the assertion in check args to figure out how to pre-check the body and get a result type
-        //
 
         const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
         const margs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
@@ -1476,7 +1518,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, frtype, ckey, margs.args, refinfo, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, fdecl.invoke.resultType, binds as Map<string, ResolvedType>))];
+        return [env.setExpressionResult(this.resolveAndEnsureTypeOnly(exp.sinfo, fdecl.invoke.resultInfo, binds as Map<string, ResolvedType>))];
     }
 
     private checkCallStaticFunctionExpression(env: TypeEnvironment, exp: CallStaticFunctionExpression, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
@@ -1484,8 +1526,13 @@ class TypeChecker {
 
         const fdecltry = this.m_assembly.tryGetOOMemberDeclUnique(baseType, "static", exp.name);
         this.raiseErrorIf(exp.sinfo, fdecltry === undefined, `Constant value not defined for type '${baseType.idStr}'`);
-
         const fdecl = fdecltry as OOMemberLookupInfo;
+
+        //
+        //TODO: if we want to do template inference this is a key point -- see the assertion in check args to figure out how to pre-check the body and get a result type
+        //
+        this.raiseErrorIf(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.terms.length !== exp.terms.targs.length, "Missing template arguments that cannot be inferred");
+
         const binds = this.m_assembly.resolveBindsForCall((fdecl.decl as StaticFunctionDecl).invoke.terms, exp.terms.targs, fdecl.binds, env.terms);
         this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
 
@@ -1494,22 +1541,17 @@ class TypeChecker {
         const fsig = this.m_assembly.normalizeTypeFunction((fdecl.decl as StaticFunctionDecl).invoke.generateSig(), binds as Map<string, ResolvedType>);
         this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
 
-        //
-        //TODO: if we want to do template inference this is a key point -- see the assertion in check args to figure out how to pre-check the body and get a result type
-        //
-
         const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
         const margs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
 
         this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
 
         if (this.m_emitEnabled) {
-            const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
-            const keytype = this.m_assembly.getSpecialKeyTypeConcept();
+            const keytype = this.m_assembly.getSpecialKeyTypeConceptType();
             const mirkeytype = this.m_emitter.registerResolvedTypeReference(keytype);
 
+            const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
             const iskeyop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "KeyType";
-
             const ismathop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Math";
 
             if (isindexableop && exp.name === "getKey") {
@@ -1529,12 +1571,11 @@ class TypeChecker {
                 let mirargtypeinferlhs = this.m_emitter.registerResolvedTypeReference(margs.types[0]);
                 let mirargtypeinferrhs = this.m_emitter.registerResolvedTypeReference(margs.types[1]);
 
-                xxxx;
+                const isstrictlhs = mirargtypeinferlhs.options.length === 1 && mirargtypeinferlhs.options[0] instanceof MIREntityType;
+                const isstrictrhs = mirargtypeinferrhs.options.length === 1 && mirargtypeinferrhs.options[0] instanceof MIREntityType;
+                const isstrict = isstrictlhs && isstrictrhs && mirargtypeinferlhs.trkey === mirargtypeinferrhs.trkey;
 
-                //
-                // TODO: we should infer the keytype from the Indexable info to do a better emit and type inference
-                //
-                this.m_emitter.bodyEmitter.emitBinEq(exp.sinfo, mirargtypeinferlhs.trkey, lhs, mirargtypeinferrhs.trkey, "==", rhs, trgt, true);
+                this.m_emitter.bodyEmitter.emitBinEq(exp.sinfo, mirargtypeinferlhs.trkey, margs.args[0], "==", mirargtypeinferrhs.trkey, margs.args[1], trgt, !isstrict);
             }
             else if (ismathop && (exp.name === "mult" || exp.name === "div" || exp.name === "mod")) {
                 const lhs = margs.args[0];
@@ -1560,7 +1601,7 @@ class TypeChecker {
             }
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];
+        return [env.setExpressionResult(this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultInfo, binds as Map<string, ResolvedType>))];
     }
 
     private checkPCodeInvokeExpression(env: TypeEnvironment, exp: PCodeInvokeExpression, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -2764,6 +2805,8 @@ class TypeChecker {
                 return this.checkLiteralBoolExpression(env, exp as LiteralBoolExpression, trgt);
             case ExpressionTag.LiteralIntegerExpression:
                 return this.checkLiteralIntegerExpression(env, exp as LiteralIntegerExpression, trgt);
+            case ExpressionTag.LiteralRegexExpression:
+                return this.checkLiteralRegexExpression(env, exp as LiteralRegexExpression, trgt);
             case ExpressionTag.LiteralStringExpression:
                 return this.checkLiteralStringExpression(env, exp as LiteralStringExpression, trgt);
             case ExpressionTag.LiteralTypedStringExpression:

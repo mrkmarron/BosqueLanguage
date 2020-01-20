@@ -34,10 +34,8 @@
       (bsqterm@clear)
       (bsqterm_key (bsqterm_key_value BKeyValue))
       (bsqterm_regex (bsqterm_regex_value String))
-      (bsqterm_tuple (bsqterm_tuple_entries (Array Int BTerm))) 
-      (bsqterm_tuple_key (bsqterm_tuple_key_entries (Array Int BKeyValue)))
-      (bsqterm_record (bsqterm_record_entries (Array String BTerm)))
-      (bsqterm_record_key (bsqterm_record_key_entries (Array String BKeyValue)))
+      (bsqterm_tuple (bsqterm_tuple_ispod Bool) (bsqterm_tuple_isapi Bool) (bsqterm_tuple_entries (Array Int BTerm))) 
+      (bsqterm_record (bsqterm_tuple_ispod Bool) (bsqterm_tuple_isapi Bool) (bsqterm_record_entries (Array String BTerm)))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_obj bsqobject))
     )
   ;;NOMINAL_DECLS;;
