@@ -65,6 +65,10 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQGUIDIdKey::hash(dynamic_cast<BSQGUIDIdKey*>(ptr));
         }
+         else if(dynamic_cast<BSQEventTimeIdKey*>(ptr) != nullptr)
+        {
+            return BSQEventTimeIdKey::hash(dynamic_cast<BSQEventTimeIdKey*>(ptr));
+        }
         else if(dynamic_cast<BSQDataHashIdKey*>(ptr) != nullptr)
         {
             return BSQDataHashIdKey::hash(dynamic_cast<BSQDataHashIdKey*>(ptr));
@@ -145,6 +149,10 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQGUIDIdKey::keyEqual(dynamic_cast<BSQGUIDIdKey*>(ptr1), dynamic_cast<BSQGUIDIdKey*>(ptr2));
         }
+        else if(dynamic_cast<BSQEventTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQEventTimeIdKey*>(ptr2) != nullptr)
+        {
+            return BSQEventTimeIdKey::keyEqual(dynamic_cast<BSQEventTimeIdKey*>(ptr1), dynamic_cast<BSQEventTimeIdKey*>(ptr2));
+        }
         else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
         {
             return BSQDataHashIdKey::keyEqual(dynamic_cast<BSQDataHashIdKey*>(ptr1), dynamic_cast<BSQDataHashIdKey*>(ptr2));
@@ -180,16 +188,56 @@ std::u32string diagnostic_format(Value v)
         const BSQRef* vv = BSQ_GET_VALUE_PTR(v, const BSQRef);
         if(dynamic_cast<const BSQString*>(vv) != nullptr)
         {
-            auto sstr = dynamic_cast<const BSQString*>(vv);
-            return std::u32string(U"\"") + std::u32string(sstr->sdata.cbegin(), sstr->sdata.cend()) + std::u32string(U"\"");
+            return DisplayFunctor_BSQString{}(*dynamic_cast<const BSQString*>(vv));
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            auto sof = dynamic_cast<const BSQStringOf*>(vv);
-
-            return conv.from_bytes(s_nominaltypenames[(uint32_t)sof->oftype]) + std::u32string(U"'") + sof->sdata + std::u32string(U"'");
+            return DisplayFunctor_BSQStringOf{}(*dynamic_cast<const BSQStringOf*>(vv));
         }
+        else if(dynamic_cast<const BSQGUID*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQGUID{}(*dynamic_cast<const BSQGUID*>(vv));
+        }
+        else if(dynamic_cast<const BSQDataHash*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQDataHash{}(*dynamic_cast<const BSQDataHash*>(vv));
+        }
+        else if(dynamic_cast<const BSQCryptoHash*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQCryptoHash{}(*dynamic_cast<const BSQCryptoHash*>(vv));
+        }
+        else if(dynamic_cast<const BSQDataHash*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQDataHash{}(*dynamic_cast<const BSQDataHash*>(vv));
+        }
+        else if(dynamic_cast<const BSQEventTime*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQEventTime{}(*dynamic_cast<const BSQEventTime*>(vv));
+        }
+        else if(dynamic_cast<const BSQEnum*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQEnum{}(*dynamic_cast<const BSQEnum*>(vv));
+        }
+        else if(dynamic_cast<const BSQIdKey*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQIdKey{}(*dynamic_cast<const BSQIdKey*>(vv));
+        }
+        else if(dynamic_cast<const BSQGUIDIdKey*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQGUIDIdKey{}(*dynamic_cast<const BSQGUIDIdKey*>(vv));
+        }
+        else if(dynamic_cast<const BSQDataHashIdKey*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQDataHashIdKey{}(*dynamic_cast<const BSQDataHashIdKey*>(vv));
+        }
+        else if(dynamic_cast<const BSQCryptoHashIdKey*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQCryptoHashIdKey{}(*dynamic_cast<const BSQCryptoHashIdKey*>(vv));
+        }
+
+
+
+
         else if(dynamic_cast<const BSQPODBuffer*>(vv) != nullptr)
         {
             auto pbuf = dynamic_cast<const BSQPODBuffer*>(vv);
@@ -207,25 +255,9 @@ std::u32string diagnostic_format(Value v)
 
             return rvals;
         }
-        else if(dynamic_cast<const BSQGUID*>(vv) != nullptr)
-        {
-            auto guid = dynamic_cast<const BSQGUID*>(vv);
-            return std::u32string(U"GUID@") + std::u32string(guid->sdata.cbegin(), guid->sdata.cend());
-        }
-        else if(dynamic_cast<const BSQEnum*>(vv) != nullptr)
-        {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            auto ev = dynamic_cast<const BSQEnum*>(vv);
-
-            return conv.from_bytes(s_nominaltypenames[(uint32_t)ev->oftype]) + std::u32string(U"::") + conv.from_bytes(ev->ename);
-        }
-        else if(dynamic_cast<const BSQIdKey*>(vv) != nullptr)
-        {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            auto idv = dynamic_cast<const BSQIdKey*>(vv);
-
-            return conv.from_bytes(s_nominaltypenames[(uint32_t)idv->oftype]) + std::u32string(U"@") + Runtime::diagnostic_format(idv->sdata);
-        }
+        
+       
+       
         else if(dynamic_cast<const BSQTuple*>(vv) != nullptr)
         {
             auto tv = dynamic_cast<const BSQTuple*>(vv);

@@ -18,6 +18,15 @@ class CPPTypeEmitter {
     readonly intType: MIRType;
     readonly stringType: MIRType;
 
+    readonly keyType: MIRType;
+
+    readonly enumtype: MIRType;
+    readonly idkeytype: MIRType;
+    readonly guididkeytype: MIRType;
+    readonly eventtimeidkeytype: MIRType;
+    readonly datahashidkeytype: MIRType;
+    readonly cryptohashidkeytype: MIRType;    
+
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
     scopectr: number = 0;
@@ -47,6 +56,111 @@ class CPPTypeEmitter {
     getMIRType(tkey: MIRResolvedTypeKey): MIRType {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
+
+    typecheckIsName(tt: MIRType, oftype: RegExp, match: "exact" | "noneable" | "may"): boolean {
+        if(match === "exact") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && oftype.test(tt.options[0].trkey);
+        }
+        else if(match === "noneable") {
+            return tt.options.every((opt) => (opt instanceof MIREntityType) && (oftype.test(opt.trkey) || opt.trkey === "NSCore::None"));
+        }
+        else {
+            return tt.options.some((opt) => (opt instanceof MIREntityType) && oftype.test(opt.trkey));
+        }
+    }
+
+    typecheckEntityAndProvidesName(tt: MIRType, oftype: MIRType, match: "exact" | "noneable" | "may"): boolean {
+        if(match === "exact") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && this.assembly.subtypeOf(tt, oftype);
+        }
+        else if(match === "noneable") {
+            return tt.options.every((opt) => (opt instanceof MIREntityType) && (this.assembly.subtypeOf(MIRType.createSingle(opt), oftype) || opt.trkey === "NSCore::None"));
+        }
+        else {
+            return tt.options.some((opt) => (opt instanceof MIREntityType) && this.assembly.subtypeOf(MIRType.createSingle(opt), oftype));
+        }
+    }
+
+    typecheckIsNoneable(tt: MIRType): boolean {
+        return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
+    }
+
+    getCPPTypeFor(tt: MIRType, declspec: "base" | "parameter" | "return" | "storage"): string {
+        if (this.typecheckIsName(tt, /^NSCore::Bool$/, "exact")) {
+            return "bool";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Int$/, "exact")) {
+            return "BSQInt";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::String$/, "noneable")) {
+            return "BSQString" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/, "noneable")) {
+            return "BSQStringOf" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/, "noneable")) {
+            return "BSQGUID" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/, "noneable")) {
+            return "BSQEventTime" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::EventTime$/, "exact")) ? "" : "*";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/, "noneable")) {
+            return "BSQDataHash" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::DataHash$/, "exact")) ? "" : "*";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/, "noneable")) {
+            return "BSQCryptoHash" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype, "noneable")) {
+            return "BSQEnum" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype, "noneable")) {
+            return "BSQIdKey" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype, "noneable")) {
+            return "BSQGUIDIdKey" + (declspec !== "base" ? "*" : "");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype, "noneable")) {
+            return "BSQEventTimeIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype, "noneable")) {
+            return "BSQDataHashIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype, "noneable")) {
+            return "BSQCryptoHashIdKey" + (declspec !== "base" ? "*" : "");
+        }
+        else {
+            if(tt.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
+                return "KeyValue";
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/, "noneable")) {
+                return "BSQBuffer" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/, "noneable")) {
+                return "BSQISOTime" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
+                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            }
+
+            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
+                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
+                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            }
+
+            //uentity
+
+            //mapentry
+
+            //value
+        }
+
+    }
+
+
+
+
 
     isSimpleBoolType(tt: MIRType): boolean {
         return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::Bool";

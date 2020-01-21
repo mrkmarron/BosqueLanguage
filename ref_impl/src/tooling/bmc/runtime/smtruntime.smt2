@@ -6,7 +6,7 @@
 (set-option :smt.auto-config false) ; disable automatic self configuration
 (set-option :smt.mbqi false) ; disable model-based quantifier instantiation
 
-(set-option :timeout 30000)
+(set-option :timeout 10000)
 
 (declare-datatypes ( 
       (BKeyValue 0)
@@ -18,10 +18,15 @@
       (bsqkey_string (bsqkey_string_value String))
       (bsqkey_stringof (bsqkey_stringof_type String) (bsqkey_stringof_value String))
       (bsqkey_guid (bsqkey_guid_value String))
-      (bsqkey_isotime (bsqkey_isotime_value Int))
-      (bsqkey_eventtime (bsqkey_eventtime_type String) (bsqkey_eventtime_value Int))
+      (bsqkey_datahash (bsqkey_datahash Int))
+      (bsqkey_cryptohash (bsqkey_cryptohash String))
+      (bsqkey_eventtime (bsqkey_eventtime_value Int))
       (bsqkey_enum (bsqkey_enum_type String) (bsqkey_enum_value Int))
       (bsqkey_idkey (bsqkey_idkey_type String) (bsqkey_idkey_value (Array String BKeyValue)))
+      (bsqkey_idkey_eventtime (bsqkey_idkey_eventtime_type String) (bsqkey_idkey_eventtime_value Int))
+      (bsqkey_idkey_guid (bsqkey_idkey_guid_type String) (bsqkey_idkey_guid_value String))
+      (bsqkey_idkey_datahash (bsqkey_idkey_datahash_type String) (bsqkey_idkey_datahash_value Int))
+      (bsqkey_idkey_cryptohash (bsqkey_idkey_cryptohash_type String) (bsqkey_idkey_cryptohash_value String))
     )
 ))
 
@@ -33,6 +38,7 @@
     (
       (bsqterm@clear)
       (bsqterm_key (bsqterm_key_value BKeyValue))
+      (bsqterm_isotime (bsqterm_isotime_value Int))
       (bsqterm_regex (bsqterm_regex_value String))
       (bsqterm_tuple (bsqterm_tuple_ispod Bool) (bsqterm_tuple_isapi Bool) (bsqterm_tuple_entries (Array Int BTerm))) 
       (bsqterm_record (bsqterm_tuple_ispod Bool) (bsqterm_tuple_isapi Bool) (bsqterm_record_entries (Array String BTerm)))
@@ -40,23 +46,18 @@
     )
   ;;NOMINAL_DECLS;;
     (
-  ;;OBJECT_CONSTRUCTORS;; like (cons@name1 (name1_value nominal_decl1)) (cons@name2 (name2_value nominal_decl2))
+  ;;NOMINAL_CONSTRUCTORS;; like (cons@name1 (name1_value nominal_decl1)) (cons@name2 (name2_value nominal_decl2))
     )
 ))
+
+;;EPHEMERAL_DECLS;;
+
 
 (declare-const bsqtuple_array_empty (Array Int BTerm))
 (assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
 
 (declare-const bsqrecord_array_empty (Array String BTerm))
 (assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm@clear)))
-
-(declare-datatypes (
-      ;;SET_ENTRIES_FWD;;
-      ;;MAP_ENTRIES_FWD;;
-    ) (
-    ;;SET_ENTRIES;;
-    ;;MAP_ENTRIES;;
-))
 
 ;;EMPTY_LIST_CONTENT_ARRAY_DECLS;;
 ;;EMPTY_SET_CONTENT_ARRAY_DECLS;;

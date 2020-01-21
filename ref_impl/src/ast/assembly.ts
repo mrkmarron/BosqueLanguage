@@ -913,6 +913,10 @@ class Assembly {
             }
         }
 
+        if(simplifiedTypes.some((opt) => opt instanceof ResolvedEphemeralListType) && simplifiedTypes.length !== 1) {
+            return ResolvedType.createEmpty(); //epemeral lists must always be uniquely typed
+        }
+
         return ResolvedType.create(simplifiedTypes);
     }
 
@@ -1098,6 +1102,7 @@ class Assembly {
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
     getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
+    getSpecialEventTimeType(): ResolvedType { return this.internSpecialObjectType("EventTime"); }
     getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType("ISOTime"); }
     getSpecialDataHashType(): ResolvedType { return this.internSpecialObjectType("DataHash"); }
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
@@ -1114,9 +1119,9 @@ class Assembly {
     getSpecialAPIValueConceptType(): ResolvedType { return this.internSpecialConceptType("APIValue"); }
     getSpecialAPITypeConceptType(): ResolvedType { return this.internSpecialConceptType("APIType"); }
     getSpecialTruthyConceptType(): ResolvedType { return this.internSpecialConceptType("Truthy"); }
-    getSpecialEventTimeConceptType(): ResolvedType { return this.internSpecialConceptType("EventTime"); }
     getSpecialEnumConceptType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
     getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
+    getSpecialEventTimeIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("EventTimeIdKey"); }
     getSpecialGUIDIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("GUIDIdKey"); }
     getSpecialDataHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("DataHashIdKey"); }
     getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }

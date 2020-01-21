@@ -22,6 +22,13 @@ class SMTTypeEmitter {
 
     readonly keyType: MIRType;
 
+    readonly enumtype: MIRType;
+    readonly idkeytype: MIRType;
+    readonly guididkeytype: MIRType;
+    readonly eventtimeidkeytype: MIRType;
+    readonly datahashidkeytype: MIRType;
+    readonly cryptohashidkeytype: MIRType;    
+
     private tempconvctr = 0;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -52,6 +59,98 @@ class SMTTypeEmitter {
     getMIRType(tkey: MIRResolvedTypeKey): MIRType {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
+
+    typecheckIsName(tt: MIRType, oftype: RegExp, match: "exact" | "noneable" | "may"): boolean {
+        if(match === "exact") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && oftype.test(tt.options[0].trkey);
+        }
+        else if(match === "noneable") {
+            return tt.options.every((opt) => (opt instanceof MIREntityType) && (oftype.test(opt.trkey) || opt.trkey === "NSCore::None"));
+        }
+        else {
+            return tt.options.some((opt) => (opt instanceof MIREntityType) && oftype.test(opt.trkey));
+        }
+    }
+
+    typecheckEntityAndProvidesName(tt: MIRType, oftype: MIRType, match: "exact" | "noneable" | "may"): boolean {
+        if(match === "exact") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && this.assembly.subtypeOf(tt, oftype);
+        }
+        else if(match === "noneable") {
+            return tt.options.every((opt) => (opt instanceof MIREntityType) && (this.assembly.subtypeOf(MIRType.createSingle(opt), oftype) || opt.trkey === "NSCore::None"));
+        }
+        else {
+            return tt.options.some((opt) => (opt instanceof MIREntityType) && this.assembly.subtypeOf(MIRType.createSingle(opt), oftype));
+        }
+    }
+
+    typecheckIsNoneable(tt: MIRType): boolean {
+        return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
+    }
+
+    getSMTTypeFor(tt: MIRType): string {
+        if (this.typecheckIsName(tt, /^NSCore::Bool$/, "exact")) {
+            return "Bool";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Int$/, "exact")) {
+            return "Int";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::String$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype, "noneable")) {
+            return "BKeyValue";
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype, "noneable")) {
+            return "BKeyValue";
+        }
+        else {
+            if(tt.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
+                return "KeyValue";
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/, "noneable")) {
+                return "BTerm";
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/, "noneable")) {
+                return "BTerm";
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
+                return "BTerm";
+            }
+
+        }
+    }
+
+
+
+
 
     isSimpleNoneType(tt: MIRType): boolean {
         return (tt.options.length === 1) && tt.options[0].trkey === "NSCore::None";

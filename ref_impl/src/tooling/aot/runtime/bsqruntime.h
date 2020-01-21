@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "bsqvalue.h"
+#include "bsqkeyvalues.h"
 
 #pragma once
 
@@ -16,5 +17,7 @@ public:
 //%%STATIC_STRING_DECLARE%%
 
 //%%STATIC_INT_DECLARE%%
+
+//%%EPHEMERAL_LIST_DECLARE
 };
 } // namespace BSQ

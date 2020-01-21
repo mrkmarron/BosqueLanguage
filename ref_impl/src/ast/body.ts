@@ -154,6 +154,7 @@ enum ExpressionTag {
     ConstructorPrimaryWithFactoryExpression = "ConstructorPrimaryWithFactoryExpression",
     ConstructorTupleExpression = "ConstructorTupleExpression",
     ConstructorRecordExpression = "ConstructorRecordExpression",
+    ConstructorEphemeralValueList = "ConstructorEphemeralValueList",
     ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
@@ -340,6 +341,15 @@ class ConstructorRecordExpression extends Expression {
 
     constructor(sinfo: SourceInfo, args: Arguments) {
         super(ExpressionTag.ConstructorRecordExpression, sinfo);
+        this.args = args;
+    }
+}
+
+class ConstructorEphemeralValueList extends Expression {
+    readonly args: Arguments;
+
+    constructor(sinfo: SourceInfo, args: Arguments) {
+        super(ExpressionTag.ConstructorEphemeralValueList, sinfo);
         this.args = args;
     }
 }
@@ -999,7 +1009,7 @@ export {
     ExpressionTag, Expression, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
-    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
+    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,

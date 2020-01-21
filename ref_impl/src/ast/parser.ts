@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -1332,6 +1332,10 @@ class Parser {
         else if (this.testToken("{")) {
             const args = this.parseArguments("{", "}");
             return new ConstructorRecordExpression(sinfo, args);
+        }
+        else if (this.testToken("(|")) {
+            const args = this.parseArguments("(|", "|)");
+            return new ConstructorEphemeralValueList(sinfo, args);
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Identifier)) {
             //it is a namespace access of some type
@@ -2853,46 +2857,6 @@ class Parser {
         }
     }
 
-    private parseEventTime(currentDecl: NamespaceDeclaration) {
-        const line = this.getCurrentLine();
-
-        //[attr] clock NAME {...}
-        const pragmas = this.parseDeclPragmas();
-        const attributes = this.parseAttributes();
-
-        const sinfo = this.getCurrentSrcInfo();
-        this.ensureAndConsumeToken("clock");
-        this.ensureToken(TokenStrings.Type);
-
-        const ename = this.consumeTokenAndGetValue();
-        this.ensureAndConsumeToken(";");
-        if (currentDecl.checkDeclNameClash(currentDecl.ns, ename)) {
-            this.raiseError(line, "Collision between object and other names");
-        }
-
-        const etimeType = new NominalTypeSignature(currentDecl.ns, ename);
-        const simpleETimeResult = [etimeType];
-
-        const zerobody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_zero");
-        const zerodecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [], undefined, undefined, simpleETimeResult, [], [], false, new Set<string>(), zerobody);
-        const zero = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "zero", zerodecl);
-
-        const param = new FunctionParameter("tick", etimeType, false, false);
-        const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "eventtime_nexttick");
-        const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleETimeResult, [], [], false, new Set<string>(), body);
-        const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "nextEventTick", tickdecl);
-
-        const provides = [[new NominalTypeSignature("NSCore", "EventTime"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
-        const invariants: Expression[] = [];
-        const staticMembers = new Map<string, StaticMemberDecl>();
-        const staticFunctions = new Map<string, StaticFunctionDecl>().set("zero", zero).set("nextEventTick", nexttick);
-        const memberFields = new Map<string, MemberFieldDecl>();
-        const memberMethods = new Map<string, MemberMethodDecl>();
-
-        currentDecl.objects.set(ename, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, ename, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-        this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + ename, 0, currentDecl.objects.get(ename) as EntityTypeDecl);
-    }
-
     private parseEnum(currentDecl: NamespaceDeclaration) {
         const line = this.getCurrentLine();
 
@@ -2957,13 +2921,15 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const ishash = this.testAndConsumeTokenIf("hashkey");
         const isguid = this.testAndConsumeTokenIf("gidentifier");
+        const isclock = this.testAndConsumeTokenIf("clock");
         const iscomposite = this.testAndConsumeTokenIf("composite");
-        if ((ishash && isguid) || (ishash && iscomposite) || (iscomposite && isguid)) {
-            this.raiseError(sinfo.line, "Cannot have multiple of hashkey, GIUD, composite identifier");
+        if ((ishash ? 1 : 0) + (isguid ? 1 : 0) + (isclock ? 1 : 0) + (iscomposite ? 1 : 0) <= 1) {
+            this.raiseError(sinfo.line, "Cannot have multiple of hashkey, GIUD, composite, or clock identifier");
         }
 
         this.ensureAndConsumeToken("identifier");
 
+        this.ensureToken(TokenStrings.Type);
         const iname = this.consumeTokenAndGetValue();
         if (currentDecl.checkDeclNameClash(currentDecl.ns, iname)) {
             this.raiseError(line, "Collision between object and other names");
@@ -3013,6 +2979,28 @@ class Parser {
                 const invariants: Expression[] = [];
                 const staticMembers = new Map<string, StaticMemberDecl>();
                 const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+                const memberFields = new Map<string, MemberFieldDecl>();
+                const memberMethods = new Map<string, MemberMethodDecl>();
+
+                currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+                this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
+            }
+            else if (isclock) {
+                this.ensureAndConsumeToken(";");
+
+                const zerobody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "time_zero");
+                const zerodecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), zerobody);
+                const zero = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "zero", zerodecl);
+
+                const param = new FunctionParameter("tick", itype, false, false);
+                const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "time_nexttick");
+                const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], [], [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+                const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "tick", tickdecl);
+
+                const provides = [[new NominalTypeSignature("NSCore", "EventTimeIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
+                const invariants: Expression[] = [];
+                const staticMembers = new Map<string, StaticMemberDecl>();
+                const staticFunctions = new Map<string, StaticFunctionDecl>().set("zero", zero).set("tick", nexttick);
                 const memberFields = new Map<string, MemberFieldDecl>();
                 const memberMethods = new Map<string, MemberMethodDecl>();
 
@@ -3229,13 +3217,10 @@ class Parser {
                 else if (tk === "entity") {
                     this.parseObject(nsdecl);
                 }
-                else if (tk === "clock") {
-                    this.parseEventTime(nsdecl);
-                }
                 else if (tk === "enum") {
                     this.parseEnum(nsdecl);
                 }
-                else if (tk === "hashkey" || tk === "gidentifier" || tk === "composite" || tk === "identifier") {
+                else if (tk === "hashkey" || tk === "gidentifier" || tk === "composite" || tk === "identifier" || tk === "clock") {
                     this.parseIdentifier(nsdecl);
                 }
                 else if (tk === TokenStrings.EndOfStream) {

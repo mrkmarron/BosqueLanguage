@@ -216,6 +216,10 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRConstructorRecord(sinfo, resultRecordType, args, trgt));
     }
 
+    emitConstructorValueList(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRConstructorValueList(sinfo, resultTupleType, args, trgt));
+    }
+
     emitLoadTupleIndex(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, idx: number, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, resultAccessType, arg, idx, trgt));
     }

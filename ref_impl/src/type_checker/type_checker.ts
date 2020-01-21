@@ -7,7 +7,7 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl, BuildLevel } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, InvokeArgument, LiteralRegexExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, InvokeArgument, LiteralRegexExpression, ConstructorEphemeralValueList } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRBodyKey, MIRFieldKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
@@ -186,6 +186,13 @@ class TypeChecker {
         }
 
         this.raiseErrorIf(sinfo, (sigr === "yes" && callr === "no") || (sigr === "no" && callr === "yes"), "Mismatched recursive annotations on call");
+    }
+
+    private checkedUnion(sinfo: SourceInfo, types: ResolvedType[]) {
+        const tj = this.m_assembly.typeUnion(types);
+        this.raiseErrorIf(sinfo, types.length !== 0 && tj.isEmptyType(), "Ephemeral list types must be unique");
+
+        return tj;
     }
 
     private checkValueEq(lhs: ResolvedType, rhs: ResolvedType, isrelaxed: boolean): boolean {
@@ -678,7 +685,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsTupleConstructor(sinfo: SourceInfo, env: TypeEnvironment, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+    private checkArgumentsTupleConstructor(sinfo: SourceInfo, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
         let targs: ResolvedType[] = [];
 
         for (let i = 0; i < args.length; ++i) {
@@ -716,7 +723,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsRecordConstructor(sinfo: SourceInfo, env: TypeEnvironment, args: [string, ResolvedType, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+    private checkArgumentsRecordConstructor(sinfo: SourceInfo, args: [string, ResolvedType, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
         let rargs: [string, ResolvedType][] = [];
 
         const seenNames = new Set<string>();
@@ -737,6 +744,45 @@ class TypeChecker {
         }
 
        return rrecord;
+    }
+
+    private checkArgumentsEvaluationValueList(env: TypeEnvironment, args: Arguments): [ResolvedType, MIRTempRegister][] {
+        let eargs: [ResolvedType, MIRTempRegister][] = [];
+
+        for (let i = 0; i < args.argList.length; ++i) {
+            const arg = args.argList[i];
+            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
+
+            this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in tuple constructor");
+            this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Expando parameters are not allowed in Tuple constructor");
+
+            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
+            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
+
+            eargs.push([earg.etype, treg]);
+        }
+
+        return eargs;
+    }
+
+    private checkArgumentsValueListConstructor(sinfo: SourceInfo, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+        let targs: ResolvedType[] = [];
+
+        for (let i = 0; i < args.length; ++i) {
+            targs.push(args[i][0] as ResolvedType);
+        }
+
+        const vlatom = ResolvedEphemeralListType.create(targs);
+        const rvl = ResolvedType.createSingle(vlatom);
+
+        if (this.m_emitEnabled) {
+            const regs = args.map((e) => e[1]);
+            const vlkey = this.m_emitter.registerResolvedTypeReference(rvl);
+            this.m_emitter.bodyEmitter.emitConstructorValueList(sinfo, vlkey.trkey, regs, trgt);
+        }
+
+        return rvl;
     }
 
     private checkArgumentsEvaluationListOrSet(env: TypeEnvironment, args: Arguments): [ResolvedType, boolean, MIRTempRegister][] {
@@ -1478,12 +1524,17 @@ class TypeChecker {
 
     private checkTupleConstructor(env: TypeEnvironment, exp: ConstructorTupleExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const eargs = this.checkArgumentsEvaluationTuple(env, exp.args);
-        return [env.setExpressionResult(this.checkArgumentsTupleConstructor(exp.sinfo, env, eargs, trgt))];
+        return [env.setExpressionResult(this.checkArgumentsTupleConstructor(exp.sinfo, eargs, trgt))];
     }
 
     private checkRecordConstructor(env: TypeEnvironment, exp: ConstructorRecordExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const eargs = this.checkArgumentsEvaluationRecord(env, exp.args);
-        return [env.setExpressionResult(this.checkArgumentsRecordConstructor(exp.sinfo, env, eargs, trgt))];
+        return [env.setExpressionResult(this.checkArgumentsRecordConstructor(exp.sinfo, eargs, trgt))];
+    }
+
+    private checkConstructorEphemeralValueList(env: TypeEnvironment, exp: ConstructorEphemeralValueList, trgt: MIRTempRegister): TypeEnvironment[] {
+        const eargs = this.checkArgumentsEvaluationValueList(env, exp.args);
+        return [env.setExpressionResult(this.checkArgumentsValueListConstructor(exp.sinfo, eargs, trgt))];
     }
 
     private checkCallNamespaceFunctionExpression(env: TypeEnvironment, exp: CallNamespaceFunctionExpression, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
@@ -2827,6 +2878,8 @@ class TypeChecker {
                 return this.checkTupleConstructor(env, exp as ConstructorTupleExpression, trgt);
             case ExpressionTag.ConstructorRecordExpression:
                 return this.checkRecordConstructor(env, exp as ConstructorRecordExpression, trgt);
+            case ExpressionTag.ConstructorEphemeralValueList:
+                return this.checkConstructorEphemeralValueList(env, exp as ConstructorEphemeralValueList, trgt);
             case ExpressionTag.CallNamespaceFunctionExpression:
                 return this.checkCallNamespaceFunctionExpression(env, exp as CallNamespaceFunctionExpression, trgt, (extraok && extraok.refok) || false);
             case ExpressionTag.CallStaticFunctionExpression:

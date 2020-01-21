@@ -370,15 +370,15 @@ public:
     }
 };
 
-struct BSQIntHashFunctor
+struct HashFunctor_BSQInt
 {
     size_t operator()(const BSQInt& i) { return i.isInt() ? i.getInt64() : i.getBigInt()->hash(); }
 };
-struct BSQIntEqualFunctor
+struct EqualFunctor_BSQInt
 {
     bool operator()(const BSQInt& l, const BSQInt& r) { return l == r; }
 };
-struct BSQIntDisplayFunctor
+struct DisplayFunctor_BSQInt
 {
     std::u32string operator()(const BSQInt& i) 
     { 

@@ -79,7 +79,6 @@ constexpr const char* nominaltypenames[] = {
 
 //%%CONCEPT_SUBTYPE_RELATION_DECLARE
 
-
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -312,6 +311,25 @@ public:
     virtual void destroy() { ; }
 };
 
+class BSQISOTime : public BSQRef
+{
+public:
+    const uint64_t isotime;
+
+    BSQISOTime(uint64_t isotime) : BSQRef(), isotime(isotime) { ; }
+    virtual ~BSQISOTime() = default;
+    virtual void destroy() { ; }
+};
+
+class BSQRegex : public BSQRef
+{
+public:
+    const std::u32string re;
+
+    BSQRegex(const std::u32string& re) : BSQRef(), re(re) { ; }
+    virtual ~BSQRegex() = default;
+};
+
 class BSQTuple : public BSQRef
 {
 public:
@@ -408,6 +426,49 @@ public:
     {
         return std::binary_search(&etypes[0], &etypes[k], tt); 
     }
+};
+
+template<typename K, typename KFDecOp, typename V, typename VFDecOp>
+class BSQMapEntry : public BSQRef
+{
+public:
+    K key;
+    V value;
+
+    BSQMapEntry() : BSQRef() { ; }
+    BSQMapEntry(const K& k, const V& v) : BSQRef(), key(k), value(v) { ; }
+
+    BSQMapEntry(const BSQMapEntry& src) : BSQRef(), key(src.key), value(src.value) 
+    { 
+        ; 
+    }
+
+    BSQMapEntry& operator=(const BSQMapEntry& src)
+    {
+        this->key = src.key;
+        this->value = src.value;
+        return *this;
+    }
+
+    virtual ~BSQMapEntry() = default;
+
+    virtual void destroy() 
+    {
+        KFDecOp(this->k);
+        VFDecOp(this->v);
+    }
+};
+
+template<typename T, typename FIncOp, typename FDecOp>
+class BSQResult : public BSQRef
+{
+xxxx;
+};
+
+template<typename K, typename KFIncOp, typename KFDecOp, typename U, typename UFIncOp, typename UFDecOp>
+class BSQTagged : public BSQRef
+{
+xxxx;
 };
 
 class BSQSet : public BSQObject {

@@ -149,6 +149,11 @@ enum BufferCompression {
 entity Buffer<T where PODType | APIType> provides APIValue, Some {
 }
 
+//<summary>Primitive ISO standard date time value.</summary>
+entity ISOTime provides PODType, APIType, Some {
+    override static tryParse(str: String): Result<Any> # time_tryparse
+}
+
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, PODType, APIType, Some {
     static create(guid: String): GUID # guid_create 
@@ -156,9 +161,12 @@ entity GUID provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # guid_tryparse
 }
 
-//<summary>Primitive ISO standard date time value.</summary>
-entity ISOTime provides KeyType, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any> # time_tryparse
+//<summary>All actual ordered event times implicitly provide this.</summary>
+entity EventTime provides KeyType, PODType, APIType, Some {
+    override static tryParse(str: String): Result<Any> # eventtime_tryparse
+
+    static zero(): EventTime # eventtime_zero
+    static tick(t: EventTime): EventTime # eventtime_tick
 }
 
 //<summary>Primitive hash value suitable for keys in maps or other associative containers.</summary>
@@ -175,20 +183,20 @@ entity CryptoHash provides provides KeyType, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any> # cryptohash_tryparse
 }
 
-//<summary>All actual ordered event times implicitly provide this.</summary>
-concept EventTime provides KeyType, APIType, Some {
-}
-
 //<summary>All actual enums implicitly provide this.</summary>
 concept Enum provides KeyType, APIType, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
-concept IdKey provides KeyType, APIType, Some {
+concept IdKey provides KeyType, Some {
 }
 
-//<summary>A concept for dealing with guids.</summary>
-concept GUIDIdKey provides KeyType, APIType, Some {
+//<summary>A concept for dealing with guid ids.</summary>
+concept GUIDIdKey provides IdKey, APIType {
+}
+
+//<summary>A concept for dealing with eventime ids.</summary>
+concept EventTimeIdKey provides IdKey, APIType {
 }
 
 //<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
@@ -236,46 +244,32 @@ concept APIRecord provides APIType, Record {
     override static tryParse(str: String): Result<Any> # apituple_tryparse
 }
 
-//<summary>All actual entities/concepts implicitly provide this concept.</summary>
-concept Object provides Some {
+entity MapEntry<K where Indexable, V> provides Some {
+    static create(k: K, v: V): MapEntry<K, V> # mapentry_create
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 entity Result<T> provides Some {
-    hidden field _success: Bool;
-    hidden field _result: T?;
-    hidden field _err: Any;
+    static success(result: T): Result<T> # result_success
+    static fail(info?: Any): Result<T> # result_error
 
-    factory static error(info?: Any): { _success: Bool, _result: T?, _err: Any } {
-        return { _success=false, _result=none, _err=(info ?| none)};
-    }
+    method isSuccess(): Bool # result_issuccess
+    method isError(): Bool # result_iserror
 
-    factory static success(result: T): { _success: Bool, _result: T? } {
-        return { _success=true, _result=result, _err=none };
-    }
+    method result(): T # result_result
+    method error(): Any # result_error
+    method errorAs<U>(): U # result_erroras
 
-    method isError(): Bool {
-        return !this._success;
-    }
+    method convert<U>(): Result<U> # result_convert
+}
 
-    method isSuccess(): Bool {
-        return this._success;
-    }
+//<summary>A lightweight tagging class for values.</summary>
+entity Tagged<T where KeyType, U> provides Indexable, Some {
+    static create(key: T, value: U): Tagged<T, U> # taagged_create
+}
 
-    method getResult(): T {
-        check this._success;
-        return this._result->as<T>();
-    }
-
-    method getErrorInfo(): Any {
-        check !this._success;
-        return this._err;
-    }
-
-    method convert<U>(): Result<U> {
-        check !this._success || this._result->is<U>();
-        return Result<U>{ _success=this._success, _result=this._result->as<U>(), _err=this._err };
-    }
+//<summary>All actual entities/concepts implicitly provide this concept.</summary>
+concept Object provides Some {
 }
 
 //<summary>A pure concept defining useful static numerical operations.</summary>
@@ -290,16 +284,3 @@ concept Keyed<T where KeyType> provides Indexable, Some {
     field key: T;
 }
 
-//<summary>A lightweight tagging class for values.</summary>
-entity Tagged<T where KeyType, U> provides Keyed<T>, Object {
-    field value: U;
-}
-
-entity MapEntry<K where Indexable, V> provides Some {
-    field key: K;
-    field value: V;
-
-    static create(k: K, v: V) {
-        return MapEntry<K, V>@{key=k, value=v};
-    }
-}
