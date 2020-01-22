@@ -50,8 +50,18 @@
     )
 ))
 
+(define-fun bsqkey_get_nominal_type ((keyv BKeyValue)) String
+xxxx
+)
+
+(define-fun bsqterm_get_nominal_type ((term BTerm)) String
+xxxx
+)
+
 ;;EPHEMERAL_DECLS;;
 
+(declare-const bterm_none BTerm)
+(assert (= bterm_none (bsqterm_key bsqkey_none)))
 
 (declare-const bsqtuple_array_empty (Array Int BTerm))
 (assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
@@ -67,7 +77,7 @@
       (ErrorCode 0)
       ;;RESULTS_FWD;;
     ) (
-    ( (result_error (error_id Int)) (result_bmc (bmc_id Int)) )
+    ( (result_error (error_id Int)) (result_bmc (bmc_id String)) )
     ;;RESULTS;;
 ))
 

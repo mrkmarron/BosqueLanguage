@@ -13,19 +13,22 @@
 ////
 //Value ops
 
+#define MIN_TAGGED -9007199254740991
+#define MAX_TAGGED 9007199254740991
+
 #define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
 
 #define BSQ_IS_VALUE_BOOL(V) ((((uintptr_t)(V)) & 0x2) == 0x2)
-#define BSQ_IS_VALUE_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x4)
-#define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0xF) == 0)
+#define BSQ_IS_VALUE_TAGGED_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x3)
+#define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0x7) == 0)
 
 #define BSQ_GET_VALUE_BOOL(V) (((uintptr_t)(V)) & 0x1)
-#define BSQ_GET_VALUE_INT(V) (int32_t)(((int64_t)(V)) >> 0x32)
+#define BSQ_GET_VALUE_TAGGED_INT(V) (int64_t)(((int64_t)(V)) >> 0x4)
 #define BSQ_GET_VALUE_PTR(V, T) (reinterpret_cast<T*>(V))
 
 #define BSQ_ENCODE_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
-#define BSQ_ENCODE_VALUE_INT(I) ((void*)((((uint64_t) I) << 0x32) | 0x4))
+#define BSQ_ENCODE_VALUE_TAGGED_INT(I) ((void*)((((uint64_t) I) << 0x3) | 0x4))
 
 #define BSQ_GET_VALUE_TRUTHY(V) (((uintptr_t)(V)) & 0x1)
 
@@ -33,25 +36,20 @@
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(true)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(false)
 
-#define BSQ_VALUE_0 BSQInt(0)
-#define BSQ_VALUE_POS_1 BSQInt(1)
-#define BSQ_VALUE_NEG_1 BSQInt(-1)
-
-////
-//Int ops
-#define BSQ_BOX_VALUE_BSQINT(E, SCOPE, SC) ((SCOPE).addAllocRefChecked<SC>(BSQBoxedInt::box(E)))
-#define BSQ_GET_VALUE_BSQINT(E) (BSQBoxedInt::unbox(E))
+#define BSQ_VALUE_0 BSQ_IS_VALUE_TAGGED_INT(0)
+#define BSQ_VALUE_POS_1 BSQ_IS_VALUE_TAGGED_INT(1)
+#define BSQ_VALUE_NEG_1 BSQ_IS_VALUE_TAGGED_INT(-1)
 
 #define HASH_COMBINE(H1, H2) (((527 + H1) * 31) + H2)
 
 ////
 //Reference counting ops
 
+#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRef(new T(__VA_ARGS__))))
+
 #define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
 #define INC_REF_NONEABLE(T, V) ((T*) BSQRef::incrementNoneable(V))
 #define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
-
-#define ADD_ALLOC_REF(T, E, SCOPE, SC) ((T*) (SCOPE).addAllocRef<SC>(E))
 
 namespace BSQ
 {
@@ -79,6 +77,7 @@ constexpr const char* nominaltypenames[] = {
 
 //%%CONCEPT_SUBTYPE_RELATION_DECLARE
 
+typedef void* IntValue;
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -106,7 +105,7 @@ public:
         if(this->count == 0)
         {
             this->destroy();
-            delete this;    
+            BSQ_DELETE(this);    
         }
     }
 
@@ -154,127 +153,267 @@ public:
             BSQ_GET_VALUE_PTR(v, BSQRef)->decrement();
         }
     }
-
-    //%%ALL_VFIELD_ACCESS_DECLS
-
-    //%%ALL_VCALL_DECLS
 };
 
-template <uint16_t k>
 class BSQRefScope
 {
 private:
-    BSQRef* opts[k];
+    std::vector<BSQRef*> opts;
 
 public:
-    BSQRefScope() : opts{nullptr}
+    BSQRefScope() : opts()
     {
         ;
     }
 
     ~BSQRefScope()
     {
-        for(uint16_t i = 0; i < k; ++i)
+        for(uint16_t i = 0; i < this->opts.size(); ++i)
         {
-            if(this->opts[i] != nullptr)
-            {
-                BSQRef::decrement(this->opts[i]);
-            }
+           this->opts[i]->decrement();
         }
     }
 
-    template <uint16_t pos>
-    inline BSQRef** getCallerSlot() {
-        return this->opts + pos; 
-    }
-
-    template <uint16_t pos>
     inline BSQRef* addAllocRef(BSQRef* ptr)
     {
         ptr->increment();
-        this->opts[pos] = ptr;
+        this->opts.push_back(ptr);
 
         return ptr;
     }
 
-    template <uint16_t pos>
     inline Value addAllocRefChecked(Value v)
     {
         if (BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
+            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
             ptr->increment();
-            this->opts[pos] = ptr;
+            this->opts.push_back(ptr);
         }
 
-        return ptr;
+        return v;
     }
 
-    inline static void callReturnDirect(BSQRef** callerslot, BSQRef* ptr)
+    inline void callReturnDirect(BSQRef* ptr)
     {
         ptr->increment();
-        *callerslot = ptr;
+        this->opts.push_back(ptr);
     }
 
-    inline static void processReturnNoneable(BSQRef** callerslot, BSQRef* ptr)
+    inline void processReturnNoneable(BSQRef* ptr)
     {
         if(BSQ_IS_VALUE_NONNONE(ptr))
         {
             ptr->increment();
-            *callerslot = ptr;
+            this->opts.push_back(ptr);
         }
     }
 
-    inline static void processReturnChecked(BSQRef** callerslot, Value v)
+    inline void processReturnInt(IntValue i)
+    {
+        if(BSQ_IS_VALUE_PTR(i))
+        {
+            BSQRef* ptr = BSQ_GET_VALUE_PTR(i, BSQRef);
+            ptr->increment();
+            this->opts.push_back(ptr);
+        }
+    }
+
+    inline void processReturnChecked(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
         {
-            BSQ_GET_VALUE_PTR(v, BSQRef)->increment();
-            *callerslot = BSQ_GET_VALUE_PTR(v, BSQRef);
+            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+            ptr->increment();
+            this->opts.push_back(ptr);
         }
     }
 };
 
-class BSQBoxedInt : public BSQRef
+
+struct ReturnOpFunctor_bool
+{
+    size_t operator()(bool b, BSQRefScope& scope) { ; }
+};
+struct ReturnOpFunctor_IntValue
+{
+    size_t operator()(IntValue i, BSQRefScope& scope) { scope.processReturnInt(i); }
+};
+struct ReturnOpFunctor_IntValueNoneable
+{
+    size_t operator()(IntValue i, BSQRefScope& scope) { scope.processReturnChecked(i); }
+};
+struct ReturnOpFunctor_Direct
+{
+    size_t operator()(BSQRef* ptr, BSQRefScope& scope) { scope.callReturnDirect(ptr); }
+};
+struct ReturnOpFunctor_Noneable
+{
+    size_t operator()(BSQRef* ptr, BSQRefScope& scope) { scope.processReturnNoneable(ptr); }
+};
+struct ReturnOpFunctor_Checked
+{
+    size_t operator()(Value v, BSQRefScope& scope) { scope.processReturnChecked(v); }
+};
+
+struct HashFunctor_bool
+{
+    size_t operator()(bool b) { return (size_t)b; }
+};
+struct EqualFunctor_bool
+{
+    bool operator()(bool l, bool r) { return l == r; }
+};
+struct DisplayFunctor_bool
+{
+    std::u32string operator()(bool b) { return b ? U"true" : U"false"; }
+};
+
+//A big integer class for supporting Bosque -- right now it does not do much
+class BSQBigInt : public BSQRef
 {
 public:
-    const BSQInt data;
+    BSQBigInt(int64_t value) { ; }
+    BSQBigInt(const char* bigstr) { ; }
 
-    BSQBoxedInt(const BSQInt idata) : BSQRef(), data(idata) { ; }
-    BSQBoxedInt(const BSQInt idata, int64_t excount) : BSQRef(excount), data(idata) { ; }
-
-    virtual ~BSQBoxedInt() = default;
-    virtual void destroy() { ; }
-    
-    static inline Value box(BSQInt v)
+    ~BSQBigInt()
     {
-        if(v.isInt())
-        {
-            return BSQ_ENCODE_VALUE_INT(v.getInt());
-        }
-        else
-        {
-            return new BSQBoxedInt(v);
-        }
-        
+        ;
     }
 
-    static inline BSQInt unbox(Value v)
+    virtual void destroy() 
+    { 
+        ; 
+    }
+
+    size_t hash() const
     {
-        if(BSQ_IS_VALUE_INT(v))
-        {
-            return BSQInt(BSQ_GET_VALUE_INT(v));
+        return 0;
+    }
+
+    std::u32string display() const
+    {
+        return U"[NOT IMPLEMENTED]";
+    }
+
+    bool isZero() const
+    {
+        return false;
+    }
+
+    BigInt* negate() const
+    {
+        return nullptr;
+    }
+
+    bool eqI64(int64_t v) const
+    {
+        return false;
+    }
+
+    static bool eq(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+    static bool neq(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+    static bool lt(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+    static bool lteq(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+     static bool gt(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+    static bool gteq(const BSQBigInt& l, const BSQBigInt& r)
+    {
+        return false;
+    }
+
+    static BigInt* add(const BSQBigInt &l, const BSQBigInt &r)
+    {
+        return nullptr;
+    }
+
+    static BigInt* sub(const BSQBigInt &l, const BSQBigInt &r)
+    {
+        return nullptr;
+    }
+
+    static BigInt* mult(const BSQBigInt &l, const BSQBigInt &r)
+    {
+        return nullptr;
+    }
+
+    static BigInt* div(const BSQBigInt &l, const BSQBigInt &r)
+    {
+        return nullptr;
+    }
+
+    static BigInt* mod(const BSQBigInt &l, const BSQBigInt &r)
+    {
+        return nullptr;
+    }
+};
+struct HashFunctor_IntValue
+{
+    size_t operator()(IntValue i) { return BSQ_IS_VALUE_TAGGED_INT(i) ? BSQ_GET_VALUE_TAGGED_INT(i) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->hash(); }
+};
+struct EqualFunctor_IntValue
+{
+    bool operator()(IntValue l, IntValue r) 
+    { 
+        if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
+            return l == r;
         }
-        else
-        {
-            return BSQ_GET_VALUE_PTR(v, BSQBoxedInt)->data;
+        else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
+            return BSQ_GET_VALUE_PTR(r, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(l));
+        }
+        else if(BSQ_IS_VALUE_TAGGED_INT(r)) {
+            return BSQ_GET_VALUE_PTR(l, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(r));
+        }
+        else {
+            return BSQBigInt::eq(*BSQ_GET_VALUE_PTR(l, BSQBigInt), *BSQ_GET_VALUE_PTR(r, BSQBigInt));
         }
     }
 };
+struct DisplayFunctor_IntValue
+{
+    std::u32string operator()(IntValue i)
+    { 
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+        return BSQ_IS_VALUE_TAGGED_INT(i) ? conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(i))) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->display();
+    }
+};
 
-size_t bsqKeyValueHash(Value v);
-bool bsqKeyValueEqual(Value v1, Value v2);
+size_t bsqKeyValueHash(KeyValue v);
+bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
 
 std::u32string diagnostic_format(Value v);
+
+struct HashFunctor_KeyValue
+{
+    size_t operator()(const KeyValue& k) { return bsqKeyValueHash(k); }
+};
+struct EqualFunctor_KeyValue
+{
+    bool operator()(const KeyValue& l, const KeyValue& r) { return bsqKeyValueEqual(l, r); }
+};
+struct DisplayFunctor_KeyValue
+{
+    std::u32string operator()(const KeyValue& k) { return diagnostic_format(k); }
+};
 
 enum class BSQBufferFormat {
     Fluent,
@@ -428,7 +567,7 @@ public:
     }
 };
 
-template<typename K, typename KFDecOp, typename V, typename VFDecOp>
+template<typename K, typename KFReturnOp, typename KFDecOp, typename V, typename VFReturnOp, typename VFDecOp>
 class BSQMapEntry : public BSQRef
 {
 public:
@@ -454,21 +593,88 @@ public:
 
     virtual void destroy() 
     {
-        KFDecOp(this->k);
-        VFDecOp(this->v);
+        KFDecOp(this->key);
+        VFDecOp(this->value);
+    }
+
+    void processReturn(BSQRefScope& scope)
+    {
+        KFReturnOp(this->key, scope);
+        VFReturnOp(this->value, scope);
     }
 };
 
-template<typename T, typename FIncOp, typename FDecOp>
+template<typename T, typename TFReturnOp, typename TDecOp>
 class BSQResult : public BSQRef
 {
-xxxx;
+    T success;
+    Value error;
+
+    BSQResult() : BSQRef() { ; }
+    BSQResult(const T& success, Value error) : BSQRef(), success(success), error(error) { ; }
+
+    BSQResult(const BSQResult& src) : BSQRef(), success(src.success), error(src.error) 
+    { 
+        ; 
+    }
+
+    BSQResult& operator=(const BSQResult& src)
+    {
+        this->success = src.success;
+        this->error = src.error;
+        return *this;
+    }
+
+    virtual ~BSQResult() = default;
+
+    virtual void destroy() 
+    {
+        TFDecOp(this->success);
+        BSQRef::decrementChecked(this->error);
+    }
+
+    void processReturn(BSQRefScope& scope)
+    {
+        TFReturnOp(this->success, scope);
+        scope.processReturnChecked(this->error);
+    }
 };
 
-template<typename K, typename KFIncOp, typename KFDecOp, typename U, typename UFIncOp, typename UFDecOp>
+template<typename K, typename KFReturnOp, typename KFDecOp, typename U, typename UFReturnOp, typename UFDecOp>
 class BSQTagged : public BSQRef
 {
-xxxx;
+public:
+    K key;
+    U value;
+
+    BSQTagged() : BSQRef() { ; }
+    BSQTagged(const K& k, const U& u) : BSQRef(), key(k), value(u) { ; }
+
+    BSQTagged(const BSQTagged& src) : BSQRef(), key(src.key), value(src.value) 
+    { 
+        ; 
+    }
+
+    BSQTagged& operator=(const BSQTagged& src)
+    {
+        this->key = src.key;
+        this->value = src.value;
+        return *this;
+    }
+
+    virtual ~BSQTagged() = default;
+
+    virtual void destroy() 
+    {
+        KFDecOp(this->key);
+        UFDecOp(this->value);
+    }
+
+    void processReturn(BSQRefScope& scope)
+    {
+        KFReturnOp(this->key, scope);
+        UFReturnOp(this->value, scope);
+    }
 };
 
 class BSQSet : public BSQObject {

@@ -37,6 +37,9 @@
 #define HANDLE_BSQ_ABORT(abrt) { printf("ABORT\n"); exit(1); }
 #endif
 
+#define BSQ_NEW(T, ...) (new T(__VA_ARGS__))
+#define BSQ_DELETE(ELEM) (delete ELEM)
+
 namespace BSQ
 {
 void bsqassert(bool cond, const char* msg, const char* file, int32_t line);

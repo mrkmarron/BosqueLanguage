@@ -265,7 +265,7 @@ entity Result<T> provides Some {
 
 //<summary>A lightweight tagging class for values.</summary>
 entity Tagged<T where KeyType, U> provides Indexable, Some {
-    static create(key: T, value: U): Tagged<T, U> # taagged_create
+    static create(key: T, value: U): Tagged<T, U> # tagged_create
 }
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>

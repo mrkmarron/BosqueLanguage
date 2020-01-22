@@ -20,13 +20,14 @@ class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
 
-    private default_gas = 4;
+    private standard_gas = 4;
+    private collection_gas = 5;
+    private string_gas = 10;
+    private regex_gas = 3;
+    private api_pod_type_gas = 3;
 
     private errorCodes = new Map<string, number>();
-    private bmcCodes = new Map<string, number>();
-    private bmcGas = new Map<string, number>();
-
-    private typecheckgas = 4;
+    private gasLimits = new Map<string, number>().set("default", 4).set("collection", 5).set("string", 10).set("regex", 3).set("ap_type", 3);
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -38,12 +39,9 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, default_gas: number) {
+    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
-
-        this.default_gas = default_gas;
-        this.typecheckgas = default_gas;
 
         this.currentRType = typegen.noneType;
     }
@@ -67,19 +65,30 @@ class SMTBodyEmitter {
         return [...new Set<number>(ekeys.map((k) => this.errorCodes.get(k) as number))].sort();
     }
 
-    getGasForOperation(key: string): number {
-        if (!this.bmcGas.has(key)) {
-           this.bmcGas.set(key, this.default_gas);
+    getGasKeyForOperation(tkey: string): "collection" | "string" | "regex" | "ap_type" | "default" {
+        if(key.startsWith("NSCore::List<") || key.startsWith("NSCore::Set<") || key.startsWith("NSCore::Map<")) {
+            return this.gasLimits.get("collection") as number;
         }
-        return this.bmcGas.get(key) as number;
+        else if(key === "NSCore::String") {
+            return this.gasLimits.get("string") as number;
+        }
+        else if(key === "NSCore::Regex") {
+            return this.gasLimits.get("regex") as number;
+        }
+        else if(key === "TYPE_CHECK") {
+            return this.gasLimits.get("ap_type") as number;
+        }
+        else {
+            return this.gasLimits.get("default") as number;
+        }
     }
 
-    generateBMCLimitCreate(key: string, rtype: string): SMTValue {
-        if (!this.bmcCodes.has(key)) {
-            this.bmcCodes.set(key, this.bmcCodes.size);
-         }
-        const errid = this.bmcCodes.get(key) as number;
+    getGasForOperation(tkey: string): number {
+        return this.gasLimits.get(this.getGasForOperation(tkey)) as number;
+    }
 
+    generateBMCLimitCreate(tkey: string, rtype: string): SMTValue {
+        const errid = this.getGasForOperation(tkey);
         return new SMTValue(`(result_error@${rtype} (result_bmc ${errid}))`);
     }
 

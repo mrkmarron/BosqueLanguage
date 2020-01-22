@@ -17,17 +17,20 @@ size_t bsqKeyValueHash(KeyValue v)
     {
         return 0;
     }
-    else if(BSQ_IS_VALUE_INT(v))
+    else if(BSQ_IS_VALUE_BOOL(v))
     {
-        return BSQ_GET_VALUE_INT(v);
+        return (size_t)BSQ_GET_VALUE_BOOL(v);
+    }
+    else if(BSQ_IS_VALUE_TAGGED_INT(v))
+    {
+        return BSQ_GET_VALUE_TAGGED_INT(v);
     }
     else
     {
         auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef); 
-        if(dynamic_cast<BSQBoxedInt*>(ptr) != nullptr)
+        if(dynamic_cast<BSQBigInt*>(ptr) != nullptr)
         {
-            auto bi = dynamic_cast<BSQBoxedInt*>(ptr);
-            return bi->data.isInt() ? bi->data.getInt64() : bi->data.getBigInt()->hash();
+            return dynamic_cast<BSQBigInt*>(ptr)->hash();
         }
         else if(dynamic_cast<BSQString*>(ptr) != nullptr)
         {
@@ -82,26 +85,30 @@ size_t bsqKeyValueHash(KeyValue v)
 
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
 {
+    if(v1 == v2) {
+        return true;
+    }
+
     if(BSQ_IS_VALUE_NONE(v1) || BSQ_IS_VALUE_NONE(v2))
     {
         return BSQ_IS_VALUE_NONE(v1) && BSQ_IS_VALUE_NONE(v2);
     }
-    else if(BSQ_IS_VALUE_INT(v1) || BSQ_IS_VALUE_INT(v2))
+    if(BSQ_IS_VALUE_BOOL(v1) && BSQ_IS_VALUE_BOOL(v2))
     {
-        if(BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_INT(v2))
-        {
-            return BSQ_GET_VALUE_INT(v1) == BSQ_GET_VALUE_INT(v2);
+        return v1 == v2;
+    }
+    else if(BSQ_IS_VALUE_TAGGED_INT(v1) || BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2)) {
+            return v1 == v2;
         }
-        else if (BSQ_IS_VALUE_INT(v1) && BSQ_IS_VALUE_PTR(v2) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef)) != nullptr)
-        {
-            return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
+        else if(BSQ_IS_VALUE_TAGGED_INT(v1) && dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef)) != nullptr) {
+            return dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef))->eqI64(BSQ_GET_VALUE_TAGGED_INT(v1));
         }
-        else if (BSQ_IS_VALUE_PTR(v1) && dynamic_cast<BSQBoxedInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef)) != nullptr && BSQ_IS_VALUE_INT(v2))
-        {
-            return BSQ_GET_VALUE_BSQINT(v1) == BSQ_GET_VALUE_BSQINT(v2);
+        else if(BSQ_IS_VALUE_TAGGED_INT(v2) && dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef)) != nullptr) {
+            return dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef))->eqI64(BSQ_GET_VALUE_TAGGED_INT(v2));
         }
-        else
-        {
+        else {
             return false;
         }
     }
@@ -109,9 +116,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
     {
         auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
         auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef); 
-        if(dynamic_cast<BSQBoxedInt*>(ptr1) != nullptr && dynamic_cast<BSQBoxedInt*>(ptr2) != nullptr)
+        if(dynamic_cast<BSQBigInt*>(ptr1) != nullptr && dynamic_cast<BSQBigInt*>(ptr2) != nullptr)
         {
-            return dynamic_cast<BSQBoxedInt*>(ptr1)->data == dynamic_cast<BSQBoxedInt*>(ptr2)->data;
+            return BSQBigInt::eq(*dynamic_cast<BSQBigInt*>(ptr1), *dynamic_cast<BSQBigInt*>(ptr2));
         }
         else if(dynamic_cast<BSQString*>(ptr1) != nullptr && dynamic_cast<BSQString*>(ptr2) != nullptr)
         {
@@ -178,15 +185,19 @@ std::u32string diagnostic_format(Value v)
     {
         return BSQ_GET_VALUE_BOOL(v) ? std::u32string(U"true") : std::u32string(U"false");
     }
-    else if(BSQ_IS_VALUE_INT(v))
+    else if(BSQ_IS_VALUE_TAGGED_INT(v))
     {
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(std::to_string(BSQ_GET_VALUE_INT(v)));
+        return conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(v)));
     }
     else
     {
         const BSQRef* vv = BSQ_GET_VALUE_PTR(v, const BSQRef);
-        if(dynamic_cast<const BSQString*>(vv) != nullptr)
+        if(dynamic_cast<const BSQBigInt*>(vv) != nullptr)
+        {
+            return dynamic_cast<const BSQBigInt*>(vv)->display();
+        }
+        else if(dynamic_cast<const BSQString*>(vv) != nullptr)
         {
             return DisplayFunctor_BSQString{}(*dynamic_cast<const BSQString*>(vv));
         }

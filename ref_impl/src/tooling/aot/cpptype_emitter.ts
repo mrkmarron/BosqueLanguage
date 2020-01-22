@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
@@ -57,106 +57,541 @@ class CPPTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
-    typecheckIsName(tt: MIRType, oftype: RegExp, match: "exact" | "noneable" | "may"): boolean {
+    typecheckIsName(tt: MIRType, oftype: RegExp, match?: "exact" | "may"): boolean {
+        match = match || "exact";
         if(match === "exact") {
             return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && oftype.test(tt.options[0].trkey);
-        }
-        else if(match === "noneable") {
-            return tt.options.every((opt) => (opt instanceof MIREntityType) && (oftype.test(opt.trkey) || opt.trkey === "NSCore::None"));
         }
         else {
             return tt.options.some((opt) => (opt instanceof MIREntityType) && oftype.test(opt.trkey));
         }
     }
 
-    typecheckEntityAndProvidesName(tt: MIRType, oftype: MIRType, match: "exact" | "noneable" | "may"): boolean {
+    typecheckEntityAndProvidesName(tt: MIRType, oftype: MIRType, match?: "exact" | "may"): boolean {
+        match = match || "exact";
         if(match === "exact") {
             return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && this.assembly.subtypeOf(tt, oftype);
-        }
-        else if(match === "noneable") {
-            return tt.options.every((opt) => (opt instanceof MIREntityType) && (this.assembly.subtypeOf(MIRType.createSingle(opt), oftype) || opt.trkey === "NSCore::None"));
         }
         else {
             return tt.options.some((opt) => (opt instanceof MIREntityType) && this.assembly.subtypeOf(MIRType.createSingle(opt), oftype));
         }
     }
 
+    typecheckTuple(tt: MIRType, match?: "known" | "tuple"): boolean {
+        match = match || "tuple";
+        if(match === "known") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIRTupleType) && !(tt.options[0] as MIRTupleType).entries.some((entry) => entry.isOptional);
+        }
+        else {
+            return tt.options.every((opt) => opt instanceof MIRTupleType);
+        }
+    }
+
+    typecheckRecord(tt: MIRType, match?: "known" | "record"): boolean {
+        match = match || "record";
+        if(match === "known") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIRRecordType) && !(tt.options[0] as MIRRecordType).entries.some((entry) => entry.isOptional);
+        }
+        else {
+            return tt.options.every((opt) => opt instanceof MIRRecordType);
+        }
+    }
+
+    typecheckUEntity(tt: MIRType, match?: "exact" | "may"): boolean {
+        match = match || "exact";
+        if(match === "exact") {
+            return tt.options.length === 1 && (tt.options[0] instanceof MIREntityType) && tt.options[0].trkey !== "NSCore::None";
+        }
+        else {
+            return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey !== "NSCore::None");
+        }
+    }
+
+    typecheckEphemeral(tt: MIRType): boolean {
+        return tt.options.length === 1 && tt.options[0] instanceof MIREpemeralListType;
+    }
+    
     typecheckIsNoneable(tt: MIRType): boolean {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
     }
 
     getCPPTypeFor(tt: MIRType, declspec: "base" | "parameter" | "return" | "storage"): string {
-        if (this.typecheckIsName(tt, /^NSCore::Bool$/, "exact")) {
+        if (this.typecheckIsName(tt, /^NSCore::Bool$/)) {
             return "bool";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::Int$/, "exact")) {
-            return "BSQInt";
+        else if (this.typecheckIsName(tt, /^NSCore::Int$/)) {
+            return "IntValue";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::String$/, "noneable")) {
+        else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "BSQString" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/, "noneable")) {
+        else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "BSQStringOf" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckIsName(tt, /^NSCore::GUID$/, "noneable")) {
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
             return "BSQGUID" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/, "noneable")) {
-            return "BSQEventTime" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::EventTime$/, "exact")) ? "" : "*";
+        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/)) {
+            return "BSQEventTime";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/, "noneable")) {
-            return "BSQDataHash" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::DataHash$/, "exact")) ? "" : "*";
+        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
+            return "BSQDataHash";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/, "noneable")) {
+        else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
             return "BSQCryptoHash" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype, "noneable")) {
-            return "BSQEnum" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype)) {
+            return "BSQEnum";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype, "noneable")) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
             return "BSQIdKey" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype, "noneable")) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
             return "BSQGUIDIdKey" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype, "noneable")) {
-            return "BSQEventTimeIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype)) {
+            return "BSQEventTimeIdKey";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype, "noneable")) {
-            return "BSQDataHashIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
+            return "BSQDataHashIdKey";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype, "noneable")) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
             return "BSQCryptoHashIdKey" + (declspec !== "base" ? "*" : "");
         }
         else {
             if(tt.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
                 return "KeyValue";
             }
-            else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/, "noneable")) {
+            else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/)) {
                 return "BSQBuffer" + (declspec !== "base" ? "*" : "");
             }
-            else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/, "noneable")) {
+            else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/)) {
                 return "BSQISOTime" + (declspec !== "base" ? "*" : "");
             }
-            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
+            else if (this.typecheckIsName(tt, /^NSCore::Regex$/)) {
                 return "BSQRegex" + (declspec !== "base" ? "*" : "");
             }
-
-            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
-                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            else if (this.typecheckTuple(tt)) {
+                return "BSQTuple" + (declspec !== "base" ? "*" : "");
             }
-            else if (this.typecheckIsName(tt, /^NSCore::Regex$/, "noneable")) {
-                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            else if (this.typecheckRecord(tt)) {
+                return "BSQRecord" + (declspec !== "base" ? "*" : "");
             }
+            else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/)) {
+                return this.mangleStringForCpp(tt.trkey);
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Result<.*>$/)) {
+                return this.mangleStringForCpp(tt.trkey);
+            }
+            else if (this.typecheckIsName(tt, /^NSCore::Tagged<.*>$/)) {
+                return this.mangleStringForCpp(tt.trkey);
+            }
+            else if(this.typecheckUEntity(tt)) {
+                return this.mangleStringForCpp(tt.trkey)
+            }
+            else if(this.typecheckEphemeral(tt)) {
+                return this.mangleStringForCpp(tt.trkey);
+            }
+            else {
+                return "Value";
+            }
+        }
+    }
 
-            //uentity
+    private coerceAtomicKey(exp: string, from: MIRType, into: MIRType): string {
+        const scope = this.mangleStringForCpp("scope");
+        if (from.trkey === "NSCore::None") {
+            return "BSQ_VALUE_NONE";
+        }
+        else if (this.typecheckIsName(from, /^NSCore::Bool$/)) {
+            return `BSQ_BOX_VALUE_BOOL(${exp})`;
+        }
+        else if (this.typecheckIsName(from, /^NSCore::EventTime$/)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTime, ${exp})`;
+        }
+        else if (this.typecheckIsName(from, /^NSCore::DataHash$/)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, DataHash, ${exp})`;
+        }
+        else if (this.typecheckEntityAndProvidesName(from, this.enumtype)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, Enum, ${exp})`;
+        }
+        else if (this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTimeIdKey, ${exp})`;
+        }
+        else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQDataHashIdKey, ${exp})`;
+        }
+        else {
+            return exp;
+        }
+    }
 
-            //mapentry
+    private coerceOptionsKey(exp: string, into: MIRType): string {
+        if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
+            return `BSQ_GET_VALUE_BOOL(${exp})`;
+        }
+        else if (this.typecheckIsName(into, /^NSCore::EventTime$/) || this.typecheckIsName(into, /^NSCore::DataHash$/)) {
+            return `*${exp}`;
+        }
+        else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
+            return `*${exp}`;
+        }
+        else {
+            return exp;
+        }
+    }
 
-            //value
+    private coerceIntoAtomicKey(exp: string, from: MIRType, into: MIRType): string {
+    }
+
+    coerce(exp: string, from: MIRType, into: MIRType): string {
+        if (this.typeToCPPType(from, "base") === this.typeToCPPType(into, "base")) {
+            return exp;
+        }
+
+        if (from.trkey === "NSCore::None") {
+            return this.coerceAtomicKey(exp, from, into);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
+            return this.coerceAtomicKey(exp, from, into);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
+            || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
+            return this.coerceAtomicKey(exp, from, into);
+        }
+        else if (this.typecheckEntityAndProvidesName(from, this.enumtype) || this.typecheckEntityAndProvidesName(from, this.idkeytype) || this.typecheckEntityAndProvidesName(from, this.guididkeytype)
+            || this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
+            return this.coerceAtomicKey(exp, from, into);
+        }
+        else {
+            if(from.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
+                return this.coerceOptionsKey(exp, into);
+            }
+            else if (this.typecheckIsName(from, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(from, /^NSCore::ISOTime$/) || this.typecheckIsName(from, /^NSCore::Regex$/)
+                || this.typecheckTuple(from) || this.typecheckRecord(from)) {
+                return exp;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/)) {
+                return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::Result<.*>$/)) {
+                return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
+                return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            }
+            else if(this.typecheckUEntity(from)) {
+                return exp;
+            }
+            else {
+                if (into.trkey === "NSCore::None") {
+                    return "BSQ_VALUE_NONE";
+                }
+                else if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
+                    return `BSQ_BOX_VALUE_BOOL(${exp})`;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::Int$/)) {
+                    return exp;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::String$/)) {
+                    return exp;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
+                    return exp;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
+                    return exp;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
+                    return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTime, ${exp})`;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
+                    return `BSQ_NEW_ADD_SCOPE(${scope}, DataHash, ${exp})`;
+                }
+                else if (this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
+                    return exp;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
+                    return `BSQ_NEW_ADD_SCOPE(${scope}, Enum, ${exp})`;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.idkeytype)) {
+                    return exp;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
+                    return exp;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
+                    return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTimeIdKey, ${exp})`;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
+                    return `BSQ_NEW_ADD_SCOPE(${scope}, BSQDataHashIdKey, ${exp})`;
+                }
+                else if (this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                    return exp;
+                }
+                else {
+                    if(into.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
+                        if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
+                            return `BSQ_GET_VALUE_BOOL(${exp})`;
+                        }
+                        else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
+                            return `*${exp}`;
+                        }
+                        else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
+                            return `*${exp}`;
+                        }
+                        else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
+                            return `*${exp}`;
+                        }
+                        else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
+                            return `*${exp}`;
+                        }
+                        else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
+                            return `*${exp}`;
+                        }
+                        else {
+                            return exp;
+                        }
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/)) {
+                        return exp;
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::ISOTime$/)) {
+                        return exp;
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::Regex$/)) {
+                        return exp;
+                    }
+                    else if (this.typecheckTuple(into)) {
+                        return exp;
+                    }
+                    else if (this.typecheckRecord(into)) {
+                        return exp;
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/)) {
+                        return `BSQ_NEW_ADD_SCOPE(${scope}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::Result<.*>$/)) {
+                        return `BSQ_NEW_ADD_SCOPE(${scope}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+                    }
+                    else if (this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
+                        return `BSQ_NEW_ADD_SCOPE(${scope}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+                    }
+                    else if(this.typecheckUEntity(into)) {
+                        return exp;
+                    }
+                    else {
+                        return exp;
+                    }
+                }
+            }
+        }
+
+
+        else if (this.isTupleType(from)) {
+            assert(!(this.isKnownLayoutTupleType(from) && this.isKnownLayoutTupleType(into)), "Shoud be a type error or handled by equality case");
+
+            const fromsize = CPPTypeEmitter.getTupleTypeMaxLength(from);
+            if (this.isKnownLayoutTupleType(from)) {
+                if (this.isTupleType(into)) {
+                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                    return `StructuralCoercionOps::convertTupleKnownToFixed<${intosize}, ${fromsize}>(${exp})`;
+                }
+                else {
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleKnown<${fromsize}>(${exp}))`;
+                }
+            }
+            else if (this.isKnownLayoutTupleType(into)) {
+                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                return `StructuralCoercionOps::convertTupleFixedToKnown<${intosize}, ${fromsize}>(${exp})`;
+            }
+            else {
+               if (this.isTupleType(into)) {
+                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                    if (intosize < fromsize) {
+                        return `StructuralCoercionOps::projectTupleDownFixed<${intosize}, ${fromsize}>(${exp})`;
+                    }
+                    else {
+                        return `StructuralCoercionOps::projectTupleUpFixed<${intosize}, ${fromsize}>(${exp})`;
+                    }
+                }
+                else {
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleFixed<${fromsize}>(${exp}))`;
+                }
+            }
+        }
+        else if (this.isRecordType(from)) {
+            assert(!(this.isKnownLayoutRecordType(from) && this.isKnownLayoutRecordType(into)), "Shoud be a type error or handled by equality case");
+
+            const fromset = CPPTypeEmitter.getRecordTypeMaxPropertySet(from);
+            if (this.isKnownLayoutRecordType(from)) {
+                if (this.isRecordType(into)) {
+                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                    if (intoset.length === 0) {
+                        return "BSQRecordFixed_empty";
+                    }
+                    else {
+                        if(fromset.length === 0) {
+                            return `BSQRecordFixed<${intoset.length}>{0}`;
+                        }
+                        else {
+                            return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
+                        }
+                    }
+                }
+                else {
+                    if(fromset.length === 0) {
+                        return "BSQRecord::_empty";
+                    }
+                    else {
+                        return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
+                    }
+                }
+            }
+            else if (this.isKnownLayoutRecordType(into)) {
+                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                return `StructuralCoercionOps::convertRecordFixedToKnown<${intoset.length}, ${fromset.length}>(${exp})`;
+            }
+            else {
+               if (this.isRecordType(into)) {
+                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                    if (intoset.length < fromset.length) {
+                        return `StructuralCoercionOps::projectRecordDownFixed<${intoset.length}, ${fromset.length}>(${exp})`;
+                    }
+                    else {
+                        return `StructuralCoercionOps::projectRecordUpFixed<${intoset.length}, ${fromset.length}>(${exp})`;
+                    }
+                }
+                else {
+                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordFixed<${fromset.length}>(${exp}))`;
+                }
+            }
+        }
+        else if (this.isUEntityType(from)) {
+            return exp;
+        }
+        else {
+            assert(this.typeToCPPType(from, "base") === "Value", "must be a Value mapped type");
+
+            if (this.isSimpleBoolType(into)) {
+                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            }
+            else if (this.isSimpleIntType(into)) {
+                return `BSQ_GET_VALUE_BSQINT(${exp})`;
+            }
+            else if (this.isSimpleStringType(into)) {
+                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
+            }
+            else if (this.isTupleType(into)) {
+                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
+                if (this.isKnownLayoutTupleType(into)) {
+                    return `StructuralCoercionOps::unboxTupleKnown<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
+                }
+                else {
+                    return `StructuralCoercionOps::unboxTupleFixed<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
+                }
+            }
+            else if (this.isRecordType(into)) {
+                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
+                if (this.isKnownLayoutRecordType(into)) {
+                    return `StructuralCoercionOps::unboxRecordKnown<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
+                }
+                else {
+                    return `StructuralCoercionOps::unboxRecordFixed<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
+                }
+            }
+            else if (this.isUEntityType(into)) {
+                return `BSQ_GET_VALUE_PTR(${exp}, ${this.typeToCPPType(into, "base")})`;
+            }
+            else {
+                return exp;
+            }
+        }
+    }
+
+    maybeRefableCountableType(tt: MIRType): boolean {
+        if (this.typecheckIsName(tt, /^NSCore::Bool$/, "noneable")) {
+            return false;
+        }
+
+        if (this.typecheckIsName(tt, /^NSCore::Int$/, "exact") {
+            return false;
+        }
+
+        if (this.typecheckIsName(tt, /^NSCore::EventTime$/, "noneable")) {
+            return "BSQEventTime" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::EventTime$/, "exact")) ? "" : "*";
+        }
+
+        if (this.typecheckIsName(tt, /^NSCore::DataHash$/, "noneable")) {
+            return "BSQDataHash" + (declspec === "base" || this.typecheckIsName(tt, /^NSCore::DataHash$/, "exact")) ? "" : "*";
+        }
+
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype, "noneable")) {
+            return "BSQEnum" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+
+        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype, "noneable")) {
+            return "BSQEventTimeIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype, "noneable")) {
+            return "BSQDataHashIdKey" + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+
+        else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/, "noneable")) {
+            return this.mangleStringForCpp(this.getNonNoneableEntityType(tt).ekey) + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Result<.*>$/, "noneable")) {
+            return this.mangleStringForCpp(this.getNonNoneableEntityType(tt).ekey) + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Tagged<.*>$/, "noneable")) {
+            return this.mangleStringForCpp(this.getNonNoneableEntityType(tt).ekey) + (declspec === "base" || !this.typecheckIsNoneable(tt) ? "" : "*");
         }
 
     }
+
+    typeToCPPDefaultValue(ttype: MIRType): string {
+        if (this.isSimpleBoolType(ttype)) {
+            return "false"
+        }
+        else if (this.isSimpleIntType(ttype)) {
+            return "BSQ_VALUE_0";
+        }
+        else if (this.isSimpleStringType(ttype)) {
+            return "nullptr";
+        }
+        else if (this.isTupleType(ttype)) {
+            {if(this.isKnownLayoutTupleType(ttype)) {
+                return "{nullptr}";
+            }
+            else {
+                return "{nullptr}";
+            }}
+        }
+        else if (this.isRecordType(ttype)) {
+            if (this.isKnownLayoutRecordType(ttype)) {
+                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
+            }
+            else {
+                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
+            }
+        }
+        else if (this.isUEntityType(ttype)) {
+            return "nullptr";
+        }
+        else {
+            return "nullptr";
+        }
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -389,32 +824,7 @@ class CPPTypeEmitter {
         return (this.conceptSubtypeRelation.get(ckey) as string[]).length;
     }
 
-    maybeRefableCountableType(tt: MIRType): boolean {
-        if(tt.options.every((opt) => {
-            const uname = opt.trkey;
-            return (uname === "NSCore::None" || uname === "NSCore::Bool");
-        })) {
-            return false;
-        }
-
-        if (tt.options.length === 1 && tt.options[0] instanceof MIREntityType && tt.options[0].trkey === "NSCore::Int") {
-            return false;
-        }
-
-        if (tt.options.length === 1 && tt.options[0] instanceof MIREntityType && (this.assembly.entityDecls.get((tt.options[0] as MIREntityType).ekey) as MIREntityTypeDecl).provides.includes("NSCore::Enum")) {
-            return false;
-        }
-
-        if(this.isTupleType(tt) && CPPTypeEmitter.getTupleTypeMaxLength(tt) === 0) {
-            return false;
-        }
-
-        if(this.isRecordType(tt) && CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).length === 0) {
-            return false;
-        }
-
-        return true;
-    }
+    
 
     typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "decl"): string {
         if (this.isSimpleBoolType(ttype)) {
@@ -466,177 +876,6 @@ class CPPTypeEmitter {
         }
     }
 
-    typeToCPPDefaultValue(ttype: MIRType): string {
-        if (this.isSimpleBoolType(ttype)) {
-            return "false"
-        }
-        else if (this.isSimpleIntType(ttype)) {
-            return "BSQ_VALUE_0";
-        }
-        else if (this.isSimpleStringType(ttype)) {
-            return "nullptr";
-        }
-        else if (this.isTupleType(ttype)) {
-            {if(this.isKnownLayoutTupleType(ttype)) {
-                return "{nullptr}";
-            }
-            else {
-                return "{nullptr}";
-            }}
-        }
-        else if (this.isRecordType(ttype)) {
-            if (this.isKnownLayoutRecordType(ttype)) {
-                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
-            }
-            else {
-                return "{std::make_pair<MIRPropertyEnum, Value>(MIRPropertyEnum::Invalid, nullptr)}";
-            }
-        }
-        else if (this.isUEntityType(ttype)) {
-            return "nullptr";
-        }
-        else {
-            return "nullptr";
-        }
-    }
-
-    coerce(exp: string, from: MIRType, into: MIRType): string {
-        if (this.typeToCPPType(from, "base") === this.typeToCPPType(into, "base")) {
-            return exp;
-        }
-
-        if (from.trkey === "NSCore::None") {
-            return "BSQ_VALUE_NONE";
-        }
-        else if (this.isSimpleBoolType(from)) {
-            return `BSQ_BOX_VALUE_BOOL(${exp})`;
-        }
-        else if (this.isSimpleIntType(from)) {
-            return `BSQ_BOX_VALUE_BSQINT(${exp}, ${this.mangleStringForCpp("$scope$")}, ${this.scopectr++})`;
-        }
-        else if (this.isSimpleStringType(from)) {
-            return exp;
-        }
-        else if (this.isTupleType(from)) {
-            assert(!(this.isKnownLayoutTupleType(from) && this.isKnownLayoutTupleType(into)), "Shoud be a type error or handled by equality case");
-
-            const fromsize = CPPTypeEmitter.getTupleTypeMaxLength(from);
-            if (this.isKnownLayoutTupleType(from)) {
-                if (this.isTupleType(into)) {
-                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
-                    return `StructuralCoercionOps::convertTupleKnownToFixed<${intosize}, ${fromsize}>(${exp})`;
-                }
-                else {
-                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleKnown<${fromsize}>(${exp}))`;
-                }
-            }
-            else if (this.isKnownLayoutTupleType(into)) {
-                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
-                return `StructuralCoercionOps::convertTupleFixedToKnown<${intosize}, ${fromsize}>(${exp})`;
-            }
-            else {
-               if (this.isTupleType(into)) {
-                    const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
-                    if (intosize < fromsize) {
-                        return `StructuralCoercionOps::projectTupleDownFixed<${intosize}, ${fromsize}>(${exp})`;
-                    }
-                    else {
-                        return `StructuralCoercionOps::projectTupleUpFixed<${intosize}, ${fromsize}>(${exp})`;
-                    }
-                }
-                else {
-                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQTuple>(StructuralCoercionOps::boxTupleFixed<${fromsize}>(${exp}))`;
-                }
-            }
-        }
-        else if (this.isRecordType(from)) {
-            assert(!(this.isKnownLayoutRecordType(from) && this.isKnownLayoutRecordType(into)), "Shoud be a type error or handled by equality case");
-
-            const fromset = CPPTypeEmitter.getRecordTypeMaxPropertySet(from);
-            if (this.isKnownLayoutRecordType(from)) {
-                if (this.isRecordType(into)) {
-                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
-                    if (intoset.length === 0) {
-                        return "BSQRecordFixed_empty";
-                    }
-                    else {
-                        if(fromset.length === 0) {
-                            return `BSQRecordFixed<${intoset.length}>{0}`;
-                        }
-                        else {
-                            return `StructuralCoercionOps::convertRecordKnownToFixed<${intoset.length}, ${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)})`;
-                        }
-                    }
-                }
-                else {
-                    if(fromset.length === 0) {
-                        return "BSQRecord::_empty";
-                    }
-                    else {
-                        return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordKnown<${fromset.length}>(${exp}, ${this.getKnownPropertyRecordArrayName(from)}))`;
-                    }
-                }
-            }
-            else if (this.isKnownLayoutRecordType(into)) {
-                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
-                return `StructuralCoercionOps::convertRecordFixedToKnown<${intoset.length}, ${fromset.length}>(${exp})`;
-            }
-            else {
-               if (this.isRecordType(into)) {
-                    const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
-                    if (intoset.length < fromset.length) {
-                        return `StructuralCoercionOps::projectRecordDownFixed<${intoset.length}, ${fromset.length}>(${exp})`;
-                    }
-                    else {
-                        return `StructuralCoercionOps::projectRecordUpFixed<${intoset.length}, ${fromset.length}>(${exp})`;
-                    }
-                }
-                else {
-                    return `${this.mangleStringForCpp("$scope$")}.addAllocRef<${this.scopectr++}, BSQRecord>(StructuralCoercionOps::boxRecordFixed<${fromset.length}>(${exp}))`;
-                }
-            }
-        }
-        else if (this.isUEntityType(from)) {
-            return exp;
-        }
-        else {
-            assert(this.typeToCPPType(from, "base") === "Value", "must be a Value mapped type");
-
-            if (this.isSimpleBoolType(into)) {
-                return `BSQ_GET_VALUE_BOOL(${exp})`;
-            }
-            else if (this.isSimpleIntType(into)) {
-                return `BSQ_GET_VALUE_BSQINT(${exp})`;
-            }
-            else if (this.isSimpleStringType(into)) {
-                return `BSQ_GET_VALUE_PTR(${exp}, BSQString)`;
-            }
-            else if (this.isTupleType(into)) {
-                const intosize = CPPTypeEmitter.getTupleTypeMaxLength(into);
-                if (this.isKnownLayoutTupleType(into)) {
-                    return `StructuralCoercionOps::unboxTupleKnown<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
-                }
-                else {
-                    return `StructuralCoercionOps::unboxTupleFixed<${intosize}>(BSQ_GET_VALUE_PTR(${exp}, BSQTuple))`;
-                }
-            }
-            else if (this.isRecordType(into)) {
-                const intoset = CPPTypeEmitter.getRecordTypeMaxPropertySet(into);
-                if (this.isKnownLayoutRecordType(into)) {
-                    return `StructuralCoercionOps::unboxRecordKnown<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
-                }
-                else {
-                    return `StructuralCoercionOps::unboxRecordFixed<${intoset.length}>(BSQ_GET_VALUE_PTR(${exp}, BSQRecord))`;
-                }
-            }
-            else if (this.isUEntityType(into)) {
-                return `BSQ_GET_VALUE_PTR(${exp}, ${this.typeToCPPType(into, "base")})`;
-            }
-            else {
-                return exp;
-            }
-        }
-    }
 
     generateFixedTupleAccessor(idx: number): string {
         return `.atFixed<${idx}>()`;

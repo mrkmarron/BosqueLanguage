@@ -467,6 +467,10 @@ class MIRRecordType extends MIRStructuralType {
     }
 }
 
+class MIREpemeralListType extends MIRTypeOption {
+    xxxx;
+}
+
 class MIRType {
     readonly trkey: MIRResolvedTypeKey;
     readonly options: MIRTypeOption[];
@@ -754,7 +758,7 @@ class MIRAssembly {
 
 export {
     MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
-    MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl,
+    MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl, MIREpemeralListType,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
     MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,
     PackageConfig, MIRAssembly
