@@ -66,25 +66,25 @@ class SMTBodyEmitter {
     }
 
     getGasKeyForOperation(tkey: string): "collection" | "string" | "regex" | "ap_type" | "default" {
-        if(key.startsWith("NSCore::List<") || key.startsWith("NSCore::Set<") || key.startsWith("NSCore::Map<")) {
-            return this.gasLimits.get("collection") as number;
+        if(tkey.startsWith("NSCore::List<") || tkey.startsWith("NSCore::Set<") || tkey.startsWith("NSCore::Map<")) {
+            return "collection";
         }
-        else if(key === "NSCore::String") {
-            return this.gasLimits.get("string") as number;
+        else if(tkey === "NSCore::String") {
+            return "string";
         }
-        else if(key === "NSCore::Regex") {
-            return this.gasLimits.get("regex") as number;
+        else if(tkey === "NSCore::Regex") {
+            return "regex";
         }
-        else if(key === "TYPE_CHECK") {
-            return this.gasLimits.get("ap_type") as number;
+        else if(tkey === "TYPE_CHECK") {
+            return "ap_type";
         }
         else {
-            return this.gasLimits.get("default") as number;
+            return "default";
         }
     }
 
     getGasForOperation(tkey: string): number {
-        return this.gasLimits.get(this.getGasForOperation(tkey)) as number;
+        return this.gasLimits.get(this.getGasKeyForOperation(tkey)) as number;
     }
 
     generateBMCLimitCreate(tkey: string, rtype: string): SMTValue {
@@ -167,7 +167,7 @@ class SMTBodyEmitter {
         else if (this.assembly.subtypeOf(argtype, this.typegen.boolType)) {
             return this.argToSMT(arg, this.typegen.boolType);
         }
-        else if (this.typegen.isKeyType(argtype)) {
+        else if (this.typegen.typecheckAllKeys(argtype)) {
             return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} (bsqkey_bool true))`);
         }
         else {
@@ -184,14 +184,11 @@ class SMTBodyEmitter {
         else if (!this.assembly.subtypeOf(this.typegen.noneType, argtype)) {
             return new SMTValue("false");
         }
-        else if (this.typegen.isUEntityType(argtype)) {
-            return new SMTValue(`(is-${this.typegen.generateEntityNoneConstructor(SMTTypeEmitter.getUEntityType(argtype).ekey)} ${this.argToSMT(arg, argtype).emit()})`);
-        }
-        else if(this.typegen.isKeyType(argtype)) {
+        else if(this.typegen.typecheckAllKeys(argtype)) {
             return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} bsqkey_none)`);
         }
         else {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} (bsqterm_key bsqkey_none))`);
+            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} bsqterm_none)`);
         }
     }
 

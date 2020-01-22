@@ -8,8 +8,8 @@
 
 namespace BSQ
 {
-BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}));
-BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}));
+BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}, true, true));
+BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}, true, true));
 
 size_t bsqKeyValueHash(KeyValue v)
 {
@@ -118,7 +118,7 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef); 
         if(dynamic_cast<BSQBigInt*>(ptr1) != nullptr && dynamic_cast<BSQBigInt*>(ptr2) != nullptr)
         {
-            return BSQBigInt::eq(*dynamic_cast<BSQBigInt*>(ptr1), *dynamic_cast<BSQBigInt*>(ptr2));
+            return BSQBigInt::eq(dynamic_cast<BSQBigInt*>(ptr1), dynamic_cast<BSQBigInt*>(ptr2));
         }
         else if(dynamic_cast<BSQString*>(ptr1) != nullptr && dynamic_cast<BSQString*>(ptr2) != nullptr)
         {

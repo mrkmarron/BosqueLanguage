@@ -109,6 +109,10 @@ class SMTTypeEmitter {
         }
     }
 
+    typecheckAllKeys(tt: MIRType): boolean {
+        return tt.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType));
+    }
+
     typecheckEphemeral(tt: MIRType): boolean {
         return tt.options.length === 1 && tt.options[0] instanceof MIREpemeralListType;
     }
@@ -128,56 +132,56 @@ class SMTTypeEmitter {
             return "String";
         }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
-            return "BKeyValue";
+            return "bsq_stringof";
         }
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
-            return "BKeyValue";
+            return "bsq_guid";
         }
         else if (this.typecheckIsName(tt, /^NSCore::EventTime$/)) {
-            return "BKeyValue";
+            return "bsq_eventtime";
         }
         else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
-            return "BKeyValue";
+            return "bsq_datahash";
         }
         else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
-            return "BKeyValue";
+            return "bsq_cryptohash";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype)) {
-            return "BKeyValue";
+            return "bsq_enum";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
-            return "BKeyValue";
+            return "bsq_idkey";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
-            return "BKeyValue";
+            return "bsq_idkey_guid";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype)) {
-            return "BKeyValue";
+            return "bsq_idkey_eventtime";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
-            return "BKeyValue";
+            return "bsq_idkey_datahash";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
-            return "BKeyValue";
+            return "bsq_idkey_cryptohash";
         }
         else {
-            if(tt.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
+            if(this.typecheckAllKeys(tt)) {
                 return "BKeyValue";
             }
             else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/)) {
-                return "BTerm";
+                return "bsq_buffer";
             }
             else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/)) {
-                return "BTerm";
+                return "bsq_isotime";
             }
             else if (this.typecheckIsName(tt, /^NSCore::Regex$/)) {
-                return "BTerm";
+                return "bsq_regex";
             }
             else if (this.typecheckTuple(tt)) {
-                return "BTerm";
+                return "bsq_tuple";
             }
             else if (this.typecheckRecord(tt)) {
-                return "BTerm";
+                return "bsq_record";
             }
             else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/)) {
                 return this.mangleStringForSMT(tt.trkey);
@@ -206,17 +210,53 @@ class SMTTypeEmitter {
         if (from.trkey === "NSCore::None") {
             return (intotype === "BKeyValue") ? new SMTValue("bsqkey_none") : new SMTValue(`bsqterm_none`);
         }
-        else if (this.typecheckIsName(from, /^NSCore::Bool$/)) {
-            return (intotype === "BKeyValue") ? new SMTValue(`(bsqkey_bool ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_bool ${exp.emit()}))`);
-        }
-        else if (this.typecheckIsName(from, /^NSCore::Int$/)) {
-            return (intotype === "BKeyValue") ? new SMTValue(`(bsqkey_int ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_int ${exp.emit()}))`);
-        }
-        else if (this.typecheckIsName(from, /^NSCore::String$/)) {
-            return (intotype === "BKeyValue") ? new SMTValue(`(bsqkey_string ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()}))`);
-        }
         else {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            let ctoval = "[NOT SET]";
+
+            if (this.typecheckIsName(from, /^NSCore::Bool$/)) {
+                ctoval = `(bsqkey_bool ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::Int$/)) {
+                ctoval = `(bsqkey_int ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::String$/)) {
+                ctoval = `(bsqkey_string ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/)) {
+                ctoval = `(bsq_stringof ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::GUID$/)) {
+                ctoval = `(bsq_guid ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::EventTime$/)) {
+                ctoval = `(bsq_eventtime ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::DataHash$/)) {
+                ctoval = `(bsq_datahash ${exp.emit()})`;
+            }
+            else if (this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
+                ctoval = `(bsq_cryptohash ${exp.emit()})`;
+            }
+            else if (this.typecheckEntityAndProvidesName(from, this.enumtype)) {
+                ctoval = `(bsq_enum ${exp.emit()})`;
+            }
+            else if (this.typecheckEntityAndProvidesName(from, this.idkeytype)) {
+                ctoval = `(bsq_idkey ${exp.emit()})`;
+            }
+            else if (this.typecheckEntityAndProvidesName(from, this.guididkeytype)) {
+                ctoval = `(bsq_idkey_guid ${exp.emit()})`;
+            }
+            else if (this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype)) {
+                ctoval = `(bsq_idkey_eventtime ${exp.emit()})`;
+            }
+            else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
+                ctoval = `(bsq_idkey_datahash ${exp.emit()})`;
+            }
+            else {
+                ctoval = `(bsq_idkey_cryptohash ${exp.emit()})`;
+            }
+
+            return (intotype === "BKeyValue") ? new SMTValue(ctoval) : new SMTValue(`(bsqterm_key ${ctoval})`);
         }
     }
 
@@ -230,62 +270,139 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(into, /^NSCore::String$/)) {
             return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
         }
-        else {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-        }
-    }
-
-    private coerceIntoAtomicKey(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
-        const fromtype = this.getSMTTypeFor(from);
-        if (into.trkey === "NSCore::None") {
-            return (fromtype === "BKeyValue") ? new SMTValue("bsqkey_none") : new SMTValue(`bsqterm_none`);
-        }
-        else if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
-            return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_bool ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_bool ${exp.emit()}))`);
-        }
-        else if (this.typecheckIsName(into, /^NSCore::Int$/)) {
-            return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_int ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_int ${exp.emit()}))`);
-        }
-        else if (this.typecheckIsName(into, /^NSCore::String$/)) {
-            return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_string ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()}))`);
-        }
         else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_stringof_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_guid_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_eventtime_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue( `(bsqkey_datahash_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_cryptohash_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_enum_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.idkeytype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_idkey_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_idkey_guid_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_idkey_eventtime_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+            return new SMTValue(`(bsqkey_idkey_datahash_value ${exp.emit()})`);
         }
-        else if (this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
-            return new SMTValue(`(bsqterm_key ${exp.emit()})`);
+        else {
+            return new SMTValue(`(bsqkey_idkey_cryptohash_value ${exp.emit()})`);
         }
     }
 
-    private coerceIntoOptionsKey(exp: SMTExp, from: MIRType): SMTExp {
-       
+    private coerceFromAtomicTerm(exp: SMTExp, from: MIRType): SMTExp {
+        if (this.typecheckIsName(from, /^NSCore::Buffer<.*>$/)) {
+            return new SMTValue(`(bsqterm_buffer ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::ISOTime$/)) {
+            return new SMTValue(`(bsqterm_isotime ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::Regex$/)) {
+            return new SMTValue(`(bsqterm_regex ${exp.emit()})`);
+        }
+        else if (this.typecheckTuple(from)) {
+            return new SMTValue(`(bsqterm_tuple ${exp.emit()})`);
+        }
+        else if (this.typecheckRecord(from)) {
+            return new SMTValue(`(bsqterm_record ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(from, /^NSCore::Result<.*>$/) || this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
+            return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (bsqterm_object_${this.mangleStringForSMT(from.trkey)}@cons ${exp.emit()}))`);
+        }
+        else {
+            return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (bsqterm_object_${this.mangleStringForSMT(from.trkey)}@cons ${exp.emit()}))`);
+        }
+    }
+
+    private coerceIntoAtomicKey(exp: SMTExp, into: MIRType): SMTExp {
+        if (into.trkey === "NSCore::None") {
+            return new SMTValue("bsqkey_none");
+        }
+        else {
+            const cfrom = `(bsqterm_key_value ${exp.emit()})`;
+
+            if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
+                return new SMTValue(`(bsqkey_bool_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::Int$/)) {
+                return new SMTValue(`(bsqkey_int_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::String$/)) {
+                return new SMTValue(`(bsqkey_string_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
+                return new SMTValue(`(bsq_stringof_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
+                return new SMTValue(`(bsq_guid_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
+                return new SMTValue(`(bsq_eventtime_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
+                return new SMTValue(`(bsq_datahash_value ${cfrom})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
+                return new SMTValue(`(bsq_cryptohash_value ${cfrom})`);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
+                return new SMTValue(`(bsq_enum_value ${cfrom})`);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.idkeytype)) {
+                return new SMTValue(`(bsq_idkey_value ${cfrom})`);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
+                return new SMTValue(`(bsq_idkey_guid_value ${cfrom})`);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
+                return new SMTValue(`(bsq_idkey_eventtime_value ${cfrom})`);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
+                return new SMTValue(`(bsq_idkey_datahash_value ${cfrom})`);
+            }
+            else {
+                return new SMTValue(`(bsq_idkey_cryptohash_value ${cfrom})`);
+            }
+        }
+    }
+
+    private coerceIntoAtomicTerm(exp: SMTExp, into: MIRType): SMTExp {
+        if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/)) {
+            return new SMTValue(`(bsqterm_buffer_value ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(into, /^NSCore::ISOTime$/)) {
+            return new SMTValue(`(bsqterm_isotime_value ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(into, /^NSCore::Regex$/)) {
+            return new SMTValue(`(bsqterm_regex_value ${exp.emit()})`);
+        }
+        else if (this.typecheckTuple(into)) {
+            return new SMTValue(`(bsqterm_tuple_value ${exp.emit()})`);
+        }
+        else if (this.typecheckRecord(into)) {
+            return new SMTValue(`(bsqterm_record_value ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(into, /^NSCore::Result<.*>$/) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
+            return new SMTValue(`(bsqterm_object_${this.mangleStringForSMT(into.trkey)}_value (bsqterm_object_value ${exp.emit()}))`);
+        }
+        else {
+            return new SMTValue(`(bsqterm_object_${this.mangleStringForSMT(into.trkey)}_value (bsqterm_object_value ${exp.emit()}))`);
+        }
     }
 
     coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {
@@ -307,123 +424,61 @@ class SMTTypeEmitter {
             || this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
-        else {
-            if(from.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
-                return this.coerceFromOptionsKey(exp, into);
-            }
-            else if (this.typecheckIsName(from, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(from, /^NSCore::ISOTime$/) || this.typecheckIsName(from, /^NSCore::Regex$/)
-                || this.typecheckTuple(from) || this.typecheckRecord(from)) {
-                return exp;
-            }
-            else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/)) {
-                    //do object construct here!!!!
-                return new SMTExp()
-            }
-            else if (this.typecheckIsName(from, /^NSCore::Result<.*>$/)) {
-                    //do object construct here!!!!
-                return new SMTExp()
-            }
-            else if (this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-                    //do object construct here!!!!
-                return new SMTExp()
-            }
-            else if (this.typecheckUEntity(from)) {
-                    //do object construct here!!!!
-                return new SMTExp()
+        else if (this.typecheckAllKeys(from)) {
+            const intotype = this.getSMTTypeFor(into);
+            if(intotype === "BTerm") {
+                return new SMTValue(`(bsqterm_key ${exp})`);
             }
             else {
-                const fromtype = this.getSMTTypeFor(from);
-                if (into.trkey === "NSCore::None") {
-                    return (fromtype === "BKeyValue") ? new SMTValue("bsqkey_none") : new SMTValue(`bsqterm_none`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
-                    return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_bool ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_bool ${exp.emit()}))`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::Int$/)) {
-                    return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_int ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_int ${exp.emit()}))`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::String$/)) {
-                    return (fromtype === "BKeyValue") ? new SMTValue(`(bsqkey_string ${exp.emit()})`) : new SMTValue(`(bsqterm_key (bsqkey_string ${exp.emit()}))`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.idkeytype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else if (this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
-                    return new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                }
-                else {
-                    if(into.options.every((opt) => this.assembly.subtypeOf(MIRType.createSingle(opt), this.keyType))) {
-                        if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
-                            return new SMTValue(`(bsqkey_bool_value ${exp.emit()})`);
-                        }
-                        else if (this.typecheckIsName(into, /^NSCore::Int$/)) {
-                            return new SMTValue(`(bsqkey_int_value ${exp.emit()})`);
-                        }
-                        else if (this.typecheckIsName(into, /^NSCore::String$/)) {
-                            return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
-                        }
-                        else {
-                            new SMTValue(`(bsqterm_key ${exp.emit()})`);
-                        }
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/)) {
-                        return exp;
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::ISOTime$/)) {
-                        return exp;
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::Regex$/)) {
-                        return exp;
-                    }
-                    else if (this.typecheckTuple(into)) {
-                        return exp;
-                    }
-                    else if (this.typecheckRecord(into)) {
-                        return exp;
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/)) {
-                        return exp;
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::Result<.*>$/)) {
-                        return exp;
-                    }
-                    else if (this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
-                        return exp;
-                    }
-                    else if(this.typecheckUEntity(into)) {
-                        return exp;
-                    }
-                    else {
-                        return exp;
-                    }
-                }
+                return this.coerceFromOptionsKey(exp, into);
+            }
+        }
+        else if (this.typecheckIsName(from, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(from, /^NSCore::ISOTime$/) || this.typecheckIsName(from, /^NSCore::Regex$/)) {
+            return this.coerceFromAtomicTerm(exp, from);
+        }
+        else if (this.typecheckTuple(from) || this.typecheckRecord(from)) {
+            return this.coerceFromAtomicTerm(exp, from);
+        }
+        else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(from, /^NSCore::Result<.*>$/) || this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
+            return this.coerceFromAtomicTerm(exp, from);
+        }
+        else if (this.typecheckUEntity(from)) {
+            return this.coerceFromAtomicTerm(exp, from);
+        }
+        else {
+            //now from must be Bterm so we are projecting down
+            assert(this.getSMTTypeFor(into) === "BTerm");
+
+            if (into.trkey === "NSCore::None") {
+                return this.coerceIntoAtomicKey(exp, into);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
+                return this.coerceIntoAtomicKey(exp, into);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
+                || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
+                return this.coerceIntoAtomicKey(exp, into);
+            }
+            else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
+                || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                return this.coerceIntoAtomicKey(exp, into);
+            }
+            else if (this.typecheckAllKeys(into)) {
+                return new SMTValue(`(bsqterm_key_value ${exp})`);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(into, /^NSCore::ISOTime$/) || this.typecheckIsName(into, /^NSCore::Regex$/)) {
+                return this.coerceIntoAtomicTerm(exp, into);
+            }
+            else if (this.typecheckTuple(into) || this.typecheckRecord(into)) {
+                return this.coerceIntoAtomicTerm(exp, into);
+            }
+            else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(into, /^NSCore::Result<.*>$/) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
+                return this.coerceIntoAtomicTerm(exp, into);
+            }
+            else {
+                assert(this.typecheckUEntity(into));
+
+                return this.coerceIntoAtomicTerm(exp, into);
             }
         }
     }
@@ -433,53 +488,7 @@ class SMTTypeEmitter {
 
 
 
-    isTupleType(tt: MIRType): boolean {
-        return tt.options.every((opt) => opt instanceof MIRTupleType);
-    }
-
-    isKnownLayoutTupleType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRTupleType)) {
-            return false;
-        }
-
-        const tup = tt.options[0] as MIRTupleType;
-        return !tup.entries.some((entry) => entry.isOptional);
-    }
-
-    isRecordType(tt: MIRType): boolean {
-        return tt.options.every((opt) => opt instanceof MIRRecordType);
-    }
-
-    isKnownLayoutRecordType(tt: MIRType): boolean {
-        if (tt.options.length !== 1 || !(tt.options[0] instanceof MIRRecordType)) {
-            return false;
-        }
-
-        const tup = tt.options[0] as MIRRecordType;
-        return !tup.entries.some((entry) => entry.isOptional);
-    }
-
-    static getTupleTypeMaxLength(tt: MIRType): number {
-        return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
-    }
-
-    static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
-        return tt.options[0] as MIRTupleType;
-    }
-
-    static getRecordTypeMaxPropertySet(tt: MIRType): string[] {
-        let popts = new Set<string>();
-        tt.options.filter((opt) => opt instanceof MIRRecordType).forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => popts.add(entry.name)));
-        return [...popts].sort();
-    }
-
-    static getKnownLayoutRecordType(tt: MIRType): MIRRecordType {
-        return tt.options[0] as MIRRecordType;
-    }
-
-    static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
-    }
+    
 
     initializeConceptSubtypeRelation(): void {
         this.assembly.conceptDecls.forEach((tt) => {

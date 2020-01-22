@@ -92,10 +92,10 @@ class CPPBodyEmitter {
             return this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, into);
         }
         else if (cval instanceof MIRConstantTrue) {
-            return this.typegen.isSimpleBoolType(into) ? "true" : "BSQ_VALUE_TRUE";
+            return this.typegen.coerce("true", this.typegen.boolType, into);
         }
         else if (cval instanceof MIRConstantFalse) {
-            return this.typegen.isSimpleBoolType(into) ? "false" : "BSQ_VALUE_FALSE";
+            return this.typegen.coerce("false", this.typegen.boolType, into);
         }
         else if (cval instanceof MIRConstantInt) {
             let bint = "";
@@ -109,8 +109,8 @@ class CPPBodyEmitter {
                 bint = "BSQ_VALUE_NEG_1";
             }
             else {
-                if(cval.value.length < 9 && -1000000000 <= Number.parseInt(cval.value) && Number.parseInt(cval.value) <= 1000000000) {
-                    bint = `BSQInt(${cval.value})`;
+                if(Number.isSafeInteger(Number.parseInt(cval.value))) {
+                    bint = `BSQ_ENCODE_VALUE_TAGGED_INT(${cval.value})`;
                 }
                 else {
                     const sname = "BIGINT__" + this.allConstStrings.size;
@@ -122,7 +122,7 @@ class CPPBodyEmitter {
                 }
             }
 
-            return this.typegen.isSimpleIntType(into) ? bint : this.typegen.coerce(bint, this.typegen.intType, into);
+            return this.typegen.coerce(bint, this.typegen.intType, into);
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -134,7 +134,7 @@ class CPPBodyEmitter {
             }
 
             const strval = `(&Runtime::${this.allConstStrings.get(sval) as string})`;
-            return this.typegen.isSimpleBoolType(into) ? strval : this.typegen.coerce(strval, this.typegen.stringType, into);
+            return this.typegen.coerce(strval, this.typegen.stringType, into);
         }
     }
 

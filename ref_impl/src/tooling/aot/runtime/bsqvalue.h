@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "common.h"
-#include "bsqint.h"
 
 #include <unordered_map>
 
@@ -48,7 +47,6 @@
 #define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRef(new T(__VA_ARGS__))))
 
 #define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
-#define INC_REF_NONEABLE(T, V) ((T*) BSQRef::incrementNoneable(V))
 #define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
 
 namespace BSQ
@@ -115,15 +113,6 @@ public:
         return v;
     }
 
-    inline static BSQRef* incrementNoneable(BSQRef* v)
-    {
-        if(BSQ_IS_VALUE_NONNONE(v))
-        {
-            v->increment();
-        }
-        return v;
-    }
-
     inline static Value incrementChecked(Value v)
     {
         if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
@@ -136,14 +125,6 @@ public:
     inline static void decrementDirect(BSQRef* v)
     {
         v->decrement();
-    }
-
-    inline static void decrementNoneable(BSQRef* v)
-    {
-        if(BSQ_IS_VALUE_NONNONE(v))
-        {
-            v->decrement();
-        }
     }
 
     inline static void decrementChecked(Value v)
@@ -174,7 +155,7 @@ public:
         }
     }
 
-    inline BSQRef* addAllocRef(BSQRef* ptr)
+    inline BSQRef* addAllocRefDirect(BSQRef* ptr)
     {
         ptr->increment();
         this->opts.push_back(ptr);
@@ -200,15 +181,6 @@ public:
         this->opts.push_back(ptr);
     }
 
-    inline void processReturnNoneable(BSQRef* ptr)
-    {
-        if(BSQ_IS_VALUE_NONNONE(ptr))
-        {
-            ptr->increment();
-            this->opts.push_back(ptr);
-        }
-    }
-
     inline void processReturnInt(IntValue i)
     {
         if(BSQ_IS_VALUE_PTR(i))
@@ -228,32 +200,6 @@ public:
             this->opts.push_back(ptr);
         }
     }
-};
-
-
-struct ReturnOpFunctor_bool
-{
-    size_t operator()(bool b, BSQRefScope& scope) { ; }
-};
-struct ReturnOpFunctor_IntValue
-{
-    size_t operator()(IntValue i, BSQRefScope& scope) { scope.processReturnInt(i); }
-};
-struct ReturnOpFunctor_IntValueNoneable
-{
-    size_t operator()(IntValue i, BSQRefScope& scope) { scope.processReturnChecked(i); }
-};
-struct ReturnOpFunctor_Direct
-{
-    size_t operator()(BSQRef* ptr, BSQRefScope& scope) { scope.callReturnDirect(ptr); }
-};
-struct ReturnOpFunctor_Noneable
-{
-    size_t operator()(BSQRef* ptr, BSQRefScope& scope) { scope.processReturnNoneable(ptr); }
-};
-struct ReturnOpFunctor_Checked
-{
-    size_t operator()(Value v, BSQRefScope& scope) { scope.processReturnChecked(v); }
 };
 
 struct HashFunctor_bool
@@ -301,7 +247,7 @@ public:
         return false;
     }
 
-    BigInt* negate() const
+    BSQBigInt* negate() const
     {
         return nullptr;
     }
@@ -311,57 +257,57 @@ public:
         return false;
     }
 
-    static bool eq(const BSQBigInt& l, const BSQBigInt& r)
+    static bool eq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-    static bool neq(const BSQBigInt& l, const BSQBigInt& r)
+    static bool neq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-    static bool lt(const BSQBigInt& l, const BSQBigInt& r)
+    static bool lt(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-    static bool lteq(const BSQBigInt& l, const BSQBigInt& r)
+    static bool lteq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-     static bool gt(const BSQBigInt& l, const BSQBigInt& r)
+     static bool gt(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-    static bool gteq(const BSQBigInt& l, const BSQBigInt& r)
+    static bool gteq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
-    static BigInt* add(const BSQBigInt &l, const BSQBigInt &r)
+    static BSQBigInt* add(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BigInt* sub(const BSQBigInt &l, const BSQBigInt &r)
+    static BSQBigInt* sub(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BigInt* mult(const BSQBigInt &l, const BSQBigInt &r)
+    static BSQBigInt* mult(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BigInt* div(const BSQBigInt &l, const BSQBigInt &r)
+    static BSQBigInt* div(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BigInt* mod(const BSQBigInt &l, const BSQBigInt &r)
+    static BSQBigInt* mod(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
@@ -384,7 +330,7 @@ struct EqualFunctor_IntValue
             return BSQ_GET_VALUE_PTR(l, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(r));
         }
         else {
-            return BSQBigInt::eq(*BSQ_GET_VALUE_PTR(l, BSQBigInt), *BSQ_GET_VALUE_PTR(r, BSQBigInt));
+            return BSQBigInt::eq(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt));
         }
     }
 };
@@ -473,8 +419,10 @@ class BSQTuple : public BSQRef
 {
 public:
     const std::vector<Value> entries;
+    const bool isPOD;
+    const bool isAPI;
 
-    BSQTuple(std::vector<Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
+    BSQTuple(std::vector<Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)), isPOD(isPOD), isAPI(isAPI) { ; }
     virtual ~BSQTuple() = default;
 
     virtual void destroy()
@@ -498,8 +446,10 @@ class BSQRecord : public BSQRef
 {
 public:
     const std::map<MIRPropertyEnum, Value> entries;
+    const bool isPOD;
+    const bool isAPI;
 
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)), isPOD(isPOD), isAPI(isAPI) { ; }
 
     virtual ~BSQRecord() = default;
 
@@ -567,7 +517,7 @@ public:
     }
 };
 
-template<typename K, typename KFReturnOp, typename KFDecOp, typename V, typename VFReturnOp, typename VFDecOp>
+template<typename K, typename KFDecOp, typename V, typename VFDecOp>
 class BSQMapEntry : public BSQRef
 {
 public:
@@ -596,15 +546,9 @@ public:
         KFDecOp(this->key);
         VFDecOp(this->value);
     }
-
-    void processReturn(BSQRefScope& scope)
-    {
-        KFReturnOp(this->key, scope);
-        VFReturnOp(this->value, scope);
-    }
 };
 
-template<typename T, typename TFReturnOp, typename TDecOp>
+template<typename T, typename TDecOp>
 class BSQResult : public BSQRef
 {
     T success;
@@ -632,15 +576,9 @@ class BSQResult : public BSQRef
         TFDecOp(this->success);
         BSQRef::decrementChecked(this->error);
     }
-
-    void processReturn(BSQRefScope& scope)
-    {
-        TFReturnOp(this->success, scope);
-        scope.processReturnChecked(this->error);
-    }
 };
 
-template<typename K, typename KFReturnOp, typename KFDecOp, typename U, typename UFReturnOp, typename UFDecOp>
+template<typename K, typename KFDecOp, typename U, typename UFDecOp>
 class BSQTagged : public BSQRef
 {
 public:
@@ -668,12 +606,6 @@ public:
     {
         KFDecOp(this->key);
         UFDecOp(this->value);
-    }
-
-    void processReturn(BSQRefScope& scope)
-    {
-        KFReturnOp(this->key, scope);
-        UFReturnOp(this->value, scope);
     }
 };
 
