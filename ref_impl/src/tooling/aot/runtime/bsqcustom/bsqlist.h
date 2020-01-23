@@ -100,7 +100,7 @@ public:
         }
         ls += U"}";
 
-        return conv.from_bytes(s_nominaltypenames[(uint32_t) this->ntype]) + ls;
+        return ls;
     }
 };
 

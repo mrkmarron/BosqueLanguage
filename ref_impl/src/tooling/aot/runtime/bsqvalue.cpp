@@ -307,42 +307,10 @@ std::u32string diagnostic_format(Value v)
         }
         else
         {
+            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+            
             auto obj = dynamic_cast<const BSQObject*>(vv);
-            if (dynamic_cast<const BSQList*>(obj) != nullptr)
-            {
-                
-            }
-            else if (dynamic_cast<const BSQSet*>(obj) != nullptr)
-            {
-               
-            }
-            else if (dynamic_cast<const BSQMap*>(obj) != nullptr)
-            {
-                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-                auto map = dynamic_cast<const BSQMap*>(vv);
-
-                std::u32string ms(U"{");
-                bool first = true;
-                for (auto iter = map->entries.cbegin(); iter != map->entries.cend(); ++iter)
-                {
-                    if (!first)
-                    {
-                        ms += U", ";
-                    }
-                    first = false;
-
-                    ms += Runtime::diagnostic_format(iter->second);
-                }
-                ms += U"}";
-
-                return conv.from_bytes(s_nominaltypenames[(uint32_t) obj->ntype]) + ms;
-            }
-            else
-            {
-                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-
-                return conv.from_bytes(s_nominaltypenames[(uint32_t) obj->ntype]) + obj->display();
-            }
+            return conv.from_bytes(nominaltypenames[(uint32_t) obj->ntype]) + obj->display();
         }
     }
 }

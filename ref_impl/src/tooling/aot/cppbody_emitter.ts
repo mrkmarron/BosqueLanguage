@@ -259,7 +259,12 @@ class CPPBodyEmitter {
             conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.join(", ")})`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /NSCore::Set<.*>/)) {
-            xxxx;
+            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+            const cvals = cpcs.args.map((arg) => {
+                return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
+            });
+
+            conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.join(", ")})`;
         }
         else {
             xxxx;

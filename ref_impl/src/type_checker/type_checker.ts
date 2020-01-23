@@ -893,12 +893,17 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsMapConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+    private checkArgumentsMapConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedEntityAtomType, args: [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][], trgt: MIRTempRegister): ResolvedType {
         for (let i = 0; i < args.length; ++i) {
             const arg = args[i];
 
             if (!arg[1]) {
-                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
+                if(arg[3] === undefined) {
+                    this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
+                }
+                else {
+
+                }
             }
             else {
                 arg[0].options.forEach((opt) => {
@@ -921,6 +926,9 @@ class TypeChecker {
         }
 
         if (this.m_emitEnabled) {
+            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(entrytype));
+            this.m_emitter.registerTypeInstantiation(entrytype.object, entrytype.binds);
+
             this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(oftype));
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
@@ -1209,9 +1217,9 @@ class TypeChecker {
             else {
                 const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
                 const entrybinds = new Map<string, ResolvedType>().set("K", oobinds.get("K") as ResolvedType).set("V", oobinds.get("V") as ResolvedType);
-                const mentry = ResolvedType.createSingle(ResolvedEntityAtomType.create(entryobj, entrybinds));
+                const mentry = ResolvedEntityAtomType.create(entryobj, entrybinds);
 
-                const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg] as [ResolvedType, boolean, MIRTempRegister]);
+                const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg, ca.etype, ca.ereg] as [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined]);
 
                 this.checkArgumentsMapConstructor(sinfo, oftype, mentry, cargs, rtreg);
             }
@@ -1453,6 +1461,8 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
 
             const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
+
+
             const eargs = this.checkArgumentsEvaluationMap(env, exp.args, oobinds.get("K") as ResolvedType, oobinds.get("V") as ResolvedType);
             return [env.setExpressionResult(this.checkArgumentsMapConstructor(exp.sinfo, oftype, contentstype, eargs, trgt))];
         }
