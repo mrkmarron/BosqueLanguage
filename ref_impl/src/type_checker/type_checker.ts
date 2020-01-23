@@ -1672,7 +1672,7 @@ class TypeChecker {
             this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, exp.sinfo, ftype, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, [], trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, (pcode as PCode).ftype.resultType)];
+        return [env.setExpressionResult((pcode as PCode).ftype.resultType)];
     }
 
     private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1681,12 +1681,12 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
 
-        const idxtype = this.getInfoForLoadFromIndex(texp, op.index);
+        const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.index);
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitLoadTupleIndex(op.sinfo, this.m_emitter.registerResolvedTypeReference(idxtype).trkey, arg, op.index, trgt);
         }
 
-        return [env.setExpressionResult(this.m_assembly, idxtype)];
+        return [env.setExpressionResult(idxtype)];
     }
 
     private checkProjectFromIndecies(env: TypeEnvironment, op: PostfixProjectFromIndecies, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -1695,17 +1695,22 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => idx < 0), "Index cannot be negative");
 
-        const resultOptions = texp.options.map((opt) => {
-            let ttypes = op.indecies.map((idx) => new ResolvedTupleAtomTypeEntry(this.getInfoForLoadFromIndex(ResolvedType.createSingle(opt), idx), false));
-            return ResolvedType.createSingle(ResolvedTupleAtomType.create(ttypes));
-        });
-        const restype = this.m_assembly.typeUnion(resultOptions);
-
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.indecies, trgt);
+        if(op.isEphemeralListResult) {
+            xxxx;
         }
+        else {
+            const resultOptions = texp.options.map((opt) => {
+                let ttypes = op.indecies.map((idx) => new ResolvedTupleAtomTypeEntry(this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(opt), idx), false));
+                return ResolvedType.createSingle(ResolvedTupleAtomType.create(ttypes));
+            });
+            const restype = this.m_assembly.typeUnion(resultOptions);
 
-        return [env.setExpressionResult(this.m_assembly, restype)];
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, op.indecies, trgt);
+            }
+
+            return [env.setExpressionResult(restype)];
+        }
     }
 
     private checkAccessFromName(env: TypeEnvironment, op: PostfixAccessFromName, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {

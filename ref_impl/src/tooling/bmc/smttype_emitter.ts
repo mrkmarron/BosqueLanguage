@@ -483,13 +483,6 @@ class SMTTypeEmitter {
         }
     }
 
-
-
-
-
-
-    
-
     initializeConceptSubtypeRelation(): void {
         this.assembly.conceptDecls.forEach((tt) => {
             const cctype = this.getMIRType(tt.tkey);
@@ -504,32 +497,12 @@ class SMTTypeEmitter {
         return (this.conceptSubtypeRelation.get(tt.trkey) as string[]).length;
     }
 
-    generateRecordTypePropertyName(tt: MIRType): string {
-        const pnames = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
-        if (pnames.length === 0) {
-            return "empty";
-        }
-        else {
-            return this.mangleStringForSMT(`{${pnames.join(", ")}}`);
-        }
+    generateEntityConstructor(ekey: MIRNominalTypeKey): string {
+        return `${this.mangleStringForSMT(ekey)}@cons`;
     }
 
-    
-
-    generateTupleConstructor(ttype: MIRType): string {
-        return `bsqtuple_${SMTTypeEmitter.getTupleTypeMaxLength(ttype)}@cons`;
-    }
-
-    generateTupleAccessor(ttype: MIRType, idx: number): string {
-        return `bsqtuple_${SMTTypeEmitter.getTupleTypeMaxLength(ttype)}@${idx}`;
-    }
-
-    generateRecordConstructor(ttype: MIRType): string {
-        return `bsqrecord_${this.generateRecordTypePropertyName(ttype)}@cons`;
-    }
-
-    generateRecordAccessor(ttype: MIRType, p: string): string {
-        return `bsqrecord_${this.generateRecordTypePropertyName(ttype)}@${p}`;
+    generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
+        return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
@@ -548,46 +521,6 @@ class SMTTypeEmitter {
         };
     }
 
-    generateEntityNoneConstructor(ekey: MIRNominalTypeKey): string {
-        if (ekey.startsWith("NSCore::List<")) {
-            return "cons@bsqlist$none";
-        }
-        else if (ekey.startsWith("NSCore::Set<")) {
-            return "cons@bsqkvcontainer$none";
-        }
-        else if (ekey.startsWith("NSCore::Map<")) {
-            return "cons@bsqkvcontainer$none";
-        }
-        else if (ekey === "NSCore::KeyList") {
-            return "cons@bsqkeylist$none";
-        }
-        else {
-            return `cons@${this.mangleStringForSMT(ekey)}$none`;
-        }
-    }
-
-    generateEntityConstructor(ekey: MIRNominalTypeKey): string {
-        if (ekey.startsWith("NSCore::List<")) {
-            return "cons@bsqlist";
-        }
-        else if (ekey.startsWith("NSCore::Set<")) {
-            return "cons@bsqkvcontainer";
-        }
-        else if (ekey.startsWith("NSCore::Map<")) {
-            return "cons@bsqkvcontainer";
-        }
-        else if (ekey === "NSCore::KeyList") {
-            return "cons@bsqkeylist";
-        }
-        else {
-            return `cons@${this.mangleStringForSMT(ekey)}`;
-        }
-    }
-
-    generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
-        return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
-    }
-
     generateCheckSubtype(ekey: MIRNominalTypeKey, oftype: MIRConceptType): string {
         const lookups = oftype.ckeys.map((ckey) => {
             return `(select MIRConceptSubtypeArray__${this.mangleStringForSMT(ckey)} ${ekey})`;
@@ -597,7 +530,7 @@ class SMTTypeEmitter {
             return lookups[0];
         }
         else {
-            return lookups.join(" ");
+            return `(or ${lookups.join(" ")})`;
         }
     }
 }

@@ -203,7 +203,7 @@ class CPPTypeEmitter {
     }
 
     private coerceFromAtomicKey(exp: string, from: MIRType): string {
-        const scope = this.mangleStringForCpp("scope");
+        const scope = this.mangleStringForCpp("$scope$");
         if (from.trkey === "NSCore::None") {
             return "BSQ_VALUE_NONE";
         }
@@ -329,13 +329,16 @@ class CPPTypeEmitter {
             return exp;
         }
         else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/)) {
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            xxxx;
+            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::Result<.*>$/)) {
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            xxxx;
+            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("scope")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            xxxx;
+            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
         }
         else if (this.typecheckUEntity(from)) {
             return exp;
@@ -446,42 +449,6 @@ class CPPTypeEmitter {
         }
     }
 
-
-
-
-
-
-
-
-
-
-    static getKnownLayoutTupleType(tt: MIRType): MIRTupleType {
-        return tt.options[0] as MIRTupleType;
-    }
-
-    static getTupleTypeMaxLength(tt: MIRType): number {
-        return Math.max(...tt.options.filter((opt) => opt instanceof MIRTupleType).map((opt) => (opt as MIRTupleType).entries.length));
-    }
-
-    static getKnownLayoutRecordType(tt: MIRType): MIRRecordType {
-        return tt.options[0] as MIRRecordType;
-    }
-
-    static getRecordTypeMaxPropertySet(tt: MIRType): string[] {
-        let popts = new Set<string>();
-        tt.options.filter((opt) => opt instanceof MIRRecordType).forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => popts.add(entry.name)));
-        return [...popts].sort();
-    }
-
-    getKnownPropertyRecordArrayName(tt: MIRType): string {
-        const name = `{ ${CPPTypeEmitter.getRecordTypeMaxPropertySet(tt).join(", ")} }`;
-        return `KnownPropertySet_${this.mangleStringForCpp(name)}`;
-    }
-
-    static getUEntityType(tt: MIRType): MIREntityType {
-        return tt.options.filter((opt) => opt.trkey !== "NSCore::None")[0] as MIREntityType;
-    }
-
     initializeConceptSubtypeRelation(): void {
         this.assembly.conceptDecls.forEach((tt) => {
             const cctype = this.getMIRType(tt.tkey);
@@ -496,100 +463,13 @@ class CPPTypeEmitter {
         return (this.conceptSubtypeRelation.get(ckey) as string[]).length;
     }
 
-    
-
-    typeToCPPType(ttype: MIRType, declspec: "base" | "parameter" | "return" | "decl"): string {
-        if (this.isSimpleBoolType(ttype)) {
-            return "bool"
-        }
-        else if (this.isSimpleIntType(ttype)) {
-            return "BSQInt";
-        }
-        else if (this.isSimpleStringType(ttype)) {
-            return "BSQString" + (declspec !== "base" ? "*" : "");
-        }
-        else if (this.isTupleType(ttype)) {
-            if(this.isKnownLayoutTupleType(ttype)) {
-                return `BSQTupleKnown<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>`;
-            }
-            else {
-                return `BSQTupleFixed<${CPPTypeEmitter.getTupleTypeMaxLength(ttype)}>`; 
-            }
-        }
-        else if (this.isRecordType(ttype)) {
-            if (this.isKnownLayoutRecordType(ttype)) {
-                return `BSQRecordKnown<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>`;
-            }
-            else {
-                return `BSQRecordFixed<${CPPTypeEmitter.getRecordTypeMaxPropertySet(ttype).length}>`;
-            }
-        }
-        else if (this.isUEntityType(ttype)) {
-            if (this.isUCollectionType(ttype)) {
-                if (this.isListType(ttype)) {
-                    return "BSQList" + (declspec !== "base" ? "*" : "");
-                }
-                else if (this.isSetType(ttype)) {
-                    return "BSQSet" + (declspec !== "base" ? "*" : "");
-                }
-                else {
-                    return "BSQMap" + (declspec !== "base" ? "*" : "");
-                }
-            }
-            else if (this.isUKeyListType(ttype)) {
-                return "BSQKeyList" + (declspec !== "base" ? "*" : "");
-            }
-            else {
-                return this.mangleStringForCpp(CPPTypeEmitter.getUEntityType(ttype).ekey) + (declspec !== "base" ? "*" : "");
-            }
-        }
-        else {
-            return "Value";
-        }
-    }
-
-
-    generateFixedTupleAccessor(idx: number): string {
-        return `.atFixed<${idx}>()`;
-    }
-
-    generateKnownRecordAccessor(ttype: MIRType, p: string): string {
-        return `.atPropertyIndex<${CPPTypeEmitter.getKnownLayoutRecordType(ttype).entries.findIndex((entry) => entry.name === p)}>()`;
-    }
-
-    generateFixedRecordAccessor(p: string): string {
-        return `.atFixed<MIRPropertyEnum::${p}>()`;
-    }
-
     generateConstructorArgInc(argtype: MIRType, arg: string): string {
         if (!this.maybeRefableCountableType(argtype)) {
             return arg;
         }
 
-        if(this.isTupleType(argtype)) {
-            if(this.isKnownLayoutTupleType(argtype)) {
-                return `${arg}.copyWithRefInc()`;
-            }
-            else {
-                return `${arg}.copyWithRefInc()`;
-            }
-        }
-        else if(this.isRecordType(argtype)) {
-            if(this.isKnownLayoutRecordType(argtype)) {
-                return `${arg}.copyWithRefInc()`;
-            }
-            else {
-                return `${arg}.copyWithRefInc()`;
-            }
-        }
-        else if (this.isUEntityType(argtype)) {
-            if (this.assembly.subtypeOf(this.noneType, argtype)) {
-                return `BSQRef::checkedIncrementNoneable<${this.typeToCPPType(argtype, "base")}>(${arg})`;
-            }
-            else {
-                return `BSQRef::checkedIncrementFast<${this.typeToCPPType(argtype, "base")}>(${arg})`;
-            }
-        }
+        xxxx;
+
         else {
             return `BSQRef::checkedIncrementOf<${this.typeToCPPType(argtype, "parameter")}>(${arg})`;
         }

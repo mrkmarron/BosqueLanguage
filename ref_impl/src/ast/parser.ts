@@ -2736,6 +2736,7 @@ class Parser {
 
     private parseOOPMembersCommon(thisType: TypeSignature, invariants: Expression[], staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         while (this.testAndConsumeTokenIf("invariant")) {
+            xxxx; //need buildlevel
             try {
                 this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(["this"])));
                 const body = this.parseExpression();

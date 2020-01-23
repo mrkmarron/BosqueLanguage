@@ -216,12 +216,12 @@ class SMTBodyEmitter {
         }
         else {
             const tv = this.generateTempName();
-            const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(cdecl.declaredType));
-            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+            const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(cdecl.declaredType));
+            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
 
             const constexp = new SMTValue(this.invokenameToSMT(cdecl.value.bkey));
             const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
-            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.typeToSMTCategory(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.getSMTTypeFor(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
             const normalassign = new SMTLet(this.varToSMTName(cp.trgt), new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
 
             return new SMTLet(tv, constexp, new SMTCond(checkerror, extracterror, normalassign));
@@ -238,8 +238,8 @@ class SMTBodyEmitter {
         }
         else {
             const tv = this.generateTempName();
-            const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(fdecl.declaredType));
-            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+            const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(fdecl.declaredType));
+            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
 
             const constexp = new SMTValue(this.invokenameToSMT((fdecl.value as MIRBody).bkey));
             const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
@@ -265,7 +265,7 @@ class SMTBodyEmitter {
         }
         else {
             const testexp = new SMTValue(`(${this.typegen.mangleStringForSMT("invariant::" + cp.tkey)} ${this.varToSMTName(cp.trgt)})`);
-            const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
             const errexp = this.generateErrorCreate(cp.sinfo, resulttype);
             return bindexp.bind(new SMTCond(testexp, SMTFreeVar.generate(), errexp));
         }

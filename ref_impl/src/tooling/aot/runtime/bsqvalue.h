@@ -517,7 +517,7 @@ public:
     }
 };
 
-template<typename K, typename KFDecOp, typename V, typename VFDecOp>
+template<typename K, typename V, typename RCOpsKey, typename RCOpsValue>
 class BSQMapEntry : public BSQRef
 {
 public:
@@ -543,8 +543,22 @@ public:
 
     virtual void destroy() 
     {
-        KFDecOp(this->key);
-        VFDecOp(this->value);
+        RCOpsKey::DecRC(reinterpret_cast<void*>(this->key));
+        RCOpsValue::DecRC(reinterpret_cast<void*>(this->value));
+    }
+
+    BSQMapEntry* processBox(BSQRefScope& scope) 
+    {
+        RCOpsKey::IncRC(reinterpret_cast<void*>(this->key));
+        RCOpsValue::IncRC(reinterpret_cast<void*>(this->value));
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQMapEntry, this->key, this->value);
+    }
+
+    void processCallReturn(BSQRefScope& scaller) 
+    {
+        RCOpsKey::ProcessCallReturn(reinterpret_cast<void*>(this->key));
+        RCOpsValue::ProcessCallReturn(reinterpret_cast<void*>(this->value));
     }
 };
 

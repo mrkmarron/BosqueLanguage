@@ -572,11 +572,13 @@ class MIRAccessLocalVariable extends MIRValueOp {
 }
 
 class MIRConstructorPrimary extends MIRValueOp {
+    readonly isValue: boolean;
     readonly tkey: MIRNominalTypeKey;
     args: MIRArgument[];
 
-    constructor(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, isValue: boolean, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         super(MIROpTag.MIRConstructorPrimary, sinfo, trgt);
+        this.isValue = isValue;
         this.tkey = tkey;
         this.args = args;
     }
@@ -584,15 +586,15 @@ class MIRConstructorPrimary extends MIRValueOp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}@(${this.args.map((arg) => arg.stringify()).join(", ")})`;
+        return `${this.trgt.stringify()} = ${this.tkey}${this.isValue ? "#" : "@"}(${this.args.map((arg) => arg.stringify()).join(", ")})`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), tkey: this.tkey, args: this.args.map((arg) => arg.jemit()) };
+        return { ...this.jbemit(), isValue: this.isValue, tkey: this.tkey, args: this.args.map((arg) => arg.jemit()) };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRConstructorPrimary(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRConstructorPrimary(jparsesinfo(jobj.sinfo), jobj.isValue, jobj.tkey, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

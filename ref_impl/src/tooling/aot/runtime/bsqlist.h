@@ -16,6 +16,24 @@ public:
     BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
     BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
+    static BSQList createFromSingle (BSQRefScope& scope, MIRNominalTypeEnum ntype, ...)
+    {
+        T val;
+        std::vector<T> entries;
+
+        va_list vl;
+        int n;
+        va_start(vl,n);
+        for (i=0; i<n; i++)
+        {
+            val=va_arg(vl, T);
+            entries.push_back(val);
+        }
+        va_end(vl);
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQList, ntype, move(entries));
+    }
+
     virtual ~BSQList() = default;
 
     virtual void destroy()
@@ -60,12 +78,73 @@ public:
         return new BSQList(this->ntype, move(nv));
     }
 
-    BSQList* destructiveAdd(const T& v)
+    virtual std::u32string display() const
     {
-        FIncOp(v);
-        this->entries.push_back(v);
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
 
-        return this;
+        std::u32string ls(U"{");
+        for (size_t i = 0; i < list->entries.size(); ++i)
+        {
+            if (i != 0)
+            {
+                ls += U", ";
+            }
+
+            ls += FDisplay(list->entries.at(i));
+        }
+        ls += U"}";
+
+        return conv.from_bytes(s_nominaltypenames[(uint32_t) obj->ntype]) + ls;
+    }
+};
+
+template<typename T>
+class BSQList : public BSQObject {
+public:
+    std::vector<T> entries;
+
+    BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
+    BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+
+    static BSQList createFromSingle (BSQRefScope& scope, MIRNominalTypeEnum ntype, ...)
+    {
+        T val;
+        std::vector<T> entries;
+
+        va_list vl;
+        int n;
+        va_start(vl,n);
+        for (i=0; i<n; i++)
+        {
+            val=va_arg(vl, T);
+            entries.push_back(val);
+        }
+        va_end(vl);
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQList, ntype, move(entries));
+    }
+
+    virtual ~BSQList() = default;
+
+    virtual void destroy()
+    {
+        ;
+    }
+
+    BSQList* unsafeAdd(const T& v) const
+    {
+        std::vector<T> nv(this->entries);
+        nv.push_back(v);
+
+        return new BSQList(this->ntype, move(nv));
+    }
+
+    BSQList* unsafeSet(const BSQInt& idx, const T& v) const
+    {
+        std::vector<T> nv(this->entries);
+        nv[i] = v;
+
+        return new BSQList(this->ntype, move(nv));
     }
 
     virtual std::u32string display() const

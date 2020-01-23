@@ -222,9 +222,9 @@ class CPPBodyEmitter {
             return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
         });
 
-        const cppctype = this.typegen.typeToCPPType(this.typegen.getMIRType(cp.tkey), "base");
+        const cppctype = this.typegen.getCPPTypeFor(this.typegen.getMIRType(cp.tkey), "base");
         const scopevar = this.varNameToCppName("$scope$");
-        const cexp = `${this.varToCppName(cp.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new ${cppctype}(${fvals.join(", ")}));`;
+        const cexp = `${this.varToCppName(cp.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}${fvals.length !== 0 ? (", " + fvals.join(", ")) : ""});`;
         if (ctype.invariants.length === 0) {
             return cexp;
         }
@@ -236,35 +236,27 @@ class CPPBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): string {
         const cpetype = this.typegen.getMIRType(cpce.tkey);
-        const cppctype = this.typegen.typeToCPPType(cpetype, "base");
-
-        let conscall = "";
-        if (this.typegen.isListType(cpetype)) {
-            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
-        }
-        else if (this.typegen.isSetType(cpetype)) {
-            conscall = `new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
-        }
-        else {
-            conscall = `new BSQMap(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
-        }
+        const cppctype = this.typegen.getCPPTypeFor(cpetype, "base");
 
         const scopevar = this.varNameToCppName("$scope$");
-        return `${this.varToCppName(cpce.trgt)} = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(${conscall});`;
+        const conscall =  `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
+
+        return `${this.varToCppName(cpce.trgt)} = ${conscall};`;
     }
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const cppctype = this.typegen.typeToCPPType(cpcstype, "base");
+        const cppctype = this.typegen.getCPPTypeFor(cpcstype, "base");
 
         let conscall = "";
         const scopevar = this.varNameToCppName("$scope$");
-        if (this.typegen.isListType(cpcstype)) {
+        if (this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
+            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
             const cvals = cpcs.args.map((arg) => {
-                return this.typegen.generateConstructorArgInc(this.typegen.anyType, this.argToCpp(arg, this.typegen.anyType));
+                return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
             });
 
-            conscall = `new BSQList(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, {${cvals.join(", ")}})`;
+            conscall = `${cppctype}::create(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.join(", ")})`;
         }
         else if (this.typegen.isSetType(cpcstype)) {
             //
