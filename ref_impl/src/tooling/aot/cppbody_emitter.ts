@@ -256,33 +256,13 @@ class CPPBodyEmitter {
                 return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
             });
 
-            conscall = `${cppctype}::create(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.join(", ")})`;
+            conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.join(", ")})`;
         }
-        else if (this.typegen.isSetType(cpcstype)) {
-            //
-            //TODO: this is performance terrible want to specialize once we split check/run core impls
-            //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-
-            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQSet(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], vtype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
-            }
+        else if (this.typegen.typecheckIsName(cpcstype, /NSCore::Set<.*>/)) {
+            xxxx;
         }
         else {
-           //
-            //TODO: this is performance terrible want to specialize once we split check/run core impls
-            //
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
-            const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
-            const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
-
-            conscall = `${scopevar}.addAllocRef<${this.typegen.scopectr++}, ${cppctype}>(new BSQMap(MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}))`;
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `${this.invokenameToCPP(invname)}(${conscall}, ${this.argToCpp(cpcs.args[i], ttype)}, ${scopevar}.getCallerSlot<${this.typegen.scopectr++}>())`
-            }
+            xxxx;
         }
 
         return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;

@@ -44,7 +44,9 @@
 ////
 //Reference counting ops
 
-#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRef(new T(__VA_ARGS__))))
+
+#define BSQ_NEW_NO_RC(T, ...) (new T(__VA_ARGS__))
+#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRef(BSQ_NEW_NO_RC(T, __VA_ARGS__))))
 
 #define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
 #define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
@@ -179,16 +181,6 @@ public:
     {
         ptr->increment();
         this->opts.push_back(ptr);
-    }
-
-    inline void processReturnInt(IntValue i)
-    {
-        if(BSQ_IS_VALUE_PTR(i))
-        {
-            BSQRef* ptr = BSQ_GET_VALUE_PTR(i, BSQRef);
-            ptr->increment();
-            this->opts.push_back(ptr);
-        }
     }
 
     inline void processReturnChecked(Value v)
@@ -487,9 +479,6 @@ public:
 
     virtual std::u32string display() const = 0;
 
-//%%VFIELD_DECLS
-//%%VMETHOD_DECLS
-
     template<int32_t k>
     inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
     {
@@ -514,228 +503,6 @@ public:
     static bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
     {
         return std::binary_search(&etypes[0], &etypes[k], tt); 
-    }
-};
-
-template<typename K, typename V, typename RCOpsKey, typename RCOpsValue>
-class BSQMapEntry : public BSQRef
-{
-public:
-    K key;
-    V value;
-
-    BSQMapEntry() : BSQRef() { ; }
-    BSQMapEntry(const K& k, const V& v) : BSQRef(), key(k), value(v) { ; }
-
-    BSQMapEntry(const BSQMapEntry& src) : BSQRef(), key(src.key), value(src.value) 
-    { 
-        ; 
-    }
-
-    BSQMapEntry& operator=(const BSQMapEntry& src)
-    {
-        this->key = src.key;
-        this->value = src.value;
-        return *this;
-    }
-
-    virtual ~BSQMapEntry() = default;
-
-    virtual void destroy() 
-    {
-        RCOpsKey::DecRC(reinterpret_cast<void*>(this->key));
-        RCOpsValue::DecRC(reinterpret_cast<void*>(this->value));
-    }
-
-    BSQMapEntry* processBox(BSQRefScope& scope) 
-    {
-        RCOpsKey::IncRC(reinterpret_cast<void*>(this->key));
-        RCOpsValue::IncRC(reinterpret_cast<void*>(this->value));
-
-        return BSQ_NEW_ADD_SCOPE(scope, BSQMapEntry, this->key, this->value);
-    }
-
-    void processCallReturn(BSQRefScope& scaller) 
-    {
-        RCOpsKey::ProcessCallReturn(reinterpret_cast<void*>(this->key));
-        RCOpsValue::ProcessCallReturn(reinterpret_cast<void*>(this->value));
-    }
-};
-
-template<typename T, typename TDecOp>
-class BSQResult : public BSQRef
-{
-    T success;
-    Value error;
-
-    BSQResult() : BSQRef() { ; }
-    BSQResult(const T& success, Value error) : BSQRef(), success(success), error(error) { ; }
-
-    BSQResult(const BSQResult& src) : BSQRef(), success(src.success), error(src.error) 
-    { 
-        ; 
-    }
-
-    BSQResult& operator=(const BSQResult& src)
-    {
-        this->success = src.success;
-        this->error = src.error;
-        return *this;
-    }
-
-    virtual ~BSQResult() = default;
-
-    virtual void destroy() 
-    {
-        TFDecOp(this->success);
-        BSQRef::decrementChecked(this->error);
-    }
-};
-
-template<typename K, typename KFDecOp, typename U, typename UFDecOp>
-class BSQTagged : public BSQRef
-{
-public:
-    K key;
-    U value;
-
-    BSQTagged() : BSQRef() { ; }
-    BSQTagged(const K& k, const U& u) : BSQRef(), key(k), value(u) { ; }
-
-    BSQTagged(const BSQTagged& src) : BSQRef(), key(src.key), value(src.value) 
-    { 
-        ; 
-    }
-
-    BSQTagged& operator=(const BSQTagged& src)
-    {
-        this->key = src.key;
-        this->value = src.value;
-        return *this;
-    }
-
-    virtual ~BSQTagged() = default;
-
-    virtual void destroy() 
-    {
-        KFDecOp(this->key);
-        UFDecOp(this->value);
-    }
-};
-
-class BSQSet : public BSQObject {
-public:
-    std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
-    BSQKeyList* keys;
-
-    BSQSet(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries(), keys(nullptr) { ; }
-    BSQSet(MIRNominalTypeEnum ntype, std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual>&& entries, BSQKeyList* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
-
-    virtual ~BSQSet()
-    {
-        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
-        {
-            BSQRef::checkedDecrement(iter->first);
-            BSQRef::checkedDecrement(iter->second);
-        }
-        BSQRef::checkedDecrementNoneable(keys);
-    }
-
-    BSQSet* add(Value key, Value val, BSQKeyList* nkeys)
-    {
-        BSQIndexableEqual eq;
-        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
-        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
-        {
-            BSQRef::checkedIncrementNop(iter->first);
-            BSQRef::checkedIncrementNop(iter->second);
-            entries.insert(*iter);
-        }
-        BSQRef::checkedIncrementNop(key);
-        BSQRef::checkedIncrementNop(val);
-        entries.insert(std::make_pair(key, val));
-
-        BSQRef::checkedIncrementNoneable(nkeys);
-
-        return new BSQSet(this->ntype, move(entries), nkeys);
-    }
-
-    BSQSet* destructiveAdd(Value key, Value val, BSQKeyList* nkeys)
-    {
-        BSQRef::checkedIncrementNop(key);
-        BSQRef::checkedIncrementNop(val);
-        entries.insert(std::make_pair(key, val));
-
-        BSQRef::checkedDecrementNoneable(this->keys);
-        BSQRef::checkedIncrementNoneable(nkeys);
-        this->keys = nkeys;
-
-        return this;
-    }
-
-    BSQSet* update(Value key, Value val)
-    {
-        BSQIndexableEqual eq;
-        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
-        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
-        {
-            if(eq(key, iter->first))
-            {
-                BSQRef::checkedIncrementNop(key);
-                BSQRef::checkedIncrementNop(val);
-                entries.insert(std::make_pair(key, val));
-            }
-            else
-            {
-                BSQRef::checkedIncrementNop(iter->first);
-                BSQRef::checkedIncrementNop(iter->second);
-                entries.insert(*iter);
-            }
-        }
-        BSQRef::checkedIncrementNoneable(this->keys);
-
-        return new BSQSet(this->ntype, move(entries), this->keys);
-    }
-
-    BSQSet* destructiveUpdate(Value key, Value val)
-    {
-        auto iter = this->entries.find(key);
-        auto oldkey = iter->first;
-        auto oldval = iter->second;
-
-        BSQRef::checkedIncrementNop(key);
-        BSQRef::checkedIncrementNop(val);
-
-        entries.erase(iter);
-        entries.emplace(std::make_pair(key, val));
-
-        BSQRef::checkedDecrement(oldkey);
-        BSQRef::checkedDecrement(oldval);
-
-        return this;
-    }
-
-    BSQSet* clearKey(Value key, BSQKeyList* nkeys)
-    {
-        BSQIndexableEqual eq;
-        std::unordered_map<Value, Value, BSQIndexableHash, BSQIndexableEqual> entries;
-        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
-        {
-            if(!eq(key, iter->first)) 
-            {
-                BSQRef::checkedIncrementNop(iter->first);
-                BSQRef::checkedIncrementNop(iter->second);
-                entries.insert(*iter);
-            }
-        }
-        BSQRef::checkedIncrementNoneable(nkeys);
-
-        return new BSQSet(this->ntype, move(entries), nkeys);
-    }
-
-    virtual std::u32string display() const
-    {
-        return std::u32string(U"[SHOULD BE SPECIAL CASED IN DISPLAY]");
     }
 };
 

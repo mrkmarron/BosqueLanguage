@@ -175,17 +175,6 @@ entity Set<T where Indexable> provides Object, PODType when T subtype POD, APITy
     hidden static _unsafe_update(s: Set<T>, k: T!KeyType, v: T): Set<T> # set_unsafe_update
     hidden static _unsafe_add(s: Set<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): Set<T> # set_unsafe_add
 
-    hidden static _cons_insert(*s: Set<T>, v: T): *Set<T> {
-        var key = Indexable::getKey(v);
-        if(Set<T>::_has_key(s, key)) {
-            return Set<T>::_unsafe_update(s, key, v);
-        }
-        else {
-            var kle = Set<T>::_get_keylist(s);
-            return Set<T>::_unsafe_add(s, key, v, KeyList<T!KeyType>{hkey=key, tail=kle});
-        }
-    }
-
     method size(): Int {
         return Set<T>::_size(this);
     }
@@ -241,17 +230,6 @@ entity Map<K where Indexable, V> provides Object, PODType when K subtype POD && 
     
     hidden static _unsafe_update(m: Map<K, V>, k: K!KeyType, key: K, val: V): Map<K, V> # map_unsafe_update
     hidden static _unsafe_add(m: Map<K, V>, k: K!KeyType, key: K, val: V, newkl: KeyList<K!KeyType>): Map<K, V> # map_unsafe_add
-
-    hidden static _cons_insert(m: Map<K, V>, key: K, val: V): Map<K, V> {
-        var k = Indexable::getKey(key);
-        if(Map<K, V>::_has_key(m, k)) {
-            return Map<K, V>::_unsafe_update(m, k, key, val);
-        }
-        else {
-            var kle = Map<K, V>::_get_keylist(m);
-            return Map<K, V>::_unsafe_add(m, k, key, val, KeyList<K!KeyType>{hkey=key, tail=kle});
-        }
-    }
 
     hidden recursive static _key_list(m: Map<K, V>, kl: KeyList<K!KeyType>?, l: List<K>): List<K> {
         if(kl == none) {

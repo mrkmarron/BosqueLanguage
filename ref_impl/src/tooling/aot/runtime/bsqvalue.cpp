@@ -314,24 +314,7 @@ std::u32string diagnostic_format(Value v)
             }
             else if (dynamic_cast<const BSQSet*>(obj) != nullptr)
             {
-                std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-                auto set = dynamic_cast<const BSQSet*>(obj);
-
-                std::u32string ss(U"{");
-                bool first = true;
-                for (auto iter = set->entries.cbegin(); iter != set->entries.cend(); ++iter)
-                {
-                    if (!first)
-                    {
-                        ss += U", ";
-                    }
-                    first = false;
-
-                    ss += Runtime::diagnostic_format(iter->second);
-                }
-                ss += U"}";
-
-                return conv.from_bytes(s_nominaltypenames[(uint32_t) obj->ntype]) + ss;
+               
             }
             else if (dynamic_cast<const BSQMap*>(obj) != nullptr)
             {

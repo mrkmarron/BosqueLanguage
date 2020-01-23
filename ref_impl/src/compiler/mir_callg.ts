@@ -8,7 +8,7 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey, MIRConstructorPrimaryCollectionSingletons } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBodyKey, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRBody, MIRNominalTypeKey, MIRFieldKey } from "./mir_ops";
 import { MIRAssembly, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "./mir_assembly";
 import { MIRKeyGenerator } from "./mir_emitter";
 
@@ -52,31 +52,6 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                         const invkey = MIRKeyGenerator.generateBodyKey("invariant", cop.tkey);
                         invokeNode.callees.add(invkey);
                     }
-                    break;
-                }
-               case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
-                    const cop = op as MIRConstructorPrimaryCollectionSingletons;
-                    const ctype = assembly.entityDecls.get(cop.tkey) as MIREntityTypeDecl;
-
-                    if (ctype.name === "List") {
-                        //all handled inline
-                    }
-                    else if (ctype.name === "Set") {
-                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons_insert"));
-                        invokeNode.callees.add(invkey);
-                    }
-                    else {
-                        const invkey = MIRKeyGenerator.generateBodyKey("invoke", MIRKeyGenerator.generateStaticKey_MIR(ctype, "_cons_insert"));
-                        invokeNode.callees.add(invkey);
-                    }
-                    break;
-                }
-                case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
-                    assert(false);
-                    break;
-                }
-                case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
-                    assert(false);
                     break;
                 }
                 case MIROpTag.MIRInvokeFixedFunction: {

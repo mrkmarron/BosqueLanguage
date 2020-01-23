@@ -831,11 +831,6 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
             }
             else {
-                if(oftype.object.name === "Set") {
-                    const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
-                    this.m_emitter.registerStaticCall(oftype.object, oftype.binds, sdecl, "_cons_insert", oftype.binds, [], []);
-                }
-
                 if (args.every((v) => !v[1])) {
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
                 }
@@ -934,11 +929,6 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
             }
             else {
-                if(oftype.object.name === "Map") {
-                    const sdecl = oftype.object.staticFunctions.get("_cons_insert") as StaticFunctionDecl;
-                    this.m_emitter.registerStaticCall(oftype.object, oftype.binds, sdecl, "_cons_insert", oftype.binds, [], []);
-                }
-
                 if (args.every((v) => !v[1])) {
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
                 }
