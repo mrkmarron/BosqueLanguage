@@ -285,6 +285,7 @@ class MIRBodyEmitter {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, rtkey.trkey, ikey, args, trgt));
         }
         else {
+            xxxx; //param pack
             const rtuple = MIRType.createSingle(MIRTupleType.create([rtkey, ...refs.map((rf) => rf[1])].map((tt) => new MIRTupleTypeEntry(tt, false))));
             if (!masm.typeMap.has(rtuple.trkey)) {
                 masm.typeMap.set(rtuple.trkey, rtuple);

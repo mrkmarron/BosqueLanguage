@@ -65,8 +65,8 @@
     ( (bsq_buffer@cons (bsq_buffer_type String) (bsq_buffer_contents String)) )
     ( (bsq_isotime@cons (bsq_isotime_value Int)) )
     ( (bsq_regex@cons (bsq_regex_value String)) )
-    ( (bsq_tuple@cons (bsq_tuple_ispod Bool) (bsq_tuple_isapi Bool) (bsq_tuple_entries (Array Int BTerm)))  )
-    ( (bsq_record@cons (bsq_tuple_ispod Bool) (bsq_tuple_isapi Bool) (bsq_record_entries (Array String BTerm))) )
+    ( (bsq_tuple@cons (bsq_tuple_entries (Array Int BTerm)))  )
+    ( (bsq_record@cons (bsq_record_entries (Array String BTerm))) )
     ;;NOMINAL_CONSTRUCTORS;;
     (
     ;;NOMINAL_OBJECT_CONSTRUCTORS;;

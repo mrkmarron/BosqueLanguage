@@ -273,49 +273,118 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
         const cpcetype = this.typegen.getMIRType(cpce.tkey);
-
-        if (this.typegen.isListType(cpcetype)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqlist 0 bsqlist_data_array_empty)"));
+        const smtctype = this.typegen.generateEntityConstructor(cpce.tkey);
+        
+        if(this.typegen.typecheckIsName(cpcetype, /NSCore::List<.*>/)) {
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
+        }
+        else if(this.typegen.typecheckIsName(cpcetype, /NSCore::Set<.*>/)) {
+            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyHasArrayFor(cpce.tkey)} ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)} bsqterm_none)`));
         }
         else {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue("(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)"));
+           return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyHasArrayFor(cpce.tkey)} ${this.typegen.generateEmptyKeyArrayFor(cpce.tkey)} ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)} bsqterm_none)`));
         }
     }
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
+        const smtctype = this.typegen.generateEntityConstructor(cpcs.tkey);
 
-        if (this.typegen.isListType(cpcstype)) {
-            let consv = "bsqlist_data_array_empty";
+        if(this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
+            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+            let consv = this.typegen.generateEmptyDataArrayFor(cpcs.tkey);
             for (let i = 0; i < cpcs.args.length; ++i) {
-                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], this.typegen.anyType).emit()})`;
+                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], oftype).emit()})`;
             }
 
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(cons@bsqlist ${cpcs.args.length} ${consv})`));
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${consv})`));
         }
-        else if (this.typegen.isSetType(cpcstype)) {
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        else if(this.typegen.typecheckIsName(cpcstype, /NSCore::Set<.*>/)) {
+            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
 
-            let conscall = `(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)`;
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `(result_success_value@bsqkvcontainer (${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], vtype).emit()}))`
+            const realkeytype = this.typegen.getKeyProjectedTypeFrom(oftype);
+            const kltype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "KeyList" && (edecl[1].terms.get("K") as MIRType).trkey === realkeytype.trkey) as [string, MIREntityTypeDecl];
+            const klcons = this.typegen.generateEntityConstructor(kltype[1].tkey);
+
+            let consv = `(${smtctype} %CTR% %HAS% %DATA% %KL%)`;
+            for (let i = cpcs.args.length - 1; i >= 1; --i) {
+                const arg = cpcs.args[i];
+
+                const key = this.typegen.getKeyFrom(this.argToSMT(arg, oftype).emit(), oftype);
+                const ctrvar = this.generateTempName();
+                const ctrup = `(ite (select %HAS% ${key}) %CTR% (+ %CTR% 1))`;
+
+                const hasvar = this.generateTempName();
+                const hasup = `(store %HAS% ${key} true)`;
+
+                const datavar = this.generateTempName();
+                const dataup = `(store %DATA% ${key} ${this.argToSMT(arg, oftype).emit()})`;
+
+                const keyvar = this.generateTempName();
+                const keyup = `(ite (select %HAS% ${key}) %KEY% (${klcons} ${key} %KEY%))`;
+
+                const body = consv.replace(/%CTR%/g, ctrvar).replace(/%HAS%/g, hasvar).replace(/%DATA%/g, datavar).replace(/%KEY%/g, keyvar);
+                consv = `(let ((${ctrvar} ${ctrup}) (${hasvar} ${hasup}) (${datavar} ${dataup}) (${keyvar} ${keyup})) ${body})`
             }
+            const key = this.typegen.getKeyFrom(this.argToSMT(cpcs.args[0], oftype).emit(), oftype);
+            const val = this.argToSMT(cpcs.args[0], oftype).emit();
+            const final = consv
+                .replace(/%CTR%/g, "1")
+                .replace(/%HAS%/g, `(store ${this.typegen.generateEmptyHasArrayFor(cpcs.tkey)} ${key} true)`)
+                .replace(/%DATA%/g, `(store ${this.typegen.generateEmptyDataArrayFor(cpcs.tkey)} ${key} ${val})`)
+                .replace(/%KEY%/g, `(${klcons} ${key} bsqterm_none)`);
 
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(final));
         }
         else {
-            const invname = MIRKeyGenerator.generateStaticKey_MIR(this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl, "_cons_insert");
-            const ktype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
-            const vtype = (this.typegen.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
-            const ttype = MIRType.createSingle(MIRTupleType.create([new MIRTupleTypeEntry(ktype, false), new MIRTupleTypeEntry(vtype, false)]));
+            const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
+            const vtype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
+            const realkeytype = this.typegen.getKeyProjectedTypeFrom(ktype);
 
-            let conscall = "(cons@bsqkvcontainer 0 cons@bsqkeylist$none bsqkvp_array_empty)";
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                conscall = `(result_success_value@bsqkvcontainer (${this.invokenameToSMT(invname)} ${conscall} ${this.argToSMT(cpcs.args[i], ttype).emit()}))`
+            const entrytype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "MapEntry" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey && (edecl[1].terms.get("V") as MIRType).trkey === vtype.trkey) as [string, MIREntityTypeDecl];
+            const entrykey = this.typegen.generateEntityAccessor(entrytype[1].tkey, (entrytype[1].fields.find((fd) => fd.name === "key") as MIRFieldDecl).fkey);
+            const entryvalue = this.typegen.generateEntityAccessor(entrytype[1].tkey, (entrytype[1].fields.find((fd) => fd.name === "value") as MIRFieldDecl).fkey);
+
+            const kltype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "KeyList" && (edecl[1].terms.get("K") as MIRType).trkey === realkeytype.trkey) as [string, MIREntityTypeDecl];
+            const klcons = this.typegen.generateEntityConstructor(kltype[1].tkey);
+
+            let consv = `(${smtctype} %CTR% %HAS% %ENTRYKEY% %ENTRYDATA% %KL%)`;
+            for (let i = cpcs.args.length - 1; i >= 1; --i) {
+                const arg = cpcs.args[i];
+                const entrykeyexp = `(${entrykey}, ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+                const entryvalexp = `(${entryvalue}, ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+
+                const key = this.typegen.getKeyFrom(entrykeyexp, ktype);
+                const ctrvar = this.generateTempName();
+                const ctrup = `(ite (select %HAS% ${key}) %CTR% (+ %CTR% 1))`;
+
+                const hasvar = this.generateTempName();
+                const hasup = `(store %HAS% ${key} true)`;
+
+                const entrykeyvar = this.generateTempName();
+                const entrykeyup = `(store %ENTRYKEY% ${key} ${entrykeyexp})`;
+
+                const entrydatavar = this.generateTempName();
+                const entrydataup = `(store %ENTRYDATA% ${key} ${entryvalexp})`;
+
+                const keyvar = this.generateTempName();
+                const keyup = `(ite (select %HAS% ${key}) %KEY% (${klcons} ${key} %KEY%))`;
+
+                const body = consv.replace(/%CTR%/g, ctrvar).replace(/%HAS%/g, hasvar).replace(/%ENTRYKEY%/g, entrykeyvar).replace(/%ENTRYDATA%/g, entrydatavar).replace(/%KEY%/g, keyvar);
+                consv = `(let ((${ctrvar} ${ctrup}) (${hasvar} ${hasup}) (${entrykeyvar} ${entrykeyup}) (${entrydatavar} ${entrydataup})  (${keyvar} ${keyup})) ${body})`
             }
+            const entrykeyexp0 = `(${entrykey}, ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+            const entryvalexp0 = `(${entryvalue}, ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
 
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(conscall));
+            const key = this.typegen.getKeyFrom(entrykeyexp0, ktype);
+            const final = consv
+                .replace(/%CTR%/g, "1")
+                .replace(/%HAS%/g, `(store ${this.typegen.generateEmptyHasArrayFor(cpcs.tkey)} ${key} true)`)
+                .replace(/%ENTRYKEY%/g, `(store ${this.typegen.generateEmptyKeyArrayFor(cpcs.tkey)} ${key} ${entrykeyexp0})`)
+                .replace(/%ENTRYKEY%/g, `(store ${this.typegen.generateEmptyDataArrayFor(cpcs.tkey)} ${key} ${entryvalexp0})`)
+                .replace(/%KEY%/g, `(${klcons} ${key} bsqterm_none)`);
+
+            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(final));
         }
     }
 

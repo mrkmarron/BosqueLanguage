@@ -411,10 +411,8 @@ class BSQTuple : public BSQRef
 {
 public:
     const std::vector<Value> entries;
-    const bool isPOD;
-    const bool isAPI;
 
-    BSQTuple(std::vector<Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)), isPOD(isPOD), isAPI(isAPI) { ; }
+    BSQTuple(std::vector<Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)) { ; }
     virtual ~BSQTuple() = default;
 
     virtual void destroy()
@@ -427,8 +425,7 @@ public:
 
     static BSQTuple* _empty;
 
-    template <uint16_t idx>
-    Value atFixed() const
+    Value atFixed(uint16_t idx) const
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
@@ -438,10 +435,8 @@ class BSQRecord : public BSQRef
 {
 public:
     const std::map<MIRPropertyEnum, Value> entries;
-    const bool isPOD;
-    const bool isAPI;
 
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)), isPOD(isPOD), isAPI(isAPI) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
 
     virtual ~BSQRecord() = default;
 
@@ -455,14 +450,12 @@ public:
 
     static BSQRecord* _empty;
 
-    template <MIRPropertyEnum p>
-    bool hasProperty() const
+    bool hasProperty(MIRPropertyEnum p) const
     {
         return this->entries.find(p) != this->entries.end();
     }
 
-    template <MIRPropertyEnum p>
-    Value atFixed() const
+    Value atFixed(MIRPropertyEnum p) const
     {
         auto iter = this->entries.find(p);
         return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;

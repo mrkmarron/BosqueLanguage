@@ -381,6 +381,26 @@ class CPPTypeEmitter {
         }
     }
 
+    getKeyProjectedTypeFrom(ktype: MIRType): MIRType {
+        if(this.typecheckAllKeys(ktype)) {
+            return ktype;
+        }
+        else {
+            assert(false);
+            return ktype;
+        }
+    }
+    
+    getKeyFrom(arg: string, atype: MIRType): string {
+        if(this.typecheckAllKeys(atype)) {
+            return arg;
+        }
+        else {
+            assert(false);
+            return "[NOT IMPLEMENTED]";
+        }
+    }
+
     maybeRefableCountableType(tt: MIRType): "no" | "int" | "direct" | "checked" | "special" {
         if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/)) {
             return "no";

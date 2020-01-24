@@ -846,8 +846,8 @@ class TypeChecker {
         return ResolvedType.createSingle(oftype);
     }
 
-    private checkArgumentsEvaluationMap(env: TypeEnvironment, args: Arguments, ktype: ResolvedType, vtype: ResolvedType): [ResolvedType, boolean, MIRTempRegister][] {
-        let eargs: [ResolvedType, boolean, MIRTempRegister][] = [];
+    private checkArgumentsEvaluationMap(env: TypeEnvironment, args: Arguments, ktype: ResolvedType, vtype: ResolvedType): [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][] {
+        let eargs: [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][] = [];
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
@@ -861,7 +861,7 @@ class TypeChecker {
                 const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
                 this.raiseErrorIf(arg.value.sinfo, !(arg as PositionalArgument).isSpread, "Expected spread on Map argument");
 
-                eargs.push([earg.etype, true, treg]);
+                eargs.push([earg.etype, true, treg, undefined, undefined]);
             }
             else {
                 const marg = arg as MapArgument;
@@ -876,17 +876,7 @@ class TypeChecker {
                 
                 this.raiseErrorIf(arg.value.sinfo, !this.m_assembly.subtypeOf(valarg.etype, vtype), "Map value value not of expected type");
 
-                const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
-                const entrybinds = new Map<string, ResolvedType>().set("K", ktype).set("V", vtype);
-                const mentry = ResolvedType.createSingle(ResolvedEntityAtomType.create(entryobj, entrybinds));
-
-                if(this.m_emitEnabled) {
-                    const entrykey = this.m_emitter.registerResolvedTypeReference(mentry);
-                    this.m_emitter.registerTypeInstantiation(entryobj, entrybinds);
-                    this.m_emitter.bodyEmitter.emitConstructorPrimary(arg.value.sinfo, entrykey.trkey, true, [kreg, vreg], treg);
-                }
-
-                eargs.push([mentry, false, treg]);
+                eargs.push([keyarg.etype, false, treg, valarg.etype, vreg]);
             }
         }
 
@@ -899,11 +889,18 @@ class TypeChecker {
 
             if (!arg[1]) {
                 if(arg[3] === undefined) {
-                    this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
-                }
-                else {
+                    const mereg = this.m_emitter.bodyEmitter.generateTmpRegister();
 
+                    if(this.m_emitEnabled) {
+                        const entrykey = this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(entrytype));
+                        this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, entrykey.trkey, true, [arg[2], arg[4] as MIRTempRegister], mereg);
+                    }
+
+                    arg[0] = ResolvedType.createSingle(entrytype);
+                    arg[2] = mereg;
                 }
+
+                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ResolvedType.createSingle(entrytype)));
             }
             else {
                 arg[0].options.forEach((opt) => {
@@ -912,14 +909,14 @@ class TypeChecker {
                     const oatom = opt as ResolvedEntityAtomType;
                     if((opt as ResolvedEntityAtomType).object.isTypeACollectionEntity()) {
                         const ttype = oatom.binds.get("T") as ResolvedType;
-                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(ttype, ctype), "Container contents not of suitable subtype");
+                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(ttype, ResolvedType.createSingle(entrytype)), "Container contents not of suitable subtype");
                     }
                     else {
                         const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
                         const entrybinds = new Map<string, ResolvedType>().set("K", oatom.binds.get("K") as ResolvedType).set("V", oatom.binds.get("V") as ResolvedType);
                         const mentry = ResolvedType.createSingle(ResolvedEntityAtomType.create(entryobj, entrybinds));
 
-                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(mentry, ctype), "Container contents not of suitable key subtype");
+                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(mentry, ResolvedType.createSingle(entrytype)), "Container contents not of suitable key subtype");
                     }
                 });
             }
@@ -1220,7 +1217,6 @@ class TypeChecker {
                 const mentry = ResolvedEntityAtomType.create(entryobj, entrybinds);
 
                 const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg, ca.etype, ca.ereg] as [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined]);
-
                 this.checkArgumentsMapConstructor(sinfo, oftype, mentry, cargs, rtreg);
             }
 
@@ -1460,11 +1456,12 @@ class TypeChecker {
         else if (oodecl.isTypeAMapEntity()) {
             this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
 
-            const contentstype = ResolvedType.createSingle(ResolvedTupleAtomType.create([new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]));
-
+            const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
+            const entrybinds = new Map<string, ResolvedType>().set("K", oobinds.get("K") as ResolvedType).set("V", oobinds.get("V") as ResolvedType);
+            const mentry = ResolvedEntityAtomType.create(entryobj, entrybinds);
 
             const eargs = this.checkArgumentsEvaluationMap(env, exp.args, oobinds.get("K") as ResolvedType, oobinds.get("V") as ResolvedType);
-            return [env.setExpressionResult(this.checkArgumentsMapConstructor(exp.sinfo, oftype, contentstype, eargs, trgt))];
+            return [env.setExpressionResult(this.checkArgumentsMapConstructor(exp.sinfo, oftype, mentry, eargs, trgt))];
         }
         else {
             //

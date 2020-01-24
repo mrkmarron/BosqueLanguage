@@ -483,6 +483,26 @@ class SMTTypeEmitter {
         }
     }
 
+    getKeyProjectedTypeFrom(ktype: MIRType): MIRType {
+        if(this.typecheckAllKeys(ktype)) {
+            return ktype;
+        }
+        else {
+            assert(false);
+            return ktype;
+        }
+    }
+
+    getKeyFrom(arg: string, atype: MIRType): string {
+        if(this.typecheckAllKeys(atype)) {
+            return arg;
+        }
+        else {
+            assert(false);
+            return "[NOT IMPLEMENTED]";
+        }
+    }
+
     initializeConceptSubtypeRelation(): void {
         this.assembly.conceptDecls.forEach((tt) => {
             const cctype = this.getMIRType(tt.tkey);
@@ -503,6 +523,18 @@ class SMTTypeEmitter {
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
         return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
+    }
+
+    generateEmptyHasArrayFor(ekey: MIRNominalTypeKey): string {
+        return this.mangleStringForSMT(`${ekey}_collection_has_array_empty`);
+    }
+
+    generateEmptyKeyArrayFor(ekey: MIRNominalTypeKey): string {
+        return this.mangleStringForSMT(`${ekey}_collection_key_array_empty`);
+    }
+
+    generateEmptyDataArrayFor(ekey: MIRNominalTypeKey): string {
+        return this.mangleStringForSMT(`${ekey}_collection_data_array_empty`);
     }
 
     generateSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {

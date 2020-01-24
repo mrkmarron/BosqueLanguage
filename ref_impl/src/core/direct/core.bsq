@@ -244,7 +244,7 @@ concept APIRecord provides APIType, Record {
     override static tryParse(str: String): Result<Any> # apituple_tryparse
 }
 
-entity MapEntry<K where Indexable, V> provides Some {
+entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
     static create(k: K, v: V): MapEntry<K, V> # mapentry_create
 }
 
