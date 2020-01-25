@@ -8,8 +8,11 @@
 //
 
 #ifndef Ty
+#define B_NAME success
 #define Ty TName
 #define T int
+#define T_NAME result
+#define E_NAME error
 #define INC_RC_T(X)
 #define DEC_RC_T(X)
 #define CALL_RET_T(X, S)
@@ -17,23 +20,23 @@
 
 class Ty : public BSQRef
 {
-    bool success;
-    T result;
-    Value error;
+    bool B_NAME;
+    T T_NAME;
+    Value E_NAME;
 
     Ty() : BSQRef() { ; }
-    Ty(bool success, T& result, Value error) : BSQRef(), success(success), result(result), error(error) { ; }
+    Ty(bool success, T& result, Value error) : BSQRef(), B_NAME(success), T_NAME(result), E_NAME(error) { ; }
 
-    Ty(const Ty& src) : BSQRef(), success(src.success), result(src.result), error(src.error) 
+    Ty(const Ty& src) : BSQRef(), B_NAME(src.B_NAME), T_NAME(src.T_NAME), E_NAME(src.E_NAME) 
     { 
         ; 
     }
 
     Ty& operator=(const Ty& src)
     {
-        this->success = src.success;
-        this->result = src.result;
-        this->error = src.error;
+        this->B_NAME = src.B_NAME;
+        this->T_NAME = src.T_NAME;
+        this->E_NAME = src.E_NAME;
         return *this;
     }
 
@@ -41,30 +44,31 @@ class Ty : public BSQRef
 
     virtual void destroy() 
     {
-        DEC_RC_T(this->result);
-        BSQRef::decrementChecked(this->error);
+        DEC_RC_T(this->T_NAME);
+        BSQRef::decrementChecked(this->E_NAME);
     }
 
     Ty* processBox(BSQRefScope& scope) 
     {
-        INC_RC_T(this->result);
-        BSQRef::incrementChecked(this->error);
+        INC_RC_T(this->T_NAME);
+        BSQRef::incrementChecked(this->E_NAME);
 
-        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->success, this->result, this->error);
+        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->B_NAME, this->T_NAME, this->E_NAME);
     }
 
     void processCallReturn(BSQRefScope& scaller) 
     {
-        CALL_RET_T(this->success, scaller);
-        scaller.processReturnChecked(this->error);
+        CALL_RET_T(this->T_NAME, scaller);
+        scaller.processReturnChecked(this->E_NAME);
     }
 };
 
 #undef Ty
+#undef B_NAME
+#undef Ty 
 #undef T
-#undef INC_RC_K
-#undef DEC_RC_K
-#undef CALL_RET_K
-#undef INC_RC_ERR
-#undef DEC_RC_ERR
-#undef CALL_RET_ERR
+#undef T_NAME
+#undef E_NAME
+#undef INC_RC_T
+#undef DEC_RC_T
+#undef CALL_RET_T

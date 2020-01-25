@@ -321,9 +321,11 @@ abstract class MIRTypeOption {
                 return MIRConceptType.jparse(jobj);
             case "tuple":
                 return MIRTupleType.jparse(jobj);
-            default:
-                assert(jobj.kind === "record");
+            case "record":
                 return MIRRecordType.jparse(jobj);
+            default:
+                assert(jobj.kind === "ephemeral"); 
+                return MIREpemeralListType.jparse(jobj);
         }
     }
 }
@@ -468,7 +470,25 @@ class MIRRecordType extends MIRStructuralType {
 }
 
 class MIREpemeralListType extends MIRTypeOption {
-    xxxx;
+    readonly entries: MIRType[];
+
+    private constructor(trkey: MIRResolvedTypeKey, entries: MIRType[]) {
+        super(trkey);
+        this.entries = entries;
+    }
+
+    static create(entries: MIRType[]): MIREpemeralListType {
+        let cvalue = entries.map((entry) => entry.trkey).join(", ");
+        return new MIREpemeralListType("(|" + cvalue + "|)", [...entries]);
+    }
+
+    jemit(): object {
+        return { kind: "ephemeral", entries: this.entries.map((e) => e.jemit()) };
+    }
+
+    static jparse(jobj: any): MIREpemeralListType {
+        return MIREpemeralListType.create(jobj.entries.map((e: any) => MIRType.jparse(e)));
+    }
 }
 
 class MIRType {

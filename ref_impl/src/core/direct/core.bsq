@@ -245,26 +245,54 @@ concept APIRecord provides APIType, Record {
 }
 
 entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
+    field key: K;
+    field value: V;
+
     static create(k: K, v: V): MapEntry<K, V> # mapentry_create
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 entity Result<T> provides Some {
+    hidden _issuccess: Bool;
+    hidden _result: T?;
+    hidden _error: Any;
+
     static success(result: T): Result<T> # result_success
-    static fail(info?: Any): Result<T> # result_error
+    static failure(info?: Any): Result<T> # result_error
 
-    method isSuccess(): Bool # result_issuccess
-    method isError(): Bool # result_iserror
+    method isSuccess(): Bool {
+        return this._issuccess;
+    }
 
-    method result(): T # result_result
-    method error(): Any # result_error
-    method errorAs<U>(): U # result_erroras
+    method isError(): Bool {
+        return !this._issuccess;
+    }
 
-    method convert<U>(): Result<U> # result_convert
+    method result(): T {
+        check this._issuccess;
+        return this._result->as<T>();
+    }
+
+    method error(): Any {
+        check !this._issuccess;
+        return this._error;
+    }
+
+    method errorAs<U>(): U  {
+        check !this._issuccess;
+        return this._error->as<U>();
+    }
+
+    method convert<U>(): Result<U> {
+        return this._issuccess ? Result<U>::success(this._result->as<U>()) : Result<U>::failure(this._error);
+    }
 }
 
 //<summary>A lightweight tagging class for values.</summary>
 entity Tagged<T where KeyType, U> provides Indexable, Some {
+    field key: K;
+    field value: U;
+
     static create(key: T, value: U): Tagged<T, U> # tagged_create
 }
 

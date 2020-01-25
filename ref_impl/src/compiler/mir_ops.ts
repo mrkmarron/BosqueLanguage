@@ -217,6 +217,7 @@ enum MIROpTag {
     MIRConstructorPrimaryCollectionMixed = "MIRConstructorPrimaryCollectionMixed",
     MIRConstructorTuple = "MIRConstructorTuple",
     MIRConstructorRecord = "MIRConstructorRecord",
+    MIRConstructorEphemeralValueList = "MIRConstructorEphemeralValueList",
 
     MIRAccessFromIndex = "MIRAccessFromIndex",
     MIRProjectFromIndecies = "MIRProjectFromIndecies",
@@ -252,6 +253,7 @@ enum MIROpTag {
     MIRTruthyConvert = "MIRTruthyConvert",
     MIRLogicStore = "MIRLogicStore",
     MIRVarStore = "MIRVarStore",
+    MIRVarPackStore = "MIRVarPackStore",
     MIRReturnAssign = "MIRReturnAssign",
 
     MIRAbort = "MIRAbort",
@@ -319,6 +321,8 @@ abstract class MIROp {
                 return MIRConstructorTuple.jparse(jobj);
             case MIROpTag.MIRConstructorRecord:
                 return MIRConstructorRecord.jparse(jobj);
+            case MIROpTag.MIRConstructorEphemeralValueList:
+                return MIRConstructorEphemeralValueList.jparse(jobj);
             case MIROpTag.MIRAccessFromIndex:
                 return MIRAccessFromIndex.jparse(jobj);
             case MIROpTag.MIRProjectFromIndecies:
@@ -377,6 +381,8 @@ abstract class MIROp {
                 return MIRLogicStore.jparse(jobj);
             case MIROpTag.MIRVarStore:
                 return MIRVarStore.jparse(jobj);
+            case MIROpTag.MIRVarPackStore:
+                return MIRVarPackStore.jparse(jobj);
             case MIROpTag.MIRReturnAssign:
                 return MIRReturnAssign.jparse(jobj);
             case MIROpTag.MIRAbort:
@@ -745,6 +751,32 @@ class MIRConstructorRecord extends MIRValueOp {
         return new MIRConstructorRecord(jparsesinfo(jobj.sinfo), jobj.resultRecordType, jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRTempRegister.jparse(jobj.trgt));
     }
 }
+
+class MIRConstructorEphemeralValueList extends MIRValueOp {
+    resultEphemeralListType: MIRResolvedTypeKey;
+    args: MIRArgument[];
+
+    constructor(sinfo: SourceInfo, resultEphemeralListType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        super(MIROpTag.MIRConstructorEphemeralValueList, sinfo, trgt);
+        this.resultEphemeralListType = resultEphemeralListType;
+        this.args = args;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = [${this.args.map((arg) => arg.stringify()).join(", ")}]`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), resultEphemeralListType: this.resultEphemeralListType, args: this.args.map((arg) => arg.jemit()) };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRConstructorEphemeralValueList(jparsesinfo(jobj.sinfo), jobj.resultEphemeralListType, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRTempRegister.jparse(jobj.trgt));
+    }
+}
+
 
 class MIRAccessFromIndex extends MIRValueOp {
     resultAccessType: MIRResolvedTypeKey;
@@ -1529,6 +1561,33 @@ class MIRVarStore extends MIRFlowOp {
     }
 }
 
+class MIRVarPackStore extends MIRFlowOp {
+    src: MIRArgument | MIRArgument[]; //can get a single argument that is (|...|) or a list of arguments 1-per variable
+    names: MIRVariable[];
+
+    constructor(sinfo: SourceInfo, src: MIRArgument | MIRArgument[], names: MIRVariable[]) {
+        super(MIROpTag.MIRVarPackStore, sinfo);
+        this.src = src;
+        this.names = names;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(Array.isArray(this.src) ? this.src : [this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [...this.names]; }
+
+    stringify(): string {
+        return `${this.names.map((name) => name.stringify()).join(", ")} = ${Array.isArray(this.src) ? this.src.map((arg) => arg.stringify()).join(",") : this.src.stringify()}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), src: (Array.isArray(this.src) ? this.src.map((arg) => arg.jemit()) : this.src.jemit()), names: this.names.map((name) => name.jemit()) };
+    }
+
+    static jparse(jobj: any): MIROp {
+        const src = Array.isArray(jobj.src) ? jobj.src.map((jo: any) => MIRArgument.jparse(jo.src)) : MIRArgument.jparse(jobj.src);
+        return new MIRVarPackStore(jparsesinfo(jobj.sinfo), src, jobj.names.map((name: any) => MIRVariable.jparse(name)));
+    }
+}
+
 class MIRReturnAssign extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
@@ -1894,12 +1953,12 @@ export {
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstTypedString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
-    MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord,
+    MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorEphemeralValueList,
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeConcept, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject,
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
     MIRPrefixOp, MIRBinOp, MIRGetKey, MIRBinEq, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
-    MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign,
+    MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRVarPackStore, MIRReturnAssign,
     MIRAbort, MIRDebug,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRPhi,

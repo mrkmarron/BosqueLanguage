@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
@@ -330,16 +330,13 @@ class CPPTypeEmitter {
             return exp;
         }
         else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/)) {
-            xxxx;
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::Result<.*>$/)) {
-            xxxx;
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-            xxxx;
-            return `BSQ_NEW_ADD_SCOPE(${this.mangleStringForCpp("$scope$")}, ${this.mangleStringForCpp(from.trkey)}, ${exp})`;
+            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
         }
         else if (this.typecheckUEntity(from)) {
             return exp;
@@ -399,6 +396,30 @@ class CPPTypeEmitter {
         else {
             assert(false);
             return "[NOT IMPLEMENTED]";
+        }
+    }
+
+    tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
+        if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length < idx && !opt.entries[idx].isOptional)) {
+            return "yes";
+        }
+        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length >= idx)) {
+            return "no";
+        }
+        else {
+            return "maybe";
+        }
+    }
+
+    recordHasField(tt: MIRType, pname: string): "yes" | "no" | "maybe" {
+        if(tt.options.every((opt) => opt instanceof MIRRecordType && opt.entries.find((entry) => entry.name === pname) !== undefined && !(opt.entries.find((entry) => entry.name === pname) as MIRRecordTypeEntry).isOptional)) {
+            return "yes";
+        }
+        else if(tt.options.every((opt) => opt instanceof MIRRecordType && opt.entries.find((entry) => entry.name === pname) === undefined)) {
+            return "no";
+        }
+        else {
+            return "maybe";
         }
     }
 

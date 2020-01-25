@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTLet, SMTCond } from "./smt_exp";
@@ -501,6 +501,30 @@ class SMTTypeEmitter {
         else {
             assert(false);
             return "[NOT IMPLEMENTED]";
+        }
+    }
+
+    tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
+        if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length < idx && !opt.entries[idx].isOptional)) {
+            return "yes";
+        }
+        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length >= idx)) {
+            return "no";
+        }
+        else {
+            return "maybe";
+        }
+    }
+
+    recordHasField(tt: MIRType, pname: string): "yes" | "no" | "maybe" {
+        if(tt.options.every((opt) => opt instanceof MIRRecordType && opt.entries.find((entry) => entry.name === pname) !== undefined && !(opt.entries.find((entry) => entry.name === pname) as MIRRecordTypeEntry).isOptional)) {
+            return "yes";
+        }
+        else if(tt.options.every((opt) => opt instanceof MIRRecordType && opt.entries.find((entry) => entry.name === pname) === undefined)) {
+            return "no";
+        }
+        else {
+            return "maybe";
         }
     }
 

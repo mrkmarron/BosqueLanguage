@@ -3,9 +3,9 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString, MIRConstructorEphemeralValueList } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -326,31 +326,30 @@ class CPPBodyEmitter {
         return `${this.varToCppName(op.trgt)} = ${conscall};`;
     }
 
+    generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): string {
+        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREpemeralListType;
+
+        let args: string[] = [];
+        for(let i = 0; i < op.args.length; ++i) {
+            args.push(this.argToCpp(op.args[i], etype.entries[i]));
+        }
+
+        const scopevar = this.varNameToCppName("$scope$");
+        const conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${this.typegen.mangleStringForCpp(etype.trkey)}, {${args.join(", ")}})`;
+
+        return `${this.varToCppName(op.trgt)} = ${conscall};`;
+    }
+
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
         const tuptype = this.getArgType(op.arg);
-        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
-            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
-            if (op.idx < ftuptype.entries.length) {
-                const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
-            }
-            else {
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
-            }
-        }
-        else if (this.typegen.isTupleType(tuptype)) {
-            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
-            if (op.idx < maxlen) {
-                const value = `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(op.idx)}`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
-            }
-            else {
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
-            }
+        const hasidx = this.typegen.tupleHasIndex(tuptype, op.idx);
+    
+        if(hasidx === "no") {
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
         }
         else {
-            const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${op.idx}>()`;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            const select = `BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->atFixed(${op.idx})`
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)};`;
         }
     }
 
@@ -1502,7 +1501,7 @@ class CPPBodyEmitter {
                 return `${this.varToCppName(lcv.trgt)} = ${this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt))};`;
             }
             case MIROpTag.MIRLoadConstTypedString:  {
-                return NOT_IMPLEMENTED<string>("MIRLoadConstTypedString");
+                return this.generateLoadConstTypedString(op as MIRLoadConstTypedString);
             }
             case MIROpTag.MIRAccessConstantValue: {
                 const acv = (op as MIRAccessConstantValue);
@@ -1544,6 +1543,8 @@ class CPPBodyEmitter {
             case MIROpTag.MIRConstructorRecord: {
                return this.generateMIRConstructorRecord(op as MIRConstructorRecord);
             }
+            case MIROpTag.MIRConstructorEphemeralValueList:
+                return this.generateMIRConstructorEphemeralValueList(op as MIRConstructorEphemeralValueList);
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 return this.generateMIRAccessFromIndex(ai, this.typegen.getMIRType(ai.resultAccessType));

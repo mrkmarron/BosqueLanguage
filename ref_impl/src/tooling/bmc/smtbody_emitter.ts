@@ -3,9 +3,9 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -211,14 +211,14 @@ class SMTBodyEmitter {
             const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.getSMTTypeFor(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
 
             if (this.typegen.assembly.subtypeOf(ttype, this.typegen.validatorType)) {
-                const resultv = new SMTValue(`(result_success_value@${ivrtype} ${tv})`);
+                const resultv = ichk.bind(new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
                 const cond = new SMTValue(`(or ${checkerror} (= ${resultv} false))`)
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
             }
             else {
                 const resultobj = this.assembly.entityDecls.get(pfunc.resultType) as MIREntityTypeDecl;
                 const successf = this.typegen.generateEntityAccessor(resultobj.tkey, (resultobj.fields.find((fd) => fd.name === "success") as MIRFieldDecl).fkey);
-                const resultv = new SMTValue(`(result_success_value@${ivrtype} ${tv})`);
+                const resultv = ichk.bind(new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
                 const cond = new SMTValue(`(or ${checkerror} (= (${successf} ${resultv}) false))`)
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
             }
@@ -439,39 +439,33 @@ class SMTBodyEmitter {
         return new SMTValue(`(bsq_record@cons ${cvals})`);
     }
 
+    generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): SMTExp {
+        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREpemeralListType;
+
+        let args: string[] = [];
+        for(let i = 0; i < op.args.length; ++i) {
+            args.push(this.argToSMT(op.args[i], etype.entries[i]).emit());
+        } 
+
+        return new SMTValue(`(${this.typegen.generateEntityConstructor(etype.trkey)} ${args.join(" ")})`);
+    }
+
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {
         const tuptype = this.getArgType(op.arg);
-        if (this.typegen.isTupleType(tuptype)) {
-            if (this.typegen.isKnownLayoutTupleType(tuptype)) {
-                if(op.idx < SMTTypeEmitter.getKnownLayoutTupleType(tuptype).entries.length) {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(`(${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`), this.typegen.anyType, resultAccessType));
-                }
-                else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
-                }
-            }
-            else {
-                const tmax = SMTTypeEmitter.getTupleTypeMaxLength(tuptype);
-                if (op.idx < tmax) {
-                    const avalue = `(${this.typegen.generateTupleAccessor(tuptype, op.idx)} ${this.argToSMT(op.arg, tuptype).emit()})`;
-                    const nval = this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType);
-                    const rval = this.typegen.coerce(new SMTValue(avalue), this.typegen.anyType, resultAccessType);
-                    return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(new SMTValue(`(is-bsqterm@clear ${avalue})`), nval, rval));
-                }
-                else {
-                    return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
-                }
-            }
+        const hasidx = this.typegen.tupleHasIndex(tuptype, op.idx);
+    
+        if(hasidx === "no") {
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType));
         }
         else {
-            const avalue = `(select (bsqterm_tuple_entries ${this.argToSMT(op.arg, tuptype).emit()}) ${op.idx})`;
-            if(!this.typegen.assembly.subtypeOf(this.typegen.noneType, resultAccessType)) {
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(new SMTValue(avalue), this.typegen.anyType, resultAccessType));
+            const tupcontents = this.typegen.typecheckTuple(tuptype) ? `(bsq_tuple_entries ${this.varToSMTName(op.arg)})` : `(bsq_tuple_entries (bsqterm_tuple_value ${this.varToSMTName(op.arg)}))`;
+            const select = new SMTValue(`(select ${tupcontents} ${op.idx})`);
+            if(hasidx === "yes") {
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(select, this.typegen.anyType, resultAccessType));
             }
             else {
-                const nval = this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, resultAccessType);
-                const rval = this.typegen.coerce(new SMTValue(avalue), this.typegen.anyType, resultAccessType);
-                return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(new SMTValue(`(is-bsqterm@clear ${avalue})`), nval, rval));
+                const getop = new SMTCond(new SMTValue(`(= ${select.emit()} bsqterm@clear)`), new SMTValue("bsqterm_none"), select); 
+                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(getop, this.typegen.anyType, resultAccessType));
             }
         }
     }
@@ -1474,7 +1468,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(lcv.trgt), this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt)));
             }
             case MIROpTag.MIRLoadConstTypedString:  {
-                return NOT_IMPLEMENTED<SMTExp>("MIRLoadConstTypedString");
+                return this.generateLoadConstTypedString(op as MIRLoadConstTypedString);
             }
             case MIROpTag.MIRAccessConstantValue: {
                 const acv = (op as MIRAccessConstantValue);
@@ -1517,6 +1511,10 @@ class SMTBodyEmitter {
             case MIROpTag.MIRConstructorRecord: {
                 const tr = op as MIRConstructorRecord;
                 return this.generateMIRConstructorRecord(tr);
+            }
+            case MIROpTag.MIRConstructorEphemeralValueList: {
+                const te = op as MIRConstructorEphemeralValueList;
+                return this.generateMIRConstructorEphemeralValueList(te);
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
