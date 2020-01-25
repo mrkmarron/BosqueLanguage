@@ -252,7 +252,7 @@ class OOPTypeDecl {
 
     readonly provides: [TypeSignature, TypeConditionRestriction[] | undefined][];
 
-    readonly invariants: Expression[];
+    readonly invariants: InvariantDecl[];
 
     readonly staticMembers: Map<string, StaticMemberDecl>;
     readonly staticFunctions: Map<string, StaticFunctionDecl>;
@@ -260,7 +260,7 @@ class OOPTypeDecl {
     readonly memberMethods: Map<string, MemberMethodDecl>;
 
     constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
-        invariants: Expression[],
+        invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         this.sourceLocation = sourceLocation;
@@ -301,7 +301,7 @@ class OOPTypeDecl {
 
 class ConceptTypeDecl extends OOPTypeDecl {
     constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
-        invariants: Expression[],
+        invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         super(sourceLocation, srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
@@ -310,7 +310,7 @@ class ConceptTypeDecl extends OOPTypeDecl {
 
 class EntityTypeDecl extends OOPTypeDecl {
     constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
-        invariants: Expression[],
+        invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         super(sourceLocation, srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);

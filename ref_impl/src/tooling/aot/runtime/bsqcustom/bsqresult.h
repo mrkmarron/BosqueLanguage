@@ -17,13 +17,14 @@
 
 class Ty : public BSQRef
 {
-    T success;
+    bool success;
+    T result;
     Value error;
 
     Ty() : BSQRef() { ; }
-    Ty(T& success, Value error) : BSQRef(), success(success), error(error) { ; }
+    Ty(bool success, T& result, Value error) : BSQRef(), success(success), result(result), error(error) { ; }
 
-    Ty(const Ty& src) : BSQRef(), success(src.success), error(src.error) 
+    Ty(const Ty& src) : BSQRef(), success(src.success), result(src.result), error(src.error) 
     { 
         ; 
     }
@@ -31,6 +32,7 @@ class Ty : public BSQRef
     Ty& operator=(const Ty& src)
     {
         this->success = src.success;
+        this->result = src.result;
         this->error = src.error;
         return *this;
     }
@@ -39,16 +41,16 @@ class Ty : public BSQRef
 
     virtual void destroy() 
     {
-        DEC_RC_T(this->success);
+        DEC_RC_T(this->result);
         BSQRef::decrementChecked(this->error);
     }
 
     Ty* processBox(BSQRefScope& scope) 
     {
-        INC_RC_T(this->success);
+        INC_RC_T(this->result);
         BSQRef::incrementChecked(this->error);
 
-        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->success, this->error);
+        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->success, this->result, this->error);
     }
 
     void processCallReturn(BSQRefScope& scaller) 

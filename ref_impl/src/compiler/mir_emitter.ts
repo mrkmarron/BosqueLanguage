@@ -168,7 +168,7 @@ class MIRBodyEmitter {
         xxxx;
     }
 
-    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey, trgt: MIRTempRegister) {
+    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey, pfunckey, trgt));
     }
 

@@ -454,9 +454,9 @@ class MIRLoadConstTypedString extends MIRValueOp {
     readonly ivalue: string;
     readonly tkey: MIRNominalTypeKey;
     readonly tskey: MIRResolvedTypeKey;
-    readonly pfunckey: MIRInvokeKey;
+    readonly pfunckey: MIRInvokeKey | undefined;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
         super(MIROpTag.MIRLoadConstTypedString, sinfo, trgt);
         this.ivalue = ivalue;
         this.tkey = tkey;

@@ -19,6 +19,7 @@ class CPPTypeEmitter {
     readonly stringType: MIRType;
 
     readonly keyType: MIRType;
+    readonly validatorType: MIRType;
 
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;

@@ -6,7 +6,7 @@
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
 import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList } from "./body";
-import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction } from "./assembly";
+import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl } from "./assembly";
 
 const KeywordStrings = [
     "pragma",
@@ -2734,7 +2734,7 @@ class Parser {
         memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), attributes, mname, sig));
     }
 
-    private parseOOPMembersCommon(thisType: TypeSignature, invariants: Expression[], staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
+    private parseOOPMembersCommon(thisType: TypeSignature, invariants: InvariantDecl[], staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
         while (this.testAndConsumeTokenIf("invariant")) {
             xxxx; //need buildlevel
             try {
@@ -2793,7 +2793,7 @@ class Parser {
 
             const thisType = new NominalTypeSignature(currentDecl.ns, cname, terms.map((term) => new TemplateTypeSignature(term.name)));
 
-            const invariants: Expression[] = [];
+            const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>();
             const memberFields = new Map<string, MemberFieldDecl>();
@@ -2836,7 +2836,7 @@ class Parser {
 
             const thisType = new NominalTypeSignature(currentDecl.ns, cname, terms.map((term) => new TemplateTypeSignature(term.name)));
 
-            const invariants: Expression[] = [];
+            const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>();
             const memberFields = new Map<string, MemberFieldDecl>();
@@ -2887,7 +2887,7 @@ class Parser {
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", createdecl);
 
             const provides = [[new NominalTypeSignature("NSCore", "Enum"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
-            const invariants: Expression[] = [];
+            const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
             const memberFields = new Map<string, MemberFieldDecl>();
@@ -2957,7 +2957,7 @@ class Parser {
 
             const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
 
-            const invariants: Expression[] = [];
+            const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
             const memberFields = new Map<string, MemberFieldDecl>();
@@ -2977,7 +2977,7 @@ class Parser {
 
                 const provides = [[new NominalTypeSignature("NSCore", "GUIDIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
 
-                const invariants: Expression[] = [];
+                const invariants: InvariantDecl[] = [];
                 const staticMembers = new Map<string, StaticMemberDecl>();
                 const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
                 const memberFields = new Map<string, MemberFieldDecl>();
@@ -2999,7 +2999,7 @@ class Parser {
                 const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "tick", tickdecl);
 
                 const provides = [[new NominalTypeSignature("NSCore", "EventTimeIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
-                const invariants: Expression[] = [];
+                const invariants: InvariantDecl[] = [];
                 const staticMembers = new Map<string, StaticMemberDecl>();
                 const staticFunctions = new Map<string, StaticFunctionDecl>().set("zero", zero).set("tick", nexttick);
                 const memberFields = new Map<string, MemberFieldDecl>();
@@ -3025,7 +3025,7 @@ class Parser {
                         [new NominalTypeSignature("NSCore", iscrypto ? "CryptoHashIdKey" : "DataHashIdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined],
                         [new NominalTypeSignature("NSCore", "APIType"), [new TypeConditionRestriction(idval, new NominalTypeSignature("NSCore", "APIType"))]] as [TypeSignature, TypeConditionRestriction[] | undefined],
                     ];
-                    const invariants: Expression[] = [];
+                    const invariants: InvariantDecl[] = [];
                     const staticMembers = new Map<string, StaticMemberDecl>();
                     const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
                     const memberFields = new Map<string, MemberFieldDecl>();
@@ -3041,7 +3041,7 @@ class Parser {
                     const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
                     const provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined] as [TypeSignature, TypeConditionRestriction[] | undefined]];
-                    const invariants: Expression[] = [];
+                    const invariants: InvariantDecl[] = [];
                     const staticMembers = new Map<string, StaticMemberDecl>();
                     const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
                     const memberFields = new Map<string, MemberFieldDecl>();

@@ -176,7 +176,29 @@ class CPPBodyEmitter {
     }
 
     generateLoadConstTypedString(op: MIRLoadConstTypedString): string {
-        xxxx;
+        const sname = "STR__" + this.allConstStrings.size;
+        if (!this.allConstStrings.has(op.ivalue)) {
+            this.allConstStrings.set(op.ivalue, sname);
+        }
+        const strval = `Runtime::${this.allConstStrings.get(op.ivalue) as string}`;
+
+        const ttype = this.typegen.getMIRType(op.tkey);
+        let opstrs: string[] = [];
+
+        if(op.pfunckey !== undefined) {
+            const chkexp = `${this.invokenameToCPP(op.pfunckey)}(${strval})`;
+            if(this.typegen.assembly.subtypeOf(ttype, this.typegen.validatorType)) {
+                opstrs.push(`if(!${chkexp}) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
+            }
+            else {
+                opstrs.push(`if(!${chkexp}.success) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
+            }
+        }
+
+        const scopevar = this.varNameToCppName("$scope$");
+        opstrs.push(`${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`);
+
+        return opstrs.join(" ");
     }
 
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {

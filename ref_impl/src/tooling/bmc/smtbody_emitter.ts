@@ -193,7 +193,36 @@ class SMTBodyEmitter {
     }
 
     generateLoadConstTypedString(op: MIRLoadConstTypedString): SMTExp {
-        xxxx;
+        const ttype = this.typegen.getMIRType(op.tkey);
+        
+        if (op.pfunckey === undefined) {
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${op.ivalue})`));
+        }
+        else {
+            const pfunc = (this.assembly.invokeDecls.get(op.pfunckey) || this.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
+
+            const rval = new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${op.ivalue})`);
+            const tv = this.generateTempName();
+            const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(pfunc.resultType));
+            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
+        
+            const ichk = new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${op.ivalue})`));
+            const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
+            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.getSMTTypeFor(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+
+            if (this.typegen.assembly.subtypeOf(ttype, this.typegen.validatorType)) {
+                const resultv = new SMTValue(`(result_success_value@${ivrtype} ${tv})`);
+                const cond = new SMTValue(`(or ${checkerror} (= ${resultv} false))`)
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
+            }
+            else {
+                const resultobj = this.assembly.entityDecls.get(pfunc.resultType) as MIREntityTypeDecl;
+                const successf = this.typegen.generateEntityAccessor(resultobj.tkey, (resultobj.fields.find((fd) => fd.name === "success") as MIRFieldDecl).fkey);
+                const resultv = new SMTValue(`(result_success_value@${ivrtype} ${tv})`);
+                const cond = new SMTValue(`(or ${checkerror} (= (${successf} ${resultv}) false))`)
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
+            }
+        }
     }
 
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {

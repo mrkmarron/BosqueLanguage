@@ -50,6 +50,7 @@ class TypeChecker {
     private readonly m_assembly: Assembly;
 
     private readonly m_buildLevel: BuildLevel;
+    private readonly m_doLiteralStringValidate;
 
     private m_file: string;
     private m_errors: [string, number, string][];
@@ -679,6 +680,7 @@ class TypeChecker {
             const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
             const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
 
+            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
             eargs.push([earg.etype, treg]);
         }
 
@@ -717,6 +719,7 @@ class TypeChecker {
             const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
             const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
 
+            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
             eargs.push([(arg as NamedArgument).name, earg.etype, treg]);
         }
 
@@ -760,6 +763,7 @@ class TypeChecker {
             const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
             const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
 
+            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
             eargs.push([earg.etype, treg]);
         }
 
@@ -1345,14 +1349,14 @@ class TypeChecker {
             if (this.m_assembly.subtypeOf(aoftype.ofresolved, this.m_assembly.getSpecialValidatorConceptType())) {
                 const sdecl = aoftype.oftype[0].staticFunctions.get("validate");
                 this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'validate'");
-                const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "validate", aoftype.oftype[1], [], []);
+                const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "validate", aoftype.oftype[1], [], []) : undefined;
 
                 this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
             }
             else {
                 const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
                 this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
-                const pfunckey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+                const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []) : undefined;
 
                 this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
             }
