@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -190,6 +190,10 @@ class SMTBodyEmitter {
         else {
             return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} bsqterm_none)`);
         }
+    }
+
+    generateLoadConstTypedString(op: MIRLoadConstTypedString): SMTExp {
+        xxxx;
     }
 
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
@@ -389,25 +393,21 @@ class SMTBodyEmitter {
     }
 
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
-        const tcons = this.typegen.generateTupleConstructor(this.typegen.getMIRType(op.resultTupleType));
-        if (tcons === "bsqtuple_0@cons") {
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqtuple_0@cons"));
+        let cvals = "bsqtuple_array_empty";
+        for (let i = 0; i < op.args.length; ++i) {
+            cvals = `(store ${cvals} ${i} ${this.argToSMT(op.args[i], this.typegen.anyType)})`;
         }
-        else {
-            const argl = op.args.map((arg) => this.argToSMT(arg, this.typegen.anyType).emit());
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${argl.join(" ")})`));
-        }
+
+        return new SMTValue(`(bsq_tuple@cons ${cvals})`);
     }
 
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
-        const tcons = this.typegen.generateRecordConstructor(this.typegen.getMIRType(op.resultRecordType));
-        if (tcons === "bsqrecord_empty@cons") {
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue("bsqrecord_empty@cons"));
+        let cvals = "bsqrecord_array_empty";
+        for (let i = 0; i < op.args.length; ++i) {
+            cvals = `(store ${cvals} "${op.args[i][0]}" ${this.argToSMT(op.args[i][1], this.typegen.anyType)})`;
         }
-        else {
-            const argl = op.args.map((arg) => this.argToSMT(arg[1], this.typegen.anyType).emit());
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${tcons} ${argl.join(" ")})`));
-        }
+
+        return new SMTValue(`(bsq_record@cons ${cvals})`);
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): SMTExp {

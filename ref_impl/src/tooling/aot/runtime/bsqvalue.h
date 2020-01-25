@@ -412,7 +412,7 @@ class BSQTuple : public BSQRef
 public:
     const std::vector<Value> entries;
 
-    BSQTuple(std::vector<Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)) { ; }
+    BSQTuple(std::vector<Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
     virtual ~BSQTuple() = default;
 
     virtual void destroy()

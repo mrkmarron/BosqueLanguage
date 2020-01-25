@@ -941,6 +941,12 @@ class TypeChecker {
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
                 }
                 else {
+                    const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
+                    const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get("K") as ResolvedType);
+                    const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
+                    this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(kltype));
+                    this.m_emitter.registerTypeInstantiation(klobj, klbinds);
+
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
                 }
             }

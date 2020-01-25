@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -175,6 +175,10 @@ class CPPBodyEmitter {
         }
     }
 
+    generateLoadConstTypedString(op: MIRLoadConstTypedString): string {
+        xxxx;
+    }
+
     static expBodyTrivialCheck(bd: MIRBody): MIROp | undefined {
         if (bd.body.size !== 2 || (bd.body.get("entry") as MIRBasicBlock).ops.length !== 2) {
             return undefined;
@@ -239,7 +243,7 @@ class CPPBodyEmitter {
         const cppctype = this.typegen.getCPPTypeFor(cpetype, "base");
 
         const scopevar = this.varNameToCppName("$scope$");
-        const conscall =  `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
+        const conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
 
         return `${this.varToCppName(cpce.trgt)} = ${conscall};`;
     }
@@ -280,6 +284,24 @@ class CPPBodyEmitter {
         }
 
         return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
+    }
+
+    generateMIRConstructorTuple(op: MIRConstructorTuple): string {
+        const args = op.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
+
+        const scopevar = this.varNameToCppName("$scope$");
+        const conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, BSQTuple, {${args.join(", ")}})`;
+
+        return `${this.varToCppName(op.trgt)} = ${conscall};`;
+    }
+
+    generateMIRConstructorRecord(op: MIRConstructorRecord): string {
+        const args = op.args.map((arg) => `std::make_pair(MIRPropertyEnum::${arg[0]}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
+
+        const scopevar = this.varNameToCppName("$scope$");
+        const conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, BSQRecord, {${args.join(", ")}})`;
+
+        return `${this.varToCppName(op.trgt)} = ${conscall};`;
     }
 
     generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
@@ -1495,27 +1517,10 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRConstructorPrimaryCollectionMixed");
             }
             case MIROpTag.MIRConstructorTuple: {
-                const tc = op as MIRConstructorTuple;
-                const args = tc.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
-
-                if (this.typegen.isKnownLayoutTupleType(this.typegen.getMIRType(tc.resultTupleType))) {
-                    return `${this.varToCppName(tc.trgt)} = { ${args.join(", ")} };`;
-                }
-                else {
-                    return `${this.varToCppName(tc.trgt)} = { ${[args.length, ...args].join(", ")} };`;
-                }
+                return this.generateMIRConstructorTuple(op as MIRConstructorTuple);
             }
             case MIROpTag.MIRConstructorRecord: {
-                const tr = op as MIRConstructorRecord;
-
-                if (this.typegen.isKnownLayoutRecordType(this.typegen.getMIRType(tr.resultRecordType))) {
-                    const args = tr.args.map((arg) => this.argToCpp(arg[1], this.typegen.anyType));
-                    return `${this.varToCppName(tr.trgt)} = { ${args.join(", ")} };`;
-                }
-                else {
-                    const args = tr.args.map((arg) => `std::make_pair(MIRPropertyEnum::${this.typegen.mangleStringForCpp(arg[0])}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
-                    return `${this.varToCppName(tr.trgt)} = { ${[args.length, ...args].join(", ")} };`;
-                }
+               return this.generateMIRConstructorRecord(op as MIRConstructorRecord);
             }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
