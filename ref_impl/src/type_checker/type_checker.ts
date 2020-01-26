@@ -50,7 +50,7 @@ class TypeChecker {
     private readonly m_assembly: Assembly;
 
     private readonly m_buildLevel: BuildLevel;
-    private readonly m_doLiteralStringValidate;
+    private readonly m_doLiteralStringValidate: boolean;
 
     private m_file: string;
     private m_errors: [string, number, string][];
@@ -60,10 +60,11 @@ class TypeChecker {
 
     private readonly AnySplitMethods = ["is", "isSome", "isNone"];
 
-    constructor(assembly: Assembly, emitEnabled: boolean, emitter: MIREmitter, buildlevel: BuildLevel) {
+    constructor(assembly: Assembly, emitEnabled: boolean, emitter: MIREmitter, buildlevel: BuildLevel, doLiteralStringValidate: boolean) {
         this.m_assembly = assembly;
 
         this.m_buildLevel = buildlevel;
+        this.m_doLiteralStringValidate = doLiteralStringValidate;
 
         this.m_file = "[No File]";
         this.m_errors = [];

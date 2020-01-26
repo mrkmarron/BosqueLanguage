@@ -340,56 +340,37 @@ class CPPBodyEmitter {
         return `${this.varToCppName(op.trgt)} = ${conscall};`;
     }
 
-    generateMIRAccessFromIndex(op: MIRAccessFromIndex, resultAccessType: MIRType): string {
-        const tuptype = this.getArgType(op.arg);
-        const hasidx = this.typegen.tupleHasIndex(tuptype, op.idx);
+    generateMIRAccessFromIndexExpression(arg: MIRArgument, idx: number, resultAccessType: MIRType): string {
+        const tuptype = this.getArgType(arg);
+        const hasidx = this.typegen.tupleHasIndex(tuptype, idx);
     
         if(hasidx === "no") {
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
+            return `${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)}`;
         }
         else {
-            const select = `BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->atFixed(${op.idx})`
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)};`;
+            const select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQTuple)->atFixed(${idx})`
+            return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
         }
     }
 
-    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string { 
-        const tuptype = this.getArgType(op.arg);
+    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string {
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
         let vals: string[] = [];
 
-        if (this.typegen.isKnownLayoutTupleType(tuptype)) {
-            const ftuptype = CPPTypeEmitter.getKnownLayoutTupleType(tuptype);
-            vals = op.indecies.map((idx) => {
-                if (idx < ftuptype.entries.length) {
-                    return `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(idx)}`;
-                }
-                else {
-                    return "BSQ_VALUE_NONE";
-                }
-            });
-        }
-        else if (this.typegen.isTupleType(tuptype)) {
-            const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(tuptype);
-            vals = op.indecies.map((idx) => {
-                if (idx < maxlen) {
-                    return `(${this.argToCpp(op.arg, tuptype)})${this.typegen.generateFixedTupleAccessor(idx)}`;
-                }
-                else {
-                    return "BSQ_VALUE_NONE";
-                }
-            });
-        }
-        else {
-            vals = op.indecies.map((idx) => {
-                return `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQTuple)->atFixed<${idx}>()`;
-            });
+        for (let i = 0; i < op.indecies.length; ++i) {
+            vals.push(this.generateMIRAccessFromIndexExpression(op.arg, op.indecies[i], intotypes[i] || this.typegen.anyType));
         }
 
-        if (this.typegen.isKnownLayoutTupleType(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        const scopevar = this.varNameToCppName("$scope$");
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            const rargs: string[] = [];
+            for(let i = 0; i < op.properties.length; ++i) {
+                rargs.push(`(Value)${vals[i]}`);
+            }
+            return `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}, ${rargs.join(", ")});`;
         }
         else {
-            return `${this.varToCppName(op.trgt)} = { ${[vals.length, ...vals].join(", ")} };`;
+            return `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, BSQTuple, { ${vals.join(", ")} });`;
         }
     }
 
@@ -493,76 +474,37 @@ class CPPBodyEmitter {
         }
     }
 
-    generateMIRAccessFromProperty(op: MIRAccessFromProperty, resultAccessType: MIRType): string {
-        const rectype = this.getArgType(op.arg);
-        if (this.typegen.isKnownLayoutRecordType(rectype)) {
-            const frectype = CPPTypeEmitter.getKnownLayoutRecordType(rectype);
-            if (frectype.entries.some((entry) => entry.name === op.property)) {
-                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateKnownRecordAccessor(rectype, op.property)}`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
-            }
-            else {
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
-            }
-        }
-        else if (this.typegen.isRecordType(rectype)) {
-            const maxset = CPPTypeEmitter.getRecordTypeMaxPropertySet(rectype);
-            if (maxset.some((pname) => pname === op.property)) {
-                const value = `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(op.property)}`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
-            }
-            else {
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)};`;
-            }
+    generateMIRAccessFromPropertyExpression(arg: MIRArgument, property: string, resultAccessType: MIRType): string {
+        const rectype = this.getArgType(arg);
+        const hasproperty = this.typegen.recordHasField(rectype, property);
+    
+        if(hasproperty === "no") {
+            return `${this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, resultAccessType)}`;
         }
         else {
-            const value = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRecord)->atFixed<MIRPropertyEnum::${op.property}>()`;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(value, this.typegen.anyType, resultAccessType)};`;
+            const select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQRecord)->atFixed(MIRPropertyEnum::${property})`
+            return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
         }
     }
 
     generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): string {
-        const rectype = this.getArgType(op.arg);
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
         let vals: string[] = [];
 
-        if (this.typegen.isKnownLayoutRecordType(rectype)) {
-            const frectype = CPPTypeEmitter.getKnownLayoutRecordType(rectype);
-            vals = op.properties.map((p) => {
-                if (frectype.entries.findIndex((entry) => entry.name === p) !== -1) {
-                    return `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateKnownRecordAccessor(rectype, p)}`;
-                }
-                else {
-                    return "BSQ_VALUE_NONE";
-                }
-            });
-        }
-        else if (this.typegen.isRecordType(rectype)) {
-            const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(rectype);
-            vals = op.properties.map((p) => {
-                if (allprops.includes(p)) {
-                    return `(${this.argToCpp(op.arg, rectype)})${this.typegen.generateFixedRecordAccessor(p)}`;
-                }
-                else {
-                    return "BSQ_VALUE_NONE";
-                }
-            });
-        }
-        else {
-            vals = op.properties.map((p) => {
-                return `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, this.typegen.anyType)}, BSQRecord)->atFixed<MIRPropertyEnum::${p}>()`;
-            });
+        for (let i = 0; i < op.properties.length; ++i) {
+            vals.push(this.generateMIRAccessFromPropertyExpression(op.arg, op.properties[i], intotypes[i] || this.typegen.anyType));
         }
 
-        if (this.typegen.isKnownLayoutRecordType(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = { ${vals.join(", ")} };`;
+        const scopevar = this.varNameToCppName("$scope$");
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            return `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}, ${vals.join(", ")});`;
         }
         else {
-            const args: string[] = [];
+            const rargs: string[] = [];
             for(let i = 0; i < op.properties.length; ++i) {
-                const pkey = this.typegen.mangleStringForCpp(op.properties[i]);
-                args.push(`std::make_pair(MIRPropertyEnum::${pkey}, ${vals[i]})`);
+                rargs.push(`std::make_tuple<MIRRecordEnum, Value>(MIRRecordEnum::${op.properties[i]}, ${vals[i]})`);
             }
-            return `${this.varToCppName(op.trgt)} = { ${[args.length, ...args].join(", ")} };`;
+            return `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, BSQrecord, { ${rargs.join(", ")} });`;
         }
     }
 
@@ -1547,7 +1489,7 @@ class CPPBodyEmitter {
                 return this.generateMIRConstructorEphemeralValueList(op as MIRConstructorEphemeralValueList);
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
-                return this.generateMIRAccessFromIndex(ai, this.typegen.getMIRType(ai.resultAccessType));
+                return `${this.varToCppName(ai.trgt)} = ${this.generateMIRAccessFromIndexExpression(ai.arg, ai.idx, this.typegen.getMIRType(ai.resultAccessType))};`;
             }
             case MIROpTag.MIRProjectFromIndecies: {
                 const pi = op as MIRProjectFromIndecies;
@@ -1555,7 +1497,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRAccessFromProperty: {
                 const ap = op as MIRAccessFromProperty;
-                return this.generateMIRAccessFromProperty(ap, this.typegen.getMIRType(ap.resultAccessType));
+                return `${this.varToCppName(ap.trgt)} = ${this.generateMIRAccessFromPropertyExpression(ap.arg, ap.property, this.typegen.getMIRType(ap.resultAccessType))};`;
             }
             case MIROpTag.MIRProjectFromProperties: {
                 const pp = op as MIRProjectFromProperties;
