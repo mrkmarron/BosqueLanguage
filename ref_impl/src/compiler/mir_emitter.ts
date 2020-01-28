@@ -691,9 +691,9 @@ class MIREmitter {
         const checker = new TypeChecker(assembly, true, emitter, doInvChecks, doPrePostChecks, doAssertChecks);
 
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialAnyType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAnyConceptType());
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Some", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialSomeType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialSomeConceptType());
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Tuple", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialTupleConceptType());
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Record", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());

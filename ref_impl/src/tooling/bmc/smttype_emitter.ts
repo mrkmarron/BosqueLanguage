@@ -184,15 +184,6 @@ class SMTTypeEmitter {
             else if (this.typecheckRecord(tt)) {
                 return "bsq_record";
             }
-            else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/)) {
-                return this.mangleStringForSMT(tt.trkey);
-            }
-            else if (this.typecheckIsName(tt, /^NSCore::Result<.*>$/)) {
-                return this.mangleStringForSMT(tt.trkey);
-            }
-            else if (this.typecheckIsName(tt, /^NSCore::Tagged<.*>$/)) {
-                return this.mangleStringForSMT(tt.trkey);
-            }
             else if(this.typecheckUEntity(tt)) {
                 return this.mangleStringForSMT(tt.trkey)
             }
@@ -322,9 +313,6 @@ class SMTTypeEmitter {
         else if (this.typecheckRecord(from)) {
             return new SMTValue(`(bsqterm_record ${exp.emit()})`);
         }
-        else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(from, /^NSCore::Result<.*>$/) || this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-            return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (bsqterm_object_${this.mangleStringForSMT(from.trkey)}@cons ${exp.emit()}))`);
-        }
         else {
             return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (bsqterm_object_${this.mangleStringForSMT(from.trkey)}@cons ${exp.emit()}))`);
         }
@@ -398,9 +386,6 @@ class SMTTypeEmitter {
         else if (this.typecheckRecord(into)) {
             return new SMTValue(`(bsqterm_record_value ${exp.emit()})`);
         }
-        else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(into, /^NSCore::Result<.*>$/) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
-            return new SMTValue(`(bsqterm_object_${this.mangleStringForSMT(into.trkey)}_value (bsqterm_object_value ${exp.emit()}))`);
-        }
         else {
             return new SMTValue(`(bsqterm_object_${this.mangleStringForSMT(into.trkey)}_value (bsqterm_object_value ${exp.emit()}))`);
         }
@@ -440,9 +425,6 @@ class SMTTypeEmitter {
         else if (this.typecheckTuple(from) || this.typecheckRecord(from)) {
             return this.coerceFromAtomicTerm(exp, from);
         }
-        else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(from, /^NSCore::Result<.*>$/) || this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-            return this.coerceFromAtomicTerm(exp, from);
-        }
         else if (this.typecheckUEntity(from)) {
             return this.coerceFromAtomicTerm(exp, from);
         }
@@ -471,9 +453,6 @@ class SMTTypeEmitter {
                 return this.coerceIntoAtomicTerm(exp, into);
             }
             else if (this.typecheckTuple(into) || this.typecheckRecord(into)) {
-                return this.coerceIntoAtomicTerm(exp, into);
-            }
-            else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckIsName(into, /^NSCore::Result<.*>$/) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
                 return this.coerceIntoAtomicTerm(exp, into);
             }
             else {
@@ -564,6 +543,10 @@ class SMTTypeEmitter {
 
     generateEntityAccessor(ekey: MIRNominalTypeKey, f: MIRFieldKey): string {
         return `${this.mangleStringForSMT(ekey)}@${this.mangleStringForSMT(f)}`;
+    }
+
+    generateConstructorTest(ekey: MIRNominalTypeKey): string {
+        return `is-${this.mangleStringForSMT(ekey)}@cons`;
     }
 
     generateEmptyHasArrayFor(ekey: MIRNominalTypeKey): string {

@@ -8,7 +8,6 @@
 //
 
 #ifndef Ty
-#define B_NAME success
 #define Ty TName
 #define T int
 #define T_NAME result
@@ -20,21 +19,21 @@
 
 class Ty : public BSQRef
 {
-    bool B_NAME;
+    bool success;
     T T_NAME;
     Value E_NAME;
 
     Ty() : BSQRef() { ; }
-    Ty(bool success, T& result, Value error) : BSQRef(), B_NAME(success), T_NAME(result), E_NAME(error) { ; }
+    Ty(bool success, T& result, Value error) : BSQRef(), success(success), T_NAME(result), E_NAME(error) { ; }
 
-    Ty(const Ty& src) : BSQRef(), B_NAME(src.B_NAME), T_NAME(src.T_NAME), E_NAME(src.E_NAME) 
+    Ty(const Ty& src) : BSQRef(), success(src.success), T_NAME(src.T_NAME), E_NAME(src.E_NAME) 
     { 
         ; 
     }
 
     Ty& operator=(const Ty& src)
     {
-        this->B_NAME = src.B_NAME;
+        this->success = src.success;
         this->T_NAME = src.T_NAME;
         this->E_NAME = src.E_NAME;
         return *this;
@@ -53,7 +52,7 @@ class Ty : public BSQRef
         INC_RC_T(this->T_NAME);
         BSQRef::incrementChecked(this->E_NAME);
 
-        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->B_NAME, this->T_NAME, this->E_NAME);
+        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->success, this->T_NAME, this->E_NAME);
     }
 
     void processCallReturn(BSQRefScope& scaller) 
@@ -63,8 +62,6 @@ class Ty : public BSQRef
     }
 };
 
-#undef Ty
-#undef B_NAME
 #undef Ty 
 #undef T
 #undef T_NAME

@@ -1138,7 +1138,7 @@ class Assembly {
 
     isStringOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::StringOf<"); }
     isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }
-    isResultType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<"); }
+    isResultType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<") || ty.idStr.startsWith("NSCore::Ok<") || ty.idStr.startsWith("NSCore::Err<"); }
     isKeyedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Keyed<"); }
     isTaggedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Tagged<"); }
     

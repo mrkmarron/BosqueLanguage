@@ -252,40 +252,45 @@ entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD 
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-entity Result<T> provides Some {
-    hidden _issuccess: Bool;
-    hidden _result: T?;
-    hidden _error: Any;
-
-    static success(result: T): Result<T> # result_success
-    static failure(info?: Any): Result<T> # result_error
-
-    method isSuccess(): Bool {
-        return this._issuccess;
+concept Result<T> provides Some {
+    static ok(result: T): Result<T> {
+        return Ok<T>::create(result);
     }
 
-    method isError(): Bool {
-        return !this._issuccess;
+    static err(info?: Any): Result<T> {
+        return Err<T>::create(info);
     }
 
-    method result(): T {
-        check this._issuccess;
-        return this._result->as<T>();
+    method isOk(): Bool {
+        return this->is<Ok<T>>();
     }
 
-    method error(): Any {
-        check !this._issuccess;
-        return this._error;
+    method isErr(): Bool {
+        return this->is<Err<T>>();
     }
+
+    method value(): T # result_result
+    method error(): Any # result_error
 
     method errorAs<U>(): U  {
-        check !this._issuccess;
-        return this._error->as<U>();
+        return this.error()->as<U>();
     }
 
     method convert<U>(): Result<U> {
-        return this._issuccess ? Result<U>::success(this._result->as<U>()) : Result<U>::failure(this._error);
+        return this->ok() ? Result<U>::ok(this.value->as<U>()) : Result<U>::err(this.error);
     }
+}
+
+entity Ok<T> provides Result<T> {
+    field value: T;
+
+    static of(value: T): Ok<T> # ok_of
+}
+
+entity Err<T> provides Result<T> {
+    field error: Any;
+
+    static of(info?: Any): Err<T> # err_of
 }
 
 //<summary>A lightweight tagging class for values.</summary>

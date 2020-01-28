@@ -1359,6 +1359,18 @@ class TypeChecker {
                 this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
                 const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []) : undefined;
 
+                if(this.m_doLiteralStringValidate) {
+                    const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 1) as EntityTypeDecl;
+                    const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+                    this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, okbinds)));
+                    this.m_emitter.registerTypeInstantiation(okt, okbinds);
+
+                    const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 1) as EntityTypeDecl;
+                    const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+                    this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, errbinds)));
+                    this.m_emitter.registerTypeInstantiation(errt, errbinds);
+                }
+
                 this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
             }
         }
@@ -1380,6 +1392,17 @@ class TypeChecker {
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
             const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
+
+            const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 1) as EntityTypeDecl;
+            const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, okbinds)));
+            this.m_emitter.registerTypeInstantiation(okt, okbinds);
+
+            const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 1) as EntityTypeDecl;
+            const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, errbinds)));
+            this.m_emitter.registerTypeInstantiation(errt, errbinds);
+
 
             const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
             this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);

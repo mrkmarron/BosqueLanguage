@@ -218,10 +218,12 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
             }
             else {
-                const resultobj = this.assembly.entityDecls.get(pfunc.resultType) as MIREntityTypeDecl;
-                const successf = this.typegen.generateEntityAccessor(resultobj.tkey, (resultobj.fields.find((fd) => fd.name === "success") as MIRFieldDecl).fkey);
+                const resultT = (this.typegen.assembly.conceptDecls.get(pfunc.resultType) as MIREntityTypeDecl).terms.get("T") as MIRType;
+                const errtname = [...this.typegen.assembly.entityDecls].find((dcl) => dcl[0].startsWith("NSCore::Err<") && (dcl[1].terms.get("T") as MIRType).trkey === resultT.trkey) as [string, MIREntityTypeDecl];
+                const successf = this.typegen.generateConstructorTest(errtname[0]);
+
                 const resultv = ichk.bind(new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
-                const cond = new SMTValue(`(or ${checkerror} (= (${successf} ${resultv}) false))`)
+                const cond = new SMTValue(`(or ${checkerror} (${successf} ${resultv}))`)
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
             }
         }
