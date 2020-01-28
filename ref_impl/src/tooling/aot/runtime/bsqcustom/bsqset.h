@@ -45,18 +45,17 @@ public:
         BSQRef::decrementChecked(keys);
     }
 
-    static Ty createFromSingle (BSQRefScope& scope, MIRNominalTypeEnum ntype, ...)
+    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, int n, ...)
     {
         T val;
         std::unordered_map<K, T, K_HASH, K_EQ> entries;
         K_LIST* keys = nullptr;
 
         va_list vl;
-        int n;
-        va_start(vl,n);
-        for (int i=0; i<n; i++)
+        va_start(vl, n);
+        for (int i = 0; i < n; i++)
         {
-            val=va_arg(vl, T);
+            val = va_arg(vl, T);
             auto key = T_GET_KEY(val);
 
             auto iter = entries.find(key);

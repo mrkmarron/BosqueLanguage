@@ -516,6 +516,11 @@ class SMTTypeEmitter {
         }
     }
 
+    getMaxTupleLength(tt: MIRType): number {
+        const lens = tt.options.map((opt) => (opt as MIRTupleType).entries.length);
+        return Math.max(...lens);
+    }
+
     recordHasField(tt: MIRType, pname: string): "yes" | "no" | "maybe" {
         if(tt.options.every((opt) => opt instanceof MIRRecordType && opt.entries.find((entry) => entry.name === pname) !== undefined && !(opt.entries.find((entry) => entry.name === pname) as MIRRecordTypeEntry).isOptional)) {
             return "yes";
@@ -526,6 +531,13 @@ class SMTTypeEmitter {
         else {
             return "maybe";
         }
+    }
+
+    getMaxPropertySet(tt: MIRType): string[] {
+        let props = new Set<string>();
+        tt.options.forEach((opt) => (opt as MIRRecordType).entries.forEach((entry) => props.add(entry.name)));
+
+        return [...props].sort();
     }
 
     initializeConceptSubtypeRelation(): void {

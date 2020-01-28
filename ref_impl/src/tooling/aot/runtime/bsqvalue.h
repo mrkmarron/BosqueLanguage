@@ -46,7 +46,7 @@
 
 
 #define BSQ_NEW_NO_RC(T, ...) (new T(__VA_ARGS__))
-#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRef(BSQ_NEW_NO_RC(T, __VA_ARGS__))))
+#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRefDirect(BSQ_NEW_NO_RC(T, __VA_ARGS__))))
 
 #define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
 #define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
@@ -413,6 +413,26 @@ public:
     const std::vector<Value> entries;
 
     BSQTuple(std::vector<Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
+
+    static BSQTuple* createFromSingle(BSQRefScope& scope, int n, ...)
+    {
+        Value val;
+        std::vector<Value> entries;
+
+        va_list vl;
+        va_start(vl, n);
+        for (int i = 0; i < n; i++)
+        {
+            val = va_arg(vl, Value);
+
+            BSQRef::incrementChecked(val);
+            entries.push_back(val);
+        }
+        va_end(vl);
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries));
+    }
+
     virtual ~BSQTuple() = default;
 
     virtual void destroy()
@@ -429,14 +449,64 @@ public:
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
+
+    static void _push(std::vector<Value>& entries, Value v)
+    {
+        BSQRef::incrementChecked(v);
+        entries.push_back(v);
+    }
 };
 
+typedef std::pair<MIRPropertyEnum, Value> BSQRecordPairEntry; //because va_arg hates a ,
 class BSQRecord : public BSQRef
 {
 public:
     const std::map<MIRPropertyEnum, Value> entries;
 
     BSQRecord(std::map<MIRPropertyEnum, Value>&& entries) : BSQRef(), entries(move(entries)) { ; }
+
+    static BSQRecord* createFromSingle(BSQRefScope& scope, int n, ...)
+    {
+        BSQRecordPairEntry val;
+        std::map<MIRPropertyEnum, Value> entries;
+
+        va_list vl;
+        va_start(vl, n);
+        for (int i = 0; i < n; i++)
+        {
+            val = va_arg(vl, BSQRecordPairEntry);
+
+            BSQRef::incrementChecked(val.second);
+            entries.insert(val);
+        }
+        va_end(vl);
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries));
+    }
+
+    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, int n, ...)
+    {
+        BSQRecordPairEntry val;
+        std::map<MIRPropertyEnum, Value> entries;
+
+        va_list vl;
+        va_start(vl, n);
+        for (int i = 0; i < n; i++)
+        {
+            val = va_arg(vl, BSQRecordPairEntry);
+
+            BSQRef::incrementChecked(val.second);
+            entries.insert(val);
+        }
+        va_end(vl);
+
+        for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
+            BSQRef::incrementChecked(iter->second);
+            entries.insert(*iter);
+        }
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries));
+    }
 
     virtual ~BSQRecord() = default;
 
