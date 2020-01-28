@@ -494,23 +494,17 @@ class CPPBodyEmitter {
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
-        const argtype = this.getArgType(op.arg);
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
         const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
         const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
-        if (this.typegen.isUEntityType(argtype)) {
-            const access = `${this.argToCpp(op.arg, argtype)}->${this.typegen.mangleStringForCpp(op.field)}`;
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const access = `${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(op.field)}`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
         else {
-            if (this.typegen.getMIRType(fdecl.enclosingDecl).options[0] instanceof MIREntityType) {
-                const access = `${this.argToCpp(op.arg, this.typegen.getMIRType(fdecl.enclosingDecl))}->${this.typegen.mangleStringForCpp(op.field)}`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
-            }
-            else {
-                const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, argtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
-            }
+            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
     }
 

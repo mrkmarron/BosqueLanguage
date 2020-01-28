@@ -540,6 +540,10 @@ class SMTTypeEmitter {
         return [...props].sort();
     }
 
+    getEntityEKey(tt: MIRType): MIRNominalTypeKey {
+        return (tt.options[0] as MIREntityType).ekey;
+    }
+
     initializeConceptSubtypeRelation(): void {
         this.assembly.conceptDecls.forEach((tt) => {
             const cctype = this.getMIRType(tt.tkey);

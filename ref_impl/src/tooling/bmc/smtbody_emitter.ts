@@ -39,6 +39,8 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
+    vfieldLookups: { arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
+
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
         this.typegen = typegen;
@@ -613,27 +615,28 @@ class SMTBodyEmitter {
         return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
     }
 
+    generateVFieldLookup(arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl): SMTExp {
+        const lname = `resolve_${fdecl.fkey}_from_${infertype.trkey}`;
+        let decl = this.vfieldLookups.find((lookup) => lookup.lname === lname);
+        if(decl === undefined) {
+            this.vfieldLookups.push({ arg: arg, infertype: infertype, fdecl: fdecl, lname: lname });
+        }
+
+        return new SMTValue(`(${this.typegen.mangleStringForSMT(lname)} ${this.argToSMT(arg, infertype)})`);
+    }
+
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
-        const argtype = this.getArgType(op.arg);
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
         const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
+        const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
-        if (this.typegen.isUEntityType(argtype)) {
-            const etype = SMTTypeEmitter.getUEntityType(argtype);
-            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, argtype).emit()})`);
-
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(fdecl.declaredType), resultAccessType));
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), op.field)} ${this.argToSMT(op.arg, inferargtype).emit()})`);
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, ftype, resultAccessType));
         }
         else {
-            if (this.typegen.getMIRType(fdecl.enclosingDecl).options[0] instanceof MIREntityType) {
-                const etype = SMTTypeEmitter.getUEntityType(this.typegen.getMIRType(fdecl.enclosingDecl));
-                const access = new SMTValue(`(${this.typegen.generateEntityAccessor(etype.ekey, op.field)} ${this.argToSMT(op.arg, this.typegen.getMIRType(fdecl.enclosingDecl)).emit()})`);
-                
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.getMIRType(fdecl.declaredType), resultAccessType));
-            }
-            else {
-                const access = new SMTValue(`(select (bsqterm_object_entries ${this.argToSMT(op.arg, this.typegen.anyType).emit()}) "${op.field}")`);
-                return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, this.typegen.anyType, resultAccessType));
-            }
+            const access = this.generateVFieldLookup(op.arg, inferargtype, fdecl);
+            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, ftype, resultAccessType));
         }
     }
 
