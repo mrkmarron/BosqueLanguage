@@ -397,31 +397,39 @@ class TypeChecker {
         }
     }
 
-    private projectOOTypeAtom(sinfo: SourceInfo, opt: ResolvedType, ptype: ResolvedConceptAtomType, istry: boolean): ResolvedType {
+    private projectOOTypeAtom(sinfo: SourceInfo, opt: ResolvedType, ptype: ResolvedEntityAtomType | ResolvedConceptAtomType, istry: boolean): [ResolvedType, OOMemberLookupInfo[]] {
         let fields = new Set<string>();
-        ptype.conceptTypes.forEach((concept) => {
-            const fmap = this.m_assembly.getAllOOFields(concept.concept, concept.binds);
+        if (ptype instanceof ResolvedEntityAtomType) {
+            const fmap = this.m_assembly.getAllOOFields(ptype.object, ptype.binds);
             fmap.forEach((v, k) => fields.add(k));
-        });
+        }
+        else {
+            ptype.conceptTypes.forEach((concept) => {
+                const fmap = this.m_assembly.getAllOOFields(concept.concept, concept.binds);
+                fmap.forEach((v, k) => fields.add(k));
+            });
+        }
 
         let farray: string[] = [];
         fields.forEach((f) => farray.push(f));
         farray.sort();
 
         let rentries: ResolvedRecordAtomTypeEntry[] = [];
+        let fkeys: OOMemberLookupInfo[] = [];
         for(let i = 0; i < farray.length; ++i) {
             const f = farray[i];
             const finfo = this.m_assembly.tryGetOOMemberDeclUnique(opt, "field", f);
             if(finfo === undefined) {
                 this.raiseErrorIf(sinfo, !istry, "Field name is not defined (or is multiply) defined");
-                return ResolvedType.createEmpty();
+                return [ResolvedType.createEmpty(), []];
             }
 
             const ftype = this.resolveAndEnsureTypeOnly(sinfo, ((finfo as OOMemberLookupInfo).decl as MemberFieldDecl).declaredType, (finfo as OOMemberLookupInfo).binds);
             rentries.push(new ResolvedRecordAtomTypeEntry(f, ftype, false));
+            fkeys.push(this.m_assembly.tryGetOOMemberDeclOptions(opt, "field", f).root as OOMemberLookupInfo);
         }
 
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
+        return [ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries)), fkeys];
     }
 
     private updateTupleIndeciesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [number, ResolvedType][]): ResolvedType {
@@ -1360,13 +1368,13 @@ class TypeChecker {
                 const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []) : undefined;
 
                 if(this.m_doLiteralStringValidate) {
-                    const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 1) as EntityTypeDecl;
-                    const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+                    const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 2) as EntityTypeDecl;
+                    const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType()).set("E", this.m_assembly.getSpecialAnyConceptType());
                     this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, okbinds)));
                     this.m_emitter.registerTypeInstantiation(okt, okbinds);
 
-                    const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 1) as EntityTypeDecl;
-                    const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+                    const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 2) as EntityTypeDecl;
+                    const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType()).set("E", this.m_assembly.getSpecialAnyConceptType());
                     this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, errbinds)));
                     this.m_emitter.registerTypeInstantiation(errt, errbinds);
                 }
@@ -1393,13 +1401,13 @@ class TypeChecker {
 
             const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", aoftype.oftype[1], [], []);
 
-            const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 1) as EntityTypeDecl;
-            const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+            const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok", 2) as EntityTypeDecl;
+            const okbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType()).set("E", this.m_assembly.getSpecialAnyConceptType());
             this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, okbinds)));
             this.m_emitter.registerTypeInstantiation(okt, okbinds);
 
-            const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 1) as EntityTypeDecl;
-            const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType());
+            const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err", 2) as EntityTypeDecl;
+            const errbinds = new Map<string, ResolvedType>().set("T", this.m_assembly.getSpecialAnyConceptType()).set("E", this.m_assembly.getSpecialAnyConceptType());
             this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, errbinds)));
             this.m_emitter.registerTypeInstantiation(errt, errbinds);
 
@@ -1852,51 +1860,85 @@ class TypeChecker {
         const texp = env.getExpressionResult().etype;
 
         let resultOptions: ResolvedType[] = [];
+        let mayfail = false;
         const opType = this.resolveAndEnsureTypeOnly(op.sinfo, op.ptype, env.terms);
         this.raiseErrorIf(op.sinfo, opType.options.length !== 1, "Invalid type");
 
-        xxxx; //check for subtype and handle istry as well
-
         const ptype = opType.options[0];
         if (ptype instanceof ResolvedTupleAtomType) {
-            this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()));
+            if(!this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType())) {
+                if(op.istry) {
+                    return [env.setExpressionResult(this.m_assembly.getSpecialNoneType())];
+                }
+                else {
+                    this.raiseError(op.sinfo, "This projection will always fail");
+                }
+            }
 
-            resultOptions = texp.options.map((opt) => this.projectTupleAtom(op.sinfo, opt, ptype));
+            resultOptions = texp.options.map((opt) => this.projectTupleAtom(op.sinfo, opt, ptype, op.istry));
+            mayfail = resultOptions.some((ropt) => ropt.isEmptyType());
 
+            resultOptions = resultOptions.filter((ropt) => !ropt.isEmptyType());
             if (this.m_emitEnabled) {
                 const ttype = this.m_emitter.registerResolvedTypeReference(opType);
                 const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
-                this.m_emitter.bodyEmitter.emitProjectFromTypeTuple(op.sinfo, resultType.trkey, arg, ttype.trkey, trgt);
+                this.m_emitter.bodyEmitter.emitProjectFromTypeTuple(op.sinfo, resultType.trkey, arg, op.istry, this.m_emitter.registerResolvedTypeReference(texp).trkey, ttype.trkey, trgt);
             }
         }
         else if (ptype instanceof ResolvedRecordAtomType) {
-            this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType()));
+            if(!this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
+                if(op.istry) {
+                    return [env.setExpressionResult(this.m_assembly.getSpecialNoneType())];
+                }
+                else {
+                    this.raiseError(op.sinfo, "This projection will always fail");
+                }
+            }
 
-            resultOptions = texp.options.map((opt) => this.projectRecordAtom(op.sinfo, opt, ptype));
+            resultOptions = texp.options.map((opt) => this.projectRecordAtom(op.sinfo, opt, ptype, op.istry));
+            mayfail = resultOptions.some((ropt) => ropt.isEmptyType());
 
+            resultOptions = resultOptions.filter((ropt) => !ropt.isEmptyType());
             if (this.m_emitEnabled) {
                 const ttype = this.m_emitter.registerResolvedTypeReference(opType);
                 const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
-                this.m_emitter.bodyEmitter.emitProjectFromTypeRecord(op.sinfo, resultType.trkey, arg, ttype.trkey, trgt);
+                this.m_emitter.bodyEmitter.emitProjectFromTypeRecord(op.sinfo, resultType.trkey, arg, op.istry, this.m_emitter.registerResolvedTypeReference(texp).trkey, ttype.trkey, trgt);
             }
         }
         else {
-            this.raiseErrorIf(op.sinfo, !(ptype instanceof ResolvedConceptAtomType), "Can only project on Tuple, Record, Object, or Concept types");
-            this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, opType), "Must be subtype for project operation to be valid");
+            this.raiseErrorIf(op.sinfo, !(ptype instanceof ResolvedConceptAtomType) && !(ptype instanceof ResolvedEntityAtomType), "Can only project on Tuple, Record, Object, or Concept types");
 
-            resultOptions = this.projectOOTypeAtom(op.sinfo, texp, ptype as ResolvedConceptAtomType);
+            if(!this.m_assembly.subtypeOf(texp, opType)) {
+                if(op.istry) {
+                    return [env.setExpressionResult(this.m_assembly.getSpecialNoneType())];
+                }
+                else {
+                    this.raiseError(op.sinfo, "This projection will always fail");
+                }
+            }
 
+            const res = this.projectOOTypeAtom(op.sinfo, texp, ptype as (ResolvedEntityAtomType | ResolvedConceptAtomType), op.istry);
+            resultOptions = [res[0]];
+            mayfail = resultOptions.some((ropt) => ropt.isEmptyType());
+
+            resultOptions = resultOptions.filter((ropt) => !ropt.isEmptyType());
             if (this.m_emitEnabled) {
                 this.m_emitter.registerResolvedTypeReference(opType);
-                (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => this.m_emitter.registerTypeInstantiation(ctype.concept, ctype.binds));
+                if(ptype instanceof ResolvedEntityAtomType) {
+                    this.m_emitter.registerTypeInstantiation((ptype as ResolvedEntityAtomType).object, (ptype as ResolvedEntityAtomType).binds);
+                }
+                else {
+                    (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => this.m_emitter.registerTypeInstantiation(ctype.concept, ctype.binds));
+                }
 
-                const ckeys = (ptype as ResolvedConceptAtomType).conceptTypes.map((ctype) => MIRKeyGenerator.generateTypeKey(ctype.concept, ctype.binds));
+                const cfields = res[1].map((ff) => MIRKeyGenerator.generateFieldKey(ff.contiainingType, ff.binds, (ff.decl as MemberFieldDecl).name));
                 const resultType = this.m_emitter.registerResolvedTypeReference(this.m_assembly.typeUnion(resultOptions));
-                this.m_emitter.bodyEmitter.emitProjectFromTypeConcept(op.sinfo, resultType.trkey, arg, ckeys, trgt);
+                this.m_emitter.bodyEmitter.emitProjectFromTypeNominal(op.sinfo, resultType.trkey, arg, op.istry, this.m_emitter.registerResolvedTypeReference(texp).trkey, this.m_emitter.registerResolvedTypeReference(opType).trkey, cfields, trgt);
             }
         }
 
-        return [env.setExpressionResult(this.m_assembly, this.m_assembly.typeUnion(resultOptions))];
+        this.raiseErrorIf(op.sinfo, !op.istry && mayfail, "Project may fail but not using 'tryProject'");
+        return [env.setExpressionResult(this.m_assembly.typeUnion(mayfail ? [...resultOptions, this.m_assembly.getSpecialNoneType()] : resultOptions))];
     }
 
     private checkModifyWithIndecies(env: TypeEnvironment, op: PostfixModifyWithIndecies, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {

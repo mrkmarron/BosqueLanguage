@@ -5,7 +5,7 @@ entity PODReadBuffer provides Object, UniquenessTypeable{
     static fromString(data: String): *PODReadBuffer # podreadbuffer_fromstring
 
     static read<T where PODType>(ref *buf: PODReadBuffer): T # podreadbuffer_read
-    static tryRead<T where PODType>(ref *buf: PODReadBuffer): Result<T> # podreadbuffer_tryread
+    static tryRead<T where PODType>(ref *buf: PODReadBuffer): Result<T, String> # podreadbuffer_tryread
 
     static isTupleStart(^buf: PODReadBuffer): Bool # podreadbuffer_istuplestart
     static isTupleEnd(^buf: PODReadBuffer): Bool # podreadbuffer_istupleend
@@ -75,7 +75,7 @@ entity APIReadBuffer provides Object, UniquenessTypeable {
     static fromString(data: String): *APIReadBuffer # apireadbuffer_fromstring
 
     static read<T where APIType>(ref *buf: APIReadBuffer): T # apireadbuffer_read
-    static tryRead<T where APIType>(ref *buf: APIReadBuffer): Result<T> # apireadbuffer_tryread
+    static tryRead<T where APIType>(ref *buf: APIReadBuffer): Result<T, String> # apireadbuffer_tryread
 
     static isTupleStart(^buf: APIReadBuffer): Bool # apireadbuffer_istuplestart
     static isTupleEnd(^buf: APIReadBuffer): Bool # apireadbuffer_istupleend

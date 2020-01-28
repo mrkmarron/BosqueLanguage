@@ -33,7 +33,7 @@ concept Indexable provides Any {
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
-    abstract static tryParse(str: String): Result<Any>;
+    abstract static tryParse(str: String): Result<Any, String>;
 }
 
 //<summary>Special type that all Validator (regex etc.) types provide.</summary>
@@ -50,16 +50,16 @@ concept KeyType provides Any, Indexable {
 concept PODType provides Any, Parsable {
     static stringify<T where PODType>(data: T): StringOf<T> # pod_stringify
     static parseString<T where PODType>(str: StringOf<T>): T # pod_parsestring
-    static tryParseString<T where PODType>(str: String): Result<T> # pod_tryparsestring
+    static tryParseString<T where PODType>(str: String): Result<T, String> # pod_tryparsestring
 
     static bufferify<T where PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
     static parseBuffer<T where PODType>(data: Buffer<T>): T # pod_parsebuffer
 
     static jsonify<T where PODType>(data: T): String # pod_jsonify
     static parseJSON<T where PODType>(str: String): T # pod_parsejson
-    static tryParseJSON<T where PODType>(str: String): Result<T> # pod_tryparsejson
+    static tryParseJSON<T where PODType>(str: String): Result<T, String> # pod_tryparsejson
 
-    override static tryParse(str: String): Result<Any> # pod_tryparse
+    override static tryParse(str: String): Result<Any, String> # pod_tryparse
 }
 
 //<summary>Type to unify Buffers and APITypes at top level for checking</summary>
@@ -70,36 +70,36 @@ concept APIValue provides Any {
 concept APIType provides APIValue, Parsable {
     static stringify<T where APIType>(data: T): StringOf<T> # api_stringify
     static parseString<T where APIType>(str: StringOf<T>): T # api_parsestring
-    static tryParseString<T where APIType>(str: String): Result<T> # api_tryparsestring
+    static tryParseString<T where APIType>(str: String): Result<T, String> # api_tryparsestring
 
     static bufferify<T where APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
     static parseBuffer<T where APIType>(data: Buffer<T>): T # api_parsebuffer
 
     static jsonify<T where APIType>(data: T): String # api_jsonify
     static parseJSON<T where APIType>(str: String): T # api_parsejson
-    static tryParseJSON<T where APIType>(str: String): Result<T> # api_tryparsejson
+    static tryParseJSON<T where APIType>(str: String): Result<T, String> # api_tryparsejson
 
-    override static tryParse(str: String): Result<Any> # api_tryparse
+    override static tryParse(str: String): Result<Any, String> # api_tryparse
 }
 
 //<summary>Type for representing the none-value.</summary>
 concept Truthy provides KeyType, PODType, APIType {
-    override static tryParse(str: String): Result<Any> # truthy_tryparse
+    override static tryParse(str: String): Result<Any, String> # truthy_tryparse
 }
 
 //<summary>Type for representing the none-value.</summary>
 entity None provides Truthy {
-    override static tryParse(str: String): Result<Any> # none_tryparse
+    override static tryParse(str: String): Result<Any, String> # none_tryparse
 }
 
 //<summary>Primitive boolean value.</summary>
 entity Bool provides Some, Truthy {
-    override static tryParse(str: String): Result<Any> # bool_tryparse
+    override static tryParse(str: String): Result<Any, String> # bool_tryparse
 }
 
 //<summary>Primitive integer value.</summary>
 entity Int provides KeyType, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any> # int_tryparse
+    override static tryParse(str: String): Result<Any, String> # int_tryparse
 
     static max(v1: Int, v2: Int): Int {
         return v1 > v2 ? v1 : v2;
@@ -112,7 +112,7 @@ entity Int provides KeyType, PODType, APIType, Some {
 
 //<summary>Primitive string value.</summary>
 entity String provides KeyType, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any> # string_tryparse
+    override static tryParse(str: String): Result<Any, String> # string_tryparse
 }
 
 //<summary>Primitive stringof value.</summary>
@@ -151,19 +151,19 @@ entity Buffer<T where PODType | APIType> provides APIValue, Some {
 
 //<summary>Primitive ISO standard date time value.</summary>
 entity ISOTime provides PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any> # time_tryparse
+    override static tryParse(str: String): Result<Any, String> # time_tryparse
 }
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, PODType, APIType, Some {
     static create(guid: String): GUID # guid_create 
 
-    override static tryParse(str: String): Result<Any> # guid_tryparse
+    override static tryParse(str: String): Result<Any, String> # guid_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
 entity EventTime provides KeyType, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any> # eventtime_tryparse
+    override static tryParse(str: String): Result<Any, String> # eventtime_tryparse
 
     static zero(): EventTime # eventtime_zero
     static tick(t: EventTime): EventTime # eventtime_tick
@@ -173,14 +173,14 @@ entity EventTime provides KeyType, PODType, APIType, Some {
 entity DataHash provides KeyType, PODType, APIType, Some {
     static compute<T>(T: value): DataHash # datahash_compute
 
-    override static tryParse(str: String): Result<Any> # datahash_tryparse
+    override static tryParse(str: String): Result<Any, String> # datahash_tryparse
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 entity CryptoHash provides provides KeyType, PODType, APIType, Some {
     static compute<T>(T: value): CryptoHash # cryptohash_compute
 
-    override static tryParse(str: String): Result<Any> # cryptohash_tryparse
+    override static tryParse(str: String): Result<Any, String> # cryptohash_tryparse
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
@@ -222,12 +222,12 @@ concept Tuple provides Some {
 
 //<summary>All actual POD tuples implicitly provide this concept.</summary>
 concept PODTuple provides PODType, Tuple {
-    override static tryParse(str: String): Result<Any> # podtuple_tryparse
+    override static tryParse(str: String): Result<Any, String> # podtuple_tryparse
 }
 
 //<summary>All actual POD tuples implicitly provide this concept.</summary>
 concept APITuple provides APIType, Tuple {
-    override static tryParse(str: String): Result<Any> # apituple_tryparse
+    override static tryParse(str: String): Result<Any, String> # apituple_tryparse
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
@@ -236,12 +236,12 @@ concept Record provides Some {
 
 //<summary>All actual POD records implicitly provide this concept.</summary>
 concept PODRecord provides POD, Record {
-    override static tryParse(str: String): Result<Any> # podrecord_tryparse
+    override static tryParse(str: String): Result<Any, String> # podrecord_tryparse
 }
 
 //<summary>All actual POD records implicitly provide this concept.</summary>
 concept APIRecord provides APIType, Record {
-    override static tryParse(str: String): Result<Any> # apituple_tryparse
+    override static tryParse(str: String): Result<Any, String> # apituple_tryparse
 }
 
 entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
@@ -252,45 +252,41 @@ entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD 
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T> provides Some {
-    static ok(result: T): Result<T> {
-        return Ok<T>::create(result);
+concept Result<T, E> provides Some, provides Some, PODType when T subtype POD && E subtype PODType, APIType when T subtype APIType && E subtype APIType {
+    static ok(result: T): Result<T, E> {
+        return Ok<T, E>::create(result);
     }
 
-    static err(info?: Any): Result<T> {
-        return Err<T>::create(info);
+    static err(info?: Any): Result<T, E> {
+        return Err<T, E>::create(info);
     }
 
     method isOk(): Bool {
-        return this->is<Ok<T>>();
+        return this->is<Ok<T, E>>();
     }
 
     method isErr(): Bool {
-        return this->is<Err<T>>();
+        return this->is<Err<T, E>>();
     }
 
     method value(): T # result_result
-    method error(): Any # result_error
+    method error(): E # result_error
 
-    method errorAs<U>(): U  {
-        return this.error()->as<U>();
-    }
-
-    method convert<U>(): Result<U> {
-        return this->ok() ? Result<U>::ok(this.value->as<U>()) : Result<U>::err(this.error);
+    method convert<U, V>(): Result<U, V> {
+        return this->ok() ? Result<U, V>::ok(this.value->as<U>()) : Result<U, V>::err(this.error);
     }
 }
 
-entity Ok<T> provides Result<T> {
+entity Ok<T, E> provides Result<T, E> {
     field value: T;
 
-    static of(value: T): Ok<T> # ok_of
+    static of(value: T): Ok<T, E> # ok_of
 }
 
-entity Err<T> provides Result<T> {
-    field error: Any;
+entity Err<T, E> provides Result<T, E> {
+    field error: E;
 
-    static of(info?: Any): Err<T> # err_of
+    static of(info: E): Err<T, E> # err_of
 }
 
 //<summary>A lightweight tagging class for values.</summary>

@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString, MIRConstructorEphemeralValueList } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -506,6 +506,32 @@ class CPPBodyEmitter {
             const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
+    }
+
+    generateMIRProjectFromFields(op: MIRProjectFromFields): string {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+
+        let cvals: string[] = [];
+        op.fields.map((f) => {
+            const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
+            const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+            if (this.typegen.typecheckUEntity(inferargtype)) {
+                const access = `${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`;
+                cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
+            }
+            else {
+                const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`;
+                cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
+            }
+        });
+
+        const scopevar = this.varNameToCppName("$scope$");
+        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${cvals.join(", ")});`;
+    }
+
+    generateMIRModifyWithFields(mf: MIRModifyWithFields): string {
+        xxxx;
     }
 
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): string {
@@ -1251,7 +1277,8 @@ class CPPBodyEmitter {
                 return this.generateMIRAccessFromField(af, this.typegen.getMIRType(af.resultAccessType));
             }
             case MIROpTag.MIRProjectFromFields: {
-                return NOT_IMPLEMENTED<string>("MIRProjectFromFields");
+                const pf = op as MIRProjectFromFields;
+                return this.generateMIRProjectFromFields(pf);
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromTypeTuple");
@@ -1271,7 +1298,8 @@ class CPPBodyEmitter {
                 return this.generateMIRModifyWithProperties(mp, this.typegen.getMIRType(mp.resultRecordType));
             }
             case MIROpTag.MIRModifyWithFields: {
-                return NOT_IMPLEMENTED<string>("MIRModifyWithFields");
+                const mf = op as MIRModifyWithFields;
+                return this.generateMIRModifyWithFields(mf);
             }
             case MIROpTag.MIRStructuredExtendTuple: {
                 const si = op as MIRStructuredExtendTuple;

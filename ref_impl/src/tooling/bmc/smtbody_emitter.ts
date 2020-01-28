@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -40,6 +40,9 @@ class SMTBodyEmitter {
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
     vfieldLookups: { arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
+    vfieldProjects: { arg: MIRArgument, infertype: MIRType, fdecls: MIRFieldDecl[], pname: string }[] = [];
+    vfieldUpdates: { arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
+    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -640,6 +643,42 @@ class SMTBodyEmitter {
             const access = this.generateVFieldLookup(op.arg, inferargtype, fdecl);
             return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, ftype, resultAccessType));
         }
+    }
+
+    generateVFieldProject(arg: MIRArgument, infertype: MIRType, fdecls: MIRFieldDecl[]): SMTExp {
+        const pname = `project_${fdecls.map((fd) => fd.fkey).sort().join("*")}_from_${infertype.trkey}`;
+        let decl = this.vfieldProjects.find((lookup) => lookup.pname === pname);
+        if(decl === undefined) {
+            this.vfieldProjects.push({ arg: arg, infertype: infertype, fdecls: fdecls, pname: pname });
+        }
+
+        return new SMTValue(`(${this.typegen.mangleStringForSMT(pname)} ${this.argToSMT(arg, infertype)})`);
+    }
+
+    generateMIRProjectFromFields(op: MIRProjectFromFields): SMTExp {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        
+
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            let cvals = "bsqrecord_array_empty";
+            for (let i = 0; i < op.fields.length; ++i) {
+                const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+                const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), op.fields[i])} ${this.argToSMT(op.arg, inferargtype).emit()})`);
+                cvals = `(store ${cvals} "${fdecl.name}" ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`;
+            }
+
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+        }
+        else {
+            const access = this.generateVFieldProject(op.arg, inferargtype, op.fields.map((f) => this.assembly.fieldDecls.get(f) as MIRFieldDecl));
+            return new SMTLet(this.varToSMTName(op.trgt), access);
+        }
+    }
+
+    generateMIRModifyWithFields(mf: MIRModifyWithFields): SMTExp {
+        
     }
 
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction, gas: number | undefined): SMTExp {
@@ -1425,7 +1464,8 @@ class SMTBodyEmitter {
                 return this.generateMIRAccessFromField(af, this.typegen.getMIRType(af.resultAccessType));
             }
             case MIROpTag.MIRProjectFromFields: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromFields");
+                const pf = op as MIRProjectFromFields;
+                return this.generateMIRProjectFromFields(pf);
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 return NOT_IMPLEMENTED<SMTExp>("MIRProjectFromTypeTuple");
@@ -1445,7 +1485,8 @@ class SMTBodyEmitter {
                 return this.generateMIRModifyWithProperties(mp, this.typegen.getMIRType(mp.resultRecordType));
             }
             case MIROpTag.MIRModifyWithFields: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRModifyWithFields");
+                const mf = op as MIRModifyWithFields;
+                return this.generateMIRModifyWithFields(mf);
             }
             case MIROpTag.MIRStructuredExtendTuple: {
                 const si = op as MIRStructuredExtendTuple;
