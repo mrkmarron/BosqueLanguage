@@ -777,8 +777,8 @@ class SMTBodyEmitter {
         }
 
         const tv = this.generateTempName();
-        const ivrtype = this.typegen.typeToSMTCategory(this.typegen.getMIRType((idecl as MIRInvokeDecl).resultType));
-        const resulttype = this.typegen.typeToSMTCategory(this.currentRType);
+        const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType((idecl as MIRInvokeDecl).resultType));
+        const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
 
         const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
         const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${resulttype} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
@@ -800,28 +800,10 @@ class SMTBodyEmitter {
         }
     }
 
-    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        const lhsargtype = this.getArgType(lhs);
-        const rhsargtype = this.getArgType(rhs);
-
+    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
         let coreop = "";
-        if (lhsinfertype.trkey === "NSCore::Bool" && rhsinfertype.trkey === "NSCore::Bool") {
-            const lhsbool = (lhsargtype.trkey === "NSCore::Bool") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
-            const rhsbool = (rhsargtype.trkey === "NSCore::Bool") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
-            coreop = `(= ${lhsbool} ${rhsbool})`;
-        }
-        else if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
-            const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
-            const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
-            coreop = `(= ${lhsint} ${rhsint})`;
-        }
-        else if (lhsinfertype.trkey === "NSCore::String" && rhsinfertype.trkey === "NSCore::String") {
-            const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
-            const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
-            coreop = `(= ${lhsstring} ${rhsstring})`;
-        }
-        else if(lhsargtype.trkey === rhsargtype.trkey) {
-            coreop = `(= ${this.argToSMT(lhs, lhsargtype).emit()} ${this.argToSMT(rhs, rhsargtype).emit()})`;
+        if (isstrict) {
+            coreop = `(= ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
         }
         else {
             coreop = `(= ${this.argToSMT(lhs, this.typegen.keyType).emit()} ${this.argToSMT(rhs, this.typegen.keyType).emit()})`;
@@ -831,6 +813,7 @@ class SMTBodyEmitter {
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+        xxxx;
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 

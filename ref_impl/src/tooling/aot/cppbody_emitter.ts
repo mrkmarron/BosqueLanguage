@@ -661,68 +661,23 @@ class CPPBodyEmitter {
 
         const rtype = this.typegen.getMIRType(ivop.resultType);
         if (this.typegen.maybeRefableCountableType(rtype)) {
-            const scopevar = this.varNameToCppName("$scope$");
-            if (this.typegen.isTupleType(rtype)) {
-                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(rtype);
-
-                for (let i = 0; i < maxlen; ++i) {
-                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
-                }
-            }
-            else if (this.typegen.isRecordType(rtype)) {
-                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(rtype);
-
-                for (let i = 0; i < allprops.length; ++i) {
-                    vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
-                }
-            }
-            else {
-                vals.push(`${scopevar}.getCallerSlot<${this.typegen.scopectr++}>()`);
-            }
+            vals.push(this.varNameToCppName("$scope$"));
         }
 
         return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.mkey)}(${vals.join(", ")});`;
     }
 
-    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        const lhsargtype = this.getArgType(lhs);
-        const rhsargtype = this.getArgType(rhs);
-
-        if (lhsinfertype.trkey === "NSCore::Bool" && rhsinfertype.trkey === "NSCore::Bool") {
-            const lhsbool = (lhsargtype.trkey === "NSCore::Bool") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
-            const rhsbool = (rhsargtype.trkey === "NSCore::Bool") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-            return `(${lhsbool} ${op} ${rhsbool})`;
-        }
-        else if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
-            const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
-            const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-            return `(${lhsint} ${op} ${rhsint})`;
-        }
-        else if (lhsinfertype.trkey === "NSCore::String" && rhsinfertype.trkey === "NSCore::String"){
-            const lhsstring = (lhsargtype.trkey === "NSCore::String") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
-            const rhsstring = (rhsargtype.trkey === "NSCore::String") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-            return `(${lhsstring}->sdata ${op} ${rhsstring}->sdata)`;
-        }
-        else if (lhsargtype === rhsargtype) {
-            if(this.typegen.isTupleType(lhsargtype)) {
-                return NOT_IMPLEMENTED<string>("Not Implemented -- equals tuple");
-            }
-            else if (this.typegen.isRecordType(lhsargtype)) {
-                return NOT_IMPLEMENTED<string>("Not Implemented -- equals record");
-            }
-            else {
-                //
-                //TODO: there are a number of options here for things like enum or typed string that we can handle better
-                //
-                return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
-            }
+    generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
+        if (isstrict) {
+            return `(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
         }
         else {
-            return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.anyType)}, ${this.argToCpp(rhs, this.typegen.anyType)})`;
+            return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
         }
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
+        xxxx;
         const lhsargtype = this.getArgType(lhs);
         const rhsargtype = this.getArgType(rhs);
 
