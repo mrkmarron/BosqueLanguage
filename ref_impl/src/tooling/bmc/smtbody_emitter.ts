@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -42,7 +42,7 @@ class SMTBodyEmitter {
     vfieldLookups: { arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
     vfieldProjects: { arg: MIRArgument, infertype: MIRType, fdecls: MIRFieldDecl[], pname: string }[] = [];
     vfieldUpdates: { arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
-    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, mname: string }[] = [];
+    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -658,7 +658,6 @@ class SMTBodyEmitter {
     generateMIRProjectFromFields(op: MIRProjectFromFields): SMTExp {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         
-
         if (this.typegen.typecheckUEntity(inferargtype)) {
             let cvals = "bsqrecord_array_empty";
             for (let i = 0; i < op.fields.length; ++i) {
@@ -677,8 +676,96 @@ class SMTBodyEmitter {
         }
     }
 
-    generateMIRModifyWithFields(mf: MIRModifyWithFields): SMTExp {
+    generateVFieldUpdates(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][]): SMTExp {
+        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
+        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
+        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
+        if(decl === undefined) {
+            this.vfieldUpdates.push({ arg: arg, infertype: infertype, fupds: fupds, uname: uname });
+        }
+
+        return new SMTValue(`(${this.typegen.mangleStringForSMT(uname)} ${this.argToSMT(arg, infertype)} ${fupds.map((upd) => this.argToSMT(upd[1], this.getArgType(upd[1])).emit()).join(" ")})`);
+    }
+
+    generateMIRModifyWithFields(op: MIRModifyWithFields): SMTExp {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
         
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const ekey = this.typegen.getEntityEKey(inferargtype);
+            const utype = this.typegen.assembly.entityDecls.get(ekey) as MIREntityTypeDecl;
+            let cvals: string[] = [];
+            for (let i = 0; i < utype.fields.length; ++i) {
+                const fdecl = utype.fields[i];
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+                const upd = op.updates.find((update) => update[0] == fdecl.fkey);
+                if(upd !== undefined) {
+                    cvals.push(this.argToSMT(upd[1], ftype).emit());
+                }
+                else {
+                    cvals.push(`(${this.typegen.generateEntityAccessor(ekey, fdecl.fkey)} ${this.argToSMT(op.arg, inferargtype).emit()})`);
+                }
+            }
+
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(ekey)} ${cvals.join(" ")})`));
+        }
+        else {
+            const access = this.generateVFieldUpdates(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]));
+            return new SMTLet(this.varToSMTName(op.trgt), access);
+        }
+    }
+    
+    generateVFieldExtend(arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermerge: MIRType, fieldResolves: [string, MIRFieldDecl][]): SMTExp {
+        const upnames = fieldResolves.map((fr) => `${fr[0]}->${fr[1].fkey}`);
+        const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
+        let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
+        if(decl === undefined) {
+            this.vobjmerges.push({ arg: arg, infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
+        }
+
+        return new SMTValue(`(${this.typegen.mangleStringForSMT(mname)} ${this.argToSMT(arg, infertype)} ${this.argToSMT(merge, infermerge)})`);
+    }
+
+    generateMIRStructuredExtendObject(op: MIRStructuredExtendObject): SMTExp {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        const mergeargtype = this.typegen.getMIRType(op.updateInferType);
+        
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const ekey = this.typegen.getEntityEKey(inferargtype);
+            const utype = this.typegen.assembly.entityDecls.get(ekey) as MIREntityTypeDecl;
+            let cvals: string[] = [];
+            for (let i = 0; i < utype.fields.length; ++i) {
+                const fdecl = utype.fields[i];
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+                const fp = op.fieldResolves.find((tfp) => tfp[1] === fdecl.fkey);
+                const faccess = `(${this.typegen.generateEntityAccessor(ekey, fdecl.fkey)} ${this.argToSMT(op.arg, inferargtype).emit()})`;
+                if(fp === undefined) {
+                    cvals.push(faccess);
+                }
+                else {
+                    const hasp = this.typegen.recordHasField(mergeargtype, fp[0]);
+                    if(hasp === "no") {
+                        cvals.push(faccess);
+                    }
+                    else if (hasp === "yes") {
+                        cvals.push(this.generateMIRAccessFromPropertyExpression(op.arg, fp[0], ftype).emit());
+                    }
+                    else {
+                        let mvals = this.typegen.typecheckRecord(this.getArgType(op.update)) ? `(bsq_record_entries ${this.varToSMTName(op.update)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.update)}))`;
+                        const check = new SMTValue(`(= (select ${mvals} "${fp[0]}") bsqterm@clear)`);
+
+                        cvals.push(new SMTCond(check, new SMTValue(faccess), new SMTValue(`(select ${mvals} "${fp[0]}")`)).emit());
+                    }
+                }
+            }
+
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(ekey)} ${cvals.join(" ")})`));
+        }
+        else {
+            const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]));
+            return new SMTLet(this.varToSMTName(op.trgt), access);
+        }
     }
 
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction, gas: number | undefined): SMTExp {
@@ -1497,7 +1584,8 @@ class SMTBodyEmitter {
                 return this.generateMIRStructuredExtendRecord(sp, this.typegen.getMIRType(sp.resultRecordType));
             }
             case MIROpTag.MIRStructuredExtendObject: {
-                return NOT_IMPLEMENTED<SMTExp>("MIRStructuredExtendObject");
+                const so = op as MIRStructuredExtendObject;
+                return this.generateMIRStructuredExtendObject(op);
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;

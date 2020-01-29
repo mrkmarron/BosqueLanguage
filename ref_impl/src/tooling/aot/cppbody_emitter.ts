@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRRecordTypeEntry, MIRConceptType, MIRTupleTypeEntry, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRBodyKey, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRResolvedTypeKey, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -35,6 +35,9 @@ class CPPBodyEmitter {
 
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
+
+    vfieldUpdates: { arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
+    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
@@ -530,8 +533,122 @@ class CPPBodyEmitter {
         return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${cvals.join(", ")});`;
     }
 
-    generateMIRModifyWithFields(mf: MIRModifyWithFields): string {
-        xxxx;
+    generateVFieldUpdates(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][]): string {
+        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
+        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
+        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
+        if(decl === undefined) {
+            this.vfieldUpdates.push({ arg: arg, infertype: infertype, fupds: fupds, uname: uname });
+        }
+
+        return `${this.typegen.mangleStringForCpp(uname)}(${this.argToCpp(arg, infertype)}, ${fupds.map((upd) => this.argToCpp(upd[1], this.getArgType(upd[1]))).join(", ")})`;
+    }
+
+    generateMIRModifyWithFields(op: MIRModifyWithFields): string {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const ekey = this.typegen.getEntityEKey(inferargtype);
+            const utype = this.typegen.assembly.entityDecls.get(ekey) as MIREntityTypeDecl;
+            let cvals: [string, MIRType][] = [];
+            for (let i = 0; i < utype.fields.length; ++i) {
+                const fdecl = utype.fields[i];
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+                const upd = op.updates.find((update) => update[0] == fdecl.fkey);
+                if(upd !== undefined) {
+                    cvals.push([this.argToCpp(upd[1], ftype), ftype]);
+                }
+                else {
+                    cvals.push([`${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`, ftype]);
+                }
+            }
+
+            let fvals = cvals.map((val) => {
+                return this.typegen.generateConstructorArgInc(val[1], val[0]);
+            });
+    
+            const cppctype = this.typegen.getCPPTypeFor(inferargtype, "base");
+            const scopevar = this.varNameToCppName("$scope$");
+            const cexp = `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}${fvals.length !== 0 ? (", " + fvals.join(", ")) : ""});`;
+            if (utype.invariants.length === 0) {
+                return cexp;
+            }
+            else {
+                const testexp = `${this.typegen.mangleStringForCpp("invariant::" + ekey)}(${this.varToCppName(op.trgt)});`;
+                return cexp + " " + testexp;
+            }
+        }
+        else {
+            const access = this.generateVFieldUpdates(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]));
+            return `${this.varToCppName(op.trgt)} = ${access};`;
+        }
+    }
+
+    generateVFieldExtend(arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermerge: MIRType, fieldResolves: [string, MIRFieldDecl][]): string {
+        const upnames = fieldResolves.map((fr) => `${fr[0]}->${fr[1].fkey}`);
+        const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
+        let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
+        if(decl === undefined) {
+            this.vobjmerges.push({ arg: arg, infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
+        }
+
+        return `${this.typegen.mangleStringForCpp(mname)}(${this.argToCpp(arg, infertype)}, ${this.argToCpp(merge, infermerge)})`;
+    }
+
+    generateMIRStructuredExtendObject(op: MIRStructuredExtendObject): string {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        const mergeargtype = this.typegen.getMIRType(op.updateInferType);
+        
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const ekey = this.typegen.getEntityEKey(inferargtype);
+            const utype = this.typegen.assembly.entityDecls.get(ekey) as MIREntityTypeDecl;
+            let cvals: [string, MIRType][] = [];
+            for (let i = 0; i < utype.fields.length; ++i) {
+                const fdecl = utype.fields[i];
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+
+                const fp = op.fieldResolves.find((tfp) => tfp[1] === fdecl.fkey);
+                const faccess = [`${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`, ftype] as [string, MIRType];
+                if(fp === undefined) {
+                    cvals.push(faccess);
+                }
+                else {
+                    const hasp = this.typegen.recordHasField(mergeargtype, fp[0]);
+                    if(hasp === "no") {
+                        cvals.push(faccess);
+                    }
+                    else if (hasp === "yes") {
+                        cvals.push([this.generateMIRAccessFromPropertyExpression(op.arg, fp[0], ftype), ftype]);
+                    }
+                    else {
+                        const check = `BSQ_GET_VALUE_PTR(${this.varToCppName(op.update)}, BSQRecord)->hasProperty(MIRPropertyEnum::${fp[0]})`;
+                        const update = `(${check} ? ${this.generateMIRAccessFromPropertyExpression(op.update, fp[0], ftype)}) : ${faccess})`;
+
+                        cvals.push([update, ftype]);
+                    }
+                }
+            }
+
+            let fvals = cvals.map((val) => {
+                return this.typegen.generateConstructorArgInc(val[1], val[0]);
+            });
+    
+            const cppctype = this.typegen.getCPPTypeFor(inferargtype, "base");
+            const scopevar = this.varNameToCppName("$scope$");
+            const cexp = `${this.varToCppName(op.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}${fvals.length !== 0 ? (", " + fvals.join(", ")) : ""});`;
+            if (utype.invariants.length === 0) {
+                return cexp;
+            }
+            else {
+                const testexp = `${this.typegen.mangleStringForCpp("invariant::" + ekey)}(${this.varToCppName(op.trgt)});`;
+                return cexp + " " + testexp;
+            }
+        }
+        else {
+            const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]));
+            return `${this.varToCppName(op.trgt)} = ${access};`;
+        }
     }
 
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): string {
@@ -1310,7 +1427,8 @@ class CPPBodyEmitter {
                 return this.generateMIRStructuredExtendRecord(sp, this.typegen.getMIRType(sp.resultRecordType));
             }
             case MIROpTag.MIRStructuredExtendObject: {
-                return NOT_IMPLEMENTED<string>("MIRStructuredExtendObject");
+                const so = op as MIRStructuredExtendObject;
+                return this.generateMIRStructuredExtendObject(so);
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;

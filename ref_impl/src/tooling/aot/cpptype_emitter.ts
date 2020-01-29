@@ -439,6 +439,10 @@ class CPPTypeEmitter {
         return [...props].sort();
     }
 
+    getEntityEKey(tt: MIRType): MIRNominalTypeKey {
+        return (tt.options[0] as MIREntityType).ekey;
+    }
+    
     maybeRefableCountableType(tt: MIRType): "no" | "int" | "direct" | "checked" | "special" {
         if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/)) {
             return "no";
