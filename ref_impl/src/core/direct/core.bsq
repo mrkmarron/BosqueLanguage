@@ -244,15 +244,17 @@ concept APIRecord provides APIType, Record {
     override static tryParse(str: String): Result<Any, String> # apituple_tryparse
 }
 
-entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
+entity MapEntry<K where Indexable, V> provides Some {
     field key: K;
     field value: V;
 
-    static create(k: K, v: V): MapEntry<K, V> # mapentry_create
+    static create(k: K, v: V): MapEntry<K, V> {
+        return MapEntry<K, V>@{ key=key, value=value };
+    }
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T, E> provides Some, provides Some, PODType when T subtype POD && E subtype PODType, APIType when T subtype APIType && E subtype APIType {
+concept Result<T, E> provides Some, provides Some {
     static ok(result: T): Result<T, E> {
         return Ok<T, E>::create(result);
     }
@@ -280,13 +282,17 @@ concept Result<T, E> provides Some, provides Some, PODType when T subtype POD &&
 entity Ok<T, E> provides Result<T, E> {
     field value: T;
 
-    static of(value: T): Ok<T, E> # ok_of
+    static of(value: T): Ok<T, E> {
+        return Ok<T, E>@{ value=value };
+    }
 }
 
 entity Err<T, E> provides Result<T, E> {
     field error: E;
 
-    static of(info: E): Err<T, E> # err_of
+    static of(info: E): Err<T, E> {
+        return Err<T, E>@{ error=info };
+    }
 }
 
 //<summary>A lightweight tagging class for values.</summary>
@@ -294,7 +300,9 @@ entity Tagged<T where KeyType, U> provides Indexable, Some {
     field key: K;
     field value: U;
 
-    static create(key: T, value: U): Tagged<T, U> # tagged_create
+    static create(key: T, value: U): Tagged<T, U> {
+        return Tagged<T, U>@{ key=key, value=value };
+    }
 }
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>

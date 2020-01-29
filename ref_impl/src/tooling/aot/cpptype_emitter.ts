@@ -98,10 +98,6 @@ class CPPTypeEmitter {
         }
     }
 
-    typecheckResultT(tt: MIRType, match?: "exact" | "may"): boolean {
-        return this.typecheckIsName(tt, /^NSCore::Result<.*>$/) || this.typecheckIsName(tt, /^NSCore::Ok<.*>$/) || this.typecheckIsName(tt, /^NSCore::Err<.*>$/);
-    }
-
     typecheckUEntity(tt: MIRType, match?: "exact" | "may"): boolean {
         match = match || "exact";
         if(match === "exact") {
@@ -185,15 +181,6 @@ class CPPTypeEmitter {
             }
             else if (this.typecheckRecord(tt)) {
                 return "BSQRecord" + (declspec !== "base" ? "*" : "");
-            }
-            else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/)) {
-                return this.mangleStringForCpp(tt.trkey);
-            }
-            else if (this.typecheckResultT(tt)) {
-                return this.mangleStringForCpp(tt.trkey);
-            }
-            else if (this.typecheckIsName(tt, /^NSCore::Tagged<.*>$/)) {
-                return this.mangleStringForCpp(tt.trkey);
             }
             else if(this.typecheckUEntity(tt)) {
                 return this.mangleStringForCpp(tt.trkey);
@@ -293,9 +280,6 @@ class CPPTypeEmitter {
         else if (this.typecheckRecord(into)) {
             return `BSQ_GET_VALUE_PTR(${exp}, BSQRecord)`;
         }
-        else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckResultT(into) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
-        }
         else {
             return `BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
         }
@@ -333,15 +317,6 @@ class CPPTypeEmitter {
             || this.typecheckTuple(from) || this.typecheckRecord(from)) {
             return exp;
         }
-        else if (this.typecheckIsName(from, /^NSCore::MapEntry<.*>$/)) {
-            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
-        }
-        else if (this.typecheckResultT(from)) {
-            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
-        }
-        else if (this.typecheckIsName(from, /^NSCore::Tagged<.*>$/)) {
-            return `${exp}.processBox(${this.mangleStringForCpp("$scope$")})`;
-        }
         else if (this.typecheckUEntity(from)) {
             return exp;
         }
@@ -370,9 +345,6 @@ class CPPTypeEmitter {
                return this.coerceIntoAtomicTerm(exp, into);
            }
            else if (this.typecheckTuple(into) || this.typecheckRecord(into)) {
-               return this.coerceIntoAtomicTerm(exp, into);
-           }
-           else if (this.typecheckIsName(into, /^NSCore::MapEntry<.*>$/) || this.typecheckResultT(into) || this.typecheckIsName(into, /^NSCore::Tagged<.*>$/)) {
                return this.coerceIntoAtomicTerm(exp, into);
            }
            else {
@@ -475,9 +447,6 @@ class CPPTypeEmitter {
             else if (this.typecheckTuple(tt) || this.typecheckRecord(tt)) {
                 return "direct";
             }
-            else if (this.typecheckIsName(tt, /^NSCore::MapEntry<.*>$/) || this.typecheckResultT(tt) || this.typecheckIsName(tt, /^NSCore::Tagged<.*>$/)) {
-               return "special";
-            }
             else if(this.typecheckUEntity(tt)) {
                 return "direct";
             }
@@ -503,9 +472,6 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(ttype, this.enumtype) || this.typecheckEntityAndProvidesName(ttype, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(ttype, this.datahashidkeytype)) {
             return `${this.getCPPTypeFor(ttype, "storage")}{}`;
         }
-        else if (this.typecheckIsName(ttype, /^NSCore::MapEntry<.*>$/) || this.typecheckResultT(ttype) || this.typecheckIsName(ttype, /^NSCore::Tagged<.*>$/)) {
-            return `${this.getCPPTypeFor(ttype, "storage")}{}`;
-         }
         else {
             return "nullptr";
         }
