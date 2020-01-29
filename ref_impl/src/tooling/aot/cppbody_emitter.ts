@@ -668,23 +668,24 @@ class CPPBodyEmitter {
     }
 
     generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
+        let coreop = "";
         if (isstrict) {
-            return `(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
+            coreop = `EqualFunctor_${this.typegen.getCPPTypeFor(lhsinfertype, "base")}{}(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
         }
         else {
-            return `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
+            coreop = `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
         }
+
+        return op === "!=" ? `!${coreop}` : coreop; 
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        xxxx;
-        const lhsargtype = this.getArgType(lhs);
-        const rhsargtype = this.getArgType(rhs);
-
-        const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToCpp(lhs, lhsargtype) : this.argToCpp(lhs, lhsinfertype);
-        const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToCpp(rhs, rhsargtype) : this.argToCpp(rhs, rhsinfertype);
-
-        return `(${lhsint} ${op} ${rhsint})`;
+        if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
+            return `(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
+        }
+        else {
+            return NOT_IMPLEMENTED<string>("compare string");
+        }
     }
 
     generateSubtypeTupleCheck(argv: string, argt: string, size_macro: string, accessor_macro: string, argtype: MIRType, oftype: MIRTupleType): string {

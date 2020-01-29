@@ -116,7 +116,7 @@ entity String provides KeyType, PODType, APIType, Some {
 }
 
 //<summary>Primitive stringof value.</summary>
-entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType when T subtype PODType, APIType when T subtype APIType {
+entity StringOf<T where Parsable | Validator> provides KeyType, Some, PODType when T subtype Validator, APIType when T subtype Validator {
     method rawString(): String # stringof_rawstring
 
     static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
@@ -220,31 +220,11 @@ entity Regex provides Some {
 concept Tuple provides Some {
 }
 
-//<summary>All actual POD tuples implicitly provide this concept.</summary>
-concept PODTuple provides PODType, Tuple {
-    override static tryParse(str: String): Result<Any, String> # podtuple_tryparse
-}
-
-//<summary>All actual POD tuples implicitly provide this concept.</summary>
-concept APITuple provides APIType, Tuple {
-    override static tryParse(str: String): Result<Any, String> # apituple_tryparse
-}
-
 //<summary>All actual records implicitly provide this concept.</summary>
 concept Record provides Some {
 }
 
-//<summary>All actual POD records implicitly provide this concept.</summary>
-concept PODRecord provides POD, Record {
-    override static tryParse(str: String): Result<Any, String> # podrecord_tryparse
-}
-
-//<summary>All actual POD records implicitly provide this concept.</summary>
-concept APIRecord provides APIType, Record {
-    override static tryParse(str: String): Result<Any, String> # apituple_tryparse
-}
-
-entity MapEntry<K where Indexable, V> provides Some {
+entity MapEntry<K where Indexable, V> provides Some, PODType when K subtype POD && V subtype POD, APIType when K subtype APIType && V subtype APIType {
     field key: K;
     field value: V;
 

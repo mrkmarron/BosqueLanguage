@@ -813,13 +813,12 @@ class SMTBodyEmitter {
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        xxxx;
-        const lhsargtype = this.getArgType(lhs);
-        const rhsargtype = this.getArgType(rhs);
-
-        const lhsint = (lhsargtype.trkey === "NSCore::Int") ? this.argToSMT(lhs, lhsargtype).emit() : this.argToSMT(lhs, lhsinfertype).emit();
-        const rhsint = (rhsargtype.trkey === "NSCore::Int") ? this.argToSMT(rhs, rhsargtype).emit() : this.argToSMT(rhs, rhsinfertype).emit();
-        return `(${op} ${lhsint} ${rhsint})`;
+        if(lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
+            return `(${op} ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
+        }
+        else {
+            return NOT_IMPLEMENTED<string>("compare string");
+        }
     }
 
     generateSubtypeTupleCheck(argv: string, argt: string, accessor_macro: string, nothas_macro: string, argtype: MIRType, oftype: MIRTupleType, gas: number): string {

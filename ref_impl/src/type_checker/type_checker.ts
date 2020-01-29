@@ -2538,7 +2538,7 @@ class TypeChecker {
         const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, lhs);
 
         //THIS IS WRONG -- in "true && x" the true is redundant but the rest of the expressions needs to be evaluated 
-        this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || falseflow.length === 0, "Expression is always true/false rest of expression is infeasible");
+        //this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || falseflow.length === 0, "Expression is always true/false rest of expression is infeasible");
 
         if (exp.op === "||") {
             const rhsreg = this.m_emitter.bodyEmitter.generateTmpRegister();
@@ -2589,7 +2589,7 @@ class TypeChecker {
 
             //THIS IS WRONG -- in "x => true" the true is redundant but the rest of the expressions needs to be evaluated 
             //this.raiseErrorIf(exp.sinfo, rtflow.length === 0 || rfflow.length === 0, "Expression is never true/false and not needed");
-            return [...falseflow.map((opt) => opt.setExpressionResult(this.m_assembly, this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)), ...rtflow, ...rfflow];
+            return [...falseflow.map((opt) => opt.setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)), ...rtflow, ...rfflow];
         }
     }
 
@@ -2705,7 +2705,7 @@ class TypeChecker {
         }
 
         const rtype = this.m_assembly.typeUnion([truestate.getExpressionResult().etype, falsestate.getExpressionResult().etype]);
-        return [env.setExpressionResult(this.m_assembly, rtype)];
+        return [env.setExpressionResult(rtype)];
     }
 
     private checkOrExpression(env: TypeEnvironment, exp: ExpOrExpression, trgt: MIRTempRegister, extraok: { refok: boolean, orok: boolean }): TypeEnvironment[] {
@@ -2721,6 +2721,7 @@ class TypeChecker {
         let terminaltype: ResolvedType = this.m_assembly.getSpecialNoneType();
         let terminalexps: TypeEnvironment[] = [];
 
+        xxxx;
         if (exp.cond !== undefined || exp.result !== undefined) {
             evalue = evalue.map((ev) => ev.pushLocalScope().addVar("_value_", true, ev.getExpressionResult().etype, true, ev.getExpressionResult().etype));
             if (this.m_emitEnabled) {
