@@ -14,21 +14,33 @@ type BuildLevel = "debug" | "test" | "release";
 
 class TemplateTermDecl {
     readonly name: string;
+    readonly isGrounded: boolean;
     readonly constraint: TypeSignature;
 
-    constructor(name: string, constraint: TypeSignature) {
+    constructor(name: string, isgrounded: boolean, constraint: TypeSignature) {
         this.name = name;
+        this.isGrounded = isgrounded;
+        this.constraint = constraint;
+    }
+}
+
+class TemplateTypeRestriction {
+    readonly t: TypeSignature;
+    readonly isGrounded: boolean;
+    readonly constraint: TypeSignature;
+
+    constructor(t: TypeSignature, isGrounded: boolean, constraint: TypeSignature) {
+        this.t = t;
+        this.isGrounded = isGrounded;
         this.constraint = constraint;
     }
 }
 
 class TypeConditionRestriction {
-    readonly t: TypeSignature;
-    readonly constraint: TypeSignature;
+    readonly constraints: TemplateTypeRestriction[];
 
-    constructor(t: TypeSignature, constraint: TypeSignature) {
-        this.t = t;
-        this.constraint = constraint;
+    constructor(constraints: TemplateTypeRestriction[]) {
+        this.constraints = constraints;
     }
 }
 
@@ -81,7 +93,7 @@ class InvokeDecl {
     readonly pragmas: [TypeSignature, string][];
 
     readonly terms: TemplateTermDecl[];
-    readonly termRestrictions: TypeConditionRestriction[];
+    readonly termRestrictions: TypeConditionRestriction | undefined;
 
     readonly params: FunctionParameter[];
     readonly optRestName: string | undefined;
@@ -96,7 +108,7 @@ class InvokeDecl {
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
@@ -126,14 +138,14 @@ class InvokeDecl {
     }
 
     static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], captureSet: Set<string>, body: BodyImplementation) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], [], params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], undefined, params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
     }
 
-    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 
-    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction[], params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 }
@@ -250,7 +262,7 @@ class OOPTypeDecl {
 
     readonly terms: TemplateTermDecl[];
 
-    readonly provides: [TypeSignature, TypeConditionRestriction[] | undefined][];
+    readonly provides: [TypeSignature, TypeConditionRestriction | undefined][];
 
     readonly invariants: InvariantDecl[];
 
@@ -259,7 +271,7 @@ class OOPTypeDecl {
     readonly memberFields: Map<string, MemberFieldDecl>;
     readonly memberMethods: Map<string, MemberMethodDecl>;
 
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
@@ -300,7 +312,7 @@ class OOPTypeDecl {
 }
 
 class ConceptTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
@@ -309,7 +321,7 @@ class ConceptTypeDecl extends OOPTypeDecl {
 }
 
 class EntityTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction[] | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
@@ -534,18 +546,18 @@ class Assembly {
     }
 
     restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
-        let opts: ResolvedType[] = [];
-
-        if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        if (this.subtypeOf(this.getSpecialAPITupleConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
         if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
             return oft;
+        }
+
+        let opts: ResolvedType[] = [];
+
+        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
         return opts.length !== 0 ? this.restrictTupleEntries(oft, this.typeUnion(opts)) : undefined;
@@ -600,18 +612,18 @@ class Assembly {
     }
 
     restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
-        let opts: ResolvedType[] = [];
-
-        if (this.subtypeOf(this.getSpecialPODRecordConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        if (this.subtypeOf(this.getSpecialAPIRecordConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
         if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
             return oft;
+        }
+        
+        let opts: ResolvedType[] = [];
+
+        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(withc))) {
+            opts.push(this.getSpecialPODTypeConceptType());
         }
 
         return opts.length !== 0 ? this.restrictRecordEntries(oft, this.typeUnion(opts)) : undefined;
@@ -933,6 +945,25 @@ class Assembly {
         return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
     }
 
+    private isGroundedType(tt: ResolvedType): boolean {
+        return tt.options.every((opt) => this.isGrounded_Atom(opt));
+    }
+
+    private isGrounded_Atom(atom: ResolvedAtomType): boolean {
+        if(atom instanceof ResolvedEntityAtomType) {
+            return [...atom.binds].every((bind) => this.isGroundedType(bind[1]));
+        }
+        else if(atom instanceof ResolvedTupleAtomType) {
+            return atom.types.every((entry) => this.isGroundedType(entry.type));
+        }
+        else if(atom instanceof ResolvedRecordAtomType) {
+            return atom.entries.every((entry) => this.isGroundedType(entry.type));
+        }
+        else {
+            return false;
+        }
+    }
+
     private atomSubtypeOf_EntityEntity(t1: ResolvedEntityAtomType, t2: ResolvedEntityAtomType): boolean {
         if (t1.object.ns !== t2.object.ns || t1.object.name !== t2.object.name) {
             return false;
@@ -960,11 +991,11 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialPODTupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialAPITupleConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             return true;
         }
 
@@ -980,11 +1011,11 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialPODRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialAPIRecordConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             return true;
         }
 
@@ -1127,12 +1158,7 @@ class Assembly {
     getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
-    getSpecialPODTupleConceptType(): ResolvedType { return this.internSpecialConceptType("PODTuple"); }
-    getSpecialAPITupleConceptType(): ResolvedType { return this.internSpecialConceptType("APITuple"); }
-
     getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
-    getSpecialPODRecordConceptType(): ResolvedType { return this.internSpecialConceptType("PODRecord"); }
-    getSpecialAPIRecordConceptType(): ResolvedType { return this.internSpecialConceptType("APIRecord"); }
 
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
 
@@ -1256,8 +1282,8 @@ class Assembly {
         return declfields;
     }
 
-    getAllOOInvariants(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, invs?: [Expression, Map<string, ResolvedType>][]): [Expression, Map<string, ResolvedType>][] {
-        let declinvs: [Expression, Map<string, ResolvedType>][] = invs || [];
+    getAllOOInvariants(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, invs?: [InvariantDecl, Map<string, ResolvedType>][]): [InvariantDecl, Map<string, ResolvedType>][] {
+        let declinvs: [InvariantDecl, Map<string, ResolvedType>][] = invs || [];
         ooptype.invariants.forEach((inv) => {
             declinvs.push([inv, binds]);
         });
@@ -1656,7 +1682,7 @@ class Assembly {
 
 export {
     BuildLevel,
-    TemplateTermDecl, TypeConditionRestriction, PreConditionDecl, PostConditionDecl, InvokeDecl,
+    TemplateTermDecl, TemplateTypeRestriction, TypeConditionRestriction, PreConditionDecl, PostConditionDecl, InvokeDecl,
     OOMemberDecl, InvariantDecl, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
     NamespaceConstDecl, NamespaceFunctionDecl, NamespaceTypedef, NamespaceUsing, NamespaceDeclaration,
     OOMemberLookupInfo, Assembly
