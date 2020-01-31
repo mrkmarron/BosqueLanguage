@@ -42,6 +42,44 @@ struct DisplayFunctor_BSQString
     std::u32string operator()(const BSQString& s) { return std::u32string(U"\"") + std::u32string(s.sdata.cbegin(), s.sdata.cend()) + std::u32string(U"\""); }
 };
 
+class BSQValidatedStringOf : public BSQRef
+{
+public:
+    const std::u32string sdata;
+    const MIRNominalTypeEnum oftype;
+  
+    BSQValidatedStringOf(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(), sdata(str), oftype(oftype) { ; }
+
+    virtual ~BSQValidatedStringOf() = default;
+    virtual void destroy() { ; }
+
+    inline static size_t hash(const BSQValidatedStringOf* str)
+    {
+        return HASH_COMBINE((size_t)str->oftype, std::hash<std::u32string>{}(str->sdata));
+    }
+
+    inline static bool keyEqual(const BSQValidatedStringOf* l, const BSQValidatedStringOf* r)
+    {
+        return l->oftype == r->oftype && l->sdata == r->sdata;
+    }
+};
+struct HashFunctor_BSQValidatedStringOf
+{
+    size_t operator()(const BSQValidatedStringOf& s) { return BSQValidatedStringOf::hash(&s); }
+};
+struct EqualFunctor_BSQValidatedStringOf
+{
+    bool operator()(const BSQValidatedStringOf& l, const BSQValidatedStringOf& r) { return BSQValidatedStringOf::keyEqual(&l, &r); }
+};
+struct DisplayFunctor_BSQValidatedStringOf
+{
+    std::u32string operator()(const BSQValidatedStringOf& s) 
+    { 
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+        return conv.from_bytes(nominaltypenames[(uint32_t)s.oftype]) + std::u32string(U"'") + s.sdata + std::u32string(U"'"); 
+    }
+};
+
 class BSQStringOf : public BSQRef
 {
 public:

@@ -36,6 +36,10 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQString::hash(dynamic_cast<BSQString*>(ptr));
         }
+         else if(dynamic_cast<BSQValidatedStringOf*>(ptr) != nullptr)
+        {
+            return BSQValidatedStringOf::hash(dynamic_cast<BSQValidatedStringOf*>(ptr));
+        }
         else if(dynamic_cast<BSQStringOf*>(ptr) != nullptr)
         {
             return BSQStringOf::hash(dynamic_cast<BSQStringOf*>(ptr));
@@ -124,6 +128,10 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQString::keyEqual(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
         }
+        else if(dynamic_cast<BSQValidatedStringOf*>(ptr1) != nullptr && dynamic_cast<BSQValidatedStringOf*>(ptr2) != nullptr)
+        {
+            return BSQValidatedStringOf::keyEqual(dynamic_cast<BSQValidatedStringOf*>(ptr1), dynamic_cast<BSQValidatedStringOf*>(ptr2));
+        }
         else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
         {
             return BSQStringOf::keyEqual(dynamic_cast<BSQStringOf*>(ptr1), dynamic_cast<BSQStringOf*>(ptr2));
@@ -175,6 +183,16 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
     }
 }
 
+MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v)
+{
+    
+}
+
+MIRNominalTypeEnum getNominalTypeOf_Value(Value v)
+{
+
+}
+
 std::u32string diagnostic_format(Value v)
 {
     if(BSQ_IS_VALUE_NONE(v))
@@ -200,6 +218,10 @@ std::u32string diagnostic_format(Value v)
         else if(dynamic_cast<const BSQString*>(vv) != nullptr)
         {
             return DisplayFunctor_BSQString{}(*dynamic_cast<const BSQString*>(vv));
+        }
+        else if(dynamic_cast<const BSQValidatedStringOf*>(vv) != nullptr)
+        {
+            return DisplayFunctor_BSQValidatedStringOf{}(*dynamic_cast<const BSQValidatedStringOf*>(vv));
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {

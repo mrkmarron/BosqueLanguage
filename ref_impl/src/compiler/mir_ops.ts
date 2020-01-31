@@ -203,6 +203,7 @@ class MIRConstantString extends MIRConstantArgument {
 
 enum MIROpTag {
     MIRLoadConst = "MIRLoadConst",
+    MIRLoadConstValidatedString = "MIRLoadConstValidatedString",
     MIRLoadConstTypedString = "MIRLoadConstTypedString",
 
     MIRAccessConstantValue = "MIRAccessConstantValue",
@@ -297,6 +298,8 @@ abstract class MIROp {
         switch (jobj.tag) {
             case MIROpTag.MIRLoadConst:
                 return MIRLoadConst.jparse(jobj);
+            case MIROpTag.MIRLoadConstValidatedString:
+                return MIRLoadConstValidatedString.jparse(jobj);
             case MIROpTag.MIRLoadConstTypedString:
                 return MIRLoadConstTypedString.jparse(jobj);
             case MIROpTag.MIRAccessConstantValue:
@@ -453,6 +456,35 @@ class MIRLoadConst extends MIRValueOp {
 
     static jparse(jobj: any): MIROp {
         return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, MIRTempRegister.jparse(jobj.trgt));
+    }
+}
+
+class MIRLoadConstValidatedString extends MIRValueOp {
+    readonly ivalue: string;
+    readonly tkey: MIRNominalTypeKey;
+    readonly tskey: MIRResolvedTypeKey;
+    readonly vfunckey: MIRInvokeKey | undefined;
+
+    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
+        super(MIROpTag.MIRLoadConstValidatedString, sinfo, trgt);
+        this.ivalue = ivalue;
+        this.tkey = tkey;
+        this.tskey = tskey;
+        this.vfunckey = vfunckey;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return []; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.ivalue}#${this.tkey}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), ivalue: this.ivalue, tkey: this.tkey, tskey: this.tskey, vfunckey: this.vfunckey };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRLoadConstValidatedString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.vfunckey, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -1996,7 +2028,7 @@ export {
     MIRBodyKey, extractMirBodyKeyPrefix, extractMirBodyKeyData,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
-    MIRLoadConst, MIRLoadConstTypedString,
+    MIRLoadConst, MIRLoadConstValidatedString, MIRLoadConstTypedString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
     MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorEphemeralValueList,
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject,

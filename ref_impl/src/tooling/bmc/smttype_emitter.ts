@@ -132,6 +132,9 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "String";
         }
+        else if (this.typecheckIsName(tt, /^NSCore::ValidatedStringOf<.*>$/)) {
+            return "bsq_validatedstringof";
+        }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "bsq_stringof";
         }
@@ -214,6 +217,9 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(from, /^NSCore::String$/)) {
                 ctoval = `(bsqkey_string ${exp.emit()})`;
             }
+            else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/)) {
+                ctoval = `(bsq_validatedstringof ${exp.emit()})`;
+            }
             else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/)) {
                 ctoval = `(bsq_stringof ${exp.emit()})`;
             }
@@ -261,6 +267,9 @@ class SMTTypeEmitter {
         }
         else if (this.typecheckIsName(into, /^NSCore::String$/)) {
             return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/)) {
+            return new SMTValue(`(bsqkey_validatedstringof_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
             return new SMTValue(`(bsqkey_stringof_value ${exp.emit()})`);
@@ -334,6 +343,9 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::String$/)) {
                 return new SMTValue(`(bsqkey_string_value ${cfrom})`);
             }
+            else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/)) {
+                return new SMTValue(`(bsq_validatedstringof_value ${cfrom})`);
+            }
             else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
                 return new SMTValue(`(bsq_stringof_value ${cfrom})`);
             }
@@ -402,7 +414,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
-        else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
+        else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
+            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
@@ -438,7 +451,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
-            else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
+            else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
+                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }

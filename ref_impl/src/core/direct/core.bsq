@@ -96,15 +96,9 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
 entity String provides KeyType, PODType, APIType, Some {
 }
 
-//<summary>Primitive stringof value.</summary>
-entity ValidatedString<T where Validator> provides KeyType, Some, PODType, APIType {
-    method rawString(): String # stringof_rawstring
-
-    static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
-    static tryAsString<T>(str: String): StringOf<T>? # stringof_tryasstring
-
-    method convert<U where Parsable | Validator>(): StringOf<U> # stringof_convert
-    method tryConvert<U where Parsable | Validator>(): StringOf<U>? # stringof_tryconvert
+//<summary>Primitive validated stringof value.</summary>
+entity ValidatedStringOf<T where Validator> provides KeyType, Some, PODType, APIType {
+    method rawString(): String # validatedstringof_rawstring
 }
 
 //<summary>Primitive stringof value.</summary>

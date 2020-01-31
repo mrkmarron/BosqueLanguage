@@ -130,6 +130,9 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "BSQString" + (declspec !== "base" ? "*" : "");
         }
+        else if (this.typecheckIsName(tt, /^NSCore::ValidatedStringOf<.*>$/)) {
+            return "BSQValidatedStringOf" + (declspec !== "base" ? "*" : "");
+        }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "BSQStringOf" + (declspec !== "base" ? "*" : "");
         }
@@ -296,7 +299,8 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
             return this.coerceFromAtomicKey(exp, from);
         }
-        else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
+        else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
+            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from);
         }
@@ -330,27 +334,28 @@ class CPPTypeEmitter {
            else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
                return this.coerceIntoAtomicKey(exp, into);
            }
-           else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
-               || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
+           else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
+                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
+                || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
-               || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
-               return this.coerceIntoAtomicKey(exp, into);
+                || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckAllKeys(into)) {
-               return `((KeyValue)${exp})`;
+                return `((KeyValue)${exp})`;
            }
            else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(into, /^NSCore::ISOTime$/) || this.typecheckIsName(into, /^NSCore::Regex$/)) {
-               return this.coerceIntoAtomicTerm(exp, into);
+                return this.coerceIntoAtomicTerm(exp, into);
            }
            else if (this.typecheckTuple(into) || this.typecheckRecord(into)) {
-               return this.coerceIntoAtomicTerm(exp, into);
+                return this.coerceIntoAtomicTerm(exp, into);
            }
            else {
-               assert(this.typecheckUEntity(into));
+                assert(this.typecheckUEntity(into));
 
-               return this.coerceIntoAtomicTerm(exp, into);
+                return this.coerceIntoAtomicTerm(exp, into);
            }
         }
     }
@@ -422,7 +427,7 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::Int$/)) {
             return "int";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::String$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::String$/) || this.typecheckIsName(tt, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "direct";
         }
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
