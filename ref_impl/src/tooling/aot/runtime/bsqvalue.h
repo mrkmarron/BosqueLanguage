@@ -53,11 +53,11 @@
 ////
 //Type ops
 
+//Note POD => API
 typedef uint32_t DATA_KIND_FLAG;
 #define DATA_KIND_CLEAR_FLAG 0x0
-#define DATA_KIND_POD_FLAG 0x1
-#define DATA_KIND_API_FLAG 0x2
-#define DATA_KIND_POD_AND_API_FLAG 0x3
+#define DATA_KIND_API_FLAG 0x1
+#define DATA_KIND_POD_FLAG 0x3
 #define DATA_KIND_UNKNOWN_FLAG 0xF
 
 namespace BSQ
@@ -99,7 +99,14 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_Bool MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_String MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_GUID MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_EventTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_DataHash MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END
 
 typedef void* IntValue;
@@ -112,8 +119,10 @@ private:
     int64_t count;
 
 public:
-    BSQRef() : count(0) { ; }
-    BSQRef(int64_t excount) : count(excount) { ; }
+    MIRNominalTypeEnum nominalType;
+
+    BSQRef(MIRNominalTypeEnum nominalType) : count(0), nominalType(nominalType) { ; }
+    BSQRef(int64_t excount, MIRNominalTypeEnum nominalType) : count(excount), nominalType(nominalType) { ; }
     virtual ~BSQRef() { ; }
 
     virtual void destroy() = 0;
@@ -236,8 +245,8 @@ struct DisplayFunctor_bool
 class BSQBigInt : public BSQRef
 {
 public:
-    BSQBigInt(int64_t value) { ; }
-    BSQBigInt(const char* bigstr) { ; }
+    BSQBigInt(int64_t value) : BSQRef(MIRNominalTypeEnum_Int) { ; }
+    BSQBigInt(const char* bigstr) : BSQRef(MIRNominalTypeEnum_Int) { ; }
 
     ~BSQBigInt()
     {
@@ -366,6 +375,8 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
 MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v);
 MIRNominalTypeEnum getNominalTypeOf_Value(Value v);
 
+DATA_KIND_FLAG getDataKindFlag(Value v);
+
 std::u32string diagnostic_format(Value v);
 
 struct HashFunctor_KeyValue
@@ -408,9 +419,8 @@ public:
     const BSQBufferCompression compression;
 
     const std::vector<uint8_t> sdata;
-    const MIRNominalTypeEnum oftype;
 
-    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQBufferCompression compression, std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(), format(format), encoding(encoding), compression(compression), sdata(move(sdata)), oftype(oftype) { ; }
+    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQBufferCompression compression, std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), compression(compression), sdata(move(sdata)) { ; }
     
     virtual ~BSQBuffer() = default;
     virtual void destroy() { ; }
@@ -421,7 +431,7 @@ class BSQISOTime : public BSQRef
 public:
     const uint64_t isotime;
 
-    BSQISOTime(uint64_t isotime) : BSQRef(), isotime(isotime) { ; }
+    BSQISOTime(uint64_t isotime) : BSQRef(MIRNominalTypeEnum_ISOTime), isotime(isotime) { ; }
     virtual ~BSQISOTime() = default;
     virtual void destroy() { ; }
 };
@@ -431,7 +441,7 @@ class BSQRegex : public BSQRef
 public:
     const std::u32string re;
 
-    BSQRegex(const std::u32string& re) : BSQRef(), re(re) { ; }
+    BSQRegex(const std::u32string& re) : BSQRef(MIRNominalTypeEnum_Regex), re(re) { ; }
     virtual ~BSQRegex() = default;
 };
 
@@ -441,9 +451,9 @@ public:
     const std::vector<Value> entries;
     const DATA_KIND_FLAG flag;
 
-    BSQTuple(std::vector<Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)) { ; }
+    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(entries)), flag(flag) { ; }
 
-    static BSQTuple* createFromSingle(BSQRefScope& scope, int n, ...)
+    static BSQTuple* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, int n, ...)
     {
         Value val;
         std::vector<Value> entries;
@@ -459,16 +469,24 @@ public:
         }
         va_end(vl);
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries));
+        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        {
+            for(size_t i = 0; i < entries.size(); ++i)
+            {
+                flag &= getDataKindFlag(entries[i]);
+            }
+        }
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries), flag);
     }
 
     virtual ~BSQTuple() = default;
 
     virtual void destroy()
     {
-        for(size_t i = 0; i < this->entries.size(); ++i)
+        for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
         {
-            BSQRef::decrementChecked(this->entries[i]);
+            BSQRef::decrementChecked(*iter);
         }
     }
 
@@ -491,12 +509,11 @@ class BSQRecord : public BSQRef
 {
 public:
     const std::map<MIRPropertyEnum, Value> entries;
-    const bool isPOD;
-    const bool isAPI;
+    const DATA_KIND_FLAG flag;
 
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, bool isPOD, bool isAPI) : BSQRef(), entries(move(entries)), isPOD(isPOD), isAPI(isAPI) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Record), entries(move(entries)), flag(flag) { ; }
 
-    static BSQRecord* createFromSingle(BSQRefScope& scope, int n, ...)
+    static BSQRecord* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, int n, ...)
     {
         BSQRecordPairEntry val;
         std::map<MIRPropertyEnum, Value> entries;
@@ -512,10 +529,18 @@ public:
         }
         va_end(vl);
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries));
+        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        {
+            for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
+            {
+                flag &= getDataKindFlag(iter->second);
+            }
+        }
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries), flag);
     }
 
-    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, int n, ...)
+    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, DATA_KIND_FLAG flag, int n, ...)
     {
         BSQRecordPairEntry val;
         std::map<MIRPropertyEnum, Value> entries;
@@ -532,11 +557,23 @@ public:
         va_end(vl);
 
         for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
-            BSQRef::incrementChecked(iter->second);
-            entries.insert(*iter);
+            auto pos = entries.lower_bound(iter->first);
+            if(pos != src->entries.cend() && pos->first != iter->first)
+            {
+                BSQRef::incrementChecked(iter->second);
+                entries.emplace_hint(pos, *iter);
+            }
         }
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries));
+        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        {
+            for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
+            {
+                flag &= getDataKindFlag(iter->second);
+            }
+        }
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries), flag);
     }
 
     virtual ~BSQRecord() = default;
@@ -566,9 +603,7 @@ public:
 class BSQObject : public BSQRef
 {
 public:
-    MIRNominalTypeEnum ntype;
-
-    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(), ntype(ntype) { ; }
+    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(ntype) { ; }
     virtual ~BSQObject() = default;
 
     virtual std::u32string display() const = 0;

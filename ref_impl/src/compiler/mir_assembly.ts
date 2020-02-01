@@ -582,6 +582,31 @@ class MIRAssembly {
         });
     }
 
+    private checkAllTupleEntriesOfType(t1: MIRTupleType, t2: MIRType): boolean {
+        return t1.entries.every((entry) => this.subtypeOf(entry.type, t2));
+    }
+
+    private atomSubtypeOf_TupleConcept(t1: MIRTupleType, t2: MIRConceptType): boolean {
+        const tupleconcept = (this.typeMap.get("NSCore::Tuple") as MIRType).options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(tupleconcept, t2)) {
+            return true;
+        }
+
+        const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
+        const podconceptatom = podconcept.options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllTupleEntriesOfType(t1, podconcept)) {
+            return true;
+        }
+ 
+        const apiconcept = (this.typeMap.get("NSCore::APIType") as MIRType);
+        const apiconceptatom = apiconcept.options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(apiconceptatom, t2) && this.checkAllTupleEntriesOfType(t1, apiconcept)) {
+            return true;
+        }
+
+        return false;
+    }
+
     private atomSubtypeOf_TupleTuple(t1: MIRTupleType, t2: MIRTupleType): boolean {
         for (let i = 0; i < t1.entries.length; ++i) {
             const t1e = t1.entries[i];
@@ -603,6 +628,31 @@ class MIRAssembly {
         }
 
         return true;
+    }
+
+    private checkAllRecordEntriesOfType(t1: MIRRecordType, t2: MIRType): boolean {
+        return t1.entries.every((entry) => this.subtypeOf(entry.type, t2));
+    }
+
+    private atomSubtypeOf_RecordConcept(t1: MIRRecordType, t2: MIRConceptType): boolean {
+        const recordconcept = (this.typeMap.get("NSCore::Record") as MIRType).options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(recordconcept, t2)) {
+            return true;
+        }
+
+        const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
+        const podconceptatom = podconcept.options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllRecordEntriesOfType(t1, podconcept)) {
+            return true;
+        }
+
+        const apiconcept = (this.typeMap.get("NSCore::APIType") as MIRType);
+        const apiconceptatom = apiconcept.options[0] as MIRConceptType;
+        if (this.atomSubtypeOf_ConceptConcept(apiconceptatom, t2) && this.checkAllRecordEntriesOfType(t1, apiconcept)) {
+            return true;
+        }
+
+        return false;
     }
 
     private atomSubtypeOf_RecordRecord(t1: MIRRecordType, t2: MIRRecordType): boolean {
@@ -659,10 +709,10 @@ class MIRAssembly {
                     res = this.atomSubtypeOf_EntityConcept(t1, t2);
                 }
                 else if (t1 instanceof MIRTupleType) {
-                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Tuple"]), t2);
+                    res = this.atomSubtypeOf_TupleConcept(t1, t2);
                 }
                 else if (t1 instanceof MIRRecordType) {
-                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Record"]), t2);
+                    res = this.atomSubtypeOf_RecordConcept(t1, t2);
                 }
                 else {
                     res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Function"]), t2);

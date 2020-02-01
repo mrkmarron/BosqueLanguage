@@ -20,6 +20,8 @@ class CPPTypeEmitter {
 
     readonly keyType: MIRType;
     readonly validatorType: MIRType;
+    readonly podType: MIRType;
+    readonly apiType: MIRType;
 
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
@@ -118,6 +120,38 @@ class CPPTypeEmitter {
     
     typecheckIsNoneable(tt: MIRType): boolean {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
+    }
+
+    typecheckIsPOD_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.podType);
+    }
+
+    typecheckIsPOD_Never(tt: MIRType): boolean {
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.podType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsPOD_Never(entry.type));
+            }
+            else if (opt instanceof MIRTupleType) {
+                xxxx;
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
+    typecheckIsAPI_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.apiType);
+    }
+
+    typecheckIsAPI_Never(tt: MIRType): boolean {
+        xxxx;
     }
 
     getCPPTypeFor(tt: MIRType, declspec: "base" | "parameter" | "return" | "storage"): string {

@@ -185,12 +185,65 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
 
 MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v)
 {
-    
+    if (BSQ_IS_VALUE_NONE(v))
+    {
+        return MIRNominalTypeEnum_None;
+    }
+    else if (BSQ_IS_VALUE_BOOL(v))
+    {
+        return MIRNominalTypeEnum_Bool;
+    }
+    else if (BSQ_IS_VALUE_TAGGED_INT(v))
+    {
+        return MIRNominalTypeEnum_Int;
+    }
+    else
+    {
+        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+        return ptr->nominalType;
+    }
 }
 
 MIRNominalTypeEnum getNominalTypeOf_Value(Value v)
 {
+    if (BSQ_IS_VALUE_NONE(v))
+    {
+        return MIRNominalTypeEnum_None;
+    }
+    else if (BSQ_IS_VALUE_BOOL(v))
+    {
+        return MIRNominalTypeEnum_Bool;
+    }
+    else if (BSQ_IS_VALUE_TAGGED_INT(v))
+    {
+        return MIRNominalTypeEnum_Int;
+    }
+    else
+    {
+        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+        return ptr->nominalType;
+    }
+}
 
+DATA_KIND_FLAG getDataKindFlag(Value v)
+{
+    if(BSQ_IS_VALUE_NONE(v) | BSQ_IS_VALUE_BOOL(v) | BSQ_IS_VALUE_TAGGED_INT(v))
+    {
+        return DATA_KIND_POD_FLAG;
+    }
+    else {
+        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+
+        if(dynamic_cast<BSQTuple*>(ptr) != nullptr) {
+            return dynamic_cast<BSQTuple*>(ptr)->flag;
+        }
+        else if(dynamic_cast<BSQRecord*>(ptr) != nullptr) {
+            return dynamic_cast<BSQTuple*>(ptr)->flag;
+        }
+        else {
+            return nominalDataKinds[(size_t)getNominalTypeOf_Value(v)];
+        }
+    }
 }
 
 std::u32string diagnostic_format(Value v)
