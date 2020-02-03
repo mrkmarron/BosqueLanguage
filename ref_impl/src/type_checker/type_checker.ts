@@ -230,11 +230,11 @@ class TypeChecker {
                 const catom = ResolvedType.createSingle(atom);
                 let lopts: ResolvedType[] = [];
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTupleConceptType(), catom)) {
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialPODTypeConceptType());
                 }
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITupleConceptType(), catom)) {
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialAPITypeConceptType());
                 }
 
@@ -270,11 +270,11 @@ class TypeChecker {
                 const catom = ResolvedType.createSingle(atom);
                 let lopts: ResolvedType[] = [];
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODRecordConceptType(), catom)) {
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialPODTypeConceptType());
                 }
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPIRecordConceptType(), catom)) {
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
                     lopts.push(this.m_assembly.getSpecialAPITypeConceptType());
                 }
 
@@ -1358,7 +1358,8 @@ class TypeChecker {
                 this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'validate'");
                 const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "validate", aoftype.oftype[1], [], []) : undefined;
 
-                this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
+                xxxx;
+                this.m_emitter.bodyEmitter.emitLoadValidatedTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
             }
             else {
                 const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");

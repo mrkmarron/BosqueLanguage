@@ -137,8 +137,8 @@ class CPPTypeEmitter {
             else if (opt instanceof MIRTupleType) {
                 return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsPOD_Never(entry.type));
             }
-            else if (opt instanceof MIRTupleType) {
-                xxxx;
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsPOD_Never(entry.type));
             }
             else {
                 return false;
@@ -151,7 +151,39 @@ class CPPTypeEmitter {
     }
 
     typecheckIsAPI_Never(tt: MIRType): boolean {
-        xxxx;
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.apiType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsAPI_Never(entry.type));
+            }
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsAPI_Never(entry.type));
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
+    generateInitialDataKindFlag(tt: MIRType): string {
+        if(this.typecheckIsPOD_Always(tt)) {
+            return "DATA_KIND_POD_FLAG";
+        }
+
+        if(this.typecheckIsAPI_Always(tt) && !this.typecheckIsPOD_Never(tt)) {
+            return "DATA_KIND_API_FLAG";
+        }
+
+        if(this.typecheckIsAPI_Never(tt)) {
+            return "DATA_KIND_CLEAR_FLAG";
+        }
+
+        return "DATA_KIND_UNKNOWN_FLAG";
     }
 
     getCPPTypeFor(tt: MIRType, declspec: "base" | "parameter" | "return" | "storage"): string {
@@ -164,8 +196,8 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "BSQString" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckIsName(tt, /^NSCore::ValidatedStringOf<.*>$/)) {
-            return "BSQValidatedStringOf" + (declspec !== "base" ? "*" : "");
+        else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/)) {
+            return "BSQValidatedString" + (declspec !== "base" ? "*" : "");
         }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "BSQStringOf" + (declspec !== "base" ? "*" : "");
@@ -333,7 +365,7 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
             return this.coerceFromAtomicKey(exp, from);
         }
-        else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
+        else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
             || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from);
@@ -368,7 +400,7 @@ class CPPTypeEmitter {
            else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
                return this.coerceIntoAtomicKey(exp, into);
            }
-           else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
+           else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
                 || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                return this.coerceIntoAtomicKey(exp, into);

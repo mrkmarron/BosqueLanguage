@@ -428,22 +428,31 @@ class SMTBodyEmitter {
         }
     }
 
+    generateDataKindLoad(rtype: MIRType, cf: string): string {
+        const idf = this.typegen.generateInitialDataKindFlag(rtype);
+        return idf === "unknown" ? cf : idf;
+    }
+
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
+        let fvals = "3";
         let cvals = "bsqtuple_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
             cvals = `(store ${cvals} ${i} ${this.argToSMT(op.args[i], this.typegen.anyType)})`;
+            fvals = `(@fj ${this.argToSMT(op.args[i], this.typegen.anyType)} ${fvals})`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${cvals})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultTupleType), fvals)} ${cvals})`));
     }
 
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
+        let fvals = "3";
         let cvals = "bsqrecord_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
             cvals = `(store ${cvals} "${op.args[i][0]}" ${this.argToSMT(op.args[i][1], this.typegen.anyType)})`;
+            fvals = `(@fj ${this.argToSMT(op.args[i][1], this.typegen.anyType)} ${fvals})`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultRecordType), fvals)} ${cvals})`));
     }
 
     generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): SMTExp {
@@ -489,26 +498,31 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${vals.join(" ")})`));
         }
         else {
+            let fvals = "3";
             let cvals = "bsqtuple_array_empty";
             for (let i = 0; i < vals.length; ++i) {
                 cvals = `(store ${cvals} ${i} ${vals[i]})`;
+                fvals = `(@fj ${vals[i]} ${fvals})`;
             }
 
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${cvals})`));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${this.generateDataKindLoad(resultAccessType, fvals)} ${cvals})`));
         }
     }
     
     generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): SMTExp {
         const updmax = Math.max(...op.updates.map((upd) => upd[0] + 1));
 
+        let fvals = "3";
         let cvals = "bsqtuple_array_empty";
         for (let i = 0; i < updmax; ++i) {
             const upd = op.updates.find((update) => update[0] === i);
             if (upd !== undefined) {
                 cvals = `(store ${cvals} ${i} ${this.argToSMT(upd[1], this.typegen.anyType)})`;
+                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType)} ${fvals})`;
             }
             else {
                 cvals = `(store ${cvals} ${i} ${this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType).emit()})`;
+                fvals = `(@fj ${this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType).emit()} ${fvals})`;
             }
         }
 
@@ -516,9 +530,10 @@ class SMTBodyEmitter {
         let tc = this.typegen.typecheckTuple(this.getArgType(op.arg)) ? `(bsq_tuple_entries ${this.varToSMTName(op.arg)})` : `(bsq_tuple_entries (bsqterm_tuple_value ${this.varToSMTName(op.arg)}))`;
         for (let i = updmax; i < rmax; ++i) {
             cvals = `(store ${cvals} ${i} (select ${tc} ${i}))`;
+            fvals = `(@fj (select ${tc} ${i}) ${fvals})`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${cvals})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultTupleType), fvals)} ${cvals})`));
     }
 
     generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): SMTExp {
@@ -528,12 +543,13 @@ class SMTBodyEmitter {
 
         let cvals = this.typegen.typecheckTuple(this.getArgType(op.arg)) ? `(bsq_tuple_entries ${this.varToSMTName(op.arg)})` : `(bsq_tuple_entries (bsqterm_tuple_value ${this.varToSMTName(op.arg)}))`;
         let mvals = this.typegen.typecheckTuple(this.getArgType(op.update)) ? `(bsq_tuple_entries ${this.varToSMTName(op.update)})` : `(bsq_tuple_entries (bsqterm_tuple_value ${this.varToSMTName(op.update)}))`;
-           
+        
         for (let i = 0; i < ftuple; ++i) {
             cvals = `(store ${cvals} ${btuple + i} (select ${mvals} ${i}))`;
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${cvals})`));
+        let fvals = `(@fj ${this.argToSMT(op.arg, this.typegen.anyType).emit()} ${this.argToSMT(op.update, this.typegen.anyType).emit()})`;
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_tuple@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultTupleType), fvals)} ${cvals})`));
     }
 
     generateMIRAccessFromPropertyExpression(arg: MIRArgument, property: string, resultAccessType: MIRType): SMTExp {
@@ -568,33 +584,43 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${vals.join(" ")})`));
         }
         else {
+            let fvals = "3";
             let cvals = "bsqrecord_array_empty";
             for (let i = 0; i < vals.length; ++i) {
                 cvals = `(store ${cvals} "${op.properties[i]}" ${vals[i]})`;
+                fvals = `(@fj ${vals[i]} ${fvals})`;
             }
 
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(resultAccessType, fvals)} ${cvals})`));
         }
     }
 
     generateMIRModifyWithProperties(op: MIRModifyWithProperties, resultRecordType: MIRType): SMTExp {
         const pmax = this.typegen.getMaxPropertySet(resultRecordType);
 
-        let cvals = this.typegen.typecheckRecord(this.getArgType(op.arg)) ? `(bsq_record_entries ${this.varToSMTName(op.arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.arg)}))`;
+        let fvals = "3";
+        let cvals = "bsqrecord_array_empty";
+        let tc = this.typegen.typecheckRecord(this.getArgType(op.arg)) ? `(bsq_record_entries ${this.varToSMTName(op.arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.arg)}))`;
         for (let i = 0; i < pmax.length; ++i) {
             const pname = pmax[i];
             const upd = op.updates.find((update) => update[0] === pname);
             if (upd !== undefined) {
                 cvals = `(store ${cvals} "${pname}" ${this.argToSMT(upd[1], this.typegen.anyType)})`;
+                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType)} ${fvals})`;
+            }
+            else {
+                cvals = `(store ${cvals} "${pname}" (select ${tc} "${pname}"))`
+                fvals = `(@fj (select ${tc} "${pname}") ${fvals})`;
             }
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultRecordType), fvals)} ${cvals})`));
     }
 
     generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultRecordType: MIRType): SMTExp {
         const argvals = this.typegen.typecheckRecord(this.getArgType(op.arg)) ? `(bsq_record_entries ${this.varToSMTName(op.arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.arg)}))`;
         let cvals = argvals;
+        let fvals = "3";
 
         const rprops = this.typegen.getMaxPropertySet(resultRecordType);
         const mtype = this.typegen.getMIRType(op.updateInferType);
@@ -602,10 +628,12 @@ class SMTBodyEmitter {
             const pname = rprops[i];
             const uhas = this.typegen.recordHasField(mtype, pname);
             if(uhas === "no") {
-                //nothing to do
+                //nothing to do for cvals
+                fvals = `(@fj (select ${argvals} "${pname}") ${fvals})`;
             }
             else if (uhas === "yes") {
-                cvals = `(store ${cvals} "${pname}" ${this.generateMIRAccessFromPropertyExpression(op.update, pname, this.typegen.anyType)})`
+                cvals = `(store ${cvals} "${pname}" ${this.generateMIRAccessFromPropertyExpression(op.update, pname, this.typegen.anyType)})`;
+                fvals = `(@fj ${this.generateMIRAccessFromPropertyExpression(op.update, pname, this.typegen.anyType)} ${fvals})`;
             }
             else {
                 let mvals = this.typegen.typecheckRecord(this.getArgType(op.update)) ? `(bsq_record_entries ${this.varToSMTName(op.update)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.update)}))`;
@@ -613,11 +641,12 @@ class SMTBodyEmitter {
                 const check = new SMTValue(`(= (select ${mvals} "${pname}") bsqterm@clear)`);
                 const caccess = new SMTCond(check, new SMTValue(`(select ${argvals} "${pname}")`), new SMTValue(`(select ${mvals} "${pname}")`));
 
-                cvals =  `(store ${cvals} "${pname}" ${caccess})`;
+                cvals = `(store ${cvals} "${pname}" ${caccess})`;
+                fvals = `(@fj ${caccess} ${fvals})`;
             }
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultRecordType), fvals)} ${cvals})`));
     }
 
     generateVFieldLookup(arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl): SMTExp {
@@ -659,6 +688,7 @@ class SMTBodyEmitter {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         
         if (this.typegen.typecheckUEntity(inferargtype)) {
+            let fvals = "3";
             let cvals = "bsqrecord_array_empty";
             for (let i = 0; i < op.fields.length; ++i) {
                 const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
@@ -666,9 +696,10 @@ class SMTBodyEmitter {
 
                 const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), op.fields[i])} ${this.argToSMT(op.arg, inferargtype).emit()})`);
                 cvals = `(store ${cvals} "${fdecl.name}" ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`;
+                fvals = `(@fj ${this.typegen.coerce(access, ftype, this.typegen.anyType)} ${fvals})`;
             }
 
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${cvals})`));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultProjectType), fvals)} ${cvals})`));
         }
         else {
             const access = this.generateVFieldProject(op.arg, inferargtype, op.fields.map((f) => this.assembly.fieldDecls.get(f) as MIRFieldDecl));

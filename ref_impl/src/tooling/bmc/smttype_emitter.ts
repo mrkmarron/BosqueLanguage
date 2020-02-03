@@ -22,6 +22,8 @@ class SMTTypeEmitter {
 
     readonly keyType: MIRType;
     readonly validatorType: MIRType;
+    readonly podType: MIRType;
+    readonly apiType: MIRType;
 
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
@@ -122,6 +124,70 @@ class SMTTypeEmitter {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
     }
 
+    typecheckIsPOD_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.podType);
+    }
+
+    typecheckIsPOD_Never(tt: MIRType): boolean {
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.podType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsPOD_Never(entry.type));
+            }
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsPOD_Never(entry.type));
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
+    typecheckIsAPI_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.apiType);
+    }
+
+    typecheckIsAPI_Never(tt: MIRType): boolean {
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.apiType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsAPI_Never(entry.type));
+            }
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsAPI_Never(entry.type));
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
+    generateInitialDataKindFlag(tt: MIRType): string {
+        if(this.typecheckIsPOD_Always(tt)) {
+            return "3";
+        }
+
+        if(this.typecheckIsAPI_Always(tt) && !this.typecheckIsPOD_Never(tt)) {
+            return "1";
+        }
+
+        if(this.typecheckIsAPI_Never(tt)) {
+            return "0";
+        }
+
+        return "unknown";
+    }
+
     getSMTTypeFor(tt: MIRType): string {
         if (this.typecheckIsName(tt, /^NSCore::Bool$/)) {
             return "Bool";
@@ -132,8 +198,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "String";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::ValidatedStringOf<.*>$/)) {
-            return "bsq_validatedstringof";
+        else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/)) {
+            return "bsq_validatedstring";
         }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "bsq_stringof";
@@ -217,8 +283,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(from, /^NSCore::String$/)) {
                 ctoval = `(bsqkey_string ${exp.emit()})`;
             }
-            else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/)) {
-                ctoval = `(bsq_validatedstringof ${exp.emit()})`;
+            else if (this.typecheckIsName(from, /^NSCore:<.*>$/)) {
+                ctoval = `(bsq_validatedstring ${exp.emit()})`;
             }
             else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/)) {
                 ctoval = `(bsq_stringof ${exp.emit()})`;
@@ -268,8 +334,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(into, /^NSCore::String$/)) {
             return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
         }
-        else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/)) {
-            return new SMTValue(`(bsqkey_validatedstringof_value ${exp.emit()})`);
+        else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/)) {
+            return new SMTValue(`(bsqkey_validatedstring_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
             return new SMTValue(`(bsqkey_stringof_value ${exp.emit()})`);
@@ -343,8 +409,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::String$/)) {
                 return new SMTValue(`(bsqkey_string_value ${cfrom})`);
             }
-            else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/)) {
-                return new SMTValue(`(bsq_validatedstringof_value ${cfrom})`);
+            else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/)) {
+                return new SMTValue(`(bsq_validatedstring_value ${cfrom})`);
             }
             else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
                 return new SMTValue(`(bsq_stringof_value ${cfrom})`);
@@ -414,7 +480,7 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
-        else if (this.typecheckIsName(from, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
+        else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
             || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
@@ -451,7 +517,7 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
-            else if (this.typecheckIsName(into, /^NSCore::ValidatedStringOf<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
+            else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
                 || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                 return this.coerceIntoAtomicKey(exp, into);

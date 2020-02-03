@@ -97,8 +97,8 @@ entity String provides KeyType, PODType, APIType, Some {
 }
 
 //<summary>Primitive validated stringof value.</summary>
-entity ValidatedStringOf<T where Validator> provides KeyType, Some, PODType, APIType {
-    method rawString(): String # validatedstringof_rawstring
+entity ValidatedString<T where Validator> provides KeyType, Some, PODType, APIType {
+    method rawString(): String # validatedstring_rawstring
 }
 
 //<summary>Primitive stringof value.</summary>

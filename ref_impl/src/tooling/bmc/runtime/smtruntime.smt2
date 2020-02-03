@@ -8,7 +8,8 @@
 
 (set-option :timeout 10000)
 
-(declare-datatypes ( 
+(declare-datatypes (
+      (bsq_validatedstring 0)
       (bsq_stringof 0)
       (bsq_guid 0)
       (bsq_datahash 0)
@@ -22,6 +23,7 @@
       (bsq_idkey_cryptohash 0)
       (BKeyValue 0)
     ) (
+    ( (bsq_validatedstring@cons (bsq_validatedstring_type String) (bsq_validatedstring_value String)) )
     ( (bsq_stringof@cons (bsq_stringof_type String) (bsq_stringof_value String)) )
     ( (bsq_guid@cons (bsqy_guid_value String)) )
     ( (bsq_datahash@cons (bsq_datahash Int)) )
@@ -38,6 +40,7 @@
       (bsqkey_bool (bsqkey_bool_value Bool))
       (bsqkey_int (bsqkey_int_value Int))
       (bsqkey_string (bsqkey_string_value String))
+      (bsqkey_validatedstring (bsqkey_validatedstring_value bsq_validatedstring))
       (bsqkey_stringof (bsqkey_stringof_value bsq_stringof))
       (bsqkey_guid (bsqkey_guid_value bsq_guid))
       (bsqkey_datahash (bsqkey_datahash bsq_datahash))
@@ -77,18 +80,92 @@
       (bsqterm_buffer (bsqterm_buffer_value bsq_buffer))
       (bsqterm_isotime (bsqterm_isotime_value bsq_isotime))
       (bsqterm_regex (bsqterm_regex_value bsq_regex))
-      (bsqterm_tuple (bsqterm_tuple_value bsq_tuple)) 
-      (bsqterm_record (bsqterm_record_value bsq_record))
+      (bsqterm_tuple (bsqterm_tuple_flag Int) (bsqterm_tuple_value bsq_tuple)) 
+      (bsqterm_record (bsqterm_record_flag Int) (bsqterm_record_value bsq_record))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_value bsq_object))
     )
 ))
 
+(declare-fun nominalDataKinds (String) Int)
+;;NOMINAL_TYPE_TO_DATA_KIND_ASSERTS;;
+
+(declare-const MIRNominalTypeEnum_None String)
+(declare-const MIRNominalTypeEnum_Bool String)
+(declare-const MIRNominalTypeEnum_Int String)
+(declare-const MIRNominalTypeEnum_String String)
+(declare-const MIRNominalTypeEnum_GUID String)
+(declare-const MIRNominalTypeEnum_EventTime String)
+(declare-const MIRNominalTypeEnum_DataHash String)
+(declare-const MIRNominalTypeEnum_CryptoHash String)
+(declare-const MIRNominalTypeEnum_ISOTime String)
+(declare-const MIRNominalTypeEnum_Tuple String)
+(declare-const MIRNominalTypeEnum_Regex String)
+(declare-const MIRNominalTypeEnum_Record String)
+
+;;SPECIAL_NAME_BLOCK_ASSERTS;;
+
 (define-fun bsqkey_get_nominal_type ((keyv BKeyValue)) String
-xxxx
+  (ite (= keyv bsqkey_none) MIRNominalTypeEnum_None
+    (ite (is-bsqkey_bool keyv) MIRNominalTypeEnum_Bool
+      (ite (is-bsqkey_int keyv) MIRNominalTypeEnum_Int
+        (ite (is-bsqkey_string keyv) MIRNominalTypeEnum_String
+          (ite (is-bsqkey_validatedstring keyv) (bsq_validatedstring_type (bsqkey_validatedstring_value keyv))
+            (ite (is-bsqkey_stringof keyv) (bsq_stringof_type (bsqkey_stringof_value keyv))
+              (ite (is-bsqkey_guid keyv) MIRNominalTypeEnum_GUID
+                (ite (is-bsqkey_datahash keyv) MIRNominalTypeEnum_DataHash
+                  (ite (is-bsqkey_cryptohash keyv) MIRNominalTypeEnum_CryptoHash
+                    (ite (is-bsqkey_eventime keyv) MIRNominalTypeEnum_EventTime
+                      (ite (is-bsqkey_enum keyv) (bsq_enum_type (bsqkey_enum_value keyv))
+                        (ite (is-bsqkey_idkey keyv) (bsq_idkey_type (bsqkey_idkey_value keyv))
+                          (ite (is-bsqkey_idkey_eventtime keyv) (bsq_idkey_eventime_type (bsqkey_idkey_eventtime_type keyv))
+                            (ite (is-bsqkey_idkey_guid keyv) (bsq_idkey_guid_type (bsqkey_idkey_guid_type keyv))
+                              (ite (is-bsqkey_idkey_datahash keyv) (bsq_idkey_datahash_type (bsqkey_idkey_datahash_type keyv))
+                                (bsq_idkey_cryptohash_type (bsqkey_idkey_cryptohash_type keyv))
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
 )
 
 (define-fun bsqterm_get_nominal_type ((term BTerm)) String
-xxxx
+  (ite (is-bsqterm_key term) (bsqkey_get_nominal_type (bsqterm_key_value term))
+    (ite (is-bsqterm_buffer term) (bsq_buffer_type (bsqterm_buffer_value term))
+      (ite (is-bsqterm_isotime term) MIRNominalTypeEnum_ISOTime
+        (ite (is-bsqterm_regex term) MIRNominalTypeEnum_Regex
+          (ite (is-bsqterm_tuple term) MIRNominalTypeEnum_Tuple
+            (ite (is-bsqterm_record term) MIRNominalTypeEnum_Record
+              (bsqterm_object_type term)
+            )
+          )
+        )
+      )
+    )
+  )
+)
+
+(define-fun getDataKindFlag ((term BTerm)) Int
+  (ite (= term bsqterm@clear) 3
+    (ite (is-bsqterm_tuple term) (bsqterm_tuple_flag term)
+      (ite (is-bsqterm_record term) (bsqterm_record_flag term)
+        (nominalDataKinds (bsqterm_get_nominal_type term))
+      )
+    )
+  )
+)
+
+(define-fun @fj ((f1 Int) (f2 Int)) Int
+  (ite (< f1 f2) f1 f2)
 )
 
 ;;EPHEMERAL_DECLS;;

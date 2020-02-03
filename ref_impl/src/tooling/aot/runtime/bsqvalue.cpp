@@ -8,8 +8,8 @@
 
 namespace BSQ
 {
-BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}, true, true));
-BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}, true, true));
+BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}, DATA_KIND_POD_FLAG));
+BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}, DATA_KIND_POD_FLAG));
 
 size_t bsqKeyValueHash(KeyValue v)
 {
@@ -36,9 +36,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQString::hash(dynamic_cast<BSQString*>(ptr));
         }
-         else if(dynamic_cast<BSQValidatedStringOf*>(ptr) != nullptr)
+         else if(dynamic_cast<BSQValidatedString*>(ptr) != nullptr)
         {
-            return BSQValidatedStringOf::hash(dynamic_cast<BSQValidatedStringOf*>(ptr));
+            return BSQValidatedString::hash(dynamic_cast<BSQValidatedString*>(ptr));
         }
         else if(dynamic_cast<BSQStringOf*>(ptr) != nullptr)
         {
@@ -128,9 +128,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQString::keyEqual(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
         }
-        else if(dynamic_cast<BSQValidatedStringOf*>(ptr1) != nullptr && dynamic_cast<BSQValidatedStringOf*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQValidatedString*>(ptr1) != nullptr && dynamic_cast<BSQValidatedString*>(ptr2) != nullptr)
         {
-            return BSQValidatedStringOf::keyEqual(dynamic_cast<BSQValidatedStringOf*>(ptr1), dynamic_cast<BSQValidatedStringOf*>(ptr2));
+            return BSQValidatedString::keyEqual(dynamic_cast<BSQValidatedString*>(ptr1), dynamic_cast<BSQValidatedString*>(ptr2));
         }
         else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
         {
@@ -272,9 +272,9 @@ std::u32string diagnostic_format(Value v)
         {
             return DisplayFunctor_BSQString{}(*dynamic_cast<const BSQString*>(vv));
         }
-        else if(dynamic_cast<const BSQValidatedStringOf*>(vv) != nullptr)
+        else if(dynamic_cast<const BSQValidatedString*>(vv) != nullptr)
         {
-            return DisplayFunctor_BSQValidatedStringOf{}(*dynamic_cast<const BSQValidatedStringOf*>(vv));
+            return DisplayFunctor_BSQValidatedString{}(*dynamic_cast<const BSQValidatedString*>(vv));
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {

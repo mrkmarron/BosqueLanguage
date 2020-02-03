@@ -42,37 +42,37 @@ struct DisplayFunctor_BSQString
     std::u32string operator()(const BSQString& s) { return std::u32string(U"\"") + std::u32string(s.sdata.cbegin(), s.sdata.cend()) + std::u32string(U"\""); }
 };
 
-class BSQValidatedStringOf : public BSQRef
+class BSQValidatedString : public BSQRef
 {
 public:
     const std::u32string sdata;
   
-    BSQValidatedStringOf(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
+    BSQValidatedString(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
 
-    virtual ~BSQValidatedStringOf() = default;
+    virtual ~BSQValidatedString() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQValidatedStringOf* str)
+    inline static size_t hash(const BSQValidatedString* str)
     {
         return HASH_COMBINE((size_t)str->nominalType, std::hash<std::u32string>{}(str->sdata));
     }
 
-    inline static bool keyEqual(const BSQValidatedStringOf* l, const BSQValidatedStringOf* r)
+    inline static bool keyEqual(const BSQValidatedString* l, const BSQValidatedString* r)
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
     }
 };
-struct HashFunctor_BSQValidatedStringOf
+struct HashFunctor_BSQValidatedString
 {
-    size_t operator()(const BSQValidatedStringOf& s) { return BSQValidatedStringOf::hash(&s); }
+    size_t operator()(const BSQValidatedString& s) { return BSQValidatedString::hash(&s); }
 };
-struct EqualFunctor_BSQValidatedStringOf
+struct EqualFunctor_BSQValidatedString
 {
-    bool operator()(const BSQValidatedStringOf& l, const BSQValidatedStringOf& r) { return BSQValidatedStringOf::keyEqual(&l, &r); }
+    bool operator()(const BSQValidatedString& l, const BSQValidatedString& r) { return BSQValidatedString::keyEqual(&l, &r); }
 };
-struct DisplayFunctor_BSQValidatedStringOf
+struct DisplayFunctor_BSQValidatedString
 {
-    std::u32string operator()(const BSQValidatedStringOf& s) 
+    std::u32string operator()(const BSQValidatedString& s) 
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
         return conv.from_bytes(nominaltypenames[(uint32_t)s.nominalType]) + std::u32string(U"'") + s.sdata + std::u32string(U"'"); 
