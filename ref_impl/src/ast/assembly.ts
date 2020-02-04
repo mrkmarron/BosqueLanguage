@@ -546,21 +546,24 @@ class Assembly {
     }
 
     restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
+
+        //
+        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
+        //
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+            return this.restrictTupleEntries(oft, this.getSpecialAPITypeConceptType());
+        }
+
         if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
             return oft;
         }
 
-        let opts: ResolvedType[] = [];
-
-        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        return opts.length !== 0 ? this.restrictTupleEntries(oft, this.typeUnion(opts)) : undefined;
+        return undefined;
     }
 
     private restrictRecordTypes(ofr: ResolvedRecordAtomType, withr: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
@@ -612,21 +615,24 @@ class Assembly {
     }
 
     restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
+
+        //
+        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
+        //
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+            return this.restrictRecordEntries(oft, this.getSpecialAPITypeConceptType());
+        }
+
         if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
             return oft;
         }
-        
-        let opts: ResolvedType[] = [];
 
-        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(withc))) {
-            opts.push(this.getSpecialPODTypeConceptType());
-        }
-
-        return opts.length !== 0 ? this.restrictRecordEntries(oft, this.typeUnion(opts)) : undefined;
+        return undefined;
     }
 
     private restrictEphemeralListTypes(oft: ResolvedEphemeralListType, witht: ResolvedEphemeralListType): ResolvedEphemeralListType | undefined {
@@ -991,11 +997,11 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialAPITypeConceptType()) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialPODTypeConceptType()) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
             return true;
         }
 
@@ -1011,11 +1017,11 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialPODTypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialAPITypeConceptType()) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             return true;
         }
 
-        if (this.subtypeOf(this.getSpecialAPITypeConceptType(), ResolvedType.createSingle(t2)) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialPODTypeConceptType()) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
             return true;
         }
 

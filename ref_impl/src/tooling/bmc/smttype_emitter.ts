@@ -24,7 +24,9 @@ class SMTTypeEmitter {
     readonly validatorType: MIRType;
     readonly podType: MIRType;
     readonly apiType: MIRType;
-
+    readonly tupleType: MIRType;
+    readonly recordType: MIRType;
+    
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
     readonly guididkeytype: MIRType;

@@ -492,7 +492,12 @@ public:
 
     static BSQTuple* _empty;
 
-    Value atFixed(uint16_t idx) const
+    inline bool hasIndex(uint16_t idx) const
+    {
+        return idx < this->entries.size();
+    }
+
+    inline Value atFixed(uint16_t idx) const
     {
         return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
     }
@@ -588,15 +593,38 @@ public:
 
     static BSQRecord* _empty;
 
-    bool hasProperty(MIRPropertyEnum p) const
+    inline bool hasProperty(MIRPropertyEnum p) const
     {
         return this->entries.find(p) != this->entries.end();
     }
 
-    Value atFixed(MIRPropertyEnum p) const
+    inline Value atFixed(MIRPropertyEnum p) const
     {
         auto iter = this->entries.find(p);
         return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
+    }
+
+    bool checkPropertySet(int n, ...)
+    {
+        MIRPropertyEnum val;
+        std::set<MIRPropertyEnum> props;
+
+        va_list vl;
+        va_start(vl, n);
+        for (int i = 0; i < n; i++)
+        {
+            val = va_arg(vl, MIRPropertyEnum);
+            props.insert(val);
+        }
+        va_end(vl);
+
+        for(auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter) {
+            if(props.find(iter->first) == props.cend()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 };
 

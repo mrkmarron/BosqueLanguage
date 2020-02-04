@@ -228,36 +228,34 @@ class TypeChecker {
         const options = rtype.options.map((atom) => {
             if (atom instanceof ResolvedConceptAtomType) {
                 const catom = ResolvedType.createSingle(atom);
-                let lopts: ResolvedType[] = [];
 
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialPODTypeConceptType());
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODAndAPIConceptType(), catom)) {
+                    return this.m_assembly.getSpecialPODAndAPIConceptType();
                 }
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialAPITypeConceptType());
+                else if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
+                    return this.m_assembly.getSpecialPODTypeConceptType();
                 }
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialTupleConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialAnyConceptType());
-                }
-
-                this.raiseErrorIf(sinfo, lopts.length === 0, "Can only load indecies from Tuples and Tuple Concepts");
-                return this.m_assembly.typeUnion(lopts);
-            }
-
-            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples and Tuple Concepts");
-            const tatom = atom as ResolvedTupleAtomType;
-            if (idx < tatom.types.length) {
-                if (!tatom.types[idx].isOptional) {
-                    return tatom.types[idx].type;
+                else if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
+                    return this.m_assembly.getSpecialAPITypeConceptType();
                 }
                 else {
-                    return this.m_assembly.typeUnion([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
+                    return this.m_assembly.getSpecialAnyConceptType();
                 }
             }
             else {
-                return this.m_assembly.getSpecialNoneType();
+                this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples and Tuple Concepts");
+                const tatom = atom as ResolvedTupleAtomType;
+                if (idx < tatom.types.length) {
+                    if (!tatom.types[idx].isOptional) {
+                        return tatom.types[idx].type;
+                    }
+                    else {
+                        return this.m_assembly.typeUnion([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
+                    }
+                }
+                else {
+                    return this.m_assembly.getSpecialNoneType();
+                }
             }
         });
 
@@ -268,22 +266,19 @@ class TypeChecker {
         const options = rtype.options.map((atom) => {
             if (atom instanceof ResolvedEntityAtomType) {
                 const catom = ResolvedType.createSingle(atom);
-                let lopts: ResolvedType[] = [];
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialPODTypeConceptType());
+                
+                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODAndAPIConceptType(), catom)) {
+                    return this.m_assembly.getSpecialPODAndAPIConceptType();
                 }
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialAPITypeConceptType());
+                else if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
+                    return this.m_assembly.getSpecialPODTypeConceptType();
                 }
-
-                if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialRecordConceptType(), catom)) {
-                    lopts.push(this.m_assembly.getSpecialAnyConceptType());
+                else if(this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
+                    return this.m_assembly.getSpecialAPITypeConceptType();
                 }
-
-                this.raiseErrorIf(sinfo, lopts.length === 0, "Can only load properties from Records and Record Concepts");
-                return this.m_assembly.typeUnion(lopts);
+                else {
+                    return this.m_assembly.getSpecialAnyConceptType();
+                }
             }
 
             this.raiseErrorIf(sinfo, !(atom instanceof ResolvedRecordAtomType), "Can only load properties from Records and Record Concepts");

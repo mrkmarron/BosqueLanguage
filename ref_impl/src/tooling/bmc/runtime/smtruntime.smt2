@@ -68,8 +68,8 @@
     ( (bsq_buffer@cons (bsq_buffer_type String) (bsq_buffer_contents String)) )
     ( (bsq_isotime@cons (bsq_isotime_value Int)) )
     ( (bsq_regex@cons (bsq_regex_value String)) )
-    ( (bsq_tuple@cons (bsq_tuple_entries (Array Int BTerm)))  )
-    ( (bsq_record@cons (bsq_record_entries (Array String BTerm))) )
+    ( (bsq_tuple@cons (bsqterm_tuple_flag Int) (bsq_tuple_entries (Array Int BTerm)))  )
+    ( (bsq_record@cons (bsqterm_record_flag Int) (bsq_record_entries (Array String BTerm))) )
     ;;NOMINAL_CONSTRUCTORS;;
     (
     ;;NOMINAL_OBJECT_CONSTRUCTORS;;
@@ -80,8 +80,8 @@
       (bsqterm_buffer (bsqterm_buffer_value bsq_buffer))
       (bsqterm_isotime (bsqterm_isotime_value bsq_isotime))
       (bsqterm_regex (bsqterm_regex_value bsq_regex))
-      (bsqterm_tuple (bsqterm_tuple_flag Int) (bsqterm_tuple_value bsq_tuple)) 
-      (bsqterm_record (bsqterm_record_flag Int) (bsqterm_record_value bsq_record))
+      (bsqterm_tuple (bsqterm_tuple_value bsq_tuple)) 
+      (bsqterm_record (bsqterm_record_value bsq_record))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_value bsq_object))
     )
 ))
@@ -165,7 +165,11 @@
 )
 
 (define-fun @fj ((f1 Int) (f2 Int)) Int
-  (ite (< f1 f2) f1 f2)
+  (ite (and (= f1 3) (= f2 3)) 3
+    (ite (or (= f1 0) (= f2 0)) 0
+      1
+    )
+  )
 )
 
 ;;EPHEMERAL_DECLS;;

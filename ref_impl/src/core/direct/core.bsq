@@ -47,7 +47,7 @@ concept KeyType provides Any, Indexable {
 }
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
-concept PODType provides Any {
+concept PODType provides APIType {
     static bufferify<T where grounded PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
     static parseBuffer<T where grounded PODType>(data: Buffer<T>): T # pod_parsebuffer
     static tryParseBuffer<T where grounded PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
@@ -58,7 +58,7 @@ concept APIValue provides Any {
 }
 
 //<summary>Type for indicating that a datatype can be exported as part of a stable API.</summary>
-concept APIType provides APIValue, Parsable {
+concept APIType provides APIValue {
     static bufferify<T where grounded APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
     static parseBuffer<T where grounded APIType>(data: Buffer<T>): T # api_parsebuffer
     static tryParseBuffer<T where grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
