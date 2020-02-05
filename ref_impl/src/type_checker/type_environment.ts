@@ -87,6 +87,14 @@ type ExpressionReturnResult = {
     value: FlowTypeTruthValue
 };
 
+type StructuredAssignmentPathStep = {
+    fromtype: ResolvedType,
+    t: ResolvedType,
+    step: "tuple" | "record" | "elist" | "nominal";
+    ival: number;
+    nval: string;
+};
+
 class TypeEnvironment {
     readonly scope: MIRBodyKey;
     readonly terms: Map<string, ResolvedType>;
@@ -265,7 +273,7 @@ class TypeEnvironment {
         return this.updateVarInfo(name, newv);
     }
 
-    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, {p: (string|number), t: ResolvedType}[], ResolvedType][], allAssigned: [string, {p: (string|number), t: ResolvedType}[], ResolvedType][]): TypeEnvironment {
+    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][]): TypeEnvironment {
         let nenv: TypeEnvironment = this;
 
         for (let i = 0; i < allDeclared.length; ++i) {
@@ -364,6 +372,6 @@ class TypeEnvironment {
 
 export {
     FlowTypeTruthValue, FlowTypeTruthOps,
-    VarInfo, ExpressionReturnResult,
+    VarInfo, ExpressionReturnResult, StructuredAssignmentPathStep,
     TypeEnvironment
 };
