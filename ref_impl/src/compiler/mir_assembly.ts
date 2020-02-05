@@ -260,7 +260,7 @@ abstract class MIROOTypeDecl {
             jobj.terms.forEach((t: any) => terms.set(t[0], MIRType.jparse(t[1])));
 
         if (jobj.isentity) {
-            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides, jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.isCollectionEntityType, jobj.isMapEntityType, jobj.isEnum, jobj.isKey);
+            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jparsepragmas(jobj.pragmas), jobj.ns, jobj.name, terms, jobj.provides, jobj.invariants.map((i: any) => MIRBody.jparse(i)), jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
             jobj.vcallMap.forEach((vc: any) => entity.vcallMap.set(vc[0], vc[1]));
             return entity;
         }
@@ -283,24 +283,12 @@ class MIRConceptTypeDecl extends MIROOTypeDecl {
 }
 
 class MIREntityTypeDecl extends MIROOTypeDecl {
-    readonly isEnum: boolean;
-    readonly isKey: boolean;
-
-    readonly isCollectionEntityType: boolean;
-    readonly isMapEntityType: boolean;
-
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[], isCollectionEntityType: boolean, isMapEntityType: boolean, isEnum: boolean, isKey: boolean) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRNominalTypeKey[], invariants: MIRBody[], fields: MIRFieldDecl[]) {
         super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides, invariants, fields);
-
-        this.isEnum = isEnum;
-        this.isKey = isKey;
-
-        this.isCollectionEntityType = isCollectionEntityType;
-        this.isMapEntityType = isMapEntityType;
     }
 
     jemit(): object {
-        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], isEnum: this.isEnum, isKey: this.isKey, isCollectionEntityType: this.isCollectionEntityType, isMapEntityType: this.isMapEntityType };
+        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, pragmas: jemitpragmas(this.pragmas), ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, invariants: this.invariants.map((i) => i.jemit()), fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap] };
     }
 }
 

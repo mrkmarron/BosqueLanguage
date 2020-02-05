@@ -220,8 +220,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRConstructorRecord(sinfo, resultRecordType, args, trgt));
     }
 
-    emitConstructorValueList(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRConstructorEphemeralValueList(sinfo, resultTupleType, args, trgt));
+    emitConstructorValueList(sinfo: SourceInfo, resultEphemeralType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRConstructorEphemeralValueList(sinfo, resultEphemeralType, args, trgt));
     }
 
     emitLoadTupleIndex(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, idx: number, trgt: MIRTempRegister) {
@@ -376,25 +376,28 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRVarLifetimeEnd(sinfo, name));
     }
 
-    emitReturnAssign(sinfo: SourceInfo, resultTupleType: MIRResolvedTypeKey | undefined, refparams: string[], src: MIRArgument) {
+    emitReturnAssign(sinfo: SourceInfo, resultEphemeralListType: MIRResolvedTypeKey | undefined, refparams: string[], src: MIRArgument) {
         if (refparams.length === 0) {
             this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
         }
         else {
-            xxxx; //var pack?
             let args: MIRArgument[] = [src];
             for (let i = 0; i < refparams.length; ++i) {
                 args.push(new MIRVariable(refparams[i]));
             }
 
-            const tupreg = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRConstructorTuple(sinfo, resultTupleType as MIRResolvedTypeKey, args, tupreg));
-            this.m_currentBlock.push(new MIRReturnAssign(sinfo, tupreg));
+            const elreg = this.generateTmpRegister();
+            this.m_currentBlock.push(new MIRConstructorEphemeralValueList(sinfo, resultEphemeralListType as MIRResolvedTypeKey, args, elreg));
+            this.m_currentBlock.push(new MIRReturnAssign(sinfo, elreg));
         }
     }
 
-    emitAbort(sinfo: SourceInfo, releaseEnable: boolean, info: string) {
-        this.m_currentBlock.push(new MIRAbort(sinfo, releaseEnable, info));
+    emitReturnAssignPack(sinfo: SourceInfo, src: MIRArgument) {
+        this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
+    }
+
+    emitAbort(sinfo: SourceInfo, info: string) {
+        this.m_currentBlock.push(new MIRAbort(sinfo, info));
     }
 
     emitDebugBreak(sinfo: SourceInfo) {

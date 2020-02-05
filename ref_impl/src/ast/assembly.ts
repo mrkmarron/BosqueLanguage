@@ -12,6 +12,18 @@ import * as assert from "assert";
 
 type BuildLevel = "debug" | "test" | "release";
 
+function isBuildLevelEnabled(check: BuildLevel, enabled: BuildLevel): boolean {
+    if(enabled === "debug") {
+        return true;
+    }
+    else if(enabled === "test") {
+        return check === "test" || check === "release";
+    }
+    else {
+        return check === "release";
+    }
+}
+
 class TemplateTermDecl {
     readonly name: string;
     readonly isGrounded: boolean;
@@ -1687,7 +1699,7 @@ class Assembly {
 }
 
 export {
-    BuildLevel,
+    BuildLevel, isBuildLevelEnabled,
     TemplateTermDecl, TemplateTypeRestriction, TypeConditionRestriction, PreConditionDecl, PostConditionDecl, InvokeDecl,
     OOMemberDecl, InvariantDecl, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
     NamespaceConstDecl, NamespaceFunctionDecl, NamespaceTypedef, NamespaceUsing, NamespaceDeclaration,

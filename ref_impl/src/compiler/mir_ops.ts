@@ -465,7 +465,7 @@ class MIRLoadConstValidatedString extends MIRValueOp {
     readonly tskey: MIRResolvedTypeKey;
     readonly vfunckey: MIRInvokeKey | undefined;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, vfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
         super(MIROpTag.MIRLoadConstValidatedString, sinfo, trgt);
         this.ivalue = ivalue;
         this.tkey = tkey;
@@ -1692,12 +1692,10 @@ class MIRReturnAssign extends MIRFlowOp {
 }
 
 class MIRAbort extends MIRFlowOp {
-    readonly releaseEnable: boolean;
     readonly info: string;
 
-    constructor(sinfo: SourceInfo, releaseEnable: boolean, info: string) {
+    constructor(sinfo: SourceInfo, info: string) {
         super(MIROpTag.MIRAbort, sinfo);
-        this.releaseEnable = releaseEnable;
         this.info = info;
     }
 
@@ -1705,15 +1703,15 @@ class MIRAbort extends MIRFlowOp {
     getModVars(): MIRRegisterArgument[] { return []; }
 
     stringify(): string {
-        return `abort${this.releaseEnable ? "" : "_debug"} -- ${this.info}`;
+        return `abort -- ${this.info}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), releaseEnable: this.releaseEnable, info: this.info };
+        return { ...this.jbemit(), info: this.info };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRAbort(jparsesinfo(jobj.sinfo), jobj.releaseEnable, jobj.info);
+        return new MIRAbort(jparsesinfo(jobj.sinfo), jobj.info);
     }
 }
 
