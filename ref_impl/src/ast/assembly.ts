@@ -1300,20 +1300,78 @@ class Assembly {
         return declfields;
     }
 
-    getAllOOInvariants(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, invs?: [InvariantDecl, Map<string, ResolvedType>][]): [InvariantDecl, Map<string, ResolvedType>][] {
-        let declinvs: [InvariantDecl, Map<string, ResolvedType>][] = invs || [];
-        ooptype.invariants.forEach((inv) => {
-            declinvs.push([inv, binds]);
-        });
+    getAllInvariantProvidingTypes(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, invprovs?: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][]): [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] {
+        let declinvs:  [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] = [...(invprovs || [])];
 
         ooptype.provides.forEach((provide) => {
             const tt = this.normalizeTypeOnly(provide, binds);
             (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
-                declinvs = this.getAllOOInvariants(concept.concept, concept.binds, declinvs);
+                declinvs = this.getAllInvariantProvidingTypes(concept.concept, concept.binds, declinvs);
             });
         });
 
-        return declinvs;
+        const ttype = ResolvedType.createSingle(ooptype instanceof EntityTypeDecl ? ResolvedEntityAtomType.create(ooptype, binds) : ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(ooptype as ConceptTypeDecl, binds)]));
+        if(declinvs.find((dd) => dd[0].idStr === ttype.idStr)) {
+            return declinvs;
+        }
+        else {
+            if(ooptype.invariants.length !== 0) {
+                declinvs.push([ttype, ooptype, binds]);
+            }
+
+            return declinvs;
+        }
+    }
+
+    getAbstractPreConds(fname: string, ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>): PreConditionDecl[] | undefined {
+        for (let i = 0; i < ooptype.provides.length; ++i) {
+            const provide = ooptype.provides[i];
+            const tt = this.normalizeTypeOnly(provide, binds);
+            for (let j = 0; j < (tt.options[0] as ResolvedConceptAtomType).conceptTypes.length; ++j) {
+                const concept = (tt.options[0] as ResolvedConceptAtomType).conceptTypes[j];
+                const pc = this.getAbstractPreConds(fname, concept.concept, concept.binds);
+                if (pc !== undefined) {
+                    return pc;
+                }
+            }
+        }
+
+        if(ooptype.memberMethods.has(fname) && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("abstract") && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions.length !== 0) {
+            return (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions;
+        }
+
+        if (ooptype.staticFunctions.has(fname) && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("abstract") && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions.length !== 0) {
+            (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions;
+        }
+
+        return undefined;
+    }
+
+    getConcreteAndAbstractPostCondProvidingTypes(fname: string, ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, postconds?: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][]): [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] {
+        let declpostconds: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] = [...(postconds || [])];
+
+        ooptype.provides.forEach((provide) => {
+            const tt = this.normalizeTypeOnly(provide, binds);
+            (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
+                declpostconds = this.getConcreteAndAbstractPostCondProvidingTypes(fname, concept.concept, concept.binds, declpostconds);
+            });
+        });
+
+        const ttype = ResolvedType.createSingle(ooptype instanceof EntityTypeDecl ? ResolvedEntityAtomType.create(ooptype, binds) : ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(ooptype as ConceptTypeDecl, binds)]));
+        if(declpostconds.find((dd) => dd[0].idStr === ttype.idStr)) {
+            return declpostconds;
+        }
+        else {
+            if(ooptype.memberMethods.has(fname) && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("abstract") && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.postconditions.length !== 0) {
+                declpostconds.push([ttype, ooptype, binds])
+            }
+            
+            if(ooptype.staticFunctions.has(fname) && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("abstract") && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.postconditions.length !== 0) {
+                declpostconds.push([ttype, ooptype, binds])
+            }
+
+            return declpostconds;
+        }
     }
 
     private tryGetOOMemberDeclThis(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, kind: "const" | "static" | "field" | "method", search: string): OOMemberLookupInfo | undefined {

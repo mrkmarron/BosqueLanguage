@@ -15,16 +15,6 @@ type MIRNominalTypeKey = string; //ns::name#binds
 type MIRResolvedTypeKey = string; //idstr
 type MIRVirtualMethodKey = string; //method#binds
 
-type MIRBodyKey = string; //pfx$$key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
-
-function extractMirBodyKeyPrefix(bkey: MIRBodyKey): "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault" {
-    return bkey.substring(0, bkey.indexOf("::")) as "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault";
-}
-
-function extractMirBodyKeyData(bkey: MIRBodyKey): MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey {
-    return bkey.substring(bkey.indexOf("::") + 2) as MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey;
-}
-
 //
 //Probably want to declare a MIRSourceInfo class
 //
@@ -1943,15 +1933,13 @@ class MIRBasicBlock {
 class MIRBody {
     readonly file: string;
     readonly sinfo: SourceInfo;
-    readonly bkey: MIRBodyKey;
 
     body: Map<string, MIRBasicBlock>;
     vtypes: Map<string, MIRResolvedTypeKey> | undefined;
 
-    constructor(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, body: Map<string, MIRBasicBlock>, vtypes?: Map<string, MIRResolvedTypeKey>) {
+    constructor(file: string, sinfo: SourceInfo, body: Map<string, MIRBasicBlock>, vtypes?: Map<string, MIRResolvedTypeKey>) {
         this.file = file;
         this.sinfo = sinfo;
-        this.bkey = bkey;
 
         this.body = body;
         this.vtypes = vtypes;
@@ -2002,7 +1990,7 @@ class MIRBody {
     jemit(): object {
         const blocks = topologicalOrder(this.body).map((blck) => blck.jemit());
         const vtypes = this.vtypes !== undefined ? ([...this.vtypes].sort((a, b) => a[0].localeCompare(b[0]))) : undefined;
-        return { file: this.file, sinfo: jemitsinfo(this.sinfo), bkey: this.bkey, blocks: blocks, vtypes: vtypes };
+        return { file: this.file, sinfo: jemitsinfo(this.sinfo), blocks: blocks, vtypes: vtypes };
     }
 
     static jparse(jobj: any): MIRBody {
@@ -2010,20 +1998,19 @@ class MIRBody {
         jobj.blocks.map((blck: any) => MIRBasicBlock.jparse(blck)).forEach((blck: MIRBasicBlock) => body.set(blck.label, blck));
 
         if (jobj.vtypes === undefined) {
-            return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), jobj.bkey, body);
+            return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), body);
         }
         else {
             let vtypes = new Map<string, MIRResolvedTypeKey>();
             jobj.vtypes.forEach((vtype: [string, string]) => vtypes.set(vtype[0], vtype[1]));
 
-            return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), jobj.bkey, body, vtypes);
+            return new MIRBody(jobj.file, jparsesinfo(jobj.sinfo), body, vtypes);
         }
     }
 }
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRBodyKey, extractMirBodyKeyPrefix, extractMirBodyKeyData,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstValidatedString, MIRLoadConstTypedString,

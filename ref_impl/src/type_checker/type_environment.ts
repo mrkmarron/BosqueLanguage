@@ -7,7 +7,7 @@ import assert = require("assert");
 
 import { Assembly } from "../ast/assembly";
 import { ResolvedType } from "../ast/resolved_type";
-import { MIRTempRegister, MIRBodyKey } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRInvokeKey } from "../compiler/mir_ops";
 import { PCode } from "../compiler/mir_emitter";
 
 enum FlowTypeTruthValue {
@@ -96,7 +96,7 @@ type StructuredAssignmentPathStep = {
 };
 
 class TypeEnvironment {
-    readonly scope: MIRBodyKey;
+    readonly scope: MIRInvokeKey;
     readonly terms: Map<string, ResolvedType>;
 
     readonly refparams: string[];
@@ -114,7 +114,7 @@ class TypeEnvironment {
 
     readonly frozenVars: Set<string>;
 
-    private constructor(scope: MIRBodyKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>,
+    private constructor(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>,
         args: Map<string, VarInfo> | undefined, locals: Map<string, VarInfo>[] | undefined, result: ResolvedType,
         expressionResult: ExpressionReturnResult | undefined, rflow: ResolvedType | undefined, yflow: ResolvedType | undefined,
         yieldTrgtInfo: [MIRTempRegister, string][], frozenVars: Set<string>) {
@@ -148,7 +148,7 @@ class TypeEnvironment {
         }
     }
 
-    static createInitialEnvForCall(scope: MIRBodyKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>, args: Map<string, VarInfo>, result: ResolvedType): TypeEnvironment {
+    static createInitialEnvForCall(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>, args: Map<string, VarInfo>, result: ResolvedType): TypeEnvironment {
         return new TypeEnvironment(scope, terms, refparams, pcodes, args, [new Map<string, VarInfo>()], result, undefined, undefined, undefined, [], new Set<string>());
     }
 

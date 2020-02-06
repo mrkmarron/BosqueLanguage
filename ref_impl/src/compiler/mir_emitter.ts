@@ -5,7 +5,7 @@
 
 import { SourceInfo, Parser } from "../ast/parser";
 import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRBodyKey, MIRGetKey, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
-import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl } from "../ast/assembly";
+import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl, BuildLevel } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIROOTypeDecl, MIREpemeralListType } from "./mir_assembly";
 
@@ -80,34 +80,6 @@ class MIRKeyGenerator {
         //      maybe we can do a hash of contents + basename (or something similar)?
         //
         return `fn--${inv.srcFile}%${inv.sourceLocation.line}%${inv.sourceLocation.column}`;
-    }
-
-    //pfx::key -- pfx \in {invoke, pre, post, invariant, const, fdefault}
-    static generateBodyKey(prefix: "invoke" | "pre" | "post" | "invariant" | "const" | "fdefault", data: MIRInvokeKey | MIRNominalTypeKey | MIRConstantKey | MIRFieldKey): MIRBodyKey {
-        return `${prefix}::${data}`;
-    }
-
-    static computeBindsKeyInfo_MIR(binds: Map<string, MIRType>): string {
-        if (binds.size === 0) {
-            return "";
-        }
-
-        let terms: string[] = [];
-        binds.forEach((v, k) => terms.push(`${k}=${v.trkey}`));
-
-        return `<${terms.sort().join(", ")}>`;
-    }
-
-    static generateTypeKey_MIR(t: MIROOTypeDecl): MIRResolvedTypeKey {
-        return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}`;
-    }
-
-    static generateConstKey_MIR(t: MIROOTypeDecl, name: string): MIRConstantKey {
-        return `${MIRKeyGenerator.generateTypeKey_MIR(t)}::${name}`;
-    }
-
-    static generateStaticKey_MIR(t: MIROOTypeDecl, name: string): MIRInvokeKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo_MIR(t.terms)}`;
     }
 }
 
@@ -626,8 +598,6 @@ class MIREmitter {
             const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
-            ccdecl.invariants.forEach((inv) => cpt.invariants.push(inv));
-
             ccdecl.fields.forEach((fd) => {
                 if (cpt.fields.findIndex((ff) => ff.name === fd.name) === -1) {
                     cpt.fields.push(fd);
@@ -647,8 +617,6 @@ class MIREmitter {
             const ccdecl = this.masm.conceptDecls.get(tkey) as MIRConceptTypeDecl;
             this.closeConceptDecl(ccdecl);
 
-            ccdecl.invariants.forEach((inv) => entity.invariants.push(inv));
-
             ccdecl.fields.forEach((fd) => {
                 if (entity.fields.findIndex((ff) => ff.name === fd.name) === -1) {
                     entity.fields.push(fd);
@@ -665,7 +633,7 @@ class MIREmitter {
         entity.fields.sort((f1, f2) => f1.name.localeCompare(f2.name));
     }
 
-    static generateMASM(pckge: PackageConfig, doInvChecks: boolean, doPrePostChecks: boolean, doAssertChecks: boolean, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
+    static generateMASM(pckge: PackageConfig, buildLevel: BuildLevel, validateLiteralStrings: boolean, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
         ////////////////
         //Parse the contents and generate the assembly
         const assembly = new Assembly();
@@ -699,7 +667,7 @@ class MIREmitter {
 
         const masm = new MIRAssembly(pckge, srcFiles, hash.digest("hex"));
         const emitter = new MIREmitter(masm);
-        const checker = new TypeChecker(assembly, true, emitter, doInvChecks, doPrePostChecks, doAssertChecks);
+        const checker = new TypeChecker(assembly, true, emitter, buildLevel, validateLiteralStrings);
 
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialAnyConceptType());
@@ -799,33 +767,6 @@ class MIREmitter {
                 const args = new Map<string, MIRType>();
                 idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
                 computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
-
-                idecl.preconditions.forEach((pre) => {
-                    computeVarTypesForInvoke(pre[0], args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
-                });
-
-                idecl.postconditions.forEach((post) => {
-                    computeVarTypesForInvoke(post, args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
-                });
-            });
-
-            masm.constantDecls.forEach((cdecl) => {
-                const args = new Map<string, MIRType>();
-                computeVarTypesForInvoke(cdecl.value, args, masm.typeMap.get(cdecl.declaredType) as MIRType, masm);
-            });
-
-            masm.fieldDecls.forEach((fdecl) => {
-                if (fdecl.value !== undefined) {
-                    const args = new Map<string, MIRType>();
-                    computeVarTypesForInvoke(fdecl.value, args, masm.typeMap.get(fdecl.declaredType) as MIRType, masm);
-                }
-            });
-
-            masm.entityDecls.forEach((edecl) => {
-                edecl.invariants.forEach((invdecl) => {
-                    const args = new Map<string, MIRType>().set("this", masm.typeMap.get(edecl.tkey) as MIRType);
-                    computeVarTypesForInvoke(invdecl, args, masm.typeMap.get("NSCore::Bool") as MIRType, masm);
-                });
             });
         }
         catch (ex) {

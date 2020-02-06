@@ -1227,7 +1227,7 @@ class CPPBodyEmitter {
 
                 const lhvtypeinfer = this.typegen.getMIRType(beq.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(beq.rhsInferType);
-                return `${this.varToCppName(beq.trgt)} = ${this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)};`;
+                return `${this.varToCppName(beq.trgt)} = ${this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs, true)};`;
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
@@ -1249,7 +1249,7 @@ class CPPBodyEmitter {
                 const oftype = this.typegen.getMIRType(top.oftype);
                 const argtype = this.getArgType(top.arg);
 
-                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, argtype), argtype, oftype, true)};`;
+                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, argtype), argtype, oftype)};`;
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;
