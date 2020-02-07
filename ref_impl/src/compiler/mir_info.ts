@@ -7,7 +7,6 @@
 //Some handy helpers for computing IR info
 //
 
-import * as assert from "assert";
 import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp } from "./mir_ops";
 
 type FlowLink = {
@@ -172,7 +171,7 @@ function computeBlockLiveVars(blocks: Map<string, MIRBasicBlock>): Map<string, B
         let lexit = new Set<string>();
         linfo.forEach((ls) => ls.liveEntry.forEach((lv) => lexit.add(lv)));
 
-        if (bb.label === xxx) {
+        if (bb.label === "exit") {
             lexit.add("_return_");
         }
 

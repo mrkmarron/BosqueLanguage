@@ -1068,7 +1068,7 @@ class TypeChecker {
             if(this.m_assembly.hasInvariants(oftype.object, oftype.binds)) {
                 const ttreg = this.m_emitter.bodyEmitter.generateTmpRegister();
                 const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@@invariant", oftype.binds, []);
-                this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(sinfo, ikey, trgt, ttreg);
+                this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(sinfo, ikey, tkey, trgt, ttreg);
 
                 const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
                 const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
@@ -2017,8 +2017,9 @@ class TypeChecker {
 
                 if (texp.options.length === 1 && texp.options[0] instanceof ResolvedEntityAtomType && this.m_assembly.hasInvariants((texp.options[0] as ResolvedEntityAtomType).object, (texp.options[0] as ResolvedEntityAtomType).binds)) {
                     const oftype = texp.options[0] as ResolvedEntityAtomType;
+                    const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
                     const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@@invariant", oftype.binds, []);
-                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, trgt, ttreg);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, tkey, trgt, ttreg);
                 }
                 else {
                     const mirotype = this.m_emitter.registerResolvedTypeReference(texp);
@@ -2108,8 +2109,9 @@ class TypeChecker {
 
                 if (texp.options.length === 1 && texp.options[0] instanceof ResolvedEntityAtomType && this.m_assembly.hasInvariants((texp.options[0] as ResolvedEntityAtomType).object, (texp.options[0] as ResolvedEntityAtomType).binds)) {
                     const oftype = texp.options[0] as ResolvedEntityAtomType;
+                    const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
                     const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@@invariant", oftype.binds, []);
-                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, trgt, ttreg);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, tkey, trgt, ttreg);
                 }
                 else {
                     const mirotype = this.m_emitter.registerResolvedTypeReference(texp);

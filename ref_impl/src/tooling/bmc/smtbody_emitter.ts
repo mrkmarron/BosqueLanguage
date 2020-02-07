@@ -1362,7 +1362,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRStructuredExtendObject: {
                 const so = op as MIRStructuredExtendObject;
-                return this.generateMIRStructuredExtendObject(op);
+                return this.generateMIRStructuredExtendObject(so);
             }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
@@ -1428,7 +1428,7 @@ class SMTBodyEmitter {
 
                 const lhvtypeinfer = this.typegen.getMIRType(beq.lhsInferType);
                 const rhvtypeinfer = this.typegen.getMIRType(beq.rhsInferType);
-                return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs)));
+                return new SMTLet(this.varToSMTName(beq.trgt), new SMTValue(this.generateEquals(beq.op, lhvtypeinfer, beq.lhs, rhvtypeinfer, beq.rhs, !beq.relaxed)));
             }
             case MIROpTag.MIRBinCmp: {
                 const bcmp = op as MIRBinCmp;
