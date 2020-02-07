@@ -2518,7 +2518,7 @@ class Parser {
             while (this.testToken("requires") || this.testToken("validate")) {
                 const isvalidate = this.testAndConsumeTokenIf("validate");
                 this.consumeToken();
-
+                
                 let level: BuildLevel = isvalidate ? "release" : "debug";
                 if (!isvalidate && this.testAndConsumeTokenIf("#")) {
                     level = this.consumeTokenAndGetValue() as BuildLevel;

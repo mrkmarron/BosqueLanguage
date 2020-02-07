@@ -56,7 +56,7 @@ function computeBlockLinks(blocks: Map<string, MIRBasicBlock>): Map<string, Flow
 
         }
         else {
-            assert(block.label === "exit");
+            //nothing to do here
         }
 
         done.add(bb);
@@ -172,7 +172,7 @@ function computeBlockLiveVars(blocks: Map<string, MIRBasicBlock>): Map<string, B
         let lexit = new Set<string>();
         linfo.forEach((ls) => ls.liveEntry.forEach((lv) => lexit.add(lv)));
 
-        if (bb.label === "exit") {
+        if (bb.label === xxx) {
             lexit.add("_return_");
         }
 

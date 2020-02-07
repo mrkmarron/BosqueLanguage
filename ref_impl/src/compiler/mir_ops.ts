@@ -242,7 +242,6 @@ enum MIROpTag {
 
     MIRRegAssign = "MIRRegAssign",
     MIRTruthyConvert = "MIRTruthyConvert",
-    MIRLogicStore = "MIRLogicStore",
     MIRVarStore = "MIRVarStore",
     MIRPackStore = "MIRPackStore",
     MIRReturnAssign = "MIRReturnAssign",
@@ -370,8 +369,6 @@ abstract class MIROp {
                 return MIRRegAssign.jparse(jobj);
             case MIROpTag.MIRTruthyConvert:
                 return MIRTruthyConvert.jparse(jobj);
-            case MIROpTag.MIRLogicStore:
-                return MIRLogicStore.jparse(jobj);
             case MIROpTag.MIRVarStore:
                 return MIRVarStore.jparse(jobj);
             case MIROpTag.MIRPackStore:
@@ -1572,36 +1569,6 @@ class MIRTruthyConvert extends MIRFlowOp {
     }
 }
 
-class MIRLogicStore extends MIRFlowOp {
-    lhs: MIRArgument;
-    readonly op: string;
-    rhs: MIRArgument;
-    trgt: MIRTempRegister;
-
-    constructor(sinfo: SourceInfo, lhs: MIRArgument, op: string, rhs: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLogicStore, sinfo);
-        this.lhs = lhs;
-        this.op = op;
-        this.rhs = rhs;
-        this.trgt = trgt;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.lhs, this.rhs]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.lhs.stringify()} ${this.op} ${this.rhs.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), lhs: this.lhs.jemit(), op: this.op, rhs: this.rhs.jemit(), trgt: this.trgt.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRLogicStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.lhs), jobj.op, MIRArgument.jparse(jobj.rhs), MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
 class MIRVarStore extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
@@ -2020,7 +1987,7 @@ export {
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
     MIRPrefixOp, MIRBinOp, MIRGetKey, MIRBinEq, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
-    MIRRegAssign, MIRTruthyConvert, MIRLogicStore, MIRVarStore, MIRPackStore, MIRReturnAssign,
+    MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRPackStore, MIRReturnAssign,
     MIRAbort, MIRDebug,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRPhi,

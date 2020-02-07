@@ -4,11 +4,11 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedFunctionTypeParam, ResolvedEphemeralListType } from "../ast/resolved_type";
-import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl, BuildLevel, isBuildLevelEnabled } from "../ast/assembly";
+import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, ConceptTypeDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement } from "../ast/body";
-import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry } from "../ast/body";
+import { PCode, MIREmitter, MIRKeyGenerator, MIRBodyEmitter } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRTupleType, MIRTupleTypeEntry, MIREntityType } from "../compiler/mir_assembly";
@@ -1066,6 +1066,21 @@ class TypeChecker {
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
             this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, tkey, asValue, filledLocations.map((fl) => fl.trgt), trgt);
+
+            if(this.m_assembly.hasInvariants(oftype.object, oftype.binds)) {
+                const ttreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@invariant", oftype.binds, []);
+                this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(sinfo, ikey, trgt, ttreg);
+
+                const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
+                const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
+                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, ttreg, okblock, failblock);
+
+                this.m_emitter.bodyEmitter.setActiveBlock(failblock);
+                this.m_emitter.bodyEmitter.emitAbort(sinfo, "Invariant Failure");
+
+                this.m_emitter.bodyEmitter.setActiveBlock(okblock);
+            }
         }
 
         return ResolvedType.createSingle(oftype);
@@ -1984,6 +1999,8 @@ class TypeChecker {
             return [env.setExpressionResult(rrecord)];
         }
         else {
+            this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialObjectConceptType()), "Should be subtype of Object");
+
             const fieldupdates = updates.map<[MIRFieldKey, MIRTempRegister]>((update) => {
                 const finfo = this.m_assembly.tryGetOOMemberDeclOptions(texp, "field", update[0]);
                 this.raiseErrorIf(op.sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
@@ -1997,6 +2014,27 @@ class TypeChecker {
             
             if (this.m_emitEnabled) {
                 this.m_emitter.bodyEmitter.emitModifyWithFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, fieldupdates, trgt);
+
+                const ttreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+
+                if (texp.options.length === 1 && texp.options[0] instanceof ResolvedEntityAtomType && this.m_assembly.hasInvariants((texp.options[0] as ResolvedEntityAtomType).object, (texp.options[0] as ResolvedEntityAtomType).binds)) {
+                    const oftype = texp.options[0] as ResolvedEntityAtomType;
+                    const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@invariant", oftype.binds, []);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, trgt, ttreg);
+                }
+                else {
+                    const mirotype = this.m_emitter.registerResolvedTypeReference(texp);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckVirtualTarget(op.sinfo, mirotype.trkey, trgt, ttreg);
+                }
+
+                const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
+                const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
+                this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, okblock, failblock);
+
+                this.m_emitter.bodyEmitter.setActiveBlock(failblock);
+                this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "Invariant Failure");
+
+                this.m_emitter.bodyEmitter.setActiveBlock(okblock);
             }
 
             return [env.setExpressionResult(texp)];
@@ -2068,6 +2106,26 @@ class TypeChecker {
 
             if (this.m_emitEnabled) {
                 this.m_emitter.bodyEmitter.emitStructuredExtendObject(op.sinfo, this.m_emitter.registerResolvedTypeReference(texp).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, etreg, this.m_emitter.registerResolvedTypeReference(mergeValue).trkey, fieldResolves, trgt);
+                const ttreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+
+                if (texp.options.length === 1 && texp.options[0] instanceof ResolvedEntityAtomType && this.m_assembly.hasInvariants((texp.options[0] as ResolvedEntityAtomType).object, (texp.options[0] as ResolvedEntityAtomType).binds)) {
+                    const oftype = texp.options[0] as ResolvedEntityAtomType;
+                    const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@invariant", oftype.binds, []);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckDirect(op.sinfo, ikey, trgt, ttreg);
+                }
+                else {
+                    const mirotype = this.m_emitter.registerResolvedTypeReference(texp);
+                    this.m_emitter.bodyEmitter.emitInvokeInvariantCheckVirtualTarget(op.sinfo, mirotype.trkey, trgt, ttreg);
+                }
+
+                const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
+                const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
+                this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, okblock, failblock);
+
+                this.m_emitter.bodyEmitter.setActiveBlock(failblock);
+                this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "Invariant Failure");
+
+                this.m_emitter.bodyEmitter.setActiveBlock(okblock);
             }
 
             return [env.setExpressionResult(texp)];
@@ -2168,8 +2226,7 @@ class TypeChecker {
 
                         this.m_emitter.bodyEmitter.setActiveBlock(failblck);
                         this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "as<T> fail");
-                        this.m_emitter.bodyEmitter.emitDirectJump(op.sinfo, "exit");
-
+                        
                         this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
                         this.m_emitter.bodyEmitter.emitRegAssign(op.sinfo, margs.args[0], trgt);
                     }
@@ -2835,7 +2892,7 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 const rtuple = this.generateRefInfoForReturnEmit(exp.sinfo, terminaltype, env);
                 this.m_emitter.bodyEmitter.emitReturnAssign(exp.sinfo, rtuple, env.refparams, rreg);
-                this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "exit");
+                this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "returnassign");
 
                 this.m_emitter.bodyEmitter.setActiveBlock(regularblck);
             }
@@ -2978,7 +3035,6 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitAbort(exp.sinfo, "exhaustive");
-            this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, "exit");
         }
 
         if (this.m_emitEnabled) {
@@ -3804,7 +3860,6 @@ class TypeChecker {
 
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "exhaustive");
-            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
         }
 
         if (this.m_emitEnabled) {
@@ -3837,7 +3892,7 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 const rtype = this.generateRefInfoForReturnEmit(stmt.sinfo, venv.getExpressionResult().etype, env);
                 this.m_emitter.bodyEmitter.emitReturnAssign(stmt.sinfo, rtype, env.refparams, etreg);
-                this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
+                this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "returnassign");
             }
 
             return env.setReturn(this.m_assembly, venv.getExpressionResult().etype);
@@ -3860,7 +3915,7 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitConstructorValueList(stmt.sinfo, this.m_emitter.registerResolvedTypeReference(etype).trkey, regs, elreg);
                 
                 this.m_emitter.bodyEmitter.emitReturnAssignPack(stmt.sinfo, elreg);
-                this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
+                this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "returnassign");
             }
 
             return env.setReturn(this.m_assembly, etype);
@@ -3908,7 +3963,6 @@ class TypeChecker {
     private checkAbortStatement(env: TypeEnvironment, stmt: AbortStatement): TypeEnvironment {
         if (this.m_emitEnabled) {
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "abort");
-            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
         }
 
         return env.setAbort();
@@ -3931,7 +3985,6 @@ class TypeChecker {
 
             this.m_emitter.bodyEmitter.setActiveBlock(failblck);
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "assert fail");
-            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
 
             this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
         }
@@ -3956,7 +4009,6 @@ class TypeChecker {
 
             this.m_emitter.bodyEmitter.setActiveBlock(failblck);
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "check fail");
-            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
 
             this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
         }
@@ -4006,12 +4058,17 @@ class TypeChecker {
         const errenv = this.checkExpression(errflow, stmt.err, errreg);
 
         const errres = errenv.getExpressionResult().etype;
-        this.raiseErrorIf(stmt.sinfo, errres.options.length !== 1 && !(errres.options[0].idStr.startsWith("NSCore::Result<") || errres.options[0].idStr.startsWith("NSCore::Err<")));
-
         if (this.m_emitEnabled) {
+            if (stmt.err instanceof LiteralNoneExpression) {
+                this.raiseErrorIf(stmt.sinfo, !this.m_assembly.subtypeOf(this.m_assembly.getSpecialNoneType(), env.result));
+            }
+            else {
+                this.raiseErrorIf(stmt.sinfo, errres.options.length !== 1 && !(errres.options[0].idStr.startsWith("NSCore::Result<") || errres.options[0].idStr.startsWith("NSCore::Err<")));
+            }
+
             const rtype = this.generateRefInfoForReturnEmit(stmt.sinfo, errenv.getExpressionResult().etype, env);
             this.m_emitter.bodyEmitter.emitReturnAssign(stmt.sinfo, rtype, env.refparams, errreg);
-            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "exit");
+            this.m_emitter.bodyEmitter.emitDirectJump(stmt.sinfo, "returnassign");
 
             this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
         }
@@ -4094,12 +4151,14 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 const rtuple = this.generateRefInfoForReturnEmit(body.body.sinfo, resultType, env);
                 this.m_emitter.bodyEmitter.emitReturnAssign(body.body.sinfo, rtuple, env.refparams, etreg);
-                this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
+                this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "returnassign");
             }
+
+            xxx; //handle postcondition insertion of link returnassign block to exit block
 
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(evalue.getExpressionResult().etype, resultType), "Did not produce the expected return type");
 
-            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args) : undefined;
+            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, args) : undefined;
         }
         else if (body.body instanceof BlockStatement) {
             if (this.m_emitEnabled) {
@@ -4110,7 +4169,9 @@ class TypeChecker {
             this.raiseErrorIf(body.body.sinfo, renv.hasNormalFlow(), "Not all flow paths return a value!");
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(renv.returnResult as ResolvedType, resultType), "Did not produce the expected return type");
 
-            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, env.scope, args) : undefined;
+            xxx; //handle postcondition insertion of link returnassign block to exit block
+
+            return this.m_emitEnabled ? this.m_emitter.bodyEmitter.getBody(this.m_file, body.body.sinfo, args) : undefined;
         }
         else {
             return undefined;
@@ -4147,7 +4208,7 @@ class TypeChecker {
         }
     }
 
-    private processGenerateSpecialInvariantFunction(fkey: MIRInvokeKey, iname: string, tdecl: OOPTypeDecl, binds: Map<string, ResolvedType>, exps: Expression[], srcFile: string, sinfo: SourceInfo) {
+    private processGenerateSpecialInvariantDirectFunction(fkey: MIRInvokeKey, iname: string, tdecl: OOPTypeDecl, binds: Map<string, ResolvedType>, exps: Expression[], srcFile: string, sinfo: SourceInfo) {
         try {
             let bexp = exps[0];
             for(let i = 1; i < exps.length; ++i) {
@@ -4167,16 +4228,100 @@ class TypeChecker {
         }
     }
 
-    private processGenerateSpecialPreFunction(fkey: MIRInvokeKey, iname: string, tdecl: OOPTypeDecl, binds: Map<string, ResolvedType>, exps: Expression[], srcFile: string, sinfo: SourceInfo) {
+    private processGenerateSpecialInvariantFunction(sinfo: SourceInfo, srcFile: string, iname: string, ikey: MIRInvokeKey, thistype: ResolvedType, callkeys: MIRInvokeKey[]) {
+        const be = new MIRBodyEmitter();
+        be.initialize();
+        const failblock = be.createNewBlock("failure");
+
+        const targ = new MIRVariable("this");
+
+        const mirbooltype = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
+        const etreg = be.generateTmpRegister();
+        be.emitLoadConstBool(sinfo, true, etreg);
+
+        for (let i = 0; i < callkeys.length; ++i) {
+            be.emitInvokeFixedFunction(this.m_emitter.masm, sinfo, mirbooltype, callkeys[i], [targ], [], etreg);
+
+            const nexttest = be.createNewBlock("next");
+            be.emitBoolJump(sinfo, etreg, nexttest, failblock);
+
+            be.setActiveBlock(nexttest);
+        }
+
+        be.emitReturnAssign(sinfo, undefined, [], etreg);
+        be.emitDirectJump(sinfo, "returnassign");
+
+        be.setActiveBlock("failure");
+        be.emitReturnAssign(sinfo, undefined, [], etreg);
+        be.emitDirectJump(sinfo, "returnassign");
+
+        be.setActiveBlock("returnassign")
+        be.emitDirectJump(sinfo, "exit");
+
+        const mirthistype = this.m_emitter.registerResolvedTypeReference(thistype);
+        const mirbody = be.getBody(this.m_file, sinfo, new Map<string, MIRType>().set("this", mirthistype));
+
+        const mirparams = [new MIRFunctionParameter("this", mirthistype.trkey)];
+        const ibody = new MIRInvokeBodyDecl(mirthistype.trkey, iname, ikey, [], false, [], sinfo, srcFile, mirparams, mirbooltype.trkey, [], [], mirbody as MIRBody);
+
+        this.m_emitter.masm.invokeDecls.set(ikey, ibody);
+    }
+
+    private processGenerateSpecialPreFunction_FailFast(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], binds: Map<string, ResolvedType>, exps: PreConditionDecl[], srcFile: string, sinfo: SourceInfo) {
+        if(this.m_emitter.masm.invokeDecls.has(fkey)) {
+            return;
+        }
+
         try {
-            let bexp = exps[0];
+            let bexp = exps[0].exp;
             for(let i = 1; i < exps.length; ++i) {
-                bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i]);
+                bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i].exp);
             }
 
-            const fp = new FunctionParameter("this", new NominalTypeSignature(tdecl.ns, tdecl.name, tdecl.terms), false, false);
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [fp], undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
+
+            const invinfo = this.processInvokeInfo(undefined, iname, fkey, sinfo, ivk, binds, [], []);
+            this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
+        }
+        catch (ex) {
+            this.m_emitEnabled = false;
+            this.abortIfTooManyErrors();
+        }
+    }
+
+    private processGenerateSpecialPreFunction_ResultT(sinfo: SourceInfo, exps: PreConditionDecl[], body: BodyImplementation): BodyImplementation {
+        if (body.body instanceof Expression) {
+            const ops = exps.map((pc) => {
+                return new CondBranchEntry<Expression>(pc.exp, pc.err as Expression);
+            });
+            const ite = new IfExpression(sinfo, new IfElse<Expression>(ops, body.body as Expression));
+
+            return new BodyImplementation(body.id, body.file, ite);
+        }
+        else {
+            const ops = exps.map((pc) => {
+                return new CondBranchEntry<BlockStatement>(pc.exp, new BlockStatement((pc.err as Expression).sinfo, [new ReturnStatement((pc.err as Expression).sinfo, [pc.err as Expression])]));
+            });
+            const ite = new IfElseStatement(sinfo, new IfElse<BlockStatement>(ops, body.body as BlockStatement));
+
+            return new BodyImplementation(body.id, body.file, new BlockStatement(sinfo, [ite]));
+        }
+    }
+
+    private processGenerateSpecialPostFunction(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], binds: Map<string, ResolvedType>, exps: PostConditionDecl[], srcFile: string, sinfo: SourceInfo) {
+        if(this.m_emitter.masm.invokeDecls.has(fkey)) {
+            return;
+        }
+
+        try {
+            let bexp = exps[0].exp;
+            for(let i = 1; i < exps.length; ++i) {
+                bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i].exp);
+            }
+
+            const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
 
             const invinfo = this.processInvokeInfo(undefined, iname, fkey, sinfo, ivk, binds, [], []);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
@@ -4203,11 +4348,18 @@ class TypeChecker {
             });
 
             if(tdecl.invariants.length !== 0) {
-                const fkey = MIRKeyGenerator.generateStaticKey(tdecl, "@invariant", binds, []);
-                this.processGenerateSpecialInvariantFunction(fkey, `${tkey}::invariant`, tdecl, binds, tdecl.invariants.map((inv) => inv.exp), tdecl.srcFile, tdecl.sourceLocation);
+                const fkey = MIRKeyGenerator.generateStaticKey(tdecl, "@invariant_direct", binds, []);
+                this.processGenerateSpecialInvariantDirectFunction(fkey, `${tkey}::invariant_direct`, tdecl, binds, tdecl.invariants.map((inv) => inv.exp), tdecl.srcFile, tdecl.sourceLocation);
             }
-            const allinvariants = this.m_assembly.getAllInvariantProvidingTypes(tdecl, binds).map((iinfo) => MIRKeyGenerator.generateStaticKey(iinfo[1], "@invariant", iinfo[2], []));
 
+            const allinvariants = this.m_assembly.getAllInvariantProvidingTypes(tdecl, binds).map((iinfo) => MIRKeyGenerator.generateStaticKey(iinfo[1], "@invariant_direct", iinfo[2], []));
+            if(allinvariants.length !== 0 && tdecl instanceof EntityTypeDecl) {
+                const fkey = MIRKeyGenerator.generateStaticKey(tdecl, "@invariant", binds, []);
+                const thistype = ResolvedType.createSingle(ResolvedEntityAtomType.create(tdecl, binds));
+                
+                this.processGenerateSpecialInvariantFunction(tdecl.sourceLocation, tdecl.srcFile, `${tkey}::invariant`, fkey, thistype, allinvariants,);
+            }
+            
             //
             //TODO: we need to check inheritance and provides rules here -- diamonds, virtual/abstract/override use, etc.
             //
@@ -4234,11 +4386,11 @@ class TypeChecker {
             const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
 
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariants, fields);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, icall, fields);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariants, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, icall, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -4289,7 +4441,11 @@ class TypeChecker {
         }
     }
 
-    private processInvokeInfo(enclosingDecl: MIRNominalTypeKey | undefined, iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+    private processInvokeInfo(namespace: string, enclosingDecl: [MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member" | "special",
+        
+        
+        iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+        
         this.checkInvokeDecl(sinfo, invoke, binds, pcodes);
 
         let terms = new Map<string, MIRType>();
@@ -4358,17 +4514,89 @@ class TypeChecker {
 
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, refNames, fargs, cargs, resolvedResult);
 
-        const prescope = MIRKeyGenerator.generateBodyKey("pre", ikey);
-        const preargs = new Map<string, VarInfo>(cargs);
-        const preconds: [MIRBody, boolean][] = invoke.preconditions.filter((pre) => isBuildLevelEnabled(pre.level, this.m_buildLevel)).map<[MIRBody, boolean]>((pre) => {
-            const preenv = TypeEnvironment.createInitialEnvForCall(prescope, binds, [], fargs, preargs, resolvedResult);
-            if(pre.isvalidate) {
-                xxxx;
+        let preject: string | undefined = undefined;
+        let postject: string | undefined = undefined;
+        let realbody = invoke.body;
+        if(kind === "namespace") {
+            this.raiseErrorIf(sinfo, invoke.preconditions.some((pre) => pre.isvalidate) && !invoke.preconditions.some((pre) => pre.isvalidate), "Cannot mix terminal and validate preconditions");
+            this.raiseErrorIf(sinfo, invoke.preconditions.some((pre) => pre.isvalidate) && !invoke.attributes.includes("entrypoint"), "Cannot use validate preconditions on non-entrypoint functions");
+
+            let preconds = invoke.preconditions.filter((pre) => isBuildLevelEnabled(pre.level, this.m_buildLevel));
+            if(preconds.length !== 0) {
+                if (preconds.every((pre) => pre.isvalidate)) {
+                    realbody = this.processGenerateSpecialPreFunction_ResultT(sinfo, preconds, invoke.body as BodyImplementation);
+                }
+                else {
+                    const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@pre`, binds, []);
+                    this.processGenerateSpecialPreFunction_FailFast(fkey, `${iname}@@pre`, invoke.params, binds, preconds, invoke.srcFile, invoke.sourceLocation);
+
+                    preject = fkey;
+                }
             }
-            else {
-                return [this.checkExpressionAsBody(preenv, prescope, pre.exp, this.m_assembly.getSpecialBoolType()), false];
+
+            let postconds = invoke.postconditions.filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
+            if(preconds.length !== 0) {
+                const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
+                const retv = new FunctionParameter("_return_", invoke.resultInfo[0], false, false); //this is wrong for pack functions but yeah
+                this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, invoke.srcFile, invoke.sourceLocation);
+
+                postject = fkey;
             }
-        });
+        }
+        else {
+            xxx;
+            this.raiseErrorIf(sinfo, invoke.preconditions.some((pre) => pre.isvalidate), "Cannot use validate preconditions on non-entrypoint functions");
+
+            let preconds = invoke.preconditions.filter((pre) => isBuildLevelEnabled(pre.level, this.m_buildLevel));
+            if(preconds.length !== 0) {
+                if (preconds.every((pre) => pre.isvalidate)) {
+                    realbody = this.processGenerateSpecialPreFunction_ResultT(sinfo, preconds, invoke.body as BodyImplementation);
+                }
+                else {
+                    const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@pre`, binds, []);
+                    this.processGenerateSpecialPreFunction_FailFast(fkey, `${iname}@@pre`, invoke.params, binds, preconds, invoke.srcFile, invoke.sourceLocation);
+
+                    preject = fkey;
+                }
+            }
+
+            let postconds = invoke.postconditions.filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
+            if(preconds.length !== 0) {
+                const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
+                const retv = new FunctionParameter("_return_", invoke.resultInfo[0], false, false); //this is wrong for pack functions but yeah
+                this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, invoke.srcFile, invoke.sourceLocation);
+
+                postject = fkey;
+            }
+        }
+
+
+
+        let precalls: [MIRInvokeKey, boolean, ResolvedType][] = [];
+        if (kind === "dynamic") {
+            let preconds: [PreConditionDecl[], Map<string, ResolvedType>] = this.m_assembly.getAbstractPreConds(fname, enclosingtype, enclosingbinds, binds) || [invoke.preconditions, binds];
+            preconds = [preconds[0].filter((pre) => isBuildLevelEnabled(pre.level, this.m_buildLevel)), preconds[1]];
+
+            for (let i = 0; i < preconds[0].length; ++i) {
+                const fkey = MIRKeyGenerator.generateFunctionKey(fnamespace, `${ikey}@@pre${i}`, binds, []);
+                const iname = `${fnamespace}::${ikey.name}@@pre`;
+                this.processGenerateSpecialPreFunction(fkey, iname, invoke.params, preconds[1], preconds[0][i], invoke.srcFile, invoke.sourceLocation);
+
+                precalls.push([fkey, preconds[0][i].isvalidate, resolvedResult]);
+            }
+        }
+        else {
+            let preconds: [PreConditionDecl[], Map<string, ResolvedType>] = [invoke.preconditions, binds];
+            preconds = [preconds[0].filter((pre) => isBuildLevelEnabled(pre.level, this.m_buildLevel)), preconds[1]];
+
+            for (let i = 0; i < preconds[0].length; ++i) {
+                const fkey = MIRKeyGenerator.generateFunctionKey(fnamespace, `${ikey}@@pre${i}`, binds, []);
+                const iname = `${fnamespace}::${ikey.name}@@pre`;
+                this.processGenerateSpecialPreFunction(fkey, iname, invoke.params, preconds[1], preconds[0][i], invoke.srcFile, invoke.sourceLocation);
+
+                precalls.push([fkey, preconds[0][i].isvalidate, resolvedResult]);
+            }
+        }
 
         const postscope = MIRKeyGenerator.generateBodyKey("post", ikey);
         const postargs = new Map<string, VarInfo>(cargs).set("_return_", new VarInfo(resolvedResult, true, false, true, resolvedResult));

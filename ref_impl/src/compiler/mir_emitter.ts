@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRLogicStore, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRBodyKey, MIRGetKey, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRBodyKey, MIRGetKey, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl, BuildLevel } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIROOTypeDecl, MIREpemeralListType } from "./mir_assembly";
@@ -94,9 +94,10 @@ class MIRBodyEmitter {
 
         this.m_blockMap = new Map<string, MIRBasicBlock>();
         this.m_blockMap.set("entry", new MIRBasicBlock("entry", []));
+        this.m_blockMap.set("returnassign", new MIRBasicBlock("returnassign", []));
         this.m_blockMap.set("exit", new MIRBasicBlock("exit", []));
 
-        (this.m_blockMap.get("exit") as MIRBasicBlock).ops.push(new MIRVarStore(new SourceInfo(-1, 0, 0, 0), new MIRVariable("__ir_ret__"), new MIRVariable("_return_")));
+        (this.m_blockMap.get("returnassign") as MIRBasicBlock).ops.push(new MIRVarStore(new SourceInfo(-1, 0, 0, 0), new MIRVariable("__ir_ret__"), new MIRVariable("_return_")));
 
         this.m_currentBlock = (this.m_blockMap.get("entry") as MIRBasicBlock).ops;
     }
@@ -166,6 +167,14 @@ class MIRBodyEmitter {
 
     emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, asValue: boolean, args: MIRArgument[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, asValue, tkey, args, trgt));
+    }
+
+    emitInvokeInvariantCheckDirect(sinfo: SourceInfo, ikey: MIRInvokeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
+        xxxx;
+    }
+
+    emitInvokeInvariantCheckVirtualTarget(sinfo: SourceInfo, inferrcvr: MIRResolvedTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
+        xxxx;
     }
 
     emitConstructorPrimaryCollectionEmpty(sinfo: SourceInfo, tkey: MIRNominalTypeKey, trgt: MIRTempRegister) {
@@ -332,10 +341,6 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRTruthyConvert(sinfo, src, trgt));
     }
 
-    emitLogicStore(sinfo: SourceInfo, trgt: MIRTempRegister, lhs: MIRArgument, op: string, rhs: MIRArgument) {
-        this.m_currentBlock.push(new MIRLogicStore(sinfo, lhs, op, rhs, trgt));
-    }
-
     localLifetimeStart(sinfo: SourceInfo, name: string, rtkey: MIRResolvedTypeKey) {
         this.m_currentBlock.push(new MIRVarLifetimeStart(sinfo, name, rtkey));
     }
@@ -392,8 +397,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    getBody(file: string, sinfo: SourceInfo, bkey: MIRBodyKey, args: Map<string, MIRType>): MIRBody {
-        let ibody = new MIRBody(file, sinfo, bkey, this.m_blockMap);
+    getBody(file: string, sinfo: SourceInfo, args: Map<string, MIRType>): MIRBody {
+        let ibody = new MIRBody(file, sinfo, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);

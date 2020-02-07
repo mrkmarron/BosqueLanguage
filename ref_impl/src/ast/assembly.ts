@@ -1323,55 +1323,40 @@ class Assembly {
         }
     }
 
-    getAbstractPreConds(fname: string, ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>): PreConditionDecl[] | undefined {
+    hasInvariants(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>): boolean {
+        return this.getAllInvariantProvidingTypes(ooptype, binds).length !== 0;
+    }
+
+    getAbstractPreConds(fname: string, ooptype: OOPTypeDecl, oobinds: Map<string, ResolvedType>, callbinds: Map<string, ResolvedType>): [PreConditionDecl[], Map<string, ResolvedType>] | undefined {
         for (let i = 0; i < ooptype.provides.length; ++i) {
             const provide = ooptype.provides[i];
-            const tt = this.normalizeTypeOnly(provide, binds);
+            const tt = this.normalizeTypeOnly(provide, oobinds);
             for (let j = 0; j < (tt.options[0] as ResolvedConceptAtomType).conceptTypes.length; ++j) {
                 const concept = (tt.options[0] as ResolvedConceptAtomType).conceptTypes[j];
-                const pc = this.getAbstractPreConds(fname, concept.concept, concept.binds);
+                const pc = this.getAbstractPreConds(fname, concept.concept, concept.binds, callbinds);
                 if (pc !== undefined) {
                     return pc;
                 }
             }
         }
 
-        if(ooptype.memberMethods.has(fname) && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("abstract") && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions.length !== 0) {
-            return (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions;
+        if (ooptype.memberMethods.has(fname) && !(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("override")) {
+            let newbinds = new Map<string, ResolvedType>();
+            oobinds.forEach((v, k) => newbinds.set(k, v));
+            (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
+
+            return [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions, newbinds];
         }
 
-        if (ooptype.staticFunctions.has(fname) && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("abstract") && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions.length !== 0) {
-            (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions;
+        if (ooptype.staticFunctions.has(fname) && !(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("override")) {
+            let newbinds = new Map<string, ResolvedType>();
+            oobinds.forEach((v, k) => newbinds.set(k, v));
+            (ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
+
+            return [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds];
         }
 
         return undefined;
-    }
-
-    getConcreteAndAbstractPostCondProvidingTypes(fname: string, ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, postconds?: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][]): [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] {
-        let declpostconds: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] = [...(postconds || [])];
-
-        ooptype.provides.forEach((provide) => {
-            const tt = this.normalizeTypeOnly(provide, binds);
-            (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
-                declpostconds = this.getConcreteAndAbstractPostCondProvidingTypes(fname, concept.concept, concept.binds, declpostconds);
-            });
-        });
-
-        const ttype = ResolvedType.createSingle(ooptype instanceof EntityTypeDecl ? ResolvedEntityAtomType.create(ooptype, binds) : ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(ooptype as ConceptTypeDecl, binds)]));
-        if(declpostconds.find((dd) => dd[0].idStr === ttype.idStr)) {
-            return declpostconds;
-        }
-        else {
-            if(ooptype.memberMethods.has(fname) && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("abstract") && (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.postconditions.length !== 0) {
-                declpostconds.push([ttype, ooptype, binds])
-            }
-            
-            if(ooptype.staticFunctions.has(fname) && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("abstract") && (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.postconditions.length !== 0) {
-                declpostconds.push([ttype, ooptype, binds])
-            }
-
-            return declpostconds;
-        }
     }
 
     private tryGetOOMemberDeclThis(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, kind: "const" | "static" | "field" | "method", search: string): OOMemberLookupInfo | undefined {
