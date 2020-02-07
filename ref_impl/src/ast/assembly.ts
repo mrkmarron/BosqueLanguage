@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType } from "./resolved_type";
-import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature } from "./type_signature";
+import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
 
@@ -111,7 +111,7 @@ class InvokeDecl {
     readonly optRestName: string | undefined;
     readonly optRestType: TypeSignature | undefined;
 
-    readonly resultInfo: TypeSignature[];
+    readonly resultType: TypeSignature;
 
     readonly preconditions: PreConditionDecl[];
     readonly postconditions: PostConditionDecl[];
@@ -120,7 +120,7 @@ class InvokeDecl {
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
@@ -135,7 +135,7 @@ class InvokeDecl {
         this.optRestName = optRestName;
         this.optRestType = optRestType;
 
-        this.resultInfo = resultInfo;
+        this.resultType = resultType;
 
         this.preconditions = preconds;
         this.postconditions = postconds;
@@ -146,18 +146,18 @@ class InvokeDecl {
     }
 
     generateSig(): TypeSignature {
-        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultInfo);
+        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultType);
     }
 
-    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], captureSet: Set<string>, body: BodyImplementation) {
+    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, captureSet: Set<string>, body: BodyImplementation) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], undefined, params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
     }
 
-    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createStaticInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 
-    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature[], preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+    static createMemberInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
         return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 }
@@ -817,6 +817,15 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedRecordAtomType.create(entries));
     }
 
+    private normalizeType_EphemeralList(t: EphemeralListTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+        const entries = t.entries.map((entry) => this.normalizeTypeOnly(entry, binds));
+        if (entries.some((e) => e.isEmptyType())) {
+            return ResolvedType.createEmpty();
+        }
+
+        return ResolvedType.createSingle(ResolvedEphemeralListType.create(entries));
+    }
+
     private normalizeType_Projection(t: ProjectTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         const fromt = this.normalizeTypeOnly(t.fromtype, binds);
         const oft = this.normalizeTypeOnly(t.oftype, binds);
@@ -953,13 +962,12 @@ class Assembly {
     private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedFunctionType | undefined {
         const params = t.params.map((param) => new ResolvedFunctionTypeParam(param.name, this.normalizeTypeGeneral(param.type, binds), param.isOptional, param.isRef));
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeTypeOnly(t.optRestParamType, binds) : undefined;
-        const resInfo = t.resultInfo.map((ri) => this.normalizeTypeOnly(ri, binds));
+        const rtype = this.normalizeTypeOnly(t.resultType, binds);
 
-        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || resInfo.some((ri) => ri.isEmptyType())) {
+        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || rtype.isEmptyType()) {
             return undefined;
         }
 
-        const rtype = resInfo.length === 1 ? resInfo[0] : ResolvedType.createSingle(ResolvedEphemeralListType.create(resInfo.map((ri) => ri)));
         return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
     }
 
@@ -1327,13 +1335,13 @@ class Assembly {
         return this.getAllInvariantProvidingTypes(ooptype, binds).length !== 0;
     }
 
-    getAbstractPreConds(fname: string, ooptype: OOPTypeDecl, oobinds: Map<string, ResolvedType>, callbinds: Map<string, ResolvedType>): [PreConditionDecl[], Map<string, ResolvedType>] | undefined {
+    getAbstractPrePostConds(fname: string, ooptype: OOPTypeDecl, oobinds: Map<string, ResolvedType>, callbinds: Map<string, ResolvedType>): {pre: [PreConditionDecl[], Map<string, ResolvedType>], post: [PostConditionDecl[], Map<string, ResolvedType>] } | undefined {
         for (let i = 0; i < ooptype.provides.length; ++i) {
             const provide = ooptype.provides[i];
             const tt = this.normalizeTypeOnly(provide, oobinds);
             for (let j = 0; j < (tt.options[0] as ResolvedConceptAtomType).conceptTypes.length; ++j) {
                 const concept = (tt.options[0] as ResolvedConceptAtomType).conceptTypes[j];
-                const pc = this.getAbstractPreConds(fname, concept.concept, concept.binds, callbinds);
+                const pc = this.getAbstractPrePostConds(fname, concept.concept, concept.binds, callbinds);
                 if (pc !== undefined) {
                     return pc;
                 }
@@ -1345,7 +1353,7 @@ class Assembly {
             oobinds.forEach((v, k) => newbinds.set(k, v));
             (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
 
-            return [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions, newbinds];
+            return {pre: [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions, newbinds], post: [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.postconditions, newbinds]};
         }
 
         if (ooptype.staticFunctions.has(fname) && !(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("override")) {
@@ -1353,7 +1361,7 @@ class Assembly {
             oobinds.forEach((v, k) => newbinds.set(k, v));
             (ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
 
-            return [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds];
+            return {pre: [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds], post: [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.postconditions, newbinds]};
         }
 
         return undefined;
@@ -1525,6 +1533,9 @@ class Assembly {
         }
         else if (t instanceof RecordTypeSignature) {
             return this.normalizeType_Record(t, binds);
+        }
+        else if (t instanceof EphemeralListTypeSignature) {
+            return this.normalizeType_EphemeralList(t, binds);
         }
         else if(t instanceof ProjectTypeSignature) {
             return this.normalizeType_Projection(t, binds);

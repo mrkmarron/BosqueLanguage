@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
-import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature } from "./type_signature";
+import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
 import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
 
@@ -687,7 +687,7 @@ class Parser {
 
         let restName: string | undefined = undefined;
         let restType: TypeSignature | undefined = undefined;
-        let resultInfo = [this.m_penv.SpecialAutoSignature];
+        let resultInfo = this.m_penv.SpecialAutoSignature;
 
         const params = this.parseListOf<[string, TypeSignature, boolean, boolean, boolean]>("(", ")", ",", () => {
             const isrest = this.testAndConsumeTokenIf("...");
@@ -732,9 +732,8 @@ class Parser {
             this.raiseError(line, "Cannot have optional and rest parameters in a function");
         }
 
-
         if (this.testAndConsumeTokenIf(":")) {
-            resultInfo = this.parseEphemeralListTypeSignature();
+            resultInfo = this.parseEphemeralListTypeSignature(!ispcode);
         }
         else {
             if (!ispcode) {
@@ -785,19 +784,25 @@ class Parser {
     ////
     //Type parsing
 
-    private parseEphemeralListTypeSignature(): TypeSignature[] {
-        if (this.testAndConsumeTokenIf("(|")) {
+    private parseEphemeralListTypeSignature(parensreq: boolean): TypeSignature {
+        const parens = this.testAndConsumeTokenIf("(|");
+        if (parens || !parensreq) {
             const decls = this.parseEphemeralListOf(() => {
                 const tdecl = this.parseTypeSignature();
                 return tdecl;
             });
-            this.ensureAndConsumeToken("|)");
 
-            return decls;
+            if (!parens) {
+                return decls.length === 1 ? decls[0] : new EphemeralListTypeSignature(decls);
+            }
+            else {
+                this.ensureAndConsumeToken("|)");
+                return new EphemeralListTypeSignature(decls);
+            }
         }
         else {
             const tdecl = this.parseTypeSignature();
-            return [tdecl];
+            return tdecl;
         }
     }
 
@@ -1028,7 +1033,7 @@ class Parser {
             }
 
             this.ensureAndConsumeToken("->");
-            const resultInfo = this.parseEphemeralListTypeSignature();
+            const resultInfo = this.parseEphemeralListTypeSignature(false);
 
             this.clearRecover();
             return new FunctionTypeSignature(recursive, fparams, restName, restType, resultInfo);
@@ -1236,8 +1241,8 @@ class Parser {
 
         this.ensureAndConsumeToken("fn");
         const sig = this.parseInvokableCommon(true, false, false, [], isrecursive ? "yes" : "no", [], [], undefined);
-        const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || (sig.resultInfo.length === 1 && sig.resultInfo[0] instanceof AutoTypeSignature);
-        const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && (sig.resultInfo.length === 1 && sig.resultInfo[0] instanceof AutoTypeSignature);
+        const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || (sig.resultType instanceof AutoTypeSignature);
+        const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && (sig.resultType instanceof AutoTypeSignature);
         if (someAuto && !allAuto) {
             this.raiseError(line, "Cannot have mixed of auto propagated and explicit types on lambda arguments/return");
         }

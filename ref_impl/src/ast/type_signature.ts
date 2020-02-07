@@ -52,6 +52,15 @@ class RecordTypeSignature extends TypeSignature {
     }
 }
 
+class EphemeralListTypeSignature extends TypeSignature {
+    readonly entries: TypeSignature[];
+
+    constructor(entries: TypeSignature[]) {
+        super();
+        this.entries = entries;
+    }
+}
+
 class FunctionParameter {
     readonly name: string;
     readonly type: TypeSignature;
@@ -71,15 +80,15 @@ class FunctionTypeSignature extends TypeSignature {
     readonly params: FunctionParameter[];
     readonly optRestParamName: string | undefined;
     readonly optRestParamType: TypeSignature | undefined;
-    readonly resultInfo: TypeSignature[];
+    readonly resultType: TypeSignature;
 
-    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, resultInfo: TypeSignature[]) {
+    constructor(recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestParamName: string | undefined, optRestParamType: TypeSignature | undefined, resultType: TypeSignature) {
         super();
         this.recursive = recursive;
         this.params = params;
         this.optRestParamName = optRestParamName;
         this.optRestParamType = optRestParamType;
-        this.resultInfo = resultInfo;
+        this.resultType = resultType;
     }
 }
 
@@ -115,6 +124,6 @@ class UnionTypeSignature extends TypeSignature {
 export { 
     TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, 
     TemplateTypeSignature, NominalTypeSignature, 
-    TupleTypeSignature, RecordTypeSignature, 
+    TupleTypeSignature, RecordTypeSignature, EphemeralListTypeSignature,
     FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, IntersectionTypeSignature, UnionTypeSignature
 };
