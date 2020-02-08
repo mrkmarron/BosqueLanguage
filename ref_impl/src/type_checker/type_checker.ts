@@ -907,7 +907,7 @@ class TypeChecker {
 
                     if(this.m_emitEnabled) {
                         const entrykey = this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(entrytype));
-                        this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, entrykey.trkey, true, [arg[2], arg[4] as MIRTempRegister], mereg);
+                        this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, entrykey.trkey, false, [arg[2], arg[4] as MIRTempRegister], mereg);
                     }
 
                     arg[0] = ResolvedType.createSingle(entrytype);

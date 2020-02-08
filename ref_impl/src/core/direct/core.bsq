@@ -220,7 +220,7 @@ entity MapEntry<K where Indexable, V> provides Some {
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T, E> provides Some, provides Some {
+concept Result<T, E> provides Some {
     static ok(result: T): Result<T, E> {
         return Ok<T, E>::create(result);
     }

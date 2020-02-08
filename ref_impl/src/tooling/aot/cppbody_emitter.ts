@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
@@ -640,7 +640,8 @@ class CPPBodyEmitter {
     }
 
     generateMIRLoadFromEpehmeralList(op: MIRLoadFromEpehmeralList): string {
-        xxxx;
+        //should never need to coearce op
+        return `${this.varToCppName(op.trgt)} = ${this.varToCppName(op.arg)}.entry_${op.idx};`;
     }
 
     generateMIRInvokeFixedFunction(ivop: MIRInvokeFixedFunction): string {
@@ -1060,11 +1061,40 @@ class CPPBodyEmitter {
         }
     }
 
+    generateMIRPackStore(op: MIRPackStore): string {
+        if (Array.isArray(op.src)) {
+            let ops: string[] = [];
+            for(let i = 0; i < op.src.length; ++i) {
+                ops.push(`${this.varToCppName(op.names[i])} = ${this.argToCpp(op.src[i], this.getArgType(op.names[i]))}`);
+            }
+
+            return ops.join(", ") + ";";
+        }
+        else {
+            const tlist = (this.getArgType(op.src).options[0] as MIREpemeralListType).entries;
+
+            let ops: string[] = [];
+            for(let i = 0; i < tlist.length; ++i) {
+                ops.push(`${this.varToCppName(op.names[i])} = ${this.varToCppName(op.src)}.entry_${i}`);
+            }
+
+            return ops.join(", ") + ";";
+        }
+    }
+
     generateStmt(op: MIROp): string | undefined {
         switch (op.tag) {
             case MIROpTag.MIRLoadConst: {
                 const lcv = op as MIRLoadConst;
                 return `${this.varToCppName(lcv.trgt)} = ${this.generateConstantExp(lcv.src, this.getArgType(lcv.trgt))};`;
+            }
+            case MIROpTag.MIRLoadConstRegex: {
+                const lcr = op as MIRLoadConstRegex;
+                const scopevar = this.varNameToCppName("$scope$");
+                return `${this.varToCppName(lcr.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, BSQRegex, ${lcr.restr});`;
+            }
+            case MIROpTag.MIRLoadConstValidatedString: {
+                return this.generateLoadConstValidatedString(op as MIRLoadConstValidatedString);
             }
             case MIROpTag.MIRLoadConstTypedString:  {
                 return this.generateLoadConstTypedString(op as MIRLoadConstTypedString);
@@ -1084,6 +1114,13 @@ class CPPBodyEmitter {
             case MIROpTag.MIRAccessLocalVariable: {
                 const llv = op as MIRAccessLocalVariable;
                 return `${this.varToCppName(llv.trgt)} = ${this.argToCpp(llv.name, this.getArgType(llv.trgt))};`;
+            }
+            case MIROpTag.MIRInvokeInvariantCheckDirect: {
+                const icd = op as MIRInvokeInvariantCheckDirect;
+                return this.generateMIRInvokeInvariantCheckDirect(icd);
+            }
+            case MIROpTag.MIRInvokeInvariantCheckVirtualTarget: {
+                return NOT_IMPLEMENTED<string>("MIRInvokeInvariantCheckVirtualTarget");
             }
             case MIROpTag.MIRConstructorPrimary: {
                 const cp = op as MIRConstructorPrimary;
@@ -1109,8 +1146,9 @@ class CPPBodyEmitter {
             case MIROpTag.MIRConstructorRecord: {
                return this.generateMIRConstructorRecord(op as MIRConstructorRecord);
             }
-            case MIROpTag.MIRConstructorEphemeralValueList:
+            case MIROpTag.MIRConstructorEphemeralValueList: {
                 return this.generateMIRConstructorEphemeralValueList(op as MIRConstructorEphemeralValueList);
+            }
             case MIROpTag.MIRAccessFromIndex: {
                 const ai = op as MIRAccessFromIndex;
                 return `${this.varToCppName(ai.trgt)} = ${this.generateMIRAccessFromIndexExpression(ai.arg, ai.idx, this.typegen.getMIRType(ai.resultAccessType))};`;
@@ -1142,7 +1180,7 @@ class CPPBodyEmitter {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromTypeRecord");
             }
             case MIROpTag.MIRProjectFromTypeNominal: {
-                return NOT_IMPLEMENTED<string>("MIRProjectFromTypeConcept");
+                return NOT_IMPLEMENTED<string>("MIRProjectFromTypeNominal");
             }
             case MIROpTag.MIRModifyWithIndecies: {
                 const mi = op as MIRModifyWithIndecies;
@@ -1168,6 +1206,10 @@ class CPPBodyEmitter {
                 const so = op as MIRStructuredExtendObject;
                 return this.generateMIRStructuredExtendObject(so);
             }
+            case MIROpTag.MIRLoadFromEpehmeralList: {
+                const le = op as MIRLoadFromEpehmeralList;
+                return this.generateMIRLoadFromEpehmeralList(le);
+            }
             case MIROpTag.MIRInvokeFixedFunction: {
                 const invk = op as MIRInvokeFixedFunction;
                 return this.generateMIRInvokeFixedFunction(invk);
@@ -1183,6 +1225,7 @@ class CPPBodyEmitter {
                 }
                 else {
                     if (pfx.op === "-") {
+                        xxxx;
                         return `${this.varToCppName(pfx.trgt)} = (${this.argToCpp(pfx.arg, this.typegen.intType)}).negate();`;
                     }
                     else {
@@ -1193,6 +1236,7 @@ class CPPBodyEmitter {
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
                 if (bop.op === "+" || bop.op === "-" || bop.op === "*") {
+                    xxxx;
                     return `${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
                 }
                 else if (bop.op === "/") {
@@ -1231,8 +1275,9 @@ class CPPBodyEmitter {
                 const top = op as MIRIsTypeOf;
                 const oftype = this.typegen.getMIRType(top.oftype);
                 const argtype = this.getArgType(top.arg);
+                const infertype = this.typegen.getMIRType(top.argInferType);
 
-                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, argtype), argtype, oftype)};`;
+                return `${this.varToCppName(top.trgt)} = ${this.generateTypeCheck(this.argToCpp(top.arg, argtype), argtype, infertype, oftype)};`;
             }
             case MIROpTag.MIRRegAssign: {
                 const regop = op as MIRRegAssign;
@@ -1245,6 +1290,10 @@ class CPPBodyEmitter {
             case MIROpTag.MIRVarStore: {
                 const vsop = op as MIRVarStore;
                 return `${this.varToCppName(vsop.name)} = ${this.argToCpp(vsop.src, this.getArgType(vsop.name))};`;
+            }
+            case MIROpTag.MIRPackStore: {
+                const vps = op as MIRPackStore;
+                return this.generateMIRPackStore(vps);
             }
             case MIROpTag.MIRReturnAssign: {
                 const raop = op as MIRReturnAssign;
@@ -1317,7 +1366,7 @@ class CPPBodyEmitter {
             ++blocki;
         }
 
-        if (block.label === xxx) {
+        if (block.label === "exit") {
             if (this.typegen.maybeRefableCountableType(this.currentRType)) {
                 if(this.typegen.isTupleType(this.currentRType)) {
                     const procs: string[] = [];

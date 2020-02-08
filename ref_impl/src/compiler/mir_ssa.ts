@@ -236,7 +236,7 @@ function assignSSA(op: MIROp, remap: Map<string, MIRRegisterArgument>, ctrs: Map
         }
         case MIROpTag.MIRLoadFromEpehmeralList: {
             const el = op as MIRLoadFromEpehmeralList;
-            el.arg = processSSA_Use(el.arg, remap);
+            el.arg = processSSA_Use(el.arg, remap) as MIRRegisterArgument;
             processValueOpTempSSA(el, remap, ctrs);
             break;
         }
