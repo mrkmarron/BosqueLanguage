@@ -204,13 +204,14 @@ class CPPBodyEmitter {
         }
         const strval = `Runtime::${this.allConstStrings.get(op.ivalue) as string}`;
 
+        const scopevar = this.varNameToCppName("$scope$");
+
         let opstrs: string[] = [];
         if(op.pfunckey !== undefined) {
-            const chkexp = `${this.invokenameToCPP(op.pfunckey)}(${strval})`;
+            const chkexp = `${this.invokenameToCPP(op.pfunckey)}(${strval}, ${scopevar})`;
             opstrs.push(`if(!${chkexp}.success) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
         }
 
-        const scopevar = this.varNameToCppName("$scope$");
         opstrs.push(`${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`);
 
         return opstrs.join(" ");
@@ -218,12 +219,14 @@ class CPPBodyEmitter {
 
     generateAccessConstantValue(cp: MIRAccessConstantValue): string {
         const cdecl = this.assembly.constantDecls.get(cp.ckey) as MIRConstantDecl;
-        return `${this.varToCppName(cp.trgt)} = ${this.invokenameToCPP(cdecl.value)}();`;
+        const scopevar = this.typegen.getRefCountableStatus(this.typegen.getMIRType(cdecl.declaredType)) !== "no" ? this.varNameToCppName("$scope$") : "";
+        return `${this.varToCppName(cp.trgt)} = ${this.invokenameToCPP(cdecl.value)}(${scopevar});`;
     }
 
     generateLoadFieldDefaultValue(ld: MIRLoadFieldDefaultValue): string {
         const fdecl = this.assembly.fieldDecls.get(ld.fkey) as MIRFieldDecl;
-        return `${this.varToCppName(ld.trgt)} = ${this.invokenameToCPP(fdecl.value as MIRInvokeKey)}();`;
+        const scopevar = this.typegen.getRefCountableStatus(this.typegen.getMIRType(fdecl.declaredType)) !== "no" ? this.varNameToCppName("$scope$") : "";
+        return `${this.varToCppName(ld.trgt)} = ${this.invokenameToCPP(fdecl.value as MIRInvokeKey)}(${scopevar});`;
     }
 
     generateMIRInvokeInvariantCheckDirect(ivop: MIRInvokeInvariantCheckDirect): string {
@@ -653,7 +656,7 @@ class CPPBodyEmitter {
         }
 
         const rtype = this.typegen.getMIRType(ivop.resultType);
-        if (this.typegen.maybeRefableCountableType(rtype)) {
+        if (this.typegen.getRefCountableStatus(rtype) !== "no") {
             vals.push(this.varNameToCppName("$scope$"));
         }
 
@@ -674,7 +677,19 @@ class CPPBodyEmitter {
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
         if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
-            return `(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
+            const scope = this.typegen.mangleStringForCpp("$scope$");
+            if(op === "<") {
+                return `op_intLess(${scope}, ${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+            }
+            else if(op === "<=") {
+                return `op_intLessEq(${scope}, ${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+            }
+            else if(op === ">") {
+                return `op_intLess(${scope}, ${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
+            }
+            else {
+                return `op_intLessEq(${scope}, ${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
+            }
         }
         else {
             return NOT_IMPLEMENTED<string>("compare string");
@@ -1225,8 +1240,8 @@ class CPPBodyEmitter {
                 }
                 else {
                     if (pfx.op === "-") {
-                        xxxx;
-                        return `${this.varToCppName(pfx.trgt)} = (${this.argToCpp(pfx.arg, this.typegen.intType)}).negate();`;
+                        const scope = this.typegen.mangleStringForCpp("$scope$");
+                        return `${this.varToCppName(pfx.trgt)} = op_intNegate(${scope}, ${this.argToCpp(pfx.arg, this.typegen.intType)});`;
                     }
                     else {
                         return `${this.varToCppName(pfx.trgt)} = ${this.argToCpp(pfx.arg, this.typegen.intType)};`;
@@ -1235,15 +1250,21 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRBinOp: {
                 const bop = op as MIRBinOp;
-                if (bop.op === "+" || bop.op === "-" || bop.op === "*") {
-                    xxxx;
-                    return `${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} ${bop.op} ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                const scope = this.typegen.mangleStringForCpp("$scope$");
+                if (bop.op === "+") {
+                    return `${this.varToCppName(bop.trgt)} = op_intAdd(${scope}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)});`;
+                }
+                if (bop.op === "-") {
+                    return `${this.varToCppName(bop.trgt)} = op_intSub(${scope}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)});`;
+                }
+                if (bop.op === "*") {
+                    return `${this.varToCppName(bop.trgt)} = op_intMult(${scope}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)});`;
                 }
                 else if (bop.op === "/") {
-                    return `if(${this.argToCpp(bop.lhs, this.typegen.intType)}.isZero()) { BSQ_ABORT("Div by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); } ${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} / ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                    return `${this.varToCppName(bop.trgt)} = op_intDiv(${scope}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}); if(${this.varToCppName(bop.trgt)} == nullptr) { BSQ_ABORT("Div by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`;
                 }
                 else {
-                    return `if(${this.argToCpp(bop.lhs, this.typegen.intType)}.isZero()) { BSQ_ABORT("Mod by 0", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); } ${this.varToCppName(bop.trgt)} = ${this.argToCpp(bop.lhs, this.typegen.intType)} % ${this.argToCpp(bop.rhs, this.typegen.intType)};`;
+                    return ` ${this.varToCppName(bop.trgt)} = op_intMod(${scope}, ${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}); if(${this.varToCppName(bop.trgt)} == nullptr) { BSQ_ABORT("Mod by 0 or Negative Mod Values", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`;
                 }
             }
             case MIROpTag.MIRGetKey: {
@@ -1367,45 +1388,24 @@ class CPPBodyEmitter {
         }
 
         if (block.label === "exit") {
-            if (this.typegen.maybeRefableCountableType(this.currentRType)) {
-                if(this.typegen.isTupleType(this.currentRType)) {
-                    const procs: string[] = [];
-                    const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                    for (let i = 0; i < maxlen; ++i) {
-                        const cvn = this.varNameToCppName(`$callerslot$${i}`);
-                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedTupleAccessor(i)});`);
-                    }
-                    gblock.push(procs.join(" "));
-                }
-                else if(this.typegen.isRecordType(this.currentRType)) {
-                    const procs: string[] = [];
-                    const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                    for (let i = 0; i < allprops.length; ++i) {
-                        const cvn = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                        if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, allprops[i])});`);
-                        }
-                        else {
-                            procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(allprops[i])});`);
-                        }
-                    }
-                    gblock.push(procs.join(" "));
-                }
-                else if (this.typegen.isUEntityType(this.currentRType)) {
-                    const cslotvar = this.varNameToCppName("$callerslot$");
-                    if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
-                        gblock.push(`BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`);
-                    }
-                    else {
-                        gblock.push(`BSQRefScopeMgr::processCallReturnFast(${cslotvar}, _return_);`);
-                    }
-                }
-                else {
-                    const cslotvar = this.varNameToCppName("$callerslot$");
-                    gblock.push(`BSQRefScopeMgr::processCallRefAny(${cslotvar}, _return_);`);
-                }
+            const rctype = this.typegen.getRefCountableStatus(this.currentRType);
+            const callerscope = this.varNameToCppName("callerscope");
+            if(rctype === "no") {
+                //nothing needed
             }
-
+            else if (rctype === "int") {
+                gblock.push(`${callerscope}.processReturnChecked(_return_);`);
+            }
+            else if (rctype === "direct") {
+                gblock.push(`${callerscope}.callReturnDirect(_return_);`);
+            }
+            else if (rctype === "checked") {
+                gblock.push(`${callerscope}.processReturnChecked(_return_);`);
+            }
+            else {
+                gblock.push(`_return_.processForCallReturn(${callerscope});`);
+            }
+            
             gblock.push("return _return_;");
         }
 

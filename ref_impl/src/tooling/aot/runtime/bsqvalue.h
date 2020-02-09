@@ -15,6 +15,9 @@
 #define MIN_TAGGED -9007199254740991
 #define MAX_TAGGED 9007199254740991
 
+#define MIN_TAGGED_MULT -2147483648
+#define MAX_TAGGED_MULT  2147483647
+
 #define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
 
@@ -268,12 +271,7 @@ public:
         return U"[NOT IMPLEMENTED]";
     }
 
-    bool isZero() const
-    {
-        return false;
-    }
-
-    BSQBigInt* negate() const
+    static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
     {
         return nullptr;
     }
@@ -288,11 +286,6 @@ public:
         return false;
     }
 
-    static bool neq(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
     static bool lt(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
@@ -303,37 +296,27 @@ public:
         return false;
     }
 
-     static bool gt(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
-    static bool gteq(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
-    static BSQBigInt* add(const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* add(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* sub(const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* sub(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* mult(const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* mult(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* div(const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* div(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* mod(const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* mod(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
@@ -347,7 +330,7 @@ struct EqualFunctor_IntValue
     bool operator()(IntValue l, IntValue r) 
     { 
         if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return l == r;
+            return l == r; //tag doesn't affect equality
         }
         else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
             return BSQ_GET_VALUE_PTR(r, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(l));
@@ -368,6 +351,17 @@ struct DisplayFunctor_IntValue
         return BSQ_IS_VALUE_TAGGED_INT(i) ? conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(i))) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->display();
     }
 };
+
+bool op_intLess(BSQRefScope& scope, IntValue v1, IntValue v2);
+bool op_intLessEq(BSQRefScope& scope, IntValue v1, IntValue v2);
+
+IntValue op_intNegate(BSQRefScope& scope, IntValue v);
+
+IntValue op_intAdd(IntValue v1, IntValue v2);
+IntValue op_intSub(IntValue v1, IntValue v2);
+IntValue op_intMult(IntValue v1, IntValue v2);
+IntValue op_intDiv(IntValue v1, IntValue v2);
+IntValue op_intMod(IntValue v1, IntValue v2);
 
 size_t bsqKeyValueHash(KeyValue v);
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);

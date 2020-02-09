@@ -6,10 +6,163 @@
 #include "bsqvalue.h"
 #include "bsqkeyvalues.h"
 
+#define COERSE_TO_BIG_INT(X) (BSQ_IS_VALUE_TAGGED_INT(X) ? BSQ_GET_VALUE_PTR(X, BSQBigInt) : BSQ_NEW_ADD_SCOPE(scope, BSQBigInt, BSQ_GET_VALUE_TAGGED_INT(X)))
+
 namespace BSQ
 {
 BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}, DATA_KIND_POD_FLAG));
 BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}, DATA_KIND_POD_FLAG));
+
+bool op_intLessSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    return BSQBigInt::lt(COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+}
+
+bool op_intLess(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        return v1 < v2;
+    }
+
+    return op_intLessSlow(scope, v1, v2);
+}
+
+bool op_intLessEqSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    return BSQBigInt::lteq(COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+}
+
+bool op_intLessEq(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        return v1 <= v2;
+    }
+
+    return op_intLessEqSlow(scope, v1, v2);
+}
+
+IntValue op_intNegate(BSQRefScope& scope, IntValue v)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v))
+    {
+        return BSQ_ENCODE_VALUE_TAGGED_INT(-BSQ_GET_VALUE_TAGGED_INT(v));
+    }
+    
+    return BSQBigInt::negate(scope, BSQ_GET_VALUE_PTR(v, BSQBigInt));
+}
+
+IntValue op_intAddSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t res = BSQ_GET_VALUE_TAGGED_INT(v1) + BSQ_GET_VALUE_TAGGED_INT(v2);
+        return BSQ_NEW_ADD_SCOPE(scope, BSQBigInt, res);
+    }
+    else
+    {
+        return BSQBigInt::add(scope, COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+    }
+}
+
+IntValue op_intAdd(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t res = BSQ_GET_VALUE_TAGGED_INT(v1) + BSQ_GET_VALUE_TAGGED_INT(v2);
+        if((MIN_TAGGED <= res) & (res <= MAX_TAGGED))
+        {
+            return BSQ_ENCODE_VALUE_TAGGED_INT(res);
+        }
+    }
+
+    return op_intAddSlow(scope, v1, v2);
+}
+
+IntValue op_intSubSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t res = BSQ_GET_VALUE_TAGGED_INT(v1) - BSQ_GET_VALUE_TAGGED_INT(v2);
+        return BSQ_NEW_ADD_SCOPE(scope, BSQBigInt, res);
+    }
+    else
+    {
+        return BSQBigInt::sub(scope, COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+    }
+}
+
+IntValue op_intSub(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t res = BSQ_GET_VALUE_TAGGED_INT(v1) - BSQ_GET_VALUE_TAGGED_INT(v2);
+        if((MIN_TAGGED <= res) & (res <= MAX_TAGGED))
+        {
+            return BSQ_ENCODE_VALUE_TAGGED_INT(res);
+        }
+    }
+
+    return op_intSubSlow(scope, v1, v2);
+}
+
+IntValue op_intMult(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t tv1 = BSQ_GET_VALUE_TAGGED_INT(v1);
+        int64_t tv2 = BSQ_GET_VALUE_TAGGED_INT(v2);
+        if((MIN_TAGGED_MULT <= tv1) & (tv1 <= MAX_TAGGED_MULT) & (MIN_TAGGED_MULT <= tv2) & (tv2 <= MAX_TAGGED_MULT))
+        {
+            int64_t res = tv1 * tv2;
+            if((MIN_TAGGED <= res) & (res <= MAX_TAGGED))
+            {
+                return BSQ_ENCODE_VALUE_TAGGED_INT(res);
+            }
+        }
+    }
+
+    return BSQBigInt::mult(scope, COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+}
+
+IntValue op_intDiv(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t tv1 = BSQ_GET_VALUE_TAGGED_INT(v1);
+        int64_t tv2 = BSQ_GET_VALUE_TAGGED_INT(v2);
+        if(tv2 == 0)
+        {
+            return nullptr;
+        }
+        else
+        {
+            return BSQ_ENCODE_VALUE_TAGGED_INT(tv1 / tv2);
+        }
+    }
+
+    return BSQBigInt::div(scope, COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+}
+
+IntValue op_intMod(BSQRefScope& scope, IntValue v1, IntValue v2)
+{
+    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        int64_t tv1 = BSQ_GET_VALUE_TAGGED_INT(v1);
+        int64_t tv2 = BSQ_GET_VALUE_TAGGED_INT(v2);
+        if((tv1 < 0) | (tv2 <= 0))
+        {
+            return nullptr;
+        }
+        else
+        {
+            return BSQ_ENCODE_VALUE_TAGGED_INT(tv1 % tv2);
+        }
+    }
+
+    return BSQBigInt::mod(scope, COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
+}
 
 size_t bsqKeyValueHash(KeyValue v)
 {
