@@ -5,12 +5,11 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
 import * as assert from "assert";
-import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -26,7 +25,7 @@ class SMTBodyEmitter {
     private regex_gas = 3;
 
     private errorCodes = new Map<string, number>();
-    private gasLimits = new Map<string, number>().set("default", 4).set("collection", 5).set("string", 10).set("regex", 3);
+    private gasLimits = new Map<string, number>().set("default", this.standard_gas).set("collection", this.collection_gas).set("string",this.string_gas).set("regex", this.regex_gas);
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
@@ -300,7 +299,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
         const cpcetype = this.typegen.getMIRType(cpce.tkey);
-        const smtctype = this.typegen.generateEntityConstructor(cpce.tkey);
+        const smtctype = this.generateSpecialTypeConsName(cpce.tkey);
         
         if(this.typegen.typecheckIsName(cpcetype, /NSCore::List<.*>/)) {
             return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
@@ -315,7 +314,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const smtctype = this.typegen.generateEntityConstructor(cpcs.tkey);
+        const smtctype = this.generateSpecialTypeConsName(cpcs.tkey);
 
         if(this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
@@ -1595,8 +1594,8 @@ class SMTBodyEmitter {
         let argvars = new Map<string, MIRType>();
         idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
 
-        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
-        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.resultType));
+        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.getSMTTypeFor(this.typegen.getMIRType(arg.type))})`);
+        const restype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(idecl.resultType));
         const decl = `(define-fun ${this.invokenameToSMT(idecl.key)}${gas !== undefined ? `@gas${gas}` : ""} (${args.join(" ")}) Result@${restype}`;
 
         if (idecl instanceof MIRInvokeBodyDecl) {
@@ -1608,30 +1607,8 @@ class SMTBodyEmitter {
             const blocks = (idecl as MIRInvokeBodyDecl).body.body;
             const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gasdown);
 
-            if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                return `${decl} \n${body.emit("  ")})`;
-            }
-            else {
-                let cbody = body;
+            return `${decl} \n${body.emit("  ")})`;
 
-                if (idecl.postconditions.length !== 0) {
-                    //
-                    //TODO -- ref parms don't get expanded correctly here -- need to coordinate with def and call here
-                    //
-                    const tbody = this.generateTempName();
-                    const postinvoke = this.invokenameToSMT(MIRKeyGenerator.generateBodyKey("post", idecl.key));
-                    const callpost = new SMTValue(`(${postinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")} (result_success_value@${restype} ${tbody}))`);
-                    cbody = new SMTLet(tbody, new SMTValue(cbody.emit("  ")), new SMTCond(callpost, new SMTValue(tbody), this.generateErrorCreate(idecl.sourceLocation, restype)));
-                }
-
-                if (idecl.preconditions.length !== 0) {
-                    const preinvoke = this.invokenameToSMT(MIRKeyGenerator.generateBodyKey("pre", idecl.key));
-                    const callpre = new SMTValue(idecl.params.length !== 0 ? `(${preinvoke} ${idecl.params.map((arg) => this.varNameToSMTName(arg.name)).join(" ")})` : preinvoke);
-                    cbody = new SMTCond(callpre, cbody, this.generateErrorCreate(idecl.sourceLocation, restype));
-                }
-
-                return `${decl} \n${cbody.emit("  ")})`;
-            }
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
@@ -1641,219 +1618,122 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSMTPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-
-        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
-        const decl = `(define-fun ${this.invokenameToSMT(prekey)} (${args.join(" ")}) Bool`;
-
-        const decls = idecl.preconditions.map((pc, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (pc[0].vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            const blocksi = pc[0].body;
-            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
-            const decli = `(define-fun ${this.invokenameToSMT(prekey)}$${i} (${args.join(" ")}) Result@Bool \n${bodyi.emit("  ")})`;
-            const calli = (`(${this.invokenameToSMT(prekey)}$${i} ${idecl.params.map((p) => this.varNameToSMTName(p.name)).join(" ")})`);
-
-            return [decli, calli];
-        });
-
-        const declsand = decls.map((cc) => {
-            const tv = `@tmpvarda@${this.tmpvarctr++}`;
-            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
-        });
-
-        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody}\n)\n`;
+    generateSpecialTypeConsName(stype: MIRNominalTypeKey): string {
+        return `${this.typegen.mangleStringForSMT(stype)}@@cons`;
     }
 
-    generateSMTPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-        const restype = this.typegen.getMIRType(idecl.resultType);
-
-        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(arg.type))})`);
-        args.push(`(__result__ ${this.typegen.typeToSMTCategory(restype)})`);
-        const decl = `(define-fun ${this.invokenameToSMT(postkey)} (${args.join(" ")}) Bool`;
-
-        const decls = idecl.postconditions.map((pc, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            const blocksi = pc.body;
-            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
-            const decli = `(define-fun ${this.invokenameToSMT(postkey)}$${i} (${args.join(" ")}) Result@Bool \n${bodyi.emit("  ")})`;
-            const calli = (`(${this.invokenameToSMT(postkey)}$${i} ${[idecl.params.map((p) => this.varNameToSMTName(p.name)), "__result__"].join(" ")})`);
-
-            return [decli, calli];
-        });
-
-        const declsand = decls.map((cc) => {
-            const tv = `@tmpvarda@${this.tmpvarctr++}`;
-            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
-        });
-
-        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody})\n`;
+    generateSpecialTypeFieldName(stype: MIRNominalTypeKey, f: string): string {
+        return `${this.typegen.mangleStringForSMT(stype)}@@f`;
     }
 
-    generateSMTInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-
-        const args = `(${this.varNameToSMTName("this")} ${this.typegen.typeToSMTCategory(this.typegen.getMIRType(idecl.tkey))})`;
-        const decl = `(define-fun ${this.invokenameToSMT(invkey)} (${args}) Bool`;
-
-        const decls = idecl.invariants.map((pc, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            const blocksi = pc.body;
-            const bodyi = this.generateBlockExps(blocksi.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocksi, undefined);
-            const decli = `(define-fun ${this.invokenameToSMT(invkey)}$${i} (${args}) Result@Bool \n${bodyi.emit("  ")})`;
-            const calli = (`(${this.invokenameToSMT(invkey)}$${i} ${this.varNameToSMTName("this")})`);
-
-            return [decli, calli];
-        });
-
-        const declsand = decls.map((cc) => {
-            const tv = `@tmpvarda@${this.tmpvarctr++}`;
-            return new SMTLet(tv, new SMTValue(cc[1]), new SMTValue(`(and (is-result_success@Bool ${tv}) (result_success_value@Bool ${tv}))`)).emit();
-        });
-
-        const rbody = declsand.length === 1 ? declsand[0] : `(and ${declsand.join(" ")})`;
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${decl}\n${rbody})\n`;
+    generateSpecialTypeFieldAccess(stype: MIRNominalTypeKey, f: string, arg: string): string {
+        return `(${this.generateSpecialTypeFieldName(stype, f)} ${arg})`;
     }
 
-    generateSMTConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): string | undefined {
-        this.currentFile = cdecl.srcFile;
-        this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
-
-        if (SMTBodyEmitter.expBodyTrivialCheck(cdecl.value as MIRBody)) {
-            return undefined;
-        }
-
-        this.vtypes = new Map<string, MIRType>();
-        (cdecl.value.vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.typegen.getMIRType(tkey));
-        });
-
-        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(cdecl.declaredType));
-        const decl = `(define-fun ${this.invokenameToSMT(constkey)} () Result@${restype}`;
-        const blocks = cdecl.value.body;
-        const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
-        return `${decl} \n${body.emit("  ")})`;
-    }
-
-    generateSMTFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): string | undefined {
-        this.currentFile = fdecl.srcFile;
-        this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
-
-        if (SMTBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
-            return undefined;
-        }
-
-        this.vtypes = new Map<string, MIRType>();
-        ((fdecl.value as MIRBody).vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.typegen.getMIRType(tkey));
-        });
-
-        const restype = this.typegen.typeToSMTCategory(this.typegen.getMIRType(fdecl.declaredType));
-        const decl = `(define-fun ${this.invokenameToSMT(fdkey)} () Result@${restype}`;
-        const blocks = (fdecl.value as MIRBody).body;
-        const body = this.generateBlockExps(blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, undefined);
-        return `${decl} \n${body.emit("  ")})`;
+    generateSpecialTypeFieldAccessExp(stype: MIRNominalTypeKey, f: string, arg: string): SMTExp {
+        return new SMTValue(`(${this.generateSpecialTypeFieldName(stype, f)} ${arg})`);
     }
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): SMTExp {
         const rtype = this.typegen.getMIRType(idecl.resultType);
 
         let bodyres: SMTExp | undefined = undefined;
-        let autowrap = true;
+        const enclkey = (idecl.enclosingDecl || "[NA]") as MIRNominalTypeKey
         switch (idecl.implkey) {
-            case "list_size": {
-                bodyres = new SMTValue(`(bsqlist@size ${params[0]})`);
+            case "list_size":
+            case "set_size":
+            case "map_size": {
+                bodyres = this.generateSpecialTypeFieldAccessExp(enclkey, "size", params[0]);
                 break;
             }
             case "list_unsafe_at": {
-                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqlist@entries ${params[0]}) ${params[1]})`), this.typegen.anyType, rtype);
+                bodyres = new SMTValue(`(select (${this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])}) ${params[1]})`);
                 break;
             }
             case "list_unsafe_add": {
-                const storeval = this.typegen.coerce(new SMTValue(params[1]), this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType).emit();
-                const idx = `(bsqlist@size ${params[0]})`;
-                bodyres = new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) ${idx} ${storeval}))`);
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
+                const csize = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                bodyres = new SMTValue(`(${cons} (+ ${csize} 1) (store ${entries} ${csize} ${params[1]}))`);
                 break;
             }
             case "list_unsafe_set": {
-                const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqlist (bsqlist@size ${params[0]}) (store (bsqlist@entries ${params[0]}) ${params[1]} ${storeval}))`);
-                break;
-            }
-            case "list_destructive_add": {
-                const storeval = this.typegen.coerce(new SMTValue(params[1]), this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqlist (+ (bsqlist@size ${params[0]}) 1) (store (bsqlist@entries ${params[0]}) (bsqlist@size ${params[0]}) ${storeval}))`);
-                break;
-            }
-            case "keylist_cons": {
-                bodyres = new SMTValue(`(cons@bsqkeylist ${params[0]} ${params[1]})`);
-                break;
-            }
-            case "keylist_getkey": {
-                bodyres = new SMTValue(`(bsqkeylist@key ${params[0]})`);
-                break;
-            }
-            case "keylist_gettail": {
-                bodyres = new SMTValue(`(bsqkeylist@tail ${params[0]})`);
-                break;
-            }
-            case "set_size":
-            case "map_size": {
-                bodyres = new SMTValue(`(bsqkvcontainer@size ${params[0]})`);
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
+                const csize = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                bodyres = new SMTValue(`(${cons} ${csize} (store ${entries} ${params[1]} ${params[2]}))`);
                 break;
             }
             case "set_has_key":
             case "map_has_key": {
-                bodyres = new SMTValue(`(not (is-bsqterm@clear (select (bsqkvcontainer@entries ${params[0]}) ${params[1]})))`);
+                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "has", params[0])} ${params[1]})`)
+                break;
+            }
+            case "map_at_key": {
+                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0])} ${params[1]})`)
                 break;
             }
             case "set_at_val":
             case "map_at_val": {
-                bodyres = this.typegen.coerce(new SMTValue(`(select (bsqkvcontainer@entries ${params[0]}) ${params[1]})`), this.typegen.anyType, rtype);
+                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "values", params[0])} ${params[1]})`);
                 break;
             }
             case "set_get_keylist":
             case "map_get_keylist": {
-                bodyres = new SMTValue(`(bsqkvcontainer@keylist ${params[0]})`);
+                bodyres = this.generateSpecialTypeFieldAccessExp(enclkey, "keylist", params[0]);
                 break;
             } 
-            case "set_clear_val": 
+            case "set_clear_val": {
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                bodyres = new SMTValue(`(${cons} (- ${size} 1) (store ${has} ${params[1]} false) ${entries} ${params[2]})`);
+                break;
+            }
             case "map_clear_val": {
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (- (bsqkvcontainer@size ${params[0]}) 1) ${params[2]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} bsqterm@clear))`);
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                bodyres = new SMTValue(`(${cons} (- ${size} 1) (store ${has} ${params[1]} false) ${keys} ${entries} ${params[2]})`);
                 break;
             }
-            case "set_unsafe_update":  
-            case "map_unsafe_update":
-            case "set_destuctive_update":
-            case "map_destuctive_update": {
-                const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (bsqkvcontainer@size ${params[0]}) (bsqkvcontainer@keylist ${params[0]}) (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+            case "set_unsafe_update": {
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const kl = this.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
+                bodyres = new SMTValue(`(${cons} ${size} ${has} (store ${entries} ${params[1]} ${params[2]}) ${kl})`);
                 break;
             }
-            case "set_unsafe_add":  
-            case "map_unsafe_add": 
-            case "set_destuctive_add":
-            case "map_destuctive_add": {
-                const storeval = this.typegen.coerce(new SMTValue(params[2]), this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType).emit();
-                bodyres = new SMTValue(`(cons@bsqkvcontainer (+ (bsqkvcontainer@size ${params[0]}) 1) ${params[3]} (store (bsqkvcontainer@entries ${params[0]}) ${params[1]} ${storeval}))`);
+            case "map_unsafe_update": {
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const kl = this.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
+                bodyres = new SMTValue(`(${cons} ${size} ${has} ${keys} (store ${entries} ${params[1]} ${params[2]}) ${kl})`);
+                break;
+            }
+            case "set_unsafe_add":  {
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                bodyres = new SMTValue(`(${cons} (+ ${size} 1) (store ${has} ${params[1]} true) (store ${entries} ${params[1]} ${params[2]}) ${params[3]})`);
+                break;
+            }
+            case "map_unsafe_add": {
+                const cons = this.generateSpecialTypeConsName(enclkey);
+                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                bodyres = new SMTValue(`(${cons}(+ ${size} 1) (store ${has} ${params[1]} true) (store ${keys} ${params[1]} ${params[2]}) (store ${entries} ${params[1]} ${params[3]}) ${params[4]})`);
                 break;
             }
             default: {
@@ -1862,12 +1742,7 @@ class SMTBodyEmitter {
             }
         }
 
-        if(!autowrap) {
-            return bodyres;
-        }
-        else {
-            return new SMTValue(`(result_success@${this.typegen.typeToSMTCategory(rtype)} ${bodyres.emit()})`)
-        }
+        return new SMTValue(`(result_success@${this.typegen.getSMTTypeFor(rtype)} ${bodyres.emit()})`);
     }
 }
 

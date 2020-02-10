@@ -7,7 +7,6 @@ import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimit
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
-import { MIRKeyGenerator } from "../../compiler/mir_emitter";
 
 import * as assert from "assert";
 
@@ -1389,7 +1388,7 @@ class CPPBodyEmitter {
 
         if (block.label === "exit") {
             const rctype = this.typegen.getRefCountableStatus(this.currentRType);
-            const callerscope = this.varNameToCppName("callerscope");
+            const callerscope = this.varNameToCppName("$callerscope$");
             if(rctype === "no") {
                 //nothing needed
             }
@@ -1414,12 +1413,12 @@ class CPPBodyEmitter {
 
     generateCPPVarDecls(body: MIRBody, params: MIRFunctionParameter[]): string {
         const scopevar = this.varNameToCppName("$scope$");
-        const refscope = "    " + (this.typegen.scopectr !== 0 ? `BSQRefScope<${this.typegen.scopectr}> ${scopevar};` : ";");
+        const refscope = "    " + (this.typegen.scopectr !== 0 ? `BSQRefScope ${scopevar};` : ";");
 
         let vdecls = new Map<string, string[]>();
         (body.vtypes as Map<string, string>).forEach((tkey, name) => {
             if (params.findIndex((p) => p.name === name) === -1) {
-                const declt = this.typegen.typeToCPPType(this.typegen.getMIRType(tkey), "decl");
+                const declt = this.typegen.getCPPTypeFor(this.typegen.getMIRType(tkey), "storage");
                 if (!vdecls.has(declt)) {
                     vdecls.set(declt, [] as string[]);
                 }
@@ -1431,7 +1430,7 @@ class CPPBodyEmitter {
         if (vdecls.has("bool")) {
             vdeclscpp.push(`bool ${(vdecls.get("bool") as string[]).join(", ")};`);
         }
-       [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
+        [...vdecls].sort((a, b) => a[0].localeCompare(b[0])).forEach((kv) => {
             if (kv[0] !== "bool") {
                 vdeclscpp.push(kv[1].map((vname) => `${kv[0]} ${vname}`).join("; ") + ";");
             }
@@ -1445,28 +1444,12 @@ class CPPBodyEmitter {
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.typegen.scopectr = 0;
 
-        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
-        const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.resultType), "return");
+        const args = idecl.params.map((arg) => `${this.typegen.getCPPTypeFor(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
+        const restype = this.typegen.getCPPTypeFor(this.typegen.getMIRType(idecl.resultType), "return");
 
-        if (this.typegen.maybeRefableCountableType(this.typegen.getMIRType(idecl.resultType))) {
-            if (this.typegen.isTupleType(this.currentRType)) {
-                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                for (let i = 0; i < maxlen; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
-                    args.push(`BSQRef** ${cslotvar}`);
-                }
-            }
-            else if (this.typegen.isRecordType(this.currentRType)) {
-                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                for (let i = 0; i < allprops.length; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    args.push(`BSQRef** ${cslotvar}`);
-                }
-            }
-            else {
-                const cslotvar = this.varNameToCppName("$callerslot$");
-                args.push(`BSQRef** ${cslotvar}`);
-            }
+        if (this.typegen.getRefCountableStatus(this.typegen.getMIRType(idecl.resultType)) !== "no") {
+                const cslotvar = this.varNameToCppName("$callerscope$");
+                args.push(`BSQRefScope& ${cslotvar}`);
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;
 
@@ -1483,138 +1466,6 @@ class CPPBodyEmitter {
                 this.generateBlock(blocks[i]);
             }
 
-            if (idecl.preconditions.length === 0 && idecl.postconditions.length === 0) {
-                const blockstrs = [...this.generatedBlocks].map((blck) => {
-                    const lbl = `${this.labelToCpp(blck[0])}:\n`;
-                    const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-
-                    if(lbl.startsWith("entry:")) {
-                        return stmts;
-                    }
-                    else {
-                        return lbl + stmts;
-                    }
-                });
-
-                const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
-
-                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
-            }
-            else {
-                let prestr = ";";
-                const preargs = idecl.params.map((arg) => this.varNameToCppName(arg.name));
-
-                //
-                //TODO -- ref parms don't get expanded correctly here -- need to coordinate with def and call here
-                //
-                let poststr = "   return _return_;";
-                const postargs = [...idecl.params.map((arg) => this.varNameToCppName(arg.name)), "_return_"];
-
-                if (idecl.preconditions.length !== 0) {
-                    const preinvoke = `${this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("pre", idecl.key))}(${preargs.join(", ")})`;
-                    prestr = `    ${preinvoke};`;
-                }
-                
-                if(idecl.postconditions.length !== 0) {
-                    const postinvoke = `${this.invokenameToCPP(MIRKeyGenerator.generateBodyKey("post", idecl.key))}(${postargs.join(", ")})`;
-                    poststr = `    ${postinvoke};\n   return _return_;`;
-                }
-
-                const blockstrs = [...this.generatedBlocks].map((blck) => {
-                    const lbl = `${this.labelToCpp(blck[0])}:\n`;
-                    const stmts = blck[1].map((stmt) => "    " + stmt);
-                    if(blck[0] === xxx) {
-                        stmts[stmts.length - 1] = poststr;
-                    }
-
-                    if(lbl.startsWith("entry:")) {
-                        return stmts.join("\n");
-                    }
-                    else {
-                        return lbl + stmts.join("\n");
-                    }
-                });
-
-                const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
-
-                return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${prestr}\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
-            }
-        }
-        else {
-            assert(idecl instanceof MIRInvokePrimitiveDecl);
-
-            const params = idecl.params.map((arg) => this.varNameToCppName(arg.name));
-            return { fwddecl: decl + ";", fulldecl: `${decl} { ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)} }\n` };
-        }
-    }
-
-    generateCPPPre(prekey: MIRBodyKey, idecl: MIRInvokeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-        this.typegen.scopectr = 0;
-
-        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
-
-        const decls = idecl.preconditions.map((pc, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (pc[0].vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            this.generatedBlocks = new Map<string, string[]>();
-
-            const blocks = topologicalOrder(pc[0].body);
-            for (let i = 0; i < blocks.length; ++i) {
-                this.generateBlock(blocks[i]);
-            }
-
-            const blockstrs = [...this.generatedBlocks].map((blck) => {
-                const lbl = `${this.labelToCpp(blck[0])}:\n`;
-                const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-
-                if(lbl.startsWith("entry:")) {
-                    return stmts;
-                }
-                else {
-                    return lbl + stmts;
-                }
-            });
-
-            const decl = `bool ${this.invokenameToCPP(prekey)}${i}(${args.join(", ")})`;
-            const scopestrs = this.generateCPPVarDecls(pc[0], idecl.params);
-
-            const call = `${this.invokenameToCPP(prekey)}${i}(${idecl.params.map((p) => this.varNameToCppName(p.name)).join(", ")})`;
-
-            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, call];
-        });
-
-        const declroot = `void ${this.invokenameToCPP(prekey)}(${args.join(", ")})`;
-        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Pre-condition Failure: ${idecl.iname}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
-    }
-
-    generateCPPPost(postkey: MIRBodyKey, idecl: MIRInvokeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-        this.typegen.scopectr = 0;
-        const restype = this.typegen.getMIRType(idecl.resultType);
-
-        const args = idecl.params.map((arg) => `${this.typegen.typeToCPPType(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
-        args.push(`${this.typegen.typeToCPPType(restype, "parameter")} __result__`);
-
-        const decls = idecl.postconditions.map((pc, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (pc.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            this.generatedBlocks = new Map<string, string[]>();
-
-            const blocks = topologicalOrder(pc.body);
-            for (let i = 0; i < blocks.length; ++i) {
-                this.generateBlock(blocks[i]);
-            }
-
             const blockstrs = [...this.generatedBlocks].map((blck) => {
                 const lbl = `${this.labelToCpp(blck[0])}:\n`;
                 const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
@@ -1627,273 +1478,56 @@ class CPPBodyEmitter {
                 }
             });
 
-            const decl = `bool ${this.invokenameToCPP(postkey)}${i}(${args.join(", ")})`;
-            const scopestrs = this.generateCPPVarDecls(pc, [...idecl.params, new MIRFunctionParameter("__result__", idecl.resultType)]);
+            const scopestrs = this.generateCPPVarDecls(idecl.body, idecl.params);
 
-            const call = `${this.invokenameToCPP(postkey)}${i}(${[...idecl.params.map((p) => this.varNameToCppName(p.name)), "__result__"].join(", ")})`;
-
-            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, call];
-        });
-
-        const declroot = `void ${this.invokenameToCPP(postkey)}(${args.join(", ")})`;
-        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Post-condition Failure: ${idecl.iname}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
-    }
-
-    generateCPPInv(invkey: MIRBodyKey, idecl: MIREntityTypeDecl): string {
-        this.currentFile = idecl.srcFile;
-        this.currentRType = this.typegen.boolType;
-        this.typegen.scopectr = 0;
-
-        const decls = idecl.invariants.map((ic, i) => {
-            this.vtypes = new Map<string, MIRType>();
-            (ic.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
-
-            this.generatedBlocks = new Map<string, string[]>();
-
-            const blocks = topologicalOrder(ic.body);
-            for (let i = 0; i < blocks.length; ++i) {
-                this.generateBlock(blocks[i]);
-            }
-
-            const blockstrs = [...this.generatedBlocks].map((blck) => {
-                const lbl = `${this.labelToCpp(blck[0])}:\n`;
-                const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-
-                if(lbl.startsWith("entry:")) {
-                    return stmts;
-                }
-                else {
-                    return lbl + stmts;
-                }
-            });
-
-            const decl = `bool ${this.invokenameToCPP(invkey)}${i}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} ${this.varNameToCppName("this")})`;
-            const scopestrs = this.generateCPPVarDecls(idecl.invariants[0], [new MIRFunctionParameter("this", idecl.tkey)]);
-
-            return [`${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n`, `${this.invokenameToCPP(invkey)}${i}(${this.varNameToCppName("this")})`];
-        });
-
-        const declroot = `void ${this.invokenameToCPP(invkey)}(${this.typegen.typeToCPPType(this.typegen.getMIRType(idecl.tkey), "parameter")} ${this.varNameToCppName("this")})`;
-        const declbody = `if(!(${decls.map((cc) => cc[1]).join(" && ")})) { BSQ_ABORT("Invariant Failure: ${idecl.ns}::${idecl.name}", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line}); }`
-        return `${decls.map((cc) => cc[0]).join("\n")}\n\n${declroot}\n{\n    ${declbody}\n}`;
-    }
-
-    generateCPPConst(constkey: MIRBodyKey, cdecl: MIRConstantDecl): { fwddecl: string, fulldecl: string } | undefined {
-        this.currentFile = cdecl.srcFile;
-        this.currentRType = this.typegen.getMIRType(cdecl.declaredType);
-        this.typegen.scopectr = 0;
-
-        if (CPPBodyEmitter.expBodyTrivialCheck(cdecl.value)) {
-            return undefined;
+            return { fwddecl: decl + ";", fulldecl: `${decl}\n{\n${scopestrs}\n\n${blockstrs.join("\n\n")}\n}\n` };
         }
+        else {
+            assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-        const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "decl");
-        const flagname = `_flag_${this.invokenameToCPP(constkey)}`;
-        const memoname = `_memo_${this.invokenameToCPP(constkey)}`;
-        const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
-
-        let rcvars = "";
-        if(this.typegen.maybeRefableCountableType(this.typegen.getMIRType(cdecl.declaredType))) {
-            if (this.typegen.isTupleType(this.currentRType)) {
-                const procs: string[] = [];
-                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                for (let i = 0; i < maxlen; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
-                    procs.push(`BSQRef** ${cslotvar};`);
-                }
-                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join(" ")}`;
-            }
-            else if (this.typegen.isRecordType(this.currentRType)) {
-                const procs: string[] = [];
-                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                for (let i = 0; i < allprops.length; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i};`);
-                }
-                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join(" ")}`;
-            }
-            else {
-                const cslotvar = this.varNameToCppName("$callerslot$");
-                rcvars = `    BSQRef* __CS_DUMMY__ = nullptr; BSQRef** ${cslotvar} = &__CS_DUMMY__;`;
-            }
+            const params = idecl.params.map((arg) => this.varNameToCppName(arg.name));
+            return { fwddecl: decl + ";", fulldecl: `${decl} { ${this.generateBuiltinBody(idecl as MIRInvokePrimitiveDecl, params)} }\n` };
         }
-
-        const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
-        const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(cdecl.declaredType), "return");
-        const decl = `${restype} ${this.invokenameToCPP(constkey)}()`;
-
-        this.vtypes = new Map<string, MIRType>();
-        (cdecl.value.vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
-        });
-
-        this.generatedBlocks = new Map<string, string[]>();
-
-        const blocks = topologicalOrder(cdecl.value.body);
-        for (let i = 0; i < blocks.length; ++i) {
-            this.generateBlock(blocks[i]);
-        }
-
-        const blockstrs = [...this.generatedBlocks].map((blck) => {
-            const lbl = `${this.labelToCpp(blck[0])}:\n`;
-            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-
-            if(lbl.startsWith("entry:")) {
-                return stmts;
-            }
-            else {
-                return lbl + stmts;
-            }
-        });
-
-        const scopestrs = this.generateCPPVarDecls(cdecl.value, []);
-        const jblockstrs = blockstrs.join("\n\n");
-
-        const rstart = jblockstrs.indexOf("return _return_");
-        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
-
-        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n${rcvars}\n\n${nblockstrs}\n}\n` };
-    }
-
-    generateCPPFDefault(fdkey: MIRBodyKey, fdecl: MIRFieldDecl): { fwddecl: string, fulldecl: string } | undefined {
-        this.currentFile = fdecl.srcFile;
-        this.currentRType = this.typegen.getMIRType(fdecl.declaredType);
-        this.typegen.scopectr = 0;
-
-        if (CPPBodyEmitter.expBodyTrivialCheck(fdecl.value as MIRBody)) {
-            return undefined;
-        }
-
-        const fdbody = fdecl.value as MIRBody;
-
-        const decltype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "decl");
-        const flagname = `_flag_${this.invokenameToCPP(fdkey)}`;
-        const memoname = `_memo_${this.invokenameToCPP(fdkey)}`;
-        const gdecl = `bool ${flagname} = false; ${decltype} ${memoname};`;
-        const qcheck = `    if (${flagname}) { return ${memoname}; }`;
-
-        let rcvars = "";
-        if(this.typegen.maybeRefableCountableType(this.typegen.getMIRType(fdecl.declaredType))) {
-            if (this.typegen.isTupleType(this.currentRType)) {
-                const procs: string[] = [];
-                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                for (let i = 0; i < maxlen; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${i}`);
-                    procs.push(`BSQRef** ${cslotvar};`);
-                }
-                rcvars = `    BSQRef* __CS_DUMMY__[${maxlen}] = {nullptr}; ${procs.join(" ")}`;
-            }
-            else if (this.typegen.isRecordType(this.currentRType)) {
-                const procs: string[] = [];
-                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                for (let i = 0; i < allprops.length; ++i) {
-                    const cslotvar = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    procs.push(`BSQRef** ${cslotvar} = __CS_DUMMY__ + ${i};`);
-                }
-                rcvars = `    BSQRef* __CS_DUMMY__[${allprops.length}] = {nullptr}; ${procs.join(" ")}`;
-            }
-            else {
-                const cslotvar = this.varNameToCppName("$callerslot$");
-                rcvars = `    BSQRef* __CS_DUMMY__ = nullptr; BSQRef** ${cslotvar} = &__CS_DUMMY__;`;
-            }
-        }
-
-        const rupdate = `${memoname} = _return_;  ${flagname} = true;`;
-
-        const restype = this.typegen.typeToCPPType(this.typegen.getMIRType(fdecl.declaredType), "return");
-        const decl = `${restype} ${this.invokenameToCPP(fdkey)}()`;
-
-        this.vtypes = new Map<string, MIRType>();
-        (fdbody.vtypes as Map<string, string>).forEach((tkey, name) => {
-            this.vtypes.set(name, this.assembly.typeMap.get(tkey) as MIRType);
-        });
-
-        this.generatedBlocks = new Map<string, string[]>();
-
-        const blocks = topologicalOrder(fdbody.body);
-        for (let i = 0; i < blocks.length; ++i) {
-            this.generateBlock(blocks[i]);
-        }
-
-        const blockstrs = [...this.generatedBlocks].map((blck) => {
-            const lbl = `${this.labelToCpp(blck[0])}:\n`;
-            const stmts = blck[1].map((stmt) => "    " + stmt).join("\n");
-
-            if(lbl.startsWith("entry:")) {
-                return stmts;
-            }
-            else {
-                return lbl + stmts;
-            }
-        });
-
-        const scopestrs = this.generateCPPVarDecls(fdbody, []);
-        const jblockstrs = blockstrs.join("\n\n");
-
-        const rstart = jblockstrs.indexOf("return _return_;");
-        const nblockstrs = jblockstrs.slice(0, rstart) + rupdate + "\n    " + jblockstrs.slice(rstart);
-
-        return { fwddecl: decl + ";", fulldecl: `${gdecl}\n${decl}\n{\n${scopestrs}\n\n${qcheck}\n${rcvars}\n\n${nblockstrs}\n}\n` };
     }
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
-        const rtype = this.typegen.getMIRType(idecl.resultType);
         const scopevar = this.varNameToCppName("$scope$");
 
         let bodystr = ";";
         switch (idecl.implkey) {
-            case "list_size": {
-                bodystr = `auto _return_ = ${params[0]}->entries.size();`
-                break;
-            }
-            case "list_unsafe_at": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`${params[0]}->entries[${params[1]}.getInt64()]`, this.typegen.anyType, rtype) + ";";
-                break;
-            }
-            case "list_unsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
-                break;
-            }
-            case "list_unsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)});`
-                break;
-            }
-            case "list_destructive_add": {
-                bodystr = `auto _return_ = ${params[0]}->destructiveAdd(${this.typegen.coerce(params[1], this.typegen.getMIRType(idecl.params[1].type), this.typegen.anyType)});`
-                break;
-            }
-            case "keylist_cons": {
-                const tag = `MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(rtype.trkey)}`;
-                const klparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[0].type), params[0]);
-                const vparam = this.typegen.generateConstructorArgInc(this.typegen.getMIRType(idecl.params[1].type), params[1]);
-                bodystr = `auto _return_ = ${scopevar}.addAllocRef<${this.typegen.scopectr++}, BSQKeyList>(new BSQKeyList(${tag}, ${klparam}, ${vparam}));`
-                break;
-            }
-            case "keylist_getkey": {
-                bodystr = `auto _return_ = ${params[0]}->key;`
-                break;
-            }
-            case "keylist_gettail": {
-                bodystr = `auto _return_ = ${params[0]}->tail;`
-                break;
-            }
+            case "list_size":
             case "set_size":
             case "map_size": {
                 bodystr = `auto _return_ = ${params[0]}->entries.size();`
                 break;
             }
-            case "set_has_key":
-            case "map_has_key": {
-                bodystr = "auto _return_ = " + `${params[0]}->entries.find(${params[1]}) != ${params[0]}->entries.cend()` + ";";
+            case "list_unsafe_at": {
+                bodystr = `auto _return_ = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT${params[1]}];`;
                 break;
             }
-            case "set_at_val":
+            case "list_unsafe_add": {
+                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${scopevar}, ${params[1]});`
+                break;
+            }
+            case "list_unsafe_set": {
+                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${scopevar}, ${params[1]}, ${params[2]});`
+                break;
+            }
+            case "set_has_key":
+            case "map_has_key": {
+                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}) != ${params[0]}->entries.cend();`;
+                break;
+            }
+            case "map_at_key": {
+                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second.first;`;
+                break;
+            }
+            case "set_at_val": {
+                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second;`;
+                break;
+            }
             case "map_at_val": {
-                bodystr = "auto _return_ = " + this.typegen.coerce(`(${params[0]}->entries.find(${params[1]}))->second`, this.typegen.anyType, rtype) + ";";
+                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second.second;`;
                 break;
             }
             case "set_get_keylist":
@@ -1903,27 +1537,23 @@ class CPPBodyEmitter {
             }
             case "set_clear_val": 
             case "map_clear_val": {
-                bodystr = "auto _return_ = " + `${params[0]}->clearKey(${params[1]}, ${params[2]})` + ";";
+                bodystr = "auto _return_ = " + `${params[0]}->clearKey(${params[1]}, ${params[2]}, ${scopevar});`;
                 break;
             }
-            case "set_unsafe_update":  
+            case "set_unsafe_update": {
+                bodystr = `auto _return_ = ${params[0]}->update(${params[1]}, ${params[2]}, ${scopevar});`;
+                break;
+            }
             case "map_unsafe_update": {
-                bodystr = "auto _return_ = " + `${params[0]}->update(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)})` + ";";
+                bodystr = `auto _return_ = ${params[0]}->update(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
                 break;
             }
-            case "set_destuctive_update":
-            case "map_destuctive_update": {
-                bodystr = "auto _return_ = " + `${params[0]}->destructiveUpdate(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)})` + ";";
+            case "set_unsafe_add": {
+                bodystr = `auto _return_ = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
                 break;
             }
-            case "set_unsafe_add":  
             case "map_unsafe_add": {
-                bodystr = "auto _return_ = " + `${params[0]}->add(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${params[3]})` + ";";
-                break;
-            }
-            case "set_destuctive_add":
-            case "map_destuctive_add": {
-                bodystr = "auto _return_ = " + `${params[0]}->destructiveAdd(${params[1]}, ${this.typegen.coerce(params[2], this.typegen.getMIRType(idecl.params[2].type), this.typegen.anyType)}, ${params[3]})` + ";";
+                bodystr = `auto _return_ = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${params[4]}, ${scopevar});`;
                 break;
             }
             default: {
@@ -1932,44 +1562,25 @@ class CPPBodyEmitter {
             }
         }
 
-        const refscope = (this.typegen.scopectr !== 0 ? `BSQRefScope<${this.typegen.scopectr}> ${scopevar};` : ";");
+        const refscope = `BSQRefScope ${scopevar};`;
         let returnmgr = "";
-        if (this.typegen.maybeRefableCountableType(this.currentRType)) {
-            if (this.typegen.isTupleType(this.currentRType)) {
-                const procs: string[] = [];
-                const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(this.currentRType);
-                for (let i = 0; i < maxlen; ++i) {
-                    const cvn = this.varNameToCppName(`$callerslot$${i}`);
-                    procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedTupleAccessor(i)});`);
-                }
-                returnmgr = procs.join(" ");
+        if (this.typegen.getRefCountableStatus(this.currentRType) !== "no") {
+            const rctype = this.typegen.getRefCountableStatus(this.currentRType);
+            const callerscope = this.varNameToCppName("$callerscope$");
+            if(rctype === "no") {
+                //nothing needed
             }
-            else if (this.typegen.isRecordType(this.currentRType)) {
-                const procs: string[] = [];
-                const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(this.currentRType);
-                for (let i = 0; i < allprops.length; ++i) {
-                    const cvn = this.varNameToCppName(`$callerslot$${allprops[i]}`);
-                    if (this.typegen.isKnownLayoutRecordType(this.currentRType)) {
-                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateKnownRecordAccessor(this.currentRType, allprops[i])});`);
-                    }
-                    else {
-                        procs.push(`BSQRefScopeMgr::processCallRefAny(${cvn}, _return_${this.typegen.generateFixedRecordAccessor(allprops[i])});`);
-                    }
-                }
-                returnmgr = procs.join(" ");
+            else if (rctype === "int") {
+                returnmgr = `${callerscope}.processReturnChecked(_return_);`;
             }
-            else if (this.typegen.isUEntityType(this.currentRType)) {
-                const cslotvar = this.varNameToCppName("$callerslot$");
-                if (this.assembly.subtypeOf(this.typegen.noneType, this.currentRType)) {
-                    returnmgr = `BSQRefScopeMgr::processCallRefNoneable(${cslotvar}, _return_);`;
-                }
-                else {
-                    returnmgr = `BSQRefScopeMgr::processCallReturnFast(${cslotvar}, _return_);`;
-                }
+            else if (rctype === "direct") {
+                returnmgr = `${callerscope}.callReturnDirect(_return_);`;
+            }
+            else if (rctype === "checked") {
+                returnmgr = `${callerscope}.processReturnChecked(_return_);`;
             }
             else {
-                const cslotvar = this.varNameToCppName("$callerslot$");
-                returnmgr = `BSQRefScopeMgr::processCallRefAny(${cslotvar}, _return_);`;
+                returnmgr = `_return_.processForCallReturn(${callerscope});`;
             }
         }
 
