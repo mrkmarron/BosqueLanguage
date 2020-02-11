@@ -971,7 +971,7 @@ class Assembly {
         return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
     }
 
-    private isGroundedType(tt: ResolvedType): boolean {
+    isGroundedType(tt: ResolvedType): boolean {
         return tt.options.every((opt) => this.isGrounded_Atom(opt));
     }
 
@@ -1002,7 +1002,7 @@ class Assembly {
 
     private atomSubtypeOf_EntityConcept(t1: ResolvedEntityAtomType, t2: ResolvedConceptAtomType): boolean {
         const t2type = ResolvedType.createSingle(t2);
-        return t1.object.provides.some((provide) => {
+        return this.resolveProvides(t1.object, t1.binds).some((provide) => {
             const tt = this.normalizeTypeOnly(provide, t1.binds);
             return !tt.isEmptyType() && this.subtypeOf(tt, t2type);
         });
@@ -1058,7 +1058,7 @@ class Assembly {
                 }
 
                 const t2type = ResolvedType.createSingle(ResolvedConceptAtomType.create([c2t]));
-                return c1t.concept.provides.some((provide) => {
+                return this.resolveProvides(c1t.concept, c1t.binds).some((provide) => {
                     const tt = this.normalizeTypeOnly(provide, c1t.binds);
                     return !tt.isEmptyType() && this.subtypeOf(tt, t2type);
                 });
@@ -1298,7 +1298,7 @@ class Assembly {
             }
         });
 
-        ooptype.provides.forEach((provide) => {
+        this.resolveProvides(ooptype, binds).forEach((provide) => {
             const tt = this.normalizeTypeOnly(provide, binds);
             (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
                 declfields = this.getAllOOFields(concept.concept, concept.binds, declfields);
@@ -1311,7 +1311,7 @@ class Assembly {
     getAllInvariantProvidingTypes(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, invprovs?: [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][]): [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] {
         let declinvs:  [ResolvedType, OOPTypeDecl, Map<string, ResolvedType>][] = [...(invprovs || [])];
 
-        ooptype.provides.forEach((provide) => {
+        this.resolveProvides(ooptype, binds).forEach((provide) => {
             const tt = this.normalizeTypeOnly(provide, binds);
             (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
                 declinvs = this.getAllInvariantProvidingTypes(concept.concept, concept.binds, declinvs);
@@ -1336,8 +1336,9 @@ class Assembly {
     }
 
     getAbstractPrePostConds(fname: string, ooptype: OOPTypeDecl, oobinds: Map<string, ResolvedType>, callbinds: Map<string, ResolvedType>): {pre: [PreConditionDecl[], Map<string, ResolvedType>], post: [PostConditionDecl[], Map<string, ResolvedType>] } | undefined {
-        for (let i = 0; i < ooptype.provides.length; ++i) {
-            const provide = ooptype.provides[i];
+        const rprovides = this.resolveProvides(ooptype, oobinds);
+        for (let i = 0; i < rprovides.length; ++i) {
+            const provide = rprovides[i];
             const tt = this.normalizeTypeOnly(provide, oobinds);
             for (let j = 0; j < (tt.options[0] as ResolvedConceptAtomType).conceptTypes.length; ++j) {
                 const concept = (tt.options[0] as ResolvedConceptAtomType).conceptTypes[j];
@@ -1391,8 +1392,9 @@ class Assembly {
     }
 
     private tryGetOOMemberDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, kind: "const" | "static" | "field" | "method", search: string): OOMemberLookupInfo | undefined {
-        for (let i = 0; i < ooptype.provides.length; ++i) {
-            const tt = (this.normalizeTypeOnly(ooptype.provides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
+        const rprovides = this.resolveProvides(ooptype, binds);
+        for (let i = 0; i < rprovides.length; ++i) {
+            const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
             const res = this.tryGetOOMemberDeclThis(tt.concept, tt.binds, kind, search) || this.tryGetOOMemberDeclParent(tt.concept, tt.binds, kind, search);
             if (res !== undefined) {
                 return res;
@@ -1414,8 +1416,9 @@ class Assembly {
         else {
             let dopts: OOMemberLookupInfo[] = [];
 
-            for (let i = 0; i < ooptype.provides.length; ++i) {
-                const tt = (this.normalizeTypeOnly(ooptype.provides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
+            const rprovides = this.resolveProvides(ooptype, binds);
+            for (let i = 0; i < rprovides.length; ++i) {
+                const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
                 const copts = this.tryGetOOMemberRootDeclarationOptions(tt.concept, tt.binds, kind, search);
                 if (copts !== undefined) {
                     dopts = dopts.concat(copts);
@@ -1681,6 +1684,35 @@ class Assembly {
 
         memores.set(t2.idStr, res);
         return res;
+    }
+ 
+    resolveProvides(tt: OOPTypeDecl, binds: Map<string, ResolvedType>): TypeSignature[] {
+        let oktypes: TypeSignature[] = [];
+        
+        for (let i = 0; i < tt.provides.length; ++i) {
+            const psig = tt.provides[i][0];
+            const pcond = tt.provides[i][1];
+            
+            if(pcond === undefined) {
+                oktypes.push(psig);
+            }
+            else {
+                const allok = pcond.constraints.every((consinfo) => {
+                    const constype = this.normalizeTypeOnly(consinfo.t, binds)
+
+                    const boundsok = this.subtypeOf(constype, this.normalizeTypeOnly(consinfo.constraint, binds));
+                    const groundok = !consinfo.isGrounded || this.isGroundedType(constype);
+                
+                    return boundsok && groundok;
+                });
+
+                if(allok) {
+                    oktypes.push(psig);
+                }
+            }
+        }
+
+        return oktypes;
     }
 
     private functionSubtypeOf_helper(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {

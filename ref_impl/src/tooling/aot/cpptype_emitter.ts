@@ -828,7 +828,7 @@ class CPPTypeEmitter {
 
             return {
                 fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
-                fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
+                fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject, public BSQVable\n`
                     + "{\n"
                     + "public:\n"
                     + `    ${fields.join("\n    ")}\n\n`
@@ -844,19 +844,44 @@ class CPPTypeEmitter {
 
     generateCPPEphemeral(tt: MIREphemeralListType): string {        
         let fields: string[] = [];
+        let displayvals: string[] = [];
+        let callretops: string[] = [];
         let constructor_args: string[] = [];
         let constructor_initializer: string[] = [];
 
         for(let i = 0; i < tt.entries.length; ++i) {
             fields.push(`${this.getCPPTypeFor(tt.entries[i], "storage")} entry_${i};`);
+            
+            const rctype = this.getRefCountableStatus(tt.entries[i]);
+            if (rctype === "int") {
+                callretops.push(`scope.processReturnChecked(this->entry_${i});`);
+            }
+            else if (rctype === "direct") {
+                callretops.push(`scope.callReturnDirect(this->entry_${i});`);
+            }
+            else if (rctype === "checked") {
+                callretops.push(`scope.processReturnChecked(this->entry_${i});`);
+            }
+            else {
+                // nothing needs to be done
+            }
+
+            displayvals.push(this.coerce(`this->entry_${i}`, tt.entries[i], this.anyType));
+
             constructor_args.push(`${this.getCPPTypeFor(tt.entries[i], "parameter")} e${i}`);
             constructor_initializer.push(`entry_${i}(e${i})`);
         }
 
+        const fjoins = displayvals.map((dv) => `diagnostic_format(${dv})`).join(" + std::u32string(U\", \") + ");
         const display = "std::u32string display() const\n"
             + "    {\n"
             + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
-            + `        return std::u32string(U"${tt.trkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
+            + `        return std::u32string(U"(|) ") + ${fjoins} + std::u32string(U" |)");\n`
+            + "    }";
+
+        const processForCallReturn = "void processForCallReturn(BSQRefScope& scope)\n"
+            + "    {\n"
+            + `        ${callretops.join("\n        ")}`
             + "    }";
 
         return `class ${this.mangleStringForCpp(tt.trkey)}\n`
@@ -864,10 +889,8 @@ class CPPTypeEmitter {
             + "public:\n"
             + `    ${fields.join("\n    ")}\n\n`
             + `    ${this.mangleStringForCpp(tt.trkey)}(${constructor_args.join(", ")}) : ${constructor_initializer.join(", ")} { ; }\n`
-            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
             + `    ${display}\n\n`
-            + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
-            + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
+            + `    ${processForCallReturn}\n`
             + "};"
     }
 }

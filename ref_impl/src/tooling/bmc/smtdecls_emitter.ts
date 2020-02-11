@@ -33,18 +33,6 @@ type SMTCode = {
     INVOKE_ACTION: string
 };
 
-type SMTCode_OLD = {
-    typedecls_fwd: string,
-    typedecls: string,
-    conceptSubtypeRelation: string,
-    typechecks: string,
-    resultdecls_fwd: string,
-    resultdecls: string,
-    function_decls: string,
-    args_info: string,
-    main_info: string
-};
-
 class SMTEmitter {
     static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, errorcheck: boolean): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
@@ -54,11 +42,17 @@ class SMTEmitter {
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
+        let ocons: string[] = [];
+        let edecls: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
             const smtdecl = typeemitter.generateSMTEntity(edecl);
             if (smtdecl !== undefined) {
                 typedecls_fwd.push(smtdecl.fwddecl);
                 typedecls.push(smtdecl.fulldecl);
+                ocons.push(smtdecl.ocons);
+                if(smtdecl.emptydecl !== undefined) {
+                    edecls.push(smtdecl.emptydecl);
+                }
             }
         });
 
@@ -183,6 +177,15 @@ class SMTEmitter {
             }
         });
 
+        let fulledecls = "";
+        if(ephdecls_fwd.length !== 0) {
+            fulledecls = "(declare-datatypes ("
+            + `  ${ephdecls_fwd.sort().join("\n  ")}`
+            + ") ("
+            + `  ${ephdecls.sort().join("\n  ")}`
+            + "))"
+        }
+
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
@@ -194,19 +197,27 @@ class SMTEmitter {
         const callinfo = resv + "\n" + cassert + "\n" + bmcchk + "\n" + chk;
 
         return {
-            typedecls_fwd: typedecls_fwd.sort().join("\n    "),
-            typedecls: typedecls.sort().join("\n    "),
-            conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
-            typechecks: typechecks.join("\n    "),
-            fixedtupledecls_fwd: fixedtupledecls_fwd.sort().join("\n    "),
-            fixedtupledecls: fixedtupledecls.sort().join("\n    "),
-            fixedrecorddecls_fwd: fixedrecorddecls_fwd.sort().join("\n    "),
-            fixedrecorddecls: fixedrecorddecls.sort().join("\n    "),
-            resultdecls_fwd: resultdecls_fwd.sort().join("\n    "),
-            resultdecls: resultdecls.sort().join("\n    "),
-            function_decls: funcdecls.join("\n"),
-            args_info: argsdecls.join("\n"),
-            main_info: callinfo
+            NOMINAL_DECLS_FWD: typedecls_fwd.sort().join("\n    "),
+            NOMINAL_CONSTRUCTORS: typedecls.sort().join("\n    "),
+            NOMINAL_OBJECT_CONSTRUCTORS: ocons.sort().join("\n    "),
+        
+            NOMINAL_TYPE_TO_DATA_KIND_ASSERTS: nominal_data_kinds.sort().join("\n"),
+            SPECIAL_NAME_BLOCK_ASSERTS: special_name_decls.sort().join("\n"),
+        
+            EPHEMERAL_DECLS: fulledecls,
+        
+            EMPTY_CONTENT_ARRAY_DECLS: edecls.sort().join("\n"),
+        
+            RESULTS_FWD: resultdecls_fwd.sort().join("\n    "),
+            RESULTS: resultdecls.sort().join("\n    "),
+        
+            CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
+            SUBTYPE_DECLS: typechecks.join("\n    "),
+        
+            FUNCTION_DECLS: funcdecls.join("\n"),
+            ARG_VALUES: argsdecls.join("\n"),
+        
+            INVOKE_ACTION: callinfo
         };
     }
 }

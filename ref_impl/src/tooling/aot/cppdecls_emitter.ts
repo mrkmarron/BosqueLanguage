@@ -3,13 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
-
-import * as assert from "assert";
 
 type CPPCode = {
     STATIC_STRING_DECLARE: string,
@@ -26,7 +23,7 @@ type CPPCode = {
     NOMINAL_TYPE_ENUM_DECLARE: string,
 
     PROPERTY_NAMES: string,
-    NOMINAL_TYPE_DISPLAY_NAMES: string
+    NOMINAL_TYPE_DISPLAY_NAMES: string,
 
     CONCEPT_SUBTYPE_RELATION_DECLARE: string,
     NOMINAL_TYPE_TO_DATA_KIND: string,
@@ -37,29 +34,9 @@ type CPPCode = {
     FUNC_DECLS_FWD: string,
     FUNC_DECLS: string,
 
-    VFIELD_DECLS: string
+    VFIELD_DECLS: string,
     VMETHOD_DECLS: string,
     MAIN_CALL: string
-};
-
-type CPPCode_OLD = {
-    typedecls_fwd: string,
-    typedecls: string,
-    nominalenums: string,
-    nomnialdisplaynames: string,
-    conceptSubtypeRelation: string,
-    typechecks: string,
-    funcdecls_fwd: string,
-    funcdecls: string,
-    conststring_declare: string,
-    conststring_create: string,
-    constint_declare: string,
-    constint_create: string,
-    propertyenums: string,
-    propertynames: string,
-    vfield_decls: string,
-    vmethod_decls: string,
-    maincall: string
 };
 
 class CPPEmitter {
@@ -157,7 +134,6 @@ class CPPEmitter {
         const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
 
         let special_name_decls: string[] = [];
-        let ephdecls_fwd: string[] = [];
         let ephdecls: string[] = [];
         [...typeemitter.assembly.typeMap].forEach((te) => {
             const tt = te[1];
@@ -172,8 +148,7 @@ class CPPEmitter {
 
             if(tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType)) {
                 const ephdecl = typeemitter.generateCPPEphemeral(tt.options[0] as MIREphemeralListType);
-                ephdecls_fwd.push(ephdecl.fwddecl);
-                ephdecls.push(ephdecl.fulldecl);
+                ephdecls.push(ephdecl);
             }
         });
 
@@ -247,25 +222,36 @@ class CPPEmitter {
 
         const maincall = `${mainsig} {\n${chkarglen}\n\n${convdecl}\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
+
         return {
-            typedecls_fwd: typedecls_fwd.sort().join("\n"),
-            typedecls: typedecls.sort().join("\n"),
-            nominalenums: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => nti.enum).join(",\n    "),
-            nomnialdisplaynames: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => `"${nti.display}"`).join(",\n  "),
-            conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
-            typechecks: typechecks.join("\n"),
-            funcdecls_fwd: funcdecls_fwd.join("\n"),
-            funcdecls: funcdecls.join("\n"),
-            conststring_declare: conststring_declare.sort().join("\n  "),
-            conststring_create: conststring_create.sort().join("\n  "),
-            constint_declare: constint_declare.sort().join("\n  "),
-            constint_create: constint_create.sort().join("\n  "),
-            propertyenums: [...propertyenums].sort().join(",\n  "),
-            propertynames: [...propertynames].sort().join(",\n  "),
-            known_property_lists_declare: known_property_lists_declare.sort().join("\n"),
-            vfield_decls: [...vfieldaccesses].sort().join("\n"),
-            vmethod_decls: [...vcalls].sort().join("\n"),
-            maincall: maincall
+            STATIC_STRING_DECLARE: conststring_declare.sort().join("\n  "),
+            STATIC_STRING_CREATE: conststring_create.sort().join("\n  "),
+        
+            STATIC_INT_DECLARE: constint_declare.sort().join("\n  "),
+            STATIC_INT_CREATE: constint_create.sort().join("\n  "),
+            
+            TYPEDECLS_FWD: typedecls_fwd.sort().join("\n"),
+            TYPEDECLS: typedecls.sort().join("\n"),
+            EPHEMERAL_LIST_DECLARE: ephdecls.sort().join("\n"),
+        
+            PROPERTY_ENUM_DECLARE: [...propertyenums].sort().join(",\n  "), 
+            NOMINAL_TYPE_ENUM_DECLARE: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => nti.enum).join(",\n    "),
+        
+            PROPERTY_NAMES: [...propertynames].sort().join(",\n  "),
+            NOMINAL_TYPE_DISPLAY_NAMES: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => `"${nti.display}"`).join(",\n  "),
+        
+            CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
+            NOMINAL_TYPE_TO_DATA_KIND: [...nominaltypeinfo].map((nti) => nti.datakind).join(",\n    "),
+        
+            SPECIAL_NAME_BLOCK_BEGIN: special_name_decls.sort().join("\n"),
+        
+            TYPECHECKS: typechecks.join("\n"),
+            FUNC_DECLS_FWD: funcdecls_fwd.join("\n"),
+            FUNC_DECLS: funcdecls.join("\n"),
+        
+            VFIELD_DECLS: [...vfieldaccesses].sort().join("\n"),
+            VMETHOD_DECLS: [...vcalls].sort().join("\n"),
+            MAIN_CALL: maincall
         };
     }
 }

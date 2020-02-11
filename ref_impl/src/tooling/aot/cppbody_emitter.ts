@@ -1201,7 +1201,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRProjectFromFields: {
                 const pf = op as MIRProjectFromFields;
-                return this.generateMIRProjectFromFields(pf);
+                return this.generateMIRProjectFromFields(pf, this.typegen.getMIRType(pf.resultProjectType));
             }
             case MIROpTag.MIRProjectFromTypeTuple: {
                 return NOT_IMPLEMENTED<string>("MIRProjectFromTypeTuple");

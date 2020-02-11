@@ -146,7 +146,8 @@ else {
             + "namespace BSQ\n"
             + "{\n/*forward type decls*/\n"
             + cparams.typedecls_fwd
-            + "\n\n/*forward function decls*/\n"
+            + xxx //BSQVable decls
+            + "\n\n/*forward function decls*/\n" 
             + cparams.funcdecls_fwd
             + "\n\n/*type decls*/\n"
             + cparams.typedecls

@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType } from "../ast/resolved_type";
-import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl } from "../ast/assembly";
+import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry } from "../ast/body";
@@ -113,13 +113,33 @@ class TypeChecker {
         return rtype;
     }
 
-    private checkTemplateTypes(sinfo: SourceInfo, terms: TemplateTermDecl[], binds: Map<string, ResolvedType>, optTypeRestrict?: [string, ResolvedType][]) {
-        const boundsok = terms.every((t) => this.m_assembly.subtypeOf(binds.get(t.name) as ResolvedType, this.resolveAndEnsureTypeOnly(sinfo, t.constraint, new Map<string, ResolvedType>())));
-        this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
+    private checkTemplateTypes(sinfo: SourceInfo, terms: TemplateTermDecl[], binds: Map<string, ResolvedType>, optTypeRestrict?: TypeConditionRestriction) {
+        for(let i = 0; i < terms.length; ++i) {
+            const terminfo = terms[i];
+            const termtype = binds.get(terminfo.name) as ResolvedType;
+
+            const boundsok = this.m_assembly.subtypeOf(termtype, this.resolveAndEnsureTypeOnly(sinfo, terminfo.constraint, new Map<string, ResolvedType>()));
+            this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
+
+            if(terminfo.isGrounded) {
+                const groundok = this.m_assembly.isGroundedType(termtype);
+                this.raiseErrorIf(sinfo, !groundok, "Term is not grounded as required");
+            }
+        }
 
         if (optTypeRestrict !== undefined) {
-            const restrictok = optTypeRestrict.every((r) => this.m_assembly.subtypeOf(binds.get(r[0]) as ResolvedType, r[1]));
-            this.raiseErrorIf(sinfo, !restrictok, "Violates type restriction in instantiation");
+            for (let i = 0; i < optTypeRestrict.constraints.length; ++i) {
+                const consinfo = optTypeRestrict.constraints[i];
+                const constype = this.resolveAndEnsureTypeOnly(sinfo, consinfo.t, binds)
+
+                const boundsok = this.m_assembly.subtypeOf(constype, this.resolveAndEnsureTypeOnly(sinfo, consinfo.constraint, binds));
+                this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
+
+                if (consinfo.isGrounded) {
+                    const groundok = this.m_assembly.isGroundedType(constype);
+                    this.raiseErrorIf(sinfo, !groundok, "Term is not grounded as required");
+                }
+            }
         }
     }
 
@@ -1608,7 +1628,7 @@ class TypeChecker {
         const binds = this.m_assembly.resolveBindsForCall(fdecl.invoke.terms, exp.terms.targs, new Map<string, ResolvedType>(), env.terms);
         this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
 
-        this.checkTemplateTypes(exp.sinfo, fdecl.invoke.terms, binds as Map<string, ResolvedType>);
+        this.checkTemplateTypes(exp.sinfo, fdecl.invoke.terms, binds as Map<string, ResolvedType>, fdecl.invoke.termRestrictions);
 
         const fsig = this.m_assembly.normalizeTypeFunction(fdecl.invoke.generateSig(), binds as Map<string, ResolvedType>);
         this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
@@ -1643,7 +1663,7 @@ class TypeChecker {
         const binds = this.m_assembly.resolveBindsForCall((fdecl.decl as StaticFunctionDecl).invoke.terms, exp.terms.targs, fdecl.binds, env.terms);
         this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
 
-        this.checkTemplateTypes(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.terms, binds as Map<string, ResolvedType>);
+        this.checkTemplateTypes(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.terms, binds as Map<string, ResolvedType>, (fdecl.decl as StaticFunctionDecl).invoke.termRestrictions);
 
         const fsig = this.m_assembly.normalizeTypeFunction((fdecl.decl as StaticFunctionDecl).invoke.generateSig(), binds as Map<string, ResolvedType>);
         this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
@@ -4405,7 +4425,7 @@ class TypeChecker {
             let terms = new Map<string, MIRType>();
             tdecl.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
 
-            const provides = tdecl.provides.map((provide) => {
+            const provides = this.m_assembly.resolveProvides(tdecl, binds).map((provide) => {
                 const ptype = this.resolveAndEnsureTypeOnly(new SourceInfo(0, 0, 0, 0), provide, binds);
                 const cpt = ((ptype.options[0]) as ResolvedConceptAtomType).conceptTypes[0];
 
