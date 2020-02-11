@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
@@ -68,14 +68,14 @@ class SMTBodyEmitter {
         return [...new Set<number>(ekeys.map((k) => this.errorCodes.get(k) as number))].sort();
     }
 
-    getGasKeyForOperation(tkey: string): "collection" | "string" | "regex" | "default" {
-        if(tkey.startsWith("NSCore::List<") || tkey.startsWith("NSCore::Set<") || tkey.startsWith("NSCore::Map<")) {
+    getGasKeyForOperation(ikey: MIRInvokeKey): "collection" | "string" | "regex" | "default" {
+        if(ikey.startsWith("NSCore::List<") || ikey.startsWith("NSCore::Set<") || ikey.startsWith("NSCore::Map<")) {
             return "collection";
         }
-        else if(tkey === "NSCore::String") {
+        else if(ikey.startsWith("NSCore::String")) {
             return "string";
         }
-        else if(tkey === "NSCore::Regex") {
+        else if(ikey.startsWith("NSCore::Regex")) {
             return "regex";
         }
         else {
@@ -83,12 +83,12 @@ class SMTBodyEmitter {
         }
     }
 
-    getGasForOperation(tkey: string): number {
-        return this.gasLimits.get(this.getGasKeyForOperation(tkey)) as number;
+    getGasForOperation(ikey: MIRInvokeKey): number {
+        return this.gasLimits.get(this.getGasKeyForOperation(ikey)) as number;
     }
 
-    generateBMCLimitCreate(tkey: string, rtype: string): SMTValue {
-        const errid = this.getGasForOperation(tkey);
+    generateBMCLimitCreate(ikey: MIRInvokeKey, rtype: string): SMTValue {
+        const errid = this.getGasForOperation(ikey);
         return new SMTValue(`(result_error@${rtype} (result_bmc ${errid}))`);
     }
 
@@ -442,7 +442,7 @@ class SMTBodyEmitter {
     }
 
     generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): SMTExp {
-        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREpemeralListType;
+        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREphemeralListType;
 
         let args: string[] = [];
         for(let i = 0; i < op.args.length; ++i) {
@@ -473,7 +473,7 @@ class SMTBodyEmitter {
     }
 
     generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): SMTExp { 
-        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
         let vals: string[] = [];
 
         for (let i = 0; i < op.indecies.length; ++i) {
@@ -559,7 +559,7 @@ class SMTBodyEmitter {
     }
 
     generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): SMTExp {
-        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
         let vals: string[] = [];
 
         for (let i = 0; i < op.properties.length; ++i) {
@@ -1252,7 +1252,7 @@ class SMTBodyEmitter {
             return ops;
         }
         else {
-            const tlist = (this.getArgType(op.src).options[0] as MIREpemeralListType).entries;
+            const tlist = (this.getArgType(op.src).options[0] as MIREphemeralListType).entries;
 
             const getter0 = new SMTValue(`(${this.typegen.generateEntityAccessor(tlist[0].trkey, `entry_0`)} ${this.varToSMTName(op.src)})`);
             let ops: SMTExp = new SMTLet(this.varToSMTName(op.names[0]), getter0);

@@ -3,13 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityTypeDecl, MIRConstantDecl, MIRFieldDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { MIRInvokeKey, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey } from "../../compiler/mir_ops";
-
-import * as assert from "assert";
+import { MIRInvokeKey } from "../../compiler/mir_ops";
 
 type SMTCode = {
     NOMINAL_DECLS_FWD: string,
@@ -82,17 +80,17 @@ class SMTEmitter {
             }
 
             const cscc = cginfo.recursive.find((scc) => scc.has(cn.invoke));
-            const currentSCC = cscc !== undefined ? new Set<string>([...cscc].map((cc) => extractMirBodyKeyData(cc))) : new Set<string>();
+            const currentSCC = cscc !== undefined ? new Set<string>(...cscc) : new Set<string>();
             let worklist = cscc !== undefined ? [...cscc].sort() : [cn.invoke];
 
             let gasmax: number | undefined = cscc !== undefined ? Math.max(...worklist.map((bbup) => bodyemitter.getGasForOperation(bbup))) : 1;
             for (let gasctr = 1; gasctr <= gasmax; gasctr++) {
                 for (let mi = 0; mi < worklist.length; ++mi) {
-                    const bbup = worklist[mi];
+                    const ikey = worklist[mi];
 
                     let gas: number | undefined = undefined;
                     let gasdown: number | undefined = undefined;
-                    if(gasctr !== gasmax) {
+                    if (gasctr !== gasmax) {
                         gas = gasctr;
                         gasdown = gasctr - 1;
                     }
@@ -100,62 +98,15 @@ class SMTEmitter {
                         gasdown = gasmax - 1;
                     }
 
-                    const tag = extractMirBodyKeyPrefix(bbup);
-                    if (tag === "invoke") {
-                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
-                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                        const finfo = bodyemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
+                    const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+                    const finfo = bodyemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
 
-                        funcdecls.push(finfo);
+                    funcdecls.push(finfo);
 
-                        const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(idcl.resultType));
-                        if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
-                            resultdecls_fwd.push(`(Result@${rtype} 0)`);
-                            resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
-                        }
-                    }
-                    else if (tag === "pre") {
-                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
-                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                        funcdecls.push(bodyemitter.generateSMTPre(bbup, idcl));
-                    }
-                    else if (tag === "post") {
-                        const ikey = extractMirBodyKeyData(bbup) as MIRInvokeKey;
-                        const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                        funcdecls.push(bodyemitter.generateSMTPost(bbup, idcl));
-                    }
-                    else if (tag === "invariant") {
-                        const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                        funcdecls.push(bodyemitter.generateSMTInv(bbup, edcl));
-                    }
-                    else if (tag === "const") {
-                        const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup) as MIRConstantKey) as MIRConstantDecl;
-                        const cdeclemit = bodyemitter.generateSMTConst(bbup, cdcl);
-                        if (cdeclemit !== undefined) {
-                            funcdecls.push(cdeclemit);
-
-                            const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(cdcl.declaredType));
-                            if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
-                                resultdecls_fwd.push(`(Result@${rtype} 0)`);
-                                resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
-                            }
-                        }
-
-                    }
-                    else {
-                        assert(tag === "fdefault");
-
-                        const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup) as MIRFieldKey) as MIRFieldDecl;
-                        const fdeclemit = bodyemitter.generateSMTFDefault(bbup, fdcl);
-                        if (fdeclemit !== undefined) {
-                            funcdecls.push(fdeclemit);
-
-                            const rtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(fdcl.declaredType));
-                            if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
-                                resultdecls_fwd.push(`(Result@${rtype} 0)`);
-                                resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
-                            }
-                        }
+                    const rtype = typeemitter.getSMTTypeFor(typeemitter.getMIRType(idcl.resultType));
+                    if (!resultdecls_fwd.includes(`(Result@${rtype} 0)`)) {
+                        resultdecls_fwd.push(`(Result@${rtype} 0)`);
+                        resultdecls.push(`( (result_success@${rtype} (result_success_value@${rtype} ${rtype})) (result_error@${rtype} (result_error_code@${rtype} ErrorCode)) )`);
                     }
                 }
 
@@ -165,7 +116,7 @@ class SMTEmitter {
             }
         }   
 
-        const rrtype = typeemitter.typeToSMTCategory(typeemitter.getMIRType(entrypoint.resultType));
+        const rrtype = typeemitter.getSMTTypeFor(typeemitter.getMIRType(entrypoint.resultType));
 
         let argscall: string[] = [];
         let argsdecls: string[] = [];
@@ -174,9 +125,17 @@ class SMTEmitter {
             const paramtype = typeemitter.getMIRType(param.type);
 
             argscall.push(`@${param.name}`);
-            argsdecls.push(`(declare-const @${param.name} ${typeemitter.typeToSMTCategory(paramtype)})`);
-            if(typeemitter.typeToSMTCategory(paramtype) === "BTerm") {
-                argsdecls.push(`(assert ${bodyemitter.generateTypeCheck(param.name, typeemitter.anyType, typeemitter.getMIRType(param.type), true, SymbolicArgTypecheckGas)})`)
+            argsdecls.push(`(declare-const @${param.name} ${typeemitter.getSMTTypeFor(paramtype)})`);
+            argsdecls.push(`(assert ${bodyemitter.generateTypeCheck(param.name, paramtype, paramtype, typeemitter.getMIRType(param.type))})`);
+        }
+
+        if(entrypoint.preconditions !== undefined) {
+            const params = entrypoint.params.map((param) => `@${param.name}`);
+            if(params.length === 0) {
+                argsdecls.push(`${entrypoint.preconditions}`);
+            }
+            else {
+                argsdecls.push(`(${entrypoint.preconditions} ${params.join(" ")})`);
             }
         }
 
@@ -196,6 +155,34 @@ class SMTEmitter {
 
         const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
 
+        let nominal_data_kinds: string[] = [];
+        let special_name_decls: string[] = [];
+        let ephdecls_fwd: string[] = [];
+        let ephdecls: string[] = [];
+        [...typeemitter.assembly.typeMap].forEach((te) => {
+            const tt = te[1];
+
+            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::String$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::GUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::EventTime$/) 
+                    || typeemitter.typecheckIsName(tt, /^NSCore::DataHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::Tuple$/) || typeemitter.typecheckIsName(tt, /^NSCore::Record$/)) {
+                        special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} "${typeemitter.mangleStringForSMT(tt.trkey)}"))`);
+                    }
+            
+            if(tt.options.length === 1 && (tt.options[0] instanceof MIREntityType)) {
+                const ndn = typeemitter.mangleStringForSMT(tt.trkey);
+                const dk = typeemitter.generateInitialDataKindFlag(tt);
+                nominal_data_kinds.push(`(assert (= (select nominalDataKinds ${ndn}) ${dk.toString()}))`);
+            }
+
+            if(tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType)) {
+                const ephdecl = typeemitter.generateSMTEphemeral(tt.options[0] as MIREphemeralListType);
+                ephdecls_fwd.push(ephdecl.fwddecl);
+                ephdecls.push(ephdecl.fulldecl);
+            }
+        });
+
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
@@ -203,13 +190,6 @@ class SMTEmitter {
         const bmcchk = `(assert (not (and (is-result_error@${rrtype} @smtres@) (is-result_bmc (result_error_code@${rrtype} @smtres@)))))`
 
         let chk = errorcheck ? `(assert (is-result_error@${rrtype} @smtres@))` : `(assert (not (is-result_error@${rrtype} @smtres@)))`;
-
-        if(entrypoint.preconditions.length !== 0) {
-            const eid = bodyemitter.getErrorIds(entrypoint.sourceLocation)[0];
-            const excludepreid = `(= (error_id (result_error_code@${rrtype} @smtres@)) ${eid})`;
-
-            chk = chk + "\n" + `(assert (or (not (is-result_error (result_error_code@${rrtype} @smtres@))) (not ${excludepreid})))`;
-        }
 
         const callinfo = resv + "\n" + cassert + "\n" + bmcchk + "\n" + chk;
 

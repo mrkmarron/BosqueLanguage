@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey, MIRGetKey, MIRLoadConstRegex, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRPackStore } from "./mir_ops";
-import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIREpemeralListType } from "./mir_assembly";
+import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIREphemeralListType } from "./mir_assembly";
 import assert = require("assert");
 import { topologicalOrder } from "./mir_info";
 
@@ -192,7 +192,7 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
         }
         case MIROpTag.MIRLoadFromEpehmeralList: {
             const elv = op as MIRLoadFromEpehmeralList;
-            vtypes.set(elv.trgt.nameID, ((assembly.typeMap.get(elv.argInferType) as MIRType).options[0] as MIREpemeralListType).entries[elv.idx]);
+            vtypes.set(elv.trgt.nameID, ((assembly.typeMap.get(elv.argInferType) as MIRType).options[0] as MIREphemeralListType).entries[elv.idx]);
             break;
         }
         case MIROpTag.MIRInvokeFixedFunction: {
@@ -272,7 +272,7 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
                 srctypes = vspack.src.map((sc) => getArgType(sc, vtypes, assembly));
             }
             else {
-                srctypes = (getArgType(vspack.src, vtypes, assembly).options[0] as MIREpemeralListType).entries;
+                srctypes = (getArgType(vspack.src, vtypes, assembly).options[0] as MIREphemeralListType).entries;
             }
 
             for(let i = 0; i < vspack.names.length; ++i) {

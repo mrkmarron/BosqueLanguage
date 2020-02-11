@@ -313,7 +313,7 @@ abstract class MIRTypeOption {
                 return MIRRecordType.jparse(jobj);
             default:
                 assert(jobj.kind === "ephemeral"); 
-                return MIREpemeralListType.jparse(jobj);
+                return MIREphemeralListType.jparse(jobj);
         }
     }
 }
@@ -457,7 +457,7 @@ class MIRRecordType extends MIRStructuralType {
     }
 }
 
-class MIREpemeralListType extends MIRTypeOption {
+class MIREphemeralListType extends MIRTypeOption {
     readonly entries: MIRType[];
 
     private constructor(trkey: MIRResolvedTypeKey, entries: MIRType[]) {
@@ -465,17 +465,17 @@ class MIREpemeralListType extends MIRTypeOption {
         this.entries = entries;
     }
 
-    static create(entries: MIRType[]): MIREpemeralListType {
+    static create(entries: MIRType[]): MIREphemeralListType {
         let cvalue = entries.map((entry) => entry.trkey).join(", ");
-        return new MIREpemeralListType("(|" + cvalue + "|)", [...entries]);
+        return new MIREphemeralListType("(|" + cvalue + "|)", [...entries]);
     }
 
     jemit(): object {
         return { kind: "ephemeral", entries: this.entries.map((e) => e.jemit()) };
     }
 
-    static jparse(jobj: any): MIREpemeralListType {
-        return MIREpemeralListType.create(jobj.entries.map((e: any) => MIRType.jparse(e)));
+    static jparse(jobj: any): MIREphemeralListType {
+        return MIREphemeralListType.create(jobj.entries.map((e: any) => MIRType.jparse(e)));
     }
 }
 
@@ -816,7 +816,7 @@ class MIRAssembly {
 
 export {
     MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
-    MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl, MIREpemeralListType,
+    MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
     MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,
     PackageConfig, MIRAssembly

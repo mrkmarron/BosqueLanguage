@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeBodyDecl } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
@@ -76,7 +76,7 @@ class CPPEmitter {
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
-        let nominaltypeinfo: {enum: string, display: string}[] = [];
+        let nominaltypeinfo: {enum: string, display: string, datakind: string}[] = [];
         let vfieldaccesses: string[] = [];
         let vcalls: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
@@ -88,7 +88,9 @@ class CPPEmitter {
 
             const enumv = typeemitter.mangleStringForCpp(edecl.tkey);
             const displayv = edecl.tkey;
-            nominaltypeinfo.push({ enum: enumv, display: displayv });
+            const dk = typeemitter.generateInitialDataKindFlag(typeemitter.getMIRType(edecl.tkey));
+
+            nominaltypeinfo.push({ enum: enumv, display: displayv, datakind: dk });
 
             edecl.fields.forEach((fd) => {
                 if (fd.enclosingDecl !== edecl.tkey) {
@@ -117,65 +119,30 @@ class CPPEmitter {
         });
         nominaltypeinfo = nominaltypeinfo.sort((a, b) => a.enum.localeCompare(b.enum));
 
+        let concepttypeinfo: {enum: string, display: string, datakind: string}[] = [];
+        assembly.conceptDecls.forEach((cdecl) => {
+            const enumv = typeemitter.mangleStringForCpp(cdecl.tkey);
+            const displayv = cdecl.tkey;
+            concepttypeinfo.push({ enum: enumv, display: displayv, datakind: "-1" });
+        });
+        concepttypeinfo = concepttypeinfo.sort((a, b) => a.enum.localeCompare(b.enum));
+
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         const rcg = [...cginfo.topologicalOrder].reverse();
 
         let funcdecls_fwd: string[] = [];
         let funcdecls: string[] = [];
         for (let i = 0; i < rcg.length; ++i) {
-            const bbup = rcg[i];
-            const tag = extractMirBodyKeyPrefix(bbup.invoke);
+            const ikey = rcg[i].invoke;
             //
             //TODO: rec is implmented via stack recusion -- want to add option for bounded stack version
             //
 
-            if (tag === "invoke") {
-                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                const finfo = bodyemitter.generateCPPInvoke(idcl);
+            const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+            const finfo = bodyemitter.generateCPPInvoke(idcl);
 
-                funcdecls_fwd.push(finfo.fwddecl);
-                funcdecls.push(finfo.fulldecl);
-            }
-            else if (tag === "pre") {
-                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                const finfo = bodyemitter.generateCPPPre(bbup.invoke, idcl);
-
-                funcdecls.push(finfo);
-            }
-            else if (tag === "post") {
-                const ikey = extractMirBodyKeyData(bbup.invoke) as MIRInvokeKey;
-                const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                const finfo = bodyemitter.generateCPPPost(bbup.invoke, idcl);
-
-                funcdecls.push(finfo);
-            }
-            else if (tag === "invariant") {
-                const edcl = assembly.entityDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRNominalTypeKey) as MIREntityTypeDecl;
-                const finfo = bodyemitter.generateCPPInv(bbup.invoke, edcl);
-
-                funcdecls.push(finfo);
-            }
-            else if (tag === "const") {
-                const cdcl = assembly.constantDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRConstantKey) as MIRConstantDecl;
-                const finfo = bodyemitter.generateCPPConst(bbup.invoke, cdcl);
-
-                if (finfo !== undefined) {
-                    funcdecls_fwd.push(finfo.fwddecl);
-                    funcdecls.push(finfo.fulldecl);
-                }
-            }
-            else {
-                assert(tag === "fdefault");
-                const fdcl = assembly.fieldDecls.get(extractMirBodyKeyData(bbup.invoke) as MIRFieldKey) as MIRFieldDecl;
-                const finfo = bodyemitter.generateCPPFDefault(bbup.invoke, fdcl);
-
-                if (finfo !== undefined) {
-                    funcdecls_fwd.push(finfo.fwddecl);
-                    funcdecls.push(finfo.fulldecl);
-                }
-            }
+            funcdecls_fwd.push(finfo.fwddecl);
+            funcdecls.push(finfo.fulldecl);
         }
 
         let conceptSubtypes: string[] = [];
@@ -188,7 +155,28 @@ class CPPEmitter {
         });
 
         const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
-        
+
+        let special_name_decls: string[] = [];
+        let ephdecls_fwd: string[] = [];
+        let ephdecls: string[] = [];
+        [...typeemitter.assembly.typeMap].forEach((te) => {
+            const tt = te[1];
+
+            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::String$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::GUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::EventTime$/) 
+                    || typeemitter.typecheckIsName(tt, /^NSCore::DataHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/)
+                    || typeemitter.typecheckIsName(tt, /^NSCore::Tuple$/) || typeemitter.typecheckIsName(tt, /^NSCore::Record$/)) {
+                        special_name_decls.push(`#define MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(tt.trkey)}`);
+                    }
+
+            if(tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType)) {
+                const ephdecl = typeemitter.generateCPPEphemeral(tt.options[0] as MIREphemeralListType);
+                ephdecls_fwd.push(ephdecl.fwddecl);
+                ephdecls.push(ephdecl.fulldecl);
+            }
+        });
+
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
@@ -218,12 +206,11 @@ class CPPEmitter {
                     });
                 }
             });
-
-            if(typeemitter.typecheckEphemeral(tt)) {
-                xxxx;
-            }
         });
 
+        //
+        //TODO: need to provide parse for API types and link in here
+        //
         const entrypoint = assembly.invokeDecls.get(entrypointname) as MIRInvokeBodyDecl;
         const restype = typeemitter.getMIRType(entrypoint.resultType);
         const mainsig = `int main(int argc, char** argv)`;
@@ -237,7 +224,7 @@ class CPPEmitter {
             }
             else if(p.type === "NSCore::Int") {
                 const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
-                const conv = `BSQInt ${p.name}(std::stoi(std::string(argv[${i}+1])));`;
+                const conv = `IntValue ${p.name} = BSQ_ENCODE_VALUE_TAGGED_INT(std::stoi(std::string(argv[${i}+1])));`;
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
@@ -247,46 +234,24 @@ class CPPEmitter {
         });
 
         let scopev = "";
+        const scopevar = bodyemitter.varNameToCppName("$scope$");
+
         let callargs = entrypoint.params.map((p) => p.type !== "NSCore::String" ? p.name : `&${p.name}`);
-        if(typeemitter.maybeRefableCountableType(restype)) {
-            if (typeemitter.maybeRefableCountableType(restype)) {
-                if (typeemitter.isTupleType(restype)) {
-                    const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(restype);
-                    scopev = `BSQRefScope<${maxlen}> __scopes__;`;
-                    for (let i = 0; i < maxlen; ++i) {
-                        callargs.push(`__scopes__.getCallerSlot<${i}>()`);
-                    }
-                }
-                else if (typeemitter.isRecordType(restype)) {
-                    const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(restype);
-                    scopev = `BSQRefScope<${allprops.length}> __scopes__;`;
-                    for (let i = 0; i < allprops.length; ++i) {
-                        callargs.push(`__scopes__.getCallerSlot<${i}>()`);                }
-                }
-                else {
-                    scopev = "BSQRefScope<1> __scopes__;";
-                    callargs.push("__scopes__.getCallerSlot<0>()");
-                }
-            }
-        }
-        
+        const resrc = typeemitter.getRefCountableStatus(restype);
+        if (resrc !== "no") {
+            scopev = `BSQRefScope ${scopevar};`;
+            callargs.push(scopevar);
+        }        
         const callv = `${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
-        const fcall = `std::cout << conv.to_bytes(Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)})) << "\\n"`;
-
-        if(typeemitter.scopectr !== 0) {
-            const scopevar = bodyemitter.varNameToCppName("$scope$");
-            const refscope = `BSQRefScope<${typeemitter.scopectr}> ${scopevar};`;
-
-            scopev = scopev + " " + refscope;
-        }
+        const fcall = `std::cout << conv.to_bytes(diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)})) << "\\n"`;
 
         const maincall = `${mainsig} {\n${chkarglen}\n\n${convdecl}\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
         return {
             typedecls_fwd: typedecls_fwd.sort().join("\n"),
             typedecls: typedecls.sort().join("\n"),
-            nominalenums: nominaltypeinfo.map((nti) => nti.enum).join(",\n    "),
-            nomnialdisplaynames: nominaltypeinfo.map((nti) => `"${nti.display}"`).join(",\n  "),
+            nominalenums: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => nti.enum).join(",\n    "),
+            nomnialdisplaynames: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => `"${nti.display}"`).join(",\n  "),
             conceptSubtypeRelation: conceptSubtypes.sort().join("\n"),
             typechecks: typechecks.join("\n"),
             funcdecls_fwd: funcdecls_fwd.join("\n"),

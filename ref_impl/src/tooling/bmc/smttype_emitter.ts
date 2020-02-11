@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
 
 import { MIRResolvedTypeKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue } from "./smt_exp";
@@ -131,7 +131,7 @@ class SMTTypeEmitter {
     }
 
     typecheckEphemeral(tt: MIRType): boolean {
-        return tt.options.length === 1 && tt.options[0] instanceof MIREpemeralListType;
+        return tt.options.length === 1 && tt.options[0] instanceof MIREphemeralListType;
     }
     
     typecheckIsNoneable(tt: MIRType): boolean {
@@ -799,6 +799,19 @@ class SMTTypeEmitter {
                 ocons: `(cons_bsq_object_from_${ename} ${this.getSMTTypeFor(tt)})`
             };
         }
+    }
+
+    generateSMTEphemeral(eph: MIREphemeralListType): { fwddecl: string, fulldecl: string } {
+        const ename = this.mangleStringForSMT(eph.trkey);
+        const aargs: string[] = [];
+        for(let i = 0; i < eph.entries.length; ++i ) {
+            aargs.push(`(${this.generateEntityAccessor(eph.trkey, `entry_${i}`)} ${this.getSMTTypeFor(eph.entries[i])})`);
+        }
+
+        return {
+            fwddecl: `(${ename} 0)`,
+            fulldecl: `( (${this.generateEntityConstructor(ename)} ${aargs.join(" ")}) )`
+        };
     }
 
     generateCheckSubtype(ekey: MIRNominalTypeKey, oftype: MIRConceptType): string {

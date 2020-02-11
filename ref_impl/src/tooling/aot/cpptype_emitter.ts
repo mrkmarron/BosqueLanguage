@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREpemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
@@ -129,7 +129,7 @@ class CPPTypeEmitter {
     }
 
     typecheckEphemeral(tt: MIRType): boolean {
-        return tt.options.length === 1 && tt.options[0] instanceof MIREpemeralListType;
+        return tt.options.length === 1 && tt.options[0] instanceof MIREphemeralListType;
     }
     
     typecheckIsNoneable(tt: MIRType): boolean {
@@ -840,6 +840,35 @@ class CPPTypeEmitter {
                     + "};"
             };
         }
+    }
+
+    generateCPPEphemeral(tt: MIREphemeralListType): string {        
+        let fields: string[] = [];
+        let constructor_args: string[] = [];
+        let constructor_initializer: string[] = [];
+
+        for(let i = 0; i < tt.entries.length; ++i) {
+            fields.push(`${this.getCPPTypeFor(tt.entries[i], "storage")} entry_${i};`);
+            constructor_args.push(`${this.getCPPTypeFor(tt.entries[i], "parameter")} e${i}`);
+            constructor_initializer.push(`entry_${i}(e${i})`);
+        }
+
+        const display = "std::u32string display() const\n"
+            + "    {\n"
+            + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
+            + `        return std::u32string(U"${tt.trkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
+            + "    }";
+
+        return `class ${this.mangleStringForCpp(tt.trkey)}\n`
+            + "{\n"
+            + "public:\n"
+            + `    ${fields.join("\n    ")}\n\n`
+            + `    ${this.mangleStringForCpp(tt.trkey)}(${constructor_args.join(", ")}) : ${constructor_initializer.join(", ")} { ; }\n`
+            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
+            + `    ${display}\n\n`
+            + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
+            + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
+            + "};"
     }
 }
 

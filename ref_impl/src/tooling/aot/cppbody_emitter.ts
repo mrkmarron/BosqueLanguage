@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREpemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRPackStore, MIRLoadConstRegex } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -319,14 +319,14 @@ class CPPBodyEmitter {
     }
 
     generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): string {
-        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREpemeralListType;
+        const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREphemeralListType;
 
         let args: string[] = [];
         for(let i = 0; i < op.args.length; ++i) {
             args.push(this.argToCpp(op.args[i], etype.entries[i]));
         }
 
-        return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(etype.trkey)}(${args.join(", ")});`;
+        return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(etype.trkey)}{${args.join(", ")}};`;
     }
 
     generateMIRAccessFromIndexExpression(arg: MIRArgument, idx: number, resultAccessType: MIRType): string {
@@ -343,7 +343,7 @@ class CPPBodyEmitter {
     }
 
     generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string {
-        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
         let vals: string[] = [];
 
         for (let i = 0; i < op.indecies.length; ++i) {
@@ -351,7 +351,7 @@ class CPPBodyEmitter {
         }
 
         if (this.typegen.typecheckEphemeral(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}(${vals.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}{${vals.join(", ")}};`;
         }
         else {
             const scopevar = this.varNameToCppName("$scope$");
@@ -421,7 +421,7 @@ class CPPBodyEmitter {
     }
 
     generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): string {
-        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREpemeralListType).entries : [];
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
         let vals: string[] = [];
 
         for (let i = 0; i < op.properties.length; ++i) {
@@ -429,7 +429,7 @@ class CPPBodyEmitter {
         }
 
         if (this.typegen.typecheckEphemeral(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}(${vals.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}{${vals.join(", ")}};`;
         }
         else {
             const rargs: string[] = [];
@@ -500,27 +500,43 @@ class CPPBodyEmitter {
         }
     }
 
-    generateMIRProjectFromFields(op: MIRProjectFromFields): string {
+    generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): string {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
 
-        let cvals: string[] = [];
-        op.fields.map((f) => {
-            const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
-            const ftype = this.typegen.getMIRType(fdecl.declaredType);
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            let cvals: string[] = [];
+            op.fields.map((f) => {
+                const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
+                if (this.typegen.typecheckUEntity(inferargtype)) {
+                    cvals.push(`${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`);
+                }
+                else {
+                    cvals.push(`BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`);
+                }
+            });
 
-            if (this.typegen.typecheckUEntity(inferargtype)) {
-                const access = `${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`;
-                cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
-            }
-            else {
-                const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`;
-                cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
-            }
-        });
+            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(op.resultProjectType)}{${cvals.join(", ")}};`;
+        }
+        else {
+            let cvals: string[] = [];
+            op.fields.map((f) => {
+                const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
+                const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
-        const scopevar = this.varNameToCppName("$scope$");
-        const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultProjectType));
-        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${iflag}, ${cvals.length}, ${cvals.join(", ")});`;
+                if (this.typegen.typecheckUEntity(inferargtype)) {
+                    const access = `${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`;
+                    cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
+                }
+                else {
+                    const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`;
+                    cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
+                }
+            });
+
+            const scopevar = this.varNameToCppName("$scope$");
+            const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultProjectType));
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${iflag}, ${cvals.length}, ${cvals.join(", ")});`;
+        }
     }
 
     generateVFieldUpdates(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][]): string {
@@ -1085,7 +1101,7 @@ class CPPBodyEmitter {
             return ops.join(", ") + ";";
         }
         else {
-            const tlist = (this.getArgType(op.src).options[0] as MIREpemeralListType).entries;
+            const tlist = (this.getArgType(op.src).options[0] as MIREphemeralListType).entries;
 
             let ops: string[] = [];
             for(let i = 0; i < tlist.length; ++i) {
