@@ -183,9 +183,7 @@
 (declare-const bsqrecord_array_empty (Array String BTerm))
 (assert (= bsqrecord_array_empty ((as const (Array String BTerm)) bsqterm@clear)))
 
-;;EMPTY_LIST_CONTENT_ARRAY_DECLS;;
-;;EMPTY_SET_CONTENT_ARRAY_DECLS;;
-;;EMPTY_MAP_CONTENT_ARRAY_DECLS;;
+;;EMPTY_CONTENT_ARRAY_DECLS;;
 
 (declare-datatypes (
       (ErrorCode 0)

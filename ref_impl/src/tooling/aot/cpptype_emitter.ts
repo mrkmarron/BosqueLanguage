@@ -34,8 +34,6 @@ class CPPTypeEmitter {
 
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
-    scopectr: number = 0;
-
     conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
 
     constructor(assembly: MIRAssembly) {
@@ -47,6 +45,20 @@ class CPPTypeEmitter {
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
+
+        this.keyType = assembly.typeMap.get("NSCore::KeyType") as MIRType;
+        this.validatorType = assembly.typeMap.get("NSCore::Validator") as MIRType;
+        this.podType = assembly.typeMap.get("NSCore::PODType") as MIRType;
+        this.apiType = assembly.typeMap.get("NSCore::APIType") as MIRType;
+        this.tupleType = assembly.typeMap.get("NSCore::Tuple") as MIRType;
+        this.recordType = assembly.typeMap.get("NSCore::Record") as MIRType;
+
+        this.enumtype = assembly.typeMap.get("NSCore::KeyType") as MIRType;
+        this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
+        this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
+        this.eventtimeidkeytype = assembly.typeMap.get("NSCore::EventTimeIdKey") as MIRType;
+        this.datahashidkeytype = assembly.typeMap.get("NSCore::DataHashIdKey") as MIRType;
+        this.cryptohashidkeytype = assembly.typeMap.get("NSCore::CryptoHashIdKey") as MIRType;
     }
 
     mangleStringForCpp(name: string): string {
@@ -532,6 +544,89 @@ class CPPTypeEmitter {
         }
     }
 
+    getIncOpForType(tt: MIRType): string {
+        const rcinfo = this.getRefCountableStatus(tt);
+        if (rcinfo === "no") {
+            return "INC_REF_NOP";
+        }
+        else if (rcinfo === "int") {
+            return "INC_REF_CHECK";
+        }
+        else if (rcinfo === "direct") {
+            return "INC_REF_DIRECT";
+        }
+        else if (rcinfo === "checked") {
+            return "INC_REF_CHECK";
+        }
+        else {
+            assert(false); //only option right now is ephemeral lists but we should't be doing this with them
+            return "[INVALID]"
+        }
+    }
+
+    getDecOpForType(tt: MIRType): string {
+        const rcinfo = this.getRefCountableStatus(tt);
+        if (rcinfo === "no") {
+            return "DEC_REF_NOP";
+        }
+        else if (rcinfo === "int") {
+            return `BSQRef::decrementChecked`;
+        }
+        else if (rcinfo === "direct") {
+            return `BSQRef::decrementDirect`;
+        }
+        else if (rcinfo === "checked") {
+            return `BSQRef::decrementChecked`;
+        }
+        else {
+            assert(false); //only option right now is ephemeral lists but we should't be doing this with them
+            return "[INVALID]"
+        }
+    }
+
+    getGetKeyOpForType(tt: MIRType): string {
+        if(this.typecheckAllKeys(tt)) {
+            return "GET_KEY_NOP";
+        }
+        else {
+            assert(false);
+            return "[INVALID]"
+        }
+    }
+
+    getGetCMPOpsForKeyType(tt: MIRType): { hash: string, eq: string, cmp: string } {
+        const tval = this.getCPPTypeFor(tt, "base");
+        const hf = `HashFunctor_${tval}{}`;
+        const eqf = `EqualFunctor_${tval}{}`;
+        const cmpf = "[INVALID]";
+
+        return { hash: hf, eq: eqf, cmp: cmpf };
+    }
+
+    isSpecialReprEntity(tt: MIRType): boolean {
+        if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/) || this.typecheckIsName(tt, /^NSCore::Int$/) || this.typecheckIsName(tt, /^NSCore::String$/)) {
+            return true;
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
+            return true;
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::EventTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
+            return true;
+        }
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype)
+            || this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+           return true;
+        }
+        else {
+            if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(tt, /^NSCore::ISOTime$/) || this.typecheckIsName(tt, /^NSCore::Regex$/)) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+    }
+
     typeToCPPDefaultValue(ttype: MIRType): string {
         if ( this.typecheckIsName(ttype, /^NSCore::Bool$/)) {
             return "false"
@@ -565,144 +660,186 @@ class CPPTypeEmitter {
     }
 
     generateConstructorArgInc(argtype: MIRType, arg: string): string {
-        if (!this.maybeRefableCountableType(argtype)) {
+        const rcinfo = this.getRefCountableStatus(argtype);
+        if (rcinfo === "no") {
             return arg;
         }
 
-        xxxx;
-
-        else {
-            return `BSQRef::checkedIncrementOf<${this.typeToCPPType(argtype, "parameter")}>(${arg})`;
-        }
+        const btype = this.getCPPTypeFor(argtype, "base");
+        return `${this.getIncOpForType(argtype)}(${btype}, ${arg})`;
     }
 
-    generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | undefined {
-        if (this.isSpecialRepType(entity) || this.isSpecialCollectionRepType(entity) || this.isSpecialKeyListRepType(entity)) {
+    generateListCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
+        const tt = this.getMIRType(entity.tkey);
+        const declname = this.getCPPTypeFor(tt, "base");
+
+        const typet = entity.terms.get("T") as MIRType;
+
+        const decl = `#define Ty ${declname}\n`
+        + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
+        + `#define FDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
+        + "\n"
+        + `#include ${templatefile}\n`;
+
+        return { fwddecl: declname, fulldecl: decl };
+    }
+
+    generateSetCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
+        const tt = this.getMIRType(entity.tkey);
+        const declname = this.getCPPTypeFor(tt, "base");
+
+        const typet = entity.terms.get("K") as MIRType;
+        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const typekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+
+        const decl = `#define Ty ${declname}\n`
+        + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
+        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet)}(X)\n`
+        + `#define K ${this.getCPPTypeFor(typekp, "storage")}\n`
+        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
+        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
+        + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
+        + `#define K_HASH(X) ${this.getGetCMPOpsForKeyType(typekp).hash}\n`
+        + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
+        + `#define FDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
+        + "\n"
+        + `#include ${templatefile}\n`;
+
+        return { fwddecl: declname, fulldecl: decl };
+    }
+
+    generateMapCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
+        const tt = this.getMIRType(entity.tkey);
+        const declname = this.getCPPTypeFor(tt, "base");
+
+        const typet = entity.terms.get("K") as MIRType;
+        const typeu = entity.terms.get("V") as MIRType;
+        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const typekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+
+        const decl = `#define Ty ${declname}\n`
+        + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
+        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet)}(X)\n`
+
+        + `#define U ${this.getCPPTypeFor(typet, "storage")}\n`
+        + `#define INC_RC_U(X) ${this.getIncOpForType(typeu)}(X)\n`
+        + `#define DEC_RC_U(X) ${this.getDecOpForType(typeu)}(X)\n`
+
+        + `#define K ${this.getCPPTypeFor(typekp, "storage")}\n`
+        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
+        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
+        + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
+        + `#define K_HASH(X) ${this.getGetCMPOpsForKeyType(typekp).hash}\n`
+        + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
+        + `#define TDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
+        + `#define UDisplay(X) diagnostic_format(${this.coerce("(X)", typeu, this.anyType)})\n`
+        + "\n"
+        + `#include ${templatefile}\n`;
+
+        return { fwddecl: declname, fulldecl: decl };
+    }
+
+    generateCPPEntity(entity: MIREntityTypeDecl, specialReps: Map<string, string>): { fwddecl: string, fulldecl: string } | undefined {
+        const tt = this.getMIRType(entity.tkey);
+
+        if(this.isSpecialReprEntity(tt)) {
             return undefined;
         }
 
-        const constructor_args = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "parameter")} ${fd.name}`;
-        });
+        if(this.typecheckIsName(tt, /^NSCore::List<.*>$/)) {
+            return this.generateListCPPEntity(entity, specialReps.get("list") as string);
+        }
+        else if(this.typecheckIsName(tt, /^NSCore::Set<.*>$/)) {
+            return this.generateSetCPPEntity(entity, specialReps.get("set") as string);
+        }
+        else if(this.typecheckIsName(tt, /^NSCore::Map<.*>$/)) {
+            return this.generateMapCPPEntity(entity, specialReps.get("map") as string);
+        }
+        else {
+            const constructor_args = entity.fields.map((fd) => {
+                return `${this.getCPPTypeFor(this.getMIRType(fd.declaredType), "parameter")} ${fd.name}`;
+            });
 
-        const constructor_initializer = entity.fields.map((fd) => {
-            return `${this.mangleStringForCpp(fd.fkey)}(${fd.name})`;
-        });
+            const constructor_initializer = entity.fields.map((fd) => {
+                return `${this.mangleStringForCpp(fd.fkey)}(${fd.name})`;
+            });
 
-        const destructor_list = entity.fields.map((fd) => {
-            const ftype = this.getMIRType(fd.declaredType);
-            if (!this.maybeRefableCountableType(ftype)) {
-                return undefined;
-            }
+            const destructor_list = entity.fields.map((fd) => {
+                const rcinfo = this.getRefCountableStatus(this.getMIRType(fd.declaredType));
+                if (rcinfo === "no") {
+                    return undefined;
+                }
 
-            if(this.isTupleType(ftype)) {
-                if(this.isKnownLayoutTupleType(ftype)) {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
+                return `${this.getDecOpForType(this.getMIRType(fd.declaredType))}(this->${this.mangleStringForCpp(fd.fkey)});`;
+            })
+            .filter((fd) => fd !== undefined);
+
+            const fields = entity.fields.map((fd) => {
+                return `${this.getCPPTypeFor(this.getMIRType(fd.declaredType), "storage")} ${this.mangleStringForCpp(fd.fkey)};`;
+            });
+
+            const vfield_accessors = entity.fields.map((fd) => {
+                if (fd.enclosingDecl === entity.tkey) {
+                    return "NA";
                 }
                 else {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
+                    const fn = `this->${this.mangleStringForCpp(fd.fkey)}`;
+                    return `${this.getCPPTypeFor(this.getMIRType(fd.declaredType), "return")} get$${this.mangleStringForCpp(fd.fkey)}() { return ${fn}; };`;
                 }
-            }
-            else if(this.isRecordType(ftype)) {
-                if(this.isKnownLayoutRecordType(ftype)) {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
-                }
-                else {
-                    return `this->${this.mangleStringForCpp(fd.fkey)}.allRefDec();`;
-                }
-            }
-            else if (this.isUEntityType(ftype)) {
-                if (this.assembly.subtypeOf(this.noneType, ftype)) {
-                    return `BSQRef::checkedDecrementNoneable(this->${this.mangleStringForCpp(fd.fkey)});`;
+            });
+
+            const vcalls = [...entity.vcallMap].map((callp) => {
+                const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
+                if (rcall.enclosingDecl === entity.tkey) {
+                    return "NA";
                 }
                 else {
-                    return `BSQRef::checkedDecrementFast(this->${this.mangleStringForCpp(fd.fkey)});`;
+                    const resulttype = this.getMIRType(rcall.resultType);
+                    const rtype = this.getCPPTypeFor(resulttype, "return");
+
+                    const vargs = rcall.params.slice(1).map((fp) => `${this.getCPPTypeFor(this.getMIRType(fp.type), "parameter")} ${fp.name}`);
+                    const cargs = rcall.params.map((fp) => fp.name);
+
+                    if (this.getRefCountableStatus(resulttype) !== "no") {
+                        vargs.push("BSQRefScope& $callerscope$");
+                        cargs.push("$callerscope$")
+                    }
+
+                    return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`
+                        + "    {\n"
+                        + `        return ${this.mangleStringForCpp(callp[1])}(${cargs.join(", ")});\n`
+                        + "    }\n";
                 }
-            }
-            else {
-                return `BSQRef::checkedDecrement(this->${this.mangleStringForCpp(fd.fkey)});`;
-            }
-        })
-        .filter((fd) => fd !== undefined);
+            });
 
-        const fields = entity.fields.map((fd) => {
-            return `${this.typeToCPPType(this.getMIRType(fd.declaredType), "decl")} ${this.mangleStringForCpp(fd.fkey)};`;
-        });
+            const faccess = entity.fields.map((f) => this.coerce(`this->${this.mangleStringForCpp(f.fkey)}`, this.getMIRType(f.declaredType), this.anyType));
+            const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
+            const display = "std::u32string display() const\n"
+                + "    {\n"
+                + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
+                + `        return std::u32string(U"${entity.tkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
+                + "    }";
 
-        const vfield_accessors = entity.fields.map((fd) => {
-            if (fd.enclosingDecl === entity.tkey) {
-                return "NA";
-            }
-            else {
-                const fn = `this->${this.mangleStringForCpp(fd.fkey)}`;
-                return `${this.typeToCPPType(this.getMIRType(fd.declaredType) , "return")} get$${this.mangleStringForCpp(fd.fkey)}() { return ${fn}; };`;
-            }
-        });
-
-        const vcalls = [...entity.vcallMap].map((callp) => {
-            const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-            if (rcall.enclosingDecl === entity.tkey) {
-                return "NA";
-            }
-            else {
-                const resulttype = this.getMIRType(rcall.resultType);
-                const rtype = this.typeToCPPType(resulttype, "return");
-
-                const vargs = rcall.params.slice(1).map((fp) => `${this.typeToCPPType(this.getMIRType(fp.type), "parameter")} ${fp.name}`);
-                const cargs = rcall.params.map((fp) => fp.name);
-
-                if (this.maybeRefableCountableType(resulttype)) {
-                    if (this.isTupleType(resulttype)) {
-                        const maxlen = CPPTypeEmitter.getTupleTypeMaxLength(resulttype);
-
-                        for (let i = 0; i < maxlen; ++i) {
-                            vargs.push(`BSQRef** $callerslot$${i}`);
-                            cargs.push(`$callerslot$${i}`);
-                        }
-                    }
-                    else if (this.isRecordType(resulttype)) {
-                        const allprops = CPPTypeEmitter.getRecordTypeMaxPropertySet(resulttype);
-
-                        for (let i = 0; i < allprops.length; ++i) {
-                            vargs.push(`BSQRef** $callerslot$${allprops[i]}`);
-                            cargs.push(`$callerslot$${allprops[i]}`);
-                        }
-                    }
-                    else {
-                        vargs.push("BSQRef** $callerslot$");
-                        cargs.push("$callerslot$");
-                    }
-                }
-
-                return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`
-                    + "    {\n"
-                    + `        return ${this.mangleStringForCpp(callp[1])}(${cargs.join(", ")});\n`
-                    + "    }\n";
-            }
-        });
-
-        this.scopectr = 0;
-        const faccess = entity.fields.map((f) => this.coerce(`this->${this.mangleStringForCpp(f.fkey)}`, this.getMIRType(f.declaredType), this.anyType));
-        const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
-        const display = "std::u32string display() const\n"
-        + "    {\n"
-        + (this.scopectr !== 0 ? `        BSQRefScope<${this.scopectr}> ${this.mangleStringForCpp("$scope$")};\n` : "")
-        + `        return std::u32string(U"${entity.tkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
-        + "    }";
-
-        return {
-            fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
-            fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
-            + "{\n"
-            + "public:\n"
-            + `    ${fields.join("\n    ")}\n\n`
-            + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
-            + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
-            + `    ${display}\n\n`
-            + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
-            + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
-            + "};"
-        };
+            return {
+                fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
+                fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
+                    + "{\n"
+                    + "public:\n"
+                    + `    ${fields.join("\n    ")}\n\n`
+                    + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
+                    + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
+                    + `    ${display}\n\n`
+                    + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
+                    + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
+                    + "};"
+            };
+        }
     }
 }
 

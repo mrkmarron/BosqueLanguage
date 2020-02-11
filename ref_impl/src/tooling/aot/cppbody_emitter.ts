@@ -1388,21 +1388,20 @@ class CPPBodyEmitter {
 
         if (block.label === "exit") {
             const rctype = this.typegen.getRefCountableStatus(this.currentRType);
-            const callerscope = this.varNameToCppName("$callerscope$");
             if(rctype === "no") {
                 //nothing needed
             }
             else if (rctype === "int") {
-                gblock.push(`${callerscope}.processReturnChecked(_return_);`);
+                gblock.push("$callerscope$.processReturnChecked(_return_);");
             }
             else if (rctype === "direct") {
-                gblock.push(`${callerscope}.callReturnDirect(_return_);`);
+                gblock.push("callerscope$.callReturnDirect(_return_);");
             }
             else if (rctype === "checked") {
-                gblock.push(`${callerscope}.processReturnChecked(_return_);`);
+                gblock.push("$callerscope$.processReturnChecked(_return_);");
             }
             else {
-                gblock.push(`_return_.processForCallReturn(${callerscope});`);
+                gblock.push("_return_.processForCallReturn($callerscope$);");
             }
             
             gblock.push("return _return_;");
@@ -1413,7 +1412,7 @@ class CPPBodyEmitter {
 
     generateCPPVarDecls(body: MIRBody, params: MIRFunctionParameter[]): string {
         const scopevar = this.varNameToCppName("$scope$");
-        const refscope = "    " + (this.typegen.scopectr !== 0 ? `BSQRefScope ${scopevar};` : ";");
+        const refscope = `    BSQRefScope ${scopevar};`;
 
         let vdecls = new Map<string, string[]>();
         (body.vtypes as Map<string, string>).forEach((tkey, name) => {
@@ -1442,14 +1441,12 @@ class CPPBodyEmitter {
     generateCPPInvoke(idecl: MIRInvokeDecl): { fwddecl: string, fulldecl: string } {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
-        this.typegen.scopectr = 0;
 
         const args = idecl.params.map((arg) => `${this.typegen.getCPPTypeFor(this.typegen.getMIRType(arg.type), "parameter")} ${this.varNameToCppName(arg.name)}`);
         const restype = this.typegen.getCPPTypeFor(this.typegen.getMIRType(idecl.resultType), "return");
 
         if (this.typegen.getRefCountableStatus(this.typegen.getMIRType(idecl.resultType)) !== "no") {
-                const cslotvar = this.varNameToCppName("$callerscope$");
-                args.push(`BSQRefScope& ${cslotvar}`);
+                args.push(`BSQRefScope& $callerscope$`);
         }
         const decl = `${restype} ${this.invokenameToCPP(idecl.key)}(${args.join(", ")})`;
 
@@ -1566,21 +1563,20 @@ class CPPBodyEmitter {
         let returnmgr = "";
         if (this.typegen.getRefCountableStatus(this.currentRType) !== "no") {
             const rctype = this.typegen.getRefCountableStatus(this.currentRType);
-            const callerscope = this.varNameToCppName("$callerscope$");
             if(rctype === "no") {
                 //nothing needed
             }
             else if (rctype === "int") {
-                returnmgr = `${callerscope}.processReturnChecked(_return_);`;
+                returnmgr = "$callerscope$.processReturnChecked(_return_);";
             }
             else if (rctype === "direct") {
-                returnmgr = `${callerscope}.callReturnDirect(_return_);`;
+                returnmgr = "$callerscope$.callReturnDirect(_return_);";
             }
             else if (rctype === "checked") {
-                returnmgr = `${callerscope}.processReturnChecked(_return_);`;
+                returnmgr = "$callerscope$.processReturnChecked(_return_);";
             }
             else {
-                returnmgr = `_return_.processForCallReturn(${callerscope});`;
+                returnmgr = "_return_.processForCallReturn($callerscope$);";
             }
         }
 

@@ -12,6 +12,30 @@ import { MIRInvokeKey, MIRNominalTypeKey, MIRConstantKey, MIRFieldKey } from "..
 import * as assert from "assert";
 
 type SMTCode = {
+    NOMINAL_DECLS_FWD: string,
+    NOMINAL_CONSTRUCTORS: string,
+    NOMINAL_OBJECT_CONSTRUCTORS: string,
+
+    NOMINAL_TYPE_TO_DATA_KIND_ASSERTS: string,
+    SPECIAL_NAME_BLOCK_ASSERTS: string,
+
+    EPHEMERAL_DECLS: string,
+
+    EMPTY_CONTENT_ARRAY_DECLS: string,
+
+    RESULTS_FWD: string,
+    RESULTS: string,
+
+    CONCEPT_SUBTYPE_RELATION_DECLARE: string,
+    SUBTYPE_DECLS: string,
+
+    FUNCTION_DECLS: string,
+    ARG_VALUES: string,
+
+    INVOKE_ACTION: string
+};
+
+type SMTCode_OLD = {
     typedecls_fwd: string,
     typedecls: string,
     conceptSubtypeRelation: string,
@@ -23,17 +47,12 @@ type SMTCode = {
     main_info: string
 };
 
-const SymbolicArgTypecheckGas = 3;
-
 class SMTEmitter {
-    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, default_gas: number, errorcheck: boolean): SMTCode {
+    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, errorcheck: boolean): SMTCode {
         const typeemitter = new SMTTypeEmitter(assembly);
         typeemitter.initializeConceptSubtypeRelation();
 
-        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter, default_gas);
-
-        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
-        const rcg = [...cginfo.topologicalOrder].reverse();
+        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter);
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
@@ -45,45 +64,16 @@ class SMTEmitter {
             }
         });
 
-        let fixedtupledecls_fwd: string[] = [];
-        let fixedtupledecls: string[] = [];
-        let fixedrecorddecls_fwd: string[] = [];
-        let fixedrecorddecls: string[] = [];
-        assembly.typeMap.forEach((tt) => {
-            if (typeemitter.isTupleType(tt) && SMTTypeEmitter.getTupleTypeMaxLength(tt) !== 0) {
-                if (!fixedtupledecls_fwd.includes(`(${typeemitter.typeToSMTCategory(tt)} 0)`)) {
-                    fixedtupledecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
-
-                    const maxlen = SMTTypeEmitter.getTupleTypeMaxLength(tt);
-                    let cargs: string[] = [];
-                    for (let i = 0; i < maxlen; ++i) {
-                        cargs.push(`(${typeemitter.generateTupleAccessor(tt, i)} BTerm)`);
-                    }
-                    fixedtupledecls.push(`( (${typeemitter.generateTupleConstructor(tt)} ${cargs.join(" ")}) )`);
-                }
-            }
-
-            if (typeemitter.isRecordType(tt) && SMTTypeEmitter.getRecordTypeMaxPropertySet(tt).length !== 0) {
-                if (!fixedrecorddecls_fwd.includes(`(${typeemitter.typeToSMTCategory(tt)} 0)`)) {
-                    fixedrecorddecls_fwd.push(`(${typeemitter.typeToSMTCategory(tt)} 0)`);
-
-                    const maxset = SMTTypeEmitter.getRecordTypeMaxPropertySet(tt);
-                    let cargs: string[] = [];
-                    for (let i = 0; i < maxset.length; ++i) {
-                        cargs.push(`(${typeemitter.generateRecordAccessor(tt, maxset[i])} BTerm)`);
-                    }
-                    fixedrecorddecls.push(`( (${typeemitter.generateRecordConstructor(tt)} ${cargs.join(" ")}) )`);
-                }
-            }
-        });
-
-        let doneset = new Set<MIRBodyKey>();
+        let doneset = new Set<MIRInvokeKey>();
         let funcdecls: string[] = [];
         let resultdecls_fwd: string[] = [];
         let resultdecls: string[] = [];
 
         resultdecls_fwd.push(`(Result@Bool 0)`);
         resultdecls.push(`( (result_success@Bool (result_success_value@Bool Bool)) (result_error@Bool (result_error_code@Bool ErrorCode)) )`);
+
+        const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
+        const rcg = [...cginfo.topologicalOrder].reverse();
 
         for (let i = 0; i < rcg.length; ++i) {
             const cn = rcg[i];

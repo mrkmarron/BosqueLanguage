@@ -473,13 +473,9 @@ std::u32string diagnostic_format(Value v)
         {
             return DisplayFunctor_BSQCryptoHashIdKey{}(*dynamic_cast<const BSQCryptoHashIdKey*>(vv));
         }
-
-
-
-
-        else if(dynamic_cast<const BSQPODBuffer*>(vv) != nullptr)
+        else if(dynamic_cast<const BSQBuffer*>(vv) != nullptr)
         {
-            auto pbuf = dynamic_cast<const BSQPODBuffer*>(vv);
+            auto pbuf = dynamic_cast<const BSQBuffer*>(vv);
             std::u32string rvals(U"PODBuffer{");
             for (size_t i = 0; i < pbuf->sdata.size(); ++i)
             {
@@ -494,9 +490,15 @@ std::u32string diagnostic_format(Value v)
 
             return rvals;
         }
-        
-       
-       
+        else if(dynamic_cast<const BSQISOTime*>(vv) != nullptr)
+        {
+            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+            return std::u32string{U"ISOTime="} + conv.from_bytes(std::to_string(dynamic_cast<const BSQISOTime*>(vv)->isotime)) + U"}";
+        }
+        else if(dynamic_cast<const BSQRegex*>(vv) != nullptr)
+        {
+            return std::u32string{U"Regex="} + dynamic_cast<const BSQRegex*>(vv)->re;
+        }
         else if(dynamic_cast<const BSQTuple*>(vv) != nullptr)
         {
             auto tv = dynamic_cast<const BSQTuple*>(vv);
@@ -508,7 +510,7 @@ std::u32string diagnostic_format(Value v)
                     tvals += U", ";
                 }
 
-                tvals += Runtime::diagnostic_format(tv->entries.at(i));
+                tvals += diagnostic_format(tv->entries.at(i));
             }
             tvals += U"]";
 
@@ -520,14 +522,16 @@ std::u32string diagnostic_format(Value v)
 
             auto rv = dynamic_cast<const BSQRecord*>(vv);
             std::u32string rvals(U"{");
-            for(size_t i = 0; i < rv->entries.size(); ++i)
+            bool first = true;
+            for(auto iter = rv->entries.cbegin(); iter != rv->entries.cend(); ++iter)
             {
-                if(i != 0)
+                if(!first)
                 {
                     rvals += U", ";
                 }
+                first = false;
 
-                rvals += conv.from_bytes(Runtime::propertyNames[(int32_t)rv->entries.at(i).first]) + U"=" + Runtime::diagnostic_format(rv->entries.at(i).second);
+                rvals += conv.from_bytes(propertyNames[(int32_t)iter->first]) + U"=" + diagnostic_format(iter->second);
             }
             rvals += U"}";
 
@@ -538,7 +542,7 @@ std::u32string diagnostic_format(Value v)
             std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
             
             auto obj = dynamic_cast<const BSQObject*>(vv);
-            return conv.from_bytes(nominaltypenames[(uint32_t) obj->ntype]) + obj->display();
+            return conv.from_bytes(nominaltypenames[(uint32_t) obj->nominalType]) + obj->display();
         }
     }
 }

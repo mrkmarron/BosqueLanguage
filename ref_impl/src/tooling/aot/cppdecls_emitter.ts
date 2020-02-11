@@ -7,11 +7,42 @@ import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRConstantDecl, MIREntityTy
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
-import { extractMirBodyKeyPrefix, extractMirBodyKeyData, MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
+import { MIRInvokeKey, MIRConstantKey, MIRNominalTypeKey, MIRFieldKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
 
 type CPPCode = {
+    STATIC_STRING_DECLARE: string,
+    STATIC_STRING_CREATE: string,
+
+    STATIC_INT_DECLARE: string,
+    STATIC_INT_CREATE: string,
+    
+    TYPEDECLS_FWD: string,
+    TYPEDECLS: string,
+    EPHEMERAL_LIST_DECLARE: string,
+
+    PROPERTY_ENUM_DECLARE: string, 
+    NOMINAL_TYPE_ENUM_DECLARE: string,
+
+    PROPERTY_NAMES: string,
+    NOMINAL_TYPE_DISPLAY_NAMES: string
+
+    CONCEPT_SUBTYPE_RELATION_DECLARE: string,
+    NOMINAL_TYPE_TO_DATA_KIND: string,
+
+    SPECIAL_NAME_BLOCK_BEGIN: string,
+
+    TYPECHECKS: string,
+    FUNC_DECLS_FWD: string,
+    FUNC_DECLS: string,
+
+    VFIELD_DECLS: string
+    VMETHOD_DECLS: string,
+    MAIN_CALL: string
+};
+
+type CPPCode_OLD = {
     typedecls_fwd: string,
     typedecls: string,
     nominalenums: string,
@@ -37,6 +68,11 @@ class CPPEmitter {
         typeemitter.initializeConceptSubtypeRelation();
 
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
+        
+        const includes = new Map<string, string>()
+            .set("list", "\"bsqcustom/bsqlist.h\"")
+            .set("set", "\"bsqcustom/bsqset.h\"")
+            .set("map", "\"bsqcustom/bsqmap.h\"");
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];
@@ -44,7 +80,7 @@ class CPPEmitter {
         let vfieldaccesses: string[] = [];
         let vcalls: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
-            const cppdecl = typeemitter.generateCPPEntity(edecl);
+            const cppdecl = typeemitter.generateCPPEntity(edecl, includes);
             if (cppdecl !== undefined) {
                 typedecls_fwd.push(cppdecl.fwddecl);
                 typedecls.push(cppdecl.fulldecl);
@@ -56,7 +92,7 @@ class CPPEmitter {
 
             edecl.fields.forEach((fd) => {
                 if (fd.enclosingDecl !== edecl.tkey) {
-                    const rftype = typeemitter.typeToCPPType(typeemitter.getMIRType(fd.declaredType) , "return");
+                    const rftype = typeemitter.getCPPTypeFor(typeemitter.getMIRType(fd.declaredType), "return");
                     const isig = `virtual ${rftype} get$${typeemitter.mangleStringForCpp(fd.fkey)}() { printf("%s\\n", "Bad v-field resolve -- ${fd.fkey}"); exit(1); return ${typeemitter.typeToCPPDefaultValue(typeemitter.getMIRType(fd.declaredType))}; }`;
 
                     if (!vfieldaccesses.includes(isig)) {
@@ -68,12 +104,12 @@ class CPPEmitter {
             [...edecl.vcallMap].map((callp) => {
                 const rcall = (typeemitter.assembly.invokeDecls.get(callp[1]) || typeemitter.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
                 if (rcall.enclosingDecl !== edecl.tkey) {
-                    const rtype = typeemitter.typeToCPPType(typeemitter.getMIRType(rcall.resultType), "return");
-    
-                    const vargs = rcall.params.slice(1).map((fp) => `${typeemitter.typeToCPPType(typeemitter.getMIRType(fp.type), "parameter")} ${fp.name}`);
+                    const rtype = typeemitter.getCPPTypeFor(typeemitter.getMIRType(rcall.resultType), "return");
+
+                    const vargs = rcall.params.slice(1).map((fp) => `${typeemitter.getCPPTypeFor(typeemitter.getMIRType(fp.type), "parameter")} ${fp.name}`);
                     const vcall = `virtual ${rtype} ${typeemitter.mangleStringForCpp(callp[0])}(${vargs.join(", ")}) { printf("%s\\n", "Bad v-call resolve ${callp[1]}"); exit(1); return ${typeemitter.typeToCPPDefaultValue(typeemitter.getMIRType(rcall.resultType))}; }`;
 
-                    if(!vcalls.includes(vcall)) {
+                    if (!vcalls.includes(vcall)) {
                         vcalls.push(vcall);
                     }
                 }
@@ -169,7 +205,6 @@ class CPPEmitter {
 
         let propertyenums: Set<string> = new Set<string>();
         let propertynames: Set<string> = new Set<string>();
-        let known_property_lists_declare: string[] = [];
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(pname);
             propertynames.add(`"${pname}"`);
@@ -182,17 +217,11 @@ class CPPEmitter {
                         propertynames.add(`"${entry.name}"`);
                     });
                 }
-
-                if (typeemitter.isKnownLayoutRecordType(tt)) {
-                    const knownrec = CPPTypeEmitter.getKnownLayoutRecordType(tt);
-                    const knownenum = knownrec.entries.map((entry) => `MIRPropertyEnum::${entry.name}`);
-
-                    const decl = `constexpr MIRPropertyEnum ${typeemitter.getKnownPropertyRecordArrayName(tt)}[${knownrec.entries.length}] = {${knownenum.join(", ")}};`
-                    if (knownrec.entries.length !== 0 && !known_property_lists_declare.includes(decl)) {
-                        known_property_lists_declare.push(decl);
-                    }
-                }
             });
+
+            if(typeemitter.typecheckEphemeral(tt)) {
+                xxxx;
+            }
         });
 
         const entrypoint = assembly.invokeDecls.get(entrypointname) as MIRInvokeBodyDecl;
@@ -241,7 +270,6 @@ class CPPEmitter {
             }
         }
         
-        typeemitter.scopectr = 0;
         const callv = `${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
         const fcall = `std::cout << conv.to_bytes(Runtime::diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)})) << "\\n"`;
 

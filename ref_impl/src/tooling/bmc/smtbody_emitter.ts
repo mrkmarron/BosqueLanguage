@@ -299,7 +299,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
         const cpcetype = this.typegen.getMIRType(cpce.tkey);
-        const smtctype = this.generateSpecialTypeConsName(cpce.tkey);
+        const smtctype = this.typegen.generateSpecialTypeConsName(cpce.tkey);
         
         if(this.typegen.typecheckIsName(cpcetype, /NSCore::List<.*>/)) {
             return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
@@ -314,7 +314,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const smtctype = this.generateSpecialTypeConsName(cpcs.tkey);
+        const smtctype = this.typegen.generateSpecialTypeConsName(cpcs.tkey);
 
         if(this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
@@ -1618,22 +1618,6 @@ class SMTBodyEmitter {
         }
     }
 
-    generateSpecialTypeConsName(stype: MIRNominalTypeKey): string {
-        return `${this.typegen.mangleStringForSMT(stype)}@@cons`;
-    }
-
-    generateSpecialTypeFieldName(stype: MIRNominalTypeKey, f: string): string {
-        return `${this.typegen.mangleStringForSMT(stype)}@@f`;
-    }
-
-    generateSpecialTypeFieldAccess(stype: MIRNominalTypeKey, f: string, arg: string): string {
-        return `(${this.generateSpecialTypeFieldName(stype, f)} ${arg})`;
-    }
-
-    generateSpecialTypeFieldAccessExp(stype: MIRNominalTypeKey, f: string, arg: string): SMTExp {
-        return new SMTValue(`(${this.generateSpecialTypeFieldName(stype, f)} ${arg})`);
-    }
-
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): SMTExp {
         const rtype = this.typegen.getMIRType(idecl.resultType);
 
@@ -1643,96 +1627,96 @@ class SMTBodyEmitter {
             case "list_size":
             case "set_size":
             case "map_size": {
-                bodyres = this.generateSpecialTypeFieldAccessExp(enclkey, "size", params[0]);
+                bodyres = this.typegen.generateSpecialTypeFieldAccessExp(enclkey, "size", params[0]);
                 break;
             }
             case "list_unsafe_at": {
-                bodyres = new SMTValue(`(select (${this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])}) ${params[1]})`);
+                bodyres = new SMTValue(`(select (${this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])}) ${params[1]})`);
                 break;
             }
             case "list_unsafe_add": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
-                const csize = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
+                const csize = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 bodyres = new SMTValue(`(${cons} (+ ${csize} 1) (store ${entries} ${csize} ${params[1]}))`);
                 break;
             }
             case "list_unsafe_set": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
-                const csize = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
+                const csize = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 bodyres = new SMTValue(`(${cons} ${csize} (store ${entries} ${params[1]} ${params[2]}))`);
                 break;
             }
             case "set_has_key":
             case "map_has_key": {
-                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "has", params[0])} ${params[1]})`)
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0])} ${params[1]})`)
                 break;
             }
             case "map_at_key": {
-                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0])} ${params[1]})`)
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0])} ${params[1]})`)
                 break;
             }
             case "set_at_val":
             case "map_at_val": {
-                bodyres = new SMTValue(`(select ${this.generateSpecialTypeFieldAccess(enclkey, "values", params[0])} ${params[1]})`);
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0])} ${params[1]})`);
                 break;
             }
             case "set_get_keylist":
             case "map_get_keylist": {
-                bodyres = this.generateSpecialTypeFieldAccessExp(enclkey, "keylist", params[0]);
+                bodyres = this.typegen.generateSpecialTypeFieldAccessExp(enclkey, "keylist", params[0]);
                 break;
             } 
             case "set_clear_val": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
                 bodyres = new SMTValue(`(${cons} (- ${size} 1) (store ${has} ${params[1]} false) ${entries} ${params[2]})`);
                 break;
             }
             case "map_clear_val": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
                 bodyres = new SMTValue(`(${cons} (- ${size} 1) (store ${has} ${params[1]} false) ${keys} ${entries} ${params[2]})`);
                 break;
             }
             case "set_unsafe_update": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
-                const kl = this.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const kl = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
                 bodyres = new SMTValue(`(${cons} ${size} ${has} (store ${entries} ${params[1]} ${params[2]}) ${kl})`);
                 break;
             }
             case "map_unsafe_update": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
-                const kl = this.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const kl = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
                 bodyres = new SMTValue(`(${cons} ${size} ${has} ${keys} (store ${entries} ${params[1]} ${params[2]}) ${kl})`);
                 break;
             }
             case "set_unsafe_add":  {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
                 bodyres = new SMTValue(`(${cons} (+ ${size} 1) (store ${has} ${params[1]} true) (store ${entries} ${params[1]} ${params[2]}) ${params[3]})`);
                 break;
             }
             case "map_unsafe_add": {
-                const cons = this.generateSpecialTypeConsName(enclkey);
-                const size = this.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
-                const has = this.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
-                const keys = this.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
-                const entries = this.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
+                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
+                const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
+                const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
+                const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
                 bodyres = new SMTValue(`(${cons}(+ ${size} 1) (store ${has} ${params[1]} true) (store ${keys} ${params[1]} ${params[2]}) (store ${entries} ${params[1]} ${params[3]}) ${params[4]})`);
                 break;
             }
