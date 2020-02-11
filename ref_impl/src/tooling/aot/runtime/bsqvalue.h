@@ -73,36 +73,36 @@ namespace BSQ
 enum class MIRPropertyEnum
 {
     Invalid = 0,
-//%%PROPERTY_ENUM_DECLARE
+//%%PROPERTY_ENUM_DECLARE%%
 };
 
 enum class MIRNominalTypeEnum
 {
     Invalid = 0x0,
-//%%NOMINAL_TYPE_ENUM_DECLARE
+//%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
 constexpr char* propertyNames[] = {
     "Invalid",
-//%%PROPERTY_NAMES
+//%%PROPERTY_NAMES%%
 };
 
 constexpr const char* nominaltypenames[] = {
     "[INVALID]",
-//%%NOMINAL_TYPE_DISPLAY_NAMES
+//%%NOMINAL_TYPE_DISPLAY_NAMES%%
 };
 
 constexpr std::pair<size_t, MIRNominalTypeEnum*> nominalSubtypeRelation[] = {
   std::make_pair<size_t, MIRNominalTypeEnum*>(0, {}),
-//%%CONCEPT_SUBTYPE_RELATION_DECLARE  
+//%%CONCEPT_SUBTYPE_RELATION_DECLARE%%
 };
 
 constexpr DATA_KIND_FLAG nominalDataKinds[] = {
   DATA_KIND_CLEAR_FLAG,
-//%%NOMINAL_TYPE_TO_DATA_KIND
+//%%NOMINAL_TYPE_TO_DATA_KIND%%
 };
 
-//%%SPECIAL_NAME_BLOCK_BEGIN
+//%%SPECIAL_NAME_BLOCK_BEGIN%%
 #define MIRNominalTypeEnum_None MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Bool MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
@@ -115,7 +115,7 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
-//%%SPECIAL_NAME_BLOCK_END
+//%%SPECIAL_NAME_BLOCK_END%%
 
 typedef void* IntValue;
 typedef void* KeyValue;
