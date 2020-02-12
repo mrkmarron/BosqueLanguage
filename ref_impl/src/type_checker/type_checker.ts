@@ -4193,6 +4193,8 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitReturnAssign(body.body.sinfo, rtuple, env.refparams, etreg);
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "returnassign");
 
+                this.m_emitter.bodyEmitter.setActiveBlock("returnassign");
+
                 if (postject !== undefined) {
                     const postreg = this.m_emitter.bodyEmitter.generateTmpRegister();
                     const postfail = this.m_emitter.bodyEmitter.createNewBlock("postfail");
@@ -4208,7 +4210,7 @@ class TypeChecker {
 
                     this.m_emitter.bodyEmitter.setActiveBlock(postok);
                 }
-
+                
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
             }
 
@@ -4240,20 +4242,25 @@ class TypeChecker {
             this.raiseErrorIf(body.body.sinfo, renv.hasNormalFlow(), "Not all flow paths return a value!");
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(renv.returnResult as ResolvedType, resultType), "Did not produce the expected return type");
 
-            if (this.m_emitEnabled && postject !== undefined) {
-                const postreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                const postfail = this.m_emitter.bodyEmitter.createNewBlock("postfail");
-                const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
+            if (this.m_emitEnabled) {
+                this.m_emitter.bodyEmitter.setActiveBlock("returnassign");
 
-                const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                const postargs = [new MIRVariable("_result_"), ...postject[1]]
-                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, postject[0], postargs, [], postreg);
-                this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
+                if (postject !== undefined) {
+                    const postreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const postfail = this.m_emitter.bodyEmitter.createNewBlock("postfail");
+                    const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
 
-                this.m_emitter.bodyEmitter.setActiveBlock(postfail);
-                this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail post-condition");
+                    const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
+                    const postargs = [new MIRVariable("_result_"), ...postject[1]]
+                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, postject[0], postargs, [], postreg);
+                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
 
-                this.m_emitter.bodyEmitter.setActiveBlock(postok);
+                    this.m_emitter.bodyEmitter.setActiveBlock(postfail);
+                    this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail post-condition");
+
+                    this.m_emitter.bodyEmitter.setActiveBlock(postok);
+                }
+
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
             }
 

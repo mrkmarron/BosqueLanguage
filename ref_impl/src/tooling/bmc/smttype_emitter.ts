@@ -191,11 +191,11 @@ class SMTTypeEmitter {
             return "3";
         }
 
-        if(this.typecheckIsAPI_Always(tt) && !this.typecheckIsPOD_Never(tt)) {
+        if(this.typecheckIsAPI_Always(tt)) {
             return "1";
         }
 
-        if(this.typecheckIsAPI_Never(tt)) {
+        if(this.typecheckIsAPI_Never(tt) && this.typecheckIsPOD_Never(tt)) {
             return "0";
         }
 

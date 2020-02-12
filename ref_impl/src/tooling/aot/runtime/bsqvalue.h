@@ -22,11 +22,11 @@
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
 
 #define BSQ_IS_VALUE_BOOL(V) ((((uintptr_t)(V)) & 0x2) == 0x2)
-#define BSQ_IS_VALUE_TAGGED_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x3)
+#define BSQ_IS_VALUE_TAGGED_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x4)
 #define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0x7) == 0)
 
 #define BSQ_GET_VALUE_BOOL(V) (((uintptr_t)(V)) & 0x1)
-#define BSQ_GET_VALUE_TAGGED_INT(V) (int64_t)(((int64_t)(V)) >> 0x4)
+#define BSQ_GET_VALUE_TAGGED_INT(V) (int64_t)(((int64_t)(V)) >> 0x3)
 #define BSQ_GET_VALUE_PTR(V, T) (reinterpret_cast<T*>(V))
 
 #define BSQ_ENCODE_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
@@ -38,9 +38,9 @@
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(true)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(false)
 
-#define BSQ_VALUE_0 BSQ_IS_VALUE_TAGGED_INT(0)
-#define BSQ_VALUE_POS_1 BSQ_IS_VALUE_TAGGED_INT(1)
-#define BSQ_VALUE_NEG_1 BSQ_IS_VALUE_TAGGED_INT(-1)
+#define BSQ_VALUE_0 BSQ_ENCODE_VALUE_TAGGED_INT(0)
+#define BSQ_VALUE_POS_1 BSQ_ENCODE_VALUE_TAGGED_INT(1)
+#define BSQ_VALUE_NEG_1 BSQ_ENCODE_VALUE_TAGGED_INT(-1)
 
 #define HASH_COMBINE(H1, H2) (((527 + H1) * 31) + H2)
 
@@ -449,21 +449,19 @@ public:
 
     BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(entries)), flag(flag) { ; }
 
-    static BSQTuple* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, int n, ...)
+    template <uint16_t n>
+    static BSQTuple* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const Value(&values)[n])
     {
         Value val;
         std::vector<Value> entries;
 
-        va_list vl;
-        va_start(vl, n);
         for (int i = 0; i < n; i++)
         {
-            val = va_arg(vl, Value);
+            val = values[i];
 
             BSQRef::incrementChecked(val);
             entries.push_back(val);
         }
-        va_end(vl);
 
         if(flag == DATA_KIND_UNKNOWN_FLAG)
         {
@@ -505,7 +503,6 @@ public:
     }
 };
 
-typedef std::pair<MIRPropertyEnum, Value> BSQRecordPairEntry; //because va_arg hates a ,
 class BSQRecord : public BSQRef
 {
 public:
@@ -514,21 +511,19 @@ public:
 
     BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Record), entries(move(entries)), flag(flag) { ; }
 
-    static BSQRecord* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, int n, ...)
+    template <uint16_t n>
+    static BSQRecord* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const std::pair<MIRPropertyEnum, Value>(&values)[n])
     {
-        BSQRecordPairEntry val;
+        std::pair<MIRPropertyEnum, Value> val;
         std::map<MIRPropertyEnum, Value> entries;
 
-        va_list vl;
-        va_start(vl, n);
         for (int i = 0; i < n; i++)
         {
-            val = va_arg(vl, BSQRecordPairEntry);
+            val = values[i];
 
             BSQRef::incrementChecked(val.second);
             entries.insert(val);
         }
-        va_end(vl);
 
         if(flag == DATA_KIND_UNKNOWN_FLAG)
         {
@@ -541,21 +536,19 @@ public:
         return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries), flag);
     }
 
-    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, DATA_KIND_FLAG flag, int n, ...)
+    template <uint16_t n>
+    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, DATA_KIND_FLAG flag, const std::pair<MIRPropertyEnum, Value>(&values)[n])
     {
-        BSQRecordPairEntry val;
+        std::pair<MIRPropertyEnum, Value> val;
         std::map<MIRPropertyEnum, Value> entries;
 
-        va_list vl;
-        va_start(vl, n);
         for (int i = 0; i < n; i++)
         {
-            val = va_arg(vl, BSQRecordPairEntry);
+            val = values[i];
 
             BSQRef::incrementChecked(val.second);
             entries.insert(val);
         }
-        va_end(vl);
 
         for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
             auto pos = entries.lower_bound(iter->first);

@@ -45,17 +45,16 @@ public:
         BSQRef::decrementChecked(keys);
     }
 
-    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, int n, ...)
+    template <uint16_t n>
+    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
     {
         T val;
         std::unordered_map<K, T, K_HASH, K_EQ> entries;
         K_LIST* keys = nullptr;
 
-        va_list vl;
-        va_start(vl, n);
         for (int i = 0; i < n; i++)
         {
-            val = va_arg(vl, T);
+            val = values[i];
             auto key = T_GET_KEY(val);
 
             auto iter = entries.find(key);
@@ -76,7 +75,6 @@ public:
                 entries.insert(std::make_pair(key, val));
             }
         }
-        va_end(vl);
 
         return BSQ_NEW_ADD_SCOPE(scope, Ty, ntype, move(entries), keys);
     }

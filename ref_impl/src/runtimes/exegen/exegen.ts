@@ -120,10 +120,10 @@ setImmediate(() => {
             + cparams.EPHEMERAL_LIST_DECLARE
             + "\n\n/*vable decls*/\n"
             + "\n\nclass BSQVable"
-            + "{"
+            + "\n{"
             + "\n  " + cparams.VFIELD_DECLS
             + "\n  " + cparams.VMETHOD_DECLS
-            + "};"
+            + "\n};"
             + "\n\n/*forward function decls*/\n"
             + cparams.FUNC_DECLS_FWD
             + "\n\n/*type decls*/\n"
@@ -149,10 +149,10 @@ setImmediate(() => {
 
         console.log(`Compiling C++ code with ${Commander.compiler} into exe file "${chalk.bold(Commander.outfile)}"...`);
         let buildOpts = "";
-        if(Commander.build === "debug") {
-            buildOpts = " -g -DBDEBUG -O0";
+        if(Commander.level === "debug") {
+            buildOpts = " -g -DBDEBUG";
         }
-        else if (Commander.build === "test") {
+        else if (Commander.level === "test") {
             buildOpts = " -g -DBDEBUG -Os"
         }
         else {

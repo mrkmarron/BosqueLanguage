@@ -266,7 +266,7 @@ class CPPBodyEmitter {
                 return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
             });
 
-            conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.length}, ${cvals.join(", ")})`;
+            conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /NSCore::Set<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
@@ -274,7 +274,7 @@ class CPPBodyEmitter {
                 return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
             });
 
-            conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.length}, ${cvals.join(", ")})`;
+            conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
         }
         else {
             const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
@@ -286,7 +286,7 @@ class CPPBodyEmitter {
                 return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
             });
 
-            conscall = `${cppctype}::createFromSingle(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, ${cvals.length}, ${cvals.join(", ")})`;
+            conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
         }
 
         return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
@@ -301,7 +301,7 @@ class CPPBodyEmitter {
         else {
             const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultTupleType));
-            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle(${scopevar}, ${iflag}, ${args.length}, ${args.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${args.length}>(${scopevar}, ${iflag}, { ${args.join(", ")} });`;
         }
     }
 
@@ -314,7 +314,7 @@ class CPPBodyEmitter {
         else {
             const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultRecordType));
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${iflag}, ${args.length}, ${args.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${args.length}>(${scopevar}, ${iflag}, { ${args.join(", ")} });`;
         }
     }
 
@@ -356,7 +356,7 @@ class CPPBodyEmitter {
         else {
             const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
-            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle(${scopevar}, ${iflag}, ${vals.length}, ${vals.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${vals.length}>(${scopevar}, ${iflag}, { ${vals.join(", ")} });`;
         }
     }
 
@@ -383,7 +383,7 @@ class CPPBodyEmitter {
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
         const realsize = `std::min(${updmax}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->entries.size())`;
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle(${scopevar}, ${iflag}, ${realsize}, ${cvals.join(", ")});`; 
+        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${realsize}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
     }
 
     generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): string {
@@ -404,7 +404,7 @@ class CPPBodyEmitter {
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
         const realsize = `BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->entries.size() + BSQ_GET_VALUE_PTR(${this.varToCppName(op.update)}, BSQTuple)->entries.size()`;
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle(${scopevar}, ${iflag}, ${realsize}, ${cvals.join(", ")});`; 
+        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${realsize}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
     }
 
     generateMIRAccessFromPropertyExpression(arg: MIRArgument, property: string, resultAccessType: MIRType): string {
@@ -439,7 +439,7 @@ class CPPBodyEmitter {
 
             const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${iflag}, ${rargs.length}, ${rargs.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${rargs.length}>(${scopevar}, ${iflag}, { ${rargs.join(", ")} });`;
         }
     }
 
@@ -457,7 +457,7 @@ class CPPBodyEmitter {
 
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultRecordType);
-        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate(${scopevar}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQRecord), ${iflag}, ${cvals.length}, ${cvals.join(", ")});`;
+        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate<${cvals.length}(${scopevar}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQRecord), ${iflag}, { ${cvals.join(", ")} });`;
     }
 
     generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultRecordType: MIRType): string {
@@ -482,7 +482,7 @@ class CPPBodyEmitter {
 
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultRecordType);
-        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate(${scopevar}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQRecord), ${iflag}, ${cvals.length}, ${cvals.join(", ")});`;
+        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate<${cvals.length}>(${scopevar}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQRecord), ${iflag}, { ${cvals.join(", ")} });`;
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
@@ -535,7 +535,7 @@ class CPPBodyEmitter {
 
             const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultProjectType));
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle(${scopevar}, ${iflag}, ${cvals.length}, ${cvals.join(", ")});`;
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${cvals.length}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`;
         }
     }
 

@@ -421,6 +421,8 @@ struct DisplayFunctor_BSQIdKey
                 rvals += conv.from_bytes(propertyNames[(int32_t)idk.keys[i].first]) + U"=" + diagnostic_format(idk.keys[i].second);
             }
             rvals += U" }"; 
+
+            return rvals;
         }
     }
 };

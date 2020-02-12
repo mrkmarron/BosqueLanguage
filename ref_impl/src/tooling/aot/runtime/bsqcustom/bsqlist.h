@@ -22,19 +22,17 @@ public:
     Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
     Ty(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
-    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, int n, ...)
+    template <uint16_t n>
+    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
     {
         T val;
         std::vector<T> entries;
 
-        va_list vl;
-        va_start(vl, n);
         for (int i = 0; i < n; i++)
         {
-            val = va_arg(vl, T);
+            val = values[i];
             entries.push_back(val);
         }
-        va_end(vl);
 
         return BSQ_NEW_ADD_SCOPE(scope, Ty, ntype, move(entries));
     }

@@ -159,11 +159,14 @@ class SMTEmitter {
             if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::String$/)
                     || typeemitter.typecheckIsName(tt, /^NSCore::GUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::EventTime$/) 
                     || typeemitter.typecheckIsName(tt, /^NSCore::DataHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/)
-                    || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/)
-                    || typeemitter.typecheckIsName(tt, /^NSCore::Tuple$/) || typeemitter.typecheckIsName(tt, /^NSCore::Record$/)) {
+                    || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
                         special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} "${typeemitter.mangleStringForSMT(tt.trkey)}"))`);
                     }
             
+            if (tt.trkey === "NSCore::Tuple" || tt.trkey === "NSCore::Record") {
+                special_name_decls.push(`#define MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum::${typeemitter.mangleStringForSMT(tt.trkey)}`);
+            }
+
             if(tt.options.length === 1 && (tt.options[0] instanceof MIREntityType)) {
                 const ndn = typeemitter.mangleStringForSMT(tt.trkey);
                 const dk = typeemitter.generateInitialDataKindFlag(tt);

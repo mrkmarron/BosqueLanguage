@@ -189,11 +189,11 @@ class CPPTypeEmitter {
             return "DATA_KIND_POD_FLAG";
         }
 
-        if(this.typecheckIsAPI_Always(tt) && !this.typecheckIsPOD_Never(tt)) {
+        if(this.typecheckIsAPI_Always(tt)) {
             return "DATA_KIND_API_FLAG";
         }
 
-        if(this.typecheckIsAPI_Never(tt)) {
+        if(this.typecheckIsAPI_Never(tt) && this.typecheckIsPOD_Never(tt)) {
             return "DATA_KIND_CLEAR_FLAG";
         }
 
