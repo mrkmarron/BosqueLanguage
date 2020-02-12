@@ -9,7 +9,7 @@
 
 import * as assert from "assert";
 import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect } from "./mir_ops";
-import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl } from "./mir_assembly";
+import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRFieldDecl } from "./mir_assembly";
 
 type CallGNode = {
     invoke: MIRInvokeKey,
@@ -44,11 +44,13 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                     break;
                 }
                 case MIROpTag.MIRAccessConstantValue: {
-                    invokeNode.callees.add((op as MIRAccessConstantValue).ckey);
+                    const cdecl = assembly.constantDecls.get((op as MIRAccessConstantValue).ckey) as MIRConstantDecl;
+                    invokeNode.callees.add(cdecl.value);
                     break;
                 }
                 case MIROpTag.MIRLoadFieldDefaultValue: {
-                    invokeNode.callees.add((op as MIRLoadFieldDefaultValue).fkey);
+                    const fdecl = assembly.fieldDecls.get((op as MIRLoadFieldDefaultValue).fkey) as MIRFieldDecl;
+                    invokeNode.callees.add(fdecl.value as MIRInvokeKey);
                     break;
                 }
                 case MIROpTag.MIRInvokeInvariantCheckDirect: {

@@ -1364,9 +1364,9 @@ class Assembly {
         if (ooptype.staticFunctions.has(fname) && !(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("override")) {
             let newbinds = new Map<string, ResolvedType>();
             oobinds.forEach((v, k) => newbinds.set(k, v));
-            (ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
+            (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
 
-            return {pre: [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds], post: [(ooptype.memberMethods.get(fname) as StaticFunctionDecl).invoke.postconditions, newbinds]};
+            return {pre: [(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds], post: [(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.postconditions, newbinds]};
         }
 
         return undefined;

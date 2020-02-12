@@ -266,7 +266,7 @@ class CPPTypeEmitter {
                 return "BSQRecord" + (declspec !== "base" ? "*" : "");
             }
             else if(this.typecheckUEntity(tt)) {
-                return this.mangleStringForCpp(tt.trkey);
+                return this.mangleStringForCpp(tt.trkey) + (declspec !== "base" ? "*" : "");
             }
             else if(this.typecheckEphemeral(tt)) {
                 return this.mangleStringForCpp(tt.trkey);
@@ -819,7 +819,7 @@ class CPPTypeEmitter {
             });
 
             const faccess = entity.fields.map((f) => this.coerce(`this->${this.mangleStringForCpp(f.fkey)}`, this.getMIRType(f.declaredType), this.anyType));
-            const fjoins = faccess.length !== 0 ? faccess.map((fa) => `Runtime::diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
+            const fjoins = faccess.length !== 0 ? faccess.map((fa) => `diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
             const display = "std::u32string display() const\n"
                 + "    {\n"
                 + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
@@ -833,7 +833,8 @@ class CPPTypeEmitter {
                     + "public:\n"
                     + `    ${fields.join("\n    ")}\n\n`
                     + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
-                    + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
+                    + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ; }\n\n`
+                    + `    virtual void destroy ${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
                     + `    ${display}\n\n`
                     + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
                     + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`

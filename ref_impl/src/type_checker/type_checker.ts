@@ -4290,7 +4290,7 @@ class TypeChecker {
     private processGenerateSpecialExpFunction(fkey: MIRInvokeKey, iname: string, binds: Map<string, ResolvedType>, exp: Expression, rtype: TypeSignature, srcFile: string, sinfo: SourceInfo) {
         try {
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, exp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [], undefined, undefined, [rtype], [], [], false, new Set<string>(), body);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [], undefined, undefined, rtype, [], [], false, new Set<string>(), body);
 
             const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, binds, [], binds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
@@ -4310,7 +4310,7 @@ class TypeChecker {
 
             const fp = new FunctionParameter("this", new NominalTypeSignature(tdecl.ns, tdecl.name, tdecl.terms), false, false);
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [fp], undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [fp], undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
 
             const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, binds, [], binds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
@@ -4372,7 +4372,7 @@ class TypeChecker {
             }
 
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
 
             const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, declbinds, [], bodybinds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
@@ -4414,7 +4414,7 @@ class TypeChecker {
             }
 
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, [new NominalTypeSignature("NSCore", "Bool")], [], [], false, new Set<string>(), body);
+            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
 
             const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, declbinds, [], bodybinds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
@@ -4460,11 +4460,14 @@ class TypeChecker {
 
             const fields: MIRFieldDecl[] = [];
             tdecl.memberFields.forEach((f) => {
-                const dkey = MIRKeyGenerator.generateStaticKey(tdecl, `${f.name}@@cons`, binds, []);
-                const iname = `${MIRKeyGenerator.generateTypeKey(tdecl, binds)}::${f.name}@@cons`;
-                const ddecltype = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
-                this.processGenerateSpecialExpFunction(dkey, iname, new Map<string, ResolvedType>(), f.value as Expression, ddecltype, f.srcFile, f.sourceLocation);
-    
+                let dkey: string | undefined = undefined;
+
+                if (f.value !== undefined) {
+                    dkey = MIRKeyGenerator.generateStaticKey(tdecl, `${f.name}@@cons`, binds, []);
+                    const iname = `${MIRKeyGenerator.generateTypeKey(tdecl, binds)}::${f.name}@@cons`;
+                    this.processGenerateSpecialExpFunction(dkey, iname, new Map<string, ResolvedType>(), f.value as Expression, f.declaredType, f.srcFile, f.sourceLocation);
+                }
+
                 const fkey = MIRKeyGenerator.generateFieldKey(tdecl, binds, f.name);
                 const fpragmas = this.processPragmas(f.sourceLocation, f.pragmas);
                 const dtypeResolved = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
@@ -4498,11 +4501,11 @@ class TypeChecker {
         try {
             const fkey = MIRKeyGenerator.generateFunctionKey(gdecl.ns, `${gdecl.name}@@cons`, new Map<string, ResolvedType>(), []);
             const iname = `${gdecl.ns}::${gdecl.name}@@cons`;
-            const ddecltype = this.resolveAndEnsureTypeOnly(gdecl.sourceLocation, gdecl.declaredType, new Map<string, ResolvedType>());
 
-            this.processGenerateSpecialExpFunction(fkey, iname, new Map<string, ResolvedType>(), gdecl.value, ddecltype, gdecl.srcFile, gdecl.sourceLocation);
+            this.processGenerateSpecialExpFunction(fkey, iname, new Map<string, ResolvedType>(), gdecl.value, gdecl.declaredType, gdecl.srcFile, gdecl.sourceLocation);
 
             const pragmas = this.processPragmas(gdecl.sourceLocation, gdecl.pragmas);
+            const ddecltype = this.resolveAndEnsureTypeOnly(gdecl.sourceLocation, gdecl.declaredType, new Map<string, ResolvedType>());
             const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
             const mirglobal = new MIRConstantDecl(undefined, `${gdecl.ns}::${gdecl.name}`, gkey, pragmas, gdecl.sourceLocation, gdecl.srcFile, dtype.trkey, fkey);
 
@@ -4518,12 +4521,12 @@ class TypeChecker {
         try {
             const fkey = MIRKeyGenerator.generateStaticKey(containingDecl, `${cdecl.name}@@cons`, binds, []);
             const iname = `${MIRKeyGenerator.generateTypeKey(containingDecl, binds)}::${cdecl.name}@@cons`;
-            const ddecltype = this.resolveAndEnsureTypeOnly(cdecl.sourceLocation, cdecl.declaredType, binds);
 
-            this.processGenerateSpecialExpFunction(fkey, iname, new Map<string, ResolvedType>(), cdecl.value as Expression, ddecltype, cdecl.srcFile, cdecl.sourceLocation);
+            this.processGenerateSpecialExpFunction(fkey, iname, new Map<string, ResolvedType>(), cdecl.value as Expression, cdecl.declaredType, cdecl.srcFile, cdecl.sourceLocation);
 
             const pragmas = this.processPragmas(cdecl.sourceLocation, cdecl.pragmas);
             const enclosingType = MIRKeyGenerator.generateTypeKey(containingDecl, binds);
+            const ddecltype = this.resolveAndEnsureTypeOnly(cdecl.sourceLocation, cdecl.declaredType, binds);
             const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
             const mirconst = new MIRConstantDecl(enclosingType, `${enclosingType}::${cdecl.name}`, ckey, pragmas, cdecl.sourceLocation, cdecl.srcFile, dtype.trkey, fkey);
 

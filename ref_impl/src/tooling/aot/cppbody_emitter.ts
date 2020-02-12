@@ -397,7 +397,7 @@ class CPPBodyEmitter {
         const rmax = this.typegen.getMaxTupleLength(resultTupleType);
         for (let i = btuple; i < rmax; ++i) {
             //may put none in the constructor list but ok since we note correct length and will ignore these if extranious
-            cvals.push(this.generateMIRAccessFromIndexExpression(op.update, i, this.typegen.anyType));
+            cvals.push(this.generateMIRAccessFromIndexExpression(op.update, i - btuple, this.typegen.anyType));
         }
 
         const scopevar = this.varNameToCppName("$scope$");
@@ -679,7 +679,7 @@ class CPPBodyEmitter {
     generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
         let coreop = "";
         if (isstrict) {
-            coreop = `EqualFunctor_${this.typegen.getCPPTypeFor(lhsinfertype, "base")}{}(${this.argToCpp(lhs, lhsinfertype)} ${op} ${this.argToCpp(rhs, rhsinfertype)})`;
+            coreop = `EqualFunctor_${this.typegen.getCPPTypeFor(lhsinfertype, "base")}{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
         }
         else {
             coreop = `BSQIndexableEqual{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
@@ -1344,7 +1344,7 @@ class CPPBodyEmitter {
                     return "assert(false);";
                 }
                 else {
-                    return `{ std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv; std::cout << conv.to_bytes(Runtime::diagnostic_format(${this.argToCpp(dbgop.value, this.typegen.anyType)})) << "\\n"; }`;
+                    return `{ std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv; std::cout << conv.to_bytes(diagnostic_format(${this.argToCpp(dbgop.value, this.typegen.anyType)})) << "\\n"; }`;
                 }
             }
             case MIROpTag.MIRJump: {

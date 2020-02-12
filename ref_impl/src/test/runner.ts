@@ -76,9 +76,9 @@ else if ((Commander.symbolic || Commander.result) !== undefined) {
         }
 
         const entrypoint = massembly.invokeDecls.get((Commander.symbolic || Commander.result)) as MIRInvokeBodyDecl;
-        const PODType = massembly.typeMap.get("NSCore::POD") as MIRType;
-        if (entrypoint.params.some((p) => !massembly.subtypeOf(massembly.typeMap.get(p.type) as MIRType, PODType))) {
-            process.stderr.write("Only PODTypes are supported for symbolic testing!!!\n");
+        const APIType = massembly.typeMap.get("NSCore::APIType") as MIRType;
+        if (entrypoint.params.some((p) => !massembly.subtypeOf(massembly.typeMap.get(p.type) as MIRType, APIType))) {
+            process.stderr.write("Only APITypes are supported for symbolic testing!!!\n");
             process.exit(1);
         }
 

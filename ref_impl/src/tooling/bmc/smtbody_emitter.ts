@@ -423,7 +423,7 @@ class SMTBodyEmitter {
         let fvals = "3";
         let cvals = "bsqtuple_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
-            cvals = `(store ${cvals} ${i} ${this.argToSMT(op.args[i], this.typegen.anyType)})`;
+            cvals = `(store ${cvals} ${i} ${this.argToSMT(op.args[i], this.typegen.anyType).emit()})`;
             fvals = `(@fj ${this.argToSMT(op.args[i], this.typegen.anyType)} ${fvals})`;
         }
 
@@ -434,7 +434,7 @@ class SMTBodyEmitter {
         let fvals = "3";
         let cvals = "bsqrecord_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
-            cvals = `(store ${cvals} "${op.args[i][0]}" ${this.argToSMT(op.args[i][1], this.typegen.anyType)})`;
+            cvals = `(store ${cvals} "${op.args[i][0]}" ${this.argToSMT(op.args[i][1], this.typegen.anyType).emit()})`;
             fvals = `(@fj ${this.argToSMT(op.args[i][1], this.typegen.anyType)} ${fvals})`;
         }
 
@@ -503,8 +503,8 @@ class SMTBodyEmitter {
         for (let i = 0; i < updmax; ++i) {
             const upd = op.updates.find((update) => update[0] === i);
             if (upd !== undefined) {
-                cvals = `(store ${cvals} ${i} ${this.argToSMT(upd[1], this.typegen.anyType)})`;
-                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType)} ${fvals})`;
+                cvals = `(store ${cvals} ${i} ${this.argToSMT(upd[1], this.typegen.anyType).emit()})`;
+                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType).emit()} ${fvals})`;
             }
             else {
                 cvals = `(store ${cvals} ${i} ${this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType).emit()})`;
@@ -547,7 +547,7 @@ class SMTBodyEmitter {
         }
         else {
             const reccontents = this.typegen.typecheckRecord(rectype) ? `(bsq_record_entries ${this.varToSMTName(arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(arg)}))`;
-            const select = new SMTValue(`(select ${reccontents} ${property})`);
+            const select = new SMTValue(`(select ${reccontents} "${property}")`);
             if(hasproperty === "yes") {
                 return this.typegen.coerce(select, this.typegen.anyType, resultAccessType);
             }
@@ -591,8 +591,8 @@ class SMTBodyEmitter {
             const pname = pmax[i];
             const upd = op.updates.find((update) => update[0] === pname);
             if (upd !== undefined) {
-                cvals = `(store ${cvals} "${pname}" ${this.argToSMT(upd[1], this.typegen.anyType)})`;
-                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType)} ${fvals})`;
+                cvals = `(store ${cvals} "${pname}" ${this.argToSMT(upd[1], this.typegen.anyType).emit()})`;
+                fvals = `(@fj ${this.argToSMT(upd[1], this.typegen.anyType).emit()} ${fvals})`;
             }
             else {
                 cvals = `(store ${cvals} "${pname}" (select ${tc} "${pname}"))`

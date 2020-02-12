@@ -2907,7 +2907,7 @@ class Parser {
 
         const ename = this.consumeTokenAndGetValue();
         const etype = new NominalTypeSignature(currentDecl.ns, ename);
-        const simpleETypeResult = [etype];
+        const simpleETypeResult = etype;
 
         try {
             this.setRecover(this.scanCodeParens());
@@ -2973,7 +2973,7 @@ class Parser {
         }
 
         const itype = new NominalTypeSignature(currentDecl.ns, iname);
-        const simpleITypeResult = [itype];
+        const simpleITypeResult = itype;
 
         if(iscomposite) {
             const components = this.parseListOf("{", "}", ";", () => {
