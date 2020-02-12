@@ -1165,6 +1165,10 @@ class Assembly {
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
     getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
     
+    getSpecialBufferFormatType(): ResolvedType { return this.internSpecialObjectType("BufferFormat"); }
+    getSpecialBufferEncodingType(): ResolvedType { return this.internSpecialObjectType("BufferEncoding"); }
+    getSpecialBufferCompressionType(): ResolvedType { return this.internSpecialObjectType("BufferCompression"); }
+
     getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType("Any"); }
     getSpecialSomeConceptType(): ResolvedType { return this.internSpecialConceptType("Some"); }
 

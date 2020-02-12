@@ -38,7 +38,7 @@ concept Parsable provides Any {
 
 //<summary>Special type that all Validator (regex etc.) types provide.</summary>
 concept Validator provides Any {
-    abstract static validate(str: String): Bool; 
+    abstract static accepts(str: String): Bool; 
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
@@ -113,22 +113,22 @@ entity StringOf<T where Parsable> provides KeyType, Some {
 }
 
 enum BufferFormat {
-    Fluent,
-    JSON,
-    Binary
+    fluent,
+    json,
+    binary
 }
 
 enum BufferEncoding {
-    UTF8,
-    URI,
-    Base64
+    utf8,
+    uri,
+    base64
 }
 
 enum BufferCompression {
-    None,
-    RLE,
-    Time,
-    Space
+    off,
+    rle,
+    time,
+    space
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
@@ -157,14 +157,14 @@ entity EventTime provides KeyType, Parsable, PODType, APIType, Some {
 
 //<summary>Primitive hash value suitable for keys in maps or other associative containers.</summary>
 entity DataHash provides KeyType, Parsable, PODType, APIType, Some {
-    static compute<T>(T: value): DataHash # datahash_compute
+    static compute<T>(value: T): DataHash # datahash_compute
 
     override static tryParse(str: String): Result<Any, String> # datahash_tryparse
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
-entity CryptoHash provides provides KeyType, Parsable, PODType, APIType, Some {
-    static compute<T>(T: value): CryptoHash # cryptohash_compute
+entity CryptoHash provides KeyType, Parsable, PODType, APIType, Some {
+    static compute<T>(value: T): CryptoHash # cryptohash_compute
 
     override static tryParse(str: String): Result<Any, String> # cryptohash_tryparse
 }
@@ -195,7 +195,7 @@ concept CryptoHashIdKey provides KeyType, Some {
 
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {
-    method test(str: String, start?: Int, end?: Int): Bool # regex_match
+    method accepts(str: String, start?: Int, end?: Int): Bool # regex_match
 
     //
     //TODO: this is pretty boring right now

@@ -53,7 +53,7 @@ Commander
     .option("-e --entrypoint [entrypoint]", "Entrypoint of the exe", "NSMain::main")
     .option("-o --outfile [outfile]", "Optional name of the output exe", (process.platform === "win32") ? "a.exe" : "a.out")
     .option("-c --compiler [compiler]", "Compiler to use", (process.platform === "win32") ? "\"C:\\Program Files\\LLVM\\bin\\clang.exe\"" : "g++")
-    .option("-l --level", "Build level version", "debug");
+    .option("-l --level [level]", "Build level version", "debug");
 
 Commander.parse(process.argv);
 
@@ -95,7 +95,7 @@ setImmediate(() => {
             const bstart = bcontents.indexOf("//%%SPECIAL_NAME_BLOCK_BEGIN%%");
             const bend = bcontents.indexOf("//%%SPECIAL_NAME_BLOCK_END%%");
             if(bstart !== -1) {
-                bcontents = bcontents.slice(0, bstart) + "//%%SPECIAL_NAME_BLOCK_BEGIN%%\n" + cparams.SPECIAL_NAME_BLOCK_BEGIN + bcontents.slice(bend);
+                bcontents = bcontents.slice(0, bstart) + "//%%SPECIAL_NAME_BLOCK_BEGIN%%\n" + cparams.SPECIAL_NAME_BLOCK_BEGIN + "\n" + bcontents.slice(bend);
             }
 
             return { file: fname, contents: bcontents };

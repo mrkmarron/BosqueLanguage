@@ -82,7 +82,7 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
-constexpr char* propertyNames[] = {
+constexpr const char* propertyNames[] = {
     "Invalid",
 //%%PROPERTY_NAMES%%
 };
@@ -92,10 +92,7 @@ constexpr const char* nominaltypenames[] = {
 //%%NOMINAL_TYPE_DISPLAY_NAMES%%
 };
 
-constexpr std::pair<size_t, MIRNominalTypeEnum*> nominalSubtypeRelation[] = {
-  std::make_pair<size_t, MIRNominalTypeEnum*>(0, {}),
 //%%CONCEPT_SUBTYPE_RELATION_DECLARE%%
-};
 
 constexpr DATA_KIND_FLAG nominalDataKinds[] = {
   DATA_KIND_CLEAR_FLAG,

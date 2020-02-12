@@ -120,24 +120,24 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_unsafe_set(this, idx, v);
     }
 
-    method recursive? exists(p: recursive? fn(_: T) -> Bool): Bool {
+    recursive? method exists(p: recursive? fn(_: T) -> Bool): Bool {
         return List<T>::_exists[recursive](this, 0, p);
     }
 
-    method recursive? all(p: recursive? fn(_: T) -> Bool): Bool {
+    recursive? method all(p: recursive? fn(_: T) -> Bool): Bool {
         return List<T>::_all[recursive](this, 0, p);
     }
 
-    method recursive? filter(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_filter[recursive](this, 0, List<T>{}, p);
+    recursive? method filter(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_filter[recursive](this, 0, List<T>@{}, p);
     }
 
     method ofType<U>(): List<U> {
-        return List<T>::_ofType<U>[recursive](this, 0, List<U>{});
+        return List<T>::_ofType<U>[recursive](this, 0, List<U>@{});
     }
 
-    method recursive? map<U>(f: recursive? fn(_: T) -> U): List<U> {
-        return List<T>::_map<U>[recursive](this, 0, List<U>{}, f);
+    recursive? method map<U>(f: recursive? fn(_: T) -> U): List<U> {
+        return List<T>::_map<U>[recursive](this, 0, List<U>@{}, f);
     }
 
     method {when T Int} sum(): Int {
@@ -158,7 +158,7 @@ entity KeyList<K where KeyType> provides Object {
         }
         else {
             var newtail = KeyList<K>::removeKey[recursive](ttail, k);
-            return KeyList<K>{hkey=tkey, tail=newtail};
+            return KeyList<K>@{hkey=tkey, tail=newtail};
         }
     }
 }
@@ -174,6 +174,16 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
     
     hidden static _unsafe_update(s: Set<T>, k: T!KeyType, v: T): Set<T> # set_unsafe_update
     hidden static _unsafe_add(s: Set<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): Set<T> # set_unsafe_add
+
+    hidden recursive static _entry_list(s: Set<T>, kl: KeyList<T!KeyType>?, l: List<T>): List<T> {
+        if(kl == none) {
+            return l;
+        }
+        else {
+            var v = Set<T>::_at_val(s, kl.hkey);
+            return Set<T>::_entry_list[recursive](s, KeyList<K!KeyType>::_get_tail(kl), l->push(v));
+        }
+    }
 
     method size(): Int {
         return Set<T>::_size(this);
@@ -194,7 +204,7 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
         }
         else {
             var kle = Set<T>::_get_keylist(this);
-            return Set<T>::_unsafe_add(this, key, v, KeyList<T!KeyType>{hkey=key, tail=kle});
+            return Set<T>::_unsafe_add(this, key, v, KeyList<T!KeyType>@{hkey=key, tail=kle});
         }
     }
 
@@ -203,7 +213,7 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
         check !Set<T>::_has_key(this, key);
         
         var kle = Set<T>::_get_keylist(this);
-        return Set<T>::_unsafe_add(this, key, v, KeyList<T!KeyType>{hkey=key, tail=kle});
+        return Set<T>::_unsafe_add(this, key, v, KeyList<T!KeyType>@{hkey=key, tail=kle});
     }
 
     method remove(v: T): Set<T> {
@@ -215,6 +225,10 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
             var kle = Set<T>::_get_keylist(this);
             return Set<T>::_clear_val(this, key, kle != none ? KeyList<T!KeyType>::removeKey[recursive](kle, key) : none);
         }
+    }
+
+    method getEntries(): List<T> {
+        return Set<T>::_entry_list[recursive](this, Set<T>::_get_keylist(this), List<T>@{});
     }
 }
 
@@ -261,14 +275,14 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         }
     }
 
-    hidden recursive static _entry_list(m: Map<K, V>, kl: KeyList?, l: List<MapEntry<K, V>>): List<MapEntry<K, V>> {
+    hidden recursive static _entry_list(m: Map<K, V>, kl: KeyList<K!KeyType>?, l: List<MapEntry<K, V>>): List<MapEntry<K, V>> {
         if(kl == none) {
             return l;
         }
         else {
             var k = Map<K, V>::_at_key(m, kl.hkey);
             var v = Map<K, V>::_at_val(m, kl.hkey);
-            return Map<K, V>::_entry_list[recursive](m, KeyList<K!KeyType>::_get_tail(kl), l->push(MapEntry<K, V>{key=k, value=v}));
+            return Map<K, V>::_entry_list[recursive](m, KeyList<K!KeyType>::_get_tail(kl), l->push(MapEntry<K, V>@{key=k, value=v}));
         }
     }
 
@@ -303,7 +317,7 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         }
         else {
             var kle = Map<K, V>::_get_keylist(this);
-            return Map<K, V>::_unsafe_add(this, k, key, val, KeyList<K!KeyType>{hkey=k, tail=kle});
+            return Map<K, V>::_unsafe_add(this, k, key, val, KeyList<K!KeyType>@{hkey=k, tail=kle});
         }
     }
 
@@ -312,7 +326,7 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         check !Map<K, V>::_has_key(this, k);
         
         var kle = Map<K, V>::_get_keylist(this);
-        return Map<K, V>::_unsafe_add(this, k, key, val, KeyList<K!KeyType>{hkey=k, tail=kle});
+        return Map<K, V>::_unsafe_add(this, k, key, val, KeyList<K!KeyType>@{hkey=k, tail=kle});
     }
 
     method set(key: K, val: V): Map<K, V> {
@@ -334,18 +348,18 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
     }
 
     method getKeyList(): List<K> {
-        return Map<K, V>::_key_list[recursive](this, Map<K, V>::_get_keylist(this), List<K>{});
+        return Map<K, V>::_key_list[recursive](this, Map<K, V>::_get_keylist(this), List<K>@{});
     }
 
     method getKeySet(): Set<K> {
-        return Map<K, V>::_key_set[recursive](this, Map<K, V>::_get_keylist(this), Set<K>{});
+        return Map<K, V>::_key_set[recursive](this, Map<K, V>::_get_keylist(this), Set<K>@{});
     }
 
     method getValues(): List<V> {
-        return Map<K, V>::_value_list[recursive](this, Map<K, V>::_get_keylist(this), List<V>{});
+        return Map<K, V>::_value_list[recursive](this, Map<K, V>::_get_keylist(this), List<V>@{});
     }
 
     method getEntries(): List<MapEntry<K, V>> {
-        return Map<K, V>::_entry_list[recursive](this, Map<K, V>::_get_keylist(this), List<MapEntry<K, V>>{});
+        return Map<K, V>::_entry_list[recursive](this, Map<K, V>::_get_keylist(this), List<MapEntry<K, V>>@{});
     }
 }

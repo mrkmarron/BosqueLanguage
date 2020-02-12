@@ -55,7 +55,7 @@ class SMTTypeEmitter {
         this.tupleType = assembly.typeMap.get("NSCore::Tuple") as MIRType;
         this.recordType = assembly.typeMap.get("NSCore::Record") as MIRType;
 
-        this.enumtype = assembly.typeMap.get("NSCore::KeyType") as MIRType;
+        this.enumtype = assembly.typeMap.get("NSCore::Enum") as MIRType;
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
         this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
         this.eventtimeidkeytype = assembly.typeMap.get("NSCore::EventTimeIdKey") as MIRType;

@@ -2507,6 +2507,10 @@ class Parser {
         }
         this.testAndConsumeTokenIf("{");
 
+        if(parencheck) {
+            this.testAndConsumeTokenIf("when");
+        }
+        
         const trl = this.parseTermRestrictionList();
 
         if(parencheck) {
@@ -2635,7 +2639,7 @@ class Parser {
         if (this.testToken("provides")) {
             this.consumeToken();
 
-            while (!this.testToken("{") && !this.testToken(";")) {
+            while (!this.testToken("{")) {
                 this.consumeTokenIf(",");
 
                 const pv = this.parseTypeSignature();

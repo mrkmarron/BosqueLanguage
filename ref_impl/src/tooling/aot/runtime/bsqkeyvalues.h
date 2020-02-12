@@ -228,7 +228,7 @@ public:
 
     inline static bool keyEqual(const BSQDataHash* l, const BSQDataHash* r)
     {
-        l->hdata == r->hdata;
+        return l->hdata == r->hdata;
     }
 };
 struct HashFunctor_BSQDataHash

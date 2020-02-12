@@ -1393,9 +1393,9 @@ class TypeChecker {
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
             if (this.m_assembly.subtypeOf(aoftype.ofresolved, this.m_assembly.getSpecialValidatorConceptType())) {
-                const sdecl = aoftype.oftype[0].staticFunctions.get("validate");
+                const sdecl = aoftype.oftype[0].staticFunctions.get("accepts");
                 this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'validate'");
-                const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "validate", aoftype.oftype[1], [], []) : undefined;
+                const pfunckey = this.m_doLiteralStringValidate ? this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "accepts", aoftype.oftype[1], [], []) : undefined;
 
                 this.m_emitter.bodyEmitter.emitLoadValidatedTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, pfunckey, trgt);
             }
