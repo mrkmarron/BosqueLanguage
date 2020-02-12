@@ -283,7 +283,7 @@ class CPPTypeEmitter {
             return "BSQ_VALUE_NONE";
         }
         else if (this.typecheckIsName(from, /^NSCore::Bool$/)) {
-            return `BSQ_BOX_VALUE_BOOL(${exp})`;
+            return `BSQ_ENCODE_VALUE_BOOL(${exp})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::EventTime$/)) {
             return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTime, ${exp})`;
@@ -349,7 +349,7 @@ class CPPTypeEmitter {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
         }
         else {
-            return `BSQ_GET_VALUE_PTR(${this.getCPPTypeFor(into, "base")}, ${exp})`;
+            return `BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
         }
     }
 
@@ -406,7 +406,7 @@ class CPPTypeEmitter {
         }
         else {
            //now from must be Bterm so we are projecting down
-           assert(this.getCPPTypeFor(into, "base") === "Value");
+           assert(this.getCPPTypeFor(from, "base") === "Value");
 
            if (into.trkey === "NSCore::None") {
                return this.coerceIntoAtomicKey(exp, into);
@@ -461,10 +461,10 @@ class CPPTypeEmitter {
     }
 
     tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
-        if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length < idx && !opt.entries[idx].isOptional)) {
+        if(tt.options.every((opt) => opt instanceof MIRTupleType && idx < opt.entries.length && !opt.entries[idx].isOptional)) {
             return "yes";
         }
-        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length >= idx)) {
+        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length <= idx)) {
             return "no";
         }
         else {

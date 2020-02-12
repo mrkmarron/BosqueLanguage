@@ -99,7 +99,7 @@ else if ((Commander.symbolic || Commander.result) !== undefined) {
         .replace(";;FUNCTION_DECLS;;", sparams.FUNCTION_DECLS)
         .replace(";;ARG_VALUES;;", sparams.ARG_VALUES)
         .replace(";;INVOKE_ACTION;;", sparams.INVOKE_ACTION)
-        .replace(";;GET_MODEL;;", Commander.model ? "(get-model)" : "");
+        .replace(";;GET_MODEL;;", (Commander.result !== undefined) ? "(get-model)" : "");
 
         const smtpath = Path.join(scratchroot, "smt");
         FS.mkdirSync(smtpath, { recursive: true });

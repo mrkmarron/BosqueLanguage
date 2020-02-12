@@ -382,8 +382,7 @@ class CPPBodyEmitter {
 
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
-        const realsize = `std::min(${updmax}, BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->entries.size())`;
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${realsize}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
+        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingleDynamic(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
     }
 
     generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): string {
@@ -403,8 +402,7 @@ class CPPBodyEmitter {
 
         const scopevar = this.varNameToCppName("$scope$");
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
-        const realsize = `BSQ_GET_VALUE_PTR(${this.varToCppName(op.arg)}, BSQTuple)->entries.size() + BSQ_GET_VALUE_PTR(${this.varToCppName(op.update)}, BSQTuple)->entries.size()`;
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${realsize}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
+        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingleDynamic(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`; 
     }
 
     generateMIRAccessFromPropertyExpression(arg: MIRArgument, property: string, resultAccessType: MIRType): string {
@@ -1411,7 +1409,7 @@ class CPPBodyEmitter {
                 gblock.push("$callerscope$.processReturnChecked(_return_);");
             }
             else if (rctype === "direct") {
-                gblock.push("callerscope$.callReturnDirect(_return_);");
+                gblock.push("$callerscope$.callReturnDirect(_return_);");
             }
             else if (rctype === "checked") {
                 gblock.push("$callerscope$.processReturnChecked(_return_);");

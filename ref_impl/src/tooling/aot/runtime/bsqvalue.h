@@ -474,6 +474,30 @@ public:
         return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries), flag);
     }
 
+    static BSQTuple* createFromSingleDynamic(BSQRefScope& scope, DATA_KIND_FLAG flag, const std::vector<Value>& values)
+    {
+        Value val;
+        std::vector<Value> entries;
+
+        for (int i = 0; i < values.size(); i++)
+        {
+            val = values[i];
+
+            BSQRef::incrementChecked(val);
+            entries.push_back(val);
+        }
+
+        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        {
+            for(size_t i = 0; i < entries.size(); ++i)
+            {
+                flag &= getDataKindFlag(entries[i]);
+            }
+        }
+
+        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries), flag);
+    }
+
     virtual ~BSQTuple() = default;
 
     virtual void destroy()

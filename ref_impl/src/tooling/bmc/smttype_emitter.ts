@@ -523,7 +523,7 @@ class SMTTypeEmitter {
         }
         else {
             //now from must be Bterm so we are projecting down
-            assert(this.getSMTTypeFor(into) === "BTerm");
+            assert(this.getSMTTypeFor(from) === "BTerm");
 
             if (into.trkey === "NSCore::None") {
                 return this.coerceIntoAtomicKey(exp, into);
@@ -578,10 +578,10 @@ class SMTTypeEmitter {
     }
 
     tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
-        if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length < idx && !opt.entries[idx].isOptional)) {
+        if(tt.options.every((opt) => opt instanceof MIRTupleType && idx < opt.entries.length && !opt.entries[idx].isOptional)) {
             return "yes";
         }
-        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length >= idx)) {
+        else if(tt.options.every((opt) => opt instanceof MIRTupleType && opt.entries.length <= idx)) {
             return "no";
         }
         else {
