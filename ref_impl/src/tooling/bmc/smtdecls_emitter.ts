@@ -164,13 +164,13 @@ class SMTEmitter {
                     }
             
             if (tt.trkey === "NSCore::Tuple" || tt.trkey === "NSCore::Record") {
-                special_name_decls.push(`#define MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum::${typeemitter.mangleStringForSMT(tt.trkey)}`);
+                special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} "${typeemitter.mangleStringForSMT(tt.trkey)}"))`);
             }
 
             if(tt.options.length === 1 && (tt.options[0] instanceof MIREntityType)) {
                 const ndn = typeemitter.mangleStringForSMT(tt.trkey);
                 const dk = typeemitter.generateInitialDataKindFlag(tt);
-                nominal_data_kinds.push(`(assert (= (select nominalDataKinds ${ndn}) ${dk.toString()}))`);
+                nominal_data_kinds.push(`(assert (= (nominalDataKinds "${ndn}") ${dk.toString()}))`);
             }
 
             if(tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType)) {

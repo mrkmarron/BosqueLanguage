@@ -72,6 +72,7 @@
     ( (bsq_record@cons (bsqterm_record_flag Int) (bsq_record_entries (Array String BTerm))) )
     ;;NOMINAL_CONSTRUCTORS;;
     (
+      (bsq_object@empty)
     ;;NOMINAL_OBJECT_CONSTRUCTORS;;
     )
     (
@@ -114,13 +115,13 @@
               (ite (is-bsqkey_guid keyv) MIRNominalTypeEnum_GUID
                 (ite (is-bsqkey_datahash keyv) MIRNominalTypeEnum_DataHash
                   (ite (is-bsqkey_cryptohash keyv) MIRNominalTypeEnum_CryptoHash
-                    (ite (is-bsqkey_eventime keyv) MIRNominalTypeEnum_EventTime
+                    (ite (is-bsqkey_eventtime keyv) MIRNominalTypeEnum_EventTime
                       (ite (is-bsqkey_enum keyv) (bsq_enum_type (bsqkey_enum_value keyv))
                         (ite (is-bsqkey_idkey keyv) (bsq_idkey_type (bsqkey_idkey_value keyv))
-                          (ite (is-bsqkey_idkey_eventtime keyv) (bsq_idkey_eventime_type (bsqkey_idkey_eventtime_type keyv))
-                            (ite (is-bsqkey_idkey_guid keyv) (bsq_idkey_guid_type (bsqkey_idkey_guid_type keyv))
-                              (ite (is-bsqkey_idkey_datahash keyv) (bsq_idkey_datahash_type (bsqkey_idkey_datahash_type keyv))
-                                (bsq_idkey_cryptohash_type (bsqkey_idkey_cryptohash_type keyv))
+                          (ite (is-bsqkey_idkey_eventtime keyv) (bsq_idkey_eventtime_type (bsqkey_idkey_eventtime_value keyv))
+                            (ite (is-bsqkey_idkey_guid keyv) (bsq_idkey_guid_type (bsqkey_idkey_guid_value keyv))
+                              (ite (is-bsqkey_idkey_datahash keyv) (bsq_idkey_datahash_type (bsqkey_idkey_datahash_value keyv))
+                                (bsq_idkey_cryptohash_type (bsqkey_idkey_cryptohash_value keyv))
                               )
                             )
                           )
@@ -156,8 +157,8 @@
 
 (define-fun getDataKindFlag ((term BTerm)) Int
   (ite (= term bsqterm@clear) 3
-    (ite (is-bsqterm_tuple term) (bsqterm_tuple_flag term)
-      (ite (is-bsqterm_record term) (bsqterm_record_flag term)
+    (ite (is-bsqterm_tuple term) (bsqterm_tuple_flag (bsqterm_tuple_value term))
+      (ite (is-bsqterm_record term) (bsqterm_record_flag (bsqterm_record_value term))
         (nominalDataKinds (bsqterm_get_nominal_type term))
       )
     )
