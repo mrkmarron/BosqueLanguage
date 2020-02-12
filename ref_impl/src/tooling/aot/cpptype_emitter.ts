@@ -834,7 +834,7 @@ class CPPTypeEmitter {
                     + `    ${fields.join("\n    ")}\n\n`
                     + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
                     + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ; }\n\n`
-                    + `    virtual void destroy ${this.mangleStringForCpp(entity.tkey)}() { ${destructor_list.join(" ")} }\n\n`
+                    + `    virtual void destroy() { ${destructor_list.join(" ")} }\n\n`
                     + `    ${display}\n\n`
                     + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
                     + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`

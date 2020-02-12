@@ -493,7 +493,7 @@ class CPPBodyEmitter {
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
         else {
-            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
+            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQVable)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
             return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
         }
     }
@@ -509,7 +509,7 @@ class CPPBodyEmitter {
                     cvals.push(`${this.argToCpp(op.arg, inferargtype)}->${this.typegen.mangleStringForCpp(fdecl.fkey)}`);
                 }
                 else {
-                    cvals.push(`BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`);
+                    cvals.push(`BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQVable)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`);
                 }
             });
 
@@ -919,7 +919,7 @@ class CPPBodyEmitter {
         }
         else {
             if(this.typegen.typecheckAllKeys(argtype)) {
-                return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum_${this.typegen.mangleStringForCpp(oftype.ekey)})`;
+                return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
             }
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
                 return oftype.ekey === argtype.trkey ? "true" : "false";
@@ -934,7 +934,7 @@ class CPPBodyEmitter {
                 return oftype.ekey === argtype.trkey ? "true" : "false";
             }
             else {
-                return `(getNominalTypeOf_Value(${arg}) == MIRNominalTypeEnum_${this.typegen.mangleStringForCpp(oftype.ekey)})`;
+                return `(getNominalTypeOf_Value(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
             }
         }
     }

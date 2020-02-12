@@ -121,6 +121,7 @@ setImmediate(() => {
             + "\n\n/*vable decls*/\n"
             + "\n\nclass BSQVable"
             + "\n{"
+            + "\npublic:"
             + "\n  " + cparams.VFIELD_DECLS
             + "\n  " + cparams.VMETHOD_DECLS
             + "\n};"

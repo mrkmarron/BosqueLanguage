@@ -158,6 +158,7 @@ else {
         + "\n\n/*vable decls*/\n"
         + "\n\nclass BSQVable"
         + "{"
+        + "\npublic:"
         + "\n  " + cparams.VFIELD_DECLS
         + "\n  " + cparams.VMETHOD_DECLS
         + "};"
