@@ -106,6 +106,7 @@ setImmediate(() => {
             .replace(";;RESULTS;;", sparams.RESULTS)
             .replace(";;CONCEPT_SUBTYPE_RELATION_DECLARE;;", sparams.CONCEPT_SUBTYPE_RELATION_DECLARE)
             .replace(";;SUBTYPE_DECLS;;", sparams.SUBTYPE_DECLS)
+            .replace(";;VFIELD_ACCESS;;", sparams.VFIELD_ACCESS)
             .replace(";;FUNCTION_DECLS;;", sparams.FUNCTION_DECLS)
             .replace(";;ARG_VALUES;;", sparams.ARG_VALUES)
             .replace(";;INVOKE_ACTION;;", sparams.INVOKE_ACTION)

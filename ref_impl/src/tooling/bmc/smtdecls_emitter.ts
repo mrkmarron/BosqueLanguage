@@ -3,11 +3,12 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
+import { SMTValue } from "./smt_exp";
 
 type SMTCode = {
     NOMINAL_DECLS_FWD: string,
@@ -26,6 +27,8 @@ type SMTCode = {
 
     CONCEPT_SUBTYPE_RELATION_DECLARE: string,
     SUBTYPE_DECLS: string,
+
+    VFIELD_ACCESS: string,
 
     FUNCTION_DECLS: string,
     ARG_VALUES: string,
@@ -109,6 +112,38 @@ class SMTEmitter {
                 }
             }
         }   
+
+        let vfieldaccess: string[] = [];
+        for(let i = 0; i < bodyemitter.vfieldLookups.length; ++i) {
+            const vl = bodyemitter.vfieldLookups[i];
+
+            const opts = [...assembly.entityDecls].filter((edcl) => {
+                const etype = typeemitter.getMIRType(edcl[0]);
+                return assembly.subtypeOf(etype, vl.infertype) && assembly.subtypeOf(etype, typeemitter.getMIRType(vl.fdecl.enclosingDecl));
+            });
+
+            const ttl = assembly.typeMap.get(opts[opts.length - 1][0]) as MIRType;
+            const cargl = typeemitter.coerce(new SMTValue("$arg$"), vl.infertype, ttl).emit();
+            let body = `(${typeemitter.generateEntityAccessor(typeemitter.getEntityEKey(ttl), vl.fdecl.fkey)} ${cargl})`;
+            
+            for(let i = opts.length - 2; i >= 0; --i) {
+                const tti = assembly.typeMap.get(opts[i][0]) as MIRType;
+                const testi = `(= $objtype$ "${typeemitter.mangleStringForSMT(tti.trkey)}")`
+                const cargi = typeemitter.coerce(new SMTValue("$arg$"), vl.infertype, tti).emit();
+
+                body = `  (ite ${testi} (${typeemitter.generateEntityAccessor(typeemitter.getEntityEKey(tti), vl.fdecl.fkey)} ${cargi})\n`
+                + `  ${body})`
+            }
+
+            const cdcl = `(define-fun ${typeemitter.mangleStringForSMT(vl.lname)} (($arg$ ${typeemitter.getSMTTypeFor(vl.infertype)})) ${typeemitter.getSMTTypeFor(typeemitter.getMIRType(vl.fdecl.declaredType))}\n`;
+            if(opts.length === 1) {
+                vfieldaccess.push(cdcl + body + "\n)");
+            }
+            else {
+                body = `(let (($objtype$ (bsqterm_get_nominal_type $arg$)))\n` + body + "\n)";
+                vfieldaccess.push(cdcl + body + "\n)");
+            }
+        }
 
         const rrtype = typeemitter.getSMTTypeFor(typeemitter.getMIRType(entrypoint.resultType));
 
@@ -217,6 +252,8 @@ class SMTEmitter {
             CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
             SUBTYPE_DECLS: typechecks.join("\n    "),
         
+            VFIELD_ACCESS: vfieldaccess.join("\n"),
+
             FUNCTION_DECLS: funcdecls.join("\n"),
             ARG_VALUES: argsdecls.join("\n"),
         

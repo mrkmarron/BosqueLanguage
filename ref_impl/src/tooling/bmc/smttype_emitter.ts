@@ -403,7 +403,7 @@ class SMTTypeEmitter {
             return new SMTValue(`(bsqterm_record ${exp.emit()})`);
         }
         else {
-            return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (bsqterm_object_${this.mangleStringForSMT(from.trkey)}@cons ${exp.emit()}))`);
+            return new SMTValue(`(bsqterm_object "${this.mangleStringForSMT(from.trkey)}" (cons@bsq_object_from_${this.mangleStringForSMT(from.trkey)} ${exp.emit()}))`);
         }
     }
 
@@ -667,10 +667,6 @@ class SMTTypeEmitter {
         return `is-${this.mangleStringForSMT(ekey)}@cons`;
     }
 
-    generateSpecialTypeConsName(stype: MIRNominalTypeKey): string {
-        return `${this.mangleStringForSMT(stype)}@@cons`;
-    }
-
     generateSpecialTypeFieldName(stype: MIRNominalTypeKey, f: string): string {
         return `${this.mangleStringForSMT(stype)}@@f`;
     }
@@ -708,8 +704,8 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( ${this.generateSpecialTypeConsName(entity.tkey)} ${fargs.join(" ")} )`,
-            ocons: `(cons_bsq_object_from_${ename} ${this.getSMTTypeFor(tt)})`,
+            fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+            ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
             emptydecl: `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array Int ${this.getSMTTypeFor(typet)}))`
         };
     }
@@ -731,8 +727,8 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( cons@${ename} ${fargs.join(" ")} )`,
-            ocons: `(cons_bsq_object_from_${ename} ${this.getSMTTypeFor(tt)})`,
+            fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+            ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
             emptydecl: [
                 `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
                 `(declare-const ${this.generateEmptyHasArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
@@ -760,8 +756,8 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( cons@${ename} ${fargs.join(" ")} )`,
-            ocons: `(cons_bsq_object_from_${ename} ${this.getSMTTypeFor(tt)})`,
+            fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+            ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
             emptydecl: [
                 `(declare-const ${this.generateEmptyKeyArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
                 `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typeu)}))`,
@@ -788,15 +784,15 @@ class SMTTypeEmitter {
             return this.generateMapSMTEntity(entity);
         }
         else {
-            const ename = this.mangleStringForSMT(entity.tkey);
             const fargs = entity.fields.map((fd) => {
-                return `(${ename}@${this.mangleStringForSMT(fd.fkey)} ${this.getSMTTypeFor(this.getMIRType(fd.declaredType))})`;
+                return `(${this.generateEntityAccessor(entity.tkey, fd.fkey)} ${this.getSMTTypeFor(this.getMIRType(fd.declaredType))})`;
             });
 
+            const ename = this.mangleStringForSMT(entity.tkey);
             return {
                 fwddecl: `(${ename} 0)`,
-                fulldecl: `( (cons@${ename} ${fargs.join(" ")}) )`,
-                ocons: `(cons_bsq_object_from_${ename} ${this.getSMTTypeFor(tt)})`
+                fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+                ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`
             };
         }
     }
@@ -810,7 +806,7 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( (${this.generateEntityConstructor(ename)} ${aargs.join(" ")}) )`
+            fulldecl: `( (${this.generateEntityConstructor(ename)}@@cons ${aargs.join(" ")}) )`
         };
     }
 

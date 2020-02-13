@@ -37,10 +37,10 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    vfieldLookups: { arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
-    vfieldProjects: { arg: MIRArgument, infertype: MIRType, fdecls: MIRFieldDecl[], pname: string }[] = [];
-    vfieldUpdates: { arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
-    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
+    vfieldLookups: { infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
+    vfieldProjects: { infertype: MIRType, fdecls: MIRFieldDecl[], pname: string }[] = [];
+    vfieldUpdates: { infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
+    vobjmerges: { infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -299,7 +299,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
         const cpcetype = this.typegen.getMIRType(cpce.tkey);
-        const smtctype = this.typegen.generateSpecialTypeConsName(cpce.tkey);
+        const smtctype = this.typegen.generateEntityConstructor(cpce.tkey);
         
         if(this.typegen.typecheckIsName(cpcetype, /NSCore::List<.*>/)) {
             return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
@@ -314,7 +314,7 @@ class SMTBodyEmitter {
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const smtctype = this.typegen.generateSpecialTypeConsName(cpcs.tkey);
+        const smtctype = this.typegen.generateEntityConstructor(cpcs.tkey);
 
         if(this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
@@ -639,10 +639,10 @@ class SMTBodyEmitter {
         const lname = `resolve_${fdecl.fkey}_from_${infertype.trkey}`;
         let decl = this.vfieldLookups.find((lookup) => lookup.lname === lname);
         if(decl === undefined) {
-            this.vfieldLookups.push({ arg: arg, infertype: infertype, fdecl: fdecl, lname: lname });
+            this.vfieldLookups.push({ infertype: infertype, fdecl: fdecl, lname: lname });
         }
 
-        return new SMTValue(`(${this.typegen.mangleStringForSMT(lname)} ${this.argToSMT(arg, infertype)})`);
+        return new SMTValue(`(${this.typegen.mangleStringForSMT(lname)} ${this.argToSMT(arg, infertype).emit()})`);
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
@@ -664,7 +664,7 @@ class SMTBodyEmitter {
         const pname = `project_${fdecls.map((fd) => fd.fkey).sort().join("*")}_from_${infertype.trkey}`;
         let decl = this.vfieldProjects.find((lookup) => lookup.pname === pname);
         if(decl === undefined) {
-            this.vfieldProjects.push({ arg: arg, infertype: infertype, fdecls: fdecls, pname: pname });
+            this.vfieldProjects.push({ infertype: infertype, fdecls: fdecls, pname: pname });
         }
 
         return new SMTValue(`(${this.typegen.mangleStringForSMT(pname)} ${this.argToSMT(arg, infertype)})`);
@@ -698,7 +698,7 @@ class SMTBodyEmitter {
         const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
         let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
         if(decl === undefined) {
-            this.vfieldUpdates.push({ arg: arg, infertype: infertype, fupds: fupds, uname: uname });
+            this.vfieldUpdates.push({ infertype: infertype, fupds: fupds, uname: uname });
         }
 
         return new SMTValue(`(${this.typegen.mangleStringForSMT(uname)} ${this.argToSMT(arg, infertype)} ${fupds.map((upd) => this.argToSMT(upd[1], this.getArgType(upd[1])).emit()).join(" ")})`);
@@ -737,7 +737,7 @@ class SMTBodyEmitter {
         const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
         let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
         if(decl === undefined) {
-            this.vobjmerges.push({ arg: arg, infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
+            this.vobjmerges.push({ infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
         }
 
         return new SMTValue(`(${this.typegen.mangleStringForSMT(mname)} ${this.argToSMT(arg, infertype)} ${this.argToSMT(merge, infermerge)})`);
@@ -1065,7 +1065,7 @@ class SMTBodyEmitter {
         }
         else {
             if(this.typegen.typecheckAllKeys(argtype)) {
-                return `(= (bsqkey_get_nominal_type ${arg}) MIRNominalTypeEnum_${this.typegen.mangleStringForSMT(oftype.ekey)})`;
+                return `(= (bsqkey_get_nominal_type ${arg}) "${this.typegen.mangleStringForSMT(oftype.ekey)}")`;
             }
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
                 return oftype.ekey === argtype.trkey ? "true" : "false";
@@ -1080,7 +1080,7 @@ class SMTBodyEmitter {
                 return oftype.ekey === argtype.trkey ? "true" : "false";
             }
             else {
-                return `(= (bsqterm_get_nominal_type ${arg}) MIRNominalTypeEnum_${this.typegen.mangleStringForSMT(oftype.ekey)})`;
+                return `(= (bsqterm_get_nominal_type ${arg}) "${this.typegen.mangleStringForSMT(oftype.ekey)}")`;
             }
         }
     }
@@ -1559,7 +1559,15 @@ class SMTBodyEmitter {
         }
         else {
             const jop = block.ops[block.ops.length - 1];
-            if (jop.tag === MIROpTag.MIRJump) {
+            if(jop.tag === MIROpTag.MIRAbort) {
+                let rexp = exps[exps.length - 1];
+                for (let i = exps.length - 2; i >= 0; --i) {
+                    rexp = exps[i].bind(rexp, "#body#");
+                }
+
+                return rexp;
+            }
+            else if (jop.tag === MIROpTag.MIRJump) {
                 let rexp = this.generateBlockExps(blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks, gas);
                 for (let i = exps.length - 1; i >= 0; --i) {
                     rexp = exps[i].bind(rexp, "#body#");
@@ -1635,14 +1643,14 @@ class SMTBodyEmitter {
                 break;
             }
             case "list_unsafe_add": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
                 const csize = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 bodyres = new SMTValue(`(${cons} (+ ${csize} 1) (store ${entries} ${csize} ${params[1]}))`);
                 break;
             }
             case "list_unsafe_set": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0]);
                 const csize = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 bodyres = new SMTValue(`(${cons} ${csize} (store ${entries} ${params[1]} ${params[2]}))`);
@@ -1668,7 +1676,7 @@ class SMTBodyEmitter {
                 break;
             } 
             case "set_clear_val": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
@@ -1676,7 +1684,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "map_clear_val": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
@@ -1685,7 +1693,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "set_unsafe_update": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
@@ -1694,7 +1702,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "map_unsafe_update": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
@@ -1704,7 +1712,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "set_unsafe_add":  {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
@@ -1712,7 +1720,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "map_unsafe_add": {
-                const cons = this.typegen.generateSpecialTypeConsName(enclkey);
+                const cons = this.typegen.generateEntityConstructor(enclkey);
                 const size = this.typegen.generateSpecialTypeFieldAccess(enclkey, "size", params[0]);
                 const has = this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0]);
                 const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
