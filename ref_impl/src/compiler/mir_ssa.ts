@@ -434,6 +434,7 @@ function convertBodyToSSA(body: MIRBody, args: Map<string, MIRType>) {
             let remap = new Map<string, MIRRegisterArgument>();
             args.forEach((arg, name) => remap.set(name, new MIRVariable(name)));
             remap.set("__ir_ret__", new MIRVariable("__ir_ret__"));
+            remap.set("_return_", new MIRVariable("_return_"));
 
             for (let i = 0; i < block.ops.length; ++i) {
                 assignSSA(block.ops[i], remap, ctrs);

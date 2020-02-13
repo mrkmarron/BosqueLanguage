@@ -230,7 +230,7 @@ class Lexer {
     }
 
     private static isIdentifierName(str: string) {
-        return /^[a-z_]/.test(str);
+        return /^[$a-z_]/.test(str);
     }
 
     private recordLexToken(epos: number, kind: string) {
@@ -352,7 +352,7 @@ class Lexer {
         }
     }
 
-    private static readonly _s_nameRe = /(\w+)|(recursive\?)/y;
+    private static readonly _s_nameRe = /([$]?\w+)|(recursive\?)/y;
     private tryLexName() {
         if (this.m_input.startsWith("recursive?", this.m_cpos)) {
             this.recordLexToken(this.m_cpos + "recursive?".length, "recursive?");
@@ -733,7 +733,7 @@ class Parser {
         }
 
         if (this.testAndConsumeTokenIf(":")) {
-            resultInfo = this.parseEphemeralListTypeSignature(!ispcode);
+            resultInfo = this.parseResultType(false);
         }
         else {
             if (!ispcode) {
@@ -784,27 +784,30 @@ class Parser {
     ////
     //Type parsing
 
-    private parseEphemeralListTypeSignature(parensreq: boolean): TypeSignature {
-        const parens = this.testAndConsumeTokenIf("(|");
-        if (parens || !parensreq) {
+    private parseResultType(parensreq: boolean): TypeSignature {
+        if (this.testAndConsumeTokenIf("(|")) {
             const decls = this.parseEphemeralListOf(() => {
                 const tdecl = this.parseTypeSignature();
                 return tdecl;
             });
 
-            if (!parens) {
-                return decls.length === 1 ? decls[0] : new EphemeralListTypeSignature(decls);
-            }
-            else {
-                this.ensureAndConsumeToken("|)");
-                return new EphemeralListTypeSignature(decls);
-            }
+            this.ensureAndConsumeToken("|)");
+            return new EphemeralListTypeSignature(decls);
         }
         else {
-            const tdecl = this.parseTypeSignature();
-            return tdecl;
+            if(parensreq) {
+                return this.parseTypeSignature();
+            }
+            else {
+                const decls = this.parseEphemeralListOf(() => {
+                    const tdecl = this.parseTypeSignature();
+                    return tdecl;
+                });
+    
+                return decls.length === 1 ? decls[0] : new EphemeralListTypeSignature(decls);
+            }
         }
-    }
+    } 
 
     private parseTypeSignature(): TypeSignature {
         return this.parseOrCombinatorType();
@@ -1033,7 +1036,7 @@ class Parser {
             }
 
             this.ensureAndConsumeToken("->");
-            const resultInfo = this.parseEphemeralListTypeSignature(false);
+            const resultInfo = this.parseResultType(true);
 
             this.clearRecover();
             return new FunctionTypeSignature(recursive, fparams, restName, restType, resultInfo);
@@ -1284,8 +1287,8 @@ class Parser {
 
             const ns = this.m_penv.tryResolveNamespace(undefined, istr);
             if (ns === undefined) {
-                //Ignore special postcondition _return_ variable but everything else should be processed
-                if (istr !== "_return_") {
+                //Ignore special postcondition $return variable but everything else should be processed
+                if (istr !== "$return") {
                     this.m_penv.getCurrentFunctionScope().useLocalVar(istr);
                 }
 
@@ -2553,8 +2556,8 @@ class Parser {
 
         let postconds: PostConditionDecl[] = [];
         try {
-            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames).add("_return_")));
-            while (this.testAndConsumeTokenIf("ensures")) {
+            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames).add("$return")));
+            while (this.testToken("ensures")) {
                 this.consumeToken();
 
                 let level: BuildLevel = "debug";

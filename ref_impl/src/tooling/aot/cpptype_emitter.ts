@@ -325,7 +325,7 @@ class CPPTypeEmitter {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
         }
         else {
-            return `BSQ_GET_VALUE_PTR(${this.getCPPTypeFor(into, "base")}, ${exp})`;
+            return `BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
         }
     }
 

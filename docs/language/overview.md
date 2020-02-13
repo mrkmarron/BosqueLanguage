@@ -246,7 +246,7 @@ entity Foo {
 
     method m(y: Int): Int
         requires y >= 0; //precondition
-        ensures _return_ > 0; //postcondition
+        ensures $return > 0; //postcondition
     {
         check this.x - y > 0;   //sanity check - enabled on optimized builds
         assert Math::mult(this.x, y) != 0; //diagnostic assert - only for test/debug

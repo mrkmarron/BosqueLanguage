@@ -4201,7 +4201,7 @@ class TypeChecker {
                     const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                    const postargs = [new MIRVariable("_result_"), ...postject[1]]
+                    const postargs = [new MIRVariable("_return_"), ...postject[1]]
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, postject[0], postargs, [], postreg);
                     this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
 
@@ -4251,7 +4251,7 @@ class TypeChecker {
                     const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                    const postargs = [new MIRVariable("_result_"), ...postject[1]]
+                    const postargs = [new MIRVariable("_return_"), ...postject[1]]
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, postject[0], postargs, [], postreg);
                     this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
 
@@ -4656,7 +4656,7 @@ class TypeChecker {
             let postconds = invoke.postconditions.filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
             if(postconds.length !== 0) {
                 const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
-                const retv = new FunctionParameter("_return_", invoke.resultType, false, false); //this is wrong for pack functions and ref params but we will let it go for now
+                const retv = new FunctionParameter("$return", invoke.resultType, false, false); //this is wrong for pack functions and ref params but we will let it go for now
                 this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, binds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];
@@ -4679,10 +4679,10 @@ class TypeChecker {
             }
 
             let postconds = (absconds !== undefined ? absconds.post[0] : invoke.postconditions).filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
-            if(preconds.length !== 0) {
+            if(postconds.length !== 0) {
                 const postbinds = absconds !== undefined ? absconds.post[1] : binds;
                 const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
-                const retv = new FunctionParameter("_return_", invoke.resultType, false, false); //this is wrong for pack functions but yeah
+                const retv = new FunctionParameter("$return", invoke.resultType, false, false); //this is wrong for pack functions but yeah
                 this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, postbinds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];

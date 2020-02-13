@@ -359,11 +359,11 @@ bool op_intLessEq(BSQRefScope& scope, IntValue v1, IntValue v2);
 
 IntValue op_intNegate(BSQRefScope& scope, IntValue v);
 
-IntValue op_intAdd(IntValue v1, IntValue v2);
-IntValue op_intSub(IntValue v1, IntValue v2);
-IntValue op_intMult(IntValue v1, IntValue v2);
-IntValue op_intDiv(IntValue v1, IntValue v2);
-IntValue op_intMod(IntValue v1, IntValue v2);
+IntValue op_intAdd(BSQRefScope& scope, IntValue v1, IntValue v2);
+IntValue op_intSub(BSQRefScope& scope, IntValue v1, IntValue v2);
+IntValue op_intMult(BSQRefScope& scope, IntValue v1, IntValue v2);
+IntValue op_intDiv(BSQRefScope& scope, IntValue v1, IntValue v2);
+IntValue op_intMod(BSQRefScope& scope, IntValue v1, IntValue v2);
 
 size_t bsqKeyValueHash(KeyValue v);
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
