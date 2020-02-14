@@ -2065,6 +2065,9 @@ class Parser {
 
                         vars.push({name: dv.vname, vtype: dv.vtype});
                     }
+                    else {
+                        this.raiseError(sinfo.line, "Cannot have structured multi-decls");
+                    }
                 }
 
                 let exp: Expression[] | undefined = undefined;
@@ -2136,6 +2139,9 @@ class Parser {
                     }
 
                     vars.push(av.vname);
+                }
+                else {
+                    this.raiseError(sinfo.line, "Cannot have structured multi-assigns");
                 }
             }
 

@@ -541,7 +541,7 @@ class SMTTypeEmitter {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckAllKeys(into)) {
-                return new SMTValue(`(bsqterm_key_value ${exp})`);
+                return new SMTValue(`(bsqterm_key_value ${exp.emit()})`);
             }
             else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(into, /^NSCore::ISOTime$/) || this.typecheckIsName(into, /^NSCore::Regex$/)) {
                 return this.coerceIntoAtomicTerm(exp, into);

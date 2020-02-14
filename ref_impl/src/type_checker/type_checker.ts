@@ -3383,6 +3383,8 @@ class TypeChecker {
                 return opt as ResolvedRecordAtomType;
             }));
 
+            const rassign = assign as RecordStructuredAssignment;
+
             this.raiseErrorIf(sinfo, rectype.options.some((atom) => {
                 return (atom as ResolvedRecordAtomType).entries.some((re) => {
                     const entry = rassign.assigns.find((e) => e[0] === re.name);
@@ -3390,7 +3392,6 @@ class TypeChecker {
                 });
             }), "More values in record that assignment");
 
-            const rassign = assign as RecordStructuredAssignment;
             for (let i = 0; i < rassign.assigns.length; ++i) {
                 const pname = rassign.assigns[i][0];
                 const aopt = rectype.options.some((atom) => {

@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey, MIRGetKey, MIRLoadConstRegex, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRPackStore } from "./mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey, MIRGetKey, MIRLoadConstRegex, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
 import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIREphemeralListType } from "./mir_assembly";
 import assert = require("assert");
 import { topologicalOrder } from "./mir_info";
@@ -113,6 +113,11 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
         case MIROpTag.MIRConstructorRecord: {
             const tr = op as MIRConstructorRecord;
             vtypes.set(tr.trgt.nameID, assembly.typeMap.get(tr.resultRecordType) as MIRType);
+            break;
+        }
+        case MIROpTag.MIRConstructorEphemeralValueList: {
+            const el = op as MIRConstructorEphemeralValueList;
+            vtypes.set(el.trgt.nameID, assembly.typeMap.get(el.resultEphemeralListType) as MIRType)
             break;
         }
         case MIROpTag.MIRAccessFromIndex: {
@@ -278,6 +283,7 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
             for(let i = 0; i < vspack.names.length; ++i) {
                 vtypes.set(vspack.names[i].nameID, srctypes[i]); //ok since we are in SSA -- like above for single var
             }
+            break;
         }
         case MIROpTag.MIRReturnAssign: {
             const raop = op as MIRReturnAssign;
@@ -298,6 +304,7 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
 
             const mtype = assembly.registerUnionTypeIfNeeded(vopts);
             vtypes.set(pop.trgt.nameID, mtype);
+            break;
         }
         case MIROpTag.MIRVarLifetimeStart:
         case MIROpTag.MIRVarLifetimeEnd: {
