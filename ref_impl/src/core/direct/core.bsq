@@ -102,7 +102,7 @@ entity ValidatedString<T where Validator> provides KeyType, Some, PODType, APITy
 }
 
 //<summary>Primitive stringof value.</summary>
-entity StringOf<T where Parsable> provides KeyType, Some {
+entity StringOf<T where Parsable> provides APIValue, KeyType, Some {
     method rawString(): String # stringof_rawstring
 
     static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
@@ -134,6 +134,11 @@ enum BufferCompression {
 //<summary>An efficient buffer encoding for data.</summary>
 entity Buffer<T where grounded PODType | APIType> provides APIValue, Some {
 }
+
+//
+//TODO: maybe want to add a generic ByteBuffer type that can manage a system that just gets bytes from some other source
+//      analogy is String <-> StringOf
+//
 
 //<summary>Primitive ISO standard date time value.</summary>
 entity ISOTime provides Parsable, PODType, APIType, Some {

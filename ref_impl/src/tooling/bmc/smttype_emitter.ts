@@ -806,7 +806,7 @@ class SMTTypeEmitter {
 
         return {
             fwddecl: `(${ename} 0)`,
-            fulldecl: `( (${this.generateEntityConstructor(ename)}@@cons ${aargs.join(" ")}) )`
+            fulldecl: `( (${this.generateEntityConstructor(eph.trkey)} ${aargs.join(" ")}) )`
         };
     }
 

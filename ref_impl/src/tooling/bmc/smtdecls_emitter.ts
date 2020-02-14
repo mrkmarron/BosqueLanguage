@@ -77,7 +77,7 @@ class SMTEmitter {
             }
 
             const cscc = cginfo.recursive.find((scc) => scc.has(cn.invoke));
-            const currentSCC = cscc !== undefined ? new Set<string>(...cscc) : new Set<string>();
+            const currentSCC = cscc || new Set<string>();
             let worklist = cscc !== undefined ? [...cscc].sort() : [cn.invoke];
 
             let gasmax: number | undefined = cscc !== undefined ? Math.max(...worklist.map((bbup) => bodyemitter.getGasForOperation(bbup))) : 1;
@@ -217,11 +217,11 @@ class SMTEmitter {
 
         let fulledecls = "";
         if(ephdecls_fwd.length !== 0) {
-            fulledecls = "(declare-datatypes ("
+            fulledecls = "(declare-datatypes (\n"
             + `  ${ephdecls_fwd.sort().join("\n  ")}`
-            + ") ("
+            + "\n) (\n"
             + `  ${ephdecls.sort().join("\n  ")}`
-            + "))"
+            + "\n))"
         }
 
         const resv = `(declare-const @smtres@ Result@${rrtype})`;

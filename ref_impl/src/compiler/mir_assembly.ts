@@ -685,6 +685,9 @@ class MIRAssembly {
         if (t1.trkey === t2.trkey) {
             res = true;
         }
+        else if (t1 instanceof MIREphemeralListType || t2 instanceof MIREphemeralListType) {
+            //not eq from above so always false
+        }
         else {
             if (t1 instanceof MIRConceptType && t2 instanceof MIRConceptType) {
                 res = this.atomSubtypeOf_ConceptConcept(t1, t2);
@@ -703,7 +706,7 @@ class MIRAssembly {
                     res = this.atomSubtypeOf_RecordConcept(t1, t2);
                 }
                 else {
-                    res = this.atomSubtypeOf_ConceptConcept(MIRConceptType.create(["NSCore::Function"]), t2);
+                    //fall-through
                 }
             }
             else {

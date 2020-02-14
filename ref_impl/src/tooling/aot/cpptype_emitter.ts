@@ -848,6 +848,7 @@ class CPPTypeEmitter {
         let displayvals: string[] = [];
         let callretops: string[] = [];
         let constructor_args: string[] = [];
+        let constructor_default: string[] = [];
         let constructor_initializer: string[] = [];
 
         for(let i = 0; i < tt.entries.length; ++i) {
@@ -870,6 +871,7 @@ class CPPTypeEmitter {
             displayvals.push(this.coerce(`this->entry_${i}`, tt.entries[i], this.anyType));
 
             constructor_args.push(`${this.getCPPTypeFor(tt.entries[i], "parameter")} e${i}`);
+            constructor_default.push(`entry_${i}(${this.typeToCPPDefaultValue(tt.entries[i])})`);
             constructor_initializer.push(`entry_${i}(e${i})`);
         }
 
@@ -889,7 +891,8 @@ class CPPTypeEmitter {
             + "{\n"
             + "public:\n"
             + `    ${fields.join("\n    ")}\n\n`
-            + `    ${this.mangleStringForCpp(tt.trkey)}(${constructor_args.join(", ")}) : ${constructor_initializer.join(", ")} { ; }\n`
+            + `    ${this.mangleStringForCpp(tt.trkey)}() : ${constructor_default.join(", ")} { ; }\n\n`
+            + `    ${this.mangleStringForCpp(tt.trkey)}(${constructor_args.join(", ")}) : ${constructor_initializer.join(", ")} { ; }\n\n`
             + `    ${display}\n\n`
             + `    ${processForCallReturn}\n`
             + "};"

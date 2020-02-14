@@ -88,8 +88,8 @@ class SMTBodyEmitter {
     }
 
     generateBMCLimitCreate(ikey: MIRInvokeKey, rtype: string): SMTValue {
-        const errid = this.getGasForOperation(ikey);
-        return new SMTValue(`(result_error@${rtype} (result_bmc ${errid}))`);
+        const errid = this.getGasKeyForOperation(ikey);
+        return new SMTValue(`(result_error@${rtype} (result_bmc "${errid}"))`);
     }
 
     varNameToSMTName(name: string): string {
@@ -1248,12 +1248,13 @@ class SMTBodyEmitter {
             return ops;
         }
         else {
-            const tlist = (this.getArgType(op.src).options[0] as MIREphemeralListType).entries;
+            const eltype = this.getArgType(op.src).options[0] as MIREphemeralListType;
+            const tlist = eltype.entries;
 
-            const getter0 = new SMTValue(`(${this.typegen.generateEntityAccessor(tlist[0].trkey, `entry_0`)} ${this.varToSMTName(op.src)})`);
+            const getter0 = new SMTValue(`(${this.typegen.generateEntityAccessor(eltype.trkey, `entry_0`)} ${this.varToSMTName(op.src)})`);
             let ops: SMTExp = new SMTLet(this.varToSMTName(op.names[0]), getter0);
             for(let i = 1; i < tlist.length; ++i) {
-                const getteri = new SMTValue(`(${this.typegen.generateEntityAccessor(tlist[i].trkey, `entry_${i}`)} ${this.varToSMTName(op.src)})`);
+                const getteri = new SMTValue(`(${this.typegen.generateEntityAccessor(eltype.trkey, `entry_${i}`)} ${this.varToSMTName(op.src)})`);
                 ops = ops.bind(new SMTLet(this.varToSMTName(op.names[i]), getteri));
             }
 
