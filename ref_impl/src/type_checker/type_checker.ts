@@ -4290,9 +4290,9 @@ class TypeChecker {
     private processGenerateSpecialExpFunction(fkey: MIRInvokeKey, iname: string, binds: Map<string, ResolvedType>, exp: Expression, rtype: TypeSignature, srcFile: string, sinfo: SourceInfo) {
         try {
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, exp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [], undefined, undefined, rtype, [], [], false, new Set<string>(), body);
+            const resultType = this.m_assembly.normalizeTypeOnly(rtype, binds);
 
-            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, binds, [], binds);
+            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], [], resultType, new Map<string, VarInfo>(), new Map<string, MIRType>(), body, binds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
         }
         catch (ex) {
@@ -4308,11 +4308,23 @@ class TypeChecker {
                 bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i]);
             }
 
-            const fp = new FunctionParameter("this", new NominalTypeSignature(tdecl.ns, tdecl.name, tdecl.terms), false, false);
-            const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, [fp], undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
+            const fields = this.m_assembly.getAllOOFields(tdecl, binds);
+            let fps: MIRFunctionParameter[] = [];
+            let cargs = new Map<string, VarInfo>();
+            let argTypes = new Map<string, MIRType>();
+            [...fields].sort((a, b) => a[0].localeCompare(b[0]))
+                .forEach((finfo) => {
+                    const fname = `$${finfo[1][1].name}`;
+                    const ftype = this.m_assembly.normalizeTypeOnly(finfo[1][1], finfo[1][2]);
+                    const mirftype = this.m_emitter.registerResolvedTypeReference(ftype);
 
-            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, binds, [], binds);
+                    fps.push(new MIRFunctionParameter(fname, mirftype.trkey));
+                    cargs.set(fname, new VarInfo(ftype, true, false, true, ftype));
+                    argTypes.set(fname, mirftype);
+                });
+
+            const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
+            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], fps, this.m_assembly.getSpecialBoolType(), cargs, argTypes, body, binds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
         }
         catch (ex) {
@@ -4321,19 +4333,18 @@ class TypeChecker {
         }
     }
 
-    private processGenerateSpecialInvariantFunction(sinfo: SourceInfo, srcFile: string, iname: string, ikey: MIRInvokeKey, thistype: ResolvedType, callkeys: MIRInvokeKey[]) {
+    private processGenerateSpecialInvariantFunction(sinfo: SourceInfo, srcFile: string, iname: string, ikey: MIRInvokeKey, mirthistype: MIRType, fields: [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>][], callkeys: {ivk: MIRInvokeKey, args: {name: string, t: ResolvedType}[]}[]) {
         const be = new MIRBodyEmitter();
         be.initialize();
         const failblock = be.createNewBlock("failure");
-
-        const targ = new MIRVariable("this");
 
         const mirbooltype = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
         const etreg = be.generateTmpRegister();
         be.emitLoadConstBool(sinfo, true, etreg);
 
         for (let i = 0; i < callkeys.length; ++i) {
-            be.emitInvokeFixedFunction(this.m_emitter.masm, sinfo, mirbooltype, callkeys[i], [targ], [], etreg);
+            const args = callkeys[i].args.map((arg) => new MIRVariable(arg.name));
+            be.emitInvokeFixedFunction(this.m_emitter.masm, sinfo, mirbooltype, callkeys[i].ivk, args, [], etreg);
 
             const nexttest = be.createNewBlock("next");
             be.emitBoolJump(sinfo, etreg, nexttest, failblock);
@@ -4350,11 +4361,19 @@ class TypeChecker {
 
         be.setActiveBlock("returnassign")
         be.emitDirectJump(sinfo, "exit");
+        let mirparams: MIRFunctionParameter[] = [];
+        let argTypes = new Map<string, MIRType>();
+        fields.forEach((finfo) => {
+                const fname = `$${finfo[1].name}`;
+                const ftype = this.m_assembly.normalizeTypeOnly(finfo[1], finfo[2]);
+                const mirftype = this.m_emitter.registerResolvedTypeReference(ftype);
 
-        const mirthistype = this.m_emitter.registerResolvedTypeReference(thistype);
-        const mirbody = be.getBody(this.m_file, sinfo, new Map<string, MIRType>().set("this", mirthistype));
-
-        const mirparams = [new MIRFunctionParameter("this", mirthistype.trkey)];
+                mirparams.push(new MIRFunctionParameter(fname, mirftype.trkey));
+                argTypes.set(fname, mirftype);
+            });
+        
+        
+        const mirbody = be.getBody(this.m_file, sinfo, argTypes);
         const ibody = new MIRInvokeBodyDecl(mirthistype.trkey, iname, ikey, [], false, [], sinfo, srcFile, mirparams, mirbooltype.trkey, undefined, undefined, mirbody as MIRBody);
 
         this.m_emitter.masm.invokeDecls.set(ikey, ibody);
@@ -4371,10 +4390,21 @@ class TypeChecker {
                 bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i].exp);
             }
 
-            const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
+            let fps: MIRFunctionParameter[] = [];
+            let cargs = new Map<string, VarInfo>();
+            let argTypes = new Map<string, MIRType>();
+            args.forEach((arg) => {
+                    const ptype = this.m_assembly.normalizeTypeOnly(arg.type, declbinds);
+                    const mirptype = this.m_emitter.registerResolvedTypeReference(ptype);
 
-            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, declbinds, [], bodybinds);
+                    fps.push(new MIRFunctionParameter(arg.name, mirptype.trkey));
+                    cargs.set(arg.name, new VarInfo(ptype, true, false, true, ptype));
+                    argTypes.set(arg.name, mirptype);
+                });
+
+            const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
+
+            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], fps, this.m_assembly.getSpecialBoolType(), cargs, argTypes, body, bodybinds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
         }
         catch (ex) {
@@ -4412,11 +4442,26 @@ class TypeChecker {
             for(let i = 1; i < exps.length; ++i) {
                 bexp = new BinLogicExpression(sinfo, bexp, "&&", exps[i].exp);
             }
+            
+            let fps: MIRFunctionParameter[] = [];
+            let cargs = new Map<string, VarInfo>();
+            let argTypes = new Map<string, MIRType>();
+            args.forEach((arg) => {
+                    const ptype = this.m_assembly.normalizeTypeOnly(arg.type, declbinds);
+                    const mirptype = this.m_emitter.registerResolvedTypeReference(ptype);
 
+                    fps.push(new MIRFunctionParameter(arg.name, mirptype.trkey));
+                    cargs.set(arg.name, new VarInfo(ptype, true, false, true, ptype));
+                    argTypes.set(arg.name, mirptype);
+                });
+
+            //
+            //TODO: need to bind orig values for ref params here + handle value pack binds for multi-return too
+            //
+            
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
-            const ivk = new InvokeDecl(sinfo, srcFile, [], "no", [], [], undefined, args, undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), body);
 
-            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, ivk, declbinds, [], bodybinds);
+            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], fps, this.m_assembly.getSpecialBoolType(), cargs, argTypes, body, bodybinds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
         }
         catch (ex) {
@@ -4445,13 +4490,26 @@ class TypeChecker {
                 this.processGenerateSpecialInvariantDirectFunction(fkey, `${tkey}::invariant_direct`, tdecl, binds, tdecl.invariants.map((inv) => inv.exp), tdecl.srcFile, tdecl.sourceLocation);
             }
 
-            let allinvariants = this.m_assembly.getAllInvariantProvidingTypes(tdecl, binds).map((iinfo) => MIRKeyGenerator.generateStaticKey(iinfo[1], "@invariant_direct", iinfo[2], []));
+            let allinvariants = this.m_assembly.getAllInvariantProvidingTypes(tdecl, binds);
+            let allinvariantcalls = allinvariants.map((iinfo) => MIRKeyGenerator.generateStaticKey(iinfo[1], "@invariant_direct", iinfo[2], []))
             if(allinvariants.length !== 0 && tdecl instanceof EntityTypeDecl) {
                 const fkey = MIRKeyGenerator.generateStaticKey(tdecl, "@@invariant", binds, []);
-                const thistype = ResolvedType.createSingle(ResolvedEntityAtomType.create(tdecl, binds));
+                const mirthistype = this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(ResolvedEntityAtomType.create(tdecl, binds)));
                 
-                this.processGenerateSpecialInvariantFunction(tdecl.sourceLocation, tdecl.srcFile, `${tkey}::invariant`, fkey, thistype, allinvariants,);
-                allinvariants.push(fkey);
+                const fields = this.m_assembly.getAllOOFields(tdecl, binds);
+                const allfields = [...fields].sort((a, b) => a[0].localeCompare(b[0])).map((field) => field[1]);
+
+                const invcallinfo = allinvariants.map((invinfo) => {
+                    const icall =  MIRKeyGenerator.generateStaticKey(invinfo[1], "@invariant_direct", invinfo[2], []);
+
+                    const fields = [...this.m_assembly.getAllOOFields(tdecl, binds)].sort((a, b) => a[0].localeCompare(b[0]));
+                    const cargs = fields.map((finfo) => ({name: `$${finfo[1][1].name}`, t: this.m_assembly.normalizeTypeOnly(finfo[1][1], finfo[1][2])}));
+
+                    return {ivk: icall, args: cargs};
+                });
+
+                this.processGenerateSpecialInvariantFunction(tdecl.sourceLocation, tdecl.srcFile, `${tkey}::invariant`, fkey, mirthistype, allfields, invcallinfo);
+                allinvariantcalls.push(fkey);
             }
             
             //
@@ -4483,11 +4541,11 @@ class TypeChecker {
             const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
 
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariants, fields);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariantcalls, fields);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariants, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, allinvariantcalls, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -4538,36 +4596,17 @@ class TypeChecker {
         }
     }
 
-    private processInvokeInfo_Simplified(enclosingDecl: MIRNominalTypeKey | undefined, iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, declbinds: Map<string, ResolvedType>, pargs: [string, ResolvedType][], bodybinds: Map<string, ResolvedType>): MIRInvokeDecl {
-        let cargs = new Map<string, VarInfo>();
-        let argTypes: Map<string, MIRType> = new Map<string, MIRType>();
-        let params: MIRFunctionParameter[] = [];
-
-        invoke.params.forEach((p) => {
-            const ptype = this.m_assembly.normalizeTypeOnly(p.type, declbinds);
-            cargs.set(p.name, new VarInfo(ptype, !p.isRef, false, true, ptype));
-
-            const mtype = this.m_emitter.registerResolvedTypeReference(ptype);
-            argTypes.set(p.name, mtype);
-            params.push(new MIRFunctionParameter(p.name, mtype.trkey));
-        });
-
-        for (let i = 0; i < pargs.length; ++i) {
-            cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
-
-            const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
-            argTypes.set(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]), ctype);
-            params.push(new MIRFunctionParameter(this.m_emitter.bodyEmitter.generateCapturedVarName(pargs[i][0]), ctype.trkey));
-        }
-
-        let resolvedResult = this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, declbinds);
+    private processInvokeInfo_Simplified(enclosingDecl: MIRNominalTypeKey | undefined, iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, srcFile: string,
+        attributes: string[], params: MIRFunctionParameter[], resolvedResult: ResolvedType,  cargs: Map<string, VarInfo>, argTypes: Map<string, MIRType>, 
+        bbody: BodyImplementation, bodybinds: Map<string, ResolvedType>): MIRInvokeDecl {
+        
         let resultType = this.m_emitter.registerResolvedTypeReference(resolvedResult);
         const env = TypeEnvironment.createInitialEnvForCall(ikey, bodybinds, [], new Map<string, { pcode: PCode, captured: string[] }>(), cargs, resolvedResult);
 
-        const mirbody = this.checkBody(env, invoke.body as BodyImplementation, argTypes, resolvedResult, undefined, undefined);
+        const mirbody = this.checkBody(env, bbody as BodyImplementation, argTypes, resolvedResult, undefined, undefined);
         this.raiseErrorIf(sinfo, mirbody === undefined, "Type check of body failed");
 
-        return new MIRInvokeBodyDecl(enclosingDecl, iname, ikey, invoke.attributes, false, [], sinfo, invoke.srcFile, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(enclosingDecl, iname, ikey, attributes, false, [], sinfo, srcFile, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     private processInvokeInfo(namespace: string, fname: string | undefined, enclosingDecl: [MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member", iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
@@ -4656,7 +4695,7 @@ class TypeChecker {
             let postconds = invoke.postconditions.filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
             if(postconds.length !== 0) {
                 const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
-                const retv = new FunctionParameter("$return", invoke.resultType, false, false); //this is wrong for pack functions and ref params but we will let it go for now
+                const retv = new FunctionParameter("$return", invoke.resultType, false, false);
                 this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, binds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];
@@ -4682,7 +4721,7 @@ class TypeChecker {
             if(postconds.length !== 0) {
                 const postbinds = absconds !== undefined ? absconds.post[1] : binds;
                 const fkey = MIRKeyGenerator.generateFunctionKey(namespace, `${ikey}@@post`, binds, []);
-                const retv = new FunctionParameter("$return", invoke.resultType, false, false); //this is wrong for pack functions but yeah
+                const retv = new FunctionParameter("$return", invoke.resultType, false, false);
                 this.processGenerateSpecialPostFunction(fkey, `${iname}@@ppost`, [retv, ...invoke.params], binds, postconds, postbinds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];

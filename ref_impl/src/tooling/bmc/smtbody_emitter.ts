@@ -271,7 +271,8 @@ class SMTBodyEmitter {
     }
 
     generateMIRInvokeInvariantCheckDirect(ivop: MIRInvokeInvariantCheckDirect): SMTExp {
-        let vals: string[] = [this.argToSMT(ivop.rcvr, this.assembly.typeMap.get(ivop.tkey) as MIRType).emit()];
+        const fields = [...(this.typegen.assembly.entityDecls.get(ivop.tkey) as MIREntityTypeDecl).fields].sort((a, b) => a.name.localeCompare(b.name));
+        let vals: string[] = fields.map((f) => `(${this.typegen.generateEntityAccessor(f.enclosingDecl, f.fkey)} ${this.argToSMT(ivop.rcvr, this.typegen.getMIRType(ivop.tkey)).emit()})`);
         
         const tv = this.generateTempName();
         const ivrtype = this.typegen.getSMTTypeFor(this.typegen.boolType);

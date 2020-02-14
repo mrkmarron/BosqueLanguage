@@ -2139,6 +2139,8 @@ class Parser {
                 }
             }
 
+            this.ensureAndConsumeToken("=");
+
             let exps: Expression[] = this.parseEphemeralListOf(() => {
                 return this.parseExpression();
             });
