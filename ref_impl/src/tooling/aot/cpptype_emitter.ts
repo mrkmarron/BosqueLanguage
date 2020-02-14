@@ -598,7 +598,7 @@ class CPPTypeEmitter {
         const tval = this.getCPPTypeFor(tt, "base");
         const hf = `HashFunctor_${tval}{}`;
         const eqf = `EqualFunctor_${tval}{}`;
-        const cmpf = "[INVALID]";
+        const cmpf = `LessFunctor_${tval}{}`;
 
         return { hash: hf, eq: eqf, cmp: cmpf };
     }
@@ -703,7 +703,7 @@ class CPPTypeEmitter {
         + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
         + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
         + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
-        + `#define K_HASH(X) ${this.getGetCMPOpsForKeyType(typekp).hash}\n`
+        + `#define K_CMP(X, Y) ${this.getGetCMPOpsForKeyType(typekp).cmp}\n`
         + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
         + `#define FDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
         + "\n"
@@ -735,7 +735,7 @@ class CPPTypeEmitter {
         + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
         + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
         + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
-        + `#define K_HASH(X) ${this.getGetCMPOpsForKeyType(typekp).hash}\n`
+        + `#define K_CMP(X, Y) ${this.getGetCMPOpsForKeyType(typekp).cmp}\n`
         + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
         + `#define TDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
         + `#define UDisplay(X) diagnostic_format(${this.coerce("(X)", typeu, this.anyType)})\n`

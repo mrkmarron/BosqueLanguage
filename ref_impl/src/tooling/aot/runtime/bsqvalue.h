@@ -5,8 +5,6 @@
 
 #include "common.h"
 
-#include <unordered_map>
-
 #pragma once
 
 ////
@@ -241,6 +239,10 @@ struct EqualFunctor_bool
 {
     bool operator()(bool l, bool r) { return l == r; }
 };
+struct LessFunctor_bool
+{
+    bool operator()(bool l, bool r) { return (!l) & r; }
+};
 struct DisplayFunctor_bool
 {
     std::u32string operator()(bool b) { return b ? U"true" : U"false"; }
@@ -283,17 +285,17 @@ public:
         return false;
     }
 
+    bool ltI64(int64_t v) const
+    {
+        return false;
+    }
+
     static bool eq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
 
     static bool lt(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
-    static bool lteq(const BSQBigInt* l, const BSQBigInt* r)
     {
         return false;
     }
@@ -332,7 +334,7 @@ struct EqualFunctor_IntValue
     bool operator()(IntValue l, IntValue r) 
     { 
         if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return l == r; //tag doesn't affect equality
+            return l == r; //tagging does not affect equality
         }
         else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
             return BSQ_GET_VALUE_PTR(r, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(l));
@@ -345,6 +347,24 @@ struct EqualFunctor_IntValue
         }
     }
 };
+struct LessFunctor_IntValue
+{
+    bool operator()(IntValue l, IntValue r) 
+    { 
+        if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
+            return BSQ_GET_VALUE_TAGGED_INT(l) < BSQ_GET_VALUE_TAGGED_INT(r);
+        }
+        else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
+            return BSQ_GET_VALUE_PTR(r, BSQBigInt)->ltI64(BSQ_GET_VALUE_TAGGED_INT(l));
+        }
+        else if(BSQ_IS_VALUE_TAGGED_INT(r)) {
+            return BSQ_GET_VALUE_PTR(l, BSQBigInt)->ltI64(BSQ_GET_VALUE_TAGGED_INT(r));
+        }
+        else {
+            return BSQBigInt::lt(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt));
+        }
+    }
+};
 struct DisplayFunctor_IntValue
 {
     std::u32string operator()(IntValue i)
@@ -353,9 +373,6 @@ struct DisplayFunctor_IntValue
         return BSQ_IS_VALUE_TAGGED_INT(i) ? conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(i))) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->display();
     }
 };
-
-bool op_intLess(BSQRefScope& scope, IntValue v1, IntValue v2);
-bool op_intLessEq(BSQRefScope& scope, IntValue v1, IntValue v2);
 
 IntValue op_intNegate(BSQRefScope& scope, IntValue v);
 
@@ -367,6 +384,7 @@ IntValue op_intMod(BSQRefScope& scope, IntValue v1, IntValue v2);
 
 size_t bsqKeyValueHash(KeyValue v);
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
+bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
 
 MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v);
 MIRNominalTypeEnum getNominalTypeOf_Value(Value v);
@@ -382,6 +400,10 @@ struct HashFunctor_KeyValue
 struct EqualFunctor_KeyValue
 {
     bool operator()(const KeyValue& l, const KeyValue& r) { return bsqKeyValueEqual(l, r); }
+};
+struct LessFunctor_KeyValue
+{
+    bool operator()(const KeyValue& l, const KeyValue& r) { return bsqKeyValueLess(l, r); }
 };
 struct DisplayFunctor_KeyValue
 {

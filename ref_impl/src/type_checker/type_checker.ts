@@ -253,9 +253,8 @@ class TypeChecker {
     
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
         const bothint = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
-        const bothstring = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()));
-
-        return bothint || bothstring;
+        
+        return bothint;
     }
 
     private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {

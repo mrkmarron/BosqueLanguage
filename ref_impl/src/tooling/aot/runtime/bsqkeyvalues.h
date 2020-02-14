@@ -28,6 +28,11 @@ public:
     {
         return l->sdata == r->sdata;
     }
+
+    inline static bool keyLess(const BSQString* l, const BSQString* r)
+    {
+        return l->sdata < r->sdata;
+    }
 };
 struct HashFunctor_BSQString
 {
@@ -36,6 +41,10 @@ struct HashFunctor_BSQString
 struct EqualFunctor_BSQString
 {
     bool operator()(const BSQString* l, const BSQString* r) { return BSQString::keyEqual(l, r); }
+};
+struct LessFunctor_BSQString
+{
+    bool operator()(const BSQString* l, const BSQString* r) { return BSQString::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQString
 {
@@ -61,6 +70,11 @@ public:
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
     }
+
+    inline static bool keyLess(const BSQValidatedString* l, const BSQValidatedString* r)
+    {
+        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
+    }
 };
 struct HashFunctor_BSQValidatedString
 {
@@ -69,6 +83,10 @@ struct HashFunctor_BSQValidatedString
 struct EqualFunctor_BSQValidatedString
 {
     bool operator()(const BSQValidatedString* l, const BSQValidatedString* r) { return BSQValidatedString::keyEqual(l, r); }
+};
+struct LessFunctor_BSQValidatedString
+{
+    bool operator()(const BSQValidatedString* l, const BSQValidatedString* r) { return BSQValidatedString::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQValidatedString
 {
@@ -98,6 +116,11 @@ public:
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
     }
+
+    inline static bool keyLess(const BSQStringOf* l, const BSQStringOf* r)
+    {
+        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
+    }
 };
 struct HashFunctor_BSQStringOf
 {
@@ -106,6 +129,10 @@ struct HashFunctor_BSQStringOf
 struct EqualFunctor_BSQStringOf
 {
     bool operator()(const BSQStringOf* l, const BSQStringOf* r) { return BSQStringOf::keyEqual(l, r); }
+};
+struct LessFunctor_BSQStringOf
+{
+    bool operator()(const BSQStringOf* l, const BSQStringOf* r) { return BSQStringOf::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQStringOf
 {
@@ -136,6 +163,11 @@ public:
     {
         return memcmp(l->sdata, r->sdata, 16) == 0;
     }
+
+    inline static bool keyLess(const BSQGUID* l, const BSQGUID* r)
+    {
+        return memcmp(l->sdata, r->sdata, 16) < 0;
+    }
 };
 struct HashFunctor_BSQGUID
 {
@@ -144,6 +176,10 @@ struct HashFunctor_BSQGUID
 struct EqualFunctor_BSQGUID
 {
     bool operator()(const BSQGUID* l, const BSQGUID* r) { return BSQGUID::keyEqual(l, r); }
+};
+struct LessFunctor_BSQGUID
+{
+    bool operator()(const BSQGUID* l, const BSQGUID* r) { return BSQGUID::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQGUID
 {
@@ -181,6 +217,11 @@ public:
     {
         return l.timestamp == r.timestamp;
     }
+
+     inline static bool keyLess(const BSQEventTime& l, const BSQEventTime& r)
+    {
+        return l.timestamp < r.timestamp;
+    }
 };
 struct HashFunctor_BSQEventTime
 {
@@ -189,6 +230,10 @@ struct HashFunctor_BSQEventTime
 struct EqualFunctor_BSQEventTime
 {
     bool operator()(const BSQEventTime& l, const BSQEventTime& r) { return BSQEventTime::keyEqual(l, r); }
+};
+struct LessFunctor_BSQEventTime
+{
+    bool operator()(const BSQEventTime& l, const BSQEventTime& r) { return BSQEventTime::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQEventTime
 {
@@ -230,6 +275,11 @@ public:
     {
         return l.hdata == r.hdata;
     }
+
+    inline static bool keyLess(const BSQDataHash& l, const BSQDataHash& r)
+    {
+        return l.hdata < r.hdata;
+    }
 };
 struct HashFunctor_BSQDataHash
 {
@@ -238,6 +288,10 @@ struct HashFunctor_BSQDataHash
 struct EqualFunctor_BSQDataHash
 {
     bool operator()(const BSQDataHash& l, const BSQDataHash& r) { return BSQDataHash::keyEqual(l, r); }
+};
+struct LessFunctor_BSQDataHash
+{
+    bool operator()(const BSQDataHash& l, const BSQDataHash& r) { return BSQDataHash::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQDataHash
 {
@@ -269,6 +323,11 @@ public:
     {
         return memcmp(l->hdata, r->hdata, 64) == 0;
     }
+
+    inline static bool keyLess(const BSQCryptoHash* l, const BSQCryptoHash* r)
+    {
+        return memcmp(l->hdata, r->hdata, 64) < 0;
+    }
 };
 struct HashFunctor_BSQCryptoHash
 {
@@ -277,6 +336,10 @@ struct HashFunctor_BSQCryptoHash
 struct EqualFunctor_BSQCryptoHash
 {
     bool operator()(const BSQCryptoHash* l, const BSQCryptoHash* r) { return BSQCryptoHash::keyEqual(l, r); }
+};
+struct LessFunctor_BSQCryptoHash
+{
+    bool operator()(const BSQCryptoHash* l, const BSQCryptoHash* r) { return BSQCryptoHash::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQCryptoHash
 {
@@ -315,6 +378,11 @@ public:
     {
         return (l.nominalType == r.nominalType) & (l.value == r.value);
     }
+
+    inline static bool keyLess(const BSQEnum& l, const BSQEnum& r)
+    {
+        return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.value < r.value);
+    }
 };
 struct HashFunctor_BSQEnum
 {
@@ -323,6 +391,10 @@ struct HashFunctor_BSQEnum
 struct EqualFunctor_BSQEnum
 {
     bool operator()(const BSQEnum& l, const BSQEnum& r) { return BSQEnum::keyEqual(l, r); }
+};
+struct LessFunctor_BSQEnum
+{
+    bool operator()(const BSQEnum& l, const BSQEnum& r) { return BSQEnum::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQEnum
 {
@@ -389,6 +461,34 @@ public:
 
         return true;
     }
+
+    inline static bool keyLess(const BSQIdKey* l, const BSQIdKey* r)
+    {
+        if(l->nominalType != r->nominalType)
+        {
+            return l->nominalType < r->nominalType;
+        }
+
+        if(l->keys.size() != r->keys.size())
+        {
+            return l->keys.size() < r->keys.size();
+        }
+        
+        for(size_t i = 0; i < l->keys.size(); ++i)
+        {
+            if(l->keys[i].first != r->keys[i].first)
+            {
+                return l->keys[i].first < r->keys[i].first;
+            }
+
+            if(!bsqKeyValueEqual(l->keys[i].second, r->keys[i].second))
+            {
+                return bsqKeyValueLess(l->keys[i].second, r->keys[i].second);
+            }
+        }
+
+        return true;
+    }
 };
 struct HashFunctor_BSQIdKey
 {
@@ -397,6 +497,10 @@ struct HashFunctor_BSQIdKey
 struct EqualFunctor_BSQIdKey
 {
     bool operator()(const BSQIdKey* l, const BSQIdKey* r) { return BSQIdKey::keyEqual(l, r); }
+};
+struct LessFunctor_BSQIdKey
+{
+    bool operator()(const BSQIdKey* l, const BSQIdKey* r) { return BSQIdKey::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQIdKey
 {
@@ -447,6 +551,11 @@ public:
     {
         return l->nominalType == r->nominalType && memcmp(l->sdata, r->sdata, 16) == 0;
     }
+
+    inline static bool keyLess(const BSQGUIDIdKey* l, const BSQGUIDIdKey* r)
+    {
+        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : memcmp(l->sdata, r->sdata, 16) < 0;
+    }
 };
 struct HashFunctor_BSQGUIDIdKey
 {
@@ -455,6 +564,10 @@ struct HashFunctor_BSQGUIDIdKey
 struct EqualFunctor_BSQGUIDIdKey
 {
     bool operator()(const BSQGUIDIdKey* l, const BSQGUIDIdKey* r) { return BSQGUIDIdKey::keyEqual(l, r); }
+};
+struct LessFunctor_BSQGUIDIdKey
+{
+    bool operator()(const BSQGUIDIdKey* l, const BSQGUIDIdKey* r) { return BSQGUIDIdKey::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQGUIDIdKey
 {
@@ -497,6 +610,11 @@ public:
     {
         return l.nominalType == r.nominalType && l.timestamp == r.timestamp;
     }
+
+    inline static bool keyLess(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r)
+    {
+        return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.timestamp < r.timestamp);
+    }
 };
 struct HashFunctor_BSQEventTimeIdKey
 {
@@ -505,6 +623,10 @@ struct HashFunctor_BSQEventTimeIdKey
 struct EqualFunctor_BSQEventTimeIdKey
 {
     bool operator()(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r) { return BSQEventTimeIdKey::keyEqual(l, r); }
+};
+struct LessFunctor_BSQEventTimeIdKey
+{
+    bool operator()(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r) { return BSQEventTimeIdKey::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQEventTimeIdKey
 {
@@ -547,6 +669,11 @@ public:
     {
         return (l.nominalType == r.nominalType) & (l.hdata == r.hdata);
     }
+
+    inline static bool keyLess(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r)
+    {
+        return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.hdata < r.hdata);
+    }
 };
 struct HashFunctor_BSQDataHashIdKey
 {
@@ -555,6 +682,10 @@ struct HashFunctor_BSQDataHashIdKey
 struct EqualFunctor_BSQDataHashIdKey
 {
     bool operator()(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r) { return BSQDataHashIdKey::keyEqual(l, r); }
+};
+struct LessFunctor_BSQDataHashIdKey
+{
+    bool operator()(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r) { return BSQDataHashIdKey::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQDataHashIdKey
 {
@@ -587,6 +718,11 @@ public:
     {
         return l->nominalType == r->nominalType && memcmp(l->hdata, r->hdata, 64) == 0;
     }
+
+    inline static bool keyLess(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r)
+    {
+        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : memcmp(l->hdata, r->hdata, 64) < 0;
+    }
 };
 struct HashFunctor_BSQCryptoHashIdKey
 {
@@ -595,6 +731,10 @@ struct HashFunctor_BSQCryptoHashIdKey
 struct EqualFunctor_BSQCryptoHashIdKey
 {
     bool operator()(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r) { return BSQCryptoHashIdKey::keyEqual(l, r); }
+};
+struct LessFunctor_BSQCryptoHashIdKey
+{
+    bool operator()(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r) { return BSQCryptoHashIdKey::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQCryptoHashIdKey
 {

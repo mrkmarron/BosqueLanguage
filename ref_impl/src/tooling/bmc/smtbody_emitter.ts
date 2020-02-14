@@ -835,12 +835,7 @@ class SMTBodyEmitter {
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        if(lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
-            return `(${op} ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
-        }
-        else {
-            return NOT_IMPLEMENTED<string>("compare string");
-        }
+        return `(${op} ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
     }
 
     generateSubtypeTupleCheck(argv: string, argtype: MIRType, oftype: MIRTupleType): string {

@@ -692,23 +692,17 @@ class CPPBodyEmitter {
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        if (lhsinfertype.trkey === "NSCore::Int" && rhsinfertype.trkey === "NSCore::Int") {
-            const scope = this.typegen.mangleStringForCpp("$scope$");
-            if(op === "<") {
-                return `op_intLess(${scope}, ${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
-            }
-            else if(op === "<=") {
-                return `op_intLessEq(${scope}, ${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
-            }
-            else if(op === ">") {
-                return `op_intLess(${scope}, ${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
-            }
-            else {
-                return `op_intLessEq(${scope}, ${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
-            }
+        if (op === "<") {
+            return `LessFunctor_IntValue{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+        }
+        else if (op === "<=") {
+            return `LessFunctor_IntValue{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)}) || EqualFunctor_IntValue{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+        }
+        else if (op === ">") {
+            return `LessFunctor_IntValue{}(${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
         }
         else {
-            return NOT_IMPLEMENTED<string>("compare string");
+            return `LessFunctor_IntValue{}(${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)}) || EqualFunctor_IntValue{}(${this.argToCpp(rhs, rhsinfertype)}, ${this.argToCpp(lhs, lhsinfertype)})`;
         }
     }
 

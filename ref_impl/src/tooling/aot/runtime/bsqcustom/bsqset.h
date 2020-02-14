@@ -17,18 +17,18 @@
 #define INC_RC_K(X)
 #define DEC_RC_K(X)
 #define K_LIST TKName
-#define K_HASH(X) 0
+#define K_CMP(X, Y) false
 #define K_EQ(X, Y) false
 #define TDisplay(X)
 #endif
 
 class Ty : public BSQObject {
 public:
-    std::unordered_map<K, T, K_HASH, K_EQ> entries;
+    std::map<K, T, K_CMP> entries;
     K_LIST* keys;
 
     Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries(), keys(nullptr) { ; }
-    Ty(MIRNominalTypeEnum ntype, std::unordered_map<K, T, K_HASH, K_EQ>&& entries, K_LIST* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
+    Ty(MIRNominalTypeEnum ntype, std::unordered_map<K, T, K_CMP>&& entries, K_LIST* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
 
     virtual ~Ty()
     {
@@ -49,7 +49,7 @@ public:
     static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
     {
         T val;
-        std::unordered_map<K, T, K_HASH, K_EQ> entries;
+        std::map<K, T, K_CMP> entries;
         K_LIST* keys = nullptr;
 
         for (int i = 0; i < n; i++)
@@ -81,7 +81,7 @@ public:
 
     Ty* add(K key, T val, K_LIST* nkeys, BSQRefScope& cscope)
     {
-        std::unordered_map<K, T, K_HASH, K_EQ> entries;
+        std::map<K, T, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
             INC_RC_K(iter->first);
@@ -99,7 +99,7 @@ public:
 
     Ty* update(K key, T val, BSQRefScope& cscope)
     {
-        std::unordered_map<K, T, K_HASH, K_EQ> entries;
+        std::map<K, T, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
             if(K_EQ(key, iter->first))
@@ -122,7 +122,7 @@ public:
 
     Ty* clearKey(K key, K_LIST* nkeys, BSQRefScope& cscope)
     {
-        std::unordered_map<K, T, K_HASH, K_EQ> entries;
+        std::map<K, T, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
             if(!K_EQ(key, iter->first)) 
@@ -171,6 +171,6 @@ public:
 #undef INC_RC_K
 #undef DEC_RC_K
 #undef K_LIST
-#undef K_HASH
+#undef K_CMP
 #undef K_EQ
 #undef TDisplay

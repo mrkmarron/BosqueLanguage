@@ -13,36 +13,6 @@ namespace BSQ
 BSQTuple* BSQTuple::_empty = INC_REF_DIRECT(BSQTuple, new BSQTuple({}, DATA_KIND_POD_FLAG));
 BSQRecord* BSQRecord::_empty = INC_REF_DIRECT(BSQRecord, new BSQRecord({}, DATA_KIND_POD_FLAG));
 
-bool op_intLessSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
-{
-    return BSQBigInt::lt(COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
-}
-
-bool op_intLess(BSQRefScope& scope, IntValue v1, IntValue v2)
-{
-    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
-    {
-        return v1 < v2;
-    }
-
-    return op_intLessSlow(scope, v1, v2);
-}
-
-bool op_intLessEqSlow(BSQRefScope& scope, IntValue v1, IntValue v2)
-{
-    return BSQBigInt::lteq(COERSE_TO_BIG_INT(v1), COERSE_TO_BIG_INT(v2));
-}
-
-bool op_intLessEq(BSQRefScope& scope, IntValue v1, IntValue v2)
-{
-    if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2))
-    {
-        return v1 <= v2;
-    }
-
-    return op_intLessEqSlow(scope, v1, v2);
-}
-
 IntValue op_intNegate(BSQRefScope& scope, IntValue v)
 {
     if(BSQ_IS_VALUE_TAGGED_INT(v))
@@ -250,29 +220,24 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
     {
         return BSQ_IS_VALUE_NONE(v1) && BSQ_IS_VALUE_NONE(v2);
     }
-    if(BSQ_IS_VALUE_BOOL(v1) && BSQ_IS_VALUE_BOOL(v2))
+    else if(BSQ_IS_VALUE_BOOL(v1) && BSQ_IS_VALUE_BOOL(v2))
     {
-        return v1 == v2;
+        return EqualFunctor_bool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
     else if(BSQ_IS_VALUE_TAGGED_INT(v1) || BSQ_IS_VALUE_TAGGED_INT(v2))
     {
-        if(BSQ_IS_VALUE_TAGGED_INT(v1) && BSQ_IS_VALUE_TAGGED_INT(v2)) {
-            return v1 == v2;
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(v1) && dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef)) != nullptr) {
-            return dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v2, BSQRef))->eqI64(BSQ_GET_VALUE_TAGGED_INT(v1));
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(v2) && dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef)) != nullptr) {
-            return dynamic_cast<BSQBigInt*>(BSQ_GET_VALUE_PTR(v1, BSQRef))->eqI64(BSQ_GET_VALUE_TAGGED_INT(v2));
-        }
-        else {
-            return false;
-        }
+        return EqualFunctor_IntValue{}((IntValue)v1, (IntValue)v2);
     }
     else
     {
         auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
-        auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef); 
+        auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef);
+
+        if(ptr1->nominalType != ptr2->nominalType)
+        {
+            return false;
+        }
+        
         if(dynamic_cast<BSQBigInt*>(ptr1) != nullptr && dynamic_cast<BSQBigInt*>(ptr2) != nullptr)
         {
             return BSQBigInt::eq(dynamic_cast<BSQBigInt*>(ptr1), dynamic_cast<BSQBigInt*>(ptr2));
@@ -325,13 +290,92 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQDataHashIdKey::keyEqual(*dynamic_cast<BSQDataHashIdKey*>(ptr1), *dynamic_cast<BSQDataHashIdKey*>(ptr2));
         }
-        else if(dynamic_cast<BSQCryptoHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQCryptoHashIdKey*>(ptr2) != nullptr)
+        else
         {
             return BSQCryptoHashIdKey::keyEqual(dynamic_cast<BSQCryptoHashIdKey*>(ptr1), dynamic_cast<BSQCryptoHashIdKey*>(ptr2));
         }
+    }
+}
+
+bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
+{
+    if(BSQ_IS_VALUE_NONE(v1) || BSQ_IS_VALUE_NONE(v2))
+    {
+        return BSQ_IS_VALUE_NONE(v1) && BSQ_IS_VALUE_NONNONE(v2);
+    }
+    else if(BSQ_IS_VALUE_BOOL(v1) && BSQ_IS_VALUE_BOOL(v2))
+    {
+        return LessFunctor_bool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
+    }
+    else if(BSQ_IS_VALUE_TAGGED_INT(v1) || BSQ_IS_VALUE_TAGGED_INT(v2))
+    {
+        return LessFunctor_IntValue{}((IntValue)v1, (IntValue)v2);
+    }
+    else
+    {
+        auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
+        auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef);
+
+        if(ptr1->nominalType != ptr2->nominalType)
+        {
+            return ptr1->nominalType < ptr2->nominalType;
+        }
+        
+        if(dynamic_cast<BSQBigInt*>(ptr1) != nullptr && dynamic_cast<BSQBigInt*>(ptr2) != nullptr)
+        {
+            return BSQBigInt::lt(dynamic_cast<BSQBigInt*>(ptr1), dynamic_cast<BSQBigInt*>(ptr2));
+        }
+        else if(dynamic_cast<BSQString*>(ptr1) != nullptr && dynamic_cast<BSQString*>(ptr2) != nullptr)
+        {
+            return BSQString::keyLess(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
+        }
+        else if(dynamic_cast<BSQValidatedString*>(ptr1) != nullptr && dynamic_cast<BSQValidatedString*>(ptr2) != nullptr)
+        {
+            return BSQValidatedString::keyLess(dynamic_cast<BSQValidatedString*>(ptr1), dynamic_cast<BSQValidatedString*>(ptr2));
+        }
+        else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
+        {
+            return BSQStringOf::keyLess(dynamic_cast<BSQStringOf*>(ptr1), dynamic_cast<BSQStringOf*>(ptr2));
+        }
+        else if(dynamic_cast<BSQGUID*>(ptr1) != nullptr && dynamic_cast<BSQGUID*>(ptr2) != nullptr)
+        {
+            return BSQGUID::keyLess(dynamic_cast<BSQGUID*>(ptr1), dynamic_cast<BSQGUID*>(ptr2));
+        }
+        else if(dynamic_cast<BSQDataHash*>(ptr1) != nullptr && dynamic_cast<BSQDataHash*>(ptr2) != nullptr)
+        {
+            return BSQDataHash::keyLess(*dynamic_cast<BSQDataHash*>(ptr1), *dynamic_cast<BSQDataHash*>(ptr2));
+        }
+        else if(dynamic_cast<BSQCryptoHash*>(ptr1) != nullptr && dynamic_cast<BSQCryptoHash*>(ptr2) != nullptr)
+        {
+            return BSQCryptoHash::keyLess(dynamic_cast<BSQCryptoHash*>(ptr1), dynamic_cast<BSQCryptoHash*>(ptr2));
+        }
+        else if(dynamic_cast<BSQEventTime*>(ptr1) != nullptr && dynamic_cast<BSQEventTime*>(ptr2) != nullptr)
+        {
+            return BSQEventTime::keyLess(*dynamic_cast<BSQEventTime*>(ptr1), *dynamic_cast<BSQEventTime*>(ptr2));
+        }
+        else if(dynamic_cast<BSQEnum*>(ptr1) != nullptr && dynamic_cast<BSQEnum*>(ptr2) != nullptr)
+        {
+            return BSQEnum::keyLess(*dynamic_cast<BSQEnum*>(ptr1), *dynamic_cast<BSQEnum*>(ptr2));
+        }
+        else if(dynamic_cast<BSQIdKey*>(ptr1) != nullptr && dynamic_cast<BSQIdKey*>(ptr2) != nullptr)
+        {
+            return BSQIdKey::keyLess(dynamic_cast<BSQIdKey*>(ptr1), dynamic_cast<BSQIdKey*>(ptr2));
+        }
+        else if(dynamic_cast<BSQGUIDIdKey*>(ptr1) != nullptr && dynamic_cast<BSQGUIDIdKey*>(ptr2) != nullptr)
+        {
+            return BSQGUIDIdKey::keyLess(dynamic_cast<BSQGUIDIdKey*>(ptr1), dynamic_cast<BSQGUIDIdKey*>(ptr2));
+        }
+        else if(dynamic_cast<BSQEventTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQEventTimeIdKey*>(ptr2) != nullptr)
+        {
+            return BSQEventTimeIdKey::keyLess(*dynamic_cast<BSQEventTimeIdKey*>(ptr1), *dynamic_cast<BSQEventTimeIdKey*>(ptr2));
+        }
+        else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
+        {
+            return BSQDataHashIdKey::keyLess(*dynamic_cast<BSQDataHashIdKey*>(ptr1), *dynamic_cast<BSQDataHashIdKey*>(ptr2));
+        }
         else
         {
-            return false;  
+            return BSQCryptoHashIdKey::keyLess(dynamic_cast<BSQCryptoHashIdKey*>(ptr1), dynamic_cast<BSQCryptoHashIdKey*>(ptr2));
         }
     }
 }
