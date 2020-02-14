@@ -28,7 +28,7 @@ class CPPTypeEmitter {
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
     readonly guididkeytype: MIRType;
-    readonly eventtimeidkeytype: MIRType;
+    readonly logicaltimeidkeytype: MIRType;
     readonly datahashidkeytype: MIRType;
     readonly cryptohashidkeytype: MIRType;    
 
@@ -56,7 +56,7 @@ class CPPTypeEmitter {
         this.enumtype = assembly.typeMap.get("NSCore::Enum") as MIRType;
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
         this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
-        this.eventtimeidkeytype = assembly.typeMap.get("NSCore::EventTimeIdKey") as MIRType;
+        this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
         this.datahashidkeytype = assembly.typeMap.get("NSCore::DataHashIdKey") as MIRType;
         this.cryptohashidkeytype = assembly.typeMap.get("NSCore::CryptoHashIdKey") as MIRType;
     }
@@ -219,8 +219,8 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
             return "BSQGUID" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/)) {
-            return "BSQEventTime";
+        else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
+            return "BSQLogicalTime";
         }
         else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
             return "BSQDataHash";
@@ -237,8 +237,8 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
             return "BSQGUIDIdKey" + (declspec !== "base" ? "*" : "");
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype)) {
-            return "BSQEventTimeIdKey";
+        else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
+            return "BSQLogicalTimeIdKey";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
             return "BSQDataHashIdKey";
@@ -285,8 +285,8 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/)) {
             return `BSQ_ENCODE_VALUE_BOOL(${exp})`;
         }
-        else if (this.typecheckIsName(from, /^NSCore::EventTime$/)) {
-            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTime, ${exp})`;
+        else if (this.typecheckIsName(from, /^NSCore::LogicalTime$/)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQLogicalTime, ${exp})`;
         }
         else if (this.typecheckIsName(from, /^NSCore::DataHash$/)) {
             return `BSQ_NEW_ADD_SCOPE(${scope}, BSQDataHash, ${exp})`;
@@ -294,8 +294,8 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(from, this.enumtype)) {
             return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEnum, ${exp})`;
         }
-        else if (this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype)) {
-            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQEventTimeIdKey, ${exp})`;
+        else if (this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype)) {
+            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQLogicalTimeIdKey, ${exp})`;
         }
         else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
             return `BSQ_NEW_ADD_SCOPE(${scope}, BSQDataHashIdKey, ${exp})`;
@@ -309,8 +309,8 @@ class CPPTypeEmitter {
         if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
             return `BSQ_GET_VALUE_BOOL(${exp})`;
         }
-        else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQEventTime)`;
+        else if (this.typecheckIsName(into, /^NSCore::LogicalTime$/)) {
+            return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTime)`;
         }
         else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHash)`;
@@ -318,8 +318,8 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQEnum)`;
         }
-        else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQEventTimeIdKey)`;
+        else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
+            return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTimeIdKey)`;
         }
         else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
@@ -333,8 +333,8 @@ class CPPTypeEmitter {
         if (this.typecheckIsName(into, /^NSCore::Bool$/)) {
             return `BSQ_GET_VALUE_BOOL(${exp})`;
         }
-        else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQEventTime)`;
+        else if (this.typecheckIsName(into, /^NSCore::LogicalTime$/)) {
+            return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTime)`;
         }
         else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHash)`;
@@ -342,8 +342,8 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(into, this.enumtype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQEnum)`;
         }
-        else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQEventTimeIdKey)`;
+        else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
+            return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTimeIdKey)`;
         }
         else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
@@ -380,12 +380,12 @@ class CPPTypeEmitter {
             return this.coerceFromAtomicKey(exp, from);
         }
         else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
-            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
+            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::LogicalTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from);
         }
         else if (this.typecheckEntityAndProvidesName(from, this.enumtype) || this.typecheckEntityAndProvidesName(from, this.idkeytype) || this.typecheckEntityAndProvidesName(from, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
             return this.coerceFromAtomicKey(exp, from);
         }
         else if (this.typecheckAllKeys(from)) {
@@ -415,12 +415,12 @@ class CPPTypeEmitter {
                return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
-                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
+                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::LogicalTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
-                || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
                 return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckAllKeys(into)) {
@@ -516,10 +516,10 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
             return "direct";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
             return "no";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
             return "no";
         }
         else {
@@ -610,11 +610,11 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return true;
         }
-        else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::EventTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::LogicalTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
             return true;
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
            return true;
         }
         else {
@@ -634,10 +634,10 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(ttype, /^NSCore::Int$/)) {
             return "BSQ_VALUE_0";
         }
-        else if (this.typecheckIsName(ttype, /^NSCore::EventTime$/) || this.typecheckIsName(ttype, /^NSCore::DataHash$/)) {
+        else if (this.typecheckIsName(ttype, /^NSCore::LogicalTime$/) || this.typecheckIsName(ttype, /^NSCore::DataHash$/)) {
             return `${this.getCPPTypeFor(ttype, "storage")}{}`;
         }
-        else if (this.typecheckEntityAndProvidesName(ttype, this.enumtype) || this.typecheckEntityAndProvidesName(ttype, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(ttype, this.datahashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(ttype, this.enumtype) || this.typecheckEntityAndProvidesName(ttype, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(ttype, this.datahashidkeytype)) {
             return `${this.getCPPTypeFor(ttype, "storage")}{}`;
         }
         else {

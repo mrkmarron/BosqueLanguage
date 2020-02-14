@@ -186,61 +186,61 @@ struct DisplayFunctor_BSQGUID
     std::u32string operator()(const BSQGUID* g) { return std::u32string(U"DataHash@") + std::u32string(g->sdata, g->sdata + 16); }
 };
 
-class BSQEventTime : public BSQRef
+class BSQLogicalTime : public BSQRef
 {
 public:
     uint64_t timestamp;
 
-    BSQEventTime() : BSQRef(MIRNominalTypeEnum_EventTime) { ; }
-    BSQEventTime(uint64_t timestamp) : BSQRef(MIRNominalTypeEnum_EventTime), timestamp(timestamp) { ; }
+    BSQLogicalTime() : BSQRef(MIRNominalTypeEnum_LogicalTime) { ; }
+    BSQLogicalTime(uint64_t timestamp) : BSQRef(MIRNominalTypeEnum_LogicalTime), timestamp(timestamp) { ; }
 
-    BSQEventTime(const BSQEventTime& src) : BSQRef(MIRNominalTypeEnum_EventTime), timestamp(src.timestamp)
+    BSQLogicalTime(const BSQLogicalTime& src) : BSQRef(MIRNominalTypeEnum_LogicalTime), timestamp(src.timestamp)
     { 
         ; 
     }
 
-    BSQEventTime& operator=(const BSQEventTime& src)
+    BSQLogicalTime& operator=(const BSQLogicalTime& src)
     {
         this->timestamp = src.timestamp;
         return *this;
     }
 
-    virtual ~BSQEventTime() = default;
+    virtual ~BSQLogicalTime() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQEventTime& t)
+    inline static size_t hash(const BSQLogicalTime& t)
     {
         return (size_t)t.timestamp;
     }
 
-    inline static bool keyEqual(const BSQEventTime& l, const BSQEventTime& r)
+    inline static bool keyEqual(const BSQLogicalTime& l, const BSQLogicalTime& r)
     {
         return l.timestamp == r.timestamp;
     }
 
-     inline static bool keyLess(const BSQEventTime& l, const BSQEventTime& r)
+     inline static bool keyLess(const BSQLogicalTime& l, const BSQLogicalTime& r)
     {
         return l.timestamp < r.timestamp;
     }
 };
-struct HashFunctor_BSQEventTime
+struct HashFunctor_BSQLogicalTime
 {
-    size_t operator()(const BSQEventTime& et) { return BSQEventTime::hash(et); }
+    size_t operator()(const BSQLogicalTime& et) { return BSQLogicalTime::hash(et); }
 };
-struct EqualFunctor_BSQEventTime
+struct EqualFunctor_BSQLogicalTime
 {
-    bool operator()(const BSQEventTime& l, const BSQEventTime& r) { return BSQEventTime::keyEqual(l, r); }
+    bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) { return BSQLogicalTime::keyEqual(l, r); }
 };
-struct LessFunctor_BSQEventTime
+struct LessFunctor_BSQLogicalTime
 {
-    bool operator()(const BSQEventTime& l, const BSQEventTime& r) { return BSQEventTime::keyLess(l, r); }
+    bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) { return BSQLogicalTime::keyLess(l, r); }
 };
-struct DisplayFunctor_BSQEventTime
+struct DisplayFunctor_BSQLogicalTime
 {
-    std::u32string operator()(const BSQEventTime& et) 
+    std::u32string operator()(const BSQLogicalTime& et) 
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return std::u32string(U"EventTime@") + conv.from_bytes(std::to_string(et.timestamp)); 
+        return std::u32string(U"LogicalTime@") + conv.from_bytes(std::to_string(et.timestamp)); 
     }
 };
 
@@ -578,59 +578,59 @@ struct DisplayFunctor_BSQGUIDIdKey
     }
 };
 
-class BSQEventTimeIdKey : public BSQRef
+class BSQLogicalTimeIdKey : public BSQRef
 {
 public:
     uint64_t timestamp;
 
-    BSQEventTimeIdKey() : BSQRef(MIRNominalTypeEnum::Invalid) { ; }
-    BSQEventTimeIdKey(uint64_t timestamp, MIRNominalTypeEnum oftype) : BSQRef(oftype), timestamp(timestamp) { ; }
+    BSQLogicalTimeIdKey() : BSQRef(MIRNominalTypeEnum::Invalid) { ; }
+    BSQLogicalTimeIdKey(uint64_t timestamp, MIRNominalTypeEnum oftype) : BSQRef(oftype), timestamp(timestamp) { ; }
 
-    BSQEventTimeIdKey(const BSQEventTimeIdKey& src) : BSQRef(src.nominalType), timestamp(src.timestamp)
+    BSQLogicalTimeIdKey(const BSQLogicalTimeIdKey& src) : BSQRef(src.nominalType), timestamp(src.timestamp)
     { 
         ; 
     }
 
-    BSQEventTimeIdKey& operator=(const BSQEventTimeIdKey& src)
+    BSQLogicalTimeIdKey& operator=(const BSQLogicalTimeIdKey& src)
     {
         this->timestamp = src.timestamp;
         this->nominalType = src.nominalType;
         return *this;
     }
 
-    virtual ~BSQEventTimeIdKey() = default;
+    virtual ~BSQLogicalTimeIdKey() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQEventTimeIdKey& tid)
+    inline static size_t hash(const BSQLogicalTimeIdKey& tid)
     {
         return HASH_COMBINE((size_t)tid.nominalType, tid.timestamp);
     }
 
-    inline static bool keyEqual(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r)
+    inline static bool keyEqual(const BSQLogicalTimeIdKey& l, const BSQLogicalTimeIdKey& r)
     {
         return l.nominalType == r.nominalType && l.timestamp == r.timestamp;
     }
 
-    inline static bool keyLess(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r)
+    inline static bool keyLess(const BSQLogicalTimeIdKey& l, const BSQLogicalTimeIdKey& r)
     {
         return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.timestamp < r.timestamp);
     }
 };
-struct HashFunctor_BSQEventTimeIdKey
+struct HashFunctor_BSQLogicalTimeIdKey
 {
-    size_t operator()(const BSQEventTimeIdKey& idt) { return BSQEventTimeIdKey::hash(idt); }
+    size_t operator()(const BSQLogicalTimeIdKey& idt) { return BSQLogicalTimeIdKey::hash(idt); }
 };
-struct EqualFunctor_BSQEventTimeIdKey
+struct EqualFunctor_BSQLogicalTimeIdKey
 {
-    bool operator()(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r) { return BSQEventTimeIdKey::keyEqual(l, r); }
+    bool operator()(const BSQLogicalTimeIdKey& l, const BSQLogicalTimeIdKey& r) { return BSQLogicalTimeIdKey::keyEqual(l, r); }
 };
-struct LessFunctor_BSQEventTimeIdKey
+struct LessFunctor_BSQLogicalTimeIdKey
 {
-    bool operator()(const BSQEventTimeIdKey& l, const BSQEventTimeIdKey& r) { return BSQEventTimeIdKey::keyLess(l, r); }
+    bool operator()(const BSQLogicalTimeIdKey& l, const BSQLogicalTimeIdKey& r) { return BSQLogicalTimeIdKey::keyLess(l, r); }
 };
-struct DisplayFunctor_BSQEventTimeIdKey
+struct DisplayFunctor_BSQLogicalTimeIdKey
 {
-    std::u32string operator()(const BSQEventTimeIdKey& idt) 
+    std::u32string operator()(const BSQLogicalTimeIdKey& idt) 
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
         return conv.from_bytes(nominaltypenames[(uint32_t)idt.nominalType]) + std::u32string(U"::") + conv.from_bytes(std::to_string(idt.timestamp)); 

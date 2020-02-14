@@ -179,9 +179,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQCryptoHash::hash(dynamic_cast<BSQCryptoHash*>(ptr));
         }
-        else if(dynamic_cast<BSQEventTime*>(ptr) != nullptr)
+        else if(dynamic_cast<BSQLogicalTime*>(ptr) != nullptr)
         {
-            return BSQEventTime::hash(*dynamic_cast<BSQEventTime*>(ptr));
+            return BSQLogicalTime::hash(*dynamic_cast<BSQLogicalTime*>(ptr));
         }
         else if(dynamic_cast<BSQEnum*>(ptr) != nullptr)
         {
@@ -195,9 +195,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQGUIDIdKey::hash(dynamic_cast<BSQGUIDIdKey*>(ptr));
         }
-         else if(dynamic_cast<BSQEventTimeIdKey*>(ptr) != nullptr)
+         else if(dynamic_cast<BSQLogicalTimeIdKey*>(ptr) != nullptr)
         {
-            return BSQEventTimeIdKey::hash(*dynamic_cast<BSQEventTimeIdKey*>(ptr));
+            return BSQLogicalTimeIdKey::hash(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr));
         }
         else if(dynamic_cast<BSQDataHashIdKey*>(ptr) != nullptr)
         {
@@ -266,9 +266,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQCryptoHash::keyEqual(dynamic_cast<BSQCryptoHash*>(ptr1), dynamic_cast<BSQCryptoHash*>(ptr2));
         }
-        else if(dynamic_cast<BSQEventTime*>(ptr1) != nullptr && dynamic_cast<BSQEventTime*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQLogicalTime*>(ptr1) != nullptr && dynamic_cast<BSQLogicalTime*>(ptr2) != nullptr)
         {
-            return BSQEventTime::keyEqual(*dynamic_cast<BSQEventTime*>(ptr1), *dynamic_cast<BSQEventTime*>(ptr2));
+            return BSQLogicalTime::keyEqual(*dynamic_cast<BSQLogicalTime*>(ptr1), *dynamic_cast<BSQLogicalTime*>(ptr2));
         }
         else if(dynamic_cast<BSQEnum*>(ptr1) != nullptr && dynamic_cast<BSQEnum*>(ptr2) != nullptr)
         {
@@ -282,9 +282,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQGUIDIdKey::keyEqual(dynamic_cast<BSQGUIDIdKey*>(ptr1), dynamic_cast<BSQGUIDIdKey*>(ptr2));
         }
-        else if(dynamic_cast<BSQEventTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQEventTimeIdKey*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQLogicalTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQLogicalTimeIdKey*>(ptr2) != nullptr)
         {
-            return BSQEventTimeIdKey::keyEqual(*dynamic_cast<BSQEventTimeIdKey*>(ptr1), *dynamic_cast<BSQEventTimeIdKey*>(ptr2));
+            return BSQLogicalTimeIdKey::keyEqual(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr1), *dynamic_cast<BSQLogicalTimeIdKey*>(ptr2));
         }
         else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
         {
@@ -349,9 +349,9 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         {
             return BSQCryptoHash::keyLess(dynamic_cast<BSQCryptoHash*>(ptr1), dynamic_cast<BSQCryptoHash*>(ptr2));
         }
-        else if(dynamic_cast<BSQEventTime*>(ptr1) != nullptr && dynamic_cast<BSQEventTime*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQLogicalTime*>(ptr1) != nullptr && dynamic_cast<BSQLogicalTime*>(ptr2) != nullptr)
         {
-            return BSQEventTime::keyLess(*dynamic_cast<BSQEventTime*>(ptr1), *dynamic_cast<BSQEventTime*>(ptr2));
+            return BSQLogicalTime::keyLess(*dynamic_cast<BSQLogicalTime*>(ptr1), *dynamic_cast<BSQLogicalTime*>(ptr2));
         }
         else if(dynamic_cast<BSQEnum*>(ptr1) != nullptr && dynamic_cast<BSQEnum*>(ptr2) != nullptr)
         {
@@ -365,9 +365,9 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         {
             return BSQGUIDIdKey::keyLess(dynamic_cast<BSQGUIDIdKey*>(ptr1), dynamic_cast<BSQGUIDIdKey*>(ptr2));
         }
-        else if(dynamic_cast<BSQEventTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQEventTimeIdKey*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQLogicalTimeIdKey*>(ptr1) != nullptr && dynamic_cast<BSQLogicalTimeIdKey*>(ptr2) != nullptr)
         {
-            return BSQEventTimeIdKey::keyLess(*dynamic_cast<BSQEventTimeIdKey*>(ptr1), *dynamic_cast<BSQEventTimeIdKey*>(ptr2));
+            return BSQLogicalTimeIdKey::keyLess(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr1), *dynamic_cast<BSQLogicalTimeIdKey*>(ptr2));
         }
         else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
         {
@@ -493,9 +493,9 @@ std::u32string diagnostic_format(Value v)
         {
             return DisplayFunctor_BSQDataHash{}(*dynamic_cast<const BSQDataHash*>(vv));
         }
-        else if(dynamic_cast<const BSQEventTime*>(vv) != nullptr)
+        else if(dynamic_cast<const BSQLogicalTime*>(vv) != nullptr)
         {
-            return DisplayFunctor_BSQEventTime{}(*dynamic_cast<const BSQEventTime*>(vv));
+            return DisplayFunctor_BSQLogicalTime{}(*dynamic_cast<const BSQLogicalTime*>(vv));
         }
         else if(dynamic_cast<const BSQEnum*>(vv) != nullptr)
         {

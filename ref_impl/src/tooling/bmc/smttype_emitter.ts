@@ -30,7 +30,7 @@ class SMTTypeEmitter {
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
     readonly guididkeytype: MIRType;
-    readonly eventtimeidkeytype: MIRType;
+    readonly logicaltimeidkeytype: MIRType;
     readonly datahashidkeytype: MIRType;
     readonly cryptohashidkeytype: MIRType;    
 
@@ -58,7 +58,7 @@ class SMTTypeEmitter {
         this.enumtype = assembly.typeMap.get("NSCore::Enum") as MIRType;
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
         this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
-        this.eventtimeidkeytype = assembly.typeMap.get("NSCore::EventTimeIdKey") as MIRType;
+        this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
         this.datahashidkeytype = assembly.typeMap.get("NSCore::DataHashIdKey") as MIRType;
         this.cryptohashidkeytype = assembly.typeMap.get("NSCore::CryptoHashIdKey") as MIRType;
     }
@@ -221,8 +221,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
             return "bsq_guid";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::EventTime$/)) {
-            return "bsq_eventtime";
+        else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
+            return "bsq_logicaltime";
         }
         else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
             return "bsq_datahash";
@@ -239,8 +239,8 @@ class SMTTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
             return "bsq_idkey_guid";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype)) {
-            return "bsq_idkey_eventtime";
+        else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
+            return "bsq_idkey_logicaltime";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
             return "bsq_idkey_datahash";
@@ -306,8 +306,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(from, /^NSCore::GUID$/)) {
                 ctoval = `(bsq_guid ${exp.emit()})`;
             }
-            else if (this.typecheckIsName(from, /^NSCore::EventTime$/)) {
-                ctoval = `(bsq_eventtime ${exp.emit()})`;
+            else if (this.typecheckIsName(from, /^NSCore::LogicalTime$/)) {
+                ctoval = `(bsq_logicaltime ${exp.emit()})`;
             }
             else if (this.typecheckIsName(from, /^NSCore::DataHash$/)) {
                 ctoval = `(bsq_datahash ${exp.emit()})`;
@@ -324,8 +324,8 @@ class SMTTypeEmitter {
             else if (this.typecheckEntityAndProvidesName(from, this.guididkeytype)) {
                 ctoval = `(bsq_idkey_guid ${exp.emit()})`;
             }
-            else if (this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype)) {
-                ctoval = `(bsq_idkey_eventtime ${exp.emit()})`;
+            else if (this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype)) {
+                ctoval = `(bsq_idkey_logicaltime ${exp.emit()})`;
             }
             else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
                 ctoval = `(bsq_idkey_datahash ${exp.emit()})`;
@@ -357,8 +357,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
             return new SMTValue(`(bsqkey_guid_value ${exp.emit()})`);
         }
-        else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-            return new SMTValue(`(bsqkey_eventtime_value ${exp.emit()})`);
+        else if (this.typecheckIsName(into, /^NSCore::LogicalTime$/)) {
+            return new SMTValue(`(bsqkey_logicaltime_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
             return new SMTValue( `(bsqkey_datahash_value ${exp.emit()})`);
@@ -375,8 +375,8 @@ class SMTTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
             return new SMTValue(`(bsqkey_idkey_guid_value ${exp.emit()})`);
         }
-        else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-            return new SMTValue(`(bsqkey_idkey_eventtime_value ${exp.emit()})`);
+        else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
+            return new SMTValue(`(bsqkey_idkey_logicaltime_value ${exp.emit()})`);
         }
         else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
             return new SMTValue(`(bsqkey_idkey_datahash_value ${exp.emit()})`);
@@ -432,8 +432,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::GUID$/)) {
                 return new SMTValue(`(bsq_guid_value ${cfrom})`);
             }
-            else if (this.typecheckIsName(into, /^NSCore::EventTime$/)) {
-                return new SMTValue(`(bsq_eventtime_value ${cfrom})`);
+            else if (this.typecheckIsName(into, /^NSCore::LogicalTime$/)) {
+                return new SMTValue(`(bsq_logicaltime_value ${cfrom})`);
             }
             else if (this.typecheckIsName(into, /^NSCore::DataHash$/)) {
                 return new SMTValue(`(bsq_datahash_value ${cfrom})`);
@@ -450,8 +450,8 @@ class SMTTypeEmitter {
             else if (this.typecheckEntityAndProvidesName(into, this.guididkeytype)) {
                 return new SMTValue(`(bsq_idkey_guid_value ${cfrom})`);
             }
-            else if (this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype)) {
-                return new SMTValue(`(bsq_idkey_eventtime_value ${cfrom})`);
+            else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
+                return new SMTValue(`(bsq_idkey_logicaltime_value ${cfrom})`);
             }
             else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
                 return new SMTValue(`(bsq_idkey_datahash_value ${cfrom})`);
@@ -495,12 +495,12 @@ class SMTTypeEmitter {
             return this.coerceFromAtomicKey(exp, from, into);
         }
         else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
-            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::EventTime$/)
+            || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::LogicalTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
         else if (this.typecheckEntityAndProvidesName(from, this.enumtype) || this.typecheckEntityAndProvidesName(from, this.idkeytype) || this.typecheckEntityAndProvidesName(from, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(from, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
         else if (this.typecheckAllKeys(from)) {
@@ -532,12 +532,12 @@ class SMTTypeEmitter {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
-                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::EventTime$/)
+                || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::LogicalTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
-                || this.typecheckEntityAndProvidesName(into, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckAllKeys(into)) {
@@ -624,11 +624,11 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return true;
         }
-        else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::EventTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::LogicalTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
             return true;
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(tt, this.eventtimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
            return true;
         }
         else {

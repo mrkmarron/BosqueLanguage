@@ -103,7 +103,7 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_String MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_GUID MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_EventTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_LogicalTime MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_DataHash MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid

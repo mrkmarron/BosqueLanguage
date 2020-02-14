@@ -148,11 +148,11 @@ entity GUID provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
-entity EventTime provides KeyType, Parsable, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any, String> # eventtime_tryparse
+entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
+    override static tryParse(str: String): Result<Any, String> # logicaltime_tryparse
 
-    static zero(): EventTime # eventtime_zero
-    static tick(t: EventTime): EventTime # eventtime_tick
+    static zero(): LogicalTime # logicaltime_zero
+    static tick(t: LogicalTime): LogicalTime # logicaltime_tick
 }
 
 //<summary>Primitive hash value suitable for keys in maps or other associative containers.</summary>
@@ -182,7 +182,7 @@ concept GUIDIdKey provides KeyType, Some {
 }
 
 //<summary>A concept for dealing with eventime ids.</summary>
-concept EventTimeIdKey provides KeyType, Some {
+concept LogicalTimeIdKey provides KeyType, Some {
 }
 
 //<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>

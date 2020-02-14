@@ -3048,7 +3048,7 @@ class Parser {
                 const tickdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
                 const nexttick = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "tick", tickdecl);
 
-                const provides = [[new NominalTypeSignature("NSCore", "EventTimeIdKey"), undefined], [new NominalTypeSignature("NSCore", "APIType"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+                const provides = [[new NominalTypeSignature("NSCore", "LogicalTimeIdKey"), undefined], [new NominalTypeSignature("NSCore", "APIType"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
             
                 const invariants: InvariantDecl[] = [];
                 const staticMembers = new Map<string, StaticMemberDecl>();

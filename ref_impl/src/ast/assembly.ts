@@ -1159,7 +1159,7 @@ class Assembly {
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
     getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
-    getSpecialEventTimeType(): ResolvedType { return this.internSpecialObjectType("EventTime"); }
+    getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType("LogicalTime"); }
     getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType("ISOTime"); }
     getSpecialDataHashType(): ResolvedType { return this.internSpecialObjectType("DataHash"); }
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
@@ -1182,7 +1182,7 @@ class Assembly {
     getSpecialTruthyConceptType(): ResolvedType { return this.internSpecialConceptType("Truthy"); }
     getSpecialEnumConceptType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
     getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
-    getSpecialEventTimeIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("EventTimeIdKey"); }
+    getSpecialLogicalTimeIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("LogicalTimeIdKey"); }
     getSpecialGUIDIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("GUIDIdKey"); }
     getSpecialDataHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("DataHashIdKey"); }
     getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }
