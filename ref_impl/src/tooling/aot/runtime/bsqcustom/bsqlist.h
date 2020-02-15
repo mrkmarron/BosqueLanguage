@@ -23,7 +23,7 @@ public:
     Ty(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
     template <uint16_t n>
-    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
+    static Ty* createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
     {
         T val;
         std::vector<T> entries;
@@ -49,36 +49,32 @@ public:
 
     Ty* unsafeAdd(BSQRefScope& scope, const T& v) const
     {
-        std::vector<T> nv();
+        std::vector<T> nv;
         for(size_t i = 0; i < this->entries.size(); ++i)
         {
-            INC_RC_T(this->entries[i]);
-            nv.push_back(this->entries[i]);
+            nv.push_back(INC_RC_T(this->entries[i]));
         }
-        INC_RC_T(v);
-        nv.push_back(v);
+        nv.push_back(INC_RC_T(v));
 
-        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->ntype, move(nv));
+        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->nominalType, move(nv));
     }
 
     Ty* unsafeSet(BSQRefScope& scope, int64_t idx, const T& v) const
     {
-        std::vector<T> nv();
+        std::vector<T> nv;
         for(int64_t i = 0; i < this->entries.size(); ++i)
         {
             if(i == idx)
             {
-                INC_RC_T(v);
-                nv.puch_back(v);
+                nv.push_back(INC_RC_T(v));
             }
             else
             {
-                INC_RC_T(this->entries[i]);
-                nv.push_bacK(this->entries[i]);
+                nv.push_back(this->entries[i]);
             }
         }
 
-        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->ntype, move(nv));
+        return BSQ_NEW_ADD_SCOPE(scope, Ty, this->nominalType, move(nv));
     }
 
     virtual std::u32string display() const

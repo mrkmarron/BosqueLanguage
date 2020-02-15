@@ -51,11 +51,6 @@
 #define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
 #define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
 
-#define INC_REF_NOP(T, V)
-#define DEC_REF_NOP(V)
-
-#define GET_KEY_NOP(V)
-
 ////
 //Type ops
 

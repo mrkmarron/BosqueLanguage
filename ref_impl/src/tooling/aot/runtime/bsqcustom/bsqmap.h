@@ -55,36 +55,32 @@ public:
     }
 
     template <uint_16 n>
-    static Ty createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const std::pair<T, U>(&values)[n])
+    static Ty* createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const std::pair<T, U>(&values)[n])
     {
-        std::pair<T, U> val;
         std::map<K, std::pair<T, U>, K_CMP> entries;
         K_LIST* keys = nullptr;
 
         for (int i = 0; i < n; i++)
         {
-            val = values[i];
+            auto = values[i];
             auto key = T_GET_KEY(val.key);
 
             auto iter = entries.find(key);
             if(iter != entries.cend())
             {
+                INC_RC_T(val.first);
+                INC_RC_U(val.second);
+
                 DEC_RC_T(iter->second.first);
                 DEC_RC_U(iter->second.second);
 
-                INC_RC_T(val.key);
-                INC_RC_U(val.value);
-                entries.insert(std::make_pair(iter->first, std::make_pair(val.key, val.value)));
+                entries.insert(std::make_pair(iter->first, std::make_pair(val.first, val.second)));
             }
             else
             {
-                INC_RC_K(key);
-                keys = (K_LIST*)BSQRef::incrementDirect(BSQ_NEW_NO_RC(K_LIST, key, keys));
+                keys = (K_LIST*)BSQRef::incrementDirect(BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
 
-                INC_RC_K(key);
-                INC_RC_T(val.key);
-                INC_RC_U(val.value);
-                entries.insert(std::make_pair(key, std::make_pair(val.key, val.value)));
+                entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(val.first), INC_RC_U(val.second))));
             }
         }
 
@@ -96,19 +92,13 @@ public:
         std::map<K, std::pair<T, U>, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
-            INC_RC_K(iter->first);
-            INC_RC_T(iter->second.first);
-            INC_RC_U(iter->second.second);
-            entries.insert(*iter);
+            entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
         }
 
-        INC_RC_K(key);
-        INC_RC_T(v);
-        INC_RC_U(u);
-        entries.insert(std::make_pair(key, std::make_pair(v, u)));
+        entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(v), INC_RC_U(u))));
 
         BSQRef::incrementDirect(nkeys);
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, ntype, move(entries), nkeys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), nkeys);
     }
 
     Ty* update(K key, T v, U u, BSQRefScope& cscope)
@@ -118,22 +108,16 @@ public:
         {
             if(K_EQ(key, iter->first))
             {
-                INC_RC_K(iter->first);
-                INC_RC_T(v);
-                INC_RC_U(u);
-                entries.insert(std::make_pair(iter->first, std::make_pair(v, u)));
+                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(v), INC_RC_U(u))));
             }
             else
             {
-                INC_RC_K(iter->first);
-                INC_RC_T(iter->second.first);
-                INC_RC_U(iter->second.second);
-                entries.insert(*iter);
+                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
             }
         }
        
         BSQRef::incrementDirect(this->keys);
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, ntype, move(entries), this->keys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), this->keys);
     }
 
     Ty* clearKey(K key, K_LIST* nkeys, BSQRefScope& cscope)
@@ -143,10 +127,7 @@ public:
         {
             if(!K_EQ(key, iter->first)) 
             {
-                INC_RC_K(iter->first);
-                INC_RC_T(iter->second.first);
-                INC_RC_U(iter->second.second);
-                entries.insert(*iter);
+                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
             }
         }
         
@@ -155,7 +136,7 @@ public:
             BSQRef::incrementDirect(nkeys);
         }
 
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, ntype, move(entries), nkeys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), nkeys);
     }
 
     virtual std::u32string display() const

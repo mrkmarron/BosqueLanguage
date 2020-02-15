@@ -1526,13 +1526,13 @@ class TypeChecker {
 
         const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
         if (oodecl.isTypeACollectionEntity()) {
-            this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
+            this.raiseErrorIf(exp.sinfo, exp.asValue, "Cannot create by-value collections");
 
             const eargs = this.checkArgumentsEvaluationListOrSet(env, exp.args);
             return [env.setExpressionResult(this.checkArgumentsListOrSetConstructor(exp.sinfo, oftype, oobinds.get("T") as ResolvedType, eargs, trgt))];
         }
         else if (oodecl.isTypeAMapEntity()) {
-            this.raiseErrorIf(exp.sinfo, !exp.asValue, "Cannot create by-value collections");
+            this.raiseErrorIf(exp.sinfo, exp.asValue, "Cannot create by-value collections");
 
             const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
             const entrybinds = new Map<string, ResolvedType>().set("K", oobinds.get("K") as ResolvedType).set("V", oobinds.get("V") as ResolvedType);

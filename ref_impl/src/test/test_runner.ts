@@ -378,9 +378,9 @@ function runAll() {
     const runner = new TestRunner();
 
     //runner.loadTestSet("expression");
-    runner.loadTestSet("types");
+    //runner.loadTestSet("types");
     //runner.loadTestSet("statement");
-    //runner.loadTestSet("library");
+    runner.loadTestSet("library");
     //runner.loadTestSet("doc_examples");
 
     runner.run();

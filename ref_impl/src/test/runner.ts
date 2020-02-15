@@ -184,5 +184,18 @@ else {
             const outfile = Path.join(cpppath, fp.file);
             FS.writeFileSync(outfile, fp.contents);
         });
+
+        const customsrc = Path.join(cpp_runtime, "bsqcustom")
+        const custompath = Path.join(cpppath, "bsqcustom");
+        FS.mkdirSync(custompath, { recursive: true });
+        const csrc = FS.readdirSync(customsrc).filter((name) => name.endsWith(".h"));
+
+        csrc.forEach((cf) => {
+            const fromfile = Path.join(customsrc, cf);
+            const outfile = Path.join(custompath, cf);
+
+            const contents = FS.readFileSync(fromfile).toString();
+            FS.writeFileSync(outfile, contents);
+        });
     });
 }

@@ -47,9 +47,9 @@ class CPPEmitter {
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
         
         const includes = new Map<string, string>()
-            .set("list", "\"bsqcustom/bsqlist.h\"")
-            .set("set", "\"bsqcustom/bsqset.h\"")
-            .set("map", "\"bsqcustom/bsqmap.h\"");
+            .set("list", "\"./bsqcustom/bsqlist.h\"")
+            .set("set", "\"./bsqcustom/bsqset.h\"")
+            .set("map", "\"./bsqcustom/bsqmap.h\"");
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];

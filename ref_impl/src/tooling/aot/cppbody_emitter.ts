@@ -1506,11 +1506,11 @@ class CPPBodyEmitter {
             case "list_size":
             case "set_size":
             case "map_size": {
-                bodystr = `auto _return_ = ${params[0]}->entries.size();`
+                bodystr = `auto _return_ = BSQ_ENCODE_VALUE_TAGGED_INT(${params[0]}->entries.size());`
                 break;
             }
             case "list_unsafe_at": {
-                bodystr = `auto _return_ = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT${params[1]}];`;
+                bodystr = `auto _return_ = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT(${params[1]})];`;
                 break;
             }
             case "list_unsafe_add": {
@@ -1518,7 +1518,7 @@ class CPPBodyEmitter {
                 break;
             }
             case "list_unsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${scopevar}, ${params[1]}, ${params[2]});`
+                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${scopevar}, BSQ_GET_VALUE_TAGGED_INT(${params[1]}), ${params[2]});`
                 break;
             }
             case "set_has_key":

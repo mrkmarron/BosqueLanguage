@@ -544,19 +544,43 @@ class CPPTypeEmitter {
         }
     }
 
-    getIncOpForType(tt: MIRType): string {
+    getIncOpForType(tt: MIRType, arg: string): string {
         const rcinfo = this.getRefCountableStatus(tt);
         if (rcinfo === "no") {
-            return "INC_REF_NOP";
+            return arg;
+        }
+        else {
+            const btype = this.getCPPTypeFor(tt, "base");
+
+            if (rcinfo === "int") {
+                return `INC_REF_CHECK(${btype}, ${arg})`;
+            }
+            else if (rcinfo === "direct") {
+                return `INC_REF_DIRECT(${btype}, ${arg})`;
+            }
+            else if (rcinfo === "checked") {
+                return `INC_REF_CHECK(${btype}, ${arg})`;
+            }
+            else {
+                assert(false); //only option right now is ephemeral lists but we should't be doing this with them
+                return "[INVALID]"
+            }
+        }
+    }
+
+    getDecOpForType(tt: MIRType, arg: string): string {
+        const rcinfo = this.getRefCountableStatus(tt);
+        if (rcinfo === "no") {
+            return "";
         }
         else if (rcinfo === "int") {
-            return "INC_REF_CHECK";
+            return `BSQRef::decrementChecked(${arg})`;
         }
         else if (rcinfo === "direct") {
-            return "INC_REF_DIRECT";
+            return `BSQRef::decrementDirect(${arg})`;
         }
         else if (rcinfo === "checked") {
-            return "INC_REF_CHECK";
+            return `BSQRef::decrementChecked(${arg})`;
         }
         else {
             assert(false); //only option right now is ephemeral lists but we should't be doing this with them
@@ -564,29 +588,9 @@ class CPPTypeEmitter {
         }
     }
 
-    getDecOpForType(tt: MIRType): string {
-        const rcinfo = this.getRefCountableStatus(tt);
-        if (rcinfo === "no") {
-            return "DEC_REF_NOP";
-        }
-        else if (rcinfo === "int") {
-            return `BSQRef::decrementChecked`;
-        }
-        else if (rcinfo === "direct") {
-            return `BSQRef::decrementDirect`;
-        }
-        else if (rcinfo === "checked") {
-            return `BSQRef::decrementChecked`;
-        }
-        else {
-            assert(false); //only option right now is ephemeral lists but we should't be doing this with them
-            return "[INVALID]"
-        }
-    }
-
-    getGetKeyOpForType(tt: MIRType): string {
+    getGetKeyOpForType(tt: MIRType, arg: string): string {
         if(this.typecheckAllKeys(tt)) {
-            return "GET_KEY_NOP";
+            return arg;
         }
         else {
             assert(false);
@@ -665,8 +669,7 @@ class CPPTypeEmitter {
             return arg;
         }
 
-        const btype = this.getCPPTypeFor(argtype, "base");
-        return `${this.getIncOpForType(argtype)}(${btype}, ${arg})`;
+        return this.getIncOpForType(argtype, arg);
     }
 
     generateListCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
@@ -677,13 +680,13 @@ class CPPTypeEmitter {
 
         const decl = `#define Ty ${declname}\n`
         + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
-        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
-        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
-        + `#define FDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet, "X")}\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet, "X")}\n`
+        + `#define FDisplay(X) diagnostic_format(${this.coerce("X", typet, this.anyType)})\n`
         + "\n"
         + `#include ${templatefile}\n`;
 
-        return { fwddecl: declname, fulldecl: decl };
+        return { fwddecl: `class ${declname};`, fulldecl: decl };
     }
 
     generateSetCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
@@ -696,20 +699,20 @@ class CPPTypeEmitter {
 
         const decl = `#define Ty ${declname}\n`
         + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
-        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
-        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
-        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet)}(X)\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet, "X")}\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet, "X")}\n`
+        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet, "X")}\n`
         + `#define K ${this.getCPPTypeFor(typekp, "storage")}\n`
-        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
-        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
+        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp, "X")}\n`
+        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp, "X")}\n`
         + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
         + `#define K_CMP(X, Y) ${this.getGetCMPOpsForKeyType(typekp).cmp}\n`
         + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
-        + `#define FDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
+        + `#define FDisplay(X) diagnostic_format(${this.coerce("X", typet, this.anyType)})\n`
         + "\n"
         + `#include ${templatefile}\n`;
 
-        return { fwddecl: declname, fulldecl: decl };
+        return { fwddecl: `class ${declname};`, fulldecl: decl };
     }
 
     generateMapCPPEntity(entity: MIREntityTypeDecl, templatefile: string): { fwddecl: string, fulldecl: string } {
@@ -723,26 +726,26 @@ class CPPTypeEmitter {
 
         const decl = `#define Ty ${declname}\n`
         + `#define T ${this.getCPPTypeFor(typet, "storage")}\n`
-        + `#define INC_RC_T(X) ${this.getIncOpForType(typet)}(X)\n`
-        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet)}(X)\n`
-        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet)}(X)\n`
+        + `#define INC_RC_T(X) ${this.getIncOpForType(typet, "X")}\n`
+        + `#define DEC_RC_T(X) ${this.getDecOpForType(typet, "X")}\n`
+        + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet, "X")}\n`
 
         + `#define U ${this.getCPPTypeFor(typet, "storage")}\n`
-        + `#define INC_RC_U(X) ${this.getIncOpForType(typeu)}(X)\n`
-        + `#define DEC_RC_U(X) ${this.getDecOpForType(typeu)}(X)\n`
+        + `#define INC_RC_U(X) ${this.getIncOpForType(typeu, "X")}\n`
+        + `#define DEC_RC_U(X) ${this.getDecOpForType(typeu, "X")}\n`
 
         + `#define K ${this.getCPPTypeFor(typekp, "storage")}\n`
-        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp)}(X)\n`
-        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp)}(X)\n`
+        + `#define INC_RC_K(X) ${this.getIncOpForType(typekp, "X")}\n`
+        + `#define DEC_RC_K(X) ${this.getDecOpForType(typekp, "X")}\n`
         + `#define K_LIST ${this.getCPPTypeFor(this.getMIRType(typekl.tkey), "base")}\n`
         + `#define K_CMP(X, Y) ${this.getGetCMPOpsForKeyType(typekp).cmp}\n`
         + `#define K_EQ(X, Y) ${this.getGetCMPOpsForKeyType(typekp).eq}\n`
-        + `#define TDisplay(X) diagnostic_format(${this.coerce("(X)", typet, this.anyType)})\n`
-        + `#define UDisplay(X) diagnostic_format(${this.coerce("(X)", typeu, this.anyType)})\n`
+        + `#define TDisplay(X) diagnostic_format(${this.coerce("X", typet, this.anyType)})\n`
+        + `#define UDisplay(X) diagnostic_format(${this.coerce("X", typeu, this.anyType)})\n`
         + "\n"
         + `#include ${templatefile}\n`;
 
-        return { fwddecl: declname, fulldecl: decl };
+        return { fwddecl: `class ${declname};`, fulldecl: decl };
     }
 
     generateCPPEntity(entity: MIREntityTypeDecl, specialReps: Map<string, string>): { fwddecl: string, fulldecl: string } | undefined {
@@ -776,7 +779,8 @@ class CPPTypeEmitter {
                     return undefined;
                 }
 
-                return `${this.getDecOpForType(this.getMIRType(fd.declaredType))}(this->${this.mangleStringForCpp(fd.fkey)});`;
+                const arg = `this->${this.mangleStringForCpp(fd.fkey)}`;
+                return `${this.getDecOpForType(this.getMIRType(fd.declaredType), arg)};`;
             })
             .filter((fd) => fd !== undefined);
 
