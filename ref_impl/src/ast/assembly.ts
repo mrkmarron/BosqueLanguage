@@ -310,6 +310,22 @@ class OOPTypeDecl {
         return this.name === "List" || this.name === "Set";
     }
 
+    isTypeAListEntity(): boolean {
+        if (this.ns !== "NSCore") {
+            return false;
+        }
+
+        return this.name === "List";
+    }
+
+    isTypeASetEntity(): boolean {
+        if (this.ns !== "NSCore") {
+            return false;
+        }
+
+        return this.name === "Set";
+    }
+
     isTypeAMapEntity(): boolean {
         if (this.ns !== "NSCore") {
             return false;
@@ -748,6 +764,41 @@ class Assembly {
         return this.typeUnion(opttypes);
     }
 
+    getTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {
+        if(oftype.idStr === "NSCore::KeyType") {
+            if(this.subtypeOf(fromtype, this.getSpecialKeyTypeConceptType())) {
+                return fromtype;
+            }
+            else if(this.subtypeOf(fromtype, this.getSpecialIndexableConceptType())) {
+                //
+                //NOT IMPLEMENTED YET -- we will need to look up the "key" field value and resolve it
+                //
+                assert(false);
+                return ResolvedType.createEmpty();    
+            }
+            else {
+                return ResolvedType.createEmpty();    
+            }
+        }
+        else if(oftype.idStr === "NSCore::APIType") {
+            //
+            //NOT IMPLEMENTED YET
+            //
+            assert(false);
+            return ResolvedType.createEmpty();
+        }
+        else if(oftype.idStr === "NSCore::Record") {
+            //
+            //NOT IMPLEMENTED YET
+            //
+            assert(false);
+            return ResolvedType.createEmpty();
+        }
+        else {
+            return ResolvedType.createEmpty();
+        }
+    }
+
     private normalizeType_Template(t: TemplateTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         return binds.has(t.name) ? binds.get(t.name) as ResolvedType : ResolvedType.createEmpty();
     }
@@ -830,42 +881,7 @@ class Assembly {
         const fromt = this.normalizeTypeOnly(t.fromtype, binds);
         const oft = this.normalizeTypeOnly(t.oftype, binds);
 
-        if(fromt.isEmptyType() || oft.isEmptyType()) {
-            return ResolvedType.createEmpty();
-        }
-
-        if(oft.idStr === "NSCore::KeyType") {
-            if(this.subtypeOf(fromt, this.getSpecialKeyTypeConceptType())) {
-                return fromt;
-            }
-            else if(this.subtypeOf(fromt, this.getSpecialIndexableConceptType())) {
-                //
-                //NOT IMPLEMENTED YET -- we will need to look up the "key" field value and resolve it
-                //
-                assert(false);
-                return ResolvedType.createEmpty();    
-            }
-            else {
-                return ResolvedType.createEmpty();    
-            }
-        }
-        else if(oft.idStr === "NSCore::APIRecord") {
-            //
-            //NOT IMPLEMENTED YET
-            //
-            assert(false);
-            return ResolvedType.createEmpty();
-        }
-        else if(oft.idStr === "NSCore::Record") {
-            //
-            //NOT IMPLEMENTED YET
-            //
-            assert(false);
-            return ResolvedType.createEmpty();
-        }
-        else {
-            return ResolvedType.createEmpty();
-        }
+        return this.getTypeProjection(fromt, oft);
     }
 
     private normalizeType_Intersection(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {

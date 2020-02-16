@@ -153,7 +153,10 @@ entity KeyList<K where KeyType> provides Object {
         var tkey = kl.hkey;
         var ttail = kl.tail;
 
-        if(KeyType::equal(k, tkey)) {
+        if(ttail == none) {
+            return none;
+        } 
+        elif(KeyType::equal(k, tkey)) {
             return ttail;
         }
         else {

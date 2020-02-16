@@ -1636,7 +1636,7 @@ class SMTBodyEmitter {
                 break;
             }
             case "list_unsafe_at": {
-                bodyres = new SMTValue(`(select (${this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])}) ${params[1]})`);
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])} ${params[1]})`);
                 break;
             }
             case "list_unsafe_add": {

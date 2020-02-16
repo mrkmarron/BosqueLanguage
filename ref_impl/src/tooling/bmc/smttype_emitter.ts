@@ -668,7 +668,7 @@ class SMTTypeEmitter {
     }
 
     generateSpecialTypeFieldName(stype: MIRNominalTypeKey, f: string): string {
-        return `${this.mangleStringForSMT(stype)}@@f`;
+        return `${this.mangleStringForSMT(stype)}@@${f}`;
     }
 
     generateSpecialTypeFieldAccess(stype: MIRNominalTypeKey, f: string, arg: string): string {

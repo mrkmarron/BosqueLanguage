@@ -28,7 +28,7 @@ public:
     K_LIST* keys;
 
     Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries(), keys(nullptr) { ; }
-    Ty(MIRNominalTypeEnum ntype, std::unordered_map<K, T, K_CMP>&& entries, K_LIST* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
+    Ty(MIRNominalTypeEnum ntype, std::map<K, T, K_CMP>&& entries, K_LIST* keys) : BSQObject(ntype), entries(move(entries)), keys(keys) { ; }
 
     virtual ~Ty()
     {
@@ -139,7 +139,7 @@ public:
             }
             first = false;
 
-            ss += TDisplay(iter->second);
+            ss += FDisplay(iter->second);
         }
         ss += U"}";
 

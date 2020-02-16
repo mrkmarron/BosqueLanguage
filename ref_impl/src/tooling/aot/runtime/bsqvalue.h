@@ -228,19 +228,19 @@ public:
 
 struct HashFunctor_bool
 {
-    size_t operator()(bool b) { return (size_t)b; }
+    size_t operator()(bool b) const { return (size_t)b; }
 };
 struct EqualFunctor_bool
 {
-    bool operator()(bool l, bool r) { return l == r; }
+    bool operator()(bool l, bool r) const { return l == r; }
 };
 struct LessFunctor_bool
 {
-    bool operator()(bool l, bool r) { return (!l) & r; }
+    bool operator()(bool l, bool r) const { return (!l) & r; }
 };
 struct DisplayFunctor_bool
 {
-    std::u32string operator()(bool b) { return b ? U"true" : U"false"; }
+    std::u32string operator()(bool b) const { return b ? U"true" : U"false"; }
 };
 
 //A big integer class for supporting Bosque -- right now it does not do much
@@ -322,11 +322,11 @@ public:
 };
 struct HashFunctor_IntValue
 {
-    size_t operator()(IntValue i) { return BSQ_IS_VALUE_TAGGED_INT(i) ? BSQ_GET_VALUE_TAGGED_INT(i) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->hash(); }
+    size_t operator()(IntValue i) const { return BSQ_IS_VALUE_TAGGED_INT(i) ? BSQ_GET_VALUE_TAGGED_INT(i) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->hash(); }
 };
 struct EqualFunctor_IntValue
 {
-    bool operator()(IntValue l, IntValue r) 
+    bool operator()(IntValue l, IntValue r) const 
     { 
         if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
             return l == r; //tagging does not affect equality
@@ -344,7 +344,7 @@ struct EqualFunctor_IntValue
 };
 struct LessFunctor_IntValue
 {
-    bool operator()(IntValue l, IntValue r) 
+    bool operator()(IntValue l, IntValue r) const 
     { 
         if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
             return BSQ_GET_VALUE_TAGGED_INT(l) < BSQ_GET_VALUE_TAGGED_INT(r);
@@ -362,7 +362,7 @@ struct LessFunctor_IntValue
 };
 struct DisplayFunctor_IntValue
 {
-    std::u32string operator()(IntValue i)
+    std::u32string operator()(IntValue i) const
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
         return BSQ_IS_VALUE_TAGGED_INT(i) ? conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(i))) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->display();
@@ -390,19 +390,19 @@ std::u32string diagnostic_format(Value v);
 
 struct HashFunctor_KeyValue
 {
-    size_t operator()(const KeyValue& k) { return bsqKeyValueHash(k); }
+    size_t operator()(const KeyValue& k) const { return bsqKeyValueHash(k); }
 };
 struct EqualFunctor_KeyValue
 {
-    bool operator()(const KeyValue& l, const KeyValue& r) { return bsqKeyValueEqual(l, r); }
+    bool operator()(const KeyValue& l, const KeyValue& r) const { return bsqKeyValueEqual(l, r); }
 };
 struct LessFunctor_KeyValue
 {
-    bool operator()(const KeyValue& l, const KeyValue& r) { return bsqKeyValueLess(l, r); }
+    bool operator()(const KeyValue& l, const KeyValue& r) const { return bsqKeyValueLess(l, r); }
 };
 struct DisplayFunctor_KeyValue
 {
-    std::u32string operator()(const KeyValue& k) { return diagnostic_format(k); }
+    std::u32string operator()(const KeyValue& k) const { return diagnostic_format(k); }
 };
 
 enum class BSQBufferFormat {

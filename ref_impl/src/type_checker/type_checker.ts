@@ -860,6 +860,14 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
+            if (oftype.object.isTypeASetEntity()) {
+                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
+                const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("T") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
+                const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
+                this.m_emitter.registerResolvedTypeReference(kltype);
+                this.m_emitter.registerTypeInstantiation(klobj, klbinds);
+            }
+
             if (args.length === 0) {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
             }
@@ -963,6 +971,12 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
+            const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
+            const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("K") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
+            const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
+            this.m_emitter.registerResolvedTypeReference(kltype);
+            this.m_emitter.registerTypeInstantiation(klobj, klbinds);
+
             if (args.length === 0) {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
             }
@@ -974,12 +988,6 @@ class TypeChecker {
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
                 }
                 else {
-                    const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
-                    const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get("K") as ResolvedType);
-                    const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
-                    this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(kltype));
-                    this.m_emitter.registerTypeInstantiation(klobj, klbinds);
-
                     this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
                 }
             }
@@ -1672,13 +1680,13 @@ class TypeChecker {
 
         this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
 
-        if (this.m_emitEnabled) {
-            const keytype = this.m_assembly.getSpecialKeyTypeConceptType();
-            const mirkeytype = this.m_emitter.registerResolvedTypeReference(keytype);
+        const keytype = this.m_assembly.getSpecialKeyTypeConceptType();
+        const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
+        const iskeyop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "KeyType";
+        const ismathop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Math";
 
-            const isindexableop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Indexable";
-            const iskeyop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "KeyType";
-            const ismathop = fdecl.contiainingType.ns === "NSCore" && fdecl.contiainingType.name === "Math";
+        if (this.m_emitEnabled) {
+            const mirkeytype = this.m_emitter.registerResolvedTypeReference(keytype);
 
             if (isindexableop && exp.name === "getKey") {
                 const mirargtypeinfer = this.m_emitter.registerResolvedTypeReference(margs.types[0]);
@@ -1727,7 +1735,26 @@ class TypeChecker {
             }
         }
 
-        return [env.setExpressionResult(this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];
+        if (isindexableop && exp.name === "getKey") {
+            if(this.m_assembly.subtypeOf(margs.types[0], keytype)) {
+                return [env.setExpressionResult(margs.types[0])];
+            }
+            else {
+                //
+                // TODO: we should infer the keytype from the Indexable info to do a better emit and type inference
+                //
+                return [env.setExpressionResult(keytype)];
+            }
+        }
+        else if (iskeyop && exp.name === "equal") {
+            return [env.setExpressionResult(this.m_assembly.getSpecialBoolType())];
+        }
+        else if (ismathop && (exp.name === "mult" || exp.name === "div" || exp.name === "mod")) {
+            return [env.setExpressionResult(this.m_assembly.getSpecialIntType())];
+        }
+        else {
+            return [env.setExpressionResult(this.resolveAndEnsureTypeOnly(exp.sinfo, (fdecl.decl as StaticFunctionDecl).invoke.resultType, binds as Map<string, ResolvedType>))];
+        }
     }
 
     private checkPCodeInvokeExpression(env: TypeEnvironment, exp: PCodeInvokeExpression, trgt: MIRTempRegister): TypeEnvironment[] {
