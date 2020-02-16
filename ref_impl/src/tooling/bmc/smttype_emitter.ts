@@ -710,19 +710,28 @@ class SMTTypeEmitter {
         };
     }
 
+    getKeyListTypeForSet(entity: MIREntityTypeDecl): MIRType {
+        const typet = entity.terms.get("T") as MIRType;
+        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const itypekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+        const rv = [...this.assembly.typeMap].find((entry) => entry[1].options.length == 2 && entry[1].options[0].trkey === itypekl.tkey && entry[1].options[1].trkey === "NSCore::None");
+
+        return (rv as [string, MIRType])[1];
+    }
+
     generateSetSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string, ocons: string, emptydecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const ename = this.mangleStringForSMT(entity.tkey);
 
-        const typet = entity.terms.get("K") as MIRType;
+        const typet = entity.terms.get("T") as MIRType;
         const typekp = this.getKeyProjectedTypeFrom(typet);
-        const typekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+        const typekl = this.getKeyListTypeForSet(entity);
 
         const fargs =  [
             `(${this.generateSpecialTypeFieldName(entity.tkey, "size")} Int)`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "has")} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "values")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
-            `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(this.getMIRType(typekl.tkey))})`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(typekl)})`,
         ];
 
         return {
@@ -737,6 +746,15 @@ class SMTTypeEmitter {
         };
     }
 
+    getKeyListTypeForMap(entity: MIREntityTypeDecl): MIRType {
+        const typet = entity.terms.get("K") as MIRType;
+        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const itypekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+        const rv = [...this.assembly.typeMap].find((entry) => entry[1].options.length == 2 && entry[1].options[0].trkey === itypekl.tkey && entry[1].options[1].trkey === "NSCore::None");
+
+        return (rv as [string, MIRType])[1];
+    }
+
     generateMapSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string, ocons: string, emptydecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const ename = this.mangleStringForSMT(entity.tkey);
@@ -744,14 +762,14 @@ class SMTTypeEmitter {
         const typet = entity.terms.get("K") as MIRType;
         const typeu = entity.terms.get("V") as MIRType;
         const typekp = this.getKeyProjectedTypeFrom(typet);
-        const typekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
+        const typekl = this.getKeyListTypeForMap(entity);
 
         const fargs =  [
             `(${this.generateSpecialTypeFieldName(entity.tkey, "size")} Int)`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "has")} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "keys")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "values")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typeu)}))`,
-            `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(this.getMIRType(typekl.tkey))})`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(typekl)})`,
         ];
 
         return {

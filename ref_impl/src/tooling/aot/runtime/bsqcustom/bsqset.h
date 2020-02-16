@@ -65,7 +65,7 @@ public:
             }
             else
             {
-                keys = (K_LIST*)BSQRef::incrementDirect(BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
+                keys = INC_REF_CHECK(K_LIST, BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
 
                 entries.insert(std::make_pair(INC_RC_K(key), INC_RC_T(val)));
             }
@@ -84,8 +84,7 @@ public:
 
         entries.insert(std::make_pair(INC_RC_K(key), INC_RC_T(val)));
 
-        BSQRef::incrementDirect(nkeys);
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), nkeys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), INC_REF_CHECK(K_LIST, nkeys));
     }
 
     Ty* update(K key, T val, BSQRefScope& cscope)
@@ -103,8 +102,7 @@ public:
             }
         }
        
-        BSQRef::incrementDirect(this->keys);
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), this->keys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), INC_REF_CHECK(K_LIST, this->keys));
     }
 
     Ty* clearKey(K key, K_LIST* nkeys, BSQRefScope& cscope)
@@ -117,13 +115,8 @@ public:
                 entries.insert(std::make_pair(INC_RC_K(iter->first), INC_RC_T(iter->second)));
             }
         }
-        
-        if(nkeys != nullptr)
-        {
-            BSQRef::incrementDirect(nkeys);
-        }
 
-        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), nkeys);
+        return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), INC_REF_CHECK(K_LIST, nkeys));
     }
 
     virtual std::u32string display() const

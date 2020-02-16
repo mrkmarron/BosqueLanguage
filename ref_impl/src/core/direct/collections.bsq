@@ -173,7 +173,7 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
     hidden static _at_val(s: Set<T>, key: T!KeyType): T # set_at_val
 
     hidden static _get_keylist(s: Set<T>): KeyList<T!KeyType>? # set_get_keylist
-    hidden static _clear_val(s: Set<T>, key: T!KeyType, newkl: KeyList<T!KeyType>?): Set<T> # set_clear_val
+    hidden static _clear_val(s: Set<T>, key: T!KeyType, newkl: KeyList<T!KeyType>): Set<T> # set_clear_val
     
     hidden static _unsafe_update(s: Set<T>, k: T!KeyType, v: T): Set<T> # set_unsafe_update
     hidden static _unsafe_add(s: Set<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): Set<T> # set_unsafe_add
@@ -226,7 +226,18 @@ entity Set<T where Indexable> provides Object, PODType when T grounded PODType, 
         }
         else {
             var kle = Set<T>::_get_keylist(this);
-            return Set<T>::_clear_val(this, key, kle != none ? KeyList<T!KeyType>::removeKey[recursive](kle, key) : none);
+            if(kle == none) {
+                return Set<T>@{};
+            }
+            else {
+                var klr = KeyList<T!KeyType>::removeKey[recursive](kle, key);
+                if(klr == none) {
+                    return Set<T>@{};
+                }
+                else {
+                    return Set<T>::_clear_val(this, key, klr);
+                }
+            }
         }
     }
 
@@ -243,7 +254,7 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
     hidden static _at_val(m: Map<K, V>, key: K!KeyType): V # map_at_val
 
     hidden static _get_keylist(m: Map<K, V>): KeyList<K!KeyType>? # map_get_keylist
-    hidden static _clear_val(m: Map<K, V>, key: K!KeyType, newkl: KeyList<K!KeyType>?): Map<K, V> # map_clear_val
+    hidden static _clear_val(m: Map<K, V>, key: K!KeyType, newkl: KeyList<K!KeyType>): Map<K, V> # map_clear_val
     
     hidden static _unsafe_update(m: Map<K, V>, k: K!KeyType, key: K, val: V): Map<K, V> # map_unsafe_update
     hidden static _unsafe_add(m: Map<K, V>, k: K!KeyType, key: K, val: V, newkl: KeyList<K!KeyType>): Map<K, V> # map_unsafe_add
@@ -346,7 +357,18 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         }
         else {
             var kle = Map<K, V>::_get_keylist(this);
-            return Map<K, V>::_clear_val(this, k, kle != none ? KeyList<K!KeyType>::removeKey[recursive](kle, key) : none);
+            if(kle == none) {
+                return Map<K, V>@{};
+            }
+            else {
+                var klr = KeyList<K!KeyType>::removeKey[recursive](kle, key);
+                if(klr == none) {
+                    return Map<K, V>@{};
+                }
+                else {
+                    return Map<K, V>::_clear_val(this, key, klr);
+                }
+            }
         }
     }
 
