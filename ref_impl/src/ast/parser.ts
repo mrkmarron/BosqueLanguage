@@ -1100,7 +1100,7 @@ class Parser {
                     const isSpread = this.testAndConsumeTokenIf("...");
                     const exp = this.parseExpression();
 
-                    if (!this.testToken("=")) {
+                    if (!this.testToken("=>")) {
                         args.push(new PositionalArgument(isref, isSpread, exp));
                     }
                     else {

@@ -59,9 +59,9 @@ public:
             auto iter = entries.find(key);
             if(iter != entries.cend())
             {
-                INC_RC_T(val);
+                auto vv = INC_RC_T(val);
                 DEC_RC_T(iter->second);
-                entries.insert(std::make_pair(iter->first, val));
+                entries.insert(std::make_pair(iter->first, vv));
             }
             else
             {

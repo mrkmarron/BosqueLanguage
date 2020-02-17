@@ -141,9 +141,9 @@ public:
         }
     }
 
-    inline static BSQRef* incrementDirect(BSQRef* v)
+    inline static void* incrementDirect(void* v)
     {
-        v->increment();
+        ((BSQRef*)v)->increment();
         return v;
     }
 
@@ -156,9 +156,9 @@ public:
         return v;
     }
 
-    inline static void decrementDirect(BSQRef* v)
+    inline static void decrementDirect(void* v)
     {
-        v->decrement();
+        ((BSQRef*)v)->decrement();
     }
 
     inline static void decrementChecked(Value v)

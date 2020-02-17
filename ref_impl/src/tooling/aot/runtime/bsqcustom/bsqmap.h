@@ -54,33 +54,31 @@ public:
         BSQRef::decrementChecked(keys);
     }
 
-    template <uint_16 n>
-    static Ty* createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const std::pair<T, U>(&values)[n])
+    template <uint16_t n>
+    static Ty* createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&mkeys)[n], const U(&mvals)[n])
     {
         std::map<K, std::pair<T, U>, K_CMP> entries;
         K_LIST* keys = nullptr;
 
         for (int i = 0; i < n; i++)
         {
-            auto = values[i];
-            auto key = T_GET_KEY(val.key);
-
+            auto key = T_GET_KEY(mkeys[i]);
             auto iter = entries.find(key);
             if(iter != entries.cend())
             {
-                INC_RC_T(val.first);
-                INC_RC_U(val.second);
+                auto kv = INC_RC_T(mkeys[i]);
+                auto vv = INC_RC_U(mvals[i]);
 
                 DEC_RC_T(iter->second.first);
                 DEC_RC_U(iter->second.second);
 
-                entries.insert(std::make_pair(iter->first, std::make_pair(val.first, val.second)));
+                entries.insert(std::make_pair(iter->first, std::make_pair(kv, vv)));
             }
             else
             {
                 keys = INC_REF_CHECK(K_LIST, BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
 
-                entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(val.first), INC_RC_U(val.second))));
+                entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(mkeys[i]), INC_RC_U(mvals[i]))));
             }
         }
 
@@ -145,7 +143,7 @@ public:
             }
             first = false;
 
-            ms += TDisplay(iter->second.first) + " => " UDisplay(iter->second.second);
+            ms += TDisplay(iter->second.first) + U" => " + UDisplay(iter->second.second);
         }
         ms += U"}";
 
@@ -158,6 +156,11 @@ public:
 #undef INC_RC_T
 #undef DEC_RC_T
 #undef T_GET_KEY
+
+#undef U
+#undef INC_RC_U
+#undef DEC_RC_U
+
 #undef K
 #undef INC_RC_K
 #undef DEC_RC_K
@@ -165,3 +168,6 @@ public:
 #undef K_CMP
 #undef K_EQ
 #undef TDisplay
+#undef UDisplay
+
+#undef TMapEntry

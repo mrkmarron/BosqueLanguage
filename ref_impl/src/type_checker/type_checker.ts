@@ -897,8 +897,9 @@ class TypeChecker {
 
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument || arg instanceof MapArgument) , "Only positional and map arguments allowed in Map constructor");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
             if (arg instanceof PositionalArgument) {
+                const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                
                 const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
                 this.raiseErrorIf(arg.value.sinfo, !(arg as PositionalArgument).isSpread, "Expected spread on Map argument");
 
@@ -917,7 +918,7 @@ class TypeChecker {
                 
                 this.raiseErrorIf(arg.value.sinfo, !this.m_assembly.subtypeOf(valarg.etype, vtype), "Map value value not of expected type");
 
-                eargs.push([keyarg.etype, false, treg, valarg.etype, vreg]);
+                eargs.push([keyarg.etype, false, kreg, valarg.etype, vreg]);
             }
         }
 
@@ -929,7 +930,7 @@ class TypeChecker {
             const arg = args[i];
 
             if (!arg[1]) {
-                if(arg[3] === undefined) {
+                if(arg[3] !== undefined) {
                     const mereg = this.m_emitter.bodyEmitter.generateTmpRegister();
 
                     if(this.m_emitEnabled) {

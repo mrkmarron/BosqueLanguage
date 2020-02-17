@@ -265,17 +265,13 @@ class CPPBodyEmitter {
         const scopevar = this.varNameToCppName("$scope$");
         if (this.typegen.typecheckIsName(cpcstype, /NSCore::List<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => {
-                return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
-            });
+            const cvals = cpcs.args.map((arg) => this.argToCpp(arg, oftype));
 
             conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /NSCore::Set<.*>/)) {
             const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => {
-                return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
-            });
+            const cvals = cpcs.args.map((arg) => this.argToCpp(arg, oftype));
 
             conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
         }
@@ -283,13 +279,13 @@ class CPPBodyEmitter {
             const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
             const vtype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
             const entrytype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "MapEntry" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey && (edecl[1].terms.get("V") as MIRType).trkey === vtype.trkey);
+            const entryentity = (entrytype as [string, MIREntityTypeDecl])[1];
 
-            const oftype = this.assembly.typeMap.get((entrytype as [string, MIREntityTypeDecl])[0]) as MIRType;
-            const cvals = cpcs.args.map((arg) => {
-                return this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype));
-            });
+            const oftype = this.assembly.typeMap.get(entryentity.tkey) as MIRType;
+            const mkeys = cpcs.args.map((arg) => `${this.argToCpp(arg, oftype)}->${this.typegen.mangleStringForCpp((entryentity.fields.find((f) => f.name === "key") as MIRFieldDecl).fkey)}`);
+            const mvals = cpcs.args.map((arg) => `${this.argToCpp(arg, oftype)}->${this.typegen.mangleStringForCpp((entryentity.fields.find((f) => f.name === "value") as MIRFieldDecl).fkey)}`);
 
-            conscall = `${cppctype}::createFromSingle<${cvals.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${cvals.join(", ")} })`;
+            conscall = `${cppctype}::createFromSingle<${mkeys.length}>(${scopevar}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}, { ${mkeys.join(", ")} }, { ${mvals.join(", ")} })`;
         }
 
         return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
@@ -1527,15 +1523,15 @@ class CPPBodyEmitter {
                 break;
             }
             case "map_at_key": {
-                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second.first;`;
+                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second.first;`;
                 break;
             }
             case "set_at_val": {
-                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second;`;
+                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second;`;
                 break;
             }
             case "map_at_val": {
-                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}))->second.second;`;
+                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second.second;`;
                 break;
             }
             case "set_get_keylist":

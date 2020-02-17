@@ -730,7 +730,7 @@ class CPPTypeEmitter {
         + `#define DEC_RC_T(X) ${this.getDecOpForType(typet, "X")}\n`
         + `#define T_GET_KEY(X) ${this.getGetKeyOpForType(typet, "X")}\n`
 
-        + `#define U ${this.getCPPTypeFor(typet, "storage")}\n`
+        + `#define U ${this.getCPPTypeFor(typeu, "storage")}\n`
         + `#define INC_RC_U(X) ${this.getIncOpForType(typeu, "X")}\n`
         + `#define DEC_RC_U(X) ${this.getDecOpForType(typeu, "X")}\n`
 

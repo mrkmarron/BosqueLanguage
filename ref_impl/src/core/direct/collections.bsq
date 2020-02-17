@@ -285,7 +285,7 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         }
         else {
             var v = Map<K, V>::_at_val(m, kl.hkey);
-            return Map<K, V>::_value_list[recursive](m, kl.tail, l->push(pv));
+            return Map<K, V>::_value_list[recursive](m, kl.tail, l->push(v));
         }
     }
 
@@ -296,7 +296,7 @@ entity Map<K where Indexable, V> provides Object, PODType when K grounded PODTyp
         else {
             var k = Map<K, V>::_at_key(m, kl.hkey);
             var v = Map<K, V>::_at_val(m, kl.hkey);
-            return Map<K, V>::_entry_list[recursive](m, KeyList<K!KeyType>::_get_tail(kl), l->push(MapEntry<K, V>@{key=k, value=v}));
+            return Map<K, V>::_entry_list[recursive](m, kl.tail, l->push(MapEntry<K, V>@{key=k, value=v}));
         }
     }
 

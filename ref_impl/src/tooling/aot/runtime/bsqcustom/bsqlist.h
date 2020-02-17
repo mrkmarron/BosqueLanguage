@@ -25,13 +25,11 @@ public:
     template <uint16_t n>
     static Ty* createFromSingle(BSQRefScope& scope, MIRNominalTypeEnum ntype, const T(&values)[n])
     {
-        T val;
         std::vector<T> entries;
 
         for (int i = 0; i < n; i++)
         {
-            val = values[i];
-            entries.push_back(val);
+            entries.push_back(INC_RC_T(values[i]));
         }
 
         return BSQ_NEW_ADD_SCOPE(scope, Ty, ntype, move(entries));
@@ -47,7 +45,7 @@ public:
         }
     }
 
-    Ty* unsafeAdd(BSQRefScope& scope, const T& v) const
+    Ty* unsafeAdd(BSQRefScope& scope, T v) const
     {
         std::vector<T> nv;
         for(size_t i = 0; i < this->entries.size(); ++i)
@@ -59,7 +57,7 @@ public:
         return BSQ_NEW_ADD_SCOPE(scope, Ty, this->nominalType, move(nv));
     }
 
-    Ty* unsafeSet(BSQRefScope& scope, int64_t idx, const T& v) const
+    Ty* unsafeSet(BSQRefScope& scope, int64_t idx, T v) const
     {
         std::vector<T> nv;
         for(int64_t i = 0; i < this->entries.size(); ++i)
