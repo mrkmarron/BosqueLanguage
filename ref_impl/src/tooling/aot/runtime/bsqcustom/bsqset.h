@@ -61,13 +61,13 @@ public:
             {
                 auto vv = INC_RC_T(val);
                 DEC_RC_T(iter->second);
-                entries.insert(std::make_pair(iter->first, vv));
+                entries[iter->first] = vv;
             }
             else
             {
                 keys = INC_REF_CHECK(K_LIST, BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
 
-                entries.insert(std::make_pair(INC_RC_K(key), INC_RC_T(val)));
+                entries[INC_RC_K(key)] = INC_RC_T(val);
             }
         }
 
@@ -79,10 +79,10 @@ public:
         std::map<K, T, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
-            entries.insert(std::make_pair(INC_RC_K(iter->first), INC_RC_T(iter->second)));
+            entries[INC_RC_K(iter->first)] = INC_RC_T(iter->second);
         }
 
-        entries.insert(std::make_pair(INC_RC_K(key), INC_RC_T(val)));
+        entries[INC_RC_K(key)] = INC_RC_T(val);
 
         return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), INC_REF_CHECK(K_LIST, nkeys));
     }
@@ -94,11 +94,11 @@ public:
         {
             if(K_EQ(key, iter->first))
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), INC_RC_T(val)));
+                entries[INC_RC_K(iter->first)] = INC_RC_T(val);
             }
             else
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), INC_RC_T(iter->second)));
+                entries[INC_RC_K(iter->first)] = INC_RC_T(iter->second);
             }
         }
        
@@ -112,7 +112,7 @@ public:
         {
             if(!K_EQ(key, iter->first)) 
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), INC_RC_T(iter->second)));
+                entries[INC_RC_K(iter->first)] = INC_RC_T(iter->second);
             }
         }
 

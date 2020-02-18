@@ -378,13 +378,13 @@ class SMTBodyEmitter {
 
             const kltype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "KeyList" && (edecl[1].terms.get("K") as MIRType).trkey === realkeytype.trkey) as [string, MIREntityTypeDecl];
             const klcons = this.typegen.generateEntityConstructor(kltype[1].tkey);
-            const klstore = this.typegen.getKeyListTypeForSet(this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl);
+            const klstore = this.typegen.getKeyListTypeForMap(this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl);
 
             let consv = `(${smtctype} %CTR% %HAS% %ENTRYKEY% %ENTRYDATA% %KEY%)`;
             for (let i = cpcs.args.length - 1; i >= 1; --i) {
                 const arg = cpcs.args[i];
-                const entrykeyexp = `(${entrykey}, ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-                const entryvalexp = `(${entryvalue}, ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+                const entrykeyexp = `(${entrykey} ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+                const entryvalexp = `(${entryvalue} ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
 
                 const key = this.typegen.getKeyFrom(entrykeyexp, ktype);
                 const ctrvar = this.generateTempName();
@@ -407,8 +407,8 @@ class SMTBodyEmitter {
                 const body = consv.replace(/%CTR%/g, ctrvar).replace(/%HAS%/g, hasvar).replace(/%ENTRYKEY%/g, entrykeyvar).replace(/%ENTRYDATA%/g, entrydatavar).replace(/%KEY%/g, keyvar);
                 consv = `(let ((${ctrvar} ${ctrup}) (${hasvar} ${hasup}) (${entrykeyvar} ${entrykeyup}) (${entrydatavar} ${entrydataup})  (${keyvar} ${keyup})) ${body})`
             }
-            const entrykeyexp0 = `(${entrykey}, ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-            const entryvalexp0 = `(${entryvalue}, ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+            const entrykeyexp0 = `(${entrykey} ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
+            const entryvalexp0 = `(${entryvalue} ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
 
             const key = this.typegen.getKeyFrom(entrykeyexp0, ktype);
             const kl = new SMTValue(`(${klcons} ${key} bsqterm_none)`);
@@ -416,7 +416,7 @@ class SMTBodyEmitter {
                 .replace(/%CTR%/g, "1")
                 .replace(/%HAS%/g, `(store ${this.typegen.generateEmptyHasArrayFor(cpcs.tkey)} ${key} true)`)
                 .replace(/%ENTRYKEY%/g, `(store ${this.typegen.generateEmptyKeyArrayFor(cpcs.tkey)} ${key} ${entrykeyexp0})`)
-                .replace(/%ENTRYKEY%/g, `(store ${this.typegen.generateEmptyDataArrayFor(cpcs.tkey)} ${key} ${entryvalexp0})`)
+                .replace(/%ENTRYDATA%/g, `(store ${this.typegen.generateEmptyDataArrayFor(cpcs.tkey)} ${key} ${entryvalexp0})`)
                 .replace(/%KEY%/g, this.typegen.coerce(kl, this.typegen.getMIRType(kltype[1].tkey), klstore).emit());
 
             return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(final));
@@ -1717,7 +1717,7 @@ class SMTBodyEmitter {
                 const keys = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keys", params[0]);
                 const entries = this.typegen.generateSpecialTypeFieldAccess(enclkey, "values", params[0]);
                 const kl = this.typegen.generateSpecialTypeFieldAccess(enclkey, "keylist", params[0]);
-                bodyres = new SMTValue(`(${cons} ${size} ${has} ${keys} (store ${entries} ${params[1]} ${params[2]}) ${kl})`);
+                bodyres = new SMTValue(`(${cons} ${size} ${has} ${keys} (store ${entries} ${params[1]} ${params[3]}) ${kl})`);
                 break;
             }
             case "set_unsafe_add":  {

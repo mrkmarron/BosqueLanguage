@@ -72,13 +72,13 @@ public:
                 DEC_RC_T(iter->second.first);
                 DEC_RC_U(iter->second.second);
 
-                entries.insert(std::make_pair(iter->first, std::make_pair(kv, vv)));
+                entries[iter->first] = std::make_pair(kv, vv);
             }
             else
             {
                 keys = INC_REF_CHECK(K_LIST, BSQ_NEW_NO_RC(K_LIST, INC_RC_K(key), keys));
 
-                entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(mkeys[i]), INC_RC_U(mvals[i]))));
+                entries[INC_RC_K(key)] = std::make_pair(INC_RC_T(mkeys[i]), INC_RC_U(mvals[i]));
             }
         }
 
@@ -90,10 +90,10 @@ public:
         std::map<K, std::pair<T, U>, K_CMP> entries;
         for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
         {
-            entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
+            entries[INC_RC_K(iter->first)] = std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second));
         }
 
-        entries.insert(std::make_pair(INC_RC_K(key), std::make_pair(INC_RC_T(v), INC_RC_U(u))));
+        entries[INC_RC_K(key)] = std::make_pair(INC_RC_T(v), INC_RC_U(u));
 
         return BSQ_NEW_ADD_SCOPE(cscope, Ty, this->nominalType, move(entries), INC_REF_CHECK(K_LIST, nkeys));
     }
@@ -105,11 +105,11 @@ public:
         {
             if(K_EQ(key, iter->first))
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(v), INC_RC_U(u))));
+                entries[INC_RC_K(iter->first)] = std::make_pair(INC_RC_T(v), INC_RC_U(u));
             }
             else
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
+                entries[INC_RC_K(iter->first)] = std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second));
             }
         }
 
@@ -123,7 +123,7 @@ public:
         {
             if(!K_EQ(key, iter->first)) 
             {
-                entries.insert(std::make_pair(INC_RC_K(iter->first), std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second))));
+                entries[INC_RC_K(iter->first)] = std::make_pair(INC_RC_T(iter->second.first), INC_RC_U(iter->second.second));
             }
         }
         
