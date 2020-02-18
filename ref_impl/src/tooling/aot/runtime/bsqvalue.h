@@ -634,7 +634,7 @@ public:
         return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
     }
 
-    bool checkPropertySet(int n, ...)
+    bool checkPropertySet(int n, ...) const
     {
         MIRPropertyEnum val;
         std::set<MIRPropertyEnum> props;
