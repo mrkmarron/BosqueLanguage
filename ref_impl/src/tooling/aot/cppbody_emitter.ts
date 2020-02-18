@@ -887,7 +887,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
             || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.datahashidkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.cryptohashidkeytype)) {
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
             return "false";
         }
         else {
@@ -932,7 +932,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
             || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.datahashidkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.cryptohashidkeytype)) {
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
             return "false";
         }
         else {
@@ -977,7 +977,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
             || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.datahashidkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.cryptohashidkeytype)) {
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
             return oftype.ekey === argtype.trkey ? "true" : "false";
         }
         else {
@@ -1043,7 +1043,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
             || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.datahashidkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.cryptohashidkeytype)) {
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
             return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
         }
         else {

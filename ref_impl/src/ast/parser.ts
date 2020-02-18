@@ -29,7 +29,6 @@ const KeywordStrings = [
     "composite",
     "concept",
     "const",
-    "cryptographic",
     "elif",
     "else",
     "enum",
@@ -3065,14 +3064,12 @@ class Parser {
                 this.ensureAndConsumeToken(";");
 
                 if (ishash) {
-                    const iscrypto = this.testAndConsumeTokenIf("cryptographic");
-
                     const param = new FunctionParameter("value", idval, false, false);
-                    const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), iscrypto ? "hashkey_data_create" : "hashkey_crypto_create");
+                    const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "hashkey_crypto_create");
                     const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
                     const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
-                    let provides = [[new NominalTypeSignature("NSCore", iscrypto ? "CryptoHashIdKey" : "DataHashIdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+                    let provides = [[new NominalTypeSignature("NSCore", "ContentHashIdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
                     provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction([new TemplateTypeRestriction(idval, true, new NominalTypeSignature("NSCore", "APIType"))])]);
                     
                     const invariants: InvariantDecl[] = [];

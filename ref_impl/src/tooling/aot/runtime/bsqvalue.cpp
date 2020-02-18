@@ -199,13 +199,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQLogicalTimeIdKey::hash(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr));
         }
-        else if(dynamic_cast<BSQDataHashIdKey*>(ptr) != nullptr)
-        {
-            return BSQDataHashIdKey::hash(*dynamic_cast<BSQDataHashIdKey*>(ptr));
-        }
         else
         {
-            return BSQCryptoHashIdKey::hash(dynamic_cast<BSQCryptoHashIdKey*>(ptr));
+            return BSQContentHashIdKey::hash(dynamic_cast<BSQContentHashIdKey*>(ptr));
         }
     }
 }
@@ -286,13 +282,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQLogicalTimeIdKey::keyEqual(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr1), *dynamic_cast<BSQLogicalTimeIdKey*>(ptr2));
         }
-        else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
-        {
-            return BSQDataHashIdKey::keyEqual(*dynamic_cast<BSQDataHashIdKey*>(ptr1), *dynamic_cast<BSQDataHashIdKey*>(ptr2));
-        }
         else
         {
-            return BSQCryptoHashIdKey::keyEqual(dynamic_cast<BSQCryptoHashIdKey*>(ptr1), dynamic_cast<BSQCryptoHashIdKey*>(ptr2));
+            return BSQContentHashIdKey::keyEqual(dynamic_cast<BSQContentHashIdKey*>(ptr1), dynamic_cast<BSQContentHashIdKey*>(ptr2));
         }
     }
 }
@@ -369,13 +361,9 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         {
             return BSQLogicalTimeIdKey::keyLess(*dynamic_cast<BSQLogicalTimeIdKey*>(ptr1), *dynamic_cast<BSQLogicalTimeIdKey*>(ptr2));
         }
-        else if(dynamic_cast<BSQDataHashIdKey*>(ptr1) != nullptr && dynamic_cast<BSQDataHashIdKey*>(ptr2) != nullptr)
-        {
-            return BSQDataHashIdKey::keyLess(*dynamic_cast<BSQDataHashIdKey*>(ptr1), *dynamic_cast<BSQDataHashIdKey*>(ptr2));
-        }
         else
         {
-            return BSQCryptoHashIdKey::keyLess(dynamic_cast<BSQCryptoHashIdKey*>(ptr1), dynamic_cast<BSQCryptoHashIdKey*>(ptr2));
+            return BSQContentHashIdKey::keyLess(dynamic_cast<BSQContentHashIdKey*>(ptr1), dynamic_cast<BSQContentHashIdKey*>(ptr2));
         }
     }
 }
@@ -509,13 +497,9 @@ std::u32string diagnostic_format(Value v)
         {
             return DisplayFunctor_BSQGUIDIdKey{}(dynamic_cast<const BSQGUIDIdKey*>(vv));
         }
-        else if(dynamic_cast<const BSQDataHashIdKey*>(vv) != nullptr)
+        else if(dynamic_cast<const BSQContentHashIdKey*>(vv) != nullptr)
         {
-            return DisplayFunctor_BSQDataHashIdKey{}(*dynamic_cast<const BSQDataHashIdKey*>(vv));
-        }
-        else if(dynamic_cast<const BSQCryptoHashIdKey*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQCryptoHashIdKey{}(dynamic_cast<const BSQCryptoHashIdKey*>(vv));
+            return DisplayFunctor_BSQContentHashIdKey{}(dynamic_cast<const BSQContentHashIdKey*>(vv));
         }
         else if(dynamic_cast<const BSQBuffer*>(vv) != nullptr)
         {

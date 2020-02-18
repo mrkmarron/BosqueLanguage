@@ -1200,8 +1200,7 @@ class Assembly {
     getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
     getSpecialLogicalTimeIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("LogicalTimeIdKey"); }
     getSpecialGUIDIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("GUIDIdKey"); }
-    getSpecialDataHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("DataHashIdKey"); }
-    getSpecialCryptoHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("CryptoHashIdKey"); }
+    getSpecialContentHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("ContentHashIdKey"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
     getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }

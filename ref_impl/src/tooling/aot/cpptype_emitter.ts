@@ -29,8 +29,7 @@ class CPPTypeEmitter {
     readonly idkeytype: MIRType;
     readonly guididkeytype: MIRType;
     readonly logicaltimeidkeytype: MIRType;
-    readonly datahashidkeytype: MIRType;
-    readonly cryptohashidkeytype: MIRType;    
+    readonly contenthashidkeytype: MIRType;    
 
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -57,8 +56,7 @@ class CPPTypeEmitter {
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
         this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
         this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
-        this.datahashidkeytype = assembly.typeMap.get("NSCore::DataHashIdKey") as MIRType;
-        this.cryptohashidkeytype = assembly.typeMap.get("NSCore::CryptoHashIdKey") as MIRType;
+        this.contenthashidkeytype = assembly.typeMap.get("NSCore::ContentHashIdKey") as MIRType;
     }
 
     mangleStringForCpp(name: string): string {
@@ -240,11 +238,8 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
             return "BSQLogicalTimeIdKey";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
-            return "BSQDataHashIdKey";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
-            return "BSQCryptoHashIdKey" + (declspec !== "base" ? "*" : "");
+        else if (this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
+            return "BSQContentHashIdKey" + (declspec !== "base" ? "*" : "");
         }
         else {
             if (this.typecheckAllKeys(tt)) {
@@ -297,9 +292,6 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype)) {
             return `BSQ_NEW_ADD_SCOPE(${scope}, BSQLogicalTimeIdKey, ${exp})`;
         }
-        else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
-            return `BSQ_NEW_ADD_SCOPE(${scope}, BSQDataHashIdKey, ${exp})`;
-        }
         else {
             return exp;
         }
@@ -321,9 +313,6 @@ class CPPTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTimeIdKey)`;
         }
-        else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
-        }
         else {
             return `BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
         }
@@ -344,9 +333,6 @@ class CPPTypeEmitter {
         }
         else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
             return `*BSQ_GET_VALUE_PTR(${exp}, BSQLogicalTimeIdKey)`;
-        }
-        else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-            return `*BSQ_GET_VALUE_PTR(${exp}, BSQDataHashIdKey)`;
         }
         else {
             return `BSQ_GET_VALUE_PTR(${exp}, ${this.getCPPTypeFor(into, "base")})`;
@@ -385,7 +371,7 @@ class CPPTypeEmitter {
             return this.coerceFromAtomicKey(exp, from);
         }
         else if (this.typecheckEntityAndProvidesName(from, this.enumtype) || this.typecheckEntityAndProvidesName(from, this.idkeytype) || this.typecheckEntityAndProvidesName(from, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.contenthashidkeytype)) {
             return this.coerceFromAtomicKey(exp, from);
         }
         else if (this.typecheckAllKeys(from)) {
@@ -420,7 +406,7 @@ class CPPTypeEmitter {
                return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
-                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.contenthashidkeytype)) {
                 return this.coerceIntoAtomicKey(exp, into);
            }
            else if (this.typecheckAllKeys(into)) {
@@ -513,13 +499,13 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
             return "direct";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype) || this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
             return "direct";
         }
         else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
             return "no";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
             return "no";
         }
         else {
@@ -618,7 +604,7 @@ class CPPTypeEmitter {
             return true;
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
            return true;
         }
         else {
@@ -641,7 +627,7 @@ class CPPTypeEmitter {
         else if (this.typecheckIsName(ttype, /^NSCore::LogicalTime$/) || this.typecheckIsName(ttype, /^NSCore::DataHash$/)) {
             return `${this.getCPPTypeFor(ttype, "storage")}{}`;
         }
-        else if (this.typecheckEntityAndProvidesName(ttype, this.enumtype) || this.typecheckEntityAndProvidesName(ttype, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(ttype, this.datahashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(ttype, this.enumtype) || this.typecheckEntityAndProvidesName(ttype, this.logicaltimeidkeytype)) {
             return `${this.getCPPTypeFor(ttype, "storage")}{}`;
         }
         else {

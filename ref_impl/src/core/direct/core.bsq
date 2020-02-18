@@ -191,11 +191,7 @@ concept LogicalTimeIdKey provides KeyType, Some {
 }
 
 //<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
-concept DataHashIdKey provides KeyType, Some {
-}
-
-//<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
-concept CryptoHashIdKey provides KeyType, Some {
+concept ContentHashIdKey provides KeyType, Some {
 }
 
 //<summary>Primitive regex value.</summary>

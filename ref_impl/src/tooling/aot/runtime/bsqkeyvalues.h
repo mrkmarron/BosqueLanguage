@@ -637,76 +637,17 @@ struct DisplayFunctor_BSQLogicalTimeIdKey
     }
 };
 
-class BSQDataHashIdKey : public BSQRef
-{
-public:
-    uint64_t hdata;
-
-    BSQDataHashIdKey() : BSQRef(MIRNominalTypeEnum::Invalid) { ; }
-    BSQDataHashIdKey(uint64_t hdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), hdata(hdata) { ; }
-
-    BSQDataHashIdKey(const BSQDataHashIdKey& src) : BSQRef(src.nominalType), hdata(src.hdata)
-    { 
-        ; 
-    }
-
-    BSQDataHashIdKey& operator=(const BSQDataHashIdKey& src)
-    {
-        this->hdata = src.hdata;
-        this->nominalType = src.nominalType;
-        return *this;
-    }
-
-    virtual ~BSQDataHashIdKey() = default;
-    virtual void destroy() { ; }
-
-    inline static size_t hash(const BSQDataHashIdKey& k)
-    {
-        return HASH_COMBINE((size_t)k.nominalType, k.hdata);
-    }
-
-    inline static bool keyEqual(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r)
-    {
-        return (l.nominalType == r.nominalType) & (l.hdata == r.hdata);
-    }
-
-    inline static bool keyLess(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r)
-    {
-        return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.hdata < r.hdata);
-    }
-};
-struct HashFunctor_BSQDataHashIdKey
-{
-    size_t operator()(const BSQDataHashIdKey& ihd) const { return BSQDataHashIdKey::hash(ihd); }
-};
-struct EqualFunctor_BSQDataHashIdKey
-{
-    bool operator()(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r) const { return BSQDataHashIdKey::keyEqual(l, r); }
-};
-struct LessFunctor_BSQDataHashIdKey
-{
-    bool operator()(const BSQDataHashIdKey& l, const BSQDataHashIdKey& r) const { return BSQDataHashIdKey::keyLess(l, r); }
-};
-struct DisplayFunctor_BSQDataHashIdKey
-{
-    std::u32string operator()(const BSQDataHashIdKey& idh) const 
-    { 
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(nominaltypenames[(uint32_t)idh.nominalType]) + std::u32string(U"::") + conv.from_bytes(std::to_string(idh.hdata)); 
-    }
-};
-
-class BSQCryptoHashIdKey : public BSQRef
+class BSQContentHashIdKey : public BSQRef
 {
 public:
     const uint8_t hdata[64];
 
-    BSQCryptoHashIdKey(const uint8_t hdata[64], MIRNominalTypeEnum oftype) : BSQRef(oftype), hdata() { memcpy_s((void*)this->hdata, 64, hdata, 64); }
+    BSQContentHashIdKey(const uint8_t hdata[64], MIRNominalTypeEnum oftype) : BSQRef(oftype), hdata() { memcpy_s((void*)this->hdata, 64, hdata, 64); }
 
-    virtual ~BSQCryptoHashIdKey() = default;
+    virtual ~BSQContentHashIdKey() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQCryptoHashIdKey* h)
+    inline static size_t hash(const BSQContentHashIdKey* h)
     {
         auto sdb = (uint64_t*)h->hdata;
         size_t lhh = HASH_COMBINE(HASH_COMBINE(sdb[0], sdb[1]), HASH_COMBINE(sdb[4], sdb[5]));
@@ -714,31 +655,31 @@ public:
         return HASH_COMBINE(lhh, rhh);
     }
 
-    inline static bool keyEqual(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r)
+    inline static bool keyEqual(const BSQContentHashIdKey* l, const BSQContentHashIdKey* r)
     {
         return l->nominalType == r->nominalType && memcmp(l->hdata, r->hdata, 64) == 0;
     }
 
-    inline static bool keyLess(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r)
+    inline static bool keyLess(const BSQContentHashIdKey* l, const BSQContentHashIdKey* r)
     {
         return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : memcmp(l->hdata, r->hdata, 64) < 0;
     }
 };
-struct HashFunctor_BSQCryptoHashIdKey
+struct HashFunctor_BSQContentHashIdKey
 {
-    size_t operator()(const BSQCryptoHashIdKey* ihc) const { return BSQCryptoHashIdKey::hash(ihc); }
+    size_t operator()(const BSQContentHashIdKey* ihc) const { return BSQContentHashIdKey::hash(ihc); }
 };
-struct EqualFunctor_BSQCryptoHashIdKey
+struct EqualFunctor_BSQContentHashIdKey
 {
-    bool operator()(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r) const { return BSQCryptoHashIdKey::keyEqual(l, r); }
+    bool operator()(const BSQContentHashIdKey* l, const BSQContentHashIdKey* r) const { return BSQContentHashIdKey::keyEqual(l, r); }
 };
-struct LessFunctor_BSQCryptoHashIdKey
+struct LessFunctor_BSQContentHashIdKey
 {
-    bool operator()(const BSQCryptoHashIdKey* l, const BSQCryptoHashIdKey* r) const { return BSQCryptoHashIdKey::keyLess(l, r); }
+    bool operator()(const BSQContentHashIdKey* l, const BSQContentHashIdKey* r) const { return BSQContentHashIdKey::keyLess(l, r); }
 };
-struct DisplayFunctor_BSQCryptoHashIdKey
+struct DisplayFunctor_BSQContentHashIdKey
 {
-    std::u32string operator()(const BSQCryptoHashIdKey* ihc) const 
+    std::u32string operator()(const BSQContentHashIdKey* ihc) const 
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
         return conv.from_bytes(nominaltypenames[(uint32_t)ihc->nominalType]) + std::u32string(U"::") + std::u32string(ihc->hdata, ihc->hdata + 64); 

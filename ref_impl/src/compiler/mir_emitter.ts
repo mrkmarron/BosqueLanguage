@@ -715,10 +715,8 @@ class MIREmitter {
         emitter.registerResolvedTypeReference(assembly.getSpecialGUIDIdKeyConceptType());
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::LogicalTimeIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialLogicalTimeIdKeyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::DataHashIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialDataHashIdKeyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::CryptoHashIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialCryptoHashIdKeyConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::ContentHashIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialContentHashIdKeyConceptType());
 
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());

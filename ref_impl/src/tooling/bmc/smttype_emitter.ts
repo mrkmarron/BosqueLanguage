@@ -31,8 +31,7 @@ class SMTTypeEmitter {
     readonly idkeytype: MIRType;
     readonly guididkeytype: MIRType;
     readonly logicaltimeidkeytype: MIRType;
-    readonly datahashidkeytype: MIRType;
-    readonly cryptohashidkeytype: MIRType;    
+    readonly contenthashidkeytype: MIRType;    
 
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -59,8 +58,7 @@ class SMTTypeEmitter {
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
         this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
         this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
-        this.datahashidkeytype = assembly.typeMap.get("NSCore::DataHashIdKey") as MIRType;
-        this.cryptohashidkeytype = assembly.typeMap.get("NSCore::CryptoHashIdKey") as MIRType;
+        this.contenthashidkeytype = assembly.typeMap.get("NSCore::ContentHashIdKey") as MIRType;
     }
 
     mangleStringForSMT(name: string): string {
@@ -242,10 +240,7 @@ class SMTTypeEmitter {
         else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
             return "bsq_idkey_logicaltime";
         }
-        else if (this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype)) {
-            return "bsq_idkey_datahash";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+        else if (this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
             return "bsq_idkey_cryptohash";
         }
         else {
@@ -327,9 +322,6 @@ class SMTTypeEmitter {
             else if (this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype)) {
                 ctoval = `(bsq_idkey_logicaltime ${exp.emit()})`;
             }
-            else if (this.typecheckEntityAndProvidesName(from, this.datahashidkeytype)) {
-                ctoval = `(bsq_idkey_datahash ${exp.emit()})`;
-            }
             else {
                 ctoval = `(bsq_idkey_cryptohash ${exp.emit()})`;
             }
@@ -377,9 +369,6 @@ class SMTTypeEmitter {
         }
         else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
             return new SMTValue(`(bsqkey_idkey_logicaltime_value ${exp.emit()})`);
-        }
-        else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-            return new SMTValue(`(bsqkey_idkey_datahash_value ${exp.emit()})`);
         }
         else {
             return new SMTValue(`(bsqkey_idkey_cryptohash_value ${exp.emit()})`);
@@ -453,9 +442,6 @@ class SMTTypeEmitter {
             else if (this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype)) {
                 return new SMTValue(`(bsq_idkey_logicaltime_value ${cfrom})`);
             }
-            else if (this.typecheckEntityAndProvidesName(into, this.datahashidkeytype)) {
-                return new SMTValue(`(bsq_idkey_datahash_value ${cfrom})`);
-            }
             else {
                 return new SMTValue(`(bsq_idkey_cryptohash_value ${cfrom})`);
             }
@@ -500,7 +486,7 @@ class SMTTypeEmitter {
             return this.coerceFromAtomicKey(exp, from, into);
         }
         else if (this.typecheckEntityAndProvidesName(from, this.enumtype) || this.typecheckEntityAndProvidesName(from, this.idkeytype) || this.typecheckEntityAndProvidesName(from, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(from, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(from, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(from, this.contenthashidkeytype)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
         else if (this.typecheckAllKeys(from)) {
@@ -537,7 +523,7 @@ class SMTTypeEmitter {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckEntityAndProvidesName(into, this.enumtype) || this.typecheckEntityAndProvidesName(into, this.idkeytype) || this.typecheckEntityAndProvidesName(into, this.guididkeytype)
-                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(into, this.cryptohashidkeytype)) {
+                || this.typecheckEntityAndProvidesName(into, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(into, this.contenthashidkeytype)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
             else if (this.typecheckAllKeys(into)) {
@@ -628,7 +614,7 @@ class SMTTypeEmitter {
             return true;
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype) || this.typecheckEntityAndProvidesName(tt, this.idkeytype) || this.typecheckEntityAndProvidesName(tt, this.guididkeytype)
-            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.datahashidkeytype) || this.typecheckEntityAndProvidesName(tt, this.cryptohashidkeytype)) {
+            || this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype) || this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
            return true;
         }
         else {
