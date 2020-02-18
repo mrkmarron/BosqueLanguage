@@ -63,7 +63,7 @@ function assignSSA(op: MIROp, remap: Map<string, MIRRegisterArgument>, ctrs: Map
     switch (op.tag) {
         case MIROpTag.MIRLoadConst:
         case MIROpTag.MIRLoadConstRegex:
-        case MIROpTag.MIRLoadConstValidatedString:
+        case MIROpTag.MIRLoadConstSafeString:
         case MIROpTag.MIRLoadConstTypedString:
         case MIROpTag.MIRAccessConstantValue:
         case MIROpTag.MIRLoadFieldDefaultValue: {

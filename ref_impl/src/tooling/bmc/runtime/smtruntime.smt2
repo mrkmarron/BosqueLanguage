@@ -9,7 +9,7 @@
 (set-option :timeout 10000)
 
 (declare-datatypes (
-      (bsq_validatedstring 0)
+      (bsq_safestring 0)
       (bsq_stringof 0)
       (bsq_guid 0)
       (bsq_datahash 0)
@@ -22,7 +22,7 @@
       (bsq_idkey_cryptohash 0)
       (BKeyValue 0)
     ) (
-    ( (bsq_validatedstring@cons (bsq_validatedstring_type String) (bsq_validatedstring_value String)) )
+    ( (bsq_safestring@cons (bsq_safestring_type String) (bsq_safestring_value String)) )
     ( (bsq_stringof@cons (bsq_stringof_type String) (bsq_stringof_value String)) )
     ( (bsq_guid@cons (bsqy_guid_value String)) )
     ( (bsq_datahash@cons (bsq_datahash Int)) )
@@ -38,7 +38,7 @@
       (bsqkey_bool (bsqkey_bool_value Bool))
       (bsqkey_int (bsqkey_int_value Int))
       (bsqkey_string (bsqkey_string_value String))
-      (bsqkey_validatedstring (bsqkey_validatedstring_value bsq_validatedstring))
+      (bsqkey_safestring (bsqkey_safestring_value bsq_safestring))
       (bsqkey_stringof (bsqkey_stringof_value bsq_stringof))
       (bsqkey_guid (bsqkey_guid_value bsq_guid))
       (bsqkey_datahash (bsqkey_datahash bsq_datahash))
@@ -107,7 +107,7 @@
     (ite (is-bsqkey_bool keyv) MIRNominalTypeEnum_Bool
       (ite (is-bsqkey_int keyv) MIRNominalTypeEnum_Int
         (ite (is-bsqkey_string keyv) MIRNominalTypeEnum_String
-          (ite (is-bsqkey_validatedstring keyv) (bsq_validatedstring_type (bsqkey_validatedstring_value keyv))
+          (ite (is-bsqkey_safestring keyv) (bsq_safestring_type (bsqkey_safestring_value keyv))
             (ite (is-bsqkey_stringof keyv) (bsq_stringof_type (bsqkey_stringof_value keyv))
               (ite (is-bsqkey_guid keyv) MIRNominalTypeEnum_GUID
                 (ite (is-bsqkey_datahash keyv) MIRNominalTypeEnum_DataHash

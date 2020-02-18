@@ -51,46 +51,46 @@ struct DisplayFunctor_BSQString
     std::u32string operator()(const BSQString* s) const { return std::u32string(U"\"") + std::u32string(s->sdata.cbegin(), s->sdata.cend()) + std::u32string(U"\""); }
 };
 
-class BSQValidatedString : public BSQRef
+class BSQSafeString : public BSQRef
 {
 public:
     const std::u32string sdata;
   
-    BSQValidatedString(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
+    BSQSafeString(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
 
-    virtual ~BSQValidatedString() = default;
+    virtual ~BSQSafeString() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQValidatedString* str)
+    inline static size_t hash(const BSQSafeString* str)
     {
         return HASH_COMBINE((size_t)str->nominalType, std::hash<std::u32string>{}(str->sdata));
     }
 
-    inline static bool keyEqual(const BSQValidatedString* l, const BSQValidatedString* r)
+    inline static bool keyEqual(const BSQSafeString* l, const BSQSafeString* r)
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
     }
 
-    inline static bool keyLess(const BSQValidatedString* l, const BSQValidatedString* r)
+    inline static bool keyLess(const BSQSafeString* l, const BSQSafeString* r)
     {
         return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
     }
 };
-struct HashFunctor_BSQValidatedString
+struct HashFunctor_BSQSafeString
 {
-    size_t operator()(const BSQValidatedString* s) const { return BSQValidatedString::hash(s); }
+    size_t operator()(const BSQSafeString* s) const { return BSQSafeString::hash(s); }
 };
-struct EqualFunctor_BSQValidatedString
+struct EqualFunctor_BSQSafeString
 {
-    bool operator()(const BSQValidatedString* l, const BSQValidatedString* r) const { return BSQValidatedString::keyEqual(l, r); }
+    bool operator()(const BSQSafeString* l, const BSQSafeString* r) const { return BSQSafeString::keyEqual(l, r); }
 };
-struct LessFunctor_BSQValidatedString
+struct LessFunctor_BSQSafeString
 {
-    bool operator()(const BSQValidatedString* l, const BSQValidatedString* r) const { return BSQValidatedString::keyLess(l, r); }
+    bool operator()(const BSQSafeString* l, const BSQSafeString* r) const { return BSQSafeString::keyLess(l, r); }
 };
-struct DisplayFunctor_BSQValidatedString
+struct DisplayFunctor_BSQSafeString
 {
-    std::u32string operator()(const BSQValidatedString* s) const 
+    std::u32string operator()(const BSQSafeString* s) const 
     { 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
         return conv.from_bytes(nominaltypenames[(uint32_t)s->nominalType]) + std::u32string(U"'") + s->sdata + std::u32string(U"'"); 

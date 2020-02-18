@@ -159,9 +159,9 @@ size_t bsqKeyValueHash(KeyValue v)
         {
             return BSQString::hash(dynamic_cast<BSQString*>(ptr));
         }
-         else if(dynamic_cast<BSQValidatedString*>(ptr) != nullptr)
+         else if(dynamic_cast<BSQSafeString*>(ptr) != nullptr)
         {
-            return BSQValidatedString::hash(dynamic_cast<BSQValidatedString*>(ptr));
+            return BSQSafeString::hash(dynamic_cast<BSQSafeString*>(ptr));
         }
         else if(dynamic_cast<BSQStringOf*>(ptr) != nullptr)
         {
@@ -242,9 +242,9 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         {
             return BSQString::keyEqual(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
         }
-        else if(dynamic_cast<BSQValidatedString*>(ptr1) != nullptr && dynamic_cast<BSQValidatedString*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQSafeString*>(ptr1) != nullptr && dynamic_cast<BSQSafeString*>(ptr2) != nullptr)
         {
-            return BSQValidatedString::keyEqual(dynamic_cast<BSQValidatedString*>(ptr1), dynamic_cast<BSQValidatedString*>(ptr2));
+            return BSQSafeString::keyEqual(dynamic_cast<BSQSafeString*>(ptr1), dynamic_cast<BSQSafeString*>(ptr2));
         }
         else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
         {
@@ -321,9 +321,9 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         {
             return BSQString::keyLess(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
         }
-        else if(dynamic_cast<BSQValidatedString*>(ptr1) != nullptr && dynamic_cast<BSQValidatedString*>(ptr2) != nullptr)
+        else if(dynamic_cast<BSQSafeString*>(ptr1) != nullptr && dynamic_cast<BSQSafeString*>(ptr2) != nullptr)
         {
-            return BSQValidatedString::keyLess(dynamic_cast<BSQValidatedString*>(ptr1), dynamic_cast<BSQValidatedString*>(ptr2));
+            return BSQSafeString::keyLess(dynamic_cast<BSQSafeString*>(ptr1), dynamic_cast<BSQSafeString*>(ptr2));
         }
         else if(dynamic_cast<BSQStringOf*>(ptr1) != nullptr && dynamic_cast<BSQStringOf*>(ptr2) != nullptr)
         {
@@ -457,9 +457,9 @@ std::u32string diagnostic_format(Value v)
         {
             return DisplayFunctor_BSQString{}(dynamic_cast<const BSQString*>(vv));
         }
-        else if(dynamic_cast<const BSQValidatedString*>(vv) != nullptr)
+        else if(dynamic_cast<const BSQSafeString*>(vv) != nullptr)
         {
-            return DisplayFunctor_BSQValidatedString{}(dynamic_cast<const BSQValidatedString*>(vv));
+            return DisplayFunctor_BSQSafeString{}(dynamic_cast<const BSQSafeString*>(vv));
         }
         else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
         {

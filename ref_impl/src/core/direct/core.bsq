@@ -96,9 +96,9 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
 entity String provides KeyType, PODType, APIType, Some {
 }
 
-//<summary>Primitive validated stringof value.</summary>
-entity ValidatedString<T where Validator> provides KeyType, Some, PODType, APIType {
-    method rawString(): String # validatedstring_rawstring
+//<summary>Primitive safe string value.</summary>
+entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
+    method rawString(): String # safestring_rawstring
 }
 
 //<summary>Primitive stringof value.</summary>

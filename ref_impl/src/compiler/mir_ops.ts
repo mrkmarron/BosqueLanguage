@@ -194,7 +194,7 @@ class MIRConstantString extends MIRConstantArgument {
 enum MIROpTag {
     MIRLoadConst = "MIRLoadConst",
     MIRLoadConstRegex = "MIRLoadConstRegex",
-    MIRLoadConstValidatedString = "MIRLoadConstValidatedString",
+    MIRLoadConstSafeString = "MIRLoadConstSafeString",
     MIRLoadConstTypedString = "MIRLoadConstTypedString",
 
     MIRAccessConstantValue = "MIRAccessConstantValue",
@@ -295,8 +295,8 @@ abstract class MIROp {
                 return MIRLoadConst.jparse(jobj);
             case MIROpTag.MIRLoadConstRegex:
                 return MIRLoadConstRegex.jparse(jobj);
-            case MIROpTag.MIRLoadConstValidatedString:
-                return MIRLoadConstValidatedString.jparse(jobj);
+            case MIROpTag.MIRLoadConstSafeString:
+                return MIRLoadConstSafeString.jparse(jobj);
             case MIROpTag.MIRLoadConstTypedString:
                 return MIRLoadConstTypedString.jparse(jobj);
             case MIROpTag.MIRAccessConstantValue:
@@ -483,14 +483,14 @@ class MIRLoadConstRegex extends MIRValueOp {
     }
 }
 
-class MIRLoadConstValidatedString extends MIRValueOp {
+class MIRLoadConstSafeString extends MIRValueOp {
     readonly ivalue: string;
     readonly tkey: MIRNominalTypeKey;
     readonly tskey: MIRResolvedTypeKey;
     readonly vfunckey: MIRInvokeKey | undefined;
 
     constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, vfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadConstValidatedString, sinfo, trgt);
+        super(MIROpTag.MIRLoadConstSafeString, sinfo, trgt);
         this.ivalue = ivalue;
         this.tkey = tkey;
         this.tskey = tskey;
@@ -508,7 +508,7 @@ class MIRLoadConstValidatedString extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConstValidatedString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.vfunckey, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadConstSafeString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.vfunckey, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -2098,7 +2098,7 @@ export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
-    MIRLoadConst, MIRLoadConstRegex, MIRLoadConstValidatedString, MIRLoadConstTypedString,
+    MIRLoadConst, MIRLoadConstRegex, MIRLoadConstSafeString, MIRLoadConstTypedString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
     MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget,
     MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorEphemeralValueList,

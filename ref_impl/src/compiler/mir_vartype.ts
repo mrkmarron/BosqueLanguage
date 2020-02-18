@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey, MIRGetKey, MIRLoadConstRegex, MIRLoadConstValidatedString, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
+import { MIROp, MIROpTag, MIRLoadConst, MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRPhi, MIRBody, MIRResolvedTypeKey, MIRGetKey, MIRLoadConstRegex, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRPackStore, MIRConstructorEphemeralValueList } from "./mir_ops";
 import { MIRType, MIRAssembly, MIRConstantDecl, MIRFieldDecl, MIREphemeralListType } from "./mir_assembly";
 import assert = require("assert");
 import { topologicalOrder } from "./mir_info";
@@ -40,8 +40,8 @@ function extendVariableTypeMapForOp(op: MIROp, vtypes: Map<string, MIRType>, ass
             vtypes.set(lcr.trgt.nameID, assembly.typeMap.get("NSCore::Regex") as MIRType);
             break;
         }
-        case MIROpTag.MIRLoadConstValidatedString: {
-            const lvs = op as MIRLoadConstValidatedString;
+        case MIROpTag.MIRLoadConstSafeString: {
+            const lvs = op as MIRLoadConstSafeString;
             vtypes.set(lvs.trgt.nameID, assembly.typeMap.get(lvs.tskey) as MIRType);
             break;
         }

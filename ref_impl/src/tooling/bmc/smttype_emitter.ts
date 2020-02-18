@@ -210,8 +210,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
             return "String";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/)) {
-            return "bsq_validatedstring";
+        else if (this.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
+            return "bsq_safestring";
         }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "bsq_stringof";
@@ -293,7 +293,7 @@ class SMTTypeEmitter {
                 ctoval = `(bsqkey_string ${exp.emit()})`;
             }
             else if (this.typecheckIsName(from, /^NSCore:<.*>$/)) {
-                ctoval = `(bsq_validatedstring ${exp.emit()})`;
+                ctoval = `(bsq_safestring ${exp.emit()})`;
             }
             else if (this.typecheckIsName(from, /^NSCore::StringOf<.*>$/)) {
                 ctoval = `(bsq_stringof ${exp.emit()})`;
@@ -340,8 +340,8 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(into, /^NSCore::String$/)) {
             return new SMTValue(`(bsqkey_string_value ${exp.emit()})`);
         }
-        else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/)) {
-            return new SMTValue(`(bsqkey_validatedstring_value ${exp.emit()})`);
+        else if (this.typecheckIsName(into, /^NSCore::SafeString<.*>$/)) {
+            return new SMTValue(`(bsqkey_safestring_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
             return new SMTValue(`(bsqkey_stringof_value ${exp.emit()})`);
@@ -412,8 +412,8 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::String$/)) {
                 return new SMTValue(`(bsqkey_string_value ${cfrom})`);
             }
-            else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/)) {
-                return new SMTValue(`(bsq_validatedstring_value ${cfrom})`);
+            else if (this.typecheckIsName(into, /^NSCore::SafeString<.*>$/)) {
+                return new SMTValue(`(bsq_safestring_value ${cfrom})`);
             }
             else if (this.typecheckIsName(into, /^NSCore::StringOf<.*>$/)) {
                 return new SMTValue(`(bsq_stringof_value ${cfrom})`);
@@ -480,7 +480,7 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Bool$/) || this.typecheckIsName(from, /^NSCore::Int$/) || this.typecheckIsName(from, /^NSCore::String$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
         }
-        else if (this.typecheckIsName(from, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
+        else if (this.typecheckIsName(from, /^NSCore::SafeString<.*>$/) || this.typecheckIsName(from, /^NSCore::StringOf<.*>$/) 
             || this.typecheckIsName(from, /^NSCore::GUID$/) || this.typecheckIsName(from, /^NSCore::LogicalTime$/)
             || this.typecheckIsName(from, /^NSCore::DataHash$/) || this.typecheckIsName(from, /^NSCore::CryptoHash$/)) {
             return this.coerceFromAtomicKey(exp, from, into);
@@ -517,7 +517,7 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(into, /^NSCore::Bool$/) || this.typecheckIsName(into, /^NSCore::Int$/) || this.typecheckIsName(into, /^NSCore::String$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
             }
-            else if (this.typecheckIsName(into, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
+            else if (this.typecheckIsName(into, /^NSCore::SafeString<.*>$/) || this.typecheckIsName(into, /^NSCore::StringOf<.*>$/) 
                 || this.typecheckIsName(into, /^NSCore::GUID$/) || this.typecheckIsName(into, /^NSCore::LogicalTime$/)
                 || this.typecheckIsName(into, /^NSCore::DataHash$/) || this.typecheckIsName(into, /^NSCore::CryptoHash$/)) {
                 return this.coerceIntoAtomicKey(exp, into);
@@ -607,7 +607,7 @@ class SMTTypeEmitter {
         if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/) || this.typecheckIsName(tt, /^NSCore::Int$/) || this.typecheckIsName(tt, /^NSCore::String$/)) {
             return true;
         }
-        else if (this.typecheckIsName(tt, /^NSCore::ValidatedString<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::SafeString<.*>$/) || this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return true;
         }
         else if (this.typecheckIsName(tt, /^NSCore::GUID$/) || this.typecheckIsName(tt, /^NSCore::LogicalTime$/) || this.typecheckIsName(tt, /^NSCore::DataHash$/) || this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
