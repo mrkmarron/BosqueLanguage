@@ -232,7 +232,7 @@ concept Result<T, E> provides Some {
         return Ok<T, E>::create(result);
     }
 
-    static err(info?: Any): Result<T, E> {
+    static err(info: E): Result<T, E> {
         return Err<T, E>::create(info);
     }
 

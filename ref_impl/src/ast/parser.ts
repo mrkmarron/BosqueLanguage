@@ -2210,6 +2210,7 @@ class Parser {
             const exp = this.parseExpression();
             let err = new LiteralNoneExpression(sinfo);
             if (this.testAndConsumeTokenIf("or")) {
+                this.ensureAndConsumeToken("return");
                 err = this.parseExpression();
             }
 
@@ -2535,7 +2536,7 @@ class Parser {
         try {
             this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames)));
             while (this.testToken("requires") || this.testToken("validate")) {
-                const isvalidate = this.testAndConsumeTokenIf("validate");
+                const isvalidate = this.testToken("validate");
                 this.consumeToken();
                 
                 let level: BuildLevel = isvalidate ? "release" : "debug";
@@ -2549,6 +2550,7 @@ class Parser {
                 if (isvalidate) {
                     err = new LiteralNoneExpression(sinfo);
                     if (this.testAndConsumeTokenIf("or")) {
+                        this.ensureAndConsumeToken("reutrn");
                         err = this.parseExpression();
                     }
                 }

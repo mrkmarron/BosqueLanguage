@@ -208,9 +208,11 @@ function createAnimalPreSafe(catchPhrase: String): Animal
     return Animal@{says=catchPhrase};
 }
 
-entrypoint function getSays(animal: String, catchPhrase: String): Result<String, Any>
-    validate animal != "";
-    validate catchPhrase != "";
+typedef ErrData = {msg: String, data?: Any};
+
+entrypoint function getSays(animal: String, catchPhrase: String): Result<String, ErrData>
+    validate animal != "" or return  Result<String, ErrData>::err({ msg="Invalid animal" });
+    validate catchPhrase != "" or return Result<String, ErrData>::err({ msg="Invalid catchPhrase" });
 {
     return String::concat("The ", animal, " says ", createAnimal::(catchPhrase).says);
 }
@@ -220,14 +222,15 @@ createAnimal("")          //fails invariant in debug
 createAnimalPre("")       //fails precondition in debug *but not* release
 createAnimalPreSafe("")   //fails precondition in all build flavors
 
-getSays("dog", "woof") //Ok<String, String>{value="The dog says woof"}
-getSays("", "woof") //Err<String, String>{error=???}
-getSays("dog", "") //Err<String, String>{error=???}
+getSays("dog", "woof") //Ok<String, Any>@{value="The dog says woof"}
+getSays("", "woof") //Err<String, Any>@{error={ msg="Invalid animal" }}
+getSays("dog", "") //Err<String, Any>@{error={ msg="Invalid catchPhrase" }
 ```
 ## Tooling
 
 **Symbolic Testing**
 
+Bosque introduces a ...
 SymTest is a powerful command line tool for symbolically testing Bosque source code. Details on this symbolic checker can be found in the [readme](./ref_impl/src/runtimes/symtest/README.md).
 
 A sample application for a `division` command line calculator would be to create a file called `division.bsq` with the contents:
