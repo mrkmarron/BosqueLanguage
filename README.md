@@ -28,7 +28,9 @@ function add2(x: Int, y: Int): Int {
     return x + y;
 }
 
-add2(2, 3) //5
+add2(2, 3)     //5
+add2(x=2, y=3) //5
+add2(y=2, 5)   //7
 ```
 
 **All odd check using rest parameters and lambda:**
@@ -62,22 +64,166 @@ sign(-5)   //-1
 sign()     //0
 ```
 
-**Typed and Validated Strings**
+**Nominal Types Data Invariants:**
+[TESTS NEEDED]
+```
+concept WithName {
+    invariant $name != "";
 
-type Digits4 = /\d\d\d\d/;
+    field name: String;
+}
 
-**Structural, and Union Types**
+concept Greeting {
+    abstract method sayHello(): String;
 
-[TODO]
+    virtual method sayGoodbye(): String {
+        return "goodbye";
+    }
+}
 
-**Nominal Types Data Invariants**
+entity genericGreeting provides Hello {
+    const instance: genericGreeting = genericGreeting@{};
 
-[TODO]
+    override method sayHello: String {
+        return "hello world";
+    }
+}
+
+entity namedGreeting provides WithName, Hello {
+    override method sayHello: String {
+        return String::concat("hello", " ", this.name);
+    }
+}
+
+genericGreeting@{}->sayHello()        //"hello world"
+genericGreeting::instance->sayHello() //"hello world"
+
+namedGreeting@{}->sayHello()           //type error no value provided for "name" field
+namedGreeting@{name=""}->sayHello()    //invariant error
+namedGreeting@{name="bob"}->sayHello() //"hello bob"
+```
+
+**Validated and Typed Strings:**
+[TESTS NEEDED]
+```
+typedef Letters4 = /\w\w\w\w/;
+typedef Digits4 = /\d\d\d\d/;
+
+function fss(s1: SafeString<Digits4>): Bool {
+    return s1->rawString() == "1234";
+}
+
+Digits4::accepts("abcd") //false
+Digits4::accepts("1234") //true
+
+fss("1234")                           //type error String is not a SafeString
+fss(SafeString<Letters4>::as("abcd")) //type error incompatible SafeString types
+fss(Digits4'abcd')                    //type error 'abcd' is incompatible with Digits4 
+fss(SafeString<Digits4>::as("abcd"))  //runtime error 'abcd' is incompatible with Digits4
+
+fss(SafeString<Digits4>::as("1234"))  //true
+```
+
+```
+entity ErrorCode provides Parsable {
+    field code: Int;
+    field name: String;
+
+    override static tryParse(err: String): Result<Any, String> {
+        return switch(err) {
+            case "IO"     => Result<Any, String>::ok(ErrorCode@{code=1, name=err})
+            case "Assert" => Result<Any, String>::ok(ErrorCode@{code=2, name=err})
+            case _        => Result<Any, String>::err("Unknown error")
+        }
+    }
+}
+
+function isIOErr(s: StringOf<ErrorCode>): ErrorCode {
+    return s == ErrorCode'IO';
+}
+
+isIOErr("IO")                             //type error not a StringOf<ErrorCode>
+isIOErr(ErrorCode'Input')                 //type error not a valid ErrorCode string
+isIOErr(StringOf<ErrorCode>::as('Input')) //runtime error not a valid ErrorCode string
+
+isIOErr(ErrorCode'Assert')             //false
+isIOErr(StringOf<ErrorCode>::as('IO')) //true
+
+var ec: ErrorCode = StringOf<ErrorCode>@'IO';
+assert(ec.code == 1); //true
+```
+
+**Structural, Nominal, and Union Types**
+[TESTS NEEDED]
+```
+entity Person {
+    field name: String; 
+}
+
+function foo(arg?: {f: Int, n?: String} | String | Person): String {
+    if(arg->is<Tuple>()) {
+        return arg.n ?| "Blank";
+    }
+    else {
+        return switch(arg) {
+            type None => "N/A"
+            type String => arg
+            type Person => arg.name
+        }
+    }
+}
+
+foo()                    //"N/A"
+foo("Bob")               //Bob
+foo(Person@{name="Bob"}) //Bob
+foo({f=5})               //"Blank"
+foo({f=1, n="Bob"})      //"Bob"
+
+Foo({g=1, n="Bob"}) //Missing f property
+foo(none) //Error
+```
 
 **Pre/Post Conditions**
+```
+entity Animal {
+    invariant $says != "";
 
-[TODO]
+    field says: String;
+}
 
+function createAnimal(catchPhrase: String): Animal
+{
+    return Animal@{says=catchPhrase};
+}
+
+function createAnimal(catchPhrase: String): Animal
+    requires catchPhrase != "";
+{
+    return Animal@{says=catchPhrase};
+}
+
+function createAnimalPreSafe(catchPhrase: String): Animal
+    requires#release catchPhrase != "";
+{
+    return Animal@{says=catchPhrase};
+}
+
+entrypoint function getSays(animal: String, catchPhrase: String): Result<String, Any>
+    validate animal != "";
+    validate catchPhrase != "";
+{
+    return String::concat("The ", animal, " says ", createAnimal::(catchPhrase).says);
+}
+
+createAnimal("woof woof") //ok always
+createAnimal("")          //fails invariant in debug
+createAnimalPre("")       //fails precondition in debug *but not* release
+createAnimalPreSafe("")   //fails precondition in all build flavors
+
+getSays("dog", "woof") //Ok<String, String>{value="The dog says woof"}
+getSays("", "woof") //Err<String, String>{error=???}
+getSays("dog", "") //Err<String, String>{error=???}
+```
 ## Tooling
 
 **Symbolic Testing**

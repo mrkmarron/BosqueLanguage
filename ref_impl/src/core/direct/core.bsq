@@ -99,17 +99,23 @@ entity String provides KeyType, PODType, APIType, Some {
 //<summary>Primitive safe string value.</summary>
 entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
     method rawString(): String # safestring_rawstring
+
+    static as(str: String): SafeString<T> # safestring_as
+    static tryAs(str: String): SafeString<T>? # safestring_tryas
+
+    method convert<U where Validator>(): SafeString<U> # stringof_convert
+    method tryConvert<U where Validator>(): SafeString<U>? # stringof_tryconvert
 }
 
 //<summary>Primitive stringof value.</summary>
 entity StringOf<T where Parsable> provides APIValue, KeyType, Some {
     method rawString(): String # stringof_rawstring
 
-    static asStringOf<T>(str: String): StringOf<T> # stringof_asstring
-    static tryAsString<T>(str: String): StringOf<T>? # stringof_tryasstring
+    static as(str: String): StringOf<T> # stringof_as
+    static tryAs(str: String): StringOf<T>? # stringof_tryas
 
-    method convert<U where Parsable | Validator>(): StringOf<U> # stringof_convert
-    method tryConvert<U where Parsable | Validator>(): StringOf<U>? # stringof_tryconvert
+    method convert<U where Parsable>(): StringOf<U> # stringof_convert
+    method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert
 }
 
 enum BufferFormat {
