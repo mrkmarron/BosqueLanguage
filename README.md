@@ -222,31 +222,57 @@ createAnimal("")          //fails invariant in debug
 createAnimalPre("")       //fails precondition in debug *but not* release
 createAnimalPreSafe("")   //fails precondition in all build flavors
 
-getSays("dog", "woof") //Ok<String, Any>@{value="The dog says woof"}
-getSays("", "woof") //Err<String, Any>@{error={ msg="Invalid animal" }}
-getSays("dog", "") //Err<String, Any>@{error={ msg="Invalid catchPhrase" }
+getSays("dog", "woof") //Ok<String, ErrData>@{value="The dog says woof"}
+getSays("", "woof") //Err<String, ErrData>@{error={ msg="Invalid animal" }}
+getSays("dog", "") //Err<String, ErrData>@{error={ msg="Invalid catchPhrase" }}
 ```
+
+**API Types**
+
+[TODO]
+
 ## Tooling
 
 **Symbolic Testing**
 
-Bosque introduces a ...
-SymTest is a powerful command line tool for symbolically testing Bosque source code. Details on this symbolic checker can be found in the [readme](./ref_impl/src/runtimes/symtest/README.md).
+Bosque provides a powerful new way to test your applications. Unit-testing is a great way to ensure that code works as expected and to prevent accidental changes to behavior when adding new features or fixing bugs. However, writing and maintaining large numbers of tests can be a tedious and time consuming task. To help with this Bosque provides a *symbolic testing* harness that augments unit-testing and provides high coverage for bugs that result in runtime failures -- arising either as builtin language errors or from failed user provided pre/post/invariant/assert conditions.
 
-A sample application for a `division` command line calculator would be to create a file called `division.bsq` with the contents:
+[TESTS NEEDED]
+
+The **symtest** tool implements the symbolic testing algorithm and works as follows. Given the application shown below:
 ```
 namespace NSMain;
 
-entrypoint function main(x: Int, y: Int): Int 
-    //requires y != 0;
+global _ops: List<String> = List<String>@{
+    "negate",
+    "add",
+    "sub"
+};
+
+entrypoint function processOp(op: string, arg1: Int, arg2: Int?): Int 
+    requires#release _ops.has(op);
+    //requires#release (op == "add" || op == "sub") ==> arg2 != none;
 {
-    return x / y;
+    if(op == "negate") {
+        return -arg1;
+    }
+    else {
+        assert(arg2 != none);
+
+        if(op == "add") {
+            return arg1 + arg2;
+        }
+        else {
+            return arg1 - arg2;
+        }
+    }
 }
+
 ```
 
-Then run the following command to check for errors:
+Assuming this code is in a file called `process_op.bsq` then we can run the following command to check for errors:
 ```
-> node bin\runtimes\symtest\symtest.js division.bsq
+> node bin\runtimes\symtest\symtest.js process_op.bsq
 ```
 Which will report that an error is possible.
 
@@ -254,13 +280,23 @@ Re-running the symbolic tested with model generation on as follows:
 ```
 > node bin\runtimes\symtest\symtest.js -m division.bsq
 ```
-Will report that an error is possible when `x == 0` and `y == 0`.
+Will report that an error is possible when `op == "negate"` and `arg2 == none`. Note that the tester was aware of the precondition `requires _ops.has(op)` and so did not generate any *spurious* failing test inputs (such as `op=""`).
 
-By un-commenting the requires line the tester will assume that the required condition is always satisfied and re-running the tester will now report that the code has been verified up to the bound.
+Un-commenting the second requires line tells the tester that this, and similar errors are excluded by the API definition, and re-running the tester will now report that the code has been verified up to the bound.
+
+Note: we recommend specifying preconditions as always checked, `requires#release`, on entrypoint functions to ensure that these externally exposed API endpdoints are not misused.
+
+More details on this symbolic checker can be found in the [readme](./ref_impl/src/runtimes/symtest/README.md).
 
 **Ahead-of-Time Compilation**
 
-Bosque supports the generation of standalone command-line executables via the `ExeGen` tool. Details on this tool can be found in the [readme](./ref_impl/src/runtimes/exegen/README.md).
+To provide the best performance Bosque supports the generation of standalone command-line executables via the `ExeGen` tool. This tool, and the design of the Bosque runtime, are designed to provide:
+
+1. Fast cold start response time by precompiling startup logic directly into constant values whenever possible and minimizing the number of operations required to start handling user input.
+2. Stable execution behavior over time and possible inputs. 
+    - The GC is a novel reference counting with eager free implementation to minimize memory footprint and prevent any indeterminate GC jitter. 
+    - The runtime itself uses sorted container implementations for Sets/Maps so that the variance between average and worst case costs of operations is minimized and to protect against pathological behaviors (like extreme hash-code collisions).
+3. Safe recursion is available with the [TODO] flag. This compiles recursive functions into a CPS form that uses constant stack space, eliminating any possible Out-of-Stack issues, and allows us to preserve the full call-stack in all debug builds. 
 
 A simple example use is to create a file called "max.bsq" with the following code:
 ```
@@ -281,6 +317,8 @@ Running this executable:
 > max.exe 1 5
 ```
 Will output `5`.
+
+More details on the `exeGen` tool can be found in the [readme](./ref_impl/src/runtimes/exegen/README.md).
 
 ## Using the Bosque Language
 
