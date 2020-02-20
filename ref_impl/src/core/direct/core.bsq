@@ -77,11 +77,17 @@ entity None provides Truthy, PODType, APIType {
 //<summary>Primitive boolean value.</summary>
 entity Bool provides Some, Truthy, PODType, APIType {
     override static tryParse(str: String): Result<Any, String> # bool_tryparse
+
+    static stringify(b: Bool): String # bool_tostring
+    static parse(str: String): Bool # bool_parse
 }
 
 //<summary>Primitive integer value.</summary>
 entity Int provides KeyType, Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<Any, String> # int_tryparse
+
+    static stringify(i: Int): String # int_tostring
+    static parse(str: String): Int # int_parse
 
     static max(v1: Int, v2: Int): Int {
         return v1 > v2 ? v1 : v2;
@@ -94,11 +100,21 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
 
 //<summary>Primitive string value.</summary>
 entity String provides KeyType, PODType, APIType, Some {
+    method length(): Int # string_count
+
+    static concat(...args: List<String>): String # string_concat
+    static join(...args: List<String>, sep?: String): String # string_join
+
+    method substring(start?: Int, end?: Int): String # string_substring
+
+    method includes(str: String): Bool # string_includes
+    method startsWith(str: String): Bool # string_startswith
+    method endsWith(str: String): Bool # string_endswith
 }
 
 //<summary>Primitive safe string value.</summary>
 entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
-    method rawString(): String # safestring_rawstring
+    method string(): String # safestring_string
 
     static as(str: String): SafeString<T> # safestring_as
     static tryAs(str: String): SafeString<T>? # safestring_tryas
@@ -109,7 +125,7 @@ entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
 
 //<summary>Primitive stringof value.</summary>
 entity StringOf<T where Parsable> provides APIValue, KeyType, Some {
-    method rawString(): String # stringof_rawstring
+    method string(): String # stringof_string
 
     static as(str: String): StringOf<T> # stringof_as
     static tryAs(str: String): StringOf<T>? # stringof_tryas

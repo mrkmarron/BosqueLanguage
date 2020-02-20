@@ -15,7 +15,7 @@ For a look at how the language works and flows _in the large_ please see the cod
 
 * [Language Docs](docs/language/overview.md)
 * [Library Docs](docs/libraries/overview.md)
-* Tutorials - _Coming Soon!_
+* Tutorials - _Coming Eventually!_
 * [Technical Papers](docs/papers/publist.md)
 * [Contribution guidelines](CONTRIBUTING.md)
 
@@ -110,7 +110,7 @@ typedef Letters4 = /\w\w\w\w/;
 typedef Digits4 = /\d\d\d\d/;
 
 function fss(s1: SafeString<Digits4>): Bool {
-    return s1->rawString() == "1234";
+    return s1->string() == "1234";
 }
 
 Digits4::accepts("abcd") //false
@@ -210,7 +210,7 @@ function createAnimalPreSafe(catchPhrase: String): Animal
 
 typedef ErrData = {msg: String, data?: Any};
 
-entrypoint function getSays(animal: String, catchPhrase: String): Result<String, ErrData>
+entrypoint function getSays(animal: String, catchPhrase: String): Result<String, ErrData?>
     validate animal != "" or return  Result<String, ErrData>::err({ msg="Invalid animal" });
     validate catchPhrase != "" or return Result<String, ErrData>::err({ msg="Invalid catchPhrase" });
 {
