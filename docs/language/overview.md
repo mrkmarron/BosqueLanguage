@@ -297,7 +297,26 @@ This complexity further manifests itself in the need to consider the possible al
 In light of these issues the Bosque language does not allow user visible _reference equality_ in any operation including `==` or container operations. Instead equality is defined either by the core language for the primitives `Bool`, `Int`, `String`, `GUID`, etc., or as a user defined _composite key_ `identifier` type ([5.21 Equality Comparison](#5.21-Equality-Comparison)). 
 
 ```
-xxxx
+identifier UserId = Int;
+composite identifier OwnedResourceId = {owner: UserId, name: String};
+guid identifier GlobalResourceId;
+
+entity Resource {
+    field id: OwnedResourceId | GlobalResourceId;
+    field data: String;
+}
+
+function checkAccessForUser(user: UserId, ...resources: List<Resource>): Bool {
+    return resources->all(fn(r) => 
+        switch(r.id) {
+            type DurableOrchestrationContext => true
+            type OwnedResourceId => r.id.owner = user
+        }
+    );
+}
+
+checkAccessForUser(UserId.create(5), {owner: UserId.create(5), "file1"}) //true
+checkAccessForUser(UserId.create(5), {owner: UserId.create(5), "file1"}, {owner: UserId.create(2), "file2"}) //false
 ```
 
 The composite key type allows a developer to create a distinct type to represent a composite equality comparable value that provides the notion of equality e.g. identity, primary key, equivalence, etc. that makes sense for their domain. The language also allows types to define a key field that will be used for equality/order by the associative containers in the language ([3 Collections](#3-Collections)).
@@ -317,9 +336,9 @@ entity Foo {
         ensures $return > 0; //postcondition
     {
         check this.x - y > 0;   //sanity check - enabled on optimized builds
-        assert Math::mult(this.x, y) != 0; //diagnostic assert - only for test/debug
+        assert this.x + y != y; //diagnostic assert - only for test/debug
 
-        return Math::mult(x, y);
+        return this.x - y + 1;
     }
 }
 ```
