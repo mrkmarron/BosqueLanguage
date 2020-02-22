@@ -2832,11 +2832,11 @@ class TypeChecker {
         let terminalexps: TypeEnvironment[] = [];
 
         if (exp.cond !== undefined || exp.result !== undefined) {
-            evalue = evalue.map((ev) => ev.pushLocalScope().addVar("_value_", true, ev.getExpressionResult().etype, true, ev.getExpressionResult().etype));
+            evalue = evalue.map((ev) => ev.pushLocalScope().addVar("$value", true, ev.getExpressionResult().etype, true, ev.getExpressionResult().etype));
             if (this.m_emitEnabled) {
                 const vtype = TypeEnvironment.join(this.m_assembly, ...evalue).getExpressionResult().etype;
-                this.m_emitter.bodyEmitter.localLifetimeStart(exp.sinfo, "_value_", this.m_emitter.registerResolvedTypeReference(vtype).trkey);
-                this.m_emitter.bodyEmitter.emitVarStore(exp.sinfo, trgt, "_value_");
+                this.m_emitter.bodyEmitter.localLifetimeStart(exp.sinfo, "$value", this.m_emitter.registerResolvedTypeReference(vtype).trkey);
+                this.m_emitter.bodyEmitter.emitVarStore(exp.sinfo, trgt, "$value");
             }
         }
 
@@ -2908,8 +2908,8 @@ class TypeChecker {
             const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, tvalue);
             //this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || falseflow.length === 0, "Expression is always true/false expression test is redundant");
 
-            normaltype = (TypeEnvironment.join(this.m_assembly, ...evalue).getLocalVarInfo("_value_") as VarInfo).flowType;
-            terminaltype = (TypeEnvironment.join(this.m_assembly, ...evalue).getLocalVarInfo("_value_") as VarInfo).flowType;
+            normaltype = (TypeEnvironment.join(this.m_assembly, ...evalue).getLocalVarInfo("$value") as VarInfo).flowType;
+            terminaltype = (TypeEnvironment.join(this.m_assembly, ...evalue).getLocalVarInfo("$value") as VarInfo).flowType;
 
             if (this.m_emitEnabled) {
                 this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, scblck, regularblck);
@@ -2929,7 +2929,7 @@ class TypeChecker {
 
         if (exp.cond !== undefined || exp.result !== undefined) {
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.localLifetimeEnd(exp.sinfo, "_value_");
+                this.m_emitter.bodyEmitter.localLifetimeEnd(exp.sinfo, "$value");
             }
         }
 

@@ -25,7 +25,7 @@ The Bosque language derives from a combination of [TypeScript](https://www.types
   - [1.2 Structural Types](#1.2-Structural-Types)
   - [1.3 Parameter Code Block Types](#1.3-Parameter-Code-Block-Types)
   - [1.4 Combination Types](#1.4-Combination-Types)
-  - [1.5 Generics](#1.5-Generics)
+  - [1.5 Value Packs](#1.5-Value-Packs)
 - [2 Core Types](#2-Core-Types)
 - [3 Collections](#3-Collections)
 - [4 Type Checking](#4-Type-Checking)
@@ -42,20 +42,19 @@ The Bosque language derives from a combination of [TypeScript](https://www.types
   - [5.10 Record Typed Access Operators](#5.10-Record-Typed-Access-Operators)
   - [5.11 Nominal Typed Access Operators](#5.11-Nominal-Typed-Access-Operators)
   - [5.12 Typed Projection](#5.12-Typed-Projection)
-  - [5.13 Difference](#5.13-Difference)
-  - [5.14 Update](#5.14-Update)
-  - [5.15 Merge](#5.15-Merge)
-  - [5.16 PCode Apply](#5.16-PCode-Apply)
-  - [5.17 Invoke](#5.17-Invoke)
-  - [5.18 Unary Operators](#5.19-Unary-Operators)
-  - [5.19 Binary Operators](#5.20-Binary-Operators)
-  - [5.20 Equality Comparison](#5.21-Equality-Comparison)
-  - [5.21 Order Comparison](#5.22-Order-Comparison)
-  - [5.22 Logic Operators](#5.23-Logic-Operators)
-  - [5.23 None Coalescing](#5.24-None-Coalescing)
-  - [5.24 Select](#5.25-Select)
-  - [5.25 Statement Expressions](#5.26-Statement-Expressions)
-  - [5.26 Synthesis Blocks](#5.28-Synthesis-Blocks)
+  - [5.13 Update](#5.13-Update)
+  - [5.14 Merge](#5.14-Merge)
+  - [5.15 PCode Apply](#5.15-PCode-Apply)
+  - [5.16 Invoke](#5.16-Invoke)
+  - [5.17 Unary Operators](#5.17-Unary-Operators)
+  - [5.18 Binary Operators](#5.18-Binary-Operators)
+  - [5.19 Equality Comparison](#5.19-Equality-Comparison)
+  - [5.20 Order Comparison](#5.20-Order-Comparison)
+  - [5.21 Logic Operators](#5.21-Logic-Operators)
+  - [5.22 None Coalescing](#5.22-None-Coalescing)
+  - [5.23 Select](#5.23-Select)
+  - [5.24 Statement Expressions](#5.24-Statement-Expressions)
+  - [5.25 Synthesis Blocks](#5.25-Synthesis-Blocks)
 - [6 Statements](#6-Statements)
   - [6.1 Empty](#6.1-Empty)
   - [6.2 Variable Declaration](#6.2-Variable-Declaration)
@@ -66,6 +65,7 @@ The Bosque language derives from a combination of [TypeScript](https://www.types
   - [6.7 If-Then-Else](#6.7-If-Then-Else)
   - [6.8 Switch](#6.8-Switch)
   - [6.9 Block](#6.9-Block)
+  - [6.9 Statement Calls](#6.9-Statement-Calls)
 - [7 Invokable Declarations](#7-Invokable-Declarations)
 - [8 Concept and Entity Declarations](#8-Concept-and-Entity-Declarations)
 - [9 Namespace Declarations](#9-Namespace-Declarations)
@@ -329,11 +329,12 @@ A central goal of the Bosque language is to simplify the process of building hig
 entity Foo {
     field x: Int;
 
-    invariant x > 0; //check whenever a Foo is constructed
+    invariant $x > 0; //check whenever a Foo is constructed
 
     method m(y: Int): Int
-        requires y >= 0; //precondition
-        ensures $return > 0; //postcondition
+        requires y >= 0;               //precondition -- only enabled in debug
+        requires # release this.x > 1; //precondition enabled in release as well as debug
+        ensures $return > 0;           //postcondition
     {
         check this.x - y > 0;   //sanity check - enabled on optimized builds
         assert this.x + y != y; //diagnostic assert - only for test/debug
@@ -342,6 +343,8 @@ entity Foo {
     }
 }
 ```
+
+The special references `$x` in the invariant and `$return` in the ensures check are instances of *implicit binder* variables in Bosque. These variables serve a number of useful roles. In the case of `$return` the variable provides a way to refer to the implicit return value. Similarly for any input reference parameter `p`, which may be rebound in the body, the variable `$p` can be used to refer to the original value. In the case of the invariant the variable `$x` refers to the value of the field `x` in the about to be created object, i.e., we check the invariants on the fields *before* construction. This choice ensures that at no point in time (or code) an object will be visible/accessible that violates its invariants.
 
 ## <a name="0.13-Atomic-Constructors-and-Factories"></a>0.13 Atomic Constructors and Factories
 
@@ -385,7 +388,22 @@ With this design the need to pass data up through super calls is eliminated as t
 
 ## <a name="0.15-API-Types"></a>0.15 API Types
 
-**[TODO]**
+API types are designed to support the definition of high-quality external interfaces into Bosque applications. Good types for APIs are easy to understand without looking at the source code of an application, can easily be validated for changes to an applications semantic version, and also are precise descriptions of what the value of the argument should be. Thus API types include:
+
+* Primitive values including `None`, `Int`, `String`, etc.
+* Simple exportable types like `enums` or `identifier` types
+* Validated string types -- `SafeString<T>`
+* Self describing `tuple` and `record` types -- which are built from other API types
+* Containers of API types -- `List`, `Set`, and `Map`
+* Exported formats -- `StringOf` and `Buffer` (although these cannot be nested in other API types)
+
+Using these types it is possible to define a high quality interface that is:
+
+1. Easy to use and highly self documenting
+2. Can have all marshalling + validation code auto-generated
+3. Can be checked for common semantic version changes
+4. Can be effectively fuzzed using structure aware fuzzers
+5. Can be effectively checked using symbolic analysis techniques
 
 # <a name="1-Type-System"></a>1 Type System
 
@@ -438,25 +456,91 @@ List<Int> <: Collection<Int> //true - List<Int> provides Collection<Int>
 
 ### <a name="1.1.2-Typed-Strings"></a>1.1.2 Typed Strings
 
-Typed strings provide a novel mechanism for lifting known structure about the contents of a string into the type in a way that is meaningful to humans and that can be used by the type checker. If a type `Ty` is declared to `provide` the `Parsable` concept, which has the static method `tryParse(str: String): Ty | None` then it is possible to declare a string value type as `String<Ty>` which indicates that the call `Ty::tryParse` returns `Ty` (not `None`).
+Typed strings provide a novel mechanism for lifting known structure about the contents of a string into the type in a way that is meaningful to humans and that can be used by the type checker. Just as with other parametric types they are univariate on the template term but both `SafeString` and `StringOf` provide efficient (when possible) coercion methods.
 
-This ties the type of the string to the entity and then, by extension, into the larger type system. If we have the type relation `Ty <: Ty2` then the type checker will allow `String<Ty> <: String<Ty2>` and of course `String<Ty> <: String`.
+Bosque provides two flavors of typed strings, `SafeString<T>` and `StringOf<T>`, to address various scenarios where including meta-data about the string in the type is useful. 
 
-This allows for code such as the following:
-
-```none
-function foo(zip: String<Zipcode>, name: String) {...}
-
-var zc: String<Zipcode> = Zipcode#'98052';
-var user: String = "Mark";
-
-var zcbad: String<Zipcode> = "9"; //error not a typed string on right side
-var zcbad: String<Zipcode> = "98052"; //error still not a typed string on right side
-var zcbad: String<Zipcode> = Zipcode#'9'; //error bad format in typed string literal
-
-foo(user, zc) //Type error String not convertible to String<Zipcode>
-foo(zc, user) //ok
+The `SafeString<T>` type is parameterized with a `Validator` regular expression type which describes the language that the string belongs to. This supports concise representation of many common string structures seen in a program, particularly at API call parameters, in a way that does not require exposing details of the program. 
 ```
+typedef SizeFormat = /(\d)+(em|px)/; //declare Validator type the size formats
+
+entrypoint function convertToPX(size: SafeString<SizeFormat>): Int {
+    var dvalstr = /?<digits>\d+/.match(size->string()).digits;
+    var dval = Int::parse(dvalstr);
+    
+    if(size->string()->endsWith("px")) {
+        return dval;
+    }
+    else {
+        return convertEMToPX(dval);
+    }
+}
+
+function convertEMToPX(emsize: Int): Int {
+    //conversion code here
+    ...
+}
+```
+
+The `StringOf<T>` type is much richer at the cost of using customized logic and exposing internal information from the codebase. It is parameterized by any type implementing the `Parsable` concept. The contents of the string are then restricted to the language of strings accepted by the static `T::tryParse` method -- which may be arbitrarily complex code. This makes them ideal for working with data that comes in a custom format or simply for light validation and then to *tag* strings with a type to avoid confusion in code or APIs with multiple string valued parameters.
+```
+//Represent an EMail address + specify parsing of format
+entity EMailAddress provides Parsable {
+    field local: String;
+    field domain: String;
+
+    hidden static parseLocal(str: String): Result<String, String> {
+        //Complex regex parsing here
+        ...
+    }
+
+    hidden static parseDomain(str: String): Result<String, String> {
+        //Complex regex parsing here
+        ...
+    }
+
+    override static tryParse(str: String): Result<Any, String> {
+        var localResult = EMailAddress::parseLocal(str);
+        var domainResult = EMailAddress::parseDomain(str);
+
+        if(localResult.isErr() || domainResult.isErr()) {
+            return Result<Any, String>::err("Invalid Email Address");
+        }
+        else {
+            var addr = EMailAddress@{local=localResult->value(), domain=domainResult->value()};
+            return Result<Any, String>::ok(addr);
+        }
+    }
+}
+
+//Almost any string is a valid user name but this gives us a nice way to sanity check and them in the type system so we don't confuse them with other strings
+entity UserName provides Parsable {
+    field name: String;
+
+    override static tryParse(str: String): Result<Any, String> {
+        if(str == "") {
+            return Result<Any, String>::err("User name cannot be empty"); 
+        }
+
+        return Result<Any, String>::ok(UserName{name=str});
+    }
+}
+
+function generateNotifications(users: List<StringOf<UserName>>, 
+    contactInfo: Map<StringOf<UserName>, StringOf<EMailAddress>>, 
+    msg: String): List<{addr: StringOf<EMailAdress>, msg: String}> {
+        return users->map<{addr: StringOf<EMailAdress>, msg: String}>(fn(uname) => {
+            var uaddr = contactInfo->get(uname);
+            var umsg = String::concat("Dear ", uname->string(), ", ", msg);
+
+            return {addr: uaddr, msg: umsg};
+        });
+    }
+```
+
+Additionally, the `StringOf` construction provides a user friendly object-literal and lightweight DSL format that can be used inside a Bosque program without requiring special extensions.
+
+In addition to improving the clarity of the code in these examples the Typed String design improves the testability of the code, enabling the symbolic-tester or a grammar aware fuzzer to generate structurally appropriate inputs, resulting in higher coverage of the core application logic.
 
 ## <a name="1.2-Structural-Types"></a>1.2 Structural Types
 
@@ -576,6 +660,10 @@ C1 <: C1 & C2             //false - (unless C1 <: C2)
 
 As shown in the above examples several combination types reduce to simpler version based on algebraic rules.
 
+## <a name="1.5-Value-Packs"></a>1.5 Value Packs
+
+Bosque supports multi-assign, multi-return, multi-yield operations. These operations implicitly result in multi-value-pack types. You cannot declare or store these types explicitly but they occur in various locations.
+
 # <a name="2-Core-Types"></a>2 Core Types
 
 **[TODO]**
@@ -624,6 +712,12 @@ The first of the examples show the use of rest and named arguments in call signa
 
 The next set of examples show how _spread_ arguments can be used. In the first case a tuple, `[1, 2, 3]`, is created and assigned to the variable `t`. This tuple is then spread to provide the last three arguments to `nsum`. Semantically the call `nsum(0, ...t)` is the same as `nsum(0, t[0], t[1], t[2])` and, as a result, the value in `p` is the same as the value computed for `x`. The spread operator also works for records and named parameters. In the example the call to `np(...r)` is semantically the same as `np(p1=r.p1, p2=r.p2)`. Although not shown here spread can also be used on any collection, List, Set, Map, based data values as well.
 
+For creating Maps we also provide a key/value argument notation `kexp => vexp` where `kexp` is an expression of the map key type and `vexp` is the value expression:
+
+```
+var m = Map<Int, Bool>@{ 0=>false, 1=>true };
+```
+
 ## <a name="5.2-Constants"></a>5.2 Constants
 
 Constant value expressions include `none`, `true`, `false` _Integer_, _String_,
@@ -637,12 +731,11 @@ true
 -1
 "ok"
 ""
-Regex'a*b*'  //String<Regex>
+/a*b*/       //Regex
 Int'5'       //String<Int>
-Regex@'a*b*' //Regex literal for Regex{str="a*b*"}
 ```
 
-Most of these literal expressions are familiar from other languages but Bosque introduces the concept of _Typed Strings_ ([1.1.2 Typed Strings](#1.1.2-Typed-Strings)). The constant notation includes `Type'...'` to introduce a literal typed string and `Type@'...'` to introduce a literal object that the string represents. Semantically the expression `Type@'...'` is equivalent to the expression `Type::tryParse(Type'...')`.
+Most of these literal expressions are familiar from other languages but Bosque introduces the concept of _Typed Strings_ ([1.1.2 Typed Strings](#1.1.2-Typed-Strings)). The constant notation includes `Type'...'` to introduce a literal typed string and `Type@'...'` to introduce a literal object that the string represents. Semantically the expression `Type@'...'` is equivalent to the expression `Type::tryParse(Type'...')`. Similarly for `SafeString` where `Type` is a validator then `Type'...'` is a literal safe string of type `SafeString<Type>`.
 
 ## <a name="5.3-Variable-and-Scoped-Access"></a>5.3 Variable and Scoped Access
 
@@ -690,8 +783,8 @@ entity Baz provides Bar {
     field h: Bool = true;
 }
 
-var y = Baz{f=1, g=2, h=false}; //Create a Baz entity with the given field values
-var x = Baz{f=1, g=2};          //Create a Baz entity with default value for h
+var y = Baz@{f=1, g=2, h=false}; //Create a Baz entity with the given field values
+var x = Baz@{f=1, g=2};          //Create a Baz entity with default value for h
 ```
 
 In this code snippet two `Baz` entities are allocated via the atomic initialization constructor. In the second case the omitted `h` field is set to the provided default value of true.
@@ -803,6 +896,7 @@ t.[5, 1]    //[none, 2]
 t.5.0       //error
 t.5.[0]     //also error
 t.5?.[0, 1] //none
+t.(|0, 2|)  //(|1, 3|) value pack
 ```
 
 As in most languages the `[]` operator allows access to individual elements in a tuple while the bulk algebraic `.[]` operator provides compact and simple reshaping of a tuple data value.
@@ -828,6 +922,7 @@ r.{h, g}    //{h=none, g=2}
 r.h.f       //error
 r.h.{f}     //also error
 r.h?.{f, g} //none
+r.(|f, k|)  //(|1, true|) value pack
 ```
 
 As in most languages the `.` operator allows access to individual elements in a record while the bulk algebraic `.{}` operator provides compact and simple reshaping of a record data value.
@@ -859,6 +954,7 @@ e.{h, g}    //{h=none, g=2}
 e.h.f       //error
 e.h.{f}     //also error
 e.h?.{f, g} //none
+e.(|f, k|)  //(|1, true|) value pack
 ```
 
 As in most languages the `.` operator allows access to individual elements in a entity (object) while the bulk algebraic `.{}` operator provides compact and simple reshaping of a data value. Note that the result type is a _record_.
@@ -901,11 +997,7 @@ e->project<T3>()        //error type mismatch
 
 Note that the result type of projecting from a nominal type is a _record_.
 
-## <a name="5.13-Difference"></a>5.13 Difference
-
-**[Not Implemented Yet]** delete indecies `->delete(i, ..., j)`, properties `->delete(f, ..., g)`, or types `\#`_Type_.
-
-## <a name="5.14-Update"></a>5.14 Update
+## <a name="5.13-Update"></a>5.13 Update
 
 In most languages updating (or creating an updated copy) is done on a field-by-field basis. However, with the bulk updates in Bosque it is possible to perform the update as an atomic operation and without manually extracting and copying fields. Bosque provides a chainable update operations for tuples (_Exp_`->update(i=e1, ... j=ek)` notation), records, and nominal types (_Exp_`->update(f=e1, ... f=ek)`).
 
@@ -934,7 +1026,7 @@ e->update(g=5, h=0)     //error invalid field name
 
 Note that for tuples updating past the end of the tuple will `none` pad the needed locations while for records it will insert the specified property. Updating a non-existent field on a nominal type is an error.
 
-## <a name="5.15-Merge"></a>5.15 Merge
+## <a name="5.14-Merge"></a>5.14 Merge
 
 The update operations allow bulk algebraic copy-modification of values but require the literal properties/indecies/fields to be specified. To allow more programmatic operation the Bosque language also provides chainable merge operations which take pairs of tuple/tuple, record/record, or nominal/record and merge the data values using the syntax _Exp_`->merge(`_Exp_`)`. The tuple/tuple operation maps to append, record/record is dictionary merge, and nominal/record is bulk update fields.
 
@@ -962,7 +1054,7 @@ e->merge({g=5, h=0})     //error field not defined
 
 The ability to programmatically merge into values allows us to write concise data processing code and eliminate redundant code copying around individual values. In addition to helping prevent subtle bugs during initial coding the operators can also simplify the process of updating data representations when refactoring code by reducing the number of places where _explicit_ value deconstruction, update, and copies need to be used.
 
-## <a name="5.16-PCode-Apply"></a>5.16 PCode Apply
+## <a name="5.15-PCode-Apply"></a>5.15 PCode Apply
 
 A pcode argument is invoked using the notation -- pcode`(...)`
 
@@ -972,7 +1064,9 @@ function foo(f: fn(_: Int, _: Int) -> Int, a: [Int, Int]): Int {
 }
 ```
 
-## <a name="5.17-Invoke"></a>5.17 Invoke
+In the case where the pcode return type is a value pack it must be denoted `(|T1, T2, ... TK|)` as opposed to other function declarations where they braces are optional.
+
+## <a name="5.16-Invoke"></a>5.16 Invoke
 
 The chainable invoke operator `->` is used to invoke both member methods from nominal types.
 
@@ -1026,7 +1120,7 @@ none->isNone() //true - see core None and Any types
 
 The Bosque type system provides a unified model for all structural, primitive, and nominal types. So, methods can be invoked on any value. See the [core types](#2-Core-Types) section for more info on what invocations are supported.
 
-## <a name="5.18-Unary-Operators"></a>5.19 Unary Operators
+## <a name="5.17-Unary-Operators"></a>5.17 Unary Operators
 
 Bosque supports the three unary prefix operators:
 
@@ -1047,7 +1141,7 @@ Examples include:
 -5 //-5
 ```
 
-## <a name="5.19-Binary-Operators"></a>5.20 Binary Operators
+## <a name="5.18-Binary-Operators"></a>5.18 Binary Operators
 
 Bosque supports a range of binary operators which can be applied to `Int` values including `+`, `-`, `Math::mult`, `Math::div`, and `Math::mod`. Examples include:
 
@@ -1063,17 +1157,24 @@ Math::mod(4, 2)  //0
 Math::mod(4, 0)  //error
 ```
 
-## <a name="5.20-Equality-Comparison"></a>5.21 Equality Comparison
+## <a name="5.19-Equality-Comparison"></a>5.19 Equality Comparison
+The Bosque language provides `==` and `!=` operators which work for `KeyType` values including:
 
-The Bosque language provides `==` and `!=` operators which work for values of the following types:
-
-- `None` where `none` may be compared with values of any other type
+- `None` where `none` may be compared with values of any other type (KeyType or not)
 - `Bool`
 - `Int`
-- `String` where typed strings are implicitly coerced to their untyped version
+- `String`
+- `StringOf<T>`
+- `SafeString<T>`
 - `GUID`
+- `LogicalTime`
+- `DataHash`
+- `CryptoHash`
 - `Enum` where their types and values must be the same
 - `IdKey` where their types and values must be the same
+- `GUIDIdKey` where their types and values must be the same
+- `LogicalTimeIdKey` where their types and values must be the same
+- `ContentHashIdKey` where their types and values must be the same
 
 Examples of the equality operators on primitive values include:
 
@@ -1082,7 +1183,6 @@ Examples of the equality operators on primitive values include:
 "1" == ""                  //false
 "1" != ""                  //true
 Foo'hello' == Foo'hello'   //true
-Foo'hello' == "hello"      //true
 {} == none                 //false
 false == none              //false
 ```
@@ -1092,26 +1192,29 @@ Bosque _does not_ admit _reference equality_ in any form. A program can either u
 Identifier keys are compared using the type of the key and the pairwise equality of each field defined in the key.
 
 ```none
-identifier MyKey [Int, String];
+identifier SimpleKey = Int;
+composite identifier CompoundKey = { f: Int, g: String };
 
-identifier OtherKey Int;
+var sk = SimpleKey@create(1);
+var osk = SimpleKey@create(2);
 
-var a = MyKey@create([1, "yes"]);
-var b = MyKey@create([1, "yes"]);
-var c = MyKey@create([1, "no"]);
+var a = CompoundKey@create(1, "yes");
+var b = CompoundKey@create(f=1, g="yes");
+var c = CompoundKey@create(1, "no");
 
-var q = OtherKey@create(1);
 
-a == a //true
-a == b //true
-a == c //false - different field values (category)
-
-a == q //false - different key types
+a == a    //true
+a == b    //true
+a == c    //false - different field values
+sk == sk  //true
+sk == osk //false
 ```
 
 Collections and operations on them are also defined to use this definition of equality and custom key valued fields ([section 3 Collections](#3-Collections)) instead of overloaded equals or compare methods.
 
-## <a name="5.21-Order-Comparison"></a>5.22 Order Comparison
+When using the `==` operator (unless one argument is the `None` type) the types of the left and right hand sides must be the same. If not then it is a type error. For a relaxed equality, that will check type equality in addition to value equality, use the static `KeyType::equal(a: KeyType, b: KeyType)` method.
+
+## <a name="5.20-Order-Comparison"></a>5.20 Order Comparison
 
 Bosque supports a range of order operators, `<`, `>`, `<=`, and `>=` which can be applied to `Int` values.
 
@@ -1121,7 +1224,7 @@ Bosque supports a range of order operators, `<`, `>`, `<=`, and `>=` which can b
 
 **[TODO]** Extend to tuples/records then Enums and IdKeys
 
-## <a name="5.22-Logic-Operators"></a>5.23 Logic Operators
+## <a name="5.21-Logic-Operators"></a>5.21 Logic Operators
 
 Bosque provides the standard short-circuiting `&&` and `||` operators as well as a implies `==>` operator. These operators all work on `Bool` typed values and will implicitly convert `none` into false. Examples include:
 
@@ -1147,7 +1250,7 @@ true ==> none          //false
 1 ==> true             //error
 ```
 
-## <a name="5.23-None-Coalescing"></a>5.24 None Coalescing
+## <a name="5.22-None-Coalescing"></a>5.22 None Coalescing
 
 Bosque provides specific none-coalescing operations, `?|` and `?&`, as opposed to truthy based coalescing that overloads the logical and/or operators.
 
@@ -1169,7 +1272,7 @@ checkValue()     //none
 
 The `?|` operator short-circuits on non-none values while the `?&` operator short-circuits on none values.
 
-## <a name="5.24-Select"></a>5.25 Select
+## <a name="5.23-Select"></a>5.23 Select
 
 The select operator uses a condition which may return a `Bool` or `None` and uses this to select between to lazily evaluated alternative expressions. The `none` value is automatically coerced to `false`.
 
@@ -1182,7 +1285,7 @@ none ? 1 : 2               //2
 "" ? 1 : 2                 //error
 ```
 
-## <a name="5.25-Statement-Expressions"></a>5.26 Statement Expressions
+## <a name="5.24-Statement-Expressions"></a>5.24 Statement Expressions
 
 Bosque includes _Switch_, _If_, and _Block_ statements ([section 6 Statements](#6-Statements)) which can be used as both expressions and statements. It also allows these to be used in expression positions where the action blocks in If/Switch are treated as expressions and, instead of `return`, a block will `yield` a result:
 
@@ -1204,7 +1307,7 @@ The _Switch_ statements support destructuring and type operations in the match j
 
 When block statements are used as expressions they cannot use `return` statements inside.
 
-## <a name="5.26-Synthesis-Blocks"></a>5.28 Synthesis Blocks
+## <a name="5.25-Synthesis-Blocks"></a>5.25 Synthesis Blocks
 
 **[Not Implemented Yet]**
 
@@ -1226,6 +1329,11 @@ Examples of these declarations are:
 
 - `var` _Identifier_ `=` _Exp_`;`
 - `var` _Identifier_`:`_Type_ `=` _Exp_`;`
+
+Multi-decls using explicit initialization or assignment from a value pack are also supported:
+
+- `var x, y: Int = true, 3;` 
+- `var x, y = foo(5);` //where foo is defined as function foo(v: Int): Int, Int {...}
 
 If the type is omitted in the declaration it is inferred from the type of the expression used to initialize the variable.
 
@@ -1268,6 +1376,8 @@ z = y;     //error z is not updatable
 
 ```
 
+Similar to declaration multi assignment is allowed either with an explicit value list or from a value pack typed expression.
+
 Updates can occur in different blocks of code as well:
 
 ```none
@@ -1293,6 +1403,8 @@ In addition to single variable declarations and assignments the Bosque language 
 [var x: Int, var y: Int] = [1, 2];               //declare and assign x=1, y=2 (explicit types)
 {f=var x, g=var y} = {f=1, g=2};                 //declare and assign x=1, y=2 (infer types)
 {f=var x, g=@[var y, var z]} = {f=1, g=@[2, 3]}; //declare x=1, y=2, and z=3
+Pair@{f=var x, s=var y} = Pair@{f=1, s=2};       //declare x, y and assign from entity or concept
+(|var x, var y|) = foo(5)                        //declare x, y and assign from value pack typed expression
 ```
 
 Just as with single variable declaration, variables can be declared as mutable:
@@ -1373,6 +1485,28 @@ function absy(x?: Int): Int {
 }
 ```
 
+Bosque supports multi-valued return and yield and return statements with the `,` notation or an explicit value pack construction `(|...|)`.
+```none
+function foo(v: Int): Int, Int {
+    return v, v + 1;
+}
+
+function bar(v: Int): Int, Int {
+    return (|v, v +1|);
+}
+
+function baz(opt: Bool): Bool {
+    var x, y = foo(0); //x=0 and y=1
+
+    var p, q = if(opt) {|
+        yield bar(0);
+    |}
+    else {|
+        yield -1, -1;
+    |}
+}
+```
+
 Error code return checking and handling can frequently obscure the core flow of a function and result in subtle errors. To simplify the logic or return values with error codes the Bosque language provides a return with, _Exp_ `or` (`return` | `yield`) (_Exp_)? (`when` _Cond_)?, syntax.
 
 ```none
@@ -1401,9 +1535,13 @@ trydec(2) //3
 trydec(0) //-1
 ```
 
+In the case where the `when` clause is omitted the checked condition is if the expression value is `none` or if it is of type `Result<T, E>` and `isErr` is true. If the alternate expression is missing then the expression value is simply propagated instead of the user supplied value.
+
+Again in the test expression the special implicit binder variable `$value` can be used to refer to the value of the expression.
+
 ## <a name="6.6-Validation"></a>6.6 Validation
 
-For statement level validation statement the Bosque language provides the `assert` and `check` statements. The `assert` is only enabled in debug builds while `check` is enabled in all builds. If the condition provided evaluates to false both statements will raise an error.
+For statement level validation statement the Bosque language provides the `assert` and `check` statements. By default the `assert` is only enabled in debug builds while `check` is enabled in all builds. If the condition provided evaluates to false both statements will raise an error.
 
 ```none
 assert false; //raise error in debug
@@ -1414,6 +1552,17 @@ check true;   //no effect
 ```
 
 The error semantics in Bosque are unique. In most languages errors are distinguishable as runtime error reporting requires the inclusion of observable information, like line numbers and error messages, to support failure analysis and debugging. However, Since Bosque execution is fully deterministic ([0.10 Determinacy](#0.10-Determinacy)) and repeatable, the language has two execution semantics: _deployed_ and _debug_. In the deployed semantics _all runtime errors_ are indistinguishable while in the debug semantics errors contain full line number, call-stack, and error metadata. When an error occurs in _deployed_ mode the runtime simply aborts, resets, and re-runs the execution in _debug_ mode to compute the precise error!
+
+In addition to checking for unexpected values a developer must often validate inputs and gracefully return error information if the date is invalid or indicates a recoverable error has occurred. To support this, while minimizing the control flow clutter, Bosque provides a `validate` statement that, in one line, validates a property and allows an immediate return of a meaninful error result.
+
+```none
+function foo(x: Int): Result<Int, String> {
+    validate x >= 0 or return Result<Int, String>::err("x must be >= 0");
+    validate x < 10 or return Result<Int, String>::err("x must < 0");
+
+    return Result<Int, String>::ok(x + 1);
+}
+```
 
 ## <a name="6.7-If-Then-Else"></a>6.7 If-Then-Else
 
@@ -1499,6 +1648,10 @@ switch(x) {
 ```
 
 Finally, a switch statement is allowed to mix `case` and `type` matches *but* it is required to be exhaustive. The matches are checked in order from top to bottom, first matching option is taken, and if none of the matches are valid a runtime error is raised.
+
+## <a name="6.10-Statement-Calls"></a>6.10 Statement Calls
+
+In rare cases a function does not have an explicit return result, perhaps just *ref* parameters, and thus calling it without a left-hand-side binding is acceptable.
 
 ## <a name="6.9-Block"></a>6.9 Block
 

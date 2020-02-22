@@ -103,8 +103,6 @@ entity String provides KeyType, PODType, APIType, Some {
     method length(): Int # string_count
 
     static concat(...args: List<String>): String # string_concat
-    static join(...args: List<String>, sep?: String): String # string_join
-
     method substring(start?: Int, end?: Int): String # string_substring
 
     method includes(str: String): Bool # string_includes
@@ -169,7 +167,7 @@ entity ISOTime provides Parsable, PODType, APIType, Some {
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, Parsable, PODType, APIType, Some {
-    static create(guid: String): GUID # guid_create 
+    static create(gval: String): GUID # guid_create 
 
     override static tryParse(str: String): Result<Any, String> # guid_tryparse
 }
