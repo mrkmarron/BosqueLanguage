@@ -49,7 +49,7 @@ entity Board {
     method getCellContents(x: Int, y: Int): StringOf<PlayerMark>?
         requires 0 <= x && x < 3 && 0 <= y && y < 3;
     {
-        return this.cells->at(x + y * 3);
+        return this.cells->get(x + y * 3);
     }
 
     method isCellOccupied(x: Int, y: Int): Bool {
