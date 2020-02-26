@@ -672,6 +672,15 @@ class Parser {
         return result;
     }
 
+    parseBuildInfo(cb: BuildLevel): BuildLevel {
+        if(this.testToken("debug") || this.testToken("test") || this.testToken("release")) {
+            return this.consumeTokenAndGetValue() as "debug" | "test" | "release";
+        }
+        else {
+            return cb;
+        }
+    }
+
     ////
     //Misc parsing
 
@@ -2191,11 +2200,13 @@ class Parser {
         }
         else if (tk === "assert") {
             this.consumeToken();
+            let level = "debug" as BuildLevel;
+            level = this.parseBuildInfo(level);
 
             const exp = this.parseExpression();
 
             this.ensureAndConsumeToken(";");
-            return new AssertStatement(sinfo, exp);
+            return new AssertStatement(sinfo, exp, level);
         }
         else if (tk === "check") {
             this.consumeToken();
@@ -2541,8 +2552,8 @@ class Parser {
                 this.consumeToken();
                 
                 let level: BuildLevel = isvalidate ? "release" : "debug";
-                if (!isvalidate && this.testAndConsumeTokenIf("#")) {
-                    level = this.consumeTokenAndGetValue() as BuildLevel;
+                if (!isvalidate) {
+                    level = this.parseBuildInfo(level);
                 }
 
                 const exp = this.parseExpression();
@@ -2780,8 +2791,8 @@ class Parser {
                 this.consumeToken();
 
                 let level: BuildLevel = ischeck ? "release" : "debug";
-                if (!ischeck && this.testAndConsumeTokenIf("#")) {
-                    level = this.consumeTokenAndGetValue() as BuildLevel;
+                if (!ischeck) {
+                    level = this.parseBuildInfo(level);
                 }
 
                 const sinfo = this.getCurrentSrcInfo();
