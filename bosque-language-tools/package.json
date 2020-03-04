@@ -10,7 +10,8 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onCommand:extension.typecheck"
+        "onCommand:extension.typecheck",
+        "onCommand:extension.symtest"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -38,6 +39,10 @@
             {
                 "command": "extension.typecheck",
                 "title": "TypeCheck"
+            },
+            {
+                "command": "extension.symtest",
+                "title": "SymbolicTest"
             }
         ]
     },

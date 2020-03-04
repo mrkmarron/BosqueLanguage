@@ -435,7 +435,7 @@ class Parser {
 
     private m_penv: ParserEnvironment;
 
-    private m_errors: [number, string][];
+    private m_errors: [string, number, string][];
     private m_recoverStack: number[];
 
     constructor(assembly: Assembly) {
@@ -483,7 +483,7 @@ class Parser {
     }
 
     private raiseError(line: number, msg: string) {
-        this.m_errors.push([line, msg]);
+        this.m_errors.push([this.m_penv.getCurrentFile(), line, msg]);
         throw new ParseError(line, msg);
     }
 
@@ -3304,8 +3304,8 @@ class Parser {
         return parseok;
     }
 
-    getParseErrors(): string[] | undefined {
-        return this.m_errors.length !== 0 ? this.m_errors.map((err) => `${err[1]} on line ${err[0]}`) : undefined;
+    getParseErrors(): [string, number, string][] | undefined {
+        return this.m_errors.length !== 0 ? this.m_errors : undefined;
     }
 }
 
