@@ -30,7 +30,7 @@ const z3path = Path.normalize(Path.join(__dirname, "../../tooling/bmc/runtime", 
 const compilerpath = (process.platform === "win32") ? "\"C:\\Program Files\\LLVM\\bin\\clang.exe\"" : "g++";
 const binext = (process.platform === "win32") ? "exe" : "out";
 
-function checkMASM(files: string[], corelibpath: string): boolean {
+function checkMASM(files: string[], corelibpath: string, doemit: boolean): boolean {
     let code: { relativePath: string, contents: string }[] = [];
     try {
         const coredir = Path.join(corelibpath, "/core.bsq");
@@ -50,9 +50,11 @@ function checkMASM(files: string[], corelibpath: string): boolean {
     }
 
     const errors = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code).errors;
-    process.stdout.write(JSON.stringify(errors));
+    if (doemit) {
+        process.stdout.write(JSON.stringify(errors));
+    }
 
-    return true;
+    return errors.length === 0;
 }
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
@@ -253,12 +255,12 @@ const pfiles = config.files.map((f: string) => Path.normalize(Path.join(projectd
 if(command === "typecheck") {
     const tccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
 
-    const checkok = checkMASM(pfiles, tccore);
-    process.exit(checkok ? 0 : 1);
+    checkMASM(pfiles, tccore, true);
+    process.exit(0);
 }
 else if(command === "compile") {
     const ccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
-    const checkok = checkMASM(pfiles, ccore);
+    const checkok = checkMASM(pfiles, ccore, false);
     if(!checkok) {
         process.exit(1);
     }
@@ -270,7 +272,7 @@ else if(command === "compile") {
 }
 else if(command === "verify") {
     const ccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
-    const checkok = checkMASM(pfiles, ccore);
+    const checkok = checkMASM(pfiles, ccore, false);
     if(!checkok) {
         process.exit(1);
     }

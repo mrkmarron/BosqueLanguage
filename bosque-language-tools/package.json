@@ -38,11 +38,15 @@
         "commands": [
             {
                 "command": "extension.typecheck",
-                "title": "TypeCheck"
+                "title": "Bosque TypeCheck"
             },
             {
                 "command": "extension.symtest",
-                "title": "SymbolicTest"
+                "title": "Bosque SymTest"
+            },
+            {
+                "command": "extension.bsqcompile",
+                "title": "Bosque Compile"
             }
         ]
     },
