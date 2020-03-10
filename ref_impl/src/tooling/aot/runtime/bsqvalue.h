@@ -114,7 +114,7 @@ typedef void* Value;
 class BSQRef
 {
 private:
-    int64_t count;
+    uint64_t count;
 
 public:
     MIRNominalTypeEnum nominalType;
