@@ -1,0 +1,630 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the bosque core language
+namespace NSCore;
+
+concept IList<T> provides Object {
+    abstract method size(): Int;
+    abstract method empty(): Bool;
+
+    abstract method front(): T;
+    abstract method tryFront(): T?;
+    abstract method last(): T;
+    abstract method tryLast(): T?;
+    abstract method get(i: Int): T;
+    abstract method tryGet(i: Int): T?;
+    abstract method single(p: recursive? fn(_: T) -> Bool): T;
+    abstract method trySingle(p: recursive? fn(_: T) -> Bool): T?;
+    abstract method uniform(i: Int): T;
+
+    abstract method allof(p: recursive? fn(_: T) -> Bool): Bool;
+    abstract method noneof(p: recursive? fn(_: T) -> Bool): Bool;
+    abstract method anyof(p: recursive? fn(_: T) -> Bool): Bool;
+    abstract method countIf(p: recursive? fn(_: T) -> Bool): Int;
+
+    abstract method {when T Indexable} contains(v: T): Bool;
+    abstract method {when T Indexable} count(v: T): Int;
+
+    abstract method {when T Int} min(): Int;
+    abstract method {when T Int} tryMin(): Int?;
+    abstract method {when T Int} max(): Int;
+    abstract method {when T Int} tryMax(): Int?;
+    abstract method {when T Int} sum(): Int;
+
+    abstract method find(p: recursive? fn(_: T) -> Bool): T;
+    abstract method tryFind(p: recursive? fn(_: T) -> Bool): T?;
+    abstract method findLast(p: recursive? fn(_: T) -> Bool): T;
+    abstract method tryFindLast(p: recursive? fn(_: T) -> Bool): T?;
+
+    abstract method findIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int;
+    abstract method tryFindIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?;
+    abstract method findLastIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int;
+    abstract method tryFindLastIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?;
+
+    abstract method {when T Indexable} indexOf(v: T, start?: Int, end?: Int): Int;
+    abstract method {when T Indexable} tryIndexOf(v: T, start?: Int, end?: Int): Int?;
+    abstract method {when T Indexable} lastIndexOf(v: T, start?: Int, end?: Int): Int;
+    abstract method {when T Indexable} tryLastIndexOf(v: T, start?: Int, end?: Int): Int?;
+
+    abstract method filter(p: recursive? fn(_: T) -> Bool): IList<T>;
+    abstract method ofType<U>(): IList<U>;
+    abstract method cast<U>(): IList<U>;
+    abstract method slice(start?: Int, end?: Int): IList<T>;
+    abstract method removeFirst(k: Int): IList<T>;
+    abstract method removeLast(k: Int): IList<T>;
+    abstract method takeWhile(p: recursive? fn(_: T) -> Bool): IList<T>;
+    abstract method discardWhile(p: recursive? fn(_: T) -> Bool): IList<T>;
+    abstract method takeUntil(p: recursive? fn(_: T) -> Bool): IList<T>;
+    abstract method discardUntil(p: recursive? fn(_: T) -> Bool): IList<T>;
+    abstract method unique(): IList<T>;
+    abstract method reverse(): IList<T>;
+
+}
+
+entity List<T> provides IList<T>, PODType when T grounded PODType, APIType when T grounded APIType {
+    hidden static _size(l: List<T>): Int # list_size
+    hidden static _unsafe_get(l: List<T>, i: Int): T # list_unsafe_get
+
+    hidden static _destructive_push(l: List<T>, v: T): T # list_destructive_push
+    hidden static _destructive_set(l: List<T>, idx: Int, v: T): T # list_destructive_set
+    
+    hidden recursive static _all(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
+        if(idx == List<T>::_size(l)) {
+            return true;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return false;
+            }
+            else {
+                return List<T>::_all[recursive](l, idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _indexof(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool, end: Int): Int {
+        if(idx == end) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexof[recursive](l, idx + 1, p, end);
+            }
+        }
+    }
+
+    hidden recursive static _indexoflast(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool, start: Int): Int {
+        if(idx == start - 1) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexoflast[recursive](l, idx - 1, p, start);
+            }
+        }
+    }
+
+    hidden recursive static _count(l: List<T>, idx: Int, acc: Int, p: recursive? fn(_: T) -> Bool): Int {
+        if(idx == List<T>::_size(l)) {
+            return acc;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            let nacc = p[recursive?](val) ? acc + 1 : acc;
+            
+            return List<T>::_count[recursive](l, idx + 1, nacc, p);
+        }
+    }
+
+    hidden recursive static {when T Indexable} _indexof_indexable(l: List<T>, idx: Int, cv: T!KeyValue, end: Int): Int {
+        if(idx == end) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(cv == Indexable::getKey(val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexof_indexable[recursive](l, idx + 1, cv, end);
+            }
+        }
+    }
+
+    hidden recursive static {when T Indexable} _indexoflast_indexable(l: List<T>, idx: Int, cv: T!KeyValue, start: Int): Int {
+        if(idx == start - 1) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(cv == Indexable::getKey(val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexoflast_indexable[recursive](l, idx - 1, cv, start);
+            }
+        }
+    }
+
+    hidden recursive static {when T Indexable} _count_indexable(l: List<T>, idx: Int, acc: Int, cv: T!KeyValue): Int {
+        if(idx == List<T>::_size(l)) {
+            return acc;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            let nacc = (cv == Indexable::getKey(val)) ? acc + 1 : acc;
+            
+            return List<T>::_count_indexable[recursive](l, idx + 1, nacc, cv);
+        }
+    }
+
+    hidden recursive static {when T Int} _min(l: List<T>, idx: Int, acc: Int): Int {
+        if(idx == List<T>::_size(l)) {
+            return acc;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_min[recursive](l, idx + 1, acc < val ? acc : val);
+        }
+    }
+
+    hidden recursive static {when T Int} _max(l: List<Int>, idx: Int, acc: Int): Int {
+        if(idx == List<T>::_size(l)) {
+            return List<T>::_size(l);
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_max[recursive](l, idx + 1, acc > val ? acc : val);
+        }
+    }
+
+    hidden recursive static {when T Int} _sum(l: List<Int>, idx: Int, acc: Int): Int {
+        if(idx == List<T>::_size(l)) {
+            return acc;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_sum[recursive](l, idx + 1, acc + val);
+        }
+    }
+
+
+    hidden recursive static _filter(l: List<T>, lp: List<U>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return List<T>::_filter(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+            }
+            else {
+                return List<T>::_filter(l, lp, idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _ofttype<U>(l: List<T>, lp: List<U>, idx: Int): List<U> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(val->is<U>()) {
+                return List<T>::_ofttype<U>(l, List<U>::_destructive_push(lp, val->as<U>()), idx + 1);
+            }
+            else {
+                return List<T>::_ofttype<U>(l, lp, idx + 1);
+            }
+        }
+    }
+
+    hidden recursive static _cast<U>(l: List<T>, lp: List<U>, idx: Int): List<U> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_cast<U>(l, List<U>::_destructive_push(lp, val->as<U>()), idx + 1);
+        }
+    }
+
+    hidden recursive static _takek(l: List<T>, lp: List<T>, idx: Int, k: Int): List<T> {
+        if(k == 0) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_takek<U>(l, List<T>::_destructive_push(lp, val), idx + 1, k - 1);
+        }
+    }
+
+    hidden recursive static _slice(l: List<T>, start: Int, end: Int): List<T> {
+        return List<T>::_takek(l, List<T>@{}, start, end - start);
+    }
+
+    hidden recursive static _takewhile(l: List<T>, lp: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return lp;
+            }
+            else {
+                return List<T>::_takewhile(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _discardwhile(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return List<T>@{};
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return List<T>::_discardwhile(l, idx + 1, p);
+            }
+            else {
+                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx)
+            }
+        }
+    }
+
+    hidden recursive static _takeuntil(l: List<T>, lp: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return lp;
+            }
+            else {
+                return List<T>::_takeuntil(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _discarduntil(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return List<T>@{};
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return List<T>::_discarduntil(l, idx + 1, p);
+            }
+            else {
+                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx)
+            }
+        }
+    }
+
+    hidden recursive static {when T Indexable} _unique(l: List<T>, lp: List<T>, idx: Int): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            let has = List<T>::_indexof_indexable[recursive](lp, 0, Indexable::getKey(val), List<T>::_size(lp)) != List<T>::_size(lp);
+            if(has) {
+                return List<T>::_unique(l, lp, idx + 1);
+            }
+            else {
+                return List<T>::_unique(l, List<T>::_destructive_push(lp, val), idx + 1);
+            }
+        }
+    }
+
+    hidden recursive static _reverse(l: List<T>, lp: List<T>, idx: Int): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_reverse(l, List<T>::_destructive_set(lp, (List<T>::_size(l) - 1) - idx, val), idx + 1);
+        }
+    }
+
+    hidden _rangeInBounds(start?: Int, end?: Int): Bool {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+        return 0 <= s && s <= e && e <= List<T>::_size(this); 
+    }
+
+    override method size(): Int {
+        return List<T>::_size(this);
+    }
+
+    override method empty(): Int {
+        return List<T>::_size(this) == 0;
+    }
+
+    override toDynamicList(): DynamicList<T> {
+        abort;
+    }
+
+    override method front(): T 
+        requires release List<T>::_size(this) != 0;
+    {
+        return List<T>::_unsafe_get(this, 0);
+    }
+
+    override method tryFront(): T? {
+        return List<T>::_size(this) != 0 ? List<T>::_unsafe_get(this, 0) : none;
+    }
+
+    override method last(): T 
+        requires release List<T>::_size(this) != 0;
+    {
+        List<T>::_unsafe_get(this, List<T>::_size(this) - 1);
+    }
+
+    override method tryLast(): T? {
+        return List<T>::_size(this) != 0 ? List<T>::_unsafe_get(this, List<T>::_size(this) - 1) : none;
+    }
+
+    override method get(i: Int): T 
+        requires release 0 <= idx && idx < List<T>::_size(this);
+    {
+        return List<T>::_unsafe_get(this, idx);
+    }
+
+    override method tryGet(i: Int): T? {
+        return 0 <= idx && idx < List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
+    }
+
+    override method single(p: recursive? fn(_: T) -> Bool): Bool 
+        requires release List<T>::_size(this) != 0;
+    {
+        let idx = List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this));
+        let lastidx = List<T>::_indexoflast[recursive](this, List<T>::_size(this) - 1, p, 0);
+
+        check lastidx == idx;
+        return List<T>::_unsafe_get(this, idx);
+    }
+
+    override method trySingle(p: Pred<T>, start?: Int, end?: Int): T? {
+        let idx = List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this));
+        let lastidx = List<T>::_indexoflast[recursive](this, List<T>::_size(this) - 1, p, 0);
+
+        return idx == lastidx ? List<T>::_unsafe_get(this, idx) : none;
+    }
+
+    override method uniform(i: Int, start?: Int, end?: Int): T
+        requires release List<T>::_size(this) != 0;
+        requires release this->_rangeInBounds(start, end);
+    {
+        abort;
+    }
+
+    override method allof(p: recursive? fn(_: T) -> Bool): Bool {
+        return List<T>::_size(this) == 0 || List<T>::_all[recursive](this, 0, p, List<T>::_size(this));
+    }
+
+    override method noneof(p: recursive? fn(_: T) -> Bool): Bool {
+        return List<T>::_size(this) == 0 || List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this)) == List<T>::_size(this);
+    }
+
+    override method anyof(p: recursive? fn(_: T) -> Bool): Bool {
+        return List<T>::_size(this) != 0 && List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this)) != List<T>::_size(this);
+    }
+
+    override method countIf(p: recursive? fn(_: T) -> Bool): Int {
+        return List<T>::_count[recursive](this, 0, 0, p, List<T>::_size(this));
+    }
+
+    override method {when T Indexable} contains(v: T): Bool {
+        return List<T>::_indexof_indexable[recursive](this, 0, Indexable::getKey(v), List<T>::_size(this)) != List<T>::_size(this);
+    }
+
+    override method {when T Indexable} count(v: T): Int {
+        return List<T>::_count_indexable[recursive](this, 0, 0, Indexable::getKey(v), List<T>::_size(this));
+    }
+
+    override method {when T Int} min(): Int 
+        requires release List<T>::_size(this) != 0;
+    {
+        return List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0));
+    }
+
+    override method {when T Int} tryMin(): Int? {
+        return List<T>::_size(this) != 0 ? List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
+    }
+
+    override method {when T Int} max(): Int 
+        requires release List<T>::_size(this) != 0;
+    {
+        return List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0));
+    }
+
+    override method {when T Int} tryMax(): Int? {
+        return s != e ? List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
+    }
+
+    override method {when T Int} sum(): Int {
+        return List<T>::_sum[recursive](this, 0, 0, List<T>::_size(this));
+    }
+
+    override method find(p: recursive? fn(_: T) -> Bool): T {
+        let idx = List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this));
+        check idx != List<T>::_size(this);
+        return List<T>::_unsafe_get(this, idx);
+    }
+
+    override method tryFind(p: recursive? fn(_: T) -> Bool): T? {
+        let idx = List<T>::_indexof[recursive](this, 0, p, List<T>::_size(this));
+        return idx != List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
+    }
+
+    override method findLast(p: recursive? fn(_: T) -> Bool): T {
+        let idxlast = List<T>::_indexoflast[recursive](this, List<T>::_size(this) - 1, p, 0);
+        check idxlast != -1;
+        return List<T>::_unsafe_get(this, idxlast);
+    }
+
+    override method tryFindLast(p: recursive? fn(_: T) -> Bool): T? {
+        let idxlast = List<T>::_indexoflast[recursive](this, List<T>::_size(this) - 1, p, 0);
+        return idxlast != -1 ? List<T>::_unsafe_get(this, idxlast) : none;
+    }
+
+    override method findIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexof[recursive](this, s, p, e);
+        check idx != e;
+        return idx;
+    }
+
+    override method tryFindIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexof[recursive](this, s, p, e);
+        return idx != e ? idx : none;
+    }
+
+    override method findLastIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idxlast = List<T>::_indexoflast[recursive](this, e - 1, p, s);
+        check idxlast != s - 1;
+        return idxlast;
+    }
+
+    override method tryFindLastIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idxlast = List<T>::_indexoflast[recursive](this, e - 1, p, s);
+        return idxlast != s - 1 ? idxlast : none;
+    }
+
+    override method {when T Indexable} indexOf(v: T, start?: Int, end?: Int): Int
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexof_indexable[recursive](this, s, Indexable::getKey(v), e);
+        check idx != e;
+        return idx;
+    }
+
+    override method {when T Indexable} tryIndexOf(v: T, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexof_indexable[recursive](this, s, Indexable::getKey(v), e);
+        return idx != e ? idx : none;
+    }
+
+    override method {when T Indexable} lastIndexOf(v: T, start?: Int, end?: Int): Int
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexoflast_indexable[recursive](this, e - 1, Indexable::getKey(v), s);
+        check idx != s - 1;
+        return idx;
+    }
+
+    override method {when T Indexable} tryLastIndexOf(v: T, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexoflast_indexable[recursive](this, e - 1, Indexable::getKey(v), s);
+        return idx != s - 1 ? idx : none;
+    }
+
+    override method filter(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_filter[recursive](this, List<T>@{}, 0, p);
+    }
+
+    override method ofType<U>(): List<U> {
+        return List<T>::_oftype<U>[recursive](this, List<T>@{}, 0);
+    }
+
+    override method cast<U>(): List<U> {
+        return List<T>::_cast<U>[recursive](this, List<U>@{}, 0);
+    }
+
+    override method slice(start?: Int, end?: Int): List<T> 
+        requires release this->_rangeInBounds(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        if(s == e) {
+            return List<T>@{};
+        }
+        else {
+            return List<T>::_slice[recursive](this, List<T>@{}, s, e);
+        }
+    }
+
+    override method removeFirst(k: Int): List<T> {
+        if(k >= List<T>::_size(this)) {
+            return List<T>@{};
+        }
+        else {
+            return List<T>::_slice[recursive](this, List<T>@{}, k, List<T>::_size(this));
+        }
+    }
+
+    override method removeLast(k: Int): List<T> {
+        if(k >= List<T>::_size(this)) {
+            return List<T>@{};
+        }
+        else {
+            return List<T>::_slice[recursive](this, List<T>@{}, 0, List<T>::_size(this) - k);
+        }
+    }
+
+    override method takeWhile(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_takewhile[recursive](this, List<T>@{}, 0, p);
+    }
+
+    override method discardWhile(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_discardwhile[recursive](this, 0, p);
+    }
+
+    override method takeUntil(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_takeuntil[recursive](this, List<T>@{}, 0, p);
+    }
+
+    override method discardUntil(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_discarduntil[recursive](this, 0, p);
+    }
+
+    override method {when T Indexable} unique(): List<T> {
+        return List<T>::_unique[recursive](this, List<T>@{}, 0);
+    }
+
+    override method reverse(): List<T> {
+        return List<T>::_reverse[recursive](this, List<T>@{}, 0);
+    }
+}
+
+//entity DynamicList<T> provides IList<T>, PODType when T grounded PODType, APIType when T grounded APIType {
+//}

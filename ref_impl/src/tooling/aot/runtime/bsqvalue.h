@@ -406,7 +406,7 @@ struct DisplayFunctor_KeyValue
 };
 
 enum class BSQBufferFormat {
-    Fluent,
+    Bosque,
     JSON,
     Binary
 };

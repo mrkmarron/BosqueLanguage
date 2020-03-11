@@ -3,21 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-//The core namespace implements the primitive concepts used in the fluent core language
+//The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
-
-//Helpers for specialized List<Int>
-hidden entity IntList provides Object {
-    hidden recursive static _sum(l: List<Int>, idx: Int, acc: Int): Int {
-        if(idx == List<Int>::_size(l)) {
-            return acc;
-        }
-        else {
-            var val = List<Int>::_unsafe_get(l, idx);
-            return IntList::_sum[recursive](l, idx + 1, acc + val);
-        }
-    }
-}
 
 //<summary>A List entity.</summary>
 entity List<T> provides Object, PODType when T grounded PODType, APIType when T grounded APIType {

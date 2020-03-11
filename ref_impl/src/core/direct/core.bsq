@@ -31,6 +31,10 @@ concept Indexable provides Any {
     static getKey(a: Indexable): KeyType # special_method
 }
 
+//<summary>A marker concept that indicates a type has a convert method that will allow conversion to a supertype -- used for method override contravariance</summary>
+concept Convertable provides Any {
+}
+
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
     abstract static tryParse(str: String): Result<Any, String>;
@@ -66,17 +70,17 @@ concept APIType provides APIValue {
 
 //<summary>Type for representing the none-value.</summary>
 concept Truthy provides KeyType, Parsable {
-    override static tryParse(str: String): Result<Any, String> # truthy_tryparse
+    override static tryParse(str: String): Result<Truthy, String> # truthy_tryparse
 }
 
 //<summary>Type for representing the none-value.</summary>
 entity None provides Truthy, PODType, APIType {
-    override static tryParse(str: String): Result<Any, String> # none_tryparse
+    override static tryParse(str: String): Result<None, String> # none_tryparse
 }
 
 //<summary>Primitive boolean value.</summary>
 entity Bool provides Some, Truthy, PODType, APIType {
-    override static tryParse(str: String): Result<Any, String> # bool_tryparse
+    override static tryParse(str: String): Result<Bool, String> # bool_tryparse
 
     static stringify(b: Bool): String # bool_tostring
     static parse(str: String): Bool # bool_parse
@@ -84,7 +88,7 @@ entity Bool provides Some, Truthy, PODType, APIType {
 
 //<summary>Primitive integer value.</summary>
 entity Int provides KeyType, Parsable, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any, String> # int_tryparse
+    override static tryParse(str: String): Result<Int, String> # int_tryparse
 
     static stringify(i: Int): String # int_tostring
     static parse(str: String): Int # int_parse
@@ -102,12 +106,27 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
 entity String provides KeyType, PODType, APIType, Some {
     method length(): Int # string_count
 
+    method charAt(idx: Int): String # string_charat
+    method charCodeAt(idx: Int): Int # string_charcodeat
+
     static concat(...args: List<String>): String # string_concat
     method substring(start?: Int, end?: Int): String # string_substring
 
     method includes(str: String): Bool # string_includes
     method startsWith(str: String): Bool # string_startswith
     method endsWith(str: String): Bool # string_endswith
+
+    method indexOf(str: String): Int # string_indexof
+    method lastIndexOf(str: String): Int # string_indexof
+
+    method split(sep: String): List<String> # string_indexof
+    static join(sep: String, args: List<String>): String # string_join
+
+    method trim(): String # string_trim
+    method trimStart(): String # string_trimstart
+    method trimEnd(): String # string_trimend
+
+    static compare(a: String, b: String): Bool # string_compare
 }
 
 //<summary>Primitive safe string value.</summary>
@@ -122,7 +141,7 @@ entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
 }
 
 //<summary>Primitive stringof value.</summary>
-entity StringOf<T where Parsable> provides APIValue, KeyType, Some {
+entity StringOf<T where Parsable> provides APIValue, KeyType, Some, Convertable {
     method string(): String # stringof_string
 
     static as(str: String): StringOf<T> # stringof_as
@@ -133,7 +152,7 @@ entity StringOf<T where Parsable> provides APIValue, KeyType, Some {
 }
 
 enum BufferFormat {
-    fluent,
+    bosque,
     json,
     binary
 }
@@ -153,45 +172,49 @@ enum BufferCompression {
 
 //<summary>An efficient buffer encoding for data.</summary>
 entity Buffer<T where grounded PODType | APIType> provides APIValue, Some {
+    method bytes(): ByteBuffer # buffer_bytes
 }
 
-//
-//TODO: maybe want to add a generic ByteBuffer type that can manage a system that just gets bytes from some other source
-//      analogy is String <-> StringOf
-//
+//<summary>An efficient byte buffer for data.</summary>
+entity ByteBuffer provides APIValue, Some {
+}
 
 //<summary>Primitive ISO standard date time value.</summary>
 entity ISOTime provides Parsable, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any, String> # time_tryparse
+    override static tryParse(str: String): Result<ISOTime, String> # time_tryparse
+
+    static compare(a: ISOTime, b: ISOTime): Bool # isotime_compare
 }
 
 //<summary>Primitive GUID value.</summary>
 entity GUID provides KeyType, Parsable, PODType, APIType, Some {
     static create(gval: String): GUID # guid_create 
 
-    override static tryParse(str: String): Result<Any, String> # guid_tryparse
+    override static tryParse(str: String): Result<GUID, String> # guid_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
 entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
-    override static tryParse(str: String): Result<Any, String> # logicaltime_tryparse
+    override static tryParse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
 
     static zero(): LogicalTime # logicaltime_zero
     static tick(t: LogicalTime): LogicalTime # logicaltime_tick
+
+    static compare(a: ISOTime, b: ISOTime): Bool # logicaltime_compare
 }
 
 //<summary>Primitive hash value suitable for keys in maps or other associative containers.</summary>
 entity DataHash provides KeyType, Parsable, PODType, APIType, Some {
     static compute<T>(value: T): DataHash # datahash_compute
 
-    override static tryParse(str: String): Result<Any, String> # datahash_tryparse
+    override static tryParse(str: String): Result<DataHash, String> # datahash_tryparse
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 entity CryptoHash provides KeyType, Parsable, PODType, APIType, Some {
     static compute<T>(value: T): CryptoHash # cryptohash_compute
 
-    override static tryParse(str: String): Result<Any, String> # cryptohash_tryparse
+    override static tryParse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
@@ -218,9 +241,8 @@ concept ContentHashIdKey provides KeyType, Some {
 entity Regex provides Some {
     method accepts(str: String, start?: Int, end?: Int): Bool # regex_match
 
-    //
-    //TODO: this is pretty boring right now
-    //
+    method match(str: String, start?: Int, end?: Int): Int, String, List<String, 
+
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
@@ -241,7 +263,7 @@ entity MapEntry<K where Indexable, V> provides Some {
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T, E> provides Some {
+concept Result<T, E> provides Some, Convertable {
     static ok(result: T): Result<T, E> {
         return Ok<T, E>::create(result);
     }
@@ -306,5 +328,25 @@ concept Math {
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 concept Keyed<T where KeyType> provides Indexable, Some {
     field key: T;
+}
+
+entity RegexCapture provides Object {
+    field index: Int;
+    field length: Int;
+    field value: String;
+}
+
+entity RegexGroup provides Object {
+    field success: Bool;
+    field name: String;
+    field captures: List<RegexCapture>;
+}
+
+entity RegexMatch provides Object {
+   field success: Bool;
+   field index: Int;
+   field length: Int;
+   field value: String;
+   field groups: List<RegexGroup>; 
 }
 
