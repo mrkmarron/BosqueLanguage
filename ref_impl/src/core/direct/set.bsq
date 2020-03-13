@@ -1,0 +1,15 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the bosque core language
+namespace NSCore;
+
+entity AbstractSet<T where Indexable> provides Object {
+
+entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded PODType, APIType when T grounded APIType {
+}
+
+entity DynamicSet<T where Indexable> provides AbstractSet<T> {
+}

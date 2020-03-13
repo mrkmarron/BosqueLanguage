@@ -1,0 +1,62 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the bosque core language
+namespace NSCore;
+
+entity Stack<T> provides Object {
+    method size(): Int {
+
+    }
+
+    method empty(): Bool {
+
+    }
+
+    method toList(): List<T> {
+
+    }
+
+    method pop(): T, Stack<T> {
+
+    }
+
+    static ipop(ref s: Stack<T>): T {
+
+    }
+
+    method peek(): T {
+
+    }
+
+    method tryPeek(): T? {
+
+    }
+
+    method lookahead(k: Int): T
+    {
+
+    }
+
+    method tryLookahead(k: Int): T? {
+
+    }
+
+    method rest(): Stack<T> {
+
+    }
+
+    static irest(ref s: Stack<T>): None {
+
+    }
+
+    method push(v: T): Stack<T> {
+
+    }
+
+    static ipush(ref s: Stack<T>, v: T): None {
+
+    }
+}

@@ -1,0 +1,28 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the bosque core language
+namespace NSCore;
+
+entity KeyList<K where KeyType> provides Object {
+    field hkey: K;
+    field tail: KeyList<K>?;
+
+    recursive static removeKey(kl: KeyList<K>, k: K): KeyList<K>? {
+        var tkey = kl.hkey;
+        var ttail = kl.tail;
+
+        if(ttail == none) {
+            return none;
+        } 
+        elif(KeyType::equal(k, tkey)) {
+            return ttail;
+        }
+        else {
+            var newtail = KeyList<K>::removeKey[recursive](ttail, k);
+            return KeyList<K>@{hkey=tkey, tail=newtail};
+        }
+    }
+}

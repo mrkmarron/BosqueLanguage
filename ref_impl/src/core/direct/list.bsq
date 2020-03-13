@@ -10,8 +10,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_get(l: List<T>, i: Int): T # list_unsafe_get
 
-    hidden static _destructive_push(l: List<T>, v: T): T # list_destructive_push
-    hidden static _destructive_set(l: List<T>, idx: Int, v: T): T # list_destructive_set
+    hidden static _unsafe_push(l: List<T>, v: T): T # list_unsafe_push
+    hidden static _unsafe_set(l: List<T>, idx: Int, v: T): T # list_unsafe_set
     
     hidden recursive static _all(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
         if(idx == List<T>::_size(l)) {
@@ -150,7 +150,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         else {
             let val = List<T>::_unsafe_get(l, idx);
             if(p[recursive?](val)) {
-                return List<T>::_filter(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+                return List<T>::_filter(l, List<T>::_unsafe_push(lp, val), idx + 1, p);
             }
             else {
                 return List<T>::_filter(l, lp, idx + 1, p);
@@ -165,7 +165,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         else {
             let val = List<T>::_unsafe_get(l, idx);
             if(val->is<U>()) {
-                return List<T>::_ofttype<U>(l, List<U>::_destructive_push(lp, val->as<U>()), idx + 1);
+                return List<T>::_ofttype<U>(l, List<U>::_unsafe_push(lp, val->as<U>()), idx + 1);
             }
             else {
                 return List<T>::_ofttype<U>(l, lp, idx + 1);
@@ -179,7 +179,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_cast<U>(l, List<U>::_destructive_push(lp, val->as<U>()), idx + 1);
+            return List<T>::_cast<U>(l, List<U>::_unsafe_push(lp, val->as<U>()), idx + 1);
         }
     }
 
@@ -189,7 +189,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_takek<U>(l, List<T>::_destructive_push(lp, val), idx + 1, k - 1);
+            return List<T>::_takek<U>(l, List<T>::_unsafe_push(lp, val), idx + 1, k - 1);
         }
     }
 
@@ -207,7 +207,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
                 return lp;
             }
             else {
-                return List<T>::_takewhile(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+                return List<T>::_takewhile(l, List<T>::_unsafe_push(lp, val), idx + 1, p);
             }
         }
     }
@@ -237,7 +237,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
                 return lp;
             }
             else {
-                return List<T>::_takeuntil(l, List<T>::_destructive_push(lp, val), idx + 1, p);
+                return List<T>::_takeuntil(l, List<T>::_unsafe_push(lp, val), idx + 1, p);
             }
         }
     }
@@ -268,7 +268,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
                 return List<T>::_unique(l, lp, idx + 1);
             }
             else {
-                return List<T>::_unique(l, List<T>::_destructive_push(lp, val), idx + 1);
+                return List<T>::_unique(l, List<T>::_unsafe_push(lp, val), idx + 1);
             }
         }
     }
@@ -279,7 +279,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_reverse(l, List<T>::_destructive_set(lp, (List<T>::_size(l) - 1) - idx, val), idx + 1);
+            return List<T>::_reverse(l, List<T>::_unsafe_set(lp, (List<T>::_size(l) - 1) - idx, val), idx + 1);
         }
     }
 
@@ -289,7 +289,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_destructive_push(lp, f[recursive?](val)), idx + 1, f);
+            return List<T>::_map(l, List<T>::_unsafe_push(lp, f[recursive?](val)), idx + 1, f);
         }
     }
 
@@ -299,7 +299,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_destructive_push(lp, f[recursive?](idx, val)), idx + 1, f);
+            return List<T>::_map(l, List<T>::_unsafe_push(lp, f[recursive?](idx, val)), idx + 1, f);
         }
     }
 
@@ -309,7 +309,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_destructive_push(lp, m->get(val)), idx + 1);
+            return List<T>::_map(l, List<T>::_unsafe_push(lp, m->get(val)), idx + 1);
         }
     }
 
@@ -319,7 +319,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_destructive_push(lp, m->tryGet(val)), idx + 1);
+            return List<T>::_map(l, List<T>::_unsafe_push(lp, m->tryGet(val)), idx + 1);
         }
     }
 
@@ -329,7 +329,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_zipIndex[recursive](l, List<T>::_destructive_push(lp, [idx, val]), idx + 1);
+            return List<T>::_zipIndex[recursive](l, List<T>::_unsafe_push(lp, [idx, val]), idx + 1);
         }
     }
 
@@ -340,7 +340,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         else {
             let val = List<U>::_unsafe_get(ol, idx);
             if(p[recursive?](v, val)) {
-                return List<T>::_joinSingle<U>[recursive](v, List<[T, U]>::_destructive_push(lp, [v, val]), idx + 1, p);
+                return List<T>::_joinSingle<U>[recursive](v, List<[T, U]>::_unsafe_push(lp, [v, val]), idx + 1, p);
             }
             else {
                 return List<T>::_joinSingle<U>[recursive](v, lp, idx + 1, p);
@@ -367,7 +367,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         else {
             let val = List<U>::_unsafe_get(ol, idx);
             if(p[recursive?](v, val)) {
-                return List<T>::_joinGroupSingle<U>[recursive](v, List<T>::_destructive_push(lp, [v, val]), idx + 1, p);
+                return List<T>::_joinGroupSingle<U>[recursive](v, List<T>::_unsafe_push(lp, [v, val]), idx + 1, p);
             }
             else {
                 return List<T>::_joinGroupSingle<U>[recursive](v, lp, idx + 1, p);
@@ -383,7 +383,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             let val = List<T>::_unsafe_get(l, idx);
             let jl = List<T>::_joinGroupSingle<U>[recursive](val, ol, List<[T, List<U>]>, 0, p);
 
-            return List<T>::_joinGroup<U>[recursive](l, ol, List<T>::_destructive_push(lp, jl), idx + 1, p);
+            return List<T>::_joinGroup<U>[recursive](l, ol, List<T>::_unsafe_push(lp, jl), idx + 1, p);
         }
     }
 
@@ -393,7 +393,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_append[recursive](l, List<T>::_destructive_push(lp, val), idx + 1);
+            return List<T>::_append[recursive](l, List<T>::_unsafe_push(lp, val), idx + 1);
         }
     }
 
@@ -405,7 +405,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             let val = List<T>::_unsafe_get(ol, idx);
             let key = pf[recursive?](val);
             if(kk == Indexable::getKey(key)) {
-                return List<T>::_partitionSingle[recursive](kk, ol, List<T>::_destructive_push(lp, val), idx + 1, pf);
+                return List<T>::_partitionSingle[recursive](kk, ol, List<T>::_unsafe_push(lp, val), idx + 1, pf);
             }
             else {
                 return List<T>::_partitionSingle[recursive](kk, ol, lp, idx + 1, pf);
@@ -812,7 +812,7 @@ concept ListUtil {
         else {
             let vt = List<T>::_unsafe_get(l1, idx);
             let vu = List<U>::_unsafe_get(l2, idx);
-            return ListUtil::_zip(l1, l2, List<[T, U]>::_destructive_push(lp, [vt, vu]), idx + 1);
+            return ListUtil::_zip(l1, l2, List<[T, U]>::_unsafe_push(lp, [vt, vu]), idx + 1);
         }
     }
 
@@ -822,7 +822,7 @@ concept ListUtil {
         }
         else {
             let vp = List<[T, U]>::_unsafe_get(l, idx);
-            return ListUtil::_unzip(l, List<T>::_destructive_push(lt, vp.0), List<U>::_destructive_push(lu, vp.1), idx + 1);
+            return ListUtil::_unzip(l, List<T>::_unsafe_push(lt, vp.0), List<U>::_unsafe_push(lu, vp.1), idx + 1);
         }
     }
 
@@ -842,7 +842,7 @@ concept ListUtil {
             return lp;
         }
         else {
-            return ListUtil::_fill[recursive](k - 1, List<Int>::_destructive_push(lp, val));
+            return ListUtil::_fill[recursive](k - 1, List<Int>::_unsafe_push(lp, val));
         }
     }
 
@@ -851,7 +851,7 @@ concept ListUtil {
             return lp;
         }
         else {
-            return ListUtil::_fillIndex[recursive](k, List<Int>::_destructive_push(lp, idx), idx + 1);
+            return ListUtil::_fillIndex[recursive](k, List<Int>::_unsafe_push(lp, idx), idx + 1);
         }
     }
 
@@ -860,7 +860,7 @@ concept ListUtil {
             return lp;
         }
         else {
-            return ListUtil::_range[recursive](start + 1, end, List<Int>::_destructive_push(lp, start));
+            return ListUtil::_range[recursive](start + 1, end, List<Int>::_unsafe_push(lp, start));
         }
     }
 
