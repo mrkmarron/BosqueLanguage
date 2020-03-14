@@ -289,7 +289,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_unsafe_push(lp, f[recursive?](val)), idx + 1, f);
+            return List<T>::_map<U>(l, List<T>::_unsafe_push(lp, f[recursive?](val)), idx + 1, f);
         }
     }
 
@@ -299,7 +299,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_unsafe_push(lp, f[recursive?](idx, val)), idx + 1, f);
+            return List<T>::_mapIndex<U>(l, List<T>::_unsafe_push(lp, f[recursive?](idx, val)), idx + 1, f);
         }
     }
 
@@ -309,7 +309,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_unsafe_push(lp, m->get(val)), idx + 1);
+            let lv = xxxx;
+            return List<T>::_projectWMap<U>(l, List<T>::_unsafe_push(lp, lv), idx + 1);
         }
     }
 
@@ -319,7 +320,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            return List<T>::_map(l, List<T>::_unsafe_push(lp, m->tryGet(val)), idx + 1);
+            let tlv = xxxx;
+            return List<T>::_tryProjectWMap<U>[recursive](l, List<T>::_unsafe_push(lp, tlv), idx + 1);
         }
     }
 
@@ -831,7 +833,7 @@ concept ListUtil {
             return lp;
         }
         else {
-            let ll = List<[List<T>>::_unsafe_get(l, idx);
+            let ll = List<List<T>>::_unsafe_get(l, idx);
             let cc = List<T>::_append(ll, lp, 0);
             return List<T>::_concat(l, lp, idx + 1);
         }

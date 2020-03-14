@@ -7,9 +7,122 @@
 namespace NSCore;
 
 entity AbstractSet<T where Indexable> provides Object {
+    abstract method size(): Int;
+    abstract method empty(): Bool;
+    abstract method entries(): List<T>;
+
+    abstract method has(v: T): Bool;
+    abstract method hasAll(...v: Set<T>): Bool;
+}
 
 entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded PODType, APIType when T grounded APIType {
+    hidden static _size(s: Set<T>): Int # set_size
+    hidden static _has_key(s: Set<T>, key: T!KeyType): Bool # set_has_key
+    hidden static _at_val(s: Set<T>, key: T!KeyType): T # set_at_val
+
+    hidden static _get_keylist(s: Set<T>): KeyList<T!KeyType>? # set_get_keylist
+    hidden static _clear_val(s: Set<T>, key: T!KeyType, newkl: KeyList<T!KeyType>): Set<T> # set_clear_val
+    
+    hidden static _unsafe_update(s: Set<T>, k: T!KeyType, v: T): Set<T> # set_unsafe_update
+    hidden static _unsafe_add(s: Set<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): Set<T> # set_unsafe_add
+
+    hidden recursive static _entry_list(s: Set<T>, kl: KeyList<T!KeyType>?, l: List<T>): List<T> {
+        if(kl == none) {
+            return l;
+        }
+        else {
+            var v = Set<T>::_at_val(s, kl.hkey);
+            return Set<T>::_entry_list[recursive](s, KeyList<K!KeyType>::_get_tail(kl), List<T>::_unsafe_push(l, v));
+        }
+    }
+
+    override method size(): Int {
+        return Set<T>::_size(this);
+    }
+
+    override method empty(): Bool;
+    override method entries(): List<T>;
+
+    override method has(v: T): Bool;
+    override method hasAll(...v: Set<T>): Bool;
+
+    method toDynamicSet<T>(): DynamicSet<T> {
+        xxxx;
+    }
+
+    method subsetOf(s: Set<T>): Bool;
+    method equal(s: Set<T>): Bool;
+    method disjoint(s: Set<T>): Bool;
+
+    method unionWith(s: Set<T>): Set<T>;
+    method intersectWith(s: Set<T>): Set<T>;
+    method diffWith(s: Set<T>): Set<T>;
+    method symmetricDiffWith(s: Set<T>): Set<T>;
+
+    static union(...sl: List<Set<T>>): Set<T> {
+        xxxx;
+    }
+
+    static intersection(...sl: List<Set<T>>): Set<T> {
+        xxxx;
+    }
 }
 
 entity DynamicSet<T where Indexable> provides AbstractSet<T> {
+    hidden static _size(s: DynamicSet<T>): Int # set_size
+    hidden static _has_key(s: DynamicSet<T>, key: T!KeyType): Bool # set_has_key
+    hidden static _at_val(s: DynamicSet<T>, key: T!KeyType): T # set_at_val
+
+    hidden static _get_keylist(s: DynamicSet<T>): KeyList<T!KeyType>? # set_get_keylist
+    hidden static _clear_val(s: DynamicSet<T>, key: T!KeyType, newkl: KeyList<T!KeyType>): DynamicSet<T> # set_clear_val
+    
+    hidden static _unsafe_update(s: DynamicSet<T>, k: T!KeyType, v: T): DynamicSet<T> # set_unsafe_update
+    hidden static _unsafe_add(s: DynamicSet<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): DynamicSet<T> # set_unsafe_add
+
+    hidden recursive static _entry_list(s: DynamicSet<T>, kl: KeyList<T!KeyType>?, l: List<T>): List<T> {
+        if(kl == none) {
+            return l;
+        }
+        else {
+            var v = DynamicSet<T>::_at_val(s, kl.hkey);
+            return DynamicSet<T>::_entry_list[recursive](s, KeyList<K!KeyType>::_get_tail(kl), List<T>::_unsafe_push(l, v));
+        }
+    }
+
+    override method size(): Int;
+    override method empty(): Bool;
+    override method entries(): List<T>;
+
+    override method has(v: T): Bool;
+    override method hasAll(...v: Set<T>): Bool;
+
+    method toSet<T>(): Set<T> {
+        xxxx;
+    }
+
+    method add(v: T): DynamicSet<T>
+    method addAll(...v: Set<T>): DynamicSet<T>
+
+    method insert(v: T): DynamicSet<T>
+    method insertAll(...v: Set<T>): DynamicSet<T>
+
+    method remove(v: T): DynamicSet<T>
+    method removeAll(...v: Set<T>): DynamicSet<T>
+
+    method subsetOf(s: DynamicSet<T>): Bool;
+    method equal(s: DynamicSet<T>): Bool;
+    method disjoint(s: DynamicSet<T>): Bool;
+
+    method unionWith(s: DynamicSet<T>): DynamicSet<T>;
+    method intersectWith(s: DynamicSet<T>): DynamicSet<T>;
+    method diffWith(s: DynamicSet<T>): DynamicSet<T>;
+    method symmetricDiffWith(s: DynamicSet<T>): DynamicSet<T>;
+
+    static union(...sl: List<DynamicSet<T>>): DynamicSet<T> {
+        xxxx;
+    }
+
+    static intersection(...sl: List<DynamicSet<T>>): DynamicSet<T> {
+        xxxx;
+    }
 }
