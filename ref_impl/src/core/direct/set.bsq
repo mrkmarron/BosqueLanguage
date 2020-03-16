@@ -25,7 +25,7 @@ entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded P
     hidden static _unsafe_add(s: Set<T>, k: T!KeyType, v: T, newkl: KeyList<T!KeyType>): Set<T> # set_unsafe_add
 
     hidden static _add(s: Set<T>, v: T): Set<T> {
-        if(Set<T>::_has_key(s, v)) {
+        if(Set<T>::_has_key(s, Indexable::getKey(v))) {
             return s;
         }
         else {
@@ -36,9 +36,9 @@ entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded P
     }
 
     //we should be able to use the array map operation on the has array
-    hidden recursive static _subset(s: Set<T>, other: Set<T>): Bool # set_equal
-    hidden recursive static _equal(s: Set<T>, other: Set<T>): Bool # set_equal
-    hidden recursive static _disjoint(s: Set<T>, other: Set<T>): Bool # set_disjoint
+    hidden static _subsetof(s: Set<T>, other: Set<T>): Bool # set_subsetof
+    hidden static _equal(s: Set<T>, other: Set<T>): Bool # set_equal
+    hidden static _disjoint(s: Set<T>, other: Set<T>): Bool # set_disjoint
 
     hidden recursive static _entry_list(s: Set<T>, kl: KeyList<T!KeyType>?, l: List<T>): List<T> {
         if(kl == none) {
@@ -151,7 +151,7 @@ entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded P
     }
 
     method subsetOf(s: Set<T>): Bool {
-        if(Set<T>::_size(s1) > Set<T>::_size(s2)) {
+        if(Set<T>::_size(s) > Set<T>::_size(this)) {
             return false;
         }
         else {
@@ -160,7 +160,7 @@ entity Set<T where Indexable> provides AbstractSet<T>, PODType when T grounded P
     }
 
     method equal(s: Set<T>): Bool {
-        if(Set<T>::_size(s1) != Set<T>::_size(s2)) {
+        if(Set<T>::_size(this) != Set<T>::_size(s)) {
             return false;
         }
         else {
