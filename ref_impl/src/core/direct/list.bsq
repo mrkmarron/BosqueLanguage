@@ -309,8 +309,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let lv = xxxx;
-            return List<T>::_projectWMap<U>(l, List<T>::_unsafe_push(lp, lv), idx + 1);
+            return List<T>::_projectWMap<U>(l, List<T>::_unsafe_push(lp, m->get(val)), idx + 1);
         }
     }
 
@@ -320,8 +319,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let tlv = xxxx;
-            return List<T>::_tryProjectWMap<U>[recursive](l, List<T>::_unsafe_push(lp, tlv), idx + 1);
+            return List<T>::_tryProjectWMap<U>[recursive](l, List<T>::_unsafe_push(lp, m->tryGet(val)), idx + 1);
         }
     }
 
@@ -427,7 +425,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             }
             else {
                 let pfg = List<T>::_partitionSingle<K>(Indexable::getKey(key), l, List<T>@{}, idx, pf);
-                return List<T>::_partition(l, xxxx, idx + 1, pf);
+                return List<T>::_partition(l, mp->add(val, pfg), idx + 1, pf);
             }
         }
     }
@@ -436,7 +434,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         abort;
     }
 
-    hidden recursive static _toMap<K, V>(l: List<T>, mp: Map<K, V>, idx: Int, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
+    hidden recursive static _toMap<K, V>(l: List<T>, mp: Map<K, V>, idx: Int, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
         if(idx === List<T>::_size(l)) {
             return lp;
         }
@@ -445,7 +443,12 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             let k = kf[recursive?](val);
             let v = vf[recursive?](val);
 
-            return List<T>::_toMap(l, xxxx, idx + 1, kf, vf);
+            if(merge) {
+                return List<T>::_toMap(l, map->insert(k, v), idx + 1, kf, vf);
+            }
+            else {
+                return List<T>::_toMap(l, map->add(k, v), idx + 1, kf, vf);
+            }
         }
     }
 
@@ -457,7 +460,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             let val = List<T>::_unsafe_get(l, idx);
             let v = vf[recursive?](val);
 
-            return List<T>::_toMap(l, xxxx, idx + 1, kf, vf);
+            return List<T>::_toMap(l, mp->add(idx, v), idx + 1, kf, vf);
         }
     }
 

@@ -10,19 +10,28 @@ entity KeyList<K where KeyType> provides Object {
     field hkey: K;
     field tail: KeyList<K>?;
 
-    recursive static removeKey(kl: KeyList<K>, k: K): KeyList<K>? {
-        var tkey = kl.hkey;
-        var ttail = kl.tail;
-
-        if(ttail == none) {
-            return none;
-        } 
-        elif(KeyType::equal(k, tkey)) {
-            return ttail;
+    hidden recursive static _reverse(kl: KeyList<K>, rkl: KeyList<K>): KeyList<K> {
+        let tl = kl.tail;
+        if(tl == none) {
+            return KeyList<K>@{hkey=kl.hkey, tail=rkl};
         }
         else {
-            var newtail = KeyList<K>::removeKey[recursive](ttail, k);
-            return KeyList<K>@{hkey=tkey, tail=newtail};
+            return KeyList<K>::_reverse[recursive](tl, KeyList<K>@{hkey=kl.hkey, tail=rkl});
+        }
+    }
+
+    static reverse(kl: KeyList<K>?): KeyList<K>? {
+        if(kl == none) {
+            return none;
+        }
+        else {
+            let tl = kl.tail;
+            if(tl == none) {
+                return kl;
+            }
+            else {
+                return KeyList<K>::_reverse[recursive](tl, KeyList<K>@{hkey=kl.hkey, tail=none});
+            }
         }
     }
 }
