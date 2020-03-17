@@ -70,45 +70,45 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Indexable} _indexof_indexable(l: List<T>, idx: Int, cv: T!KeyValue, end: Int): Int {
+    hidden recursive static {when T KeyType} _indexof_keytype(l: List<T>, idx: Int, cv: T, end: Int): Int {
         if(idx == end) {
             return idx;
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            if(cv == Indexable::getKey(val)) {
+            if(cv == val) {
                 return idx;
             }
             else {
-                return List<T>::_indexof_indexable[recursive](l, idx + 1, cv, end);
+                return List<T>::_indexof_keytype[recursive](l, idx + 1, cv, end);
             }
         }
     }
 
-    hidden recursive static {when T Indexable} _indexoflast_indexable(l: List<T>, idx: Int, cv: T!KeyValue, start: Int): Int {
+    hidden recursive static {when T KeyType} _indexoflast_keytype(l: List<T>, idx: Int, cv: T, start: Int): Int {
         if(idx == start - 1) {
             return idx;
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            if(cv == Indexable::getKey(val)) {
+            if(cv == val) {
                 return idx;
             }
             else {
-                return List<T>::_indexoflast_indexable[recursive](l, idx - 1, cv, start);
+                return List<T>::_indexoflast_keytype[recursive](l, idx - 1, cv, start);
             }
         }
     }
 
-    hidden recursive static {when T Indexable} _count_indexable(l: List<T>, idx: Int, acc: Int, cv: T!KeyValue): Int {
+    hidden recursive static {when T KeyType} _count_keytype(l: List<T>, idx: Int, acc: Int, cv: T): Int {
         if(idx == List<T>::_size(l)) {
             return acc;
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let nacc = (cv == Indexable::getKey(val)) ? acc + 1 : acc;
+            let nacc = (cv == val) ? acc + 1 : acc;
             
-            return List<T>::_count_indexable[recursive](l, idx + 1, nacc, cv);
+            return List<T>::_count_keytype[recursive](l, idx + 1, nacc, cv);
         }
     }
 
@@ -257,13 +257,13 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Indexable} _unique(l: List<T>, lp: List<T>, idx: Int): List<T> {
+    hidden recursive static {when T KeyType} _unique(l: List<T>, lp: List<T>, idx: Int): List<T> {
         if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let has = List<T>::_indexof_indexable[recursive](lp, 0, Indexable::getKey(val), List<T>::_size(lp)) != List<T>::_size(lp);
+            let has = List<T>::_indexof_keytype[recursive](lp, 0, val, List<T>::_size(lp)) != List<T>::_size(lp);
             if(has) {
                 return List<T>::_unique(l, lp, idx + 1);
             }
@@ -303,7 +303,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Indexable} _projectWMap<U>(l: List<T>, lp: List<U>, idx: Int, m: Map<T, U>): List<U> {
+    hidden recursive static {when T KeyType} _projectWMap<U>(l: List<T>, lp: List<U>, idx: Int, m: Map<T, U>): List<U> {
         if(idx == List<T>::_size(l)) {
             return lp;
         }
@@ -313,7 +313,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Indexable} _tryProjectWMap<U>(l: List<T>, lp: List<U>, idx: Int, m: Map<T, U>): List<U> {
+    hidden recursive static {when T KeyType} _tryProjectWMap<U>(l: List<T>, lp: List<U>, idx: Int, m: Map<T, U>): List<U> {
         if(idx == List<T>::_size(l)) {
             return lp;
         }
@@ -397,14 +397,14 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static _partitionSingle<K where K Indexable>(kk: K!KeyType, ol: List<T>, lp: List<T>, idx: Int, pf: recursive? fn(_: T) -> K): List<T> {
+    hidden recursive static _partitionSingle<K where K KeyType>(kk: K, ol: List<T>, lp: List<T>, idx: Int, pf: recursive? fn(_: T) -> K): List<T> {
         if(idx === List<T>::_size(ol)) {
             return lp;
         }
         else {
             let val = List<T>::_unsafe_get(ol, idx);
             let key = pf[recursive?](val);
-            if(kk == Indexable::getKey(key)) {
+            if(kk == key) {
                 return List<T>::_partitionSingle[recursive](kk, ol, List<T>::_unsafe_push(lp, val), idx + 1, pf);
             }
             else {
@@ -413,7 +413,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static _partition<K where K Indexable>(l: List<T>, mp: Map<K, List<T>>, idx: Int, pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    hidden recursive static _partition<K where K KeyType>(l: List<T>, mp: Map<K, List<T>>, idx: Int, pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         if(idx === List<T>::_size(l)) {
             return lp;
         }
@@ -424,7 +424,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
                 return List<T>::_partition(l, mp, idx + 1, pf);
             }
             else {
-                let pfg = List<T>::_partitionSingle<K>(Indexable::getKey(key), l, List<T>@{}, idx, pf);
+                let pfg = List<T>::_partitionSingle<K>(key, l, List<T>@{}, idx, pf);
                 return List<T>::_partition(l, mp->add(val, pfg), idx + 1, pf);
             }
         }
@@ -547,12 +547,12 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_count[recursive](this, 0, 0, p, List<T>::_size(this));
     }
 
-    method {when T Indexable} contains(v: T): Bool {
-        return List<T>::_indexof_indexable[recursive](this, 0, Indexable::getKey(v), List<T>::_size(this)) != List<T>::_size(this);
+    method {when T KeyType} contains(v: T): Bool {
+        return List<T>::_indexof_keytype[recursive](this, 0, v, List<T>::_size(this)) != List<T>::_size(this);
     }
 
-    method {when T Indexable} count(v: T): Int {
-        return List<T>::_count_indexable[recursive](this, 0, 0, Indexable::getKey(v), List<T>::_size(this));
+    method {when T KeyType} count(v: T): Int {
+        return List<T>::_count_keytype[recursive](this, 0, 0, v, List<T>::_size(this));
     }
 
     method {when T Int} min(): Int 
@@ -639,41 +639,41 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return idxlast != s - 1 ? idxlast : none;
     }
 
-    method {when T Indexable} indexOf(v: T, start?: Int, end?: Int): Int
+    method {when T KeyType} indexOf(v: T, start?: Int, end?: Int): Int
         requires release this->_rangeInBounds(start, end);
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof_indexable[recursive](this, s, Indexable::getKey(v), e);
+        let idx = List<T>::_indexof_keytype[recursive](this, s, v, e);
         check idx != e;
         return idx;
     }
 
-    method {when T Indexable} tryIndexOf(v: T, start?: Int, end?: Int): Int?
+    method {when T KeyType} tryIndexOf(v: T, start?: Int, end?: Int): Int?
         requires release this->_rangeInBounds(start, end);
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof_indexable[recursive](this, s, Indexable::getKey(v), e);
+        let idx = List<T>::_indexof_keytype[recursive](this, s, v, e);
         return idx != e ? idx : none;
     }
 
-    method {when T Indexable} lastIndexOf(v: T, start?: Int, end?: Int): Int
+    method {when T KeyType} lastIndexOf(v: T, start?: Int, end?: Int): Int
         requires release this->_rangeInBounds(start, end);
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexoflast_indexable[recursive](this, e - 1, Indexable::getKey(v), s);
+        let idx = List<T>::_indexoflast_keytype[recursive](this, e - 1, v, s);
         check idx != s - 1;
         return idx;
     }
 
-    method {when T Indexable} tryLastIndexOf(v: T, start?: Int, end?: Int): Int?
+    method {when T KeyType} tryLastIndexOf(v: T, start?: Int, end?: Int): Int?
         requires release this->_rangeInBounds(start, end);
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexoflast_indexable[recursive](this, e - 1, Indexable::getKey(v), s);
+        let idx = List<T>::_indexoflast_keytype[recursive](this, e - 1, v, s);
         return idx != s - 1 ? idx : none;
     }
 
@@ -736,7 +736,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_discarduntil[recursive](this, 0, p);
     }
 
-    method {when T Indexable} unique(): List<T> {
+    method {when T KeyType} unique(): List<T> {
         return List<T>::_unique[recursive](this, List<T>@{}, 0);
     }
 
@@ -752,7 +752,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_mapIndex[recursive](this, List<U>@{}, 0, f);
     }
 
-    method {when T Indexable} project<U>(m: IMap<T, U>): List<U> {
+    method {when T KeyType} project<U>(m: IMap<T, U>): List<U> {
         if(m->is<Map<T, U>()) {
             return List<T>::_projectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>()); 
         }
@@ -761,7 +761,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    method {when T Indexable} tryProject<U>(m: IMap<T, U>): List<U?> {
+    method {when T KeyType} tryProject<U>(m: IMap<T, U>): List<U?> {
         if(m->is<Map<T, U>()) {
             return List<T>::_tryProjectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>());
         }
@@ -792,7 +792,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_append[recursive](this, cl, 0);
     }
 
-    method partition<K where K Indexable>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         return List<T>::_partition<K>[recursive](this, Map<K, List<T>>@{}, 0, pf);
     }
 
@@ -800,7 +800,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_sort[recursive](this, List<T>@{}, 0, pf);
     }
 
-    method toMap<K where K Indexable, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
+    method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
         return List<T>::_toMap<K, V>[recursive](this, Map<K, V>@{}, 0, kf, vf);
     }
 
