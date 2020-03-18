@@ -252,16 +252,16 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         return Map<K, V>::_has_key(this, k) ? Map<K, V>::_at_val(this, k) : none;
     }
 
-    method submap(p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> {
-        return Map<K, V>::_submap[recursive](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, V>@{}, p);
+    recursive? method submap(p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> {
+        return Map<K, V>::_submap[recursive?](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, V>@{}, p);
     }
 
     method projectDomain(ds: Set<K>): Map<K, V> {
         return Map<K, V>::_projectDomain(this, ds);
     }
 
-    method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
-        return Map<K, V>::_remap<U>[recursive](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, U>@{}, f);
+    recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
+        return Map<K, V>::_remap<U>[recursive?](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, U>@{}, f);
     }
 
     method projectKeys(...kl: List<K>): Map<K, V> {
@@ -388,7 +388,7 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method submap(p: recursive? fn(_: K, _: V) -> Bool): DynamicMap<K, V> {
+    recursive? method submap(p: recursive? fn(_: K, _: V) -> Bool): DynamicMap<K, V> {
         abort;
     }
 
@@ -396,7 +396,7 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method remap<U>(f: recursive? fn(_: K, _: V) -> U): DynamicMap<K, U> {
+    recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): DynamicMap<K, U> {
         abort;
     }
 

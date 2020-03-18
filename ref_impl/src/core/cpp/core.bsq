@@ -96,10 +96,9 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
         return v1 < v2 ? v1 : v2;
     }
 
-    static mult(a: Int, b: Int): Int # int_mult
-    static div(a: Int, b: Int): Int # int_div
-    static mod(a: Int, b: Int): Int # int_mod
-
+    static mult(a: Int, b: Int): Int # special_method
+    static div(a: Int, b: Int): Int # special_method
+    static mod(a: Int, b: Int): Int # special_method
 }
 
 //<summary>Primitive string value.</summary>
