@@ -13,8 +13,98 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden recursive? static _all(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_all
 
     hidden recursive? static _count(l: List<T>, p: recursive? fn(_: T) -> Bool): Int # list_count
-    hidden recursive? static _indexof(l: List<T>, s: Int, e: Int p: recursive? fn(_: T) -> Bool): Int # list_indexof
-    hidden recursive? static _indexoflast(l: List<T>, s: Int, e: Int p: recursive? fn(_: T) -> Bool): Int # list_indexoflast
+    hidden recursive? static _indexof(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexof
+    hidden recursive? static _indexoflast(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexoflast
+
+    //for these we are just going to use the p versions with lambdas and the right equality test
+    hidden recursive? static {when T KeyType} _count_keytype(l: List<T>, v: T): Int # list_count_keytype
+    hidden recursive? static {when T KeyType} _indexof_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexof_keytype
+    hidden recursive? static {when T KeyType} _indexoflast_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexoflast_keytype
+
+    //for these we are just going to use a reduce with the right type of lambda
+    hidden recursive? static {when T Int} _min(l: List<T>): Int # list_min
+    hidden recursive? static {when T Int} _max(l: List<T>): Int # list_max
+    hidden recursive? static {when T Int} _sum(l: List<T>): Int # list_sum
+
+    hidden recursive? static _filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
+    hidden recursive? static _oftype<U>(l: List<T>): List<U> # list_oftype
+    hidden recursive? static _cast<U>(l: List<T>): List<U> # list_cast
+    hidden recursive? static _slice(l: List<T>, s: Int, e: Int) # list_slice
+
+    hidden recursive? static _takewhile(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_takewhile
+    hidden recursive? static _discardwhile(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_discardwhile
+    hidden recursive? static _takeuntil(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_takeuntil
+    hidden recursive? static _discarduntil(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_discarduntil
+
+    hidden static {when T KeyType} _unique(l: List<T>): List<T> # list_unique
+    hidden static _reverse(l: List<T>): List<T> # list_reverse
+
+
+    
+    recursive? method map<U>(f: recursive? fn(_: T) -> U): List<U> {
+        return List<T>::_map[recursive?](this, f);
+    }
+
+    recursive? method mapIndex<U>(f: recursive? fn(_: Int, _: T) -> U): List<U> {
+        return List<T>::_mapIndex[recursive?](this f);
+    }
+
+    method {when T KeyType} project<U>(m: IMap<T, U>): List<U> {
+        if(m->is<Map<T, U>()) {
+            return List<T>::_projectWMap<U>(this, m->as<Map<T, U>>()); 
+        }
+        else {
+            abort;
+        }
+    }
+
+    method {when T KeyType} tryProject<U>(m: IMap<T, U>): List<U?> {
+        if(m->is<Map<T, U>()) {
+            return List<T>::_tryProjectWMap<U>(this, m->as<Map<T, U>>());
+        }
+        else {
+            abort;
+        }
+    }
+
+    method zipIndex(): List<[Int, T]> {
+        return List<T>::_zipIndex(this);
+    }
+
+    method join<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
+        return List<T>::_join<U>[recursive?](this, ol, p);
+    }
+
+    method joinGroup<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
+        return List<T>::_joinGroup<U>[recursive?](this, ol, p);
+    }
+
+    method append(l: List<T>): List<T> {
+        return List<T>::_append(this, l);
+    }
+
+    method prepend(l: List<T>): List<T> {
+        return List<T>::_append(l, this);
+    }
+
+    recursive? method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+        return List<T>::_partition<K>[recursive?](this, pf);
+    }
+
+    recursive? method sort(cmp: recursive? fn(_: T, _: T) -> Bool): List<T> {
+        return List<T>::_sort[recursive?](this, pf);
+    }
+
+    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
+        return List<T>::_toMap<K, V>[recursive?](this, kf, vf);
+    }
+
+    recursive? method toIndexMap<V>(vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> {
+        return List<T>::_toIndexMap<K, V>[recursive?](this, vf);
+    }
+
+
+
 
     hidden _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
@@ -104,59 +194,57 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_count[recursive?](this, p);
     }
 
-xxxx
-
     method {when T KeyType} contains(v: T): Bool {
-        return List<T>::_indexof_keytype[recursive](this, 0, List<T>::_size(this), v) != List<T>::_size(this);
+        return List<T>::_indexof_keytype(this, 0, List<T>::_size(this), v) != List<T>::_size(this);
     }
 
     method {when T KeyType} count(v: T): Int {
-        return List<T>::_count_keytype[recursive](this, 0, 0, v, List<T>::_size(this));
+        return List<T>::_count_keytype(this, v);
     }
 
     method {when T Int} min(): Int 
         requires release List<T>::_size(this) != 0;
     {
-        return List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0));
+        return List<T>::_min(this);
     }
 
     method {when T Int} tryMin(): Int? {
-        return List<T>::_size(this) != 0 ? List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
+        return List<T>::_size(this) != 0 ? List<T>::_min(this) : none;
     }
 
     method {when T Int} max(): Int 
         requires release List<T>::_size(this) != 0;
     {
-        return List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0));
+        return List<T>::_max(this);
     }
 
     method {when T Int} tryMax(): Int? {
-        return s != e ? List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
+        return s != e ? List<T>::_max(this) : none;
     }
 
     method {when T Int} sum(): Int {
-        return List<T>::_sum[recursive](this, 0, 0, List<T>::_size(this));
+        return List<T>::_sum(this);
     }
 
     recursive? method find(p: recursive? fn(_: T) -> Bool): T {
-        let idx = List<T>::_indexof[recursive](this, 0, List<T>::_size(this), p);
+        let idx = List<T>::_indexof[recursive?](this, 0, List<T>::_size(this), p);
         check idx != List<T>::_size(this);
         return List<T>::_unsafe_get(this, idx);
     }
 
     recursive? method tryFind(p: recursive? fn(_: T) -> Bool): T? {
-        let idx = List<T>::_indexof[recursive](this, 0, List<T>::_size(this), p);
+        let idx = List<T>::_indexof[recursive?](this, 0, List<T>::_size(this), p);
         return idx != List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
     }
 
     recursive? method findLast(p: recursive? fn(_: T) -> Bool): T {
-        let idxlast = List<T>::_indexoflast[recursive](this, -1, List<T>::_size(this) - 1, p);
+        let idxlast = List<T>::_indexoflast[recursive?](this, -1, List<T>::_size(this) - 1, p);
         check idxlast != -1;
         return List<T>::_unsafe_get(this, idxlast);
     }
 
     recursive? method tryFindLast(p: recursive? fn(_: T) -> Bool): T? {
-        let idxlast = List<T>::_indexoflast[recursive](this, -1, List<T>::_size(this) - 1, p);
+        let idxlast = List<T>::_indexoflast[recursive?](this, -1, List<T>::_size(this) - 1, p);
         return idxlast != -1 ? List<T>::_unsafe_get(this, idxlast) : none;
     }
 
@@ -165,7 +253,7 @@ xxxx
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof[recursive](this, s, e, p);
+        let idx = List<T>::_indexof[recursive?](this, s, e, p);
         check idx != e;
         return idx;
     }
@@ -175,7 +263,7 @@ xxxx
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof[recursive](this, s, e, p);
+        let idx = List<T>::_indexof[recursive?](this, s, e, p);
         return idx != e ? idx : none;
     }
 
@@ -184,7 +272,7 @@ xxxx
     {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
 
-        let idxlast = List<T>::_indexoflast[recursive](this, s, e, p);
+        let idxlast = List<T>::_indexoflast[recursive?](this, s, e, p);
         check idxlast != s;
         return idxlast;
     }
@@ -194,7 +282,7 @@ xxxx
     {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
 
-        let idxlast = List<T>::_indexoflast[recursive](this, s, e, p);
+        let idxlast = List<T>::_indexoflast[recursive?](this, s, e, p);
         return idxlast != s ? idxlast : none;
     }
 
@@ -203,7 +291,7 @@ xxxx
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof_keytype[recursive](this, s, e, v);
+        let idx = List<T>::_indexof_keytype(this, s, e, v);
         check idx != e;
         return idx;
     }
@@ -213,7 +301,7 @@ xxxx
     {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
 
-        let idx = List<T>::_indexof_keytype[recursive](this, s, e, v);
+        let idx = List<T>::_indexof_keytype(this, s, e, v);
         return idx != e ? idx : none;
     }
 
@@ -222,7 +310,7 @@ xxxx
     {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
 
-        let idx = List<T>::_indexoflast_keytype[recursive](this, s, e, v);
+        let idx = List<T>::_indexoflast_keytype(this, s, e, v);
         check idx != s;
         return idx;
     }
@@ -232,20 +320,20 @@ xxxx
     {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
 
-        let idx = List<T>::_indexoflast_keytype[recursive](this, s, e, v);
+        let idx = List<T>::_indexoflast_keytype(this, s, e, v);
         return idx != s ? idx : none;
     }
 
     recursive? method filter(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_filter[recursive](this, List<T>@{}, 0, p);
+        return List<T>::_filter[recursive?](this, p);
     }
 
     method ofType<U>(): List<U> {
-        return List<T>::_oftype<U>[recursive](this, List<T>@{}, 0);
+        return List<T>::_oftype<U>(this);
     }
 
     method cast<U>(): List<U> {
-        return List<T>::_cast<U>[recursive](this, List<U>@{}, 0);
+        return List<T>::_cast<U>(this);
     }
 
     method slice(start?: Int, end?: Int): List<T> 
@@ -257,7 +345,7 @@ xxxx
             return List<T>@{};
         }
         else {
-            return List<T>::_slice[recursive](this, List<T>@{}, s, e);
+            return List<T>::_slice(this, s, e);
         }
     }
 
@@ -266,7 +354,7 @@ xxxx
             return List<T>@{};
         }
         else {
-            return List<T>::_slice[recursive](this, List<T>@{}, k, List<T>::_size(this));
+            return List<T>::_slice(this, k, List<T>::_size(this));
         }
     }
 
@@ -275,45 +363,45 @@ xxxx
             return List<T>@{};
         }
         else {
-            return List<T>::_slice[recursive](this, List<T>@{}, 0, List<T>::_size(this) - k);
+            return List<T>::_slice(this, 0, List<T>::_size(this) - k);
         }
     }
 
     recursive? method takeWhile(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_takewhile[recursive](this, List<T>@{}, 0, p);
+        return List<T>::_takewhile[recursive?](this, p);
     }
 
     recursive? method discardWhile(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_discardwhile[recursive](this, 0, p);
+        return List<T>::_discardwhile[recursive?](this, p);
     }
 
     recursive? method takeUntil(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_takeuntil[recursive](this, List<T>@{}, 0, p);
+        return List<T>::_takeuntil[recursive?](this, p);
     }
 
     recursive? method discardUntil(p: recursive? fn(_: T) -> Bool): List<T> {
-        return List<T>::_discarduntil[recursive](this, 0, p);
+        return List<T>::_discarduntil[recursive?](this, p);
     }
 
     method {when T KeyType} unique(): List<T> {
-        return List<T>::_unique[recursive](this, List<T>@{}, 0);
+        return List<T>::_unique(this);
     }
 
     method reverse(): List<T> {
-        return List<T>::_reverse[recursive](this, List<T>@{}, 0);
+        return List<T>::_reverse(this);
     }
 
     recursive? method map<U>(f: recursive? fn(_: T) -> U): List<U> {
-        return List<T>::_map[recursive](this, List<U>@{}, 0, f);
+        return List<T>::_map[recursive?](this, f);
     }
 
     recursive? method mapIndex<U>(f: recursive? fn(_: Int, _: T) -> U): List<U> {
-        return List<T>::_mapIndex[recursive](this, List<U>@{}, 0, f);
+        return List<T>::_mapIndex[recursive?](this f);
     }
 
     method {when T KeyType} project<U>(m: IMap<T, U>): List<U> {
         if(m->is<Map<T, U>()) {
-            return List<T>::_projectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>()); 
+            return List<T>::_projectWMap<U>(this, m->as<Map<T, U>>()); 
         }
         else {
             abort;
@@ -322,7 +410,7 @@ xxxx
 
     method {when T KeyType} tryProject<U>(m: IMap<T, U>): List<U?> {
         if(m->is<Map<T, U>()) {
-            return List<T>::_tryProjectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>());
+            return List<T>::_tryProjectWMap<U>(this, m->as<Map<T, U>>());
         }
         else {
             abort;
@@ -330,41 +418,39 @@ xxxx
     }
 
     method zipIndex(): List<[Int, T]> {
-        return List<T>::_zipIndex[recursive](this, List<[Int, T]>@{}, 0);
+        return List<T>::_zipIndex(this);
     }
 
     method join<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
-        return List<T>::_join<U>[recursive](this, ol, List<[T, U]>@{}, 0, p);
+        return List<T>::_join<U>[recursive?](this, ol, p);
     }
 
     method joinGroup<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
-        return List<T>::_joinGroup<U>[recursive](this, ol, List<[T, List<U>]>@{}, 0, p);
+        return List<T>::_joinGroup<U>[recursive?](this, ol, p);
     }
 
     method append(l: List<T>): List<T> {
-        let cl = List<T>::_append[recursive](this, List<T>@{}, 0);
-        return List<T>::_append[recursive](l, cl, 0);
+        return List<T>::_append(this, l);
     }
 
     method prepend(l: List<T>): List<T> {
-        let cl = List<T>::_append[recursive](l, List<T>@{}, 0);
-        return List<T>::_append[recursive](this, cl, 0);
+        return List<T>::_append(l, this);
     }
 
     recursive? method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
-        return List<T>::_partition<K>[recursive](this, Map<K, List<T>>@{}, 0, pf);
+        return List<T>::_partition<K>[recursive?](this, pf);
     }
 
     recursive? method sort(cmp: recursive? fn(_: T, _: T) -> Bool): List<T> {
-        return List<T>::_sort[recursive](this, List<T>@{}, 0, pf);
+        return List<T>::_sort[recursive?](this, pf);
     }
 
     recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
-        return List<T>::_toMap<K, V>[recursive](this, Map<K, V>@{}, 0, kf, vf);
+        return List<T>::_toMap<K, V>[recursive?](this, kf, vf);
     }
 
     recursive? method toIndexMap<V>(vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> {
-        return List<T>::_toIndexMap<K, V>[recursive](this, Map<K, V>@{}, 0, vf);
+        return List<T>::_toIndexMap<K, V>[recursive?](this, vf);
     }
 }
 

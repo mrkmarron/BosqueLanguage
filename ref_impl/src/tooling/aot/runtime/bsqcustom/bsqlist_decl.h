@@ -11,30 +11,51 @@
 #define Ty TName
 #define T int
 #define DEC_RC_T(X)
+#define FDisplay(X)
+#define BSCOPE
 #endif
 
 class Ty : public BSQObject {
 public:
-    int64_t size;
-    T* entries;
+    std::vector<T> entries;
 
-    Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), size(0), entries(nullptr) { ; }
-    Ty(MIRNominalTypeEnum ntype, int64_t size, T* vals) : BSQObject(ntype), size(size), entries(vals) { ; }
+    Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
+    Ty(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
     virtual ~Ty()
     {
-        free(this->entries);
+        ;
     }
 
     virtual void destroy()
     {
-        for(size_t i = 0; i < this->size; ++i)
+        std::for_each(this->entries.begin(), this->entries.end(), [](T& v) -> void {
+            DEC_RC_T(v);
+        });
+    }
+
+    virtual std::u32string display() const
+    {
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+
+        std::u32string ls(U"{");
+        BSQRefScope BSCOPE;
+        for (size_t i = 0; i < this->entries.size(); ++i)
         {
-            DEC_RC_T(this->entries[i]);
+            if (i != 0)
+            {
+                ls += U", ";
+            }
+            ls += FDisplay(this->entries[i]);
         }
+        ls += U"}";
+
+        return ls;
     }
 };
 
 #undef Ty
 #undef T
 #undef DEC_RC_T
+#undef FDisplay
+#undef BSCOPE
