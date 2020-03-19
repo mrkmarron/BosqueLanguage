@@ -28,6 +28,36 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
+    hidden recursive static _none(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
+        if(idx == List<T>::_size(l)) {
+            return true;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return false;
+            }
+            else {
+                return List<T>::_none[recursive](l, idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _any(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
+        if(idx == List<T>::_size(l)) {
+            return false;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(p[recursive?](val)) {
+                return true;
+            }
+            else {
+                return List<T>::_any[recursive](l, idx + 1, p);
+            }
+        }
+    }
+
     hidden recursive static _indexof(l: List<T>, idx: Int, end: Int, p: recursive? fn(_: T) -> Bool): Int {
         if(idx == end) {
             return idx;
@@ -58,6 +88,36 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
+    hidden recursive static _indexofnot(l: List<T>, idx: Int, end: Int, p: recursive? fn(_: T) -> Bool): Int {
+        if(idx == end) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexofnot[recursive](l, idx + 1, end, p);
+            }
+        }
+    }
+
+    hidden recursive static _indexoflastnot(l: List<T>, start: Int, idx: Int, p: recursive? fn(_: T) -> Bool): Int {
+        if(idx == start) {
+            return idx;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return idx;
+            }
+            else {
+                return List<T>::_indexoflastnot[recursive](l, start, idx - 1, p);
+            }
+        }
+    }
+
     hidden recursive static _count(l: List<T>, idx: Int, acc: Int, p: recursive? fn(_: T) -> Bool): Int {
         if(idx == List<T>::_size(l)) {
             return acc;
@@ -65,6 +125,18 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         else {
             let val = List<T>::_unsafe_get(l, idx);
             let nacc = p[recursive?](val) ? acc + 1 : acc;
+            
+            return List<T>::_count[recursive](l, idx + 1, nacc, p);
+        }
+    }
+
+    hidden recursive static _countnot(l: List<T>, idx: Int, acc: Int, p: recursive? fn(_: T) -> Bool): Int {
+        if(idx == List<T>::_size(l)) {
+            return acc;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            let nacc = !p[recursive?](val) ? acc + 1 : acc;
             
             return List<T>::_count[recursive](l, idx + 1, nacc, p);
         }
@@ -154,6 +226,21 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             }
             else {
                 return List<T>::_filter(l, lp, idx + 1, p);
+            }
+        }
+    }
+
+    hidden recursive static _filternot(l: List<T>, lp: List<U>, idx: Int, p: recursive? fn(_: T) -> Bool): List<T> {
+        if(idx == List<T>::_size(l)) {
+            return lp;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            if(!p[recursive?](val)) {
+                return List<T>::_filternot(l, List<T>::_unsafe_push(lp, val), idx + 1, p);
+            }
+            else {
+                return List<T>::_filternot(l, lp, idx + 1, p);
             }
         }
     }
@@ -541,15 +628,19 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     recursive? method noneof(p: recursive? fn(_: T) -> Bool): Bool {
-        return List<T>::_size(this) == 0 || List<T>::_indexof[recursive](this, 0, List<T>::_size(this), p) == List<T>::_size(this);
+        return List<T>::_size(this) == 0 || List<T>::_none[recursive](this, 0, List<T>::_size(this), p);
     }
 
     recursive? method anyof(p: recursive? fn(_: T) -> Bool): Bool {
-        return List<T>::_size(this) != 0 && List<T>::_indexof[recursive](this, 0, List<T>::_size(this), p) != List<T>::_size(this);
+        return List<T>::_size(this) != 0 && List<T>::_any[recursive](this, 0, List<T>::_size(this), p);
     }
 
     recursive? method countIf(p: recursive? fn(_: T) -> Bool): Int {
         return List<T>::_count[recursive](this, 0, 0, p, List<T>::_size(this));
+    }
+
+    recursive? method countIfNot(p: recursive? fn(_: T) -> Bool): Int {
+        return List<T>::_countnot[recursive](this, 0, 0, p, List<T>::_size(this));
     }
 
     method {when T KeyType} contains(v: T): Bool {
@@ -595,6 +686,17 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return idx != List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
     }
 
+    recursive? method findNot(p: recursive? fn(_: T) -> Bool): T {
+        let idx = List<T>::_indexofnot[recursive](this, 0, List<T>::_size(this), p);
+        check idx != List<T>::_size(this);
+        return List<T>::_unsafe_get(this, idx);
+    }
+
+    recursive? method tryFindNot(p: recursive? fn(_: T) -> Bool): T? {
+        let idx = List<T>::_indexofnot[recursive](this, 0, List<T>::_size(this), p);
+        return idx != List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
+    }
+
     recursive? method findLast(p: recursive? fn(_: T) -> Bool): T {
         let idxlast = List<T>::_indexoflast[recursive](this, -1, List<T>::_size(this) - 1, p);
         check idxlast != -1;
@@ -603,6 +705,17 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
 
     recursive? method tryFindLast(p: recursive? fn(_: T) -> Bool): T? {
         let idxlast = List<T>::_indexoflast[recursive](this, -1, List<T>::_size(this) - 1, p);
+        return idxlast != -1 ? List<T>::_unsafe_get(this, idxlast) : none;
+    }
+
+    recursive? method findLastNot(p: recursive? fn(_: T) -> Bool): T {
+        let idxlast = List<T>::_indexoflastnot[recursive](this, -1, List<T>::_size(this) - 1, p);
+        check idxlast != -1;
+        return List<T>::_unsafe_get(this, idxlast);
+    }
+
+    recursive? method tryFindLastNot(p: recursive? fn(_: T) -> Bool): T? {
+        let idxlast = List<T>::_indexoflastnot[recursive](this, -1, List<T>::_size(this) - 1, p);
         return idxlast != -1 ? List<T>::_unsafe_get(this, idxlast) : none;
     }
 
@@ -625,6 +738,25 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return idx != e ? idx : none;
     }
 
+    recursive? method findIndexOfNot(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int
+        requires release this->_rangeInBoundsFwd(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexofnot[recursive](this, s, e, p);
+        check idx != e;
+        return idx;
+    }
+
+    recursive? method tryFindIndexOfNot(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBoundsFwd(start, end);
+    {
+        let s, e = start ?| 0, end ?| List<T>::_size(this);
+
+        let idx = List<T>::_indexofnot[recursive](this, s, e, p);
+        return idx != e ? idx : none;
+    }
+
     recursive? method findLastIndexOf(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int
         requires release this->_rangeInBoundsRev(start, end);
     {
@@ -641,6 +773,25 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
 
         let idxlast = List<T>::_indexoflast[recursive](this, s, e, p);
+        return idxlast != s ? idxlast : none;
+    }
+
+    recursive? method findLastIndexOfNot(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int
+        requires release this->_rangeInBoundsRev(start, end);
+    {
+        let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
+
+        let idxlast = List<T>::_indexoflastnot[recursive](this, s, e, p);
+        check idxlast != s;
+        return idxlast;
+    }
+
+    recursive? method tryFindLastIndexOfNot(p: recursive? fn(_: T) -> Bool, start?: Int, end?: Int): Int?
+        requires release this->_rangeInBoundsRev(start, end);
+    {
+        let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
+
+        let idxlast = List<T>::_indexoflastnot[recursive](this, s, e, p);
         return idxlast != s ? idxlast : none;
     }
 
@@ -684,6 +835,10 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
 
     recursive? method filter(p: recursive? fn(_: T) -> Bool): List<T> {
         return List<T>::_filter[recursive](this, List<T>@{}, 0, p);
+    }
+
+    recursive? method filterNot(p: recursive? fn(_: T) -> Bool): List<T> {
+        return List<T>::_filternot[recursive](this, List<T>@{}, 0, p);
     }
 
     method ofType<U>(): List<U> {
@@ -779,11 +934,11 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_zipIndex[recursive](this, List<[Int, T]>@{}, 0);
     }
 
-    method join<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
+    recursive? method join<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
         return List<T>::_join<U>[recursive](this, ol, List<[T, U]>@{}, 0, p);
     }
 
-    method joinGroup<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
+    recursive? method joinGroup<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
         return List<T>::_joinGroup<U>[recursive](this, ol, List<[T, List<U>]>@{}, 0, p);
     }
 

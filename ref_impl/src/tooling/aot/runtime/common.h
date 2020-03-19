@@ -19,6 +19,7 @@
 #include <map>
 
 #include <algorithm>
+#include <numeric>
 
 #ifdef BDEBUG
 #define BSQ_ASSERT(C, MSG) (bsqassert(C, MSG, __FILE__, __LINE__))
