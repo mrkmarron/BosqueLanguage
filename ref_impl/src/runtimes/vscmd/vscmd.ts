@@ -171,7 +171,7 @@ function compile(masm: MIRAssembly, wsroot: string, config: any): boolean {
         });
 
         const binfile = Path.join(wsroot, config.outdir, `${config.app}.${binext}`);
-        execSync(`${compilerpath} -Os -march=native -std=c++14 -o ${binfile} ${cpppath}/*.cpp`);
+        execSync(`${compilerpath} -Os -march=native -std=c++17 -o ${binfile} ${cpppath}/*.cpp`);
     }
     catch (ex) {
         process.stdout.write(ex);

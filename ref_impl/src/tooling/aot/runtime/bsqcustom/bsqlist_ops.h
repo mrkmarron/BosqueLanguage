@@ -372,6 +372,62 @@ public:
 
         return BSQ_NEW_NO_RC(Ty, l->nominalType, move(entries));
     }
+
+    template <typename K, typename K_RCIncF, typename K_RCDecF, typename K_DisplayF, typename K_CMP, MIRNominalTypeEnum ntype, typename LambdaPF> 
+    static BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, T, RCDecF, DisplayF>* list_partition(Ty* l)
+    {
+        std::map<K, std::vector<T>, K_CMP> partitions;
+        std::for_each(l->entries.begin(), l->entries.end(), [&partitions](T& v) -> void {
+            auto k = LambdaPF{}(v);
+            auto pp = partitions.find(k);
+
+            if(pp != partitions.end())
+            {
+                pp->second.push_back(RCIncF(v));
+            }
+            else 
+            {
+                partitions.emplace(K_RCIncF(k), std::vector<T>{RCIncF(v)});
+            }
+        });
+
+        std::vector<std::pair<K, Ty*>> mentries;
+        mentries.reserve(partitions.size());
+
+        auto ltype = l->nominalType;
+        std::transform(partitions.begin(), partitions.end(), std::back_inserter(mentries), [ltype](std::pair<K, std::vector<T>>& me) -> std::pair<K, Ty*> {
+            auto le = BSQ_NEW_NO_RC(Ty, ltype, move(me.second));
+            return std::make_pair(me.first, INC_REF_DIRECT(Ty, le));
+        });
+
+        return BSQ_NEW_NO_RC((BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, T, RCDecF, DisplayF>), ntype, move(mentries));
+    }
+
+    template <typename LambdaCMP>
+    static Ty* list_sort(Ty* l)
+    {
+        std::vector<T> entries;
+        entries.reserve(l->entries.size());
+
+        std::for_each(l->begin(), l->end(), [&entries](T& v) -> void {
+            entries.push_back(RCIncF{}(v));
+        });
+        std::stable_sort(entries.begin(), entries.end(), LambdaCMP{});
+
+        return BSQ_NEW_NO_RC(Ty, l->nominalType, move(entries));
+    }
+
+    template <typename K, typename K_RCIncF, typename K_RCDecF, typename K_DisplayF, typename K_CMP, typename V, typename V_RCIncF, typename V_RCDecF, typename V_DisplayF, typename LambdaKF, typename V, typename LambdaVF> 
+    static BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, V, V_RCDecF, V_DisplayF>* list_tomap(Ty* l)
+    {
+
+    }
+
+    template <typename V, typename V_RCIncF, typename V_RCDecF, typename V_DisplayF, typename LambdaKF, typename V, typename LambdaVF> 
+    static BSQMap<int64_t, RCDecFunctor_Int, DisplayFunctor_Int, std::less<int64_t>, V, V_RCDecF, V_DisplayF>* list_toindexmap(Ty* l)
+    {
+
+    }
 };
 
 }

@@ -173,7 +173,7 @@ setImmediate(() => {
             buildOpts = " -Os -march=native"
         }
 
-        execSync(`${Commander.compiler}${buildOpts} -std=c++14 -o ${Commander.outfile} ${cpppath}/*.cpp`);
+        execSync(`${Commander.compiler}${buildOpts} -std=c++17 -o ${Commander.outfile} ${cpppath}/*.cpp`);
     }
     catch (ex) {
         process.stderr.write(chalk.red(`Error -- ${ex}\n`));

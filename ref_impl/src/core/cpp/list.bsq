@@ -60,24 +60,11 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
 
     hidden static _append(l: List<T>, lp: List<T>): List<T> # list_append
 
-    recursive? method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
-        return List<T>::_partition<K>[recursive?](this, pf);
-    }
+    hidden recursive? static _partition<K where K KeyType>(l: List<T>, pf: recursive? fn(_: T) -> K): Map<K, List<T>> # list_partition
+    hidden recursive? static sort(l: List<T>, cmp: recursive? fn(_: T, _: T) -> Bool): List<T> # list_sort
 
-    recursive? method sort(cmp: recursive? fn(_: T, _: T) -> Bool): List<T> {
-        return List<T>::_sort[recursive?](this, pf);
-    }
-
-    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
-        return List<T>::_toMap<K, V>[recursive?](this, kf, vf);
-    }
-
-    recursive? method toIndexMap<V>(vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> {
-        return List<T>::_toIndexMap<K, V>[recursive?](this, vf);
-    }
-
-
-
+    hidden recursive? static toMap<K where K KeyType, V>(l: List<T>, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> # list_tomap
+    hidden recursive? static toIndexMap<V>(l: List<T>, vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> # list_toindexmap
 
     hidden _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
