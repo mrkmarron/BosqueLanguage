@@ -521,7 +521,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         abort;
     }
 
-    hidden recursive static _toMap<K, V>(l: List<T>, mp: Map<K, V>, idx: Int, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
+    hidden recursive static _toMap<K, V>(l: List<T>, mp: Map<K, V>, idx: Int, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge: Bool): Map<K, V> {
         if(idx === List<T>::_size(l)) {
             return lp;
         }
@@ -547,7 +547,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
             let val = List<T>::_unsafe_get(l, idx);
             let v = vf[recursive?](val);
 
-            return List<T>::_toMap(l, mp->add(idx, v), idx + 1, kf, vf);
+            return List<T>::_toIndexMap(l, mp->add(idx, v), idx + 1, kf, vf);
         }
     }
 
@@ -960,8 +960,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_sort[recursive](this, List<T>@{}, 0, pf);
     }
 
-    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
-        return List<T>::_toMap<K, V>[recursive](this, Map<K, V>@{}, 0, kf, vf);
+    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
+        return List<T>::_toMap<K, V>[recursive](this, Map<K, V>@{}, 0, kf, vf, Truthy::truth(merge));
     }
 
     recursive? method toIndexMap<V>(vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> {

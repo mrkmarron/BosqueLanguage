@@ -65,6 +65,10 @@ concept APIType provides APIValue {
 
 //<summary>Type for representing the none-value.</summary>
 concept Truthy provides KeyType, Parsable {
+    static truth(v: Truthy): Bool {
+        return !!v;
+    }
+
     override static tryParse(str: String): Result<Truthy, String> # truthy_tryparse
 }
 

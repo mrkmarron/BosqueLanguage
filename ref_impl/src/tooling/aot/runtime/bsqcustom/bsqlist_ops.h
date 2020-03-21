@@ -373,7 +373,7 @@ public:
         return BSQ_NEW_NO_RC(Ty, l->nominalType, move(entries));
     }
 
-    template <typename K, typename K_RCIncF, typename K_RCDecF, typename K_DisplayF, typename K_CMP, MIRNominalTypeEnum ntype, typename LambdaPF> 
+    template <typename K, typename K_RCDecF, typename K_DisplayF, typename K_CMP, MIRNominalTypeEnum ntype, typename LambdaPF> 
     static BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, T, RCDecF, DisplayF>* list_partition(Ty* l)
     {
         std::map<K, std::vector<T>, K_CMP> partitions;
@@ -387,7 +387,7 @@ public:
             }
             else 
             {
-                partitions.emplace(K_RCIncF(k), std::vector<T>{RCIncF(v)});
+                partitions.emplace(k, std::vector<T>{RCIncF(v)});
             }
         });
 
@@ -417,16 +417,70 @@ public:
         return BSQ_NEW_NO_RC(Ty, l->nominalType, move(entries));
     }
 
-    template <typename K, typename K_RCIncF, typename K_RCDecF, typename K_DisplayF, typename K_CMP, typename V, typename V_RCIncF, typename V_RCDecF, typename V_DisplayF, typename LambdaKF, typename V, typename LambdaVF> 
-    static BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, V, V_RCDecF, V_DisplayF>* list_tomap(Ty* l)
+    template <typename K, typename K_RCDecF, typename K_DisplayF, typename K_CMP, typename K_EQ, typename V, typename V_RCDecF, typename V_DisplayF, typename LambdaKF, typename V, typename LambdaVF> 
+    static BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, V, V_RCDecF, V_DisplayF>* list_tomap(Ty* l, bool merge)
     {
+        std::vector<std::pair<K, V>> mentries;
+        mentries.reserve(l->entries.size());
+        std::for_each(l->entries.begin(), l->entries.end(), [&partitions](T& v) -> void {
+            auto k = LambdaKF{}(v);
+            auto v = LambdaVF{}(v);
+            mentries.push_back(std::make_pair(k, v));
+        });
 
+        std::stable_sort(mentries.begin(), mentries.end(), [](const K& a, const K& b) -> bool {
+            return K_CMP{}(a, b);
+        });
+
+        auto dup = std::adjacent_find(mentries.begin(), mentries.end(), [](const K& a, const K& b) -> bool {
+            return K_EQ{}(a, b);
+        });
+
+        bool hasdups = dup != mentries.end();
+        BSQ_ASSERT(merge || !hasdups);
+
+        if(hasdups)
+        {
+            while(dup != mentries.end())
+            {
+                auto dupend = std::find_if(dup, mentries.end(), [dup](const K& a) -> bool {
+                    return !K_EQ{}(a, dup);
+                });
+
+                std::reverse(dup, dupend);
+                std::for_each(std::advance(dup, 1), dupend, [](const std::pair<K, V>& rcc) -> void {
+                    K_RCDecF{}(rcc.first);
+                    V_RCDecF{}(rcc.second);
+                });
+
+                dup = std::adjacent_find(dupend, mentries.end(), [](const K& a, const K& b) -> bool {
+                    return K_EQ{}(a, b);
+                });
+            }
+
+            auto uend = std::unique(mentries.begin(), mentries.end(), [](const K& a, const K& b) -> bool {
+                return K_EQ{}(a, b);
+            });
+
+            mentries.erase(uend, mentries.end());
+        }
+
+        return BSQ_NEW_NO_RC((BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, T, RCDecF, DisplayF>), ntype, move(mentries));
     }
 
     template <typename V, typename V_RCIncF, typename V_RCDecF, typename V_DisplayF, typename LambdaKF, typename V, typename LambdaVF> 
     static BSQMap<int64_t, RCDecFunctor_Int, DisplayFunctor_Int, std::less<int64_t>, V, V_RCDecF, V_DisplayF>* list_toindexmap(Ty* l)
     {
+        std::vector<std::pair<int64_t, V>> mentries;
+        mentries.reserve(l->entries.size());
+        
+        for(int64_t i = 0; i < l->entries.size(); ++i)
+        {
+            auto v = LambdaVF{}(l->entries[i]);
+            mentries.push_back(std::make_pair(i, v));
+        }
 
+        return BSQ_NEW_NO_RC((BSQMap<K, K_RCDecF, K_DisplayF, K_CMP, T, RCDecF, DisplayF>), ntype, move(mentries));
     }
 };
 

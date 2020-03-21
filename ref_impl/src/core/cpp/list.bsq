@@ -63,7 +63,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden recursive? static _partition<K where K KeyType>(l: List<T>, pf: recursive? fn(_: T) -> K): Map<K, List<T>> # list_partition
     hidden recursive? static sort(l: List<T>, cmp: recursive? fn(_: T, _: T) -> Bool): List<T> # list_sort
 
-    hidden recursive? static toMap<K where K KeyType, V>(l: List<T>, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> # list_tomap
+    hidden recursive? static toMap<K where K KeyType, V>(l: List<T>, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge: Bool): Map<K, V> # list_tomap
     hidden recursive? static toIndexMap<V>(l: List<T>, vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> # list_toindexmap
 
     hidden _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
@@ -473,8 +473,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_sort[recursive?](this, pf);
     }
 
-    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
-        return List<T>::_toMap<K, V>[recursive?](this, kf, vf);
+    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
+        return List<T>::_toMap<K, V>[recursive?](this, kf, vf, Truthy::truth(merge));
     }
 
     recursive? method toIndexMap<V>(vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> {
