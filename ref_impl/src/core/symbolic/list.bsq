@@ -184,7 +184,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Int} _min(l: List<T>, idx: Int, acc: Int): Int {
+    hidden recursive static {when T KeyType} _min(l: List<T>, idx: Int, acc: T): T {
         if(idx == List<T>::_size(l)) {
             return acc;
         }
@@ -194,7 +194,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Int} _max(l: List<Int>, idx: Int, acc: Int): Int {
+    hidden recursive static {when T KeyType} _max(l: List<T>, idx: Int, acc: T): T {
         if(idx == List<T>::_size(l)) {
             return List<T>::_size(l);
         }
@@ -204,7 +204,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
     }
 
-    hidden recursive static {when T Int} _sum(l: List<Int>, idx: Int, acc: Int): Int {
+    hidden recursive static {when T Int | BigInt} _sum(l: List<T>, idx: Int, acc: T): T {
         if(idx == List<T>::_size(l)) {
             return acc;
         }
@@ -651,27 +651,27 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return List<T>::_count_keytype[recursive](this, 0, 0, v, List<T>::_size(this));
     }
 
-    method {when T Int} min(): Int 
+    method {when T KeyType} min(): KeyType 
         requires release List<T>::_size(this) != 0;
     {
         return List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0));
     }
 
-    method {when T Int} tryMin(): Int? {
+    method {when T KeyType} tryMin(): KeyType? {
         return List<T>::_size(this) != 0 ? List<T>::_min[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
     }
 
-    method {when T Int} max(): Int 
+    method {when T KeyType} max(): KeyType 
         requires release List<T>::_size(this) != 0;
     {
         return List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0));
     }
 
-    method {when T Int} tryMax(): Int? {
+    method {when T KeyType} tryMax(): KeyType? {
         return s != e ? List<T>::_max[recursive](this, 1, List<T>::_unsafe_get(0)) : none;
     }
 
-    method {when T Int} sum(): Int {
+    method {when T Int | BigInt} sum(): T {
         return List<T>::_sum[recursive](this, 0, 0, List<T>::_size(this));
     }
 

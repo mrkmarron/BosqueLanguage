@@ -29,173 +29,27 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     hidden static _has_key(m: Map<K, V>, key: K): Bool # map_has_key
     hidden static _at_val(m: Map<K, V>, key: K): V # map_at_val
 
-    hidden static _get_keylist(m: Map<K, V>): KeyList<K>? # map_get_keylist
-    
-    hidden static _unsafe_add(m: Map<K, V>, key: K, val: V, newkl: KeyList<K>): Map<K, V> # map_unsafe_add
-    hidden static _unsafe_update(m: Map<K, V>, key: K, val: V): Map<K, V> # map_unsafe_update
+    hidden static _key_list(m: Map<K, V>): List<K> # map_key_list
+    hidden static _key_set(m: Map<K, V>): Set<K> # map_key_set
+    hidden static _values(m: Map<K, V>): List<V> # map_values
+    hidden static _entries(m: Map<K, V>): List<MapEntry<K, V>> # map_entries
 
-     hidden static _add(m: Map<K, V>, k: K, v: V): Map<K, V>
-        requires release !Map<K, V>::_has_key(m, k);
-    {
-        let kl = Map<K, V>::_get_keylist(m);
-        return Map<K, V>::_unsafe_add(m, k, v, KeyList<K>@{hkey=kk, tail=kl});
-    }
-
-     hidden static _update(m: Map<K, V>, k: K, v: V): Map<K, V>
-        requires release Map<K, V>::_has_key(m, k);
-     {
-        return Map<K, V>::_unsafe_update(m, k, v);
-    }
-
-    hidden recursive static _key_list(kl: KeyList<K>?, l: List<K>): List<K> {
-        if(kl == none) {
-            return l;
-        }
-        else {
-            return Map<K, V>::_key_list[recursive](kl.tail, List<T>::_unsafe_push(l, kl.hkey));
-        }
-    }
-
-    //we should be able to take keyset and key array for the set directly
-    hidden static _key_set(m: Map<K, V>): Set<K> # map_keyset
-
-    //we should be able to use the array map operation on the has has arrays
+    hidden static _has_all(m: Map<K, V>, kl: List<K>): Bool # map_has_all
     hidden static _domainincludes(m: Map<K, V>, s: Set<K>): Bool # map_domainincludes
 
-    hidden recursive static _value_list(m: Map<K, V>, kl: KeyList<K>?, l: List<V>): List<V> {
-        if(kl == none) {
-            return l;
-        }
-        else {
-            let v = Map<K, V>::_at_val(m, kl.hkey);
-            return Map<K, V>::_value_list[recursive](m, kl.tail, List<T>::_unsafe_push(l, v));
-        }
-    }
+    recursive? hidden static _submap(m: Map<K, V>, p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> # map_submap
+    hidden static _oftype<T where KeyType, U>(m: Map<K, V>): Map<T, U> # map_oftype
+    hidden static _cast<T where KeyType, U>(m: Map<K, V>): Map<T, U> # map_cast
 
-    hidden recursive static _entries_list(m: Map<K, V>, kl: KeyList<K>?, l: List<MapEntry<K, V>>): List<MapEntry<K, V>> {
-        if(kl == none) {
-            return l;
-        }
-        else {
-            let v = Map<K, V>::_at_val(m, kl.hkey);
-            return Map<K, V>::_value_list[recursive](m, kl.tail, List<T>::_unsafe_push(l, MapEntry<K, V>@{ key=kl.hkey, value=v }));
-        }
-    }
+    hidden static _project(m: Map<K, V>, ds: Set<K>, missingok: Bool): Map<K, V> # map_project
+    recursive? hidden static _remap(m: Map<K, V>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> # map_remap
+    hidden static _projectall(m: Map<K, V>, dl: List<K>, missingok: Bool): Map<K, V> # map_projectall
 
-    hidden recursive static _hasall(m: Map<K, V>, l: List<K>, idx: Int): Bool {
-        if(idx == List<K>::_size(l)) {
-            return true;
-        }
-        else {
-            let v = List<K>::_unsafe_get(l, idx);
-            if(!Map<K, V>::_has_key(m, v)) {
-                return false;
-            }
-            else {
-                return Map<K, V>::_hasall[recursive](m, l, idx + 1);
-            }
-        }
-    }
+    hidden static _union(m: Map<K, V>, om: Map<K, V>): Map<K, V> # map_union
+    hidden static _unionall(dl: List<Map<K, V>>): Map<K, V> # map_unionall
 
-    hidden recursive static _submap(m: Map<K, V>, kl: KeyList<K>?, mp: Map<K, V>, p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> {
-        if(kl == none) {
-            return mp;
-        }
-        else {
-            let k = kl.hkey;
-            let v = Map<K, V>::_at_val(m, k);
-
-            if(!p[recursive?](k, v)) {
-                return Map<K, V>::_submap(kl.tail, mp, p);
-            }
-            else {
-                return Map<K, V>::_submap(kl.tail, Map<K, V>::_add(mp, k, v), p);
-            }
-        }
-    }
-
-    //lets steal the keylist and has array from s and pop them into the new map (some junk remains in the key/val arrays but we never look at it)
-    hidden static _projectDomain(m: Map<K, V>, s: Set<K>): Map<K, V> # map_projectdomain
-
-    hidden recursive static _remap<U>(m: Map<K, V>, kl: KeyList<K>?, mp: Map<K, U>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
-        if(kl == none) {
-            return mp;
-        }
-        else {
-            let k = kl.hkey;
-            let v = Map<K, V>::_at_val(m, k);
-
-            let u = f[recursive?](k, v);
-             return Map<K, V>::_remap(kl.tail, Map<K, V>::_add(mp, k, u), f);
-        }
-    }
-
-    hidden recursive static _projectkeys(m: Map<K, V>, l: List<K>, mp: Map<K, V>, idx: Int): Bool {
-        if(idx == List<K>::_size(l)) {
-            return mp;
-        }
-        else {
-            let k = List<K>::_unsafe_get(l, idx);
-            
-            if(!Map<K, V>::_has_key(m, k)) {
-                return Map<K, V>::_projectkeys[recursive](m, l, mp, idx + 1);
-            }
-            else {
-                let v = Map<K, V>::_at_val(m, k);
-
-                return Map<K, V>::_projectkeys[recursive](m, l, Map<K, V>::_add(mp, k, v), idx + 1);
-            }
-        }
-    }
-
-    hidden recursive static _union(m: Map<K, V>, mp: Map<K, V>, kl: KeyList<K>?): Map<K, V> {
-        if(kl == none) {
-            return mp;
-        }
-        else {
-            let k = kl.hkey;
-            let v = Map<K, V>::_at_val(m, k);
-
-            return Map<K, V>::_union[recursive](m, Map<K, v>::_add(mp, k, v), kl.tail);
-        }
-    }
-
-    hidden recursive static _merge(m: Map<K, V>, mp: Map<K, V>, kl: KeyList<K>?): Map<K, V> {
-        if(kl == none) {
-            return mp;
-        }
-        else {
-            let k = kl.hkey;
-            let v = Map<K, V>::_at_val(m, k);
-
-            if(!Map<K, V>::_has_key(mp, kl.hkey)) {
-                return Map<K, V>::_merge[recursive](m, Map<K, v>::_add(mp, k, v), kl.tail);
-            }
-            else {
-                return Map<K, V>::_merge[recursive](m, Map<K, v>::_update(mp, k, v), kl.tail);
-            }
-        }
-    }
-
-    hidden recursive static _unionall(ml: List<Map<K, V>>, mp: Map<K, V>, idx: Int): Map<K, V> {
-        if(idx == List<T>::_size(ml)) {
-            return mp;
-        }
-        else {
-            let m = List<T>::_unsafe_get(ml, idx);
-            return Map<K, V>::_unionall[recursive](ml, mp->union(m), idx + 1);
-        }
-    }
-
-    hidden recursive static _mergeall(ml: List<Map<K, V>>, mp: Map<K, V>, idx: Int): Map<K, V> {
-        if(idx == List<T>::_size(ml)) {
-            return mp;
-        }
-        else {
-            let m = List<T>::_unsafe_get(ml, idx);
-            return Map<K, V>::_mergeall[recursive](ml, mp->merge(m), idx + 1);
-        }
-    }
+    hidden static _merge(m: Map<K, V>, om: Map<K, V>): Map<K, V> # map_merge
+    hidden static _mergeall(dl: List<Map<K, V>>): Map<K, V> # map_mergeall
 
     override method size(): Int {
         return Map<K, V>::_size(this);
@@ -206,7 +60,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     override method keys(): List<K> {
-        return Map<K, V>::_key_list(Map<K, V>::_get_keylist(this)->reverse(), List<K>@{});
+        return Map<K, V>::_key_list(this);
     }
 
     override method keySet(): Set<K> {
@@ -214,11 +68,11 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     override method values(): List<K> {
-        return Map<K, V>::_value_list(this, Map<K, V>::_get_keylist(this)->reverse(), List<V>@{});
+        return Map<K, V>::_values(this);
     }
 
     override method entries(): List<MapEntry<K, V>> {
-        return Map<K, V>::_entry_list(this, Map<K, V>::_get_keylist(this)->reverse(), List<MapEntry<K, V>>@{});
+        return Map<K, V>::_entries(this);
     }
 
     method toDynamicMap(): DynamicMap<K, V> {
@@ -230,7 +84,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     override method hasAll(...kl: List<K>): Bool {
-        return Map<K, V>::_hasall[recursive](this, kl, 0);
+        return Map<K, V>::_has_all(this, kl);
     }
 
     override method domainIncludes(s: Set<K>): Bool {
@@ -253,23 +107,39 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     recursive? method submap(p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> {
-        return Map<K, V>::_submap[recursive?](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, V>@{}, p);
+        return Map<K, V>::_submap[recursive?](this, p);
     }
 
-    method projectDomain(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_projectDomain(this, ds);
+    method ofType<T where KeyType, U>(): Map<T, U> {
+        return Map<K, V>::_oftype<U>(this);
+    }
+
+    method cast<T where KeyType, U>(): Map<T, U> {
+        return Map<K, V>::_cast<U>(this);
+    }
+
+    method project(ds: Set<K>): Map<K, V> {
+        return Map<K, V>::_project(this, ds, false);
+    }
+
+    method tryProject(ds: Set<K>): Map<K, V> {
+        return Map<K, V>::_tryproject(this, ds, true);
     }
 
     recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
-        return Map<K, V>::_remap<U>[recursive?](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, U>@{}, f);
+        return Map<K, V>::_remap<U>[recursive?](this, f);
     }
 
-    method projectKeys(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_projectkeys[recursive](this, kl, Map<K, V>@{}, 0);
+    method projectAll(...kl: List<K>): Map<K, V> {
+        return Map<K, V>::_projectall(this, kl, false);
+    }
+
+    method tryProjectAll(...kl: List<K>): Map<K, V> {
+        return Map<K, V>::_tryprojectall(this, kl, true);
     }
 
     method union(m: Map<K, V>): Map<K, V> {
-        return Map<K, V>::_union[recursive](s, this, Map<K, V>::_get_keylist(s)->reverse());
+        return Map<K, V>::_union[](this, s);
     }
 
     static unionOf(...ml: List<Map<K, V>>): Map<K, V> {
@@ -279,16 +149,13 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         else if(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
         }
-        else if(List<T>::_size(ml) == 2) {
-            return List<T>::_unsafe_get(ml, 0)->union(List<T>::_unsafe_get(ml, 1));
-        }
         else {
-            return Set<T>::_unionall(ml, Map<K, V>@{}, 0);
+            return Set<T>::_unionall(ml);
         }
     }
 
     method merge(m: Map<K, V>): Map<K, V> {
-        return Map<K, V>::_merge[recursive](s, this, Map<K, V>::_get_keylist(s)->reverse());
+        return Map<K, V>::_merge(this, s);
     }
 
     static mergeOf(...ml: List<Map<K, V>>): Map<K, V> {
@@ -298,11 +165,8 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         else if(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
         }
-        else if(List<T>::_size(ml) == 2) {
-            return List<T>::_unsafe_get(ml, 0)->merge(List<T>::_unsafe_get(ml, 1));
-        }
         else {
-            return Set<T>::_mergeall(ml, Map<K, V>@{}, 0);
+            return Set<T>::_mergeall(ml);
         }
     }
 }
@@ -392,7 +256,19 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method projectDomain(ds: Set<K>): DynamicMap<K, V> {
+    method ofType<T where KeyType, U>(): Map<T, U> {
+        abort;
+    }
+
+    method cast<T where KeyType, U>(): Map<T, U> {
+        abort;
+    }
+
+    method project(ds: Set<K>): DynamicMap<K, V> {
+        abort;
+    }
+
+    method tryProject(ds: Set<K>): Map<K, V> {
         abort;
     }
 
@@ -400,7 +276,11 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method projectKeys(...kl: List<K>): DynamicMap<K, V> {
+    method projectAll(...kl: List<K>): DynamicMap<K, V> {
+        abort;
+    }
+
+    method tryProjectAll(...kl: List<K>): DynamicMap<K, V> {
         abort;
     }
 

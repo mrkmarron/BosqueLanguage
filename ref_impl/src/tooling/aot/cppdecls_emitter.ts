@@ -218,7 +218,7 @@ class CPPEmitter {
             }
             else if(p.type === "NSCore::Int") {
                 const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
-                const conv = `IntValue ${p.name} = BSQ_ENCODE_VALUE_TAGGED_INT(std::stoi(std::string(argv[${i}+1])));`;
+                const conv = `int64_t ${p.name} = std::stoi(std::string(argv[${i}+1]));`;
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {

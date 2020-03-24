@@ -63,22 +63,4 @@ BSQAbort() { ; }
 #endif
 };
 
-template <typename T>
-class Option
-{
-public:
-    const bool valid;
-    const T value;
-
-    inline static Option<T> create(const T& value)
-    {
-        return Option{true, value};
-    }
-
-    inline static Option<T> empty()
-    {
-        return Option{false};
-    }
-};
-
 } // namespace BSQ

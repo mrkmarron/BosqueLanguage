@@ -17,105 +17,27 @@ entity AbstractSet<T where KeyType> provides Object {
 
 entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded PODType, APIType when T grounded APIType {
     hidden static _size(s: Set<T>): Int # set_size
-    hidden static _has_key(s: Set<T>, key: T): Bool # set_has_key
-    hidden static _get_keylist(s: Set<T>): KeyList<T>? # set_get_keylist
-    hidden static _unsafe_add(s: Set<T>, v: T, newkl: KeyList<T>): Set<T> # set_unsafe_add
 
-    hidden static _add(s: Set<T>, v: T): Set<T> {
-        if(Set<T>::_has_key(s, v)) {
-            return s;
-        }
-        else {
-            let kl = Set<T>::_get_keylist(s);
-            return Set<T>::_unsafe_add(s, v, KeyList<T>@{hkey=k, tail=kl});
-        }
-    }
+    hidden static _entry_list(s: Set<T>): List<T> # set_entry_list
 
-    //we should be able to use the array map operation on the has array
-    hidden static _subsetof(s: Set<T>, other: Set<T>): Bool # set_subsetof
-    hidden static _equal(s: Set<T>, other: Set<T>): Bool # set_equal
-    hidden static _disjoint(s: Set<T>, other: Set<T>): Bool # set_disjoint
+    hidden static _has_key(s: Set<T>, v: T): Bool # set_has_key
+    hidden static _hasall(s: Set<T>, l: List<T>): Bool # set_hasall
+    
+    hidden static _subsetof(s: Set<T>, os: Set<T>): Bool # set_subsetof
+    hidden static _equal(s: Set<T>, os: Set<T>): Bool # set_equal
+    hidden static _disjoint(s: Set<T>, os: Set<T>): Bool # set_disjoint
 
-    hidden recursive static _entry_list(kl: KeyList<T>?, l: List<T>): List<T> {
-        if(kl == none) {
-            return l;
-        }
-        else {
-            return Set<T>::_entry_list[recursive](kl.tail, List<T>::_unsafe_push(l, kl.hkey));
-        }
-    }
+    recursive? hidden static _subset(s: Set<T>, p: recursive? fn(_: T) -> Bool): Set<T> # set_subset
+    hidden static _oftype<U where KeyType>(s: Set<T>): Set<U> # set_oftype
+    hidden static _cast<U where KeyType>(s: Set<T>): Set<U> # set_cast
 
-    hidden recursive static _hasall(s: Set<T>, l: List<T>, idx: Int): Bool {
-        if(idx == List<T>::_size(l)) {
-            return true;
-        }
-        else {
-            let v = List<T>::_unsafe_get(l, idx);
-            if(!Set<T>::_has_key(s, v)) {
-                return false;
-            }
-            else {
-                return Set<T>::_hasall[recursive](s, l, idx + 1);
-            }
-        }
-    }
+    hidden static _union(s: Set<T>, os: Set<T>): Set<T> # set_union
+    hidden static _intersect(s: Set<T>, os: Set<T>): Set<T> # set_intersect
+    hidden static _difference(s: Set<T>, os: Set<T>): Set<T> # set_difference
+    hidden static _symmetricdifference(s: Set<T>, os: Set<T>): Set<T> # set_symmetricdifference
 
-    hidden recursive static _union(s: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
-        if(kl == none) {
-            return sp;
-        }
-        else {
-            return Set<T>::_union[recursive](s, Set<T>::_add(sp, kl.hkey), kl.tail);
-        }
-    }
-
-    hidden recursive static _intersect(s: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
-        if(kl == none) {
-            return sp;
-        }
-        else {
-            if(!Set<T>::_has_key(s, kl.hkey)) {
-                return Set<T>::_intersect(s, sp, kl.tail);
-            }
-            else {
-                return Set<T>::_intersect[recursive](s, Set<T>::_add(sp, kl.hkey), kl.tail);
-            }
-        }
-    }
-
-    hidden recursive static _diff(s: Set<T>, os: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
-        if(kl == none) {
-            return sp;
-        }
-        else {
-            if(Set<T>::_has_key(os, kl.hkey)) {
-                return Set<T>::_diff[recursive](s, os, sp, kl.tail);
-            }
-            else {
-                return Set<T>::_diff[recursive](s, os, Set<T>::_add(sp, kl.hkey), kl.tail);
-            }
-        }
-    }
-
-    hidden recursive static _unionall(sl: List<Set<T>>, sp: Set<T>, idx: Int): Set<T> {
-        if(idx == List<T>::_size(sl)) {
-            return sp;
-        }
-        else {
-            let s = List<T>::_unsafe_get(sl, idx);
-            return Set<T>::_unionall[recursive](sl, sp->union(s), idx + 1);
-        }
-    }
-
-    hidden recursive static _intersectall(sl: List<Set<T>>, sp: Set<T>, idx: Int): Set<T> {
-        if(idx == List<T>::_size(sl)) {
-            return sp;
-        }
-        else {
-            let s = List<T>::_unsafe_get(sl, idx);
-            return Set<T>::_intersectall[recursive](sl, sp->intersect(s), idx + 1);
-        }
-    }
+    hidden static _unionall(sl: List<Set<T>>): Set<T> # set_unionall
+    hidden static _intersectall(sl: List<Set<T>>): Set<T> # set_intersectall
 
     override method size(): Int {
         return Set<T>::_size(this);
@@ -126,7 +48,7 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     override method entries(): List<T> {
-        return Set<T>::_entry_list(Set<T>::_get_keylist(this)->reverse(), List<T>@{});
+        return Set<T>::_entry_list(this);
     }
 
     override method has(v: T): Bool {
@@ -134,7 +56,7 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     override method hasAll(...v: List<T>): Bool {
-        return Set<T>::_hasall[recursive](this, v, 0);
+        return Set<T>::_hasall(this, v);
     }
 
     method toDynamicSet<T>(): DynamicSet<T> {
@@ -142,43 +64,43 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     method subsetOf(s: Set<T>): Bool {
-        if(Set<T>::_size(s) > Set<T>::_size(this)) {
-            return false;
-        }
-        else {
-            return Set<T>::_subsetof(this, s);
-        }
+        return Set<T>::_subsetof(this, s);
     }
 
     method equal(s: Set<T>): Bool {
-        if(Set<T>::_size(this) != Set<T>::_size(s)) {
-            return false;
-        }
-        else {
-            return Set<T>::_equal(this, s);
-        }
+        return Set<T>::_equal(this, s);
     }
 
     method disjoint(s: Set<T>): Bool {
         return Set<T>::_disjoint(this, s);
     }
 
+    recursive? method subset(p: recursive? fn(_: T) -> Bool): Set<T> {
+        return Set<T>::_subset[recursive?](this, p);
+    }
+
+    method ofType<U where KeyType>(): Set<U> {
+        return Set<T>::_oftype<U>(this);
+    }
+
+    method cast<U where KeyType>(): Set<U> {
+        return Set<T>::_cast<U>(this);
+    }
+
     method union(s: Set<T>): Set<T> {
-        return Set<T>::_union[recursive](s, this, Set<T>::_get_keylist(s)->reverse());
+        return Set<T>::_union(this, s);
     }
 
     method intersect(s: Set<T>): Set<T> {
-        return Set<T>::_intersect[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
+        return Set<T>::_intersect(this, s);
     }
 
     method difference(s: Set<T>): Set<T> {
-        return Set<T>::_diff[recursive](this, s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
+        return Set<T>::_difference(this, s);
     }
 
     method symmetricDifference(s: Set<T>): Set<T> {
-        let d1 = this->diffWith(s);
-        let d2 = s->diffWith(this);
-        return d1->unionWith(d2);
+       return Set<T>::_symmetricdifference(this, s);
     }
 
     static unionOf(...sl: List<Set<T>>): Set<T> {
@@ -188,11 +110,8 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         else if(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
         }
-        else if(List<T>::_size(sl) == 2) {
-            return List<T>::_unsafe_get(sl, 0)->union(List<T>::_unsafe_get(sl, 1));
-        }
         else {
-            return Set<T>::_unionall(sl, Set<T>@{}, 0);
+            return Set<T>::_unionall(sl);
         }
     }
 
@@ -203,11 +122,8 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         else if(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
         }
-        else if(List<T>::_size(sl) == 2) {
-            return List<T>::_unsafe_get(sl, 0)->intersect(List<T>::_unsafe_get(sl, 1));
-        }
         else {
-            return Set<T>::_intersectall(sl, Set<T>@{}, 0);
+            return Set<T>::_intersectall(sl);
         }
     }
 }
@@ -270,6 +186,18 @@ entity DynamicSet<T where KeyType> provides AbstractSet<T> {
     }
 
     method disjoint(s: DynamicSet<T>): Bool  {
+        abort;
+    }
+
+    recursive? method subset(p: recursive? fn(_: T) -> Bool): Set<T> {
+        abort;
+    }
+
+    method ofType<U where KeyType>(): Set<U> {
+        abort;
+    }
+
+    method cast<U where KeyType>(): Set<U> {
         abort;
     }
 

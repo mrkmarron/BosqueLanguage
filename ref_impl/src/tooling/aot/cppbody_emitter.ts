@@ -112,7 +112,7 @@ class CPPBodyEmitter {
             }
             else {
                 if(Number.isSafeInteger(Number.parseInt(cval.value))) {
-                    bint = `BSQ_ENCODE_VALUE_TAGGED_INT(${cval.value})`;
+                    bint = cval.value;
                 }
                 else {
                     const sname = "BIGINT__" + this.allConstStrings.size;
@@ -1579,7 +1579,7 @@ class CPPBodyEmitter {
             case "list_size":
             case "set_size":
             case "map_size": {
-                bodystr = `auto _return_ = BSQ_ENCODE_VALUE_TAGGED_INT(${params[0]}->entries.size());`
+                bodystr = `auto _return_ = (int64_t)(${params[0]}->entries.size());`
                 break;
             }
             case "list_unsafe_get": {

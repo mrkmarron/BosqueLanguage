@@ -4,20 +4,21 @@
 //-------------------------------------------------------------------------------------------------------
 
 #include "../bsqvalue.h"
+#include "bsqlist_decl.h"
 
 #pragma once
 
 namespace BSQ
 {
 
-template <typename T, typename RCDecF, typename DisplayF>
-class BSQList : public BSQObject
+template <typename T, typename RCDecF, typename DisplayF, typename T_CMP, typename T_EQ>
+class BSQSet : public BSQObject 
 {
 public:
     std::vector<T> entries;
-
+    
     Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
-    Ty(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    Ty(MIRNominalTypeEnum ntype, std::vector<T>&& entries) : BSQObject(ntype), entries(entries) { ; }
 
     virtual ~Ty()
     {
@@ -34,19 +35,21 @@ public:
     virtual std::u32string display() const
     {
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-
-        std::u32string ls(U"{");
-        for (size_t i = 0; i < this->entries.size(); ++i)
+        std::u32string ss(U"{");
+        bool first = true;
+        for (auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter)
         {
-            if (i != 0)
+            if (!first)
             {
-                ls += U", ";
+                ss += U", ";
             }
-            ls += DisplayF{}(this->entries[i]);
-        }
-        ls += U"}";
+            first = false;
 
-        return ls;
+            ss += FDisplay{}(entries->second);
+        }
+        ss += U"}";
+
+        return ss;
     }
 };
 

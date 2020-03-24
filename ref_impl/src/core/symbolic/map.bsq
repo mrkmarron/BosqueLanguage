@@ -115,7 +115,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     //lets steal the keylist and has array from s and pop them into the new map (some junk remains in the key/val arrays but we never look at it)
-    hidden static _projectDomain(m: Map<K, V>, s: Set<K>): Map<K, V> # map_projectdomain
+    hidden static _project(m: Map<K, V>, s: Set<K>): Map<K, V> # map_projectdomain
 
     hidden recursive static _remap<U>(m: Map<K, V>, kl: KeyList<K>?, mp: Map<K, U>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
         if(kl == none) {
@@ -130,7 +130,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
     }
 
-    hidden recursive static _projectkeys(m: Map<K, V>, l: List<K>, mp: Map<K, V>, idx: Int): Bool {
+    hidden recursive static _projectall(m: Map<K, V>, l: List<K>, mp: Map<K, V>, idx: Int): Bool {
         if(idx == List<K>::_size(l)) {
             return mp;
         }
@@ -256,16 +256,32 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         return Map<K, V>::_submap[recursive](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, V>@{}, p);
     }
 
-    method projectDomain(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_projectDomain(this, ds);
+    method ofType<T where KeyType, U>(): Map<T, U> {
+        xxxx;
+    }
+
+    method cast<T where KeyType, U>(): Map<T, U> {
+        xxxx;
+    }
+
+    method project(ds: Set<K>): Map<K, V> {
+        return Map<K, V>::_project(this, ds);
+    }
+
+    method tryProject(ds: Set<K>): DynamicMap<K, V> {
+        xxxx;
     }
 
     recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
         return Map<K, V>::_remap<U>[recursive](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, U>@{}, f);
     }
 
-    method projectKeys(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_projectkeys[recursive](this, kl, Map<K, V>@{}, 0);
+    method projectAll(...kl: List<K>): Map<K, V> {
+        return Map<K, V>::_projectall[recursive](this, kl, Map<K, V>@{}, 0);
+    }
+
+    method tryProjectAll(...kl: List<K>): Map<K, V> {
+        xxxx;
     }
 
     method union(m: Map<K, V>): Map<K, V> {
@@ -278,9 +294,6 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
         else if(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
-        }
-        else if(List<T>::_size(ml) == 2) {
-            return List<T>::_unsafe_get(ml, 0)->union(List<T>::_unsafe_get(ml, 1));
         }
         else {
             return Set<T>::_unionall(ml, Map<K, V>@{}, 0);
@@ -297,9 +310,6 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
         else if(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
-        }
-        else if(List<T>::_size(ml) == 2) {
-            return List<T>::_unsafe_get(ml, 0)->merge(List<T>::_unsafe_get(ml, 1));
         }
         else {
             return Set<T>::_mergeall(ml, Map<K, V>@{}, 0);
@@ -392,7 +402,19 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method projectDomain(ds: Set<K>): DynamicMap<K, V> {
+    method ofType<T where KeyType, U>(): Map<T, U> {
+        abort;
+    }
+
+    method cast<T where KeyType, U>(): Map<T, U> {
+        abort;
+    }
+
+    method project(ds: Set<K>): DynamicMap<K, V> {
+        abort;
+    }
+
+    method tryProject(ds: Set<K>): DynamicMap<K, V> {
         abort;
     }
 
@@ -400,7 +422,11 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method projectKeys(...kl: List<K>): DynamicMap<K, V> {
+    method projectAll(...kl: List<K>): DynamicMap<K, V> {
+        abort;
+    }
+
+    method tryProjectAll(...kl: List<K>): DynamicMap<K, V> {
         abort;
     }
 

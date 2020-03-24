@@ -60,12 +60,49 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         }
     }
 
-    hidden recursive static _union(s: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
+    hidden recursive static _subset(kl: KeyList<T>?, sp: Set<T>, p: recursive? fn(_: T) -> Bool): Set<T> {
         if(kl == none) {
             return sp;
         }
         else {
-            return Set<T>::_union[recursive](s, Set<T>::_add(sp, kl.hkey), kl.tail);
+            if(p[recursive?](kl.hkey)) {
+                return Set<T>::_subset[recursive](Set<T>::_add(sp, kl.hkey), kl.tail, p);
+            }
+            else {
+                return Set<T>::_subset[recursive](sp, kl.tail, p);
+            }
+        }
+    }
+
+    hidden recursive static _oftype<U where KeyType>(kl: KeyList<T>?, sp: Set<U>): Set<U> {
+        if(kl == none) {
+            return sp;
+        }
+        else {
+            if(kl.hkey->is<U>()) {
+                return Set<T>::_oftype[recursive](Set<U>::_add(sp, kl.hkey->as<U>()), kl.tail);
+            }
+            else {
+                return Set<T>::_oftype[recursive](sp, kl.tail, p);
+            }
+        }
+    }
+
+    hidden recursive static _cast<U where KeyType>(kl: KeyList<T>?, sp: Set<U>): Set<U> {
+        if(kl == none) {
+            return sp;
+        }
+        else {
+            return Set<T>::_cast[recursive](Set<U>::_add(sp, kl.hkey->as<U>()), kl.tail);
+        }
+    }
+
+    hidden recursive static _union(sp: Set<T>, kl: KeyList<T>?): Set<T> {
+        if(kl == none) {
+            return sp;
+        }
+        else {
+            return Set<T>::_union[recursive](Set<T>::_add(sp, kl.hkey), kl.tail);
         }
     }
 
@@ -83,16 +120,16 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         }
     }
 
-    hidden recursive static _diff(s: Set<T>, os: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
+    hidden recursive static _diff(os: Set<T>, sp: Set<T>, kl: KeyList<T>?): Set<T> {
         if(kl == none) {
             return sp;
         }
         else {
             if(Set<T>::_has_key(os, kl.hkey)) {
-                return Set<T>::_diff[recursive](s, os, sp, kl.tail);
+                return Set<T>::_diff[recursive](os, sp, kl.tail);
             }
             else {
-                return Set<T>::_diff[recursive](s, os, Set<T>::_add(sp, kl.hkey), kl.tail);
+                return Set<T>::_diff[recursive](os, Set<T>::_add(sp, kl.hkey), kl.tail);
             }
         }
     }
@@ -163,8 +200,20 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         return Set<T>::_disjoint(this, s);
     }
 
+    recursive? method subset(p: recursive? fn(_: T) -> Bool): Set<T> {
+        return Set<T>::_subset[recursive](Set<T>::_get_keylist(this)->reverse(), Set<T>@{}, p);
+    }
+
+    method ofType<U where KeyType>(): Set<U> {
+        return Set<T>::_oftype<U>[recursive](Set<T>::_get_keylist(this)->reverse(), Set<U>@{}, 0);
+    }
+
+    method cast<U where KeyType>(): Set<U> {
+        return Set<T>::_cast<U>[recursive](Set<T>::_get_keylist(this)->reverse(), Set<U>@{}, 0);
+    }
+
     method union(s: Set<T>): Set<T> {
-        return Set<T>::_union[recursive](s, this, Set<T>::_get_keylist(s)->reverse());
+        return Set<T>::_union[recursive](this, Set<T>::_get_keylist(s)->reverse());
     }
 
     method intersect(s: Set<T>): Set<T> {
@@ -172,7 +221,7 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     method difference(s: Set<T>): Set<T> {
-        return Set<T>::_diff[recursive](this, s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
+        return Set<T>::_diff[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
     }
 
     method symmetricDifference(s: Set<T>): Set<T> {
@@ -188,9 +237,6 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         else if(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
         }
-        else if(List<T>::_size(sl) == 2) {
-            return List<T>::_unsafe_get(sl, 0)->union(List<T>::_unsafe_get(sl, 1));
-        }
         else {
             return Set<T>::_unionall(sl, Set<T>@{}, 0);
         }
@@ -202,9 +248,6 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
         }
         else if(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
-        }
-        else if(List<T>::_size(sl) == 2) {
-            return List<T>::_unsafe_get(sl, 0)->intersect(List<T>::_unsafe_get(sl, 1));
         }
         else {
             return Set<T>::_intersectall(sl, Set<T>@{}, 0);
@@ -270,6 +313,18 @@ entity DynamicSet<T where KeyType> provides AbstractSet<T> {
     }
 
     method disjoint(s: DynamicSet<T>): Bool  {
+        abort;
+    }
+
+    recursive? method subset(p: recursive? fn(_: T) -> Bool): Set<T> {
+        abort;
+    }
+
+    method ofType<U where KeyType>(): Set<U> {
+        abort;
+    }
+
+    method cast<U where KeyType>(): Set<U> {
         abort;
     }
 
