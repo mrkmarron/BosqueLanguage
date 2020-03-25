@@ -10,6 +10,8 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_get(l: List<T>, i: Int): T # list_unsafe_get
 
+    hidden static {when T KeyType} _toset(l: List<T>): Set<T> # list_toset
+
     hidden recursive? static _all(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_all
     hidden recursive? static _none(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_none
     hidden recursive? static _any(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_any
@@ -112,6 +114,10 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
 
     method tryGet(i: Int): T? {
         return 0 <= idx && idx < List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
+    }
+
+    method {when T KeyType} toSet(): Set<T> {
+        return List<T>::_toset(this);
     }
 
     recursive? method single(p: recursive? fn(_: T) -> Bool): Bool 
@@ -566,5 +572,35 @@ concept ListUtil {
 
     static range(start: Int, end: Int): List<Int>  {
         return ListUtil::_range[recursive](start, end, List<Int>@{});
+    }
+}
+
+concept ListUtil {
+    hidden static _zip<T>(l1: List<T>, l2: List<U>): # list_zip
+    hidden static _unzip<T>(l: List<[T, U]>): List<T>, List<U> # list_unzip
+    hidden static _concat<T>(l: List<List<T>>): List<T> # list_concat
+    hidden static _fill<T>(k: Int, val: T): List<T> # list_fill
+    hidden static _range(start: Int, end: Int): List<Int> # list_range
+
+    static zip<T>(l1: List<T>, l2: List<U>): List<[T, U]>
+        requires release List<T>::_size(l1) == List<U>::_size(l2);
+    {
+        return ListUtil::_zip<T>(l1, l2);
+    }
+
+    static unzip<T, U>(l: List<[T, U]>): List<T>, List<U> {
+        return ListUtil::_unzip<T>(l);
+    }
+
+    static concat<T>(...ll: List<List<T>>): List<T> {
+        return ListUtil::_concat(ll);
+    }
+
+    static fill<T>(k: Int, val: T): List<T> {
+        return ListUtil::_fill<T>(k, val);
+    }
+
+    static range(start: Int, end: Int): List<Int>  {
+        return ListUtil::_range(start, end);
     }
 }

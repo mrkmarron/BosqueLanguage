@@ -13,6 +13,16 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden static _unsafe_push(l: List<T>, v: T): T # list_unsafe_push
     hidden static _unsafe_set(l: List<T>, idx: Int, v: T): T # list_unsafe_set
     
+    hidden recursive static {when T KeyType} _toset(l: List<T>, idx: Int, r: Set<T>): Set<T> {
+        if(idx == List<T>::_size(l)) {
+            return rs;
+        }
+        else {
+            let val = List<T>::_unsafe_get(l, idx);
+            return List<T>::_toset(l, idx + 1, Set<T>::_add(r, val));
+        }
+    }
+
     hidden recursive static _all(l: List<T>, idx: Int, p: recursive? fn(_: T) -> Bool): Bool {
         if(idx == List<T>::_size(l)) {
             return true;
@@ -599,6 +609,10 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         return 0 <= idx && idx < List<T>::_size(this) ? List<T>::_unsafe_get(this, idx) : none;
     }
 
+    method {when T KeyType} toSet(): Set<T> {
+        return List<T>::_toset(this, 0, Set<T>{});
+    }
+
     recursive? method single(p: recursive? fn(_: T) -> Bool): Bool 
         requires release List<T>::_size(this) != 0;
     {
@@ -1011,15 +1025,6 @@ concept ListUtil {
         }
     }
 
-    hidden recursive static _fillIndex(k: Int, lp: List<Int>, idx: Int): List<Int> {
-        if(idx == k) {
-            return lp;
-        }
-        else {
-            return ListUtil::_fillIndex[recursive](k, List<Int>::_unsafe_push(lp, idx), idx + 1);
-        }
-    }
-
     hidden recursive static _range(start: Int, end: Int, lp: List<Int>): List<Int> {
         if(start == end) {
             return lp;
@@ -1045,10 +1050,6 @@ concept ListUtil {
 
     static fill<T>(k: Int, val: T): List<T> {
         return ListUtil::_fill<T>[recursive](k, val, List<T>@{});
-    }
-
-    static fillIndex(k: Int): List<Int> {
-        return ListUtil::_fillIndex[recursive](k, List<Int>@{}, 0);
     }
 
     static range(start: Int, end: Int): List<Int>  {

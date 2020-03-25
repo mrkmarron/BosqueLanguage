@@ -103,7 +103,7 @@ public:
     {
         std::vector<U> entries;
         std::for_each(s->entries.begin(), l->entries.end(), [&entries](T& v) -> void {
-            BSQ_ASSERT(LambdaTC{}(v));
+            BSQ_ASSERT(LambdaTC{}(v), "Invalid element to cast");
 
             entries.push_back(LambdaCC{}(v));
         });

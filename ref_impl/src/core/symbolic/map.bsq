@@ -114,8 +114,39 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
     }
 
+    hidden recursive static _ofType<T where KeyType, U>(kl: KeyList<K>?, mp: Map<T, U>): Map<T, U> {
+        if(kl == none) {
+            return mp;
+        }
+        else {
+            let k = kl.hkey;
+            let v = Map<K, V>::_at_val(m, k);
+
+            if(k->is<T>() && v->is<U>()) {
+                return Map<K, V>::_ofType(kl.tail, Map<T, U>::_add(mp, k->as<T>(), v->as<U>()));
+            }
+            else {
+                return Map<K, V>::_ofType(kl.tail, mp, p);
+            }
+        }
+    }
+
+    hidden recursive static _cast<T where KeyType, U>(kl: KeyList<K>?, mp: Map<T, U>): Map<T, U> {
+       if(kl == none) {
+            return mp;
+        }
+        else {
+            let k = kl.hkey;
+            let v = Map<K, V>::_at_val(m, k);
+            check (k->is<T>() && v->is<U>());
+
+            return Map<K, V>::_ofType(kl.tail, Map<T, U>::_add(mp, k->as<T>(), v->as<U>()));
+        }
+    }
+
     //lets steal the keylist and has array from s and pop them into the new map (some junk remains in the key/val arrays but we never look at it)
-    hidden static _project(m: Map<K, V>, s: Set<K>): Map<K, V> # map_projectdomain
+    hidden static _project(m: Map<K, V>, s: Set<K>, missingok: Bool): Map<K, V> # map_project
+    hidden static _exclude(m: Map<K, V>, s: Set<K>): Map<K, V> # map_exclude
 
     hidden recursive static _remap<U>(m: Map<K, V>, kl: KeyList<K>?, mp: Map<K, U>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
         if(kl == none) {
@@ -130,22 +161,12 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
     }
 
-    hidden recursive static _projectall(m: Map<K, V>, l: List<K>, mp: Map<K, V>, idx: Int): Bool {
-        if(idx == List<K>::_size(l)) {
-            return mp;
-        }
-        else {
-            let k = List<K>::_unsafe_get(l, idx);
-            
-            if(!Map<K, V>::_has_key(m, k)) {
-                return Map<K, V>::_projectkeys[recursive](m, l, mp, idx + 1);
-            }
-            else {
-                let v = Map<K, V>::_at_val(m, k);
+    hidden recursive static _projectall(m: Map<K, V>, l: List<K>): Map<K, V> {
+        return Map<K, V>::_project(m, List<K>::_toset[recursive](l, 0, Set<K>@{}));
+    }
 
-                return Map<K, V>::_projectkeys[recursive](m, l, Map<K, V>::_add(mp, k, v), idx + 1);
-            }
-        }
+    hidden static _excludeall(m: Map<K, V>, l: List<K>): Map<K, V> {
+        return Map<K, V>::_exclude(m, List<K>::_toset[recursive](l, 0, Set<K>@{}));
     }
 
     hidden recursive static _union(m: Map<K, V>, mp: Map<K, V>, kl: KeyList<K>?): Map<K, V> {
@@ -257,19 +278,19 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method ofType<T where KeyType, U>(): Map<T, U> {
-        xxxx;
+        return Map<K, V>::_oftype<T, U>[recursive](Map<K, V>::_get_keylist(this)->reverse(), Map<T, U>@{});
     }
 
     method cast<T where KeyType, U>(): Map<T, U> {
-        xxxx;
+        return Map<K, V>::_cast<T, U>[recursive](Map<K, V>::_get_keylist(this)->reverse(), Map<T, U>@{});
     }
 
-    method project(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_project(this, ds);
+    method project(ds: Set<K>, missingok?: Bool): Map<K, V> {
+        return Map<K, V>::_project(this, ds, Truthy::truth(missingok));
     }
 
-    method tryProject(ds: Set<K>): DynamicMap<K, V> {
-        xxxx;
+    method exclude(ds: Set<K>): Map<K, V> {
+        return Map<K, V>::_exclude(this, ds);
     }
 
     recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
@@ -277,11 +298,11 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method projectAll(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_projectall[recursive](this, kl, Map<K, V>@{}, 0);
+        return Map<K, V>::_projectall(this, kl);
     }
 
-    method tryProjectAll(...kl: List<K>): Map<K, V> {
-        xxxx;
+    method excludeAll(...kl: List<K>): Map<K, V> {
+        return Map<K, V>::_excludeall(this, kl);
     }
 
     method union(m: Map<K, V>): Map<K, V> {

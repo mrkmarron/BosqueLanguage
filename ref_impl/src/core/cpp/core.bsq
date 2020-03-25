@@ -43,6 +43,7 @@ concept Validator provides Any {
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
 concept KeyType provides Any {
     static equal(a: KeyType, b: KeyType): Bool # special_method
+    static less(a: KeyType, b: KeyType): Bool # special_method
 }
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>

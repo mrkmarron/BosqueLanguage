@@ -42,8 +42,12 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     hidden static _cast<T where KeyType, U>(m: Map<K, V>): Map<T, U> # map_cast
 
     hidden static _project(m: Map<K, V>, ds: Set<K>, missingok: Bool): Map<K, V> # map_project
+    hidden static _exclude(m: Map<K, V>, ds: Set<K>): Map<K, V> # map_exclude
+
     recursive? hidden static _remap(m: Map<K, V>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> # map_remap
-    hidden static _projectall(m: Map<K, V>, dl: List<K>, missingok: Bool): Map<K, V> # map_projectall
+
+    hidden static _projectall(m: Map<K, V>, dl: List<K>): Map<K, V> # map_projectall
+    hidden static _excludeall(m: Map<K, V>, ds: Set<K>): Map<K, V> # map_excludeall
 
     hidden static _union(m: Map<K, V>, om: Map<K, V>): Map<K, V> # map_union
     hidden static _unionall(dl: List<Map<K, V>>): Map<K, V> # map_unionall
@@ -118,12 +122,12 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         return Map<K, V>::_cast<U>(this);
     }
 
-    method project(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_project(this, ds, false);
+    method project(ds: Set<K>, missingok?: Bool): Map<K, V> {
+        return Map<K, V>::_project(this, ds, Truthy::truth(missingok));
     }
 
-    method tryProject(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_tryproject(this, ds, true);
+    method exclude(ds: Set<K>): Map<K, V> {
+        return Map<K, V>::_exclude(this, ds);
     }
 
     recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
@@ -131,11 +135,11 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method projectAll(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_projectall(this, kl, false);
+        return Map<K, V>::_projectall(this, kl);
     }
 
-    method tryProjectAll(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_tryprojectall(this, kl, true);
+    method excludeAll(...kl: List<K>): Map<K, V> {
+        return Map<K, V>::_excludeall(this, kl);
     }
 
     method union(m: Map<K, V>): Map<K, V> {
@@ -264,11 +268,11 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method project(ds: Set<K>): DynamicMap<K, V> {
+    method project(ds: Set<K>, missingok?: Bool): DynamicMap<K, V> {
         abort;
     }
 
-    method tryProject(ds: Set<K>): Map<K, V> {
+    method exclude(ds: Set<K>): Map<K, V> {
         abort;
     }
 
@@ -280,7 +284,7 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method tryProjectAll(...kl: List<K>): DynamicMap<K, V> {
+    method excludeAll(...kl: List<K>): DynamicMap<K, V> {
         abort;
     }
 
