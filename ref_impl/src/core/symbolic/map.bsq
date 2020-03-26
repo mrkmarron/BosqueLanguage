@@ -56,7 +56,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
     }
 
-    //we should be able to take keyset and key array for the set directly
+    //we should be able to take keyset and has array for the set directly
     hidden static _key_set(m: Map<K, V>): Set<K> # map_keyset
 
     //we should be able to use the array map operation on the has has arrays
@@ -146,7 +146,23 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
 
     //lets steal the keylist and has array from s and pop them into the new map (some junk remains in the key/val arrays but we never look at it)
     hidden static _project(m: Map<K, V>, s: Set<K>, missingok: Bool): Map<K, V> # map_project
-    hidden static _exclude(m: Map<K, V>, s: Set<K>): Map<K, V> # map_exclude
+
+    hidden recursive static _exclude(m: Map<K, V>, s: Set<K>, kl: KeyList<K>?, mp: Map<K, V>): Map<K, V> {
+        if(kl == none) {
+            return mp;
+        }
+        else {
+            let k = kl.hkey;
+            
+            if(Set<K>::_has(k)) {
+                return Map<K, V>::_exclude(m, s, kl.tail, mp);
+            }
+            else {
+                let v = Map<K, V>::_at_val(m, k);
+                return Map<K, V>::_exclude(m, s, kl.tail, Map<K, V>::_add(mp, k, v));
+            }
+        }
+    }
 
     hidden recursive static _remap<U>(m: Map<K, V>, kl: KeyList<K>?, mp: Map<K, U>, f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
         if(kl == none) {
@@ -161,12 +177,12 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
         }
     }
 
-    hidden recursive static _projectall(m: Map<K, V>, l: List<K>): Map<K, V> {
+    hidden static _projectall(m: Map<K, V>, l: List<K>): Map<K, V> {
         return Map<K, V>::_project(m, List<K>::_toset[recursive](l, 0, Set<K>@{}));
     }
 
-    hidden static _excludeall(m: Map<K, V>, l: List<K>): Map<K, V> {
-        return Map<K, V>::_exclude(m, List<K>::_toset[recursive](l, 0, Set<K>@{}));
+    hidden static _excludeall(m: Map<K, V>, l: List<K>, kl: KeyList<K>?, mp: Map<K, V>): Map<K, V> {
+        return Map<K, V>::_exclude[recursive](m, List<K>::_toset[recursive](l, 0, Set<K>@{}), kl, mp);
     }
 
     hidden recursive static _union(m: Map<K, V>, mp: Map<K, V>, kl: KeyList<K>?): Map<K, V> {
@@ -227,7 +243,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     override method keys(): List<K> {
-        return Map<K, V>::_key_list(Map<K, V>::_get_keylist(this)->reverse(), List<K>@{});
+        return Map<K, V>::_key_list(KeyList<K>::sort(Map<K, V>::_get_keylist(this)), List<K>@{});
     }
 
     override method keySet(): Set<K> {
@@ -235,11 +251,11 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     override method values(): List<K> {
-        return Map<K, V>::_value_list(this, Map<K, V>::_get_keylist(this)->reverse(), List<V>@{});
+        return Map<K, V>::_value_list(this, KeyList<K>::sort(Map<K, V>::_get_keylist(this)), List<V>@{});
     }
 
     override method entries(): List<MapEntry<K, V>> {
-        return Map<K, V>::_entry_list(this, Map<K, V>::_get_keylist(this)->reverse(), List<MapEntry<K, V>>@{});
+        return Map<K, V>::_entry_list(this, KeyList<K>::sort(Map<K, V>::_get_keylist(this)), List<MapEntry<K, V>>@{});
     }
 
     method toDynamicMap(): DynamicMap<K, V> {
@@ -274,15 +290,15 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     recursive? method submap(p: recursive? fn(_: K, _: V) -> Bool): Map<K, V> {
-        return Map<K, V>::_submap[recursive](this, Map<K, V>::_get_keylist(this)->reverse(), Map<K, V>@{}, p);
+        return Map<K, V>::_submap[recursive](this, Map<K, V>::_get_keylist(this), Map<K, V>@{}, p);
     }
 
     method ofType<T where KeyType, U>(): Map<T, U> {
-        return Map<K, V>::_oftype<T, U>[recursive](Map<K, V>::_get_keylist(this)->reverse(), Map<T, U>@{});
+        return Map<K, V>::_oftype<T, U>[recursive](Map<K, V>::_get_keylist(this), Map<T, U>@{});
     }
 
     method cast<T where KeyType, U>(): Map<T, U> {
-        return Map<K, V>::_cast<T, U>[recursive](Map<K, V>::_get_keylist(this)->reverse(), Map<T, U>@{});
+        return Map<K, V>::_cast<T, U>[recursive](Map<K, V>::_get_keylist(this), Map<T, U>@{});
     }
 
     method project(ds: Set<K>, missingok?: Bool): Map<K, V> {
@@ -290,7 +306,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method exclude(ds: Set<K>): Map<K, V> {
-        return Map<K, V>::_exclude(this, ds);
+        return Map<K, V>::_exclude[recursive](this, ds, Map<K, V>::_get_keylist(this), Map<K, V>@{});
     }
 
     recursive? method remap<U>(f: recursive? fn(_: K, _: V) -> U): Map<K, U> {
@@ -302,11 +318,11 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method excludeAll(...kl: List<K>): Map<K, V> {
-        return Map<K, V>::_excludeall(this, kl);
+        return Map<K, V>::_excludeall(this, kl, Map<K, V>::_get_keylist(this), Map<K, V>@{});
     }
 
     method union(m: Map<K, V>): Map<K, V> {
-        return Map<K, V>::_union[recursive](s, this, Map<K, V>::_get_keylist(s)->reverse());
+        return Map<K, V>::_union[recursive](s, this, Map<K, V>::_get_keylist(s));
     }
 
     static unionOf(...ml: List<Map<K, V>>): Map<K, V> {
@@ -322,7 +338,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 
     method merge(m: Map<K, V>): Map<K, V> {
-        return Map<K, V>::_merge[recursive](s, this, Map<K, V>::_get_keylist(s)->reverse());
+        return Map<K, V>::_merge[recursive](s, this, Map<K, V>::_get_keylist(s));
     }
 
     static mergeOf(...ml: List<Map<K, V>>): Map<K, V> {
@@ -431,11 +447,11 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method project(ds: Set<K>): DynamicMap<K, V> {
+    method project(ds: Set<K>, missingok?: Bool): Map<K, V> {
         abort;
     }
 
-    method tryProject(ds: Set<K>): DynamicMap<K, V> {
+    method exclude(ds: Set<K>): Map<K, V> {
         abort;
     }
 
@@ -447,7 +463,7 @@ entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
         abort;
     }
 
-    method tryProjectAll(...kl: List<K>): DynamicMap<K, V> {
+    method excludeAll(...kl: List<K>): Map<K, V> {
         abort;
     }
 

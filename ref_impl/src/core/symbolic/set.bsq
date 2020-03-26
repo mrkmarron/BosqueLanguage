@@ -163,7 +163,7 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     override method entries(): List<T> {
-        return Set<T>::_entry_list(Set<T>::_get_keylist(this)->reverse(), List<T>@{});
+        return Set<T>::_entry_list(KeyList<K>::sort(Set<T>::_get_keylist(this)), List<T>@{});
     }
 
     override method has(v: T): Bool {
@@ -201,27 +201,27 @@ entity Set<T where KeyType> provides AbstractSet<T>, PODType when T grounded POD
     }
 
     recursive? method subset(p: recursive? fn(_: T) -> Bool): Set<T> {
-        return Set<T>::_subset[recursive](Set<T>::_get_keylist(this)->reverse(), Set<T>@{}, p);
+        return Set<T>::_subset[recursive](Set<T>::_get_keylist(this), Set<T>@{}, p);
     }
 
     method ofType<U where KeyType>(): Set<U> {
-        return Set<T>::_oftype<U>[recursive](Set<T>::_get_keylist(this)->reverse(), Set<U>@{}, 0);
+        return Set<T>::_oftype<U>[recursive](Set<T>::_get_keylist(this), Set<U>@{}, 0);
     }
 
     method cast<U where KeyType>(): Set<U> {
-        return Set<T>::_cast<U>[recursive](Set<T>::_get_keylist(this)->reverse(), Set<U>@{}, 0);
+        return Set<T>::_cast<U>[recursive](Set<T>::_get_keylist(this), Set<U>@{}, 0);
     }
 
     method union(s: Set<T>): Set<T> {
-        return Set<T>::_union[recursive](this, Set<T>::_get_keylist(s)->reverse());
+        return Set<T>::_union[recursive](this, Set<T>::_get_keylist(s));
     }
 
     method intersect(s: Set<T>): Set<T> {
-        return Set<T>::_intersect[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
+        return Set<T>::_intersect[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this));
     }
 
     method difference(s: Set<T>): Set<T> {
-        return Set<T>::_diff[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this)->reverse());
+        return Set<T>::_diff[recursive](s, Set<T>@{}, Set<T>::_get_keylist(this));
     }
 
     method symmetricDifference(s: Set<T>): Set<T> {

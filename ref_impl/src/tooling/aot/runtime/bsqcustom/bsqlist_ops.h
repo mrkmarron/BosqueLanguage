@@ -449,21 +449,91 @@ public:
 
         return LambdaMC{}(move(mentries));
     }
-
-    template <typename U>
-    static XXX list_zip(l1: List<T>, l2: List<U>)
-    {
-
-    }
 };
 
 class BSQListUtilOps
 {
 public:
-    static XXX list_unzip<T>(l: List<[T, U]>): List<T>, List<U> # list_unzip
-    static Ty* list_concat<T>(l: List<List<T>>): List<T> # list_concat
-    static Ty* list_fill<T>(k: Int, val: T): List<T> # list_fill
-    static list_range(start: Int, end: Int): List<Int> # list_range
+    template <typename LType1, typename LType2, typename RType, typename ZType, MIRNominalTypeEnum ntype, typename LambdaZ>
+    static RType* list_zip(LType1* l1, LType2* l2)
+    {
+        std::vector<ZType> entries;
+        entries.reserve(l1->entries.size());
+
+        for(size_t i = 0; i < l1->entries.size(); ++i)
+        {
+            entries.push_back(LambdaZ{}(l1->entries[i], l2->entries[i]));
+        }
+
+        return BSQ_NEW_NO_RC(RType, ntype, move(entries));
+    }
+
+    template <typename RType1, MIRNominalTypeEnum ntype1, typename VType, typename RType2, MIRNominalTypeEnum ntype2, typename UType, typename LType, typename LambdaUZ>
+    static std::pair<RType1*, RType2*> list_unzip(LType* l)
+    {
+        std::vector<VType> ventries;
+        ventries.reserve(l->entries.size());
+
+        std::vector<ZUype> uentries;
+        uentries.reserve(l->entries.size());
+
+        for(size_t i = 0; i < l1->entries.size(); ++i)
+        {
+            std::pair<VType, UType> rr = LambdaUZ{}(l->entries[i]);
+
+            ventries.push_back(rr.first);
+            uentries.push_back(rr.second);
+        }
+
+        auto l1 = BSQ_NEW_NO_RC(RType1, ntype1, move(ventries));
+        auto l2 = BSQ_NEW_NO_RC(RType2, ntype2, move(uentries));
+
+        return std::make_pair(l1, l2);
+    }
+
+    template <typename T, typename RCIncF, typename RCDecF, typename DisplayF, MIRNominalTypeEnum ntype, typename ListT>
+    static BSQList<T, RCDecF, DisplayF>* list_concat(ListT* l)
+    {
+        std::vector<T> entries;
+
+        for(size_t i = 0; i < l->entries.size(); ++i)
+        {
+            std::vector<T>& llentries = (l->entries[i])->entries;
+            std::transform(llentries.begin(), llentries.end(), std::back_inserter(entries), [](T& v) -> T {
+                return RCIncF{}(v);
+            });
+        }
+
+        return BSQ_NEW_NO_RC((BSQList<T, RCDecF, DisplayF>), ntype, move(entries));
+    }
+
+    template <typename T, typename RCIncF, typename RCDecF, typename DisplayF>
+    static BSQList<T, RCDecF, DisplayF>* list_fill(int64_t k, T val)
+    {
+        std::vector<T> entries;
+        entries.reserve(k);
+
+        for(size_t i = 0; i < k; ++i)
+        {
+            entries.push_back(RCIncF{}(val));
+        }
+
+        return BSQ_NEW_NO_RC((BSQList<int64_t, RCDecFunctor_int, DisplayFunctor_int>), ntype, move(entries));
+    }
+
+    template <MIRNominalTypeEnum ntype>
+    static BSQList<int64_t, RCDecFunctor_int, DisplayFunctor_int>* list_range(int64_t start, int64_t end)
+    {
+        std::vector<int64_t> entries;
+        entries.reserve(end - start);
+
+        for(size_t i = 0; i < (end - start); ++i)
+        {
+            entries.push_back(start + i);
+        }
+
+        return BSQ_NEW_NO_RC((BSQList<int64_t, RCDecFunctor_int, DisplayFunctor_int>), ntype, move(entries));
+    }
 };
 
 }

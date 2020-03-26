@@ -596,11 +596,15 @@ concept ListUtil {
         return ListUtil::_concat(ll);
     }
 
-    static fill<T>(k: Int, val: T): List<T> {
+    static fill<T>(k: Int, val: T): List<T>
+        requires release k >= 0;
+    {
         return ListUtil::_fill<T>(k, val);
     }
 
-    static range(start: Int, end: Int): List<Int>  {
+    static range(start: Int, end: Int): List<Int>
+        requires release end > start;
+    {
         return ListUtil::_range(start, end);
     }
 }

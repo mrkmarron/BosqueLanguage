@@ -7,24 +7,8 @@
 namespace NSCore;
 
 entity Queue<T> provides Object {
-    hidden static _size(q: Queue<T>): Int # queue_size
-    hidden static _unsafe_front(q: Queue<T>): T # queue_unsafe_front
-    hidden static _unsafe_at(q: Queue<T>, idx: Int): T # queue_unsafe_at
-    hidden static _unsafe_push(q: Queue<T>, v: T): Queue<T> # queue_unsafe_push
-    hidden static _unsafe_pop(q: Queue<T>): Queue<T> # queue_unsafe_pop
-
-    hidden static _toList(q: Queue<T>, lp: List<T>, idx: Int): List<T> {
-        if(idx == Queue<T>::_size(q)) {
-            return lp;
-        }
-        else {
-            let val = Queue<T>::_unsafe_at(q, idx);
-            return Queue<T>::_toList(q, List<T>::_unsafe_push(lp, val), idx + 1);
-        }
-    }
-
     method size(): Int {
-        return Queue<T>::_size(this);
+        abort;
     }
 
     method empty(): Bool {
@@ -32,64 +16,58 @@ entity Queue<T> provides Object {
     }
 
     method toList(): List<T> {
-        return Queue<T>::_toList(this, List<T>@{}, 0);
+        abort;
     }
 
     method dequeue(): T, Queue<T>
         requires release Queue<T>::_size(this) != 0;
     {
-        return Queue<T>::_unsafe_front(this), Queue<T>::_unsafe_pop(this);
+        abort;
     }
 
     static idequeue(ref q: Queue<T>): T 
         requires release Queue<T>::_size(q) != 0;
     {
-        let res = Queue<T>::_unsafe_front(this);
-        q = Queue<T>::_unsafe_pop(q);
-
-        return res;
+        abort;
     }
 
     method peek(): T
         requires release Queue<T>::_size(this) != 0;
     {
-        return Queue<T>::_unsafe_front(this);
+        abort;
     }
 
     method tryPeek(): T? {
-        return Queue<T>::_size(this) != 0 ? Queue<T>::_unsafe_front(this) : none;
+        abort;
     }
 
     method lookahead(k: Int): T
         requires release k < Queue<T>::_size(this);
     {
-        return Queue<T>::_unsafe_at(this, k);
+        abort;
     }
 
     method tryLookahead(k: Int): T? {
-        return k < Queue<T>::_size(this) ? Queue<T>::_unsafe_at(this, k) : none;
+        abort;
     }
 
     method rest(): Queue<T>
         requires release Queue<T>::_size(this) != 0;
     {
-        return Queue<T>::_unsafe_pop(this);
+        abort;
     }
 
     static irest(ref q: Queue<T>): None
         requires release Queue<T>::_size(q) != 0;
     {
-        q = Queue<T>::_unsafe_pop(q);
-        return none;
+       abort;
     }
 
     method enqueue(v: T): Queue<T> {
-        return Queue<T>::_unsafe_push(this, v);
+        abort;
     }
 
     static ienqueue(ref q: Queue<T>, v: T): None {
-        q = Queue<T>::_unsafe_push(q, v);
-        return none;
+       abort;
     }
-
 }

@@ -1048,11 +1048,15 @@ concept ListUtil {
         return ListUtil::_concat[recursive](ll, List<T>@{}, 0);
     }
 
-    static fill<T>(k: Int, val: T): List<T> {
+    static fill<T>(k: Int, val: T): List<T>
+        requires release k >= 0;
+    {
         return ListUtil::_fill<T>[recursive](k, val, List<T>@{});
     }
 
-    static range(start: Int, end: Int): List<Int>  {
+    static range(start: Int, end: Int): List<Int>
+        requires release end > start;
+    {
         return ListUtil::_range[recursive](start, end, List<Int>@{});
     }
 }

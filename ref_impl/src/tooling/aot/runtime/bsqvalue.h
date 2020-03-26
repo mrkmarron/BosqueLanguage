@@ -100,7 +100,6 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END%%
 
-typedef void* IntValue;
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -219,21 +218,58 @@ public:
     }
 };
 
+struct RCIncFunctor_bool
+{
+    inline bool operator()(bool b) const { return b; }
+};
+struct RCDecFunctor_bool
+{
+    inline void operator()(bool b) const { ; }
+};
 struct HashFunctor_bool
 {
-    size_t operator()(bool b) const { return (size_t)b; }
+    inline size_t operator()(bool b) const { return (size_t)b; }
 };
 struct EqualFunctor_bool
 {
-    bool operator()(bool l, bool r) const { return l == r; }
+    inline bool operator()(bool l, bool r) const { return l == r; }
 };
 struct LessFunctor_bool
 {
-    bool operator()(bool l, bool r) const { return (!l) & r; }
+    inline bool operator()(bool l, bool r) const { return (!l) & r; }
 };
 struct DisplayFunctor_bool
 {
     std::u32string operator()(bool b) const { return b ? U"true" : U"false"; }
+};
+
+struct RCIncFunctor_int
+{
+    inline int64_t operator()(int64_t i) const { return i; }
+};
+struct RCDecFunctor_int
+{
+    inline void operator()(bool b) const { ; }
+};
+struct HashFunctor_int
+{
+    inline size_t operator()(int64_t i) const { return (size_t)i; }
+};
+struct EqualFunctor_int
+{
+    inline bool operator()(int64_t l, int64_t r) const { return l == r; }
+};
+struct LessFunctor_int
+{
+    inline bool operator()(int64_t l, int64_t r) const { return l < r; }
+};
+struct DisplayFunctor_int
+{
+    std::u32string operator()(int64_t i) const 
+    {
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+        return conv.from_bytes(std::to_string(i));  
+    }
 };
 
 //A big integer class for supporting Bosque -- right now it does not do much
