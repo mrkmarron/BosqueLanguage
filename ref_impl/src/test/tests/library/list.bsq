@@ -10,20 +10,20 @@ entrypoint function lsize(): Int {
 }
 
 entrypoint function lvals(): Int {
-    var lint = List<Int>@{1, 2, 3};
-    var lmixed = List<Int | String | None>@{1, "one", none};
+    let lint = List<Int>@{1, 2, 3};
+    let lmixed = List<Int | String | None>@{1, "one", none};
     return lmixed->get(1) == none ? 5 : lint->get(1);
 }
 
 entrypoint function lpush(): Int {
-    var lint = List<Int>@{1, 2, 3};
-    var lup = lint->push(4);
+    let lint = List<Int>@{1, 2, 3};
+    let lup = lint->push(4);
     return lup->get(3);
 }
 
 entrypoint function lset(): Int {
-    var lint = List<Int>@{1, 2, 3};
-    var lup = lint->set(1, 5);
+    let lint = List<Int>@{1, 2, 3};
+    let lup = lint->set(1, 5);
     return lup->get(1);
 }
 
@@ -48,24 +48,24 @@ entrypoint function restCallMixedList2(): Int {
 }
 */
 entrypoint function lfilter(): Int {
-    var lint = List<Int>@{1, 2, 3};
-    var lup = lint->filter<Int>(fn(x) => x > 1);
+    let lint = List<Int>@{1, 2, 3};
+    let lup = lint->filter<Int>(fn(x) => x > 1);
     return lup->get(0);
 }
 
 entrypoint function lmap(): Int {
-    var lint = List<Int>@{1, 2, 3};
-    var lup = lint->map<Int>(fn(x) => Math::mult(x, 3));
+    let lint = List<Int>@{1, 2, 3};
+    let lup = lint->map<Int>(fn(x) => Math::mult(x, 3));
     return lup->get(1);
 }
 
 entrypoint function latbounds(i: Int): Int {
-    var lint = List<Int>@{1, 3};
+    let lint = List<Int>@{1, 3};
     return lint->get(i);
 }
 
 entrypoint function lpushok(i: Int): Int {
-    var lint = List<Int>@{1, 3};
+    let lint = List<Int>@{1, 3};
     return lint->push(i)->get(1);
 }
 

@@ -11,60 +11,60 @@ function pthread(ref x: Int): Int {
 }
 
 function pthread_multi(ref x: Int, y: Int): Int {
-    var k = pthread(ref x);
+    let k = pthread(ref x);
     return k + y;
 }
 
 entrypoint function pthread1(): Int {
-    var x = 1;
-    var z = pthread(ref x);
+    let x = 1;
+    let z = pthread(ref x);
     return x + z;
 }
 
 entrypoint function pthread2(): Int {
-    var x = 2;
-    var z = pthread(ref x);
-    var w = pthread(ref x);
+    let x = 2;
+    let z = pthread(ref x);
+    let w = pthread(ref x);
     return x + z + w;
 }
 
 entrypoint function pthread3(): Int {
-    var x = 1;
-    var z = pthread_multi(ref x, 2);
+    let x = 1;
+    let z = pthread_multi(ref x, 2);
     return x + z;
 }
 
 entrypoint function returnor1(): Int | None {
-    var y = (1 == 2) ? none : 4 or return;
+    let y = (1 == 2) ? none : 4 or return;
     return y + 1;
 }
 
 entrypoint function returnor11(): Int | None {
-    var y = (1 == 1) ? none : 4 or return;
+    let y = (1 == 1) ? none : 4 or return;
     return y + 1;
 }
 
 entrypoint function returnor2(): Int {
-    var y = (1 == 1) ? none : 4 or return 1;
+    let y = (1 == 1) ? none : 4 or return 1;
     return y + 1;
 }
 
 entrypoint function returnor3(): Int | None {
-    var y = (1 == 2) ? 0 : 4 or return when $value == 0;
+    let y = (1 == 2) ? 0 : 4 or return when $value == 0;
     return y + 1;
 }
 
 entrypoint function returnor4(): Int {
-    var y = (1 == 2) ? 0 : 4 or return when $value == 4;
+    let y = (1 == 2) ? 0 : 4 or return when $value == 4;
     return y + 1;
 }
 
 entrypoint function returnor5(): Int {
-    var y = (1 == 1) ? 0 : 4 or return 8 when $value == 4;
+    let y = (1 == 1) ? 0 : 4 or return 8 when $value == 4;
     return y + 1;
 }
 
 entrypoint function returnor6(): Int {
-    var y = (1 == 2) ? 0 : 4 or return 8 when $value == 4;
+    let y = (1 == 2) ? 0 : 4 or return 8 when $value == 4;
     return y + 1;
 }

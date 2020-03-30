@@ -6,7 +6,7 @@
 namespace NSTest;
 
 entrypoint function eif_abs1(x: Int): Int {
-    var y = if(x < 0) -x else x;
+    let y = if(x < 0) -x else x;
     return y;
 }
 
@@ -20,7 +20,7 @@ entrypoint function eif_abs2(x: Int): Int {
 }
 
 entrypoint function eif_absy_none(b: Bool): Int {
-    var x = b ? 1 : none;
+    let x = b ? 1 : none;
     return if(x == none) 0 else {|
         var! y = x;
         if(y < 0) {
@@ -31,7 +31,7 @@ entrypoint function eif_absy_none(b: Bool): Int {
 }
 
 entrypoint function eif_absy_1(b: Bool): Int {
-    var x = b ? 1 : none;
+    let x = b ? 1 : none;
     return if(x == none)
         0
     else {|
@@ -44,8 +44,8 @@ entrypoint function eif_absy_1(b: Bool): Int {
 }
 
 entrypoint function enestif_abs1(b: Bool): Int {
-    var x = b ? -3 : none;
-    var y = if(x == none) 0 else if(x > 0) x else -x;
+    let x = b ? -3 : none;
+    let y = if(x == none) 0 else if(x > 0) x else -x;
     return y;
 }
 

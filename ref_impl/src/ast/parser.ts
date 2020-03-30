@@ -64,7 +64,7 @@ const KeywordStrings = [
     "typedef",
     "using",
     "validate",
-    "var",
+    "let",
     "when",
     "where",
     "yield",
@@ -1844,7 +1844,7 @@ class Parser {
     ////
     //Statement parsing
 
-    parseStructuredAssignment(sinfo: SourceInfo, vars: "var" | "var!" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
+    parseStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
         if (this.testToken("[")) {
             const assigns = this.parseListOf<StructuredAssignment>("[", "]", ",", () => {
                 return this.parseStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
@@ -1873,13 +1873,13 @@ class Parser {
             return new ValueListStructuredAssignment(assigns);
         }
         else {
-            if (this.testToken("var")) {
+            if (this.testToken("let") || this.testToken("var")) {
                 if (vars !== undefined) {
                     this.raiseError(sinfo.line, "Cannot mix var decl before and inside structured assign");
                 }
 
+                const isConst = this.testToken("let");
                 this.consumeToken();
-                const isConst = !this.testAndConsumeTokenIf("!");
 
                 this.ensureToken(TokenStrings.Identifier);
                 const name = this.consumeTokenAndGetValue();
@@ -1942,7 +1942,7 @@ class Parser {
                         }
                         decls.add(name);
 
-                        if (vars === "var") {
+                        if (vars === "let") {
                             return new VariableDeclarationStructuredAssignment(isopt, name, true, itype);
                         }
                         else {
@@ -2029,13 +2029,13 @@ class Parser {
             this.consumeToken();
             return new EmptyStatement(sinfo);
         }
-        else if (tk === "var") {
+        else if (tk === "let" || tk === "var") {
             this.consumeToken();
             const isConst = !this.testAndConsumeTokenIf("!");
 
             if (this.testToken("[") || this.testToken("{") || this.testToken("(|") || this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Type ) || this.testToken(TokenStrings.Type)) {
                 let decls = new Set<string>();
-                const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "var" : "var!", false, decls);
+                const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", false, decls);
                 decls.forEach((dv) => {
                     if (this.m_penv.getCurrentFunctionScope().isVarNameDefined(dv)) {
                         this.raiseError(line, "Variable name is already defined");
@@ -2052,7 +2052,7 @@ class Parser {
             else {
                 let decls = new Set<string>();
                 const assigns = this.parseEphemeralListOf(() => {
-                    return this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "var" : "var!", false, decls);
+                    return this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", false, decls);
                 });
 
                 if(assigns.length === 0 || (assigns.length === 1 && !(assigns[0] instanceof VariableDeclarationStructuredAssignment))) {
@@ -2377,10 +2377,11 @@ class Parser {
             typecheck = this.parseTypeSignature();
         }
         else {
-            let varinfo: "var" | "var!" | undefined = undefined;
-            if (this.testAndConsumeTokenIf("var")) {
-                varinfo = (this.testAndConsumeTokenIf("!") ? "var!" : "var");
+            let varinfo: "let" | "var" | undefined = undefined;
+            if (this.testToken("var")) {
+                varinfo = "var";
             }
+            this.consumeToken();
             layoutcheck = this.parseStructuredAssignment(sinfo, varinfo, true, decls);
         }
 

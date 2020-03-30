@@ -20,9 +20,9 @@ entity Angle {
         ensures $return.primes < 60 && $return.primes >= 0;
         ensures $return.seconds < 60 && $return.seconds >= 0;
     {
-        var seconds = this.seconds % 60;
-        var primes = (this.primes + ((this.seconds - seconds) / 60)) % 60;
-        var! degrees = this.degrees + ((this.primes - primes) + ((this.seconds - seconds) / 60)) / 60;
+        let seconds = this.seconds % 60;
+        let primes = (this.primes + ((this.seconds - seconds) / 60)) % 60;
+        let! degrees = this.degrees + ((this.primes - primes) + ((this.seconds - seconds) / 60)) / 60;
         
         if (!over360 && degrees > 360) {
             degrees = 360;
@@ -33,7 +33,7 @@ entity Angle {
 }
 
 entrypoint function main(): Angle {
-    var angle = Angle{degrees=220, primes=60, seconds=60};
+    let angle = Angle{degrees=220, primes=60, seconds=60};
 
     return angle->normalized();
 }

@@ -26,7 +26,7 @@ function checker<T, U>(v: T): Bool {
 }
 
 entrypoint function noneTests(): Int {
-    var nv = makeValue<None>(none);
+    let nv = makeValue<None>(none);
 
     check checkerAny<None>(nv);
     check checkerAny<Any>(nv);
@@ -47,7 +47,7 @@ entrypoint function noneTests(): Int {
 }
 
 entrypoint function boolTests(): Int {
-    var nv = makeValue<Bool>(true);
+    let nv = makeValue<Bool>(true);
 
     check checkerAny<Bool>(nv);
     check checkerAny<Any>(nv);
@@ -69,7 +69,7 @@ entrypoint function boolTests(): Int {
 }
 
 entrypoint function intTests(): Int {
-    var nv = makeValue<Int>(5);
+    let nv = makeValue<Int>(5);
 
     check checkerAny<Int>(nv);
     check checkerAny<Any>(nv);
@@ -91,7 +91,7 @@ entrypoint function intTests(): Int {
 }
 
 entrypoint function stringTests(): Int {
-    var nv = makeValue<String>("ok");
+    let nv = makeValue<String>("ok");
 
     check checkerAny<String>(nv);
     check checkerAny<Any>(nv);
@@ -113,7 +113,7 @@ entrypoint function stringTests(): Int {
 }
 
 entrypoint function intOrNoneTests(): Int {
-    var nv = makeOrNone<Int>(5);
+    let nv = makeOrNone<Int>(5);
 
     check checker<Int?, Int>(nv);
     check checker<Int?, Any>(nv);
@@ -135,7 +135,7 @@ entrypoint function intOrNoneTests(): Int {
 }
 
 entrypoint function boolTruthyTests(): Int {
-    var nv = makeOrNone<Bool>(true);
+    let nv = makeOrNone<Bool>(true);
 
     check checker<Bool?, Bool>(nv);
     check checker<Bool?, Any>(nv);
@@ -157,7 +157,7 @@ entrypoint function boolTruthyTests(): Int {
 }
 
 entrypoint function intKeyTypeTests(): Int {
-    var nv = makeConcept<KeyType, Int>(5);
+    let nv = makeConcept<KeyType, Int>(5);
 
     check checker<KeyType, Int>(nv);
     check checker<KeyType, Any>(nv);

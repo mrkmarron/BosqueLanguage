@@ -14,8 +14,8 @@ entity SE {
 }
 
 entrypoint function namespaceConstEval(): Int {
-    var y = NSTest::nsconst1;
-    var x: Int = NSTest::nsconst2;
+    let y = NSTest::nsconst1;
+    let x: Int = NSTest::nsconst2;
     if (x == 0) {
         return 7;
     }
@@ -28,8 +28,8 @@ entrypoint function namespaceConstEval(): Int {
 }
 
 entrypoint function staticConstEval(): Int {
-    var y = SE::sconst1;
-    var x: Int = SE::sconst2;
+    let y = SE::sconst1;
+    let x: Int = SE::sconst2;
     if (x == 0) {
         return 7;
     }

@@ -77,12 +77,12 @@ entity Board {
     static convertRowColumnToCell(row: Int, col: Int): BoardCell
         requires 0 <= row && row < 3 && 0 <= col && col < 3;
     {
-        var pos = Math::mult(row, 3) + col;
+        let pos = Math::mult(row, 3) + col;
         return NSMain::_posToCellList->get(pos);
     }
 
     method isCellOccupied(x: Int, y: Int): Bool {
-        var cellid = Board::convertRowColumnToCell(x, y);
+        let cellid = Board::convertRowColumnToCell(x, y);
         return this.cells->has(cellid);
     }
 
@@ -90,7 +90,7 @@ entity Board {
         requires 0 <= x && x < 3 && 0 <= y && y < 3;
         requires !this->isCellOccupied(x, y);
     {
-        var cellid = Board::convertRowColumnToCell(x, y);
+        let cellid = Board::convertRowColumnToCell(x, y);
         return this->update(cells=this.cells->add(cellid, mark));
     }
 
@@ -128,7 +128,7 @@ entity Game {
     method makeExplicitMove(x: Int, y: Int, mark: PlayerMark): Game
         requires release this->isMoveLegal(x, y);
     {
-        var nboard = this.board->markCellWith(x, y, mark);
+        let nboard = this.board->markCellWith(x, y, mark);
         return Game@{ board=nboard, winner=nboard->checkAnyWinner() };
     }
 }
@@ -141,15 +141,15 @@ typedef Move = {
 function canIWinIn3(moves: [Move, Move, Move, Move]): Result<Bool, None> {
     var! game = Game@{};
     
-    var m1 = moves.0;
+    let m1 = moves.0;
     validate game->isMoveLegal(m1.row, m1.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m1.row, m1.col, PlayerMark::x);
 
-    var m2 = moves.0;
+    let m2 = moves.0;
     validate game->isMoveLegal(m2.row, m2.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m2.row, m2.col, PlayerMark::o);
 
-    var m3 = moves.0;
+    let m3 = moves.0;
     validate game->isMoveLegal(m3.row, m3.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m3.row, m3.col, PlayerMark::x);
 
@@ -159,23 +159,23 @@ function canIWinIn3(moves: [Move, Move, Move, Move]): Result<Bool, None> {
 function canIWinIn5(moves: [Move, Move, Move, Move, Move]): Result<Bool, None> {
     var! game = Game@{};
     
-    var m1 = moves.0;
+    let m1 = moves.0;
     validate game->isMoveLegal(m1.row, m1.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m1.row, m1.col, PlayerMark::x);
 
-    var m2 = moves.0;
+    let m2 = moves.0;
     validate game->isMoveLegal(m2.row, m2.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m2.row, m2.col, PlayerMark::o);
 
-    var m3 = moves.0;
+    let m3 = moves.0;
     validate game->isMoveLegal(m3.row, m3.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m3.row, m3.col, PlayerMark::x);
 
-    var m4 = moves.0;
+    let m4 = moves.0;
     validate game->isMoveLegal(m4.row, m4.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m4.row, m4.col, PlayerMark::o);
 
-    var m3 = moves.0;
+    let m3 = moves.0;
     validate game->isMoveLegal(m5.row, m5.col) or return Result<Bool, None>::err(none);
     game = game->makeExplicitMove(m5.row, m5.col, PlayerMark::x);
 

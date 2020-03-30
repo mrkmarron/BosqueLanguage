@@ -36,13 +36,13 @@ entrypoint function recchk(x: Int): Int {
 }
 
 entrypoint function recnope(x: Int): Int {
-    var r = recf2[recursive](x);
+    let r = recf2[recursive](x);
     assert r != 2;
     return 1;
 }
 
 entrypoint function recerr(x: Int): Int {
-    var r = recf2[recursive](x);
+    let r = recf2[recursive](x);
     assert r != 3;
     return 1;
 }

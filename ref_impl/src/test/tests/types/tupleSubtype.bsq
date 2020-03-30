@@ -18,7 +18,7 @@ function checker<T, U>(v: T): Bool {
 }
 
 entrypoint function tupleTests(): Int {
-    var nv = makeValue<[Int, Int, ?:Int]>([1, 2]);
+    let nv = makeValue<[Int, Int, ?:Int]>([1, 2]);
 
     check checker<[Int, Int, ?:Int], [Int, Int]>(nv);
     check checker<[Int, Int, ?:Int], [Int, ?:Int]>(nv);
@@ -40,7 +40,7 @@ entrypoint function tupleTests(): Int {
 }
 
 entrypoint function tupleAnyTests(): Int {
-    var nv = makeValue<Any>([1, 2]);
+    let nv = makeValue<Any>([1, 2]);
 
     check checkerAny<[Int, Int]>(nv);
     check checkerAny<[Int, ?:Int]>(nv);
@@ -62,7 +62,7 @@ entrypoint function tupleAnyTests(): Int {
 }
 
 entrypoint function tupleContentsTests(): Int {
-    var nv = makeValue<[Int, Bool, ?:Int, ?:String]>([1, true, 3]);
+    let nv = makeValue<[Int, Bool, ?:Int, ?:String]>([1, true, 3]);
 
     check checker<[Int, Bool, ?:Int, ?:String], [Int, Bool, Any, Int]>(nv);
     check checker<[Int, Bool, ?:Int, ?:String], [Int, Any, Any]>(nv);

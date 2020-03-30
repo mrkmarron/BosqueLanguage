@@ -149,7 +149,7 @@ isIOErr(StringOf<ErrorCode>::as('Input')) //runtime error not a valid ErrorCode 
 isIOErr(ErrorCode'Assert')             //false
 isIOErr(StringOf<ErrorCode>::as('IO')) //true
 
-var ec: ErrorCode = StringOf<ErrorCode>@'IO';
+let ec: ErrorCode = StringOf<ErrorCode>@'IO';
 assert(ec.code == 1); //true
 ```
 

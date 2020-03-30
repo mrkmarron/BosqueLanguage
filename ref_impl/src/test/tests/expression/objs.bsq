@@ -47,56 +47,56 @@ entity ENested {
 }
 
 entrypoint function createObjSimple(): Bool {
-    var o = E1@{ x=none, y=1, z=true, f=3 };
+    let o = E1@{ x=none, y=1, z=true, f=3 };
 
     check o.x == none && o.y == 1 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjDefault(): Bool {
-    var o = E1@{ x=none, z=true, f=3 };
+    let o = E1@{ x=none, z=true, f=3 };
 
     check o.x == none && o.y == 3 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjExpando(): Bool {
-    var o = E1@{ ...{ x=none, z=true, f=3 } };
+    let o = E1@{ ...{ x=none, z=true, f=3 } };
 
     check o.x == none && o.y == 3 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjFactory(): Bool {
-    var o = E1@create(3);
+    let o = E1@create(3);
 
     check o.x == none && o.y == 1 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjFactoryTemplate(): Bool {
-    var o = E1@creat<String>("ok");
+    let o = E1@creat<String>("ok");
 
     check o.x->as<String>() == "ok" && o.y == 1 && o.z && o.f == 3;
     return true;
 }
 
 entrypoint function createObjTFactory(): Bool {
-    var o = E2<Int>@create(3);
+    let o = E2<Int>@create(3);
 
     check o.f == 3 && o.g->as<Int>() == 1;
     return true;
 }
 
 entrypoint function createObjTFactoryTemplate(): Bool {
-    var o = E2<Int>@creat<String>(3, "ok");
+    let o = E2<Int>@creat<String>(3, "ok");
 
     check o.f == 3 && o.g->as<String>() == "ok";
     return true;
 }
 
 entrypoint function createObjNested(): Bool {
-    var o = ENested@{r={f=1}, o=E2<Int>@create(3)};
+    let o = ENested@{r={f=1}, o=E2<Int>@create(3)};
 
     check !o.t.1 && o.r.f == 1 && o.o.f == 3;
     return true;
@@ -104,15 +104,15 @@ entrypoint function createObjNested(): Bool {
 
 
 entrypoint function puzzle1(x: Int, b: Bool): Int {
-    var o: Bar = b ? E0@{x=none} : E1@{x=none, z=true, f=3};
+    let o: Bar = b ? E0@{x=none} : E1@{x=none, z=true, f=3};
 
     check x != o.y;
     return 0;
 }
 
 entrypoint function puzzle2(x: Int, b: Bool): Int {
-    var o1: Bar = E0@{x=none, y=x};
-    var o2 = b ? E0@{x=none, y=x} : E1@{x=none, y=x, z=true, f=3};
+    let o1: Bar = E0@{x=none, y=x};
+    let o2 = b ? E0@{x=none, y=x} : E1@{x=none, y=x, z=true, f=3};
 
     check o1.y == o2.y;
     return 0;

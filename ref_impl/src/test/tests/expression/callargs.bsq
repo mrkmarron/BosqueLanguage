@@ -85,12 +85,12 @@ entrypoint function mixedArgsNamedTest2(): Int {
 }
 
 entrypoint function identityAnyTest(): Int | String {
-    var x = identityAny<Int>(3);
+    let x = identityAny<Int>(3);
     return x == 3 ? identityAny<Int | String>(1) : 2;
 }
 
 entrypoint function identityIntTest(): Int {
-    var x = identityInt<Int>(3);
+    let x = identityInt<Int>(3);
     return x == 3 ? identityInt<Int>(1) : 2;
 }
 

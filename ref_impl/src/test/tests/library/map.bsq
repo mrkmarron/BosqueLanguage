@@ -26,7 +26,7 @@ entrypoint function restCallOverlapArgsMap(): Int {
 }
 
 function hasop(x: Int): Int {
-    var m = Map<Int, Int>@{1=>1, 5=>2};
+    let m = Map<Int, Int>@{1=>1, 5=>2};
     return m->has(x) ? m->get(x) : -1;
 }
 
@@ -39,8 +39,8 @@ entrypoint function hasCno(): Int {
 }
 
 entrypoint function insertOp(x: Int, y: Int): Int {
-    var mint = Map<Int, Int>@{1=>1, 3=>3, 2=>2};
-    var mup = mint->insert(x, y);
+    let mint = Map<Int, Int>@{1=>1, 3=>3, 2=>2};
+    let mup = mint->insert(x, y);
 
     check mup->has(x) && mup->get(x) == y;
     return mup->size();
@@ -55,8 +55,8 @@ entrypoint function insertCno(): Int {
 }
 
 entrypoint function removeOp(x: Int): Int {
-    var mint = Map<Int, Int>@{1=>1, 2=>2, 3=>3};
-    var mup = mint->remove(x);
+    let mint = Map<Int, Int>@{1=>1, 2=>2, 3=>3};
+    let mup = mint->remove(x);
 
     check !mup->has(x);
     return mup->size();
@@ -71,24 +71,24 @@ entrypoint function removeCno(): Int {
 }
 
 entrypoint function getFail(x: Int): Int {
-    var mint = Map<Int, Int>@{1=>1, 2=>2, 3=>3};
+    let mint = Map<Int, Int>@{1=>1, 2=>2, 3=>3};
     return mint->get(x);
 }
 
 entrypoint function puzzle(x: Int, y: Int): Int {
-    var mint = Map<Int, Int>@{1=>1, 2=>2, x=>y};
+    let mint = Map<Int, Int>@{1=>1, 2=>2, x=>y};
 
     check mint->size() == 2 && mint->get(x) != 11;
     return 0;
 }
 
 entrypoint function tox(): Bool {
-    var mint = Map<Int, Int>@{1=>2, 3=>4};
+    let mint = Map<Int, Int>@{1=>2, 3=>4};
     
-    var kl = mint->getKeyList();
-    var ks = mint->getKeySet();
-    var vl = mint->getValues();
-    var el = mint->getEntries();
+    let kl = mint->getKeyList();
+    let ks = mint->getKeySet();
+    let vl = mint->getValues();
+    let el = mint->getEntries();
 
     return kl->size() == 2 && ks->has(3) && vl->size() == 2 && el->size() == 2;
 }
