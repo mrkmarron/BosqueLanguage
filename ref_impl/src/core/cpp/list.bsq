@@ -25,7 +25,6 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     hidden recursive? static _indexofnot(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexofnot
     hidden recursive? static _indexoflastnot(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexoflastnot
 
-    //for these we are just going to use the p versions with lambdas and the right equality test
     hidden recursive? static {when T KeyType} _count_keytype(l: List<T>, v: T): Int # list_count_keytype
     hidden recursive? static {when T KeyType} _indexof_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexof_keytype
     hidden recursive? static {when T KeyType} _indexoflast_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexoflast_keytype

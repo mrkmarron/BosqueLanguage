@@ -76,7 +76,7 @@ entity Queue<T> provides Object {
         return Queue<T>::_unsafe_pop(this);
     }
 
-    static irest(ref q: Queue<T>): None
+    static irest(ref q: Queue<T>)
         requires release Queue<T>::_size(q) != 0;
     {
         q = Queue<T>::_unsafe_pop(q);
@@ -87,7 +87,7 @@ entity Queue<T> provides Object {
         return Queue<T>::_unsafe_push(this, v);
     }
 
-    static ienqueue(ref q: Queue<T>, v: T): None {
+    static ienqueue(ref q: Queue<T>, v: T) {
         q = Queue<T>::_unsafe_push(q, v);
         return none;
     }

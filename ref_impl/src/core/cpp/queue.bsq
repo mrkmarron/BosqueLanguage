@@ -57,7 +57,7 @@ entity Queue<T> provides Object {
         abort;
     }
 
-    static irest(ref q: Queue<T>): None
+    static irest(ref q: Queue<T>)
         requires release Queue<T>::_size(q) != 0;
     {
        abort;
@@ -67,7 +67,7 @@ entity Queue<T> provides Object {
         abort;
     }
 
-    static ienqueue(ref q: Queue<T>, v: T): None {
+    static ienqueue(ref q: Queue<T>, v: T) {
        abort;
     }
 }

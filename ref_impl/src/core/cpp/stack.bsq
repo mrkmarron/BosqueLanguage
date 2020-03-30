@@ -57,7 +57,7 @@ entity Stack<T> provides Object {
         abort;
     }
 
-    static irest(ref s: Stack<T>): None
+    static irest(ref s: Stack<T>)
         requires release Stack<T>::_size(s) != 0;
     {
         abort;
@@ -67,7 +67,7 @@ entity Stack<T> provides Object {
         abort;
     }
 
-    static ipush(ref s: Stack<T>, v: T): None {
+    static ipush(ref s: Stack<T>, v: T) {
         abort;
     }
 }

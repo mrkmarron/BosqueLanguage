@@ -76,7 +76,7 @@ entity Stack<T> provides Object {
         return Stack<T>::_unsafe_pop(this);
     }
 
-    static irest(ref s: Stack<T>): None
+    static irest(ref s: Stack<T>)
         requires release Stack<T>::_size(s) != 0;
     {
         s = Queue<T>::_unsafe_pop(s);
@@ -87,7 +87,7 @@ entity Stack<T> provides Object {
         return Queue<T>::_unsafe_push(this, v);
     }
 
-    static ipush(ref s: Stack<T>, v: T): None {
+    static ipush(ref s: Stack<T>, v: T) {
         s = Stack<T>::_unsafe_push(s, v);
         return none;
     }

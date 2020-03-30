@@ -65,25 +65,68 @@ concept APIType provides APIValue {
 }
 
 //<summary>Type for representing the none-value.</summary>
-concept Truthy provides KeyType, Parsable {
-    override static tryParse(str: String): Result<Truthy, String> # truthy_tryparse
+byvalue concept Truthy provides KeyType, Parsable {
+    static truth(v: Truthy): Bool {
+        return !!v;
+    }
+
+    override static tryParse(str: String): Result<Truthy, String> {
+        if(str == "none") {
+            return Result<Truthy, String>::ok(none);
+        }
+        else if(str == "false") {
+            return Result<Truthy, String>::ok(false);
+        }
+        else if(str == "true") {
+            return Result<Truthy, String>::ok(true);
+        }
+        else {
+            return Result<Truthy, String>::err("Expected Truthy");
+        }
+    }
 }
 
 //<summary>Type for representing the none-value.</summary>
-entity None provides Truthy, PODType, APIType {
-    override static tryParse(str: String): Result<None, String> # none_tryparse
+byvalue entity None provides Truthy, PODType, APIType {
+    override static tryParse(str: String): Result<None, String> {
+        if(str == "none") {
+            return Result<None, String>::ok(none);
+        }
+        else {
+            return Result<None, String>::err("Expected None");
+        }
+    }
 }
 
 //<summary>Primitive boolean value.</summary>
-entity Bool provides Some, Truthy, PODType, APIType {
-    override static tryParse(str: String): Result<Bool, String> # bool_tryparse
+byvalue entity Bool provides Some, Truthy, PODType, APIType {
+    override static tryParse(str: String): Result<Bool, String> {
+        if(str == "false") {
+            return Result<Truthy, String>::ok(false);
+        }
+        else if(str == "true") {
+            return Result<Truthy, String>::ok(true);
+        }
+        else {
+            return Result<Truthy, String>::err("Expected Bool");
+        }
+    }
 
-    static stringify(b: Bool): String # bool_tostring
-    static parse(str: String): Bool # bool_parse
+    static stringify(b: Bool): String {
+        return b ? "true" : "false";
+    }
+
+    static parse(str: String): Bool {
+        check str == "false" || str == "true";
+        return (str == "false") ? false : true;
+    }
 }
 
 //<summary>Primitive integer value.</summary>
-entity Int provides KeyType, Parsable, PODType, APIType, Some {
+byvalue entity Int provides KeyType, Parsable, PODType, APIType, Some {
+    const min_value = -9007199254740991;
+    const max_value = 9007199254740991;
+
     override static tryParse(str: String): Result<Int, String> # int_tryparse
 
     static stringify(i: Int): String # int_tostring
@@ -97,10 +140,23 @@ entity Int provides KeyType, Parsable, PODType, APIType, Some {
         return v1 < v2 ? v1 : v2;
     }
 
-    static mult(a: Int, b: Int): Int # special_method
-    static div(a: Int, b: Int): Int # special_method
-    static mod(a: Int, b: Int): Int # special_method
+    static mod(a: Int, b: Int): Int # int_mod
+}
 
+//<summary>Primitive big-integer value.</summary>
+entity BigInt provides KeyType, Parsable, PODType, APIType, Some {
+    override static tryParse(str: String): Result<BigInt, String> # bigint_tryparse
+
+    static stringify(i: BigInt): String # bigint_tostring
+    static parse(str: String): BigInt # bigint_parse
+}
+
+//<summary>Primitive float 64 value.</summary>
+byvalue entity Float64 provides Parsable, PODType, APIType, Some {
+    override static tryParse(str: String): Result<Float64, String> # float64_tryparse
+
+    static stringify(f: Float64): String # float64_tostring
+    static parse(str: String): Float64 # float64_parse
 }
 
 //<summary>Primitive string value.</summary>
@@ -131,7 +187,7 @@ entity String provides KeyType, PODType, APIType, Some {
 }
 
 //<summary>Primitive safe string value.</summary>
-entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType {
+entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType, Convertable {
     method string(): String # safestring_string
 
     static as(str: String): SafeString<T> # safestring_as
@@ -181,27 +237,21 @@ entity ByteBuffer provides APIValue, Some {
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
-entity ISOTime provides Parsable, PODType, APIType, Some {
+byvalue entity ISOTime provides Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<ISOTime, String> # time_tryparse
-
-    static compare(a: ISOTime, b: ISOTime): Bool # isotime_compare
 }
 
-//<summary>Primitive GUID value.</summary>
-entity GUID provides KeyType, Parsable, PODType, APIType, Some {
-    static create(gval: String): GUID # guid_create 
-
-    override static tryParse(str: String): Result<GUID, String> # guid_tryparse
+//<summary>Primitive UUID value.</summary>
+byvalue entity UUID provides KeyType, Parsable, PODType, APIType, Some {
+    override static tryParse(str: String): Result<UUID, String> # uuid_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
-entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
+byvalue entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
 
     static zero(): LogicalTime # logicaltime_zero
     static tick(t: LogicalTime): LogicalTime # logicaltime_tick
-
-    static compare(a: ISOTime, b: ISOTime): Bool # logicaltime_compare
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
@@ -220,7 +270,7 @@ concept IdKey provides KeyType, Some {
 }
 
 //<summary>A concept for dealing with guid ids.</summary>
-concept GUIDIdKey provides KeyType, Some {
+concept UUIDIdKey provides KeyType, Some {
 }
 
 //<summary>A concept for dealing with eventime ids.</summary>
@@ -235,6 +285,8 @@ concept ContentHashIdKey provides KeyType, Some {
 entity Regex provides Some {
     method accepts(str: String, start?: Int, end?: Int): Bool # regex_accepts
     method match(str: String, start?: Int, end?: Int): RegexMatch # regex_match
+    
+    method matchAll(str: String, start?: Int, end?: Int): List<RegexMatch> # regex_matchall
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
@@ -245,7 +297,7 @@ concept Tuple provides Some {
 concept Record provides Some {
 }
 
-entity MapEntry<K where KeyType, V> provides Some {
+byvalue entity MapEntry<K where KeyType, V> provides Some {
     field key: K;
     field value: V;
 
@@ -255,7 +307,7 @@ entity MapEntry<K where KeyType, V> provides Some {
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-concept Result<T, E> provides Some, Convertable {
+byvalue concept Result<T, E> provides Some, Convertable {
     static ok(result: T): Result<T, E> {
         return Ok<T, E>::create(result);
     }
@@ -280,7 +332,7 @@ concept Result<T, E> provides Some, Convertable {
     }
 }
 
-entity Ok<T, E> provides Result<T, E> {
+byvalue entity Ok<T, E> provides Result<T, E> {
     field value: T;
 
     static of(value: T): Ok<T, E> {
@@ -288,7 +340,7 @@ entity Ok<T, E> provides Result<T, E> {
     }
 }
 
-entity Err<T, E> provides Result<T, E> {
+byvalue entity Err<T, E> provides Result<T, E> {
     field error: E;
 
     static of(info: E): Err<T, E> {
@@ -300,19 +352,19 @@ entity Err<T, E> provides Result<T, E> {
 concept Object provides Some {
 }
 
-entity RegexCapture provides Object {
+byvalue entity RegexCapture provides Object {
     field index: Int;
     field length: Int;
     field value: String;
 }
 
-entity RegexGroup provides Object {
+byvalue entity RegexGroup provides Object {
     field success: Bool;
     field name: String;
     field captures: List<RegexCapture>;
 }
 
-entity RegexMatch provides Object {
+byvalue entity RegexMatch provides Object {
    field success: Bool;
    field index: Int;
    field length: Int;
