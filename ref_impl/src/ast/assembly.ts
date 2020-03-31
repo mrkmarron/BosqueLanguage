@@ -28,11 +28,15 @@ class TemplateTermDecl {
     readonly name: string;
     readonly isGrounded: boolean;
     readonly constraint: TypeSignature;
+    readonly isInfer: boolean;
+    readonly defaultType: TypeSignature | undefined;
 
-    constructor(name: string, isgrounded: boolean, constraint: TypeSignature) {
+    constructor(name: string, isgrounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
         this.isGrounded = isgrounded;
         this.constraint = constraint;
+        this.isInfer = isinfer;
+        this.defaultType = defaulttype;
     }
 }
 

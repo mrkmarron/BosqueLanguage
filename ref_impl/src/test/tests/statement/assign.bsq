@@ -21,29 +21,29 @@ entrypoint function constDeclWithUnionType(): Int | String {
 }
 
 entrypoint function varDeclWithType(): Int {
-    var! x: Int = 3;
+    var x: Int = 3;
     return x;
 }
 
 entrypoint function varDeclWithNoValue(): Int {
-    var! x: Int?;
+    var x: Int?;
     return 1;
 }
 
 entrypoint function varDeclAndAssignWithType(): Int {
-    var! x: Int = 3;
+    var x: Int = 3;
     x = 4;
     return x;
 }
 
 entrypoint function varDeclAndAssignNoType(): Int {
-    var! x = 3;
+    var x = 3;
     x = 4;
     return x;
 }
 
 entrypoint function varDeclAndAssignWithNoValue(): Int? {
-    var! x: Int?;
+    var x: Int?;
     x = 5;
     return x;
 }
@@ -54,15 +54,15 @@ entrypoint function structuredDeclTuple(): Int {
 }
 
 entrypoint function structuredDeclMutableTuple(): Int {
-    [var! x: Int, var! y] = [1, 2];
+    [var x: Int, var y] = [1, 2];
     x = x + 1;
     y = y + 1;
     return x + y;
 }
 
 entrypoint function structuredAssignTuple(): Int {
-    var! x: Int = 4;
-    var! y: Int;
+    var x: Int = 4;
+    var y: Int;
     [x, y] = [1, 2];
     return x + y;
 }
@@ -73,19 +73,19 @@ entrypoint function structuredDeclRecord(): Int {
 }
 
 entrypoint function structuredDeclMutableRecord(): Int {
-    {f=var! x: Int, g=var! y} = {f=1, g=2};
+    {f=var x: Int, g=var y} = {f=1, g=2};
     return x + y;
 }
 
 entrypoint function structuredAssignRecord(): Int {
-    var! x: Int = 4;
-    var! y: Int;
+    var x: Int = 4;
+    var y: Int;
     {f=x, g=y} = {f=1, g=2};
     return x + y;
 }
 
 entrypoint function structuredDeclAndAssign(): Int {
-    var! y: Int;
+    var y: Int;
     [let x: Int, y] = [1, 2];
     return x + y;
 }
@@ -96,7 +96,7 @@ entrypoint function structuredDeclGlobal(): Int {
 }
 
 entrypoint function structuredDeclGlobalMutable(): Int {
-    var! {f=x: Int, g=y} = {f=1, g=2};
+    var {f=x: Int, g=y} = {f=1, g=2};
     x = x + 1;
     y = y + 1;
     return x + y;

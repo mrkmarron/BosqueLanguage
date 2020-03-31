@@ -41,7 +41,7 @@ entrypoint function tryGetPropertyCnone(): Int? {
 }
 
 function sign(x?: Int): Int {
-    var! y: Int;
+    var y: Int;
 
     if(x == none || x == 0) {
         y = 0;

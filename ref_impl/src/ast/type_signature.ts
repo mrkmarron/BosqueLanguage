@@ -95,11 +95,13 @@ class FunctionTypeSignature extends TypeSignature {
 class ProjectTypeSignature extends TypeSignature {
     readonly fromtype: TypeSignature;
     readonly oftype: TypeSignature;
+    readonly version: string;
 
-    constructor(fromtype: TypeSignature, oftype: TypeSignature) {
+    constructor(fromtype: TypeSignature, oftype: TypeSignature, version: string) {
         super();
         this.fromtype = fromtype;
         this.oftype = oftype;
+        this.version = version;
     }
 }
 

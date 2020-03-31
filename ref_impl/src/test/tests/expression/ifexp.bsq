@@ -22,7 +22,7 @@ entrypoint function eif_abs2(x: Int): Int {
 entrypoint function eif_absy_none(b: Bool): Int {
     let x = b ? 1 : none;
     return if(x == none) 0 else {|
-        var! y = x;
+        var y = x;
         if(y < 0) {
             y = -y;
         }
@@ -35,7 +35,7 @@ entrypoint function eif_absy_1(b: Bool): Int {
     return if(x == none)
         0
     else {|
-        var! y = x;
+        var y = x;
         if(y < 0) {
             y = -y;
         }

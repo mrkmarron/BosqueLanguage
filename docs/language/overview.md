@@ -84,11 +84,11 @@ Reasoning about and understanding the effect of a statement or block of code is 
 
 ## <a name="0.2-Block-Scoping"></a>0.2 Block Scoping
 
-Local variables with block structured code is a very appealing model for structuring code. The Bosque language fuses functional programming with block scopes and `{...}` braces by allowing multiple assignments to updatable variables `var!` ([6.3 Variable Assignment](#6.3-Variable-Assignment)). This supports functional style programming in a block-scoped language and allows developers to write code such as:
+Local variables with block structured code is a very appealing model for structuring code. The Bosque language fuses functional programming with block scopes and `{...}` braces by allowing multiple assignments to updatable variables `var` ([6.3 Variable Assignment](#6.3-Variable-Assignment)). This supports functional style programming in a block-scoped language and allows developers to write code such as:
 
 ```none
 function abs(x: Int): Int {
-    var! sign = 1; //declare updatable variable with initial value
+    var sign = 1; //declare updatable variable with initial value
     if(x < 0) {
         sign = -1; //update the variable
     }
@@ -1323,12 +1323,12 @@ The empty statement is simply the `;` which has no effect but is a legal stateme
 
 ## <a name="6.2-Variable-Declaration"></a>6.2 Variable Declaration
 
-Variable declarations in Bosque can be declared as constant in the scope using the `var` declaration form:
+Variable declarations in Bosque can be declared as constant in the scope using the `let` declaration form:
 
 Examples of these declarations are:
 
-- `var` _Identifier_ `=` _Exp_`;`
-- `var` _Identifier_`:`_Type_ `=` _Exp_`;`
+- `let` _Identifier_ `=` _Exp_`;`
+- `let` _Identifier_`:`_Type_ `=` _Exp_`;`
 
 Multi-decls using explicit initialization or assignment from a value pack are also supported:
 
@@ -1342,29 +1342,29 @@ let x: Int = 3; //Int variable introduced and initialized
 let y = 3;      //variable introduced and inferred to be of type Int
 ```
 
-Alternatively variables can be declared as updatable in the scope using the `var!` declaration form. In the `var!` form an initializer expression can be used to set the initial value for the variable or it can be omitted to leave the variable uninitialized.
+Alternatively variables can be declared as updatable in the scope using the `var` declaration form. In the `var` form an initializer expression can be used to set the initial value for the variable or it can be omitted to leave the variable uninitialized.
 
-- `var!` _Identifier_`:` _Type_`;`
-- `var!` _Identifier_ `=` _Exp_`;`
-- `var!` _Identifier_`:`_Type_ `=` _Exp_`;`
+- `var` _Identifier_`:` _Type_`;`
+- `var` _Identifier_ `=` _Exp_`;`
+- `var` _Identifier_`:`_Type_ `=` _Exp_`;`
 
-Using the `var!` form allows for later assignment statements ([6.3 Variable Assignment](#6.3-Variable-Assignment)) to update the value of the variable. It is an error to use an uninitialized variable unless all possible paths flowing to the use _must_ have assigned it a value.
+Using the `var` form allows for later assignment statements ([6.3 Variable Assignment](#6.3-Variable-Assignment)) to update the value of the variable. It is an error to use an uninitialized variable unless all possible paths flowing to the use _must_ have assigned it a value.
 
 Examples of these declarations are:
 
 ```none
-var! x: Int;     //uninitialized mutable variable of type Int introduced
-var! x: Int = 3; //mutable variable of type Int introduced
-var! x = 3;      //mutable variable of inferred type Int introduced
+var x: Int;     //uninitialized mutable variable of type Int introduced
+var x: Int = 3; //mutable variable of type Int introduced
+var x = 3;      //mutable variable of inferred type Int introduced
 ```
 
 ## <a name="6.3-Variable-Assignment"></a>6.3 Variable Assignment
 
-Variables declared as mutable, using the `var!` syntax, can be modified by later assignment statements.
+Variables declared as mutable, using the `var` syntax, can be modified by later assignment statements.
 
 ```none
-var! x: Int;
-var! y = 7;
+var x: Int;
+var y = 7;
 
 let a = x; //error undefined use
 
@@ -1381,12 +1381,12 @@ Similar to declaration multi assignment is allowed either with an explicit value
 Updates can occur in different blocks of code as well:
 
 ```none
-var! x = 0;
+var x = 0;
 if(true) {
     x = 1;
 }
 
-var! y: Int;
+var y: Int;
 if(true) {
     y = 1;
 }
@@ -1410,29 +1410,29 @@ Pair@{f=let x, s=let y} = Pair@{f=1, s=2};       //declare x, y and assign from 
 Just as with single variable declaration, variables can be declared as mutable:
 
 ```none
-[var! x, var! y] = [1, 2]; //declare and assign x=1, y=2 (mutable)
-[var! x, let y] = [1, 2];  //declare and assign x=1, y=2 (x is mutable but y is not)
+[var x, var y] = [1, 2]; //declare and assign x=1, y=2 (mutable)
+[var x, let y] = [1, 2];  //declare and assign x=1, y=2 (x is mutable but y is not)
 ```
 
-Since including `var` or `var!` for each variable is often redundant and cluttered you can do a single global declaration for all variables in the assignment:
+Since including `let` or `var` for each variable is often redundant and cluttered you can do a single global declaration for all variables in the assignment:
 
 ```none
 let {f=x, g=y} = {f=1, g=2};  //declare and assign x=1, y=2
-var! {f=x, g=y} = {f=1, g=2}; //declare and assign x=1, y=2 (mutable)
+var {f=x, g=y} = {f=1, g=2}; //declare and assign x=1, y=2 (mutable)
 ```
 
 In addition to declaration variables can also be updated as part of a structured assignment:
 
 ```none
-var! x: Int;
-var! y: Int;
+var x: Int;
+var y: Int;
 {f=x, g=y} = {f=1, g=2}; //assign x=1, y=2
 ```
 
 It is possible to mix declarations and assignments:
 
 ```none
-var! x: Int;
+var x: Int;
 [x, let y] = [1, 2]; //assign x=1 and declare y=2
 ```
 
@@ -1476,7 +1476,7 @@ function absy(x?: Int): Int {
     }
 
     return {
-        var! y = x;
+        var y = x;
         if(y < 0) {
             y = -y;
         }
@@ -1615,7 +1615,7 @@ switch(x) {
 The case statement uses the same syntax as structured assignments (plus checking literal values) and can bind variables:
 
 ```none
-var! z: Int;
+var z: Int;
 switch(x) {
     case [1, let y: Int] => { return y; }     //on match define, bind, and use y
     case let {f=2, g=y: Int} => { return y; } //on match define all new vars in the match
@@ -1662,7 +1662,7 @@ let x = 3;
 {
     let y = 5;
 
-    var! z: Int;
+    var z: Int;
     if(x != 3) {
         z = 0;
     }

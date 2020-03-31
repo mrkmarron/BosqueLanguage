@@ -6,7 +6,7 @@
 namespace NSTest;
 
 entrypoint function ifAssignInBranches(x: Int): Int | Bool | None {
-    var! y: Int | Bool | None = none;
+    var y: Int | Bool | None = none;
     if (x == 0) {
         y = true;
     }
@@ -21,7 +21,7 @@ entrypoint function ifAssignInBranchesC(): Int | Bool | None {
 }
 
 entrypoint function ifReAssignInBranches(x: Int): Int {
-    var! y = 5;
+    var y = 5;
     if (x == 0) {
         y = 2;
     }

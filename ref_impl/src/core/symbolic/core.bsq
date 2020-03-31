@@ -102,13 +102,13 @@ byvalue entity None provides Truthy, PODType, APIType {
 byvalue entity Bool provides Some, Truthy, PODType, APIType {
     override static tryParse(str: String): Result<Bool, String> {
         if(str == "false") {
-            return Result<Truthy, String>::ok(false);
+            return Result<Bool, String>::ok(false);
         }
         else if(str == "true") {
-            return Result<Truthy, String>::ok(true);
+            return Result<Bool, String>::ok(true);
         }
         else {
-            return Result<Truthy, String>::err("Expected Bool");
+            return Result<Bool, String>::err("Expected Bool");
         }
     }
 
@@ -262,23 +262,11 @@ entity CryptoHash provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
-concept Enum provides KeyType, Some {
+byvalue concept Enum provides KeyType, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
 concept IdKey provides KeyType, Some {
-}
-
-//<summary>A concept for dealing with guid ids.</summary>
-concept UUIDIdKey provides KeyType, Some {
-}
-
-//<summary>A concept for dealing with eventime ids.</summary>
-concept LogicalTimeIdKey provides KeyType, Some {
-}
-
-//<summary>A concept for dealing with hashes -- is an API type if underlying type is an API type.</summary>
-concept ContentHashIdKey provides KeyType, Some {
 }
 
 //<summary>Primitive regex value.</summary>
@@ -309,42 +297,47 @@ byvalue entity MapEntry<K where KeyType, V> provides Some {
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 byvalue concept Result<T, E> provides Some, Convertable {
     static ok(result: T): Result<T, E> {
-        return Ok<T, E>::create(result);
+        return Ok<T>::of(result);
     }
 
-    static err(info: E): Result<T, E> {
-        return Err<T, E>::create(info);
+    static err(data: E): Result<T, E> {
+        return Err::of(info, data);
     }
 
     method isOk(): Bool {
-        return this->is<Ok<T, E>>();
+        return this->is<Ok<T>>();
     }
 
     method isErr(): Bool {
-        return this->is<Err<T, E>>();
+        return this->is<Err>();
     }
 
-    method value(): T # result_result
-    method error(): E # result_error
+    method result(): T {
+        return this->as<Ok<T>>().val;
+    }
+
+    method errInfo(): E {
+        return this->as<Err<E>>().data;
+    }
 
     method convert<U, V>(): Result<U, V> {
-        return this->ok() ? Result<U, V>::ok(this.value->as<U>()) : Result<U, V>::err(this.error);
+        return this->ok() ? Result<U, V>::ok(this->result()->as<U>()) : Result<U, V>::err(this->errData()->as<V>());
     }
 }
 
-byvalue entity Ok<T, E> provides Result<T, E> {
-    field value: T;
+byvalue entity Ok<T> provides Result<T, *> {
+    field val: T;
 
-    static of(value: T): Ok<T, E> {
-        return Ok<T, E>@{ value=value };
+    static of(v: T): Ok<T> {
+        return Ok<T>@{ val=v };
     }
 }
 
-byvalue entity Err<T, E> provides Result<T, E> {
-    field error: E;
+byvalue entity Err<E> provides Result<*, E> {
+    field data: E;
 
-    static of(info: E): Err<T, E> {
-        return Err<T, E>@{ error=info };
+    static of(data: E): Err<E> {
+        return Err<E>@{ data=data };
     }
 }
 

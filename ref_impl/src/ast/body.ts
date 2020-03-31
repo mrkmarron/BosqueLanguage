@@ -141,6 +141,8 @@ enum ExpressionTag {
     LiteralNoneExpression = "LiteralNoneExpression",
     LiteralBoolExpression = "LiteralBoolExpression",
     LiteralIntegerExpression = "LiteralIntegerExpression",
+    LiteralBigIntegerExpression = "LiteralBigIntegerExpression",
+    LiteralFloatExpression = "LiteralFloatExpression",
     LiteralStringExpression = "LiteralStringExpression",
     LiteralRegexExpression = "LiteralRegexExpression",
     LiteralTypedStringExpression = "LiteralTypedStringExpression",
@@ -222,6 +224,24 @@ class LiteralIntegerExpression extends Expression {
     }
 }
 
+class LiteralBigIntegerExpression extends Expression {
+    readonly value: string;
+
+    constructor(sinfo: SourceInfo, value: string) {
+        super(ExpressionTag.LiteralBigIntegerExpression, sinfo);
+        this.value = value;
+    }
+}
+
+class LiteralFloatExpression extends Expression {
+    readonly value: string;
+
+    constructor(sinfo: SourceInfo, value: string) {
+        super(ExpressionTag.LiteralFloatExpression, sinfo);
+        this.value = value;
+    }
+}
+
 class LiteralStringExpression extends Expression {
     readonly value: string;
 
@@ -253,13 +273,11 @@ class LiteralTypedStringExpression extends Expression {
 
 class LiteralTypedStringConstructorExpression extends Expression {
     readonly value: string;
-    readonly asValue: boolean;
     readonly stype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, value: string, asValue: boolean, stype: TypeSignature) {
+    constructor(sinfo: SourceInfo, value: string, stype: TypeSignature) {
         super(ExpressionTag.LiteralTypedStringConstructorExpression, sinfo);
         this.value = value;
-        this.asValue = asValue;
         this.stype = stype;
     }
 }
@@ -297,29 +315,25 @@ class AccessVariableExpression extends Expression {
 
 class ConstructorPrimaryExpression extends Expression {
     readonly ctype: TypeSignature;
-    readonly asValue: boolean;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ctype: TypeSignature, asvalue: boolean, args: Arguments) {
+    constructor(sinfo: SourceInfo, ctype: TypeSignature, args: Arguments) {
         super(ExpressionTag.ConstructorPrimaryExpression, sinfo);
         this.ctype = ctype;
-        this.asValue = asvalue;
         this.args = args;
     }
 }
 
 class ConstructorPrimaryWithFactoryExpression extends Expression {
     readonly ctype: TypeSignature;
-    readonly asValue: boolean;
     readonly factoryName: string;
     readonly terms: TemplateArguments;
     readonly pragmas: PragmaArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ctype: TypeSignature, asvalue: boolean, factory: string, pragmas: PragmaArguments, terms: TemplateArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, ctype: TypeSignature, factory: string, pragmas: PragmaArguments, terms: TemplateArguments, args: Arguments) {
         super(ExpressionTag.ConstructorPrimaryWithFactoryExpression, sinfo);
         this.ctype = ctype;
-        this.asValue = asvalue;
         this.factoryName = factory;
         this.pragmas = pragmas;
         this.terms = terms;
@@ -861,13 +875,11 @@ class RecordStructuredAssignment extends StructuredAssignment {
 
 class NominalStructuredAssignment extends StructuredAssignment {
     readonly atype: TypeSignature;
-    readonly isValue: boolean;
     readonly assigns: [string, StructuredAssignment][];
 
-    constructor(atype: TypeSignature, isValue: boolean, assigns: [string, StructuredAssignment][]) {
+    constructor(atype: TypeSignature, assigns: [string, StructuredAssignment][]) {
         super();
         this.atype = atype;
-        this.isValue = isValue;
         this.assigns = assigns;
     }
 }
@@ -1009,7 +1021,7 @@ class BodyImplementation {
 export {
     InvokeArgument, NamedArgument, PositionalArgument, MapArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
-    LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
+    LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralBigIntegerExpression, LiteralFloatExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,

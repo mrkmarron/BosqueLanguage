@@ -139,7 +139,7 @@ typedef Move = {
 }
 
 function canIWinIn3(moves: [Move, Move, Move, Move]): Result<Bool, None> {
-    var! game = Game@{};
+    var game = Game@{};
     
     let m1 = moves.0;
     validate game->isMoveLegal(m1.row, m1.col) or return Result<Bool, None>::err(none);
@@ -157,7 +157,7 @@ function canIWinIn3(moves: [Move, Move, Move, Move]): Result<Bool, None> {
 }
 
 function canIWinIn5(moves: [Move, Move, Move, Move, Move]): Result<Bool, None> {
-    var! game = Game@{};
+    var game = Game@{};
     
     let m1 = moves.0;
     validate game->isMoveLegal(m1.row, m1.col) or return Result<Bool, None>::err(none);
@@ -183,7 +183,7 @@ function canIWinIn5(moves: [Move, Move, Move, Move, Move]): Result<Bool, None> {
 }
 */
 entrypoint function main(): Bool {
-    var! game = Game@{};
+    var game = Game@{};
 
     game = game->makeExplicitMove(0, 0, PlayerMark::x);
     game = game->makeExplicitMove(1, 1, PlayerMark::o);
