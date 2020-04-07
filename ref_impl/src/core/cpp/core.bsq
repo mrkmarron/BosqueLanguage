@@ -208,7 +208,13 @@ entity StringOf<T where Parsable> provides APIValue, KeyType, Some, Convertable 
     method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert
 }
 
+//<summary>An efficient buffer encoding for data.</summary>
+entity Buffer<T where grounded PODType | APIType | Parsable> provides APIValue, Some {
+    method bytes(): ByteBuffer # buffer_bytes
+}
+
 enum BufferFormat {
+    text,
     bosque,
     json,
     binary
@@ -225,11 +231,6 @@ enum BufferCompression {
     rle,
     time,
     space
-}
-
-//<summary>An efficient buffer encoding for data.</summary>
-entity Buffer<T where grounded PODType | APIType> provides APIValue, Some {
-    method bytes(): ByteBuffer # buffer_bytes
 }
 
 //<summary>An efficient byte buffer for data.</summary>
@@ -273,76 +274,8 @@ concept IdKey provides KeyType, Some {
 entity Regex provides Some {
     method accepts(str: String, start?: Int, end?: Int): Bool # regex_accepts
     method match(str: String, start?: Int, end?: Int): RegexMatch # regex_match
-
+    
     method matchAll(str: String, start?: Int, end?: Int): List<RegexMatch> # regex_matchall
-}
-
-//<summary>All actual tuples implicitly provide this concept.</summary>
-concept Tuple provides Some {
-}
-
-//<summary>All actual records implicitly provide this concept.</summary>
-concept Record provides Some {
-}
-
-byvalue entity MapEntry<K where KeyType, V> provides Some {
-    field key: K;
-    field value: V;
-
-    static create(k: K, v: V): MapEntry<K, V> {
-        return MapEntry<K, V>@{ key=key, value=value };
-    }
-}
-
-//<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-byvalue concept Result<T, E> provides Some, Convertable {
-    static ok(result: T): Result<T, E> {
-        return Ok<T>::of(result);
-    }
-
-    static err(data: E): Result<T, E> {
-        return Err::of(info, data);
-    }
-
-    method isOk(): Bool {
-        return this->is<Ok<T>>();
-    }
-
-    method isErr(): Bool {
-        return this->is<Err>();
-    }
-
-    method result(): T {
-        return this->as<Ok<T>>().val;
-    }
-
-    method errInfo(): E {
-        return this->as<Err<E>>().data;
-    }
-
-    method convert<U, V>(): Result<U, V> {
-        return this->ok() ? Result<U, V>::ok(this->result()->as<U>()) : Result<U, V>::err(this->errData()->as<V>());
-    }
-}
-
-byvalue entity Ok<T> provides Result<T, *> {
-    field val: T;
-
-    static of(v: T): Ok<T> {
-        return Ok<T>@{ val=v };
-    }
-}
-
-byvalue entity Err<E> provides Result<*, E> {
-    field data: E;
-
-    static of(data: E): Err<E> {
-        return Err<E>@{ data=data };
-    }
-}
-
-//<summary>All actual entities/concepts implicitly provide this concept.</summary>
-concept Object provides Some {
 }
 
 byvalue entity RegexCapture provides Object {
@@ -358,10 +291,77 @@ byvalue entity RegexGroup provides Object {
 }
 
 byvalue entity RegexMatch provides Object {
-   field success: Bool;
-   field index: Int;
-   field length: Int;
-   field value: String;
-   field groups: List<RegexGroup>; 
+    field success: Bool;
+    field index: Int;
+    field length: Int;
+    field value: String;
+    field groups: List<RegexGroup>; 
 }
 
+//<summary>All actual tuples implicitly provide this concept.</summary>
+concept Tuple provides Some {
+}
+
+//<summary>All actual records implicitly provide this concept.</summary>
+concept Record provides Some {
+}
+
+byvalue entity MapEntry<K where KeyType, V> provides Some, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+    field key: K;
+    field value: V;
+
+    static create(k: K, v: V): MapEntry<K, V> {
+        return MapEntry<K, V>@{ key=key, value=value };
+    }
+}
+
+//<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
+byvalue concept Result<T, E=None> provides Some, Convertable {   
+    static ok(result: T): Result<T, E> {
+        return ResultOk<T, E>::of(result);
+    }
+
+    static err(info: E): Result<T, E> {
+        return ResultErr<T, E>::of(info);
+    }
+
+    method isOk(): Bool {
+        return this->is<Ok>();
+    }
+
+    method isErr(): Bool {
+        return this->is<Err>();
+    }
+
+    method result(): T {
+        return this->as<ResultOk<T, E>>().val;
+    }
+
+    method failure(): E {
+        return this->as<ResultErr<T, E>>().info;
+    }
+
+    method convert<U, V>(): Result<U, V> {
+        return this->ok() ? Result<U, V>::ok(this->result()->as<U>()) : Result<U, V>::err(this->failure()->as<V>());
+    }
+}
+
+byvalue entity ResultOk<T, E=None> provides Result<T, E> {
+    field val: T;
+
+    static of(value: T): ResultOk<T, E> {
+        return ResultOk<T, E>@{ val = value; }
+    }
+}
+
+byvalue entity ResultErr<T, E=None> provides Result<T, E> {
+    field info: E;
+
+    static of(info: E): ResultErr<T, E> {
+        return ResultErr<T, E>@{ info = info; }
+    }
+}
+
+//<summary>All actual entities/concepts implicitly provide this concept.</summary>
+concept Object provides Some {
+}
