@@ -65,50 +65,50 @@ concept APIType provides APIValue {
 }
 
 //<summary>Type for representing the none-value.</summary>
-byvalue concept Truthy provides KeyType, Parsable {
+struct concept Truthy provides KeyType, Parsable {
     static truth(v: Truthy): Bool {
         return !!v;
     }
 
     override static tryParse(str: String): Result<Truthy, String> {
         if(str == "none") {
-            return Result<Truthy, String>::ok(none);
+            return ok(none);
         }
         else if(str == "false") {
-            return Result<Truthy, String>::ok(false);
+            return ok(false);
         }
         else if(str == "true") {
-            return Result<Truthy, String>::ok(true);
+            return ok(true);
         }
         else {
-            return Result<Truthy, String>::err("Expected Truthy");
+            return err("Expected Truthy");
         }
     }
 }
 
 //<summary>Type for representing the none-value.</summary>
-byvalue entity None provides Truthy, PODType, APIType {
+struct entity None provides Truthy, PODType, APIType {
     override static tryParse(str: String): Result<None, String> {
         if(str == "none") {
-            return Result<None, String>::ok(none);
+            return ok(none);
         }
         else {
-            return Result<None, String>::err("Expected None");
+            return err("Expected None");
         }
     }
 }
 
 //<summary>Primitive boolean value.</summary>
-byvalue entity Bool provides Some, Truthy, PODType, APIType {
+struct entity Bool provides Some, Truthy, PODType, APIType {
     override static tryParse(str: String): Result<Bool, String> {
         if(str == "false") {
-            return Result<Bool, String>::ok(false);
+            return ok(false);
         }
         else if(str == "true") {
-            return Result<Bool, String>::ok(true);
+            return ok(true);
         }
         else {
-            return Result<Bool, String>::err("Expected Bool");
+            return err("Expected Bool");
         }
     }
 
@@ -123,7 +123,7 @@ byvalue entity Bool provides Some, Truthy, PODType, APIType {
 }
 
 //<summary>Primitive integer value.</summary>
-byvalue entity Int provides KeyType, Parsable, PODType, APIType, Some {
+struct entity Int provides KeyType, Parsable, PODType, APIType, Some {
     const min_value = -9007199254740991;
     const max_value = 9007199254740991;
 
@@ -152,7 +152,7 @@ entity BigInt provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>Primitive float 64 value.</summary>
-byvalue entity Float64 provides Parsable, PODType, APIType, Some {
+struct entity Float64 provides Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<Float64, String> # float64_tryparse
 
     static stringify(f: Float64): String # float64_tostring
@@ -238,17 +238,17 @@ entity ByteBuffer provides APIValue, Some {
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
-byvalue entity ISOTime provides Parsable, PODType, APIType, Some {
+struct entity ISOTime provides Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<ISOTime, String> # time_tryparse
 }
 
 //<summary>Primitive UUID value.</summary>
-byvalue entity UUID provides KeyType, Parsable, PODType, APIType, Some {
+struct entity UUID provides KeyType, Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<UUID, String> # uuid_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
-byvalue entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
+struct entity LogicalTime provides KeyType, Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
 
     static zero(): LogicalTime # logicaltime_zero
@@ -263,7 +263,7 @@ entity CryptoHash provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
-byvalue concept Enum provides KeyType, Some {
+struct concept Enum provides KeyType, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
@@ -278,19 +278,19 @@ entity Regex provides Some {
     method matchAll(str: String, start?: Int, end?: Int): List<RegexMatch> # regex_matchall
 }
 
-byvalue entity RegexCapture provides Object {
+struct entity RegexCapture provides Object {
     field index: Int;
     field length: Int;
     field value: String;
 }
 
-byvalue entity RegexGroup provides Object {
+struct entity RegexGroup provides Object {
     field success: Bool;
     field name: String;
     field captures: List<RegexCapture>;
 }
 
-byvalue entity RegexMatch provides Object {
+struct entity RegexMatch provides Object {
     field success: Bool;
     field index: Int;
     field length: Int;
@@ -306,7 +306,7 @@ concept Tuple provides Some {
 concept Record provides Some {
 }
 
-byvalue entity MapEntry<K where KeyType, V> provides Some, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+struct entity MapEntry<K where KeyType, V> provides Some, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
     field key: K;
     field value: V;
 
@@ -316,12 +316,12 @@ byvalue entity MapEntry<K where KeyType, V> provides Some, PODType when K ground
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-byvalue concept Result<T, E=None> provides Some, Convertable {   
-    static ok(result: T): Result<T, E> {
+struct concept Result<T, E=None> provides Some, Convertable {   
+    static cok(result: T): Result<T, E> {
         return ResultOk<T, E>::of(result);
     }
 
-    static err(info: E): Result<T, E> {
+    static cerr(info: E): Result<T, E> {
         return ResultErr<T, E>::of(info);
     }
 
@@ -334,31 +334,31 @@ byvalue concept Result<T, E=None> provides Some, Convertable {
     }
 
     method result(): T {
-        return this->as<ResultOk<T, E>>().val;
+        return this->as<ResultOk<T, E>>().result;
     }
 
     method failure(): E {
-        return this->as<ResultErr<T, E>>().info;
+        return this->as<ResultErr<T, E>>().failure;
     }
 
     method convert<U, V>(): Result<U, V> {
-        return this->ok() ? Result<U, V>::ok(this->result()->as<U>()) : Result<U, V>::err(this->failure()->as<V>());
+        return this->isOk() ? Result<U, V>::cok(this->result()->as<U>()) : Result<U, V>::cerr(this->failure()->as<V>());
     }
 }
 
-byvalue entity ResultOk<T, E=None> provides Result<T, E> {
-    field val: T;
+struct entity ResultOk<T, E=None> provides Result<T, E> {
+    field result: T;
 
-    static of(value: T): ResultOk<T, E> {
-        return ResultOk<T, E>@{ val = value; }
+    static of(result: T): ResultOk<T, E> {
+        return ResultOk<T, E>@{ result = result; }
     }
 }
 
-byvalue entity ResultErr<T, E=None> provides Result<T, E> {
-    field info: E;
+struct entity ResultErr<T, E=None> provides Result<T, E> {
+    field failure: E;
 
-    static of(info: E): ResultErr<T, E> {
-        return ResultErr<T, E>@{ info = info; }
+    static of(failure: E): ResultErr<T, E> {
+        return ResultErr<T, E>@{ failure = failure; }
     }
 }
 

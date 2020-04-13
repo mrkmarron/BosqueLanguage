@@ -311,7 +311,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "List" || this.name === "Set";
+        return this.name === "List" || this.name === "DynamicList" || this.name === "Set" || this.name === "DynamicSet";
     }
 
     isTypeAListEntity(): boolean {
@@ -319,7 +319,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "List";
+        return this.name === "List" || this.name === "DynamicList";
     }
 
     isTypeASetEntity(): boolean {
@@ -327,7 +327,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "Set";
+        return this.name === "Set" || this.name === "DynamicSet";
     }
 
     isTypeAMapEntity(): boolean {
@@ -335,7 +335,7 @@ class OOPTypeDecl {
             return false;
         }
 
-        return this.name === "Map";
+        return this.name === "Map" || this.name === "DynamicMap";
     }
 
     static attributeSetContains(attr: string, attrSet: string[]): boolean {
@@ -488,11 +488,21 @@ class Assembly {
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
 
-    private resolveTemplateBinds(declterms: TemplateTermDecl[], giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> {
+    private resolveTemplateBinds(declterms: TemplateTermDecl[], declbinds: Map<string, ResolvedType>, giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         const fullbinds = new Map<string, ResolvedType>();
 
         for (let i = 0; i < declterms.length; ++i) {
-            fullbinds.set(declterms[i].name, this.normalizeTypeOnly(giventerms[i], binds));
+            if(giventerms.length <= i) {
+                if(declterms[i].defaultType !== undefined) {
+                    fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, declbinds));
+                }
+                else {
+                    return undefined;
+                }
+            }
+            else {
+                fullbinds.set(declterms[i].name, this.normalizeTypeOnly(giventerms[i], binds));
+            }
         }
 
         return fullbinds;
@@ -578,16 +588,28 @@ class Assembly {
     }
 
     restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsablePODTupleConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsablePODConceptType().idStr) {
+            return this.restrictTupleEntries(oft, this.getSpecialParsablePODConceptType());
+        }
 
-        //
-        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
-        //
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsableAPITupleConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsableAPIConceptType().idStr) {
+            return this.restrictTupleEntries(oft, this.getSpecialParsableAPIConceptType());
+        }
 
-        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsableTupleConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsableConceptType().idStr) {
+            return this.restrictTupleEntries(oft, this.getSpecialParsableConceptType());
+        }
+
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialPODTupleConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialPODTypeConceptType().idStr) {
             return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialAPITupleConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialAPITypeConceptType().idStr) {
             return this.restrictTupleEntries(oft, this.getSpecialAPITypeConceptType());
         }
 
@@ -647,16 +669,28 @@ class Assembly {
     }
 
     restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsablePODRecordConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsablePODConceptType().idStr) {
+            return this.restrictRecordEntries(oft, this.getSpecialParsablePODConceptType());
+        }
 
-        //
-        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
-        //
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsableAPIRecordConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsableAPIConceptType().idStr) {
+            return this.restrictRecordEntries(oft, this.getSpecialParsableAPIConceptType());
+        }
 
-        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialParsableRecordConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialParsableConceptType().idStr) {
+            return this.restrictRecordEntries(oft, this.getSpecialParsableConceptType());
+        }
+
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialPODRecordConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialPODTypeConceptType().idStr) {
             return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+        if (ResolvedType.createSingle(withc).idStr === this.getSpecialAPIRecordConceptType().idStr
+            || ResolvedType.createSingle(withc).idStr === this.getSpecialAPITypeConceptType().idStr) {
             return this.restrictRecordEntries(oft, this.getSpecialAPITypeConceptType());
         }
 
@@ -765,26 +799,11 @@ class Assembly {
         }
 
         const opttypes = oft.options.map((opt) => this.restrictAtomWithType(opt, witht));
-        return this.typeUnion(opttypes);
+        return this.typeUpperBound(opttypes);
     }
 
     getTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {
-        if(oftype.idStr === "NSCore::KeyType") {
-            if(this.subtypeOf(fromtype, this.getSpecialKeyTypeConceptType())) {
-                return fromtype;
-            }
-            else if(this.subtypeOf(fromtype, this.getSpecialIndexableConceptType())) {
-                //
-                //NOT IMPLEMENTED YET -- we will need to look up the "key" field value and resolve it
-                //
-                assert(false);
-                return ResolvedType.createEmpty();    
-            }
-            else {
-                return ResolvedType.createEmpty();    
-            }
-        }
-        else if(oftype.idStr === "NSCore::APIType") {
+        if(oftype.idStr === "NSCore::APIType") {
             //
             //NOT IMPLEMENTED YET
             //
@@ -816,7 +835,7 @@ class Assembly {
             return this.normalizeTypeGeneral(aliasResolvedType, aliasResolvedBinds);
         }
         else {
-            const fconcept = this.tryGetConceptTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName, aliasResolvedType.terms.length);
+            const fconcept = this.tryGetConceptTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
             if (fconcept !== undefined) {
                 if (fconcept.terms.length !== aliasResolvedType.terms.length) {
                     return ResolvedType.createEmpty();
@@ -825,7 +844,7 @@ class Assembly {
                 return ResolvedType.createSingle(this.createConceptTypeAtom(fconcept, aliasResolvedType, aliasResolvedBinds));
             }
 
-            const fobject = this.tryGetObjectTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName, aliasResolvedType.terms.length);
+            const fobject = this.tryGetObjectTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
             if (fobject !== undefined) {
                 if (fobject.terms.length !== aliasResolvedType.terms.length) {
                     return ResolvedType.createEmpty();
@@ -940,6 +959,55 @@ class Assembly {
         return this.normalizeUnionList(utypes);
     }
 
+    private normalizeTuples(tuples: ResolvedTupleAtomType[]): ResolvedTupleAtomType {
+        const midx = Math.max(...tuples.map((tt) => tt.types.length));
+        let nte: ResolvedTupleAtomTypeEntry[] = [];
+        for (let i = 0; i < midx; ++i) {
+            const ituples = tuples.filter((tt) => tt.types.length > i);
+            const ttypes = ituples.map((tt) => tt.types[i].type);
+            const topt = ituples.some((tt) => tt.types[i].isOptional) || tuples.length !== ituples.length;
+
+            const ttype = this.typeUpperBound(ttypes);
+            nte.push(new ResolvedTupleAtomTypeEntry(ttype, topt));
+        }
+
+        return ResolvedTupleAtomType.create(nte);
+    }
+
+    private normalizeRecords(records: ResolvedRecordAtomType[]): ResolvedRecordAtomType {
+        const mfs: Set<string> = new Set<string>();
+        records.forEach((rt) => rt.entries.forEach((rte) => mfs.add(rte.name)));
+
+        let nte: ResolvedRecordAtomTypeEntry[] = [];
+        mfs.forEach((f) => {
+            const irecords = records.filter((tt) => tt.entries.some((rte) => rte.name === f));
+            const ttypes = irecords.map((tt) => (tt.entries.find((rte) => rte.name === f) as ResolvedRecordAtomTypeEntry).type);
+            const topt = irecords.some((tt) => (tt.entries.find((rte) => rte.name === f) as ResolvedRecordAtomTypeEntry).isOptional) || records.length !== irecords.length;
+
+            const ttype = this.typeUpperBound(ttypes);
+            nte.push(new ResolvedRecordAtomTypeEntry(f, ttype, topt));
+        });
+
+        return ResolvedRecordAtomType.create(nte);
+    }
+
+    private normalizeEphemerals(ephemerals: ResolvedEphemeralListType[]): ResolvedEphemeralListType | undefined {
+        const lidx = Math.max(...ephemerals.map((tt) => tt.types.length));
+        const uidx = Math.min(...ephemerals.map((tt) => tt.types.length));
+        if(lidx !== uidx) {
+            return undefined; //can't have different lengths!!!
+        }
+
+        let nte: ResolvedType[] = [];
+        for (let i = 0; i < lidx; ++i) {
+            const ttypes = ephemerals.map((tt) => tt.types[i]);
+            const ttype = this.typeUpperBound(ttypes);
+            nte.push(ttype);
+        }
+
+        return ResolvedEphemeralListType.create(nte);
+    }
+
     private normalizeUnionList(types: ResolvedType[]): ResolvedType {
         //flatten any union types
         const ntypes: ResolvedAtomType[][] = types.map((opt) => opt.options);
@@ -949,7 +1017,29 @@ class Assembly {
         if (flattened.some((atom) => atom.idStr === "NSCore::None") && flattened.some((atom) => atom.idStr === "NSCore::Some")) {
             flattened.push(this.getSpecialAnyConceptType().options[0]);
         }
-        const utypes = flattened.sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
+
+        const ttupes = flattened.filter((tt) => tt instanceof ResolvedTupleAtomType) as ResolvedTupleAtomType[];
+        const trecs = flattened.filter((tt) => tt instanceof ResolvedRecordAtomType) as ResolvedRecordAtomType[];
+        const teph = flattened.filter((tt) => tt instanceof ResolvedEphemeralListType) as ResolvedEphemeralListType[];
+
+        let merged = flattened.filter((tt) => !(tt instanceof ResolvedTupleAtomType) && !(tt instanceof ResolvedRecordAtomType) && !(tt instanceof ResolvedEphemeralListType));
+        if (ttupes.length !== 0) {
+            merged.push(this.normalizeTuples(ttupes));
+        }
+        if (trecs.length !== 0) {
+            merged.push(this.normalizeRecords(trecs));
+        }
+        if (teph.length !== 0) {
+            const eet = this.normalizeEphemerals(teph);
+            if (eet === undefined) {
+                return ResolvedType.createEmpty();
+            }
+            else {
+                merged.push(eet);
+            }
+        }
+
+        const utypes = merged.sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
 
         //do a simplification based on A | B when A \Subtypeeq B is B
         let simplifiedTypes: ResolvedAtomType[] = [];
@@ -970,10 +1060,6 @@ class Assembly {
             if (docopy) {
                 simplifiedTypes.push(utypes[i]);
             }
-        }
-
-        if(simplifiedTypes.some((opt) => opt instanceof ResolvedEphemeralListType) && simplifiedTypes.length !== 1) {
-            return ResolvedType.createEmpty(); //epemeral lists must always be uniquely typed
         }
 
         return ResolvedType.create(simplifiedTypes);
@@ -1037,15 +1123,20 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialAPITypeConceptType()) && this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
-            return true;
+        let tci: ResolvedConceptAtomTypeEntry[] = [...this.getSpecialTupleConceptType().options] as ResolvedConceptAtomTypeEntry[];
+        if (this.checkAllTupleEntriesOfType(t1, this.getSpecialParsableConceptType())) {
+            tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
+        }
+        if (this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+            if (this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+                tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            }
+            else {
+                tci.push(...(this.getSpecialAPITypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            }
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialPODTypeConceptType()) && this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-            return true;
-        }
-
-        return false;
+        return (this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2)));
     }
 
     private checkAllRecordEntriesOfType(t1: ResolvedRecordAtomType, t2: ResolvedType): boolean {
@@ -1057,15 +1148,20 @@ class Assembly {
             return true;
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialAPITypeConceptType()) && this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
-            return true;
+        let tci: ResolvedConceptAtomTypeEntry[] = [...this.getSpecialRecordConceptType().options] as ResolvedConceptAtomTypeEntry[];
+        if (this.checkAllRecordEntriesOfType(t1, this.getSpecialParsableConceptType())) {
+            tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
+        }
+        if (this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+            if (this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+                tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            }
+            else {
+                tci.push(...(this.getSpecialAPITypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            }
         }
 
-        if (this.subtypeOf(ResolvedType.createSingle(t2), this.getSpecialPODTypeConceptType()) && this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-            return true;
-        }
-
-        return false;
+        return (this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2)));
     }
 
     private atomSubtypeOf_ConceptConcept(t1: ResolvedConceptAtomType, t2: ResolvedConceptAtomType): boolean {
@@ -1154,7 +1250,7 @@ class Assembly {
         }
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
-        const tconcept = this.createConceptTypeAtom(this.tryGetConceptTypeForFullyResolvedName("NSCore::" + name, terms ? terms.length : 0) as ConceptTypeDecl, rsig, binds || new Map<string, ResolvedType>());
+        const tconcept = this.createConceptTypeAtom(this.tryGetConceptTypeForFullyResolvedName("NSCore::" + name) as ConceptTypeDecl, rsig, binds || new Map<string, ResolvedType>());
         const rtype = ResolvedType.createSingle(tconcept);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
@@ -1167,7 +1263,7 @@ class Assembly {
         }
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
-        const tobject = this.createObjectTypeAtom(this.tryGetObjectTypeForFullyResolvedName("NSCore::" + name, terms ? terms.length : 0) as EntityTypeDecl, rsig, binds || new Map<string, ResolvedType>());
+        const tobject = this.createObjectTypeAtom(this.tryGetObjectTypeForFullyResolvedName("NSCore::" + name) as EntityTypeDecl, rsig, binds || new Map<string, ResolvedType>());
         const rtype = ResolvedType.createSingle(tobject);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
@@ -1177,21 +1273,26 @@ class Assembly {
     getSpecialNoneType(): ResolvedType { return this.internSpecialObjectType("None"); }
     getSpecialBoolType(): ResolvedType { return this.internSpecialObjectType("Bool"); }
     getSpecialIntType(): ResolvedType { return this.internSpecialObjectType("Int"); }
+    getSpecialBigIntType(): ResolvedType { return this.internSpecialObjectType("BigInt"); }
+    getSpecialFloat64Type(): ResolvedType { return this.internSpecialObjectType("Float64"); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType("String"); }
-    getSpecialGUIDType(): ResolvedType { return this.internSpecialObjectType("GUID"); }
-    getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType("LogicalTime"); }
-    getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType("ISOTime"); }
-    getSpecialDataHashType(): ResolvedType { return this.internSpecialObjectType("DataHash"); }
-    getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
-    getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
-    
     getSpecialBufferFormatType(): ResolvedType { return this.internSpecialObjectType("BufferFormat"); }
     getSpecialBufferEncodingType(): ResolvedType { return this.internSpecialObjectType("BufferEncoding"); }
     getSpecialBufferCompressionType(): ResolvedType { return this.internSpecialObjectType("BufferCompression"); }
+    getSpecialByteBufferType(): ResolvedType { return this.internSpecialObjectType("ByteBuffer"); }
+    getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType("ISOTime"); }
+    getSpecialUUIDType(): ResolvedType { return this.internSpecialObjectType("UUID"); }
+    getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType("LogicalTime"); }
+    getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
+    getSpecialRegexCaptureType(): ResolvedType { return this.internSpecialObjectType("RegexCapture"); }
+    getSpecialRegexGroupType(): ResolvedType { return this.internSpecialObjectType("RegexGroup"); }
+    getSpecialRegexMatchType(): ResolvedType { return this.internSpecialObjectType("RegexMatch"); }
+    getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
 
     getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType("Any"); }
     getSpecialSomeConceptType(): ResolvedType { return this.internSpecialConceptType("Some"); }
 
+    getSpecialConvertableConceptType(): ResolvedType { return this.internSpecialConceptType("Convertable"); }
     getSpecialIndexableConceptType(): ResolvedType { return this.internSpecialConceptType("Indexable"); }
     getSpecialParsableConceptType(): ResolvedType { return this.internSpecialConceptType("Parsable"); }
     getSpecialValidatorConceptType(): ResolvedType { return this.internSpecialConceptType("Validator"); }
@@ -1202,25 +1303,38 @@ class Assembly {
     getSpecialTruthyConceptType(): ResolvedType { return this.internSpecialConceptType("Truthy"); }
     getSpecialEnumConceptType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
     getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
-    getSpecialLogicalTimeIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("LogicalTimeIdKey"); }
-    getSpecialGUIDIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("GUIDIdKey"); }
-    getSpecialContentHashIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("ContentHashIdKey"); }
 
     getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
     getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
 
+    getSpecialParsablePODConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialPODTypeConceptType()]); }
+    getSpecialParsableAPIConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialAPITypeConceptType()]); }
+
+    getSpecialPODTupleConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialPODTypeConceptType(), this.getSpecialTupleConceptType()]); }
+    getSpecialAPITupleConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialAPITypeConceptType(), this.getSpecialTupleConceptType()]); }
+
+    getSpecialParsableTupleConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialTupleConceptType()]); }
+    getSpecialParsablePODTupleConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialPODTypeConceptType(), this.getSpecialTupleConceptType()]); }
+    getSpecialParsableAPITupleConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialAPITypeConceptType(), this.getSpecialTupleConceptType()]); }
+    
+    getSpecialPODRecordConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialPODTypeConceptType(), this.getSpecialRecordConceptType()]); }
+    getSpecialAPIRecordConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialAPITypeConceptType(), this.getSpecialRecordConceptType()]); }
+
+    getSpecialParsableRecordConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialRecordConceptType()]); }
+    getSpecialParsablePODRecordConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialPODTypeConceptType(), this.getSpecialRecordConceptType()]); }
+    getSpecialParsableAPIRecordConceptType(): ResolvedType { return this.typeUpperBound([this.getSpecialParsableConceptType(), this.getSpecialAPITypeConceptType(), this.getSpecialRecordConceptType()]); }
+
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
 
+    isSafeStringType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::SafeString<"); }
     isStringOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::StringOf<"); }
     isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }
-    isResultType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<") || ty.idStr.startsWith("NSCore::Ok<") || ty.idStr.startsWith("NSCore::Err<"); }
-    isKeyedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Keyed<"); }
-    isTaggedType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Tagged<"); }
+    isResultType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<") || ty.idStr.startsWith("NSCore::ResultOk<") || ty.idStr.startsWith("NSCore::ResultErr<"); }
     
-    isListType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::List<"); }
-    isSetType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Set<"); }
+    isListType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::AbstractList<") || ty.idStr.startsWith("NSCore::List<") || ty.idStr.startsWith("NSCore::DynamicList<"); }
+    isSetType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::AbstractSet<") || ty.idStr.startsWith("NSCore::Set<") || ty.idStr.startsWith("NSCore::DynamicSet<"); }
     isMapEntryType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::MapEntry<"); }
-    isMapType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Map<"); }
+    isMapType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::AbstractMap<") || ty.idStr.startsWith("NSCore::Map<") || ty.idStr.startsWith("NSCore::DynamicMap<"); }
 
     ensureNominalRepresentation(t: ResolvedType): ResolvedType {
         const opts = t.options.map((opt) => {
@@ -1235,15 +1349,15 @@ class Assembly {
             }
         });
 
-        return this.typeUnion(opts);
+        return this.typeUpperBound(opts);
     }
 
-    tryGetConceptTypeForFullyResolvedName(name: string, templatecount: number): ConceptTypeDecl | undefined {
-        return this.m_conceptMap.get(name + templatecount);
+    tryGetConceptTypeForFullyResolvedName(name: string): ConceptTypeDecl | undefined {
+        return this.m_conceptMap.get(name);
     }
 
-    tryGetObjectTypeForFullyResolvedName(name: string, templatecount: number): EntityTypeDecl | undefined {
-        return this.m_objectMap.get(name + templatecount);
+    tryGetObjectTypeForFullyResolvedName(name: string): EntityTypeDecl | undefined {
+        return this.m_objectMap.get(name);
     }
 
     hasNamespace(ns: string): boolean {
@@ -1270,12 +1384,12 @@ class Assembly {
         return decls;
     }
 
-    addConceptDecl(resolvedName: string, templatecount: number, concept: ConceptTypeDecl) {
-        this.m_conceptMap.set(resolvedName + templatecount, concept);
+    addConceptDecl(resolvedName: string, concept: ConceptTypeDecl) {
+        this.m_conceptMap.set(resolvedName, concept);
     }
 
-    addObjectDecl(resolvedName: string, templatecount: number, object: EntityTypeDecl) {
-        this.m_objectMap.set(resolvedName + templatecount, object);
+    addObjectDecl(resolvedName: string, object: EntityTypeDecl) {
+        this.m_objectMap.set(resolvedName, object);
     }
 
     ////
@@ -1514,6 +1628,8 @@ class Assembly {
             fullbinds.set(k, v);
         });
 
+        xxxx;
+
         //compute the bindings to use when resolving the RHS of the typedef alias
         for (let i = 0; i < declterms.length; ++i) {
             fullbinds.set(declterms[i].name, this.normalizeTypeOnly(giventerms[i], callBinds));
@@ -1628,7 +1744,7 @@ class Assembly {
         }
     }
 
-    typeUnion(types: ResolvedType[]): ResolvedType {
+    typeUpperBound(types: ResolvedType[]): ResolvedType {
         return this.normalizeUnionList(types);
     }
 

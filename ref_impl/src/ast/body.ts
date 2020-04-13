@@ -160,6 +160,7 @@ enum ExpressionTag {
     ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
+    ResultExpression = "ResultExpression",
     CallNamespaceFunctionExpression = "CallNamespaceFunctionExpression",
     CallStaticFunctionExpression = "CallStaticFunctionExpression",
 
@@ -388,6 +389,19 @@ class PCodeInvokeExpression extends Expression {
         super(ExpressionTag.PCodeInvokeExpression, sinfo);
         this.pcode = pcode;
         this.pragmas = pragmas;
+        this.args = args;
+    }
+}
+
+class ResultExpression extends Expression {
+    readonly rtype: TypeSignature;
+    readonly rop: string;
+    readonly args: Arguments;
+
+    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: string, args: Arguments) {
+        super(ExpressionTag.ResultExpression, sinfo); 
+        this.rtype = rtype;
+        this.rop = rop;
         this.args = args;
     }
 }
@@ -1023,7 +1037,7 @@ export {
     ExpressionTag, Expression, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralBigIntegerExpression, LiteralFloatExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
-    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
+    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, ResultExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,

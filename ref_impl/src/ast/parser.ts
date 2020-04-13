@@ -5,13 +5,14 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, ResultExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
 
 const KeywordStrings = [
     "pragma",
 
-    "byvalue",
+    "api",
+    "struct",
     "hidden",
     "private",
     "factory",
@@ -34,6 +35,7 @@ const KeywordStrings = [
     "enum",
     "entity",
     "ensures",
+    "err",
     "false",
     "field",
     "fn",
@@ -47,6 +49,7 @@ const KeywordStrings = [
     "method",
     "namespace",
     "none",
+    "ok",
     "or",
     "private",
     "provides",
@@ -827,12 +830,12 @@ class Parser {
                 this.ensureAndConsumeToken("=>");
             }
             else {
-                [preconds, postconds] = this.parsePreAndPostConditions(sinfo, argNames);
+                [preconds, postconds] = this.parsePreAndPostConditions(sinfo, argNames, resultInfo);
             }
 
             const bodyid = `${srcFile}::${sinfo.pos}`;
             try {
-                this.m_penv.pushFunctionScope(new FunctionScope(argNames));
+                this.m_penv.pushFunctionScope(new FunctionScope(argNames, resultInfo));
                 body = this.parseBody(bodyid, srcFile, fparams.map((p) => p.name));
                 captured = this.m_penv.getCurrentFunctionScope().getCaptureVars();
                 this.m_penv.popFunctionScope();
@@ -1356,6 +1359,11 @@ class Parser {
             const restr = this.consumeTokenAndGetValue(); //keep in escaped format
             return new LiteralRegexExpression(sinfo, restr);
         }
+        else if(tk === "err" || tk === "ok") {
+            this.consumeToken();
+            const args = this.parseArguments("(", ")");
+            return new ResultExpression(sinfo, this.m_penv.getCurrentFunctionScope().getReturnType(), tk, args);
+        }
         else if (tk === TokenStrings.Identifier) {
             const istr = this.consumeTokenAndGetValue();
 
@@ -1707,9 +1715,26 @@ class Parser {
         }
     }
 
-    private parseNonecheckExpression(): Expression {
+    private parseRelationalExpression(): Expression {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseAdditiveExpression();
+
+        if (this.testToken("==") || this.testToken("!=")) {
+            const op = this.consumeTokenAndGetValue();
+            return new BinEqExpression(sinfo, exp, op, this.parseRelationalExpression());
+        }
+        else if (this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")) {
+            const op = this.consumeTokenAndGetValue();
+            return new BinCmpExpression(sinfo, exp, op, this.parseRelationalExpression());
+        }
+        else {
+            return exp;
+        }
+    }
+
+    private parseNonecheckExpression(): Expression {
+        const sinfo = this.getCurrentSrcInfo();
+        const exp = this.parseRelationalExpression();
 
         if (this.testAndConsumeTokenIf("?&")) {
             return new NonecheckExpression(sinfo, exp, this.parseNonecheckExpression());
@@ -1731,26 +1756,9 @@ class Parser {
         }
     }
 
-    private parseRelationalExpression(): Expression {
-        const sinfo = this.getCurrentSrcInfo();
-        const exp = this.parseCoalesceExpression();
-
-        if (this.testToken("==") || this.testToken("!=")) {
-            const op = this.consumeTokenAndGetValue();
-            return new BinEqExpression(sinfo, exp, op, this.parseRelationalExpression());
-        }
-        else if (this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")) {
-            const op = this.consumeTokenAndGetValue();
-            return new BinCmpExpression(sinfo, exp, op, this.parseRelationalExpression());
-        }
-        else {
-            return exp;
-        }
-    }
-
     private parseImpliesExpression(): Expression {
         const sinfo = this.getCurrentSrcInfo();
-        const exp = this.parseRelationalExpression();
+        const exp = this.parseCoalesceExpression();
 
         if (this.testAndConsumeTokenIf("==>")) {
             return new BinLogicExpression(sinfo, exp, "==>", this.parseImpliesExpression());
@@ -1789,7 +1797,7 @@ class Parser {
         const texp = this.parseOrExpression();
 
         if (this.testAndConsumeTokenIf("?")) {
-            const exp1 = this.parseCoalesceExpression();
+            const exp1 = this.parseOrExpression();
             this.ensureAndConsumeToken(":");
             const exp2 = this.parseSelectExpression();
 
@@ -2634,10 +2642,10 @@ class Parser {
         return new TypeConditionRestriction(trl);
     }
 
-    private parsePreAndPostConditions(sinfo: SourceInfo, argnames: Set<string>): [PreConditionDecl[], PostConditionDecl[]] {
+    private parsePreAndPostConditions(sinfo: SourceInfo, argnames: Set<string>, rtype: TypeSignature): [PreConditionDecl[], PostConditionDecl[]] {
         let preconds: PreConditionDecl[] = [];
         try {
-            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames)));
+            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames), rtype));
             while (this.testToken("requires") || this.testToken("validate")) {
                 const isvalidate = this.testToken("validate");
                 this.consumeToken();
@@ -2653,7 +2661,7 @@ class Parser {
                 if (isvalidate) {
                     err = new LiteralNoneExpression(sinfo);
                     if (this.testAndConsumeTokenIf("or")) {
-                        this.ensureAndConsumeToken("reutrn");
+                        this.ensureAndConsumeToken("return");
                         err = this.parseExpression();
                     }
                 }
@@ -2668,7 +2676,7 @@ class Parser {
 
         let postconds: PostConditionDecl[] = [];
         try {
-            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames).add("$return")));
+            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(argnames).add("$return"), rtype));
             while (this.testToken("ensures")) {
                 this.consumeToken();
 
@@ -2733,7 +2741,7 @@ class Parser {
             const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [], currentDecl.ns, tyname, [], provides, [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>());
 
             currentDecl.objects.set(tyname, validatortype);
-            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, 0, currentDecl.objects.get(tyname) as EntityTypeDecl);
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, currentDecl.objects.get(tyname) as EntityTypeDecl);
         }
         else {
             const btype = this.parseTypeSignature();
@@ -2874,7 +2882,7 @@ class Parser {
 
     private parseInvariantsInto(invs: InvariantDecl[]) {
         try {
-            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(["this"])));
+            this.m_penv.pushFunctionScope(new FunctionScope(new Set<string>(["this"]), new NominalTypeSignature("NSCore", "Bool")));
             while (this.testToken("invariant") || this.testToken("check")) {
                 const ischeck = this.testAndConsumeTokenIf("check");
                 this.consumeToken();
@@ -2957,7 +2965,7 @@ class Parser {
 
             this.clearRecover();
             currentDecl.concepts.set(cname, new ConceptTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-            this.m_penv.assembly.addConceptDecl(currentDecl.ns + "::" + cname, terms.length, currentDecl.concepts.get(cname) as ConceptTypeDecl);
+            this.m_penv.assembly.addConceptDecl(currentDecl.ns + "::" + cname, currentDecl.concepts.get(cname) as ConceptTypeDecl);
         }
         catch (ex) {
             this.processRecover();
@@ -3000,7 +3008,7 @@ class Parser {
 
             this.clearRecover();
             currentDecl.objects.set(cname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, cname, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + cname, terms.length, currentDecl.objects.get(cname) as EntityTypeDecl);
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + cname, currentDecl.objects.get(cname) as EntityTypeDecl);
         }
         catch (ex) {
             this.processRecover();
@@ -3060,7 +3068,7 @@ class Parser {
 
             this.clearRecover();
             currentDecl.objects.set(ename, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, ename, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + ename, 0, currentDecl.objects.get(ename) as EntityTypeDecl);
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + ename, currentDecl.objects.get(ename) as EntityTypeDecl);
         }
         catch (ex) {
             this.processRecover();
@@ -3106,7 +3114,7 @@ class Parser {
         const memberMethods = new Map<string, MemberMethodDecl>();
 
         currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-        this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, 0, currentDecl.objects.get(iname) as EntityTypeDecl);
+        this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
     }
 
     private parseNamespaceConst(currentDecl: NamespaceDeclaration) {

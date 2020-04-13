@@ -3792,12 +3792,7 @@ class TypeChecker {
                 const oft = this.m_emitter.registerResolvedTypeReference(oftype);
                 const tcreg = this.m_emitter.bodyEmitter.generateTmpRegister();
 
-                if(oftype.isEphemeralListType()) {
-                    this.m_emitter.bodyEmitter.emitLoadConstBool(sinfo, true, tcreg);
-                }
-                else {
-                    this.m_emitter.bodyEmitter.emitTypeOf(sinfo, tcreg, oft.trkey, this.m_emitter.registerResolvedTypeReference(sexp).trkey, vreg);
-                }
+                this.m_emitter.bodyEmitter.emitTypeOf(sinfo, tcreg, oft.trkey, this.m_emitter.registerResolvedTypeReference(sexp).trkey, vreg);
 
                 const filllabel = this.m_emitter.bodyEmitter.createNewBlock(`match${midx}_scfill`);
                 if (allChecks.length === 0) {

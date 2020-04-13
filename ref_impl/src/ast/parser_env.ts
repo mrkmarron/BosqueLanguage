@@ -7,11 +7,13 @@ import { Assembly } from "./assembly";
 import { NominalTypeSignature, TypeSignature, AutoTypeSignature } from "./type_signature";
 
 class FunctionScope {
+    private readonly m_rtype: TypeSignature;
     private m_captured: Set<string>;
     private readonly m_args: Set<string>;
     private m_locals: Set<string>[];
 
-    constructor(args: Set<string>) {
+    constructor(args: Set<string>, rtype: TypeSignature) {
+        this.m_rtype = rtype;
         this.m_captured = new Set<string>();
         this.m_args = args;
         this.m_locals = [];
@@ -45,6 +47,10 @@ class FunctionScope {
 
     getCaptureVars(): Set<string> {
         return this.m_captured;
+    }
+
+    getReturnType(): TypeSignature {
+        return this.m_rtype;
     }
 }
 
