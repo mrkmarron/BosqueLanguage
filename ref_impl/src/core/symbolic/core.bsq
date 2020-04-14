@@ -149,6 +149,11 @@ entity BigInt provides KeyType, Parsable, PODType, APIType, Some {
 
     static stringify(i: BigInt): String # bigint_tostring
     static parse(str: String): BigInt # bigint_parse
+
+    static fromInt(i: Int): BigInt # bigint_fromint
+
+    method isSafeInt(): BigInt # bigint_issafeint
+    method toInt(): Int # bigint_toint 
 }
 
 //<summary>Primitive float 64 value.</summary>
@@ -157,6 +162,8 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
 
     static stringify(f: Float64): String # float64_tostring
     static parse(str: String): Float64 # float64_parse
+
+    static less(f1: Float64, f2: Float64, epsilon?: Float64): Bool # float64_less
 }
 
 //<summary>Primitive string value.</summary>
@@ -364,4 +371,9 @@ struct entity ResultErr<T, E=None> provides Result<T, E> {
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {
+}
+
+//<summary>All collections provide this concept so we can expand them with spread operators.</summary>
+concept Expandoable<T> provides Object {
+    method expand<U>(): List<U> # special_method
 }

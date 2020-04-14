@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, ResultExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, ResultExpression, TailIsTypeExpression, TailAsTypeExpression, MapEntryConstructorExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -26,6 +26,7 @@ const KeywordStrings = [
     "_debug",
     "abort",
     "assert",
+    "astype",
     "case",
     "check",
     "concept",
@@ -46,6 +47,7 @@ const KeywordStrings = [
     "identifier",
     "if",
     "invariant",
+    "istype",
     "method",
     "namespace",
     "none",
@@ -1182,19 +1184,7 @@ class Parser {
                     const isSpread = this.testAndConsumeTokenIf("...");
                     const exp = this.parseExpression();
 
-                    if (!this.testToken("=>")) {
-                        args.push(new PositionalArgument(isref, isSpread, exp));
-                    }
-                    else {
-                        if(isSpread) {
-                            this.raiseError(line, "Cannot use spread operator on map argument key");
-                        }
-
-                        this.ensureAndConsumeToken("=>");
-                        const value = this.parseExpression();
-
-                        args.push(new MapArgument(exp, value));
-                    }
+                    args.push(new PositionalArgument(isref, isSpread, exp));
                 }
 
                 if (this.testAndConsumeTokenIf(",")) {
@@ -1689,9 +1679,28 @@ class Parser {
         }
     }
 
-    private parseMultiplicativeExpression(): Expression {
+    private parseTailTypeOp(): Expression {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parsePrefixExpression();
+
+        if(this.testToken("istype")) {
+            this.consumeToken();
+            const tt = this.parseTypeSignature();
+            return new TailIsTypeExpression(sinfo, exp, tt);
+        }
+        else if(this.testToken("astype")) {
+            this.consumeToken();
+            const tt = this.parseTypeSignature();
+            return new TailAsTypeExpression(sinfo, exp, tt);
+        }
+        else {
+            return exp;
+        }
+    }
+
+    private parseMultiplicativeExpression(): Expression {
+        const sinfo = this.getCurrentSrcInfo();
+        const exp = this.parseTailTypeOp();
 
         if (this.testToken("*") || this.testToken("/")) {
             const op = this.consumeTokenAndGetValue();
@@ -1792,12 +1801,24 @@ class Parser {
         }
     }
 
+    private parseMapEntryConstructorExpression(): Expression {
+        const sinfo = this.getCurrentSrcInfo();
+        const exp = this.parseOrExpression();
+
+        if (this.testAndConsumeTokenIf("=>")) {
+            return new MapEntryConstructorExpression(sinfo, exp, this.parseMapEntryConstructorExpression());
+        }
+        else {
+            return exp;
+        }
+    }
+
     private parseSelectExpression(): Expression {
         const sinfo = this.getCurrentSrcInfo();
-        const texp = this.parseOrExpression();
+        const texp = this.parseMapEntryConstructorExpression();
 
         if (this.testAndConsumeTokenIf("?")) {
-            const exp1 = this.parseOrExpression();
+            const exp1 = this.parseMapEntryConstructorExpression();
             this.ensureAndConsumeToken(":");
             const exp2 = this.parseSelectExpression();
 

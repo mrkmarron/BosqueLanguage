@@ -6,25 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity AbstractMap<K where KeyType, V> provides Object {
-    abstract method size(): Int;
-    abstract method empty(): Bool;
-
-    abstract method keys(): List<K>;
-    abstract method keySet(): Set<K>;
-    abstract method values(): List<K>;
-    abstract method entries(): List<MapEntry<K, V>>;
-
-    abstract method has(key: K): Bool;
-    abstract method hasAll(...ks: List<K>): Bool;
-
-    abstract method domainIncludes(s: Set<T>): Bool;
-
-    abstract method get(key: K): V;
-    abstract method tryGet(k: K): V?;
-}
-
-entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
     hidden static _size(m: Map<K, V>): Int # map_size
     hidden static _has_key(m: Map<K, V>, key: K): Bool # map_has_key
     hidden static _at_val(m: Map<K, V>, key: K): V # map_at_val
@@ -354,7 +336,7 @@ entity Map<K where KeyType, V> provides AbstractMap<K, V>, PODType when K ground
     }
 }
 
-entity DynamicMap<K where KeyType, V> provides AbstractMap<K, V> {
+entity DynamicMap<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>> {
     override method size(): Int {
         abort;
     }

@@ -7,7 +7,7 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, MapArgument, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator, MIRBodyEmitter } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
@@ -32,10 +32,7 @@ type ExpandedArgument = {
     expando: boolean,
     ref: string | undefined,
     pcode: PCode | undefined,
-    treg: MIRTempRegister,
-
-    etype?: ResolvedType,
-    ereg?: MIRTempRegister
+    treg: MIRTempRegister
 };
 
 type FilledLocation = {
@@ -59,7 +56,7 @@ function createEphemeralStructuredAssignmentPathStep(fromtype: ResolvedType, t: 
 }
 
 function createNominalStructuredAssignmentPathStep(fromtype: ResolvedType, t: ResolvedType, nval: string): StructuredAssignmentPathStep {
-    return { fromtype: fromtype, t: t, step: "tuple", ival: -1, nval: nval };
+    return { fromtype: fromtype, t: t, step: "nominal", ival: -1, nval: nval };
 }
 
 class TypeChecker {
@@ -225,39 +222,38 @@ class TypeChecker {
     }
 
     private checkedUnion(sinfo: SourceInfo, types: ResolvedType[]) {
-        const tj = this.m_assembly.typeUnion(types);
+        const tj = this.m_assembly.typeUpperBound(types);
         this.raiseErrorIf(sinfo, types.length !== 0 && tj.isEmptyType(), "Ephemeral list types must be unique");
 
         return tj;
     }
 
-    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): { isok: boolean, isstrict: boolean } {
+    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): boolean {
         if(lhs.isNoneType() || rhs.isNoneType()) {
-            return { isok: true, isstrict: lhs.isNoneType() && rhs.isNoneType() };
+            return true;
         }
 
         if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
-            return { isok: true, isstrict:false };
+            return false;
         }
 
         if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
-            return { isok: true, isstrict:false };
+            return false;
         }
 
-        const isstrictlhs = lhs.options.length === 1 && lhs.options[0] instanceof ResolvedEntityAtomType;
-        const isstrictrhs = rhs.options.length === 1 && rhs.options[0] instanceof ResolvedEntityAtomType;
-        const isstrict = isstrictlhs && isstrictrhs && lhs.idStr === rhs.idStr;
-
-        const nonnulllhs = lhs.options.filter((opt) => opt.idStr !== "NSCore::None");
-        const nonnullrhs = rhs.options.filter((opt) => opt.idStr !== "NSCore::None");
-        const isok = nonnulllhs.length == 1 && nonnullrhs.length == 1 && nonnulllhs[0].idStr === nonnullrhs[0].idStr;
-        return { isok: isok, isstrict: isstrict };
+        return lhs.options.length === 1 && rhs.options.length === 1 && lhs.idStr === rhs.idStr;
     }
     
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
-        const bothint = (this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) && this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()));
-        
-        return bothint;
+        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+            return false;
+        }
+
+        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+            return false;
+        }
+
+        return lhs.options.length === 1 && rhs.options.length === 1 && lhs.idStr === rhs.idStr;
     }
 
     private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
@@ -283,7 +279,7 @@ class TypeChecker {
                         return tatom.types[idx].type;
                     }
                     else {
-                        return this.m_assembly.typeUnion([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
+                        return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
                     }
                 }
                 else {
@@ -292,7 +288,7 @@ class TypeChecker {
             }
         });
 
-        return this.m_assembly.typeUnion(options);
+        return this.m_assembly.typeUpperBound(options);
     }
 
     private getInfoForLoadFromPropertyName(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
@@ -319,7 +315,7 @@ class TypeChecker {
                     return ratom.entries[tidx].type;
                 }
                 else {
-                    return this.m_assembly.typeUnion([ratom.entries[tidx].type, this.m_assembly.getSpecialNoneType()]);
+                    return this.m_assembly.typeUpperBound([ratom.entries[tidx].type, this.m_assembly.getSpecialNoneType()]);
                 }
             }
             else {
@@ -327,7 +323,7 @@ class TypeChecker {
             }
         });
 
-        return this.m_assembly.typeUnion(options);
+        return this.m_assembly.typeUpperBound(options);
     }
 
     private projectTupleAtom(sinfo: SourceInfo, opt: ResolvedAtomType, ptype: ResolvedTupleAtomType, istry: boolean): ResolvedType {
@@ -472,7 +468,7 @@ class TypeChecker {
                             tentries.push(new ResolvedTupleAtomTypeEntry(tuple.types[j].type, false));
                         }
                         else {
-                            tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.typeUnion([tuple.types[j].type, this.m_assembly.getSpecialNoneType()]), false));
+                            tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.typeUpperBound([tuple.types[j].type, this.m_assembly.getSpecialNoneType()]), false));
                         }
                     }
                     else {
@@ -534,7 +530,7 @@ class TypeChecker {
                     rentries[idx] = update;
                 }
                 else {
-                    rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, this.m_assembly.typeUnion([update.type, rentries[idx].type]), true);
+                    rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, this.m_assembly.typeUpperBound([update.type, rentries[idx].type]), true);
                 }
             }
         }
@@ -677,19 +673,9 @@ class TypeChecker {
                         const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
                         eargs.push({ name: arg.name, argtype: earg.etype, ref: undefined, expando: false, pcode: undefined, treg: treg });
                     }
-                    else if (arg instanceof PositionalArgument) {
+                    else {;
                         const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-                        eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: arg.isSpread, pcode: undefined, treg: treg });
-                    }
-                    else {
-                        const maparg = arg as MapArgument;
-
-                        const keyexp = this.checkExpression(env, maparg.key, treg).getExpressionResult();
-
-                        const vreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                        const valexp = this.checkExpression(env, maparg.value, vreg).getExpressionResult();
-                        
-                        eargs.push({ name: undefined, argtype: keyexp.etype, ref: undefined, expando: false, pcode: undefined, treg: treg, etype: valexp.etype, ereg: vreg });
+                        eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
                     }
                 }
             }
@@ -821,26 +807,29 @@ class TypeChecker {
         return rvl;
     }
 
-    private checkArgumentsEvaluationListOrSet(env: TypeEnvironment, args: Arguments): [ResolvedType, boolean, MIRTempRegister][] {
-        let eargs: [ResolvedType, boolean, MIRTempRegister][] = [];
+    private getExpandoType(sinfo: SourceInfo, eatom: ResolvedEntityAtomType): ResolvedType {
+        const ep = this.m_assembly.getExpandoProvides(eatom.object, eatom.binds);
+        this.raiseErrorIf(sinfo, ep === undefined, "Not an expandoable type");
 
-        for (let i = 0; i < args.argList.length; ++i) {
-            const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
-
-            this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in List/Set constructor");
-
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-
-            eargs.push([earg.etype, (arg as PositionalArgument).isSpread, treg]);
-        }
-
-        return eargs;
+        return ep as ResolvedType;
     }
 
-    private checkArgumentsListOrSetConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+    private checkExpandoType(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, argtype: ResolvedType): boolean {
+        const oftexpando = this.getExpandoType(sinfo, oftype);
+        const oftexpandoT = (oftexpando.options[0] as ResolvedConceptAtomType).conceptTypes[0].binds.get("T") as ResolvedType;
+
+        return argtype.options.every((opt) => {
+            this.raiseErrorIf(sinfo, !(opt instanceof ResolvedEntityAtomType), "Can only expand other container types in container constructor");
+            this.raiseErrorIf(sinfo, !(opt as ResolvedEntityAtomType).object.isTypeAnExpandoableCollection(), "Can only expand other container types in container constructor");
+            
+            const texpando = this.getExpandoType(sinfo, opt as ResolvedEntityAtomType);
+            const texpandoT = (texpando.options[0] as ResolvedConceptAtomType).conceptTypes[0].binds.get("T") as ResolvedType;
+
+            return this.m_assembly.subtypeOf(texpandoT, oftexpandoT);
+        });         
+    }
+
+    private checkArgumentsSequenceConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
         for (let i = 0; i < args.length; ++i) {
             const arg = args[i];
 
@@ -848,13 +837,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
             }
             else {
-                arg[0].options.forEach((opt) => {
-                    this.raiseErrorIf(sinfo, !(opt instanceof ResolvedEntityAtomType) || !(opt as ResolvedEntityAtomType).object.isTypeACollectionEntity(), "Can only expand other container types in container constructor");
-                    
-                    const oatom = opt as ResolvedEntityAtomType;
-                    const ttype = oatom.binds.get("T") as ResolvedType;
-                    this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(ttype, ctype), "Container contents not of suitable subtype");
-                });
+                this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
             }
         }
 
@@ -863,8 +846,44 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
-            if (oftype.object.isTypeASetEntity()) {
-                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
+            if (args.length === 0) {
+                this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
+            }
+            else {
+                if (args.every((v) => !v[1])) {
+                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
+                }
+                else if (args.every((v) => v[1])) {
+                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
+                }
+                else {
+                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
+                }
+            }
+        }
+
+        return ResolvedType.createSingle(oftype);
+    }
+
+    private checkArgumentsSetConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
+        for (let i = 0; i < args.length; ++i) {
+            const arg = args[i];
+
+            if (!arg[1]) {
+                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
+            }
+            else {
+                this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
+            }
+        }
+
+        if (this.m_emitEnabled) {
+            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(oftype));
+            this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
+            const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
+
+            if (this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
+                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
                 const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("T") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
                 const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
                 this.m_emitter.registerResolvedTypeReference(kltype);
@@ -890,80 +909,15 @@ class TypeChecker {
         return ResolvedType.createSingle(oftype);
     }
 
-    private checkArgumentsEvaluationMap(env: TypeEnvironment, args: Arguments, ktype: ResolvedType, vtype: ResolvedType): [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][] {
-        let eargs: [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][] = [];
-
-        for (let i = 0; i < args.argList.length; ++i) {
-            const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
-
-            this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument || arg instanceof MapArgument) , "Only positional and map arguments allowed in Map constructor");
-
-            if (arg instanceof PositionalArgument) {
-                const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                
-                const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-                this.raiseErrorIf(arg.value.sinfo, !(arg as PositionalArgument).isSpread, "Expected spread on Map argument");
-
-                eargs.push([earg.etype, true, treg, undefined, undefined]);
-            }
-            else {
-                const marg = arg as MapArgument;
-
-                const kreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                const keyarg = this.checkExpression(env, marg.key, kreg).getExpressionResult();
-
-                this.raiseErrorIf(arg.value.sinfo, !this.m_assembly.subtypeOf(keyarg.etype, ktype), "Map value key not of expected type");
-
-                const vreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                const valarg = this.checkExpression(env, marg.value, vreg).getExpressionResult();
-                
-                this.raiseErrorIf(arg.value.sinfo, !this.m_assembly.subtypeOf(valarg.etype, vtype), "Map value value not of expected type");
-
-                eargs.push([keyarg.etype, false, kreg, valarg.etype, vreg]);
-            }
-        }
-
-        return eargs;
-    }
-
-    private checkArgumentsMapConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedEntityAtomType, args: [ResolvedType, boolean, MIRTempRegister, ResolvedType | undefined, MIRTempRegister | undefined][], trgt: MIRTempRegister): ResolvedType {
+    private checkArgumentsMapConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedEntityAtomType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister): ResolvedType {
         for (let i = 0; i < args.length; ++i) {
             const arg = args[i];
 
             if (!arg[1]) {
-                if(arg[3] !== undefined) {
-                    const mereg = this.m_emitter.bodyEmitter.generateTmpRegister();
-
-                    if(this.m_emitEnabled) {
-                        const entrykey = this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(entrytype));
-                        this.m_emitter.bodyEmitter.emitConstructorPrimary(sinfo, entrykey.trkey, false, [arg[2], arg[4] as MIRTempRegister], mereg);
-                    }
-
-                    arg[0] = ResolvedType.createSingle(entrytype);
-                    arg[2] = mereg;
-                }
-
                 this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ResolvedType.createSingle(entrytype)));
             }
             else {
-                arg[0].options.forEach((opt) => {
-                    this.raiseErrorIf(sinfo, !(opt instanceof ResolvedEntityAtomType) || !((opt as ResolvedEntityAtomType).object.isTypeACollectionEntity() || (opt as ResolvedEntityAtomType).object.isTypeAMapEntity()), "Can only expand other container types in container constructor");
-                    
-                    const oatom = opt as ResolvedEntityAtomType;
-                    if((opt as ResolvedEntityAtomType).object.isTypeACollectionEntity()) {
-                        const ttype = oatom.binds.get("T") as ResolvedType;
-                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(ttype, ResolvedType.createSingle(entrytype)), "Container contents not of suitable subtype");
-                    }
-                    else {
-                        const entryobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry", 2) as EntityTypeDecl;
-                        const entrybinds = new Map<string, ResolvedType>().set("K", oatom.binds.get("K") as ResolvedType).set("V", oatom.binds.get("V") as ResolvedType);
-                        const mentry = ResolvedType.createSingle(ResolvedEntityAtomType.create(entryobj, entrybinds));
-
-                        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(mentry, ResolvedType.createSingle(entrytype)), "Container contents not of suitable key subtype");
-                    }
-                });
+                this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
             }
         }
 
@@ -975,11 +929,13 @@ class TypeChecker {
             this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
             const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
 
-            const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList", 1) as EntityTypeDecl;
-            const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("K") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
-            const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
-            this.m_emitter.registerResolvedTypeReference(kltype);
-            this.m_emitter.registerTypeInstantiation(klobj, klbinds);
+            if (this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
+                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
+                const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("K") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
+                const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
+                this.m_emitter.registerResolvedTypeReference(kltype);
+                this.m_emitter.registerTypeInstantiation(klobj, klbinds);
+            }
 
             if (args.length === 0) {
                 this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
@@ -1028,6 +984,8 @@ class TypeChecker {
         fieldInfo.forEach((v, k) => {
             fields.push(k);
         });
+
+        xxxx;
         fields = fields.sort();
 
         let filledLocations: { vtype: ResolvedType, mustDef: boolean, trgt: MIRArgument }[] = [];

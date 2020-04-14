@@ -157,6 +157,8 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
 
     static stringify(f: Float64): String # float64_tostring
     static parse(str: String): Float64 # float64_parse
+    
+    static less(f1: Float64, f2: Float64, epsilon?: Float64): Bool # float64_less
 }
 
 //<summary>Primitive string value.</summary>
@@ -334,11 +336,11 @@ struct concept Result<T, E=None> provides Some, Convertable {
     }
 
     method result(): T {
-        return this->as<ResultOk<T, E>>().result;
+        return this->cast<ResultOk<T, E>>().result;
     }
 
     method failure(): E {
-        return this->as<ResultErr<T, E>>().failure;
+        return this->cast<ResultErr<T, E>>().failure;
     }
 
     method convert<U, V>(): Result<U, V> {
@@ -364,4 +366,9 @@ struct entity ResultErr<T, E=None> provides Result<T, E> {
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {
+}
+
+//<summary>All collections provide this concept so we can expand them with spread operators.</summary>
+concept Expandoable<T> provides Object {
+    method expand<U>(): List<U> # special_method
 }

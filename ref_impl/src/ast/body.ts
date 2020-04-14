@@ -35,15 +35,6 @@ class PositionalArgument extends InvokeArgument {
     }
 }
 
-class MapArgument extends InvokeArgument {
-    readonly key: Expression;
-
-    constructor(key: Expression, value: Expression) {
-        super(value, false);
-        this.key = key;
-    }
-}
-
 class Arguments {
     readonly argList: InvokeArgument[];
 
@@ -167,11 +158,15 @@ enum ExpressionTag {
     PostfixOpExpression = "PostfixOpExpression",
 
     PrefixOpExpression = "PrefixOpExpression",
+    TailIsTypeExpression = "TailIsTypeExpression",
+    TailAsTypeExpression = "TailAsTypeExpression",
 
     BinOpExpression = "BinOpExpression",
     BinCmpExpression = "BinCmpExpression",
     BinEqExpression = "BinEqExpression",
     BinLogicExpression = "BinLogicExpression",
+
+    MapEntryConstructorExpression = "MapEntryConstructorExpression",
 
     NonecheckExpression = "NonecheckExpression",
     CoalesceExpression = "CoalesceExpression",
@@ -588,6 +583,28 @@ class PrefixOp extends Expression {
     }
 }
 
+class TailIsTypeExpression extends Expression {
+    readonly exp: Expression;
+    readonly ttype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, exp: Expression, ttype: TypeSignature) {
+        super(ExpressionTag.TailIsTypeExpression, sinfo);
+        this.exp = exp;
+        this.ttype = ttype;
+    }
+}
+
+class TailAsTypeExpression extends Expression {
+    readonly exp: Expression;
+    readonly ttype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, exp: Expression, ttype: TypeSignature) {
+        super(ExpressionTag.TailAsTypeExpression, sinfo);
+        this.exp = exp;
+        this.ttype = ttype;
+    }
+}
+
 class BinOpExpression extends Expression {
     readonly lhs: Expression;
     readonly op: string; //+, -, *, /, %
@@ -637,6 +654,17 @@ class BinLogicExpression extends Expression {
         this.lhs = lhs;
         this.op = op;
         this.rhs = rhs;
+    }
+}
+
+class MapEntryConstructorExpression extends Expression {
+    readonly kexp: Expression;
+    readonly vexp: Expression;
+
+    constructor(sinfo: SourceInfo, kexp: Expression, vexp: Expression) {
+        super(ExpressionTag.MapEntryConstructorExpression, sinfo);
+        this.kexp = kexp;
+        this.vexp = vexp;
     }
 }
 
@@ -1033,7 +1061,7 @@ class BodyImplementation {
 }
 
 export {
-    InvokeArgument, NamedArgument, PositionalArgument, MapArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
+    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralBigIntegerExpression, LiteralFloatExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
@@ -1041,7 +1069,10 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
-    PrefixOp, BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
+    TailIsTypeExpression, TailAsTypeExpression,
+    PrefixOp, 
+    BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
+    MapEntryConstructorExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,
     StatementTag, Statement, InvalidStatement, EmptyStatement,

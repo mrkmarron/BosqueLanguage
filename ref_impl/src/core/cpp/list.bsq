@@ -6,7 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity List<T> provides Object, PODType when T grounded PODType, APIType when T grounded APIType {
+entity List<T> provides Object, Expandoable<T>, PODType when T grounded PODType, APIType when T grounded APIType {
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_get(l: List<T>, i: Int): T # list_unsafe_get
 

@@ -6,7 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity List<T> provides Object, PODType when T grounded PODType, APIType when T grounded APIType {
+entity List<T> provides Object, Expandoable<T>, PODType when T grounded PODType, APIType when T grounded APIType {
     hidden static _size(l: List<T>): Int # list_size
     hidden static _unsafe_get(l: List<T>, i: Int): T # list_unsafe_get
 
@@ -158,7 +158,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            if(cv == val) {
+            if(KeyType::equal(cv, val)) {
                 return idx;
             }
             else {
@@ -173,7 +173,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            if(cv == val) {
+            if(KeyType::equal(cv, val)) {
                 return idx;
             }
             else {
@@ -188,7 +188,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let nacc = (cv == val) ? acc + 1 : acc;
+            let nacc = (KeyType::equal(cv, val)) ? acc + 1 : acc;
             
             return List<T>::_count_keytype[recursive](l, idx + 1, nacc, cv);
         }
@@ -421,7 +421,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _zipIndex(l: List<T>, lp: List<[Int, T]>, idx: Int): List<[Int, T]> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -431,7 +431,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _joinSingle<U>(v: T, ol: List<U>, lp: List<[T, U]>, idx: Int, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
-        if(idx === List<T>::_size(ol)) {
+        if(idx == List<T>::_size(ol)) {
             return lp;
         }
         else {
@@ -446,7 +446,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _join<U>(l: List<T>, ol: List<U>, lp: List<[T, U]>, idx: Int, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -458,7 +458,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _joinGroupSingle<U>(v: T, ol: List<U>, lp: List<[T, List<U>]>, idx: Int, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
-        if(idx === List<T>::_size(ol)) {
+        if(idx == List<T>::_size(ol)) {
             return lp;
         }
         else {
@@ -473,7 +473,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _joinGroup<U>(l: List<T>, ol: List<U>, lp: List<[T, List<U>]>, idx: Int, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -485,7 +485,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _append(l: List<T>, lp: List<T>, idx: Int): List<T> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -495,13 +495,13 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _partitionSingle<K where K KeyType>(kk: K, ol: List<T>, lp: List<T>, idx: Int, pf: recursive? fn(_: T) -> K): List<T> {
-        if(idx === List<T>::_size(ol)) {
+        if(idx == List<T>::_size(ol)) {
             return lp;
         }
         else {
             let val = List<T>::_unsafe_get(ol, idx);
             let key = pf[recursive?](val);
-            if(kk == key) {
+            if(KeyType::equal(kk, key)) {
                 return List<T>::_partitionSingle[recursive](kk, ol, List<T>::_unsafe_push(lp, val), idx + 1, pf);
             }
             else {
@@ -511,7 +511,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _partition<K where K KeyType>(l: List<T>, mp: Map<K, List<T>>, idx: Int, pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -532,7 +532,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _toMap<K, V>(l: List<T>, mp: Map<K, V>, idx: Int, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge: Bool): Map<K, V> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -550,7 +550,7 @@ entity List<T> provides Object, PODType when T grounded PODType, APIType when T 
     }
 
     hidden recursive static _toIndexMap<V>(l: List<T>, mp: Map<Int, V>, idx: Int, vf: recursive? fn(_: T) -> V): Map<Int, V> {
-        if(idx === List<T>::_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -1006,7 +1006,7 @@ concept ListUtil {
     }
 
     hidden recursive static _concat<T>(l: List<List<T>>, lp: List<T>, idx: Int): List<T> {
-        if(idx === List<T>_size(l)) {
+        if(idx == List<T>_size(l)) {
             return lp;
         }
         else {

@@ -6,7 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity Stack<T> provides Object {
+entity Stack<T> provides Object, Expandoable<T> {
     hidden static _size(s: Stack<T>): Int # stack_size
     hidden static _unsafe_top(s: Stack<T>): T # stack_unsafe_top
     hidden static _unsafe_at(s: Stack<T>, idx: Int): T # stack_unsafe_at
