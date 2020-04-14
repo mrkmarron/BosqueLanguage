@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation } from "./body";
+import { Expression, BodyImplementation, ResultExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -488,13 +488,13 @@ class Assembly {
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
 
-    private resolveTemplateBinds(declterms: TemplateTermDecl[], declbinds: Map<string, ResolvedType>, giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
+    private resolveTemplateBinds(declterms: TemplateTermDecl[], giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         const fullbinds = new Map<string, ResolvedType>();
 
         for (let i = 0; i < declterms.length; ++i) {
             if(giventerms.length <= i) {
                 if(declterms[i].defaultType !== undefined) {
-                    fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, declbinds));
+                    fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, binds));
                 }
                 else {
                     return undefined;
@@ -841,7 +841,8 @@ class Assembly {
                     return ResolvedType.createEmpty();
                 }
 
-                return ResolvedType.createSingle(this.createConceptTypeAtom(fconcept, aliasResolvedType, aliasResolvedBinds));
+                const cta = this.createConceptTypeAtom(fconcept, aliasResolvedType, aliasResolvedBinds);
+                return cta !== undefined ? ResolvedType.createSingle(cta) : ResolvedType.createEmpty();
             }
 
             const fobject = this.tryGetObjectTypeForFullyResolvedName(aliasResolvedType.nameSpace + "::" + aliasResolvedType.baseName);
@@ -850,7 +851,8 @@ class Assembly {
                     return ResolvedType.createEmpty();
                 }
 
-                return ResolvedType.createSingle(this.createObjectTypeAtom(fobject, aliasResolvedType, aliasResolvedBinds));
+                const ota = this.createObjectTypeAtom(fobject, aliasResolvedType, aliasResolvedBinds);
+                return ota !== undefined ? ResolvedType.createSingle(ota) : ResolvedType.createEmpty();
             }
 
             return ResolvedType.createEmpty();
@@ -959,38 +961,6 @@ class Assembly {
         return this.normalizeUnionList(utypes);
     }
 
-    private normalizeTuples(tuples: ResolvedTupleAtomType[]): ResolvedTupleAtomType {
-        const midx = Math.max(...tuples.map((tt) => tt.types.length));
-        let nte: ResolvedTupleAtomTypeEntry[] = [];
-        for (let i = 0; i < midx; ++i) {
-            const ituples = tuples.filter((tt) => tt.types.length > i);
-            const ttypes = ituples.map((tt) => tt.types[i].type);
-            const topt = ituples.some((tt) => tt.types[i].isOptional) || tuples.length !== ituples.length;
-
-            const ttype = this.typeUpperBound(ttypes);
-            nte.push(new ResolvedTupleAtomTypeEntry(ttype, topt));
-        }
-
-        return ResolvedTupleAtomType.create(nte);
-    }
-
-    private normalizeRecords(records: ResolvedRecordAtomType[]): ResolvedRecordAtomType {
-        const mfs: Set<string> = new Set<string>();
-        records.forEach((rt) => rt.entries.forEach((rte) => mfs.add(rte.name)));
-
-        let nte: ResolvedRecordAtomTypeEntry[] = [];
-        mfs.forEach((f) => {
-            const irecords = records.filter((tt) => tt.entries.some((rte) => rte.name === f));
-            const ttypes = irecords.map((tt) => (tt.entries.find((rte) => rte.name === f) as ResolvedRecordAtomTypeEntry).type);
-            const topt = irecords.some((tt) => (tt.entries.find((rte) => rte.name === f) as ResolvedRecordAtomTypeEntry).isOptional) || records.length !== irecords.length;
-
-            const ttype = this.typeUpperBound(ttypes);
-            nte.push(new ResolvedRecordAtomTypeEntry(f, ttype, topt));
-        });
-
-        return ResolvedRecordAtomType.create(nte);
-    }
-
     private normalizeEphemerals(ephemerals: ResolvedEphemeralListType[]): ResolvedEphemeralListType | undefined {
         const lidx = Math.max(...ephemerals.map((tt) => tt.types.length));
         const uidx = Math.min(...ephemerals.map((tt) => tt.types.length));
@@ -1018,20 +988,12 @@ class Assembly {
             flattened.push(this.getSpecialAnyConceptType().options[0]);
         }
 
-        const ttupes = flattened.filter((tt) => tt instanceof ResolvedTupleAtomType) as ResolvedTupleAtomType[];
-        const trecs = flattened.filter((tt) => tt instanceof ResolvedRecordAtomType) as ResolvedRecordAtomType[];
         const teph = flattened.filter((tt) => tt instanceof ResolvedEphemeralListType) as ResolvedEphemeralListType[];
-
         let merged = flattened.filter((tt) => !(tt instanceof ResolvedTupleAtomType) && !(tt instanceof ResolvedRecordAtomType) && !(tt instanceof ResolvedEphemeralListType));
-        if (ttupes.length !== 0) {
-            merged.push(this.normalizeTuples(ttupes));
-        }
-        if (trecs.length !== 0) {
-            merged.push(this.normalizeRecords(trecs));
-        }
+
         if (teph.length !== 0) {
             const eet = this.normalizeEphemerals(teph);
-            if (eet === undefined) {
+            if (eet === undefined || merged.length !== 0) {
                 return ResolvedType.createEmpty();
             }
             else {
@@ -1251,7 +1213,7 @@ class Assembly {
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
         const tconcept = this.createConceptTypeAtom(this.tryGetConceptTypeForFullyResolvedName("NSCore::" + name) as ConceptTypeDecl, rsig, binds || new Map<string, ResolvedType>());
-        const rtype = ResolvedType.createSingle(tconcept);
+        const rtype = ResolvedType.createSingle(tconcept as ResolvedAtomType);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
         return rtype;
@@ -1264,7 +1226,7 @@ class Assembly {
 
         const rsig = new NominalTypeSignature("NSCore", name, terms || [] as TypeSignature[]);
         const tobject = this.createObjectTypeAtom(this.tryGetObjectTypeForFullyResolvedName("NSCore::" + name) as EntityTypeDecl, rsig, binds || new Map<string, ResolvedType>());
-        const rtype = ResolvedType.createSingle(tobject);
+        const rtype = ResolvedType.createSingle(tobject as ResolvedAtomType);
         this.m_specialTypeMap.set("NSCore::" + name, rtype);
 
         return rtype;
@@ -1408,6 +1370,9 @@ class Assembly {
         //compute the bindings to use when resolving the RHS of the typedef alias
         const typealias = nsd.typeDefs.get(lname) as NamespaceTypedef;
         const updatedbinds = this.resolveTemplateBinds(typealias.terms, t.terms, binds);
+        if(updatedbinds === undefined) {
+            return [undefined, new Map<string, ResolvedType>()];
+        }
 
         if (typealias.boundType instanceof NominalTypeSignature) {
             return this.lookupTypeDef(typealias.boundType, updatedbinds);
@@ -1417,13 +1382,21 @@ class Assembly {
         }
     }
 
-    createConceptTypeAtom(concept: ConceptTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedConceptAtomType {
+    createConceptTypeAtom(concept: ConceptTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedConceptAtomType | undefined {
         const fullbinds = this.resolveTemplateBinds(concept.terms, t.terms, binds);
+        if(fullbinds === undefined) {
+            return undefined;
+        }
+
         return ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(concept, fullbinds)]);
     }
 
-    createObjectTypeAtom(object: EntityTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedEntityAtomType {
+    createObjectTypeAtom(object: EntityTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedEntityAtomType | undefined {
         const fullbinds = this.resolveTemplateBinds(object.terms, t.terms, binds);
+        if(fullbinds === undefined) {
+            return undefined;
+        }
+
         return ResolvedEntityAtomType.create(object, fullbinds);
     }
 
