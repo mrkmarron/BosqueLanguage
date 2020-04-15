@@ -2763,6 +2763,7 @@ class Parser {
 
             currentDecl.objects.set(tyname, validatortype);
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, currentDecl.objects.get(tyname) as EntityTypeDecl);
+            this.m_penv.assembly.addValidatorDecl(currentDecl.ns + "::" + tyname, vregex);
         }
         else {
             const btype = this.parseTypeSignature();

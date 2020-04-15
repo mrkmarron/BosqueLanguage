@@ -500,6 +500,7 @@ class Assembly {
     private m_namespaceMap: Map<string, NamespaceDeclaration> = new Map<string, NamespaceDeclaration>();
     private m_conceptMap: Map<string, ConceptTypeDecl> = new Map<string, ConceptTypeDecl>();
     private m_objectMap: Map<string, EntityTypeDecl> = new Map<string, EntityTypeDecl>();
+    private m_validatorMap: Map<string, string> = new Map<string, string>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
@@ -1387,6 +1388,10 @@ class Assembly {
         return this.m_objectMap.get(name);
     }
 
+    tryGetValidatorForFullyResolvedName(name: string): string | undefined {
+        return this.m_validatorMap.get(name);
+    }
+
     hasNamespace(ns: string): boolean {
         return this.m_namespaceMap.has(ns);
     }
@@ -1417,6 +1422,10 @@ class Assembly {
 
     addObjectDecl(resolvedName: string, object: EntityTypeDecl) {
         this.m_objectMap.set(resolvedName, object);
+    }
+
+    addValidatorDecl(resolvedName: string, validator: string) {
+        this.m_validatorMap.set(resolvedName, validator);
     }
 
     ////
