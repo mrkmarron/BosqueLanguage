@@ -173,8 +173,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRAccessLocalVariable(sinfo, new MIRVariable(name), trgt));
     }
 
-    emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, asValue: boolean, args: MIRArgument[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, asValue, tkey, args, trgt));
+    emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, tkey, args, trgt));
     }
 
     emitInvokeInvariantCheckDirect(sinfo: SourceInfo, ikey: MIRInvokeKey, tkey: MIRNominalTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {

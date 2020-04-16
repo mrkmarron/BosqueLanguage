@@ -158,9 +158,8 @@ enum ExpressionTag {
     PostfixOpExpression = "PostfixOpExpression",
 
     PrefixOpExpression = "PrefixOpExpression",
-    TailIsTypeExpression = "TailIsTypeExpression",
-    TailAsTypeExpression = "TailAsTypeExpression",
-
+    TailTypeExpression = "TailTypeExpression",
+    
     BinOpExpression = "BinOpExpression",
     BinCmpExpression = "BinCmpExpression",
     BinEqExpression = "BinEqExpression",
@@ -391,13 +390,13 @@ class PCodeInvokeExpression extends Expression {
 class ResultExpression extends Expression {
     readonly rtype: TypeSignature;
     readonly rop: string;
-    readonly args: Arguments;
+    readonly arg: Expression;
 
-    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: string, args: Arguments) {
+    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: string, arg: Expression) {
         super(ExpressionTag.ResultExpression, sinfo); 
         this.rtype = rtype;
         this.rop = rop;
-        this.args = args;
+        this.arg = arg;
     }
 }
 
@@ -583,24 +582,15 @@ class PrefixOp extends Expression {
     }
 }
 
-class TailIsTypeExpression extends Expression {
+class TailTypeExpression extends Expression {
     readonly exp: Expression;
+    readonly op: string;
     readonly ttype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, exp: Expression, ttype: TypeSignature) {
-        super(ExpressionTag.TailIsTypeExpression, sinfo);
+    constructor(sinfo: SourceInfo, exp: Expression, op: string, ttype: TypeSignature) {
+        super(ExpressionTag.TailTypeExpression, sinfo);
         this.exp = exp;
-        this.ttype = ttype;
-    }
-}
-
-class TailAsTypeExpression extends Expression {
-    readonly exp: Expression;
-    readonly ttype: TypeSignature;
-
-    constructor(sinfo: SourceInfo, exp: Expression, ttype: TypeSignature) {
-        super(ExpressionTag.TailAsTypeExpression, sinfo);
-        this.exp = exp;
+        this.op = op;
         this.ttype = ttype;
     }
 }
@@ -1069,7 +1059,7 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,
-    TailIsTypeExpression, TailAsTypeExpression,
+    TailTypeExpression,
     PrefixOp, 
     BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     MapEntryConstructorExpression,
