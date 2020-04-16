@@ -1495,9 +1495,6 @@ class Parser {
             }
 
             const type = terms.targs[0];
-            if (!(type instanceof TemplateTypeSignature || type instanceof NominalTypeSignature || type instanceof RecordTypeSignature || type instanceof TupleTypeSignature)) {
-                this.raiseError(line, "Can only project over record, tuple, or concept contraints");
-            }
 
             this.ensureAndConsumeToken("(");
             this.ensureAndConsumeToken(")");

@@ -308,12 +308,16 @@ concept Tuple provides Some {
 concept Record provides Some {
 }
 
-struct entity MapEntry<K where KeyType, V> provides Some, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
     field key: K;
     field value: V;
 
     static create(k: K, v: V): MapEntry<K, V> {
         return MapEntry<K, V>@{ key=key, value=value };
+    }
+
+    method convert<T where KeyType, U>(): MapEntry<T, U> {
+        return MapEntry<T, U>@{ key=this.key->as<T>(), value=this.value->as<U>() };
     }
 }
 
