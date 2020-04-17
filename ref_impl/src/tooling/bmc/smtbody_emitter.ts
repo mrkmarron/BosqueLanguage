@@ -93,8 +93,8 @@ class SMTBodyEmitter {
     }
 
     varNameToSMTName(name: string): string {
-        if (name === "_return_") {
-            return "_return_";
+        if (name === "$$return") {
+            return "$$return";
         }
         else {
             return this.typegen.mangleStringForSMT(name);

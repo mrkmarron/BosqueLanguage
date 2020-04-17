@@ -47,7 +47,7 @@ type ExhaustiveCheck = {
     file: string, 
     sinfo: SourceInfo, 
     vtype: ResolvedType,
-    chk: ResolvedType[]
+    chk: MatchGuard[]
 };
 
 function createTupleStructuredAssignmentPathStep(fromtype: ResolvedType, t: ResolvedType, ival: number): StructuredAssignmentPathStep {
@@ -1415,7 +1415,7 @@ class TypeChecker {
             if (fsig.resultType.options.length !== 1 || !(fsig.resultType.options[0] instanceof ResolvedEphemeralListType)) {
                 const etl = ResolvedType.createSingle(ResolvedEphemeralListType.create([fsig.resultType, ...rr]));
 
-                return [rtype, this.m_emitter.registerResolvedTypeReference(etl), 1, refinfo];
+                return [rtype, this.m_emitter.registerResolvedTypeReference(etl), -1, refinfo];
             }
             else {
                 const elr = fsig.resultType.options[0] as ResolvedEphemeralListType;
@@ -1443,7 +1443,7 @@ class TypeChecker {
             if (rtype.options.length !== 1 || !(rtype.options[0] instanceof ResolvedEphemeralListType)) {
                 const etl = ResolvedType.createSingle(ResolvedEphemeralListType.create([env.result, ...rr]));
 
-                return [rtype, this.m_emitter.registerResolvedTypeReference(etl), 1, refinfo];
+                return [rtype, this.m_emitter.registerResolvedTypeReference(etl), -1, refinfo];
             }
             else {
                 const elr = env.result.options[0] as ResolvedEphemeralListType;
@@ -3384,12 +3384,11 @@ class TypeChecker {
         let cenv = venv;
         let vtype = venv.getExpressionResult().etype;
         let results: TypeEnvironment[] = [];
-        let matchedtypes: ResolvedType[] = [];
         for (let i = 0; i < exp.flow.length; ++i) {
             const nextlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchexp_${i}next`);
             const actionlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchexp_${i}action`);
 
-            const test = this.checkMatchGuard(exp.sinfo, i, vreg, vtype, cenv, exp.flow[i].check, nextlabel, actionlabel, svname, matchedtypes);
+            const test = this.checkMatchGuard(exp.sinfo, i, vreg, vtype, cenv, exp.flow[i].check, nextlabel, actionlabel, svname);
 
             vtype = test.nexttype;
             const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, test.envinfo);
@@ -3413,8 +3412,8 @@ class TypeChecker {
         }
 
         //do an exhaustive check in one case we know
-        if (matchedtypes.length === exp.flow.length) {
-            this.m_exhaustiveChecks.push({file: this.m_file, sinfo: exp.sinfo, vtype: vtype, chk: matchedtypes});
+        if (!exp.flow.some((gc) => gc.check instanceof WildcardMatchGuard)) {
+            this.m_exhaustiveChecks.push({file: this.m_file, sinfo: exp.sinfo, vtype: vtype, chk: exp.flow.map((cc) => cc.check)});
         }
 
         if (this.m_emitEnabled) {
@@ -4077,7 +4076,7 @@ class TypeChecker {
         }
     }
 
-    private checkMatchGuard(sinfo: SourceInfo, midx: number, vreg: MIRTempRegister, sexp: ResolvedType, env: TypeEnvironment, guard: MatchGuard, nextlabel: string, actionlabel: string, svname: string | undefined, matchedtypes: ResolvedType[]): { envinfo: TypeEnvironment[], nexttype: ResolvedType } {
+    private checkMatchGuard(sinfo: SourceInfo, midx: number, vreg: MIRTempRegister, sexp: ResolvedType, env: TypeEnvironment, guard: MatchGuard, nextlabel: string, actionlabel: string, svname: string | undefined): { envinfo: TypeEnvironment[], nexttype: ResolvedType } {
         let opts: TypeEnvironment[] = [];
         let nexttype = sexp;
         let mreg = this.m_emitter.bodyEmitter.generateTmpRegister();
@@ -4087,7 +4086,6 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitLoadConstBool(sinfo, true, mreg);
             }
 
-            matchedtypes.length = 0; //clear the array to indicate that there is no exhastive problem
             opts = [env.setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)];
         }
         else if (guard instanceof TypeMatchGuard) {
@@ -4117,7 +4115,6 @@ class TypeChecker {
                 opts = [tval, ntval];
             }
 
-            matchedtypes.push(tmatch);
             nexttype = this.m_assembly.restrictNotT(sexp, tmatch);
         }
         else {
@@ -4252,12 +4249,11 @@ class TypeChecker {
         let cenv = venv;
         let vtype = venv.getExpressionResult().etype;
         let results: TypeEnvironment[] = [];
-        let matchedtypes: ResolvedType[] = [];
         for (let i = 0; i < stmt.flow.length; ++i) {
             const nextlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchstmt_${i}next`);
             const actionlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchstmt_${i}action`);
 
-            const test = this.checkMatchGuard(stmt.sinfo, i, vreg, vtype, cenv, stmt.flow[i].check, nextlabel, actionlabel, svname, matchedtypes);
+            const test = this.checkMatchGuard(stmt.sinfo, i, vreg, vtype, cenv, stmt.flow[i].check, nextlabel, actionlabel, svname);
 
             vtype = test.nexttype;
             const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, test.envinfo);
@@ -4281,8 +4277,8 @@ class TypeChecker {
         }
 
         //do an exhaustive check in one case we know
-        if (matchedtypes.length === stmt.flow.length) {
-            this.m_exhaustiveChecks.push({file: this.m_file, sinfo: stmt.sinfo, vtype: vtype, chk: matchedtypes});
+        if (!stmt.flow.some((gc) => gc.check instanceof WildcardMatchGuard)) {
+            this.m_exhaustiveChecks.push({file: this.m_file, sinfo: stmt.sinfo, vtype: vtype, chk: stmt.flow.map((cc) => cc.check)});
         }
 
         if (this.m_emitEnabled) {
@@ -4564,20 +4560,59 @@ class TypeChecker {
         return cenv.popLocalScope();
     }
 
-    private emitPrelogForRefParamsAndPostCond(sinfo: SourceInfo, env: TypeEnvironment) {
+    private emitPrelogForRefParamsAndPostCond(sinfo: SourceInfo, env: TypeEnvironment): string[] {
+        let rpnames: string[] = [];
+
         for(let i = 0; i < env.refparams.length; ++i) {
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            this.m_emitter.bodyEmitter.emitAccessArgVariable(sinfo, env.refparams[i], treg);
-            this.m_emitter.bodyEmitter.emitVarStore(sinfo, treg, `$${env.refparams[i]}`);
+            rpnames.push(`$_orig_$${env.refparams[i]}`);
+            this.m_emitter.bodyEmitter.emitArgVarStore(sinfo, env.refparams[i], `$_orig_$${env.refparams[i]}`);
         }
+
+        return rpnames;
     }
 
-    private emitExpandoForValuePackReturnPostCond() {
-        xxxx;
-    }
+    private emitPrologForReturn(sinfo: SourceInfo, rrinfo: [MIRType, MIRType, number, [string, MIRType][]], wpost: boolean): {unpack: MIRArgument[], orefs: MIRArgument[]} {
+        if(wpost) {
+            this.m_emitter.bodyEmitter.emitVarMove(sinfo, "$__ir_ret__", "$$__post_arg__");
+        }
 
-    private emitPrologForRefParamsReturn(rrinfo: [MIRType, MIRType, number, [string, MIRType][]]) {
-        xxxx;
+        let rargs: MIRArgument[] = [new MIRVariable("$$__post_arg__")];
+        let orefs: MIRArgument[] = rrinfo[3].map((rv) => new MIRVariable(`$_orig_$${rv}`));
+        if(rrinfo[3].length === 0) {
+            this.m_emitter.bodyEmitter.emitVarMove(sinfo, "$__ir_ret__", "$$return");
+        }
+        else {
+            const rreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+
+            if(rrinfo[2] === 1) {
+                let args = [new MIRVariable("$__ir_ret__"), ...rrinfo[3].map((rv) => new MIRVariable(rv[0]))];
+                this.m_emitter.bodyEmitter.emitConstructorValueList(sinfo, rrinfo[1].trkey, args, rreg);
+            }
+            else {
+                if (wpost) {
+                    rargs = [];
+                    const elreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    this.m_emitter.bodyEmitter.emitAccessLocalVariable(sinfo, "$__ir_ret__", elreg);
+                    for (let i = 0; i < rrinfo[2]; ++i) {
+                        const tlreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                        this.m_emitter.bodyEmitter.emitLoadFromEpehmeralList(sinfo, elreg, rrinfo[0].trkey, i, tlreg);
+
+                        rargs.push(tlreg);
+                    }
+                }
+                
+                let args: MIRArgument[] = [new MIRVariable("$__ir_ret__")];
+                for(let i = 0; i < rrinfo[3].length; ++i) {
+                    args.push(new MIRVariable(rrinfo[3][i][0]));
+                }
+
+                this.m_emitter.bodyEmitter.emitMIRPackExtend(sinfo, new MIRVariable("$__ir_ret__"), args, rrinfo[1].trkey, rreg);
+            }
+
+            this.m_emitter.bodyEmitter.emitVarStore(sinfo, rreg, "$$return");
+        }
+
+        return {unpack: rargs, orefs: orefs};
     }
 
     private checkBody(env: TypeEnvironment, body: BodyImplementation, args: Map<string, MIRType>, declaredResultType: ResolvedType, preject: [MIRInvokeKey, MIRArgument[]] | undefined, postject: [MIRInvokeKey, MIRArgument[]] | undefined): MIRBody | undefined {
@@ -4611,6 +4646,9 @@ class TypeChecker {
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "returnassign");
 
                 this.m_emitter.bodyEmitter.setActiveBlock("returnassign");
+                
+                const rrinfo = this.generateRefInfoForReturnEmit(body.body.sinfo, evalue.getExpressionResult().etype, env);
+                const postvar = this.emitPrologForReturn(body.body.sinfo, rrinfo, postject !== undefined);
 
                 if (postject !== undefined) {
                     const postreg = this.m_emitter.bodyEmitter.generateTmpRegister();
@@ -4618,8 +4656,8 @@ class TypeChecker {
                     const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                    const postargs = [new MIRVariable("_return_"), ...postject[1]];
-                    xxxx;
+                    const postargs = [...postvar.unpack, ...postvar.orefs, ...postject[1]];
+
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, postject[0], postargs, [mirbool, mirbool, -1, []], postreg);
                     this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
 
@@ -4629,9 +4667,6 @@ class TypeChecker {
                     this.m_emitter.bodyEmitter.setActiveBlock(postok);
                 }
                 
-                const rrinfo = this.generateRefInfoForReturnEmit(body.body.sinfo, evalue.getExpressionResult().etype, env);
-                this.emitPrologForRefParamsReturn(rrinfo);
-
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
             }
             this.raiseErrorIf(body.body.sinfo, !this.m_assembly.subtypeOf(evalue.getExpressionResult().etype, declaredResultType), "Did not produce the expected return type");
@@ -4648,7 +4683,7 @@ class TypeChecker {
                     const preok = this.m_emitter.bodyEmitter.createNewBlock("preok");
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, preject[0], preject[1], [], prereg);
+                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, preject[0], preject[1], [mirbool, mirbool, -1, []], prereg);
                     this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, prereg, preok, prefail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(prefail);
@@ -4669,16 +4704,18 @@ class TypeChecker {
             if (this.m_emitEnabled) {
                 this.m_emitter.bodyEmitter.setActiveBlock("returnassign");
 
+                const rrinfo = this.generateRefInfoForReturnEmit(body.body.sinfo, renv.returnResult as ResolvedType, env);
+                const postvar = this.emitPrologForReturn(body.body.sinfo, rrinfo, postject !== undefined);
+
                 if (postject !== undefined) {
                     const postreg = this.m_emitter.bodyEmitter.generateTmpRegister();
                     const postfail = this.m_emitter.bodyEmitter.createNewBlock("postfail");
                     const postok = this.m_emitter.bodyEmitter.createNewBlock("postok");
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
-                    const postargs = [new MIRVariable("_return_"), ...postject[1]];
-                    xxxx;
+                    const postargs = [...postvar.unpack, ...postvar.orefs, ...postject[1]];
 
-                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(this.m_emitter.masm, body.body.sinfo, mirbool, postject[0], postargs, [], postreg);
+                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, postject[0], postargs, [mirbool, mirbool, -1, []], postreg);
                     this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(postfail);
@@ -4686,9 +4723,6 @@ class TypeChecker {
 
                     this.m_emitter.bodyEmitter.setActiveBlock(postok);
                 }
-
-                const rrinfo = this.generateRefInfoForReturnEmit(body.body.sinfo, renv.returnResult as ResolvedType, env);
-                this.emitPrologForRefParamsReturn(rrinfo);
 
                 this.m_emitter.bodyEmitter.emitDirectJump(body.body.sinfo, "exit");
             }
@@ -4788,8 +4822,10 @@ class TypeChecker {
         be.emitReturnAssign(sinfo, etreg);
         be.emitDirectJump(sinfo, "returnassign");
 
-        be.setActiveBlock("returnassign")
+        be.setActiveBlock("returnassign");
+        be.emitVarMove(sinfo, "$__ir_ret__", "$$return");
         be.emitDirectJump(sinfo, "exit");
+
         let mirparams: MIRFunctionParameter[] = [];
         let argTypes = new Map<string, MIRType>();
         fields.forEach((finfo) => {
@@ -4862,7 +4898,7 @@ class TypeChecker {
         }
     }
 
-    private processGenerateSpecialPostFunction(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], declbinds: Map<string, ResolvedType>, exps: PostConditionDecl[], bodybinds: Map<string, ResolvedType>, srcFile: string, sinfo: SourceInfo) {
+    private processGenerateSpecialPostFunction(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], resultType: ResolvedType, declbinds: Map<string, ResolvedType>, exps: PostConditionDecl[], bodybinds: Map<string, ResolvedType>, srcFile: string, sinfo: SourceInfo) {
         if(this.m_emitter.masm.invokeDecls.has(fkey)) {
             return;
         }
@@ -4886,13 +4922,32 @@ class TypeChecker {
                     argTypes.set(arg.name, mirptype);
                 });
 
-            //
-            //TODO: need to bind orig values for ref params here + handle value pack binds for multi-return too
-            //
+            let rprs: MIRFunctionParameter[] = [];
+            if (resultType.options.length !== 1 || !(resultType.options[0] instanceof ResolvedEphemeralListType)) {
+                rprs.push(new MIRFunctionParameter("$return", this.m_emitter.registerResolvedTypeReference(resultType).trkey));
+            }
+            else {
+                const epl = (resultType.options[0] as ResolvedEphemeralListType)
+                for(let i = 0; i < epl.types.length; ++i) {
+                    rprs.push(new MIRFunctionParameter(`$return_${i}`, this.m_emitter.registerResolvedTypeReference(epl.types[i]).trkey));
+                }
+            }
+
+            let rreforig: MIRFunctionParameter[] = [];
+            args.forEach((arg) => {
+                const pdecltype = this.m_assembly.normalizeTypeOnly(arg.type, declbinds);
+                const ptype = arg.isOptional ? this.m_assembly.typeUpperBound([pdecltype, this.m_assembly.getSpecialNoneType()]) : pdecltype;
+                const mirptype = this.m_emitter.registerResolvedTypeReference(ptype);
+
+                const oname = `$${arg.name}`;
+                rreforig.push(new MIRFunctionParameter(oname, mirptype.trkey));
+                cargs.set(oname, new VarInfo(ptype, true, false, true, ptype));
+                argTypes.set(oname, mirptype);
+            });
             
             const body = new BodyImplementation(`${srcFile}::${sinfo.pos}`, srcFile, bexp);
 
-            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], fps, this.m_assembly.getSpecialBoolType(), cargs, argTypes, body, bodybinds);
+            const invinfo = this.processInvokeInfo_Simplified(undefined, iname, fkey, sinfo, srcFile, [], [...rprs, ...rreforig, ...fps], this.m_assembly.getSpecialBoolType(), cargs, argTypes, body, bodybinds);
             this.m_emitter.masm.invokeDecls.set(fkey, invinfo as MIRInvokeBodyDecl);
         }
         catch (ex) {
@@ -5119,9 +5174,8 @@ class TypeChecker {
             let postconds = invoke.postconditions.filter((post) => isBuildLevelEnabled(post.level, this.m_buildLevel));
             if(postconds.length !== 0) {
                 const fkey = `${ikey}@@post`;
-                const retv = new FunctionParameter("$return", invoke.resultType, false, false);
-                const orefs = invoke.params.filter((fp) => fp.isRef).map((fp) => new FunctionParameter(`$${fp.name}`, fp.type, false, false));
-                this.processGenerateSpecialPostFunction(fkey, `${iname}@@post`, [retv, ...invoke.params, ...orefs], binds, postconds, binds, invoke.srcFile, invoke.sourceLocation);
+                const retv = this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, binds);
+                this.processGenerateSpecialPostFunction(fkey, `${iname}@@post`, [...invoke.params], retv, binds, postconds, binds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];
             }
@@ -5146,9 +5200,8 @@ class TypeChecker {
             if(postconds.length !== 0) {
                 const postbinds = absconds !== undefined ? absconds.post[1] : binds;
                 const fkey = `${ikey}@@post`;
-                const retv = new FunctionParameter("$return", invoke.resultType, false, false);
-                const orefs = invoke.params.filter((fp) => fp.isRef).map((fp) => new FunctionParameter(`$${fp.name}`, fp.type, false, false));
-                this.processGenerateSpecialPostFunction(fkey, `${iname}@@post`, [retv, ...invoke.params, ...orefs], binds, postconds, postbinds, invoke.srcFile, invoke.sourceLocation);
+                const retv = this.resolveAndEnsureTypeOnly(sinfo, invoke.resultType, binds);
+                this.processGenerateSpecialPostFunction(fkey, `${iname}@@post`, [...invoke.params], retv, binds, postconds, postbinds, invoke.srcFile, invoke.sourceLocation);
 
                 postject = [fkey, prepostargs];
             }
@@ -5314,7 +5367,15 @@ class TypeChecker {
     }
 
     runFinalExhaustiveChecks() {
-        xxxx;
+        this.m_exhaustiveChecks.forEach((ec) => {
+            try {
+                //TODO: we need to do this!!!!
+            }
+            catch (ex) {
+                this.m_emitEnabled = false;
+                this.abortIfTooManyErrors();
+            }
+        });
     }
 }
 

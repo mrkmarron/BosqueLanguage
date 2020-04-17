@@ -328,7 +328,7 @@ function extendVarTypeMapForBody(body: MIRBody, invresult: MIRType, vtypes: Map<
 
 function computeVarTypesForInvoke(body: MIRBody, params: Map<string, MIRType>, resulttype: MIRType, assembly: MIRAssembly) {
     let vmirtypes = new Map<string, MIRType>();
-    vmirtypes.set("_return_", resulttype);
+    vmirtypes.set("$$return", resulttype);
     params.forEach((vtype, vname) => vmirtypes.set(vname, vtype));
 
     extendVarTypeMapForBody(body, resulttype as MIRType, vmirtypes, assembly);

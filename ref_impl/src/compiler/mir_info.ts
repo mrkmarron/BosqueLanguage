@@ -172,7 +172,7 @@ function computeBlockLiveVars(blocks: Map<string, MIRBasicBlock>): Map<string, B
         linfo.forEach((ls) => ls.liveEntry.forEach((lv) => lexit.add(lv)));
 
         if (bb.label === "exit") {
-            lexit.add("_return_");
+            lexit.add("$$return");
         }
 
         const lentry = computeLiveVarsInBlock(bb.ops, lexit);

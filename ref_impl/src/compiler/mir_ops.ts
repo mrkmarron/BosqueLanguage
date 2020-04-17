@@ -249,6 +249,7 @@ enum MIROpTag {
     MIRTruthyConvert = "MIRTruthyConvert",
     MIRVarStore = "MIRVarStore",
     MIRPackSlice = "MIRPackSlice",
+    MIRPackExtend = "MIRPackExtend",
     MIRReturnAssign = "MIRReturnAssign",
 
     MIRAbort = "MIRAbort",
@@ -384,6 +385,8 @@ abstract class MIROp {
                 return MIRVarStore.jparse(jobj);
             case MIROpTag.MIRPackSlice:
                 return MIRPackSlice.jparse(jobj);
+            case MIROpTag.MIRPackExtend:
+                return MIRPackExtend.jparse(jobj);
             case MIROpTag.MIRReturnAssign:
                 return MIRReturnAssign.jparse(jobj);
             case MIROpTag.MIRAbort:
@@ -1681,14 +1684,12 @@ class MIRVarStore extends MIRFlowOp {
 
 class MIRPackSlice extends MIRFlowOp {
     src: MIRArgument;
-    readonly sidx: number;
-    readonly sltype: MIRResolvedTypeKey; //may be a non valuepack type if so this is a single element access not a slice
+    readonly sltype: MIRResolvedTypeKey;
     trgt: MIRRegisterArgument;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, sidx: number, sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRPackSlice, sinfo);
         this.src = src;
-        this.sidx = sidx;
         this.sltype = sltype;
         this.trgt = trgt;
     }
@@ -1697,15 +1698,45 @@ class MIRPackSlice extends MIRFlowOp {
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.src.stringify()}[${this.sidx} - of ${this.sltype}]`;
+        return `${this.trgt.stringify()} = ${this.src.stringify()}[${this.sltype}]`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), sidx: this.sidx, sltype: this.sltype, trgt: this.trgt.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), sltype: this.sltype, trgt: this.trgt.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRPackSlice(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.sidx, jobj.sltype, MIRArgument.jparse(jobj.trgt));
+        return new MIRPackSlice(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.sltype, MIRArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRPackExtend extends MIRFlowOp {
+    basepack: MIRArgument;
+    ext: MIRArgument[];
+    readonly sltype: MIRResolvedTypeKey;
+    trgt: MIRRegisterArgument;
+
+    constructor(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRPackExtend, sinfo);
+        this.basepack = basepack;
+        this.ext = ext;
+        this.sltype = sltype;
+        this.trgt = trgt;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.basepack, ...this.ext]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.sltype}@(|${this.basepack.stringify()}, ${this.ext.map((e) => e.stringify()).join(", ")}|)`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), basepack: this.basepack.jemit(), ext: this.ext.map((e) => e.jemit()), sltype: this.sltype, trgt: this.trgt.jemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRPackExtend(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.basepack), jobj.ext.map((e: string) => MIRArgument.jparse(e)), jobj.sltype, MIRArgument.jparse(jobj.trgt));
     }
 }
 
@@ -1716,7 +1747,7 @@ class MIRReturnAssign extends MIRFlowOp {
     constructor(sinfo: SourceInfo, src: MIRArgument, name?: MIRVariable) {
         super(MIROpTag.MIRReturnAssign, sinfo);
         this.src = src;
-        this.name = name || new MIRVariable("__ir_ret__");
+        this.name = name || new MIRVariable("$__ir_ret__");
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
@@ -2076,7 +2107,7 @@ export {
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
     MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
-    MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRPackSlice, MIRReturnAssign,
+    MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRPackSlice, MIRPackExtend, MIRReturnAssign,
     MIRAbort, MIRDebug,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRPhi,
