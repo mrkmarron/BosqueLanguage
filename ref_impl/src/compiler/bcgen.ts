@@ -37,7 +37,7 @@ function compile(files: string[], core: string, trgt: string) {
 
     process.stdout.write("Compiling assembly...\n");
 
-    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code);
+    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, Commander.functionalize !== undefined ? Commander.functionalize : false, code);
     if (errors.length !== 0) {
         for (let i = 0; i < errors.length; ++i) {
             process.stdout.write(`Parse error -- ${errors[i]}\n`);
@@ -57,6 +57,7 @@ function compile(files: string[], core: string, trgt: string) {
 Commander
 .usage("[--output file] <file ...>")
 .option("-cl --core", "Core library version to use")
+.option("-f --functionalize [boolean]")
 .option("-j --json", "Compile to json bytecode assembly")
 .option("-o --output [file]", "Optional output file target");
 

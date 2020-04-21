@@ -2848,7 +2848,7 @@ class TypeChecker {
         this.raiseErrorIf(exp.sinfo, lhstype.idStr !== rhstype.idStr, "Operand types must be the same");
 
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitBinOp(exp.sinfo, lhsreg, exp.op, rhsreg, trgt);
+            this.m_emitter.bodyEmitter.emitBinOp(exp.sinfo, lhstype.idStr, lhsreg, exp.op, rhstype.idStr, rhsreg, trgt);
         }
 
         return [env.setExpressionResult(this.m_assembly.getSpecialIntType())];

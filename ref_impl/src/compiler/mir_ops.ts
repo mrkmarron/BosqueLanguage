@@ -1488,14 +1488,18 @@ class MIRPrefixOp extends MIRValueOp {
 }
 
 class MIRBinOp extends MIRValueOp {
+    readonly lhsInferType: MIRResolvedTypeKey;
     lhs: MIRArgument;
-    readonly op: string; //+, -, *, /, %
+    readonly op: string; //+, -, *, /
+    readonly rhsInferType: MIRResolvedTypeKey;
     rhs: MIRArgument;
 
-    constructor(sinfo: SourceInfo, lhs: MIRArgument, op: string, rhs: MIRArgument, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister) {
         super(MIROpTag.MIRBinOp, sinfo, trgt);
+        this.lhsInferType = lhsInferType;
         this.lhs = lhs;
         this.op = op;
+        this.rhsInferType = rhsInferType;
         this.rhs = rhs;
     }
 
@@ -1506,11 +1510,11 @@ class MIRBinOp extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), lhs: this.lhs.jemit(), op: this.op, rhs: this.rhs.jemit() };
+        return { ...this.jbemit(), lhsInferType: this.lhsInferType, lhs: this.lhs.jemit(), op: this.op, rhsInferType: this.rhsInferType, rhs: this.rhs.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRBinOp(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.lhs), jobj.op, MIRArgument.jparse(jobj.rhs), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRBinOp(jparsesinfo(jobj.sinfo), jobj.lhsInferType, MIRArgument.jparse(jobj.lhs), jobj.op, jobj.rhsInferType, MIRArgument.jparse(jobj.rhs), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

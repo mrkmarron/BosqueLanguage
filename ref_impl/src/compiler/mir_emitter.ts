@@ -14,6 +14,7 @@ import { TypeChecker } from "../type_checker/type_checker";
 import { propagateTmpAssignForBody, removeDeadTempAssignsFromBody } from "./mir_cleanup";
 import { convertBodyToSSA } from "./mir_ssa";
 import { computeVarTypesForInvoke } from "./mir_vartype";
+import { functionalizeInvokes } from "./functionalize";
 
 type PCode = {
     code: InvokeDecl,
@@ -325,8 +326,8 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRPrefixOp(sinfo, op, arg, trgt));
     }
 
-    emitBinOp(sinfo: SourceInfo, lhs: MIRArgument, op: string, rhs: MIRArgument, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRBinOp(sinfo, lhs, op, rhs, trgt));
+    emitBinOp(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRBinOp(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
     }
 
     emitBinEq(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister, relaxed: boolean) {
@@ -658,7 +659,7 @@ class MIREmitter {
         entity.fields.sort((f1, f2) => f1.name.localeCompare(f2.name));
     }
 
-    static generateMASM(pckge: PackageConfig, buildLevel: BuildLevel, validateLiteralStrings: boolean, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
+    static generateMASM(pckge: PackageConfig, buildLevel: BuildLevel, validateLiteralStrings: boolean, functionalize: boolean, srcFiles: { relativePath: string, contents: string }[]): { masm: MIRAssembly | undefined, errors: string[] } {
         ////////////////
         //Parse the contents and generate the assembly
         const assembly = new Assembly();
@@ -873,6 +874,10 @@ class MIREmitter {
                 idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
                 computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
             });
+
+            if(functionalize) {
+                functionalizeInvokes(masm);
+            }
         }
         catch (ex) {
             //ignore
