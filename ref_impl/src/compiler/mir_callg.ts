@@ -8,7 +8,7 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRInvokeInvariantCheckDirect } from "./mir_ops";
 import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRFieldDecl } from "./mir_assembly";
 
 type CallGNode = {
@@ -29,13 +29,6 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
         for (let i = 0; i < block.ops.length; ++i) {
             const op = block.ops[i];
             switch (op.tag) {
-                case MIROpTag.MIRLoadConstSafeString: {
-                    const lvs = (op as MIRLoadConstSafeString);
-                    if (lvs.vfunckey !== undefined) {
-                        invokeNode.callees.add(lvs.vfunckey);
-                    }
-                    break;
-                }
                 case MIROpTag.MIRLoadConstTypedString: {
                     const lcs = (op as MIRLoadConstTypedString);
                     if (lcs.pfunckey !== undefined) {

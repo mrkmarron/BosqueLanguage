@@ -10,20 +10,21 @@ import { PackageConfig, MIRAssembly } from "../compiler/mir_assembly";
 
 import * as Commander from "commander";
 
-function compile(files: string[], trgt: string) {
+function compile(files: string[], core: string, trgt: string) {
     process.stdout.write("Reading app code...\n");
 
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
 
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/core.bsq");
-        const coredata = FS.readFileSync(coredir).toString();
+        const coredir = Path.join(bosque_dir, "src/core/", core);
+        const corefiles = FS.readdirSync(coredir);
 
-        const collectionsdir = Path.join(bosque_dir, "src/core/collections.bsq");
-        const collectionsdata = FS.readFileSync(collectionsdir).toString();
-
-        code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
+        for (let i = 0; i < corefiles.length; ++i) {
+            const cfpath = Path.join(coredir, corefiles[i]);
+            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
+        }
+ 
         for (let i = 0; i < files.length; ++i) {
             const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
             code.push(file);
@@ -54,7 +55,8 @@ function compile(files: string[], trgt: string) {
 }
 
 Commander
-.usage("--bytecode [--output file] <file ...>")
+.usage("[--output file] <file ...>")
+.option("-cl --core", "Core library version to use")
 .option("-j --json", "Compile to json bytecode assembly")
 .option("-o --output [file]", "Optional output file target");
 
@@ -70,4 +72,4 @@ if (Commander.bytecode === undefined) {
     process.exit(1);
 }
 
-setImmediate(() => compile(Commander.args, Commander.output || "a.json"));
+setImmediate(() => compile(Commander.args, Commander.core || "cpp",  Commander.output || "a.json"));

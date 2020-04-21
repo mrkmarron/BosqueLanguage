@@ -7,7 +7,7 @@
 //Some handy helpers for computing IR info
 //
 
-import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp, MIRRegisterArgument, MIRVariable } from "./mir_ops";
 
 type FlowLink = {
     label: string,
@@ -17,8 +17,8 @@ type FlowLink = {
 
 type BlockLiveSet = {
     label: string,
-    liveEntry: Set<string>,
-    liveExit: Set<string>
+    liveEntry: Map<string, MIRRegisterArgument>,
+    liveExit: Map<string, MIRRegisterArgument>
 };
 
 function computeBlockLinks(blocks: Map<string, MIRBasicBlock>): Map<string, FlowLink> {
@@ -139,8 +139,8 @@ function topologicalOrder(blocks: Map<string, MIRBasicBlock>): MIRBasicBlock[] {
     return tordered.reverse();
 }
 
-function computeLiveVarsInBlock(ops: MIROp[], liveOnExit: Set<string>): Set<string> {
-    let live = new Set<string>(liveOnExit);
+function computeLiveVarsInBlock(ops: MIROp[], liveOnExit: Map<string, MIRRegisterArgument>): Map<string, MIRRegisterArgument> {
+    let live = new Map<string, MIRRegisterArgument>(liveOnExit);
 
     for (let i = ops.length - 1; i >= 0; --i) {
         const op = ops[i];
@@ -148,8 +148,8 @@ function computeLiveVarsInBlock(ops: MIROp[], liveOnExit: Set<string>): Set<stri
         const mod = op.getModVars().map((arg) => arg.nameID);
         mod.forEach((v) => live.delete(v));
 
-        const use = op.getUsedVars().map((v) => v.nameID);
-        use.forEach((v) => live.add(v));
+        const use = op.getUsedVars();
+        use.forEach((v) => live.set(v.nameID, v));
     }
 
     return live;
@@ -168,11 +168,11 @@ function computeBlockLiveVars(blocks: Map<string, MIRBasicBlock>): Map<string, B
         let linfo: BlockLiveSet[] = [];
         finfo.succs.forEach((succ) => linfo.push(liveInfo.get(succ) as BlockLiveSet));
 
-        let lexit = new Set<string>();
-        linfo.forEach((ls) => ls.liveEntry.forEach((lv) => lexit.add(lv)));
+        let lexit = new Map<string, MIRRegisterArgument>();
+        linfo.forEach((ls) => ls.liveEntry.forEach((v, n) => lexit.set(n, v)));
 
         if (bb.label === "exit") {
-            lexit.add("$$return");
+            lexit.set("$$return", new MIRVariable("$$return"));
         }
 
         const lentry = computeLiveVarsInBlock(bb.ops, lexit);

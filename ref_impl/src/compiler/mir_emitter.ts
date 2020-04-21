@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRConstructorEphemeralValueList, MIRLoadConstSafeString, MIRLoadConstRegex, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRLoadConstTypedString, MIRAccessArgVariable, MIRAccessLocalVariable, MIRArgument, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRVariable, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRNominalTypeKey, MIRConstructorEphemeralValueList, MIRLoadConstSafeString, MIRLoadConstRegex, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend, MIRConstantBigInt, MIRConstantFloat64, MIRBinLess } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl, BuildLevel } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedEphemeralListType } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType } from "./mir_assembly";
@@ -136,7 +136,7 @@ class MIRBodyEmitter {
     }
 
     emitLoadConstFloat(sinfo: SourceInfo, fv: string, trgt: MIRTempRegister)  {
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantFloat(fv), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantFloat64(fv), trgt));
     }
 
     emitLoadConstString(sinfo: SourceInfo, sv: string, trgt: MIRTempRegister) {
@@ -305,7 +305,13 @@ class MIRBodyEmitter {
         else {
             const rr = this.generateTmpRegister();
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[1].trkey, vresolve, args, thisInferType, rr));
-            this.m_currentBlock.push(new MIRPackSlice(sinfo, rr, 0, retinfo[0].trkey, trgt)); 
+           
+            if (retinfo[2] === -1) {
+                this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[1].trkey, 0, trgt));
+            }
+            else {
+                this.m_currentBlock.push(new MIRPackSlice(sinfo, rr, retinfo[0].trkey, trgt));
+            }
 
             for (let i = 0; i < retinfo[3].length; ++i) {
                 const tr = this.generateTmpRegister();
@@ -328,7 +334,7 @@ class MIRBodyEmitter {
     }
 
     emitBinLess(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister, relaxed: boolean) {
-        this.m_currentBlock.push(new MIRBinLess(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt, relaxed));
+        this.m_currentBlock.push(new MIRBinLess(sinfo, lhsInferType, lhs, rhsInferType, rhs, trgt, relaxed));
     }
 
     emitBinCmp(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, op: string, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister) {
@@ -371,7 +377,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRVarStore(sinfo, new MIRVariable(src), new MIRVariable(name)));
     }
 
-    emitMIRPackExtend(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    emitMIRPackExtend(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRPackExtend(sinfo, basepack, ext, sltype, trgt));
     }
 
@@ -688,74 +694,104 @@ class MIREmitter {
         const emitter = new MIREmitter(masm);
         const checker = new TypeChecker(assembly, true, emitter, buildLevel, validateLiteralStrings);
 
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialAnyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Some", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Some") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialSomeConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Tuple", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Convertable") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialConvertableConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Indexable") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialIndexableConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Parsable") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Validator") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialValidatorConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::KeyType") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::PODType") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialPODTypeConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::APIType") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAPITypeConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::APIValue") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAPIValueConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Truthy") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialTruthyConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Enum") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialEnumConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::IdKey") as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialIdKeyConceptType());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Tuple") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialTupleConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Record", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Record") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialRecordConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Object", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Object") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialObjectConceptType());
 
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Indexable", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialIndexableConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Parsable", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Validator", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialValidatorConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::KeyType", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::PODType", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialPODTypeConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::APIType", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialAPITypeConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::APIValue", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialAPIValueConceptType());
+        
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPIConceptType());
 
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Truthy", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialTruthyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Enum", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialEnumConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPIConceptType());
+    
+        emitter.registerResolvedTypeReference(assembly.getSpecialPODTupleConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAPITupleConceptType());
 
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::IdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialIdKeyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::GUIDIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialGUIDIdKeyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::LogicalTimeIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialLogicalTimeIdKeyConceptType());
-        emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::ContentHashIdKey", 0) as ConceptTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialContentHashIdKeyConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableTupleConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODTupleConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPITupleConceptType());
 
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeTupleConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODTupleConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPITupleConceptType());
+
+        emitter.registerResolvedTypeReference(assembly.getSpecialPODRecordConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialAPIRecordConceptType());
+    
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableRecordConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODRecordConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPIRecordConceptType());
+
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeRecordConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODRecordConceptType());
+        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPIRecordConceptType());
+
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialBoolType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Int") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialIntType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BigInt") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialBigIntType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Float64") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialFloat64Type());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::String") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialStringType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Regex", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialRegexType());
-
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::GUID", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialGUIDType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::LogicalTime", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialLogicalTimeType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ISOTime", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialISOTimeType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::DataHash", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialDataHashType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::CryptoHash", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialCryptoHashType());
-
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferFormat", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferFormat") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialBufferFormatType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferEncoding", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferEncoding") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialBufferEncodingType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferCompression", 0) as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::BufferCompression") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialBufferCompressionType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ByteBuffer") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialByteBufferType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ISOTime") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialISOTimeType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::UUID") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialUUIDType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::LogicalTime") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialLogicalTimeType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::CryptoHash") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialCryptoHashType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexCapture") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialRegexCaptureType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexGroup") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialRegexGroupType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexMatch") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialRegexMatchType());
+        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Regex") as EntityTypeDecl, new Map<string, ResolvedType>());
+        emitter.registerResolvedTypeReference(assembly.getSpecialRegexType());
 
         //get any entrypoint functions and initialize the checker there
         const nslist = assembly.getNamespaces();

@@ -46,7 +46,15 @@ abstract class MIRArgument {
         }
         else {
             if (typeof (jobj) === "string") {
-                return new MIRConstantInt(jobj);
+                if (jobj.endsWith("n")) {
+                    return new MIRConstantBigInt(jobj);
+                }
+                else if (jobj.includes(".")) {
+                    return new MIRConstantFloat64(jobj);
+                }
+                else {
+                    return new MIRConstantInt(jobj);
+                }
             }
             else if (Array.isArray(jobj)) {
                 return new MIRConstantString(jobj[0]);
@@ -173,6 +181,42 @@ class MIRConstantInt extends MIRConstantArgument {
     }
 }
 
+class MIRConstantBigInt extends MIRConstantArgument {
+    readonly value: string;
+
+    constructor(value: string) {
+        super(`=bigint=${value}`);
+
+        this.value = value;
+    }
+
+    stringify(): string {
+        return this.value;
+    }
+
+    jemit(): any {
+        return this.value;
+    }
+}
+
+class MIRConstantFloat64 extends MIRConstantArgument {
+    readonly value: string;
+
+    constructor(value: string) {
+        super(`=float64=${value}`);
+
+        this.value = value;
+    }
+
+    stringify(): string {
+        return this.value;
+    }
+
+    jemit(): any {
+        return this.value;
+    }
+}
+
 class MIRConstantString extends MIRConstantArgument {
     readonly value: string;
 
@@ -239,6 +283,7 @@ enum MIROpTag {
 
     MIRBinOp = "MIRBinOp",
     MIRBinEq = "MIRBinEq",
+    MIRBinLess = "MIRBinLess",
     MIRBinCmp = "MIRBinCmp",
 
     MIRIsTypeOfNone = "MIRIsTypeOfNone",
@@ -369,6 +414,8 @@ abstract class MIROp {
                 return MIRBinOp.jparse(jobj);
             case MIROpTag.MIRBinEq:
                 return MIRBinEq.jparse(jobj);
+            case MIROpTag.MIRBinLess:
+                return MIRBinLess.jparse(jobj);
             case MIROpTag.MIRBinCmp:
                 return MIRBinCmp.jparse(jobj);
             case MIROpTag.MIRIsTypeOfNone:
@@ -1500,6 +1547,37 @@ class MIRBinEq extends MIRValueOp {
     }
 }
 
+class MIRBinLess extends MIRValueOp {
+    readonly lhsInferType: MIRResolvedTypeKey;
+    lhs: MIRArgument;
+    readonly rhsInferType: MIRResolvedTypeKey;
+    rhs: MIRArgument;
+    readonly relaxed: boolean;
+
+    constructor(sinfo: SourceInfo, lhsInferType: MIRResolvedTypeKey, lhs: MIRArgument, rhsInferType: MIRResolvedTypeKey, rhs: MIRArgument, trgt: MIRTempRegister, relaxed: boolean) {
+        super(MIROpTag.MIRBinLess, sinfo, trgt);
+        this.lhsInferType = lhsInferType;
+        this.lhs = lhs;
+        this.rhsInferType = rhsInferType;
+        this.rhs = rhs;
+        this.relaxed = relaxed;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.lhs, this.rhs]); }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.lhs.stringify()} < ${this.rhs.stringify()}${this.relaxed ? " | relaxed" : ""}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), lhsInferType: this.lhsInferType, lhs: this.lhs.jemit(), rhsInferType: this.rhsInferType, rhs: this.rhs.jemit(), relaxed: this.relaxed };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRBinLess(jparsesinfo(jobj.sinfo), jobj.lhsInferType, MIRArgument.jparse(jobj.lhs), jobj.rhsInferType, MIRArgument.jparse(jobj.rhs), MIRTempRegister.jparse(jobj.trgt), jobj.relaxed);
+    }
+}
+
 class MIRBinCmp extends MIRValueOp {
     readonly lhsInferType: MIRResolvedTypeKey;
     lhs: MIRArgument;
@@ -1685,9 +1763,9 @@ class MIRVarStore extends MIRFlowOp {
 class MIRPackSlice extends MIRFlowOp {
     src: MIRArgument;
     readonly sltype: MIRResolvedTypeKey;
-    trgt: MIRRegisterArgument;
+    trgt: MIRTempRegister;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, sltype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         super(MIROpTag.MIRPackSlice, sinfo);
         this.src = src;
         this.sltype = sltype;
@@ -1706,7 +1784,7 @@ class MIRPackSlice extends MIRFlowOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRPackSlice(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.sltype, MIRArgument.jparse(jobj.trgt));
+        return new MIRPackSlice(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.sltype, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -1714,9 +1792,9 @@ class MIRPackExtend extends MIRFlowOp {
     basepack: MIRArgument;
     ext: MIRArgument[];
     readonly sltype: MIRResolvedTypeKey;
-    trgt: MIRRegisterArgument;
+    trgt: MIRTempRegister;
 
-    constructor(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         super(MIROpTag.MIRPackExtend, sinfo);
         this.basepack = basepack;
         this.ext = ext;
@@ -1736,7 +1814,7 @@ class MIRPackExtend extends MIRFlowOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRPackExtend(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.basepack), jobj.ext.map((e: string) => MIRArgument.jparse(e)), jobj.sltype, MIRArgument.jparse(jobj.trgt));
+        return new MIRPackExtend(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.basepack), jobj.ext.map((e: string) => MIRArgument.jparse(e)), jobj.sltype, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -2096,7 +2174,7 @@ class MIRBody {
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat64, MIRConstantString,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstRegex, MIRLoadConstSafeString, MIRLoadConstTypedString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
@@ -2105,7 +2183,7 @@ export {
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject,
     MIRLoadFromEpehmeralList,
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
-    MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp,
+    MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinLess, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
     MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRPackSlice, MIRPackExtend, MIRReturnAssign,
     MIRAbort, MIRDebug,

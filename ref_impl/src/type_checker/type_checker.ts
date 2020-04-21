@@ -1560,8 +1560,10 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, vv === undefined, `Bad Validator type for SafeString ${oftype.idStr}`);
             let mtch = null;
             try {
-                //TODO: we want to be careful that our regex implementation is consistent here!!!!
-                mtch = new RegExp(vv as string).exec(exp.value);
+                const restr = (vv as string).substring(1, (vv as string).length - 2);
+                const argstr = exp.value.substring(1, exp.value.length - 2);
+
+                mtch = new RegExp(restr).exec(argstr);
             } catch {
                 this.raiseError(exp.sinfo, "Malformed regex in validator");
             }

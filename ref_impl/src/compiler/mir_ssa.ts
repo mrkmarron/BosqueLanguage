@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
-import { MIRBody, MIRRegisterArgument, MIRBasicBlock, MIROpTag, MIRJumpNone, MIRJumpCond, MIROp, MIRValueOp, MIRTempRegister, MIRArgument, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRProjectFromFields, MIRAccessFromField, MIRProjectFromProperties, MIRAccessFromProperty, MIRProjectFromIndecies, MIRAccessFromIndex, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRPhi, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAccessArgVariable, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRVariable, MIRGetKey, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRConstructorEphemeralValueList, MIRLoadFromEpehmeralList, MIRPackStore } from "./mir_ops";
+import { MIRBody, MIRRegisterArgument, MIRBasicBlock, MIROpTag, MIRJumpNone, MIRJumpCond, MIROp, MIRValueOp, MIRTempRegister, MIRArgument, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRProjectFromFields, MIRAccessFromField, MIRProjectFromProperties, MIRAccessFromProperty, MIRProjectFromIndecies, MIRAccessFromIndex, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRPhi, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAccessArgVariable, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRVariable, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRConstructorEphemeralValueList, MIRLoadFromEpehmeralList, MIRBinLess, MIRPackSlice, MIRPackExtend } from "./mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topologicalOrder } from "./mir_info";
 import { MIRType } from "./mir_assembly";
@@ -265,17 +265,18 @@ function assignSSA(op: MIROp, remap: Map<string, MIRRegisterArgument>, ctrs: Map
             processValueOpTempSSA(bop, remap, ctrs);
             break;
         }
-        case MIROpTag.MIRGetKey: {
-            const mgk = op as MIRGetKey;
-            mgk.arg = processSSA_Use(mgk.arg, remap);
-            processValueOpTempSSA(mgk, remap, ctrs);
-            break;
-        }
         case MIROpTag.MIRBinEq: {
             const beq = op as MIRBinEq;
             beq.lhs = processSSA_Use(beq.lhs, remap);
             beq.rhs = processSSA_Use(beq.rhs, remap);
             processValueOpTempSSA(beq, remap, ctrs);
+            break;
+        }
+        case MIROpTag.MIRBinLess: {
+            const bl = op as MIRBinLess;
+            bl.lhs = processSSA_Use(bl.lhs, remap);
+            bl.rhs = processSSA_Use(bl.rhs, remap);
+            processValueOpTempSSA(bl, remap, ctrs);
             break;
         }
         case MIROpTag.MIRBinCmp: {
@@ -321,16 +322,19 @@ function assignSSA(op: MIROp, remap: Map<string, MIRRegisterArgument>, ctrs: Map
             vs.name = convertToSSA(vs.name, remap, ctrs) as MIRVariable;
             break;
         }
-        case MIROpTag.MIRPackStore: {
-            const pvs = op as MIRPackStore;
-            if(Array.isArray(pvs.src)) {
-                pvs.src = processSSAUse_RemapArgs(pvs.src, remap);
-            }
-            else {
-                pvs.src = processSSA_Use(pvs.src, remap);
-            }
-            pvs.names = pvs.names.map((name) => convertToSSA(name, remap, ctrs) as (MIRTempRegister | MIRVariable));
+        case MIROpTag.MIRPackSlice: {
+            const pso = op as MIRPackSlice;
+            pso.src = processSSA_Use(pso.src, remap);
+            pso.trgt = convertToSSA(pso.trgt, remap, ctrs) as MIRTempRegister;
             break;
+        }
+        case MIROpTag.MIRPackExtend: {
+            const pse = op as MIRPackExtend;
+            pse.basepack = processSSA_Use(pse.basepack, remap);
+            pse.ext = processSSAUse_RemapArgs(pse.ext, remap);
+            pse.trgt = convertToSSA(pse.trgt, remap, ctrs) as MIRTempRegister;
+            break;
+
         }
         case MIROpTag.MIRReturnAssign: {
             const ra = op as MIRReturnAssign;
@@ -391,27 +395,27 @@ function computePhis(sinfo: SourceInfo, block: string, ctrs: Map<string, number>
     let remap = new Map<string, MIRRegisterArgument>();
     let phis: MIRPhi[] = [];
 
-    (live.get(block) as BlockLiveSet).liveEntry.forEach((lv) => {
+    (live.get(block) as BlockLiveSet).liveEntry.forEach((v, n) => {
         const preds = (links.get(block) as FlowLink).preds;
 
         let phiOpts: [string, MIRRegisterArgument][] = [];
         let uniqueOpts = new Map<string, MIRRegisterArgument>();
         preds.forEach((pred) => {
             const pm = remapped.get(pred) as Map<string, MIRRegisterArgument>;
-            const mreg = pm.get(lv) as MIRRegisterArgument;
+            const mreg = pm.get(n) as MIRRegisterArgument;
             uniqueOpts.set(mreg.nameID, mreg);
             phiOpts.push([pred, mreg]);
         });
 
         if (uniqueOpts.size === 1) {
             const rmp = [...uniqueOpts][0][1];
-            remap.set(lv, rmp);
+            remap.set(n, rmp);
         }
         else {
-            const phi = generatePhi(sinfo, lv, phiOpts, ctrs);
+            const phi = generatePhi(sinfo, n, phiOpts, ctrs);
 
             phis.push(phi);
-            remap.set(lv, phi.trgt);
+            remap.set(n, phi.trgt);
         }
     });
 

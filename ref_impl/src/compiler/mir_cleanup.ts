@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIROp, MIRBody, MIRArgument, MIROpTag, MIRTempRegister, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJumpCond, MIRJumpNone, MIRBasicBlock, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRRegisterArgument, MIRGetKey, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRConstructorEphemeralValueList, MIRLoadFromEpehmeralList, MIRPackStore } from "./mir_ops";
+import { MIROp, MIRBody, MIRArgument, MIROpTag, MIRTempRegister, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJumpCond, MIRJumpNone, MIRBasicBlock, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRRegisterArgument, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRConstructorEphemeralValueList, MIRLoadFromEpehmeralList, MIRBinLess, MIRPackSlice, MIRPackExtend } from "./mir_ops";
 
 //
 //Implement cleanup passes for the MIR after translation from the AST representation:
@@ -229,15 +229,16 @@ function propagateTmpAssignForOp(op: MIROp, propMap: Map<number, MIRArgument>) {
             bop.rhs = propagateTmpAssign_Remap(bop.rhs, propMap);
             break;
         }
-        case MIROpTag.MIRGetKey: {
-            const mgk = op as MIRGetKey;
-            mgk.arg = propagateTmpAssign_Remap(mgk.arg, propMap);
-            break;
-        }
         case MIROpTag.MIRBinEq: {
             const beq = op as MIRBinEq;
             beq.lhs = propagateTmpAssign_Remap(beq.lhs, propMap);
             beq.rhs = propagateTmpAssign_Remap(beq.rhs, propMap);
+            break;
+        }
+        case MIROpTag.MIRBinLess: {
+            const bl = op as MIRBinLess;
+            bl.lhs = propagateTmpAssign_Remap(bl.lhs, propMap);
+            bl.rhs = propagateTmpAssign_Remap(bl.rhs, propMap);
             break;
         }
         case MIROpTag.MIRBinCmp: {
@@ -277,14 +278,15 @@ function propagateTmpAssignForOp(op: MIROp, propMap: Map<number, MIRArgument>) {
             vs.src = propagateTmpAssign_Remap(vs.src, propMap);
             break;
         }
-        case MIROpTag.MIRPackStore: {
-            const pvs = op as MIRPackStore;
-            if(Array.isArray(pvs.src)) {
-                pvs.src = propagateTmpAssign_RemapArgs(pvs.src, propMap);
-            }
-            else {
-                pvs.src = propagateTmpAssign_Remap(pvs.src, propMap);
-            }
+        case MIROpTag.MIRPackSlice: {
+            const pso = op as MIRPackSlice;
+            pso.src = propagateTmpAssign_Remap(pso.src, propMap);
+            break;
+        }
+        case MIROpTag.MIRPackExtend: {
+            const pse = op as MIRPackExtend;
+            pse.basepack = propagateTmpAssign_Remap(pse.basepack, propMap);
+            pse.ext = propagateTmpAssign_RemapArgs(pse.ext, propMap);
             break;
         }
         case MIROpTag.MIRReturnAssign: {
