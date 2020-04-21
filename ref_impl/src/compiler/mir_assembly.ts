@@ -580,6 +580,8 @@ class MIRAssembly {
             return true;
         }
 
+        xxxx;
+
         const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
         const podconceptatom = podconcept.options[0] as MIRConceptType;
         if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllTupleEntriesOfType(t1, podconcept)) {
@@ -628,6 +630,8 @@ class MIRAssembly {
             return true;
         }
 
+        xxxx;
+        
         const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
         const podconceptatom = podconcept.options[0] as MIRConceptType;
         if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllRecordEntriesOfType(t1, podconcept)) {

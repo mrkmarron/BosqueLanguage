@@ -262,11 +262,11 @@ class TypeChecker {
             return true;
         }
 
-        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(lhs)) {
             return false;
         }
 
-        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(rhs)) {
             return false;
         }
 
@@ -274,11 +274,11 @@ class TypeChecker {
     }
     
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
-        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(lhs)) {
             return false;
         }
 
-        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
+        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(rhs)) {
             return false;
         }
 
@@ -388,8 +388,7 @@ class TypeChecker {
                 return ResolvedType.createEmpty();
             }
             else {
-                const ptuple = this.m_assembly.restrictTupleConcept(ptype, opt);
-                return ResolvedType.createSingle(ptuple as ResolvedTupleAtomType);
+                return ResolvedType.createSingle(ptype);
             }
         }
         else {
@@ -434,8 +433,7 @@ class TypeChecker {
                 return ResolvedType.createEmpty();
             }
             else {
-                const ptuple = this.m_assembly.restrictRecordConcept(ptype, opt);
-                return ResolvedType.createSingle(ptuple as ResolvedRecordAtomType);
+                return ResolvedType.createSingle(ptype);
             }
         }
         else {
