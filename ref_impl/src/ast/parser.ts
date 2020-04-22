@@ -3118,22 +3118,60 @@ class Parser {
         const idval = this.parseTypeSignature();
         this.ensureAndConsumeToken(";");
 
-        const param = new FunctionParameter("value", idval, false, false);
-        const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_from");
-        const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
-        const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "from", createdecl);
+        if(idval instanceof TupleTypeSignature || idval instanceof RecordTypeSignature) {
+            let components: {cname: string, ctype: TypeSignature}[] = [];
+            if(idval instanceof TupleTypeSignature) {
+                if(idval.entries.some((te) => te[1])) {
+                    this.raiseError(line, "Composite key Tuple cannot have optional entries");
+                }
 
-        let provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
-        provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction([new TemplateTypeRestriction(idval, true, new NominalTypeSignature("NSCore", "APIType"))])]);
+                components = idval.entries.map((te, i) => { return {cname: `entry_${i}`, ctype: te[0]} });
+            }
+            else {
+                if(idval.entries.some((re) => re[2])) {
+                    this.raiseError(line, "Composite key Tuple cannot have optional entries");
+                }
 
-        const invariants: InvariantDecl[] = [];
-        const staticMembers = new Map<string, StaticMemberDecl>();
-        const staticFunctions = new Map<string, StaticFunctionDecl>().set("from", create);
-        const memberFields = new Map<string, MemberFieldDecl>();
-        const memberMethods = new Map<string, MemberMethodDecl>();
+                components = idval.entries.map((re, i) => { return {cname: re[0], ctype: re[1]} });
+            }
 
-        currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
-        this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
+            const consparams = components.map((cmp) => new FunctionParameter(cmp.cname, cmp.ctype, false, false));
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_from");
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, consparams, undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+
+            let provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+
+            const rstrs = components.map((cmp) => new TemplateTypeRestriction(cmp.ctype, true, new NominalTypeSignature("NSCore", "APIType")));
+            provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction(rstrs)]);
+                    
+            const invariants: InvariantDecl[] = [];
+            const staticMembers = new Map<string, StaticMemberDecl>();
+            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+            const memberFields = new Map<string, MemberFieldDecl>();
+            const memberMethods = new Map<string, MemberMethodDecl>();
+
+            currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
+        }
+        else {
+            const param = new FunctionParameter("value", idval, false, false);
+            const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_from");
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
+
+            let provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+            provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction([new TemplateTypeRestriction(idval, true, new NominalTypeSignature("NSCore", "APIType"))])]);
+
+            const invariants: InvariantDecl[] = [];
+            const staticMembers = new Map<string, StaticMemberDecl>();
+            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
+            const memberFields = new Map<string, MemberFieldDecl>();
+            const memberMethods = new Map<string, MemberMethodDecl>();
+
+            currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods));
+            this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
+        }
     }
 
     private parseNamespaceConst(currentDecl: NamespaceDeclaration) {

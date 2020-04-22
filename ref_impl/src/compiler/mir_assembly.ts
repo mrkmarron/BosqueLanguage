@@ -575,26 +575,26 @@ class MIRAssembly {
     }
 
     private atomSubtypeOf_TupleConcept(t1: MIRTupleType, t2: MIRConceptType): boolean {
-        const tupleconcept = (this.typeMap.get("NSCore::Tuple") as MIRType).options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(tupleconcept, t2)) {
+        const t2type = this.typeMap.get(t2.trkey) as MIRType;
+        if (this.subtypeOf(this.typeMap.get("NSCore::Tuple") as MIRType, t2type)) {
             return true;
         }
 
-        xxxx;
-
-        const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
-        const podconceptatom = podconcept.options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllTupleEntriesOfType(t1, podconcept)) {
-            return true;
+        let tci: MIRNominalTypeKey[] = ["NSCore::Tuple"] as MIRNominalTypeKey[];
+        if (this.checkAllTupleEntriesOfType(t1, this.typeMap.get("NSCore::Parsable") as MIRType)) {
+            tci.push("NSCore::Parsable");
         }
- 
-        const apiconcept = (this.typeMap.get("NSCore::APIType") as MIRType);
-        const apiconceptatom = apiconcept.options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(apiconceptatom, t2) && this.checkAllTupleEntriesOfType(t1, apiconcept)) {
-            return true;
+        if (this.checkAllTupleEntriesOfType(t1, this.typeMap.get("NSCore::APIType") as MIRType)) {
+            if (this.checkAllTupleEntriesOfType(t1, this.typeMap.get("NSCore::PODType") as MIRType)) {
+                tci.push("NSCore::PODType");
+            }
+            else {
+                tci.push("NSCore::APIType");
+            }
         }
 
-        return false;
+        const tcitype = MIRType.createSingle(MIRConceptType.create(tci))
+        return this.subtypeOf(tcitype, t2type);
     }
 
     private atomSubtypeOf_TupleTuple(t1: MIRTupleType, t2: MIRTupleType): boolean {
@@ -625,26 +625,26 @@ class MIRAssembly {
     }
 
     private atomSubtypeOf_RecordConcept(t1: MIRRecordType, t2: MIRConceptType): boolean {
-        const recordconcept = (this.typeMap.get("NSCore::Record") as MIRType).options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(recordconcept, t2)) {
+        const t2type = this.typeMap.get(t2.trkey) as MIRType;
+        if (this.subtypeOf(this.typeMap.get("NSCore::Record") as MIRType, t2type)) {
             return true;
         }
 
-        xxxx;
-        
-        const podconcept = (this.typeMap.get("NSCore::PODType") as MIRType);
-        const podconceptatom = podconcept.options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(podconceptatom, t2) && this.checkAllRecordEntriesOfType(t1, podconcept)) {
-            return true;
+        let tci: MIRNominalTypeKey[] = ["NSCore::Tuple"] as MIRNominalTypeKey[];
+        if (this.checkAllRecordEntriesOfType(t1, this.typeMap.get("NSCore::Parsable") as MIRType)) {
+            tci.push("NSCore::Parsable");
+        }
+        if (this.checkAllRecordEntriesOfType(t1, this.typeMap.get("NSCore::APIType") as MIRType)) {
+            if (this.checkAllRecordEntriesOfType(t1, this.typeMap.get("NSCore::PODType") as MIRType)) {
+                tci.push("NSCore::PODType");
+            }
+            else {
+                tci.push("NSCore::APIType");
+            }
         }
 
-        const apiconcept = (this.typeMap.get("NSCore::APIType") as MIRType);
-        const apiconceptatom = apiconcept.options[0] as MIRConceptType;
-        if (this.atomSubtypeOf_ConceptConcept(apiconceptatom, t2) && this.checkAllRecordEntriesOfType(t1, apiconcept)) {
-            return true;
-        }
-
-        return false;
+        const tcitype = MIRType.createSingle(MIRConceptType.create(tci))
+        return this.subtypeOf(tcitype, t2type);
     }
 
     private atomSubtypeOf_RecordRecord(t1: MIRRecordType, t2: MIRRecordType): boolean {

@@ -728,35 +728,6 @@ class MIREmitter {
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Object") as ConceptTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialObjectConceptType());
 
-        
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPIConceptType());
-
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPIConceptType());
-    
-        emitter.registerResolvedTypeReference(assembly.getSpecialPODTupleConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialAPITupleConceptType());
-
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableTupleConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODTupleConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPITupleConceptType());
-
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeTupleConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODTupleConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPITupleConceptType());
-
-        emitter.registerResolvedTypeReference(assembly.getSpecialPODRecordConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialAPIRecordConceptType());
-    
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableRecordConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsablePODRecordConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialParsableAPIRecordConceptType());
-
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeRecordConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypePODRecordConceptType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialKeyTypeAPIRecordConceptType());
-
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::None") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialNoneType());
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Bool") as EntityTypeDecl, new Map<string, ResolvedType>());

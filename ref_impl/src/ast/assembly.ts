@@ -814,9 +814,6 @@ class Assembly {
         if (this.checkAllTupleEntriesOfType(t1, this.getSpecialParsableConceptType())) {
             tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
         }
-        if (this.isGrounded_Atom(t1) && this.checkAllTupleEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
-            tci.push(...(this.getSpecialKeyTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
-        }
         if (this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             if (this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
                 tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
@@ -826,7 +823,7 @@ class Assembly {
             }
         }
 
-        return (this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2)));
+        return this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2));
     }
 
     private checkAllRecordEntriesOfType(t1: ResolvedRecordAtomType, t2: ResolvedType): boolean {
@@ -842,9 +839,6 @@ class Assembly {
         if (this.checkAllRecordEntriesOfType(t1, this.getSpecialParsableConceptType())) {
             tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
         }
-        if (this.isGrounded_Atom(t1) && this.checkAllRecordEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
-            tci.push(...(this.getSpecialKeyTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
-        }
         if (this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             if (this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
                 tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
@@ -854,7 +848,7 @@ class Assembly {
             }
         }
 
-        return (this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2)));
+        return this.subtypeOf(ResolvedType.createSingle(ResolvedConceptAtomType.create(tci)), ResolvedType.createSingle(t2));
     }
 
     private atomSubtypeOf_ConceptConcept(t1: ResolvedConceptAtomType, t2: ResolvedConceptAtomType): boolean {
