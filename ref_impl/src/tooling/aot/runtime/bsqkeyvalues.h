@@ -8,6 +8,95 @@
 
 namespace BSQ
 {
+class BSQBigInt : public BSQRef
+{
+public:
+    BSQBigInt(int64_t value) : BSQRef(MIRNominalTypeEnum_Int) { ; }
+    BSQBigInt(const char* bigstr) : BSQRef(MIRNominalTypeEnum_Int) { ; }
+
+    ~BSQBigInt()
+    {
+        ;
+    }
+
+    virtual void destroy() 
+    { 
+        ; 
+    }
+
+    size_t hash() const
+    {
+        return 0;
+    }
+
+    std::u32string display() const
+    {
+        return U"[NOT IMPLEMENTED]";
+    }
+
+    static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
+    {
+        return nullptr;
+    }
+
+    bool eqI64(int64_t v) const
+    {
+        return false;
+    }
+
+    bool ltI64(int64_t v) const
+    {
+        return false;
+    }
+
+    static bool eq(const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return false;
+    }
+
+    static bool lt(const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return false;
+    }
+
+    static BSQBigInt* add(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return nullptr;
+    }
+
+    static BSQBigInt* sub(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return nullptr;
+    }
+
+    static BSQBigInt* mult(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return nullptr;
+    }
+
+    static BSQBigInt* div(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return nullptr;
+    }
+
+    static BSQBigInt* mod(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    {
+        return nullptr;
+    }
+};
+struct EqualFunctor_BSQBigInt
+{
+    bool operator()(BSQBigInt* l, BSQBigInt* r) const { return BSQBigInt::eq(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt)); }
+};
+struct LessFunctor_BSQBigInt
+{
+    bool operator()(BSQBigInt* l, BSQBigInt* r) const { return BSQBigInt::lt(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt)); }
+};
+struct DisplayFunctor_BSQBigInt
+{
+    std::u32string operator()(BSQBigInt* i) const { BSQ_GET_VALUE_PTR(i, BSQBigInt)->display(); }
+};
+
 class BSQString : public BSQRef
 {
 public:
@@ -34,10 +123,6 @@ public:
         return l->sdata < r->sdata;
     }
 };
-struct HashFunctor_BSQString
-{
-    size_t operator()(const BSQString* s) const { return BSQString::hash(s); }
-};
 struct EqualFunctor_BSQString
 {
     bool operator()(const BSQString* l, const BSQString* r) const { return BSQString::keyEqual(l, r); }
@@ -61,11 +146,6 @@ public:
     virtual ~BSQSafeString() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQSafeString* str)
-    {
-        return HASH_COMBINE((size_t)str->nominalType, std::hash<std::u32string>{}(str->sdata));
-    }
-
     inline static bool keyEqual(const BSQSafeString* l, const BSQSafeString* r)
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
@@ -75,10 +155,6 @@ public:
     {
         return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
     }
-};
-struct HashFunctor_BSQSafeString
-{
-    size_t operator()(const BSQSafeString* s) const { return BSQSafeString::hash(s); }
 };
 struct EqualFunctor_BSQSafeString
 {
@@ -107,11 +183,6 @@ public:
     virtual ~BSQStringOf() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQStringOf* str)
-    {
-        return HASH_COMBINE((size_t)str->nominalType, std::hash<std::u32string>{}(str->sdata));
-    }
-
     inline static bool keyEqual(const BSQStringOf* l, const BSQStringOf* r)
     {
         return l->nominalType == r->nominalType && l->sdata == r->sdata;
@@ -121,10 +192,6 @@ public:
     {
         return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
     }
-};
-struct HashFunctor_BSQStringOf
-{
-    size_t operator()(const BSQStringOf* s) const { return BSQStringOf::hash(s); }
 };
 struct EqualFunctor_BSQStringOf
 {
@@ -143,47 +210,44 @@ struct DisplayFunctor_BSQStringOf
     }
 };
 
-class BSQGUID : public BSQRef
+class BSQUUID : public BSQRef
 {
 public:
-    const uint8_t sdata[16];
+    uint8_t sdata[16];
 
-    BSQGUID(const uint8_t sdata[16]) : BSQRef(MIRNominalTypeEnum_GUID), sdata() { memcpy((void*)this->sdata, sdata, 16); }
+    BSQUUID(const uint8_t sdata[16]) : BSQRef(MIRNominalTypeEnum_UUID), sdata() { memcpy(this->sdata, sdata, 16); }
 
-    virtual ~BSQGUID() = default;
+    BSQUUID() : BSQRef(MIRNominalTypeEnum_UUID), sdata() { ; }
+    BSQUUID(const BSQUUID& src) : BSQRef(MIRNominalTypeEnum_UUID), sdata() { memcpy(this->sdata, src.sdata, 16); }
+    BSQUUID(BSQUUID&& src) : BSQRef(MIRNominalTypeEnum_UUID), sdata() { memcpy(this->sdata, src.sdata, 16); }
+
+    BSQUUID& operator=(const BSQUUID&) = default;
+    BSQUUID& operator=(BSQUUID&&) = default;
+
+    virtual ~BSQUUID() = default;
     virtual void destroy() { ; }
 
-    inline static size_t hash(const BSQGUID* guid)
-    {
-        auto sdb = (uint64_t*)guid->sdata;
-        return HASH_COMBINE(sdb[0], sdb[1]);
-    }
-
-    inline static bool keyEqual(const BSQGUID* l, const BSQGUID* r)
+    inline static bool keyEqual(const BSQUUID* l, const BSQUUID* r)
     {
         return memcmp(l->sdata, r->sdata, 16) == 0;
     }
 
-    inline static bool keyLess(const BSQGUID* l, const BSQGUID* r)
+    inline static bool keyLess(const BSQUUID* l, const BSQUUID* r)
     {
         return memcmp(l->sdata, r->sdata, 16) < 0;
     }
 };
-struct HashFunctor_BSQGUID
+struct EqualFunctor_BSQUUID
 {
-    size_t operator()(const BSQGUID* g) const { return BSQGUID::hash(g); }
+    bool operator()(const BSQUUID* l, const BSQUUID* r) const { return BSQUUID::keyEqual(l, r); }
 };
-struct EqualFunctor_BSQGUID
+struct LessFunctor_BSQUUID
 {
-    bool operator()(const BSQGUID* l, const BSQGUID* r) const { return BSQGUID::keyEqual(l, r); }
+    bool operator()(const BSQUUID* l, const BSQUUID* r) const { return BSQUUID::keyLess(l, r); }
 };
-struct LessFunctor_BSQGUID
+struct DisplayFunctor_BSQUUID
 {
-    bool operator()(const BSQGUID* l, const BSQGUID* r) const { return BSQGUID::keyLess(l, r); }
-};
-struct DisplayFunctor_BSQGUID
-{
-    std::u32string operator()(const BSQGUID* g) const { return std::u32string(U"DataHash@") + std::u32string(g->sdata, g->sdata + 16); }
+    std::u32string operator()(const BSQUUID* u) const { return std::u32string(U"DataHash@") + std::u32string(u->sdata, u->sdata + 16); }
 };
 
 class BSQLogicalTime : public BSQRef
@@ -199,11 +263,13 @@ public:
         ; 
     }
 
-    BSQLogicalTime& operator=(const BSQLogicalTime& src)
-    {
-        this->timestamp = src.timestamp;
-        return *this;
+    BSQLogicalTime(BSQLogicalTime&& src) : BSQRef(MIRNominalTypeEnum_LogicalTime), timestamp(src.timestamp)
+    { 
+        ; 
     }
+
+    BSQLogicalTime& operator=(const BSQLogicalTime& src) = default;
+    BSQLogicalTime& operator=(BSQLogicalTime&& src) = default;
 
     virtual ~BSQLogicalTime() = default;
     virtual void destroy() { ; }

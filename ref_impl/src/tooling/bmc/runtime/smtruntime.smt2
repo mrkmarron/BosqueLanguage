@@ -11,7 +11,7 @@
 (declare-datatypes (
       (StructuralSpecialTypeInfo 0)
     ) (
-    ( (StructuralSpecialTypeInfo@cons (StructuralSpecialTypeInfo$PODType Bool) (StructuralSpecialTypeInfo$APIType Bool) (StructuralSpecialTypeInfo$KeyType Bool) (StructuralSpecialTypeInfo$Parsable Bool)) )
+    ( (StructuralSpecialTypeInfo@cons (StructuralSpecialTypeInfo$PODType Bool) (StructuralSpecialTypeInfo$APIType Bool) (StructuralSpecialTypeInfo$Parsable Bool)) )
 ))
 
 (declare-datatypes (
@@ -22,8 +22,6 @@
       (bsq_logicaltime 0)
       (bsq_cryptohash 0)
       (bsq_enum 0)
-      (bsq_keytuple 0)
-      (bsq_keyrecord 0)
       (bsq_idkey 0)
       (BKeyValue 0)
     ) (
@@ -34,8 +32,6 @@
     ( (bsq_logicaltime@cons (bsq_logicaltime_value Int)) )
     ( (bsq_cryptohash@cons (bsq_cryptohash String)) )
     ( (bsq_enum@cons (bsq_enum_type String) (bsq_enum_value Int)) )
-    ( (bsq_keytuple@cons (bsq_keytuple_concepts StructuralSpecialTypeInfo) (bsq_keytuple_entries (Array Int BKeyValue))) )
-    ( (bsq_keyrecord@cons (bsq_keyrecord_concepts StructuralSpecialTypeInfo) (bsq_keyrecord_entries (Array String BKeyValue))) )
     ( (bsq_idkey@cons (bsq_idkey_type String) (bsq_idkey_value BKeyValue)) )
     (
       (bsqkey_none) 
@@ -49,8 +45,6 @@
       (bsqkey_logicaltime (bsqkey_logicaltime_value bsq_logicaltime))
       (bsqkey_cryptohash (bsqkey_cryptohash_value bsq_cryptohash))
       (bsqkey_enum (bsqkey_enum_value bsq_enum))
-      (bsqkey_tuple (bsqkey_tuple_value bsq_keytuple))
-      (bsqkey_record (bsqkey_record_value bsq_keyrecord))
       (bsqkey_idkey (bsqkey_idkey_value bsq_idkey))
     )
 ))
@@ -60,7 +54,6 @@
     (bsq_bytebuffer 0)
     (bsq_isotime 0)
     (bsq_regex 0)
-    (bsq_structural_entry 0)
     (bsq_tuple 0)
     (bsq_record 0)
     ;;NOMINAL_DECLS_FWD;;
@@ -71,30 +64,28 @@
     ( (bsq_bytebuffer@cons (bsq_bytebuffer_contents (Seq Int))) )
     ( (bsq_isotime@cons (bsq_isotime_value Int)) )
     ( (bsq_regex@cons (bsq_regex_value String)) )
-    ( (bsq_structural_entry@clear) (bsq_structural_entry@key (bsq_structural_entry_key BKeyValue)) (bsq_structural_entry@term (bsq_structural_entry_term BTerm)) )
-    ( (bsq_tuple@cons (bsq_tuple_concepts StructuralSpecialTypeInfo) (bsq_tuple_entries (Array Int bsq_structural_entry)))  )
-    ( (bsq_record@cons (bsq_record_concepts StructuralSpecialTypeInfo) (bsq_record_entries (Array String bsq_structural_entry))) )
+    ( (bsq_tuple@cons (bsq_tuple_concepts StructuralSpecialTypeInfo) (bsq_tuple_entries (Array Int BTerm)))  )
+    ( (bsq_record@cons (bsq_record_concepts StructuralSpecialTypeInfo) (bsq_record_entries (Array String BTerm))) )
     ;;NOMINAL_CONSTRUCTORS;;
     (
       (bsq_object@empty)
     ;;NOMINAL_OBJECT_CONSTRUCTORS;;
     )
     (
+      (bsqterm@clear)
       (bsqterm_key (bsqterm_key_value BKeyValue))
       (bsqterm_float64 (bsqterm_float64_value (_ FloatingPoint 11 53)))
       (bsqterm_buffer (bsqterm_buffer_value bsq_buffer))
       (bsqterm_bytebuffer (bsqterm_buffer_value bsq_bytebuffer))
       (bsqterm_isotime (bsqterm_isotime_value bsq_isotime))
       (bsqterm_regex (bsqterm_regex_value bsq_regex))
-      (bsqterm_keytuple (bsqterm_keytuple_value bsqkey_tuple))
-      (bsqterm_tuple (bsqterm_tuple_value bsq_tuple)) 
-      (bsqterm_keyrecord (bsqterm_keyrecord_value bsqkey_record))
+      (bsqterm_tuple (bsqterm_tuple_value bsq_tuple))
       (bsqterm_record (bsqterm_record_value bsq_record))
       (bsqterm_object (bsqterm_object_type String) (bsqterm_object_value bsq_object))
     )
 ))
 
-(declare-fun nominalDataKinds (String) Int)
+(declare-fun nominalDataKinds (String) SpecialTypeTermInfo)
 ;;NOMINAL_TYPE_TO_DATA_KIND_ASSERTS;;
 
 (declare-const MIRNominalTypeEnum_None String)
@@ -126,11 +117,7 @@
                   (ite (is-bsqkey_logicaltime keyv) MIRNominalTypeEnum_LogicalTime
                     (ite (is-bsqkey_cryptohash keyv) MIRNominalTypeEnum_CryptoHash
                       (ite (is-bsqkey_enum keyv) (bsq_enum_type (bsqkey_enum_value keyv))
-                        (ite (is-bsqkey_tuple keyv) MIRNominalTypeEnum_Tuple
-                          (ite (is-bsqkey_record keyv) MIRNominalTypeEnum_Record
-                            (bsq_idkey_type (bsqkey_idkey_value keyv))
-                          )
-                        )
+                        (bsq_idkey_type (bsqkey_idkey_value keyv))
                       )
                     )
                   )
@@ -168,7 +155,6 @@
   (let ((k1t (bsqkey_get_nominal_type k1)) (k2t (bsqkey_get_nominal_type k2)))
     (ite (not (str.= k1t k2t))
       (str.< k1t k2t)
-      
       (ite (and (= k1 bsqkey_none) (= k2 bsqkey_none)) false
         (ite (and (is-bsqkey_bool k1) (is-bsqkey_bool k2)) (and (not (bsqkey_bool_value k1)) (bsqkey_bool_value k2))
           (ite (and (is-bsqkey_int k1) (is-bsqkey_int k2)) (< (bsqkey_int_value k1) (bsqkey_int_value k2))
@@ -179,11 +165,7 @@
                     (ite (and (is-bsqkey_uuid k1) (is-bsqkey_uuid k2)) (< (bsqkey_uuid_value k1) (bsqkey_uuid_value k2))
                       (ite (and (is-bsqkey_logicaltime k1) (is-bsqkey_logicaltime k2)) (< (bsqkey_logicaltime_value k1) (bsqkey_logicaltime_value k2))
                         (ite (and (is-bsqkey_cryptohash k1) (is-bsqkey_cryptohash k2)) (< (bsqkey_cryptohash k1) (bsqkey_cryptohash k2))
-                          (ite (is-bsqkey_enum keyv) (bsq_enum_type (bsqkey_enum_value keyv))
-                        (ite (is-bsqkey_tuple keyv) MIRNominalTypeEnum_Tuple
-                          (ite (is-bsqkey_record keyv) MIRNominalTypeEnum_Record
-                            (bsq_idkey_type (bsqkey_idkey_value keyv))
-                          )
+                          (< (bsq_enum_value k1) (bsq_enum_value k2))
                         )
                       )
                     )
@@ -193,35 +175,47 @@
             )
           )
         )
-      )
-    )
-  )
-      
+      )   
     )
   )
 )
+
+;;GENERATED_ID_KEY_LESS_BEGIN
+
+(define-fun bsqkeyless_identity ((idtype String) (k1 bsq_idkey) (k2 bsq_idkey)) Bool
+;;GENERATED_ID_KEY_LESS_SELECT_BEGIN
+false
+;;GENERATED_ID_KEY_LESS_SELECT_END
+)
+
+(define-fun bsqkeyless ((k1 BKeyValue) (k2 BKeyValue)) Bool
+  (let ((k1t (bsqkey_get_nominal_type k1)) (k2t (bsqkey_get_nominal_type k2)))
+    (ite (not (str.= k1t k2t))
+      (str.< k1t k2t)
+      (ite (and (is-bsq_idkey k1) (is-bsq_idkey k2))
+        (bsqkeyless_identity k1t (bsq_idkey_value k1) (bsq_idkey_value k2))
+        (bsqkeyless_basetypes k1 k2)
+      )
+    )
+  )
+)
+
+(declare-const SpecialTypeTermInfo@Clear SpecialTypeTermInfo)
+(assert (= SpecialTypeTermInfo@Clear (StructuralSpecialTypeInfo@cons true true true))
 
 (define-fun getStructuralSpecialTypeInfoTerm ((term BTerm)) StructuralSpecialTypeInfo
-  (ite (= term bsqterm@clear) 3
-    (ite (is-bsqterm_tuple term) (bsqterm_tuple_flag (bsqterm_tuple_value term))
-      (ite (is-bsqterm_record term) (bsqterm_record_flag (bsqterm_record_value term))
+  (ite (= term bsqterm@clear) SpecialTypeTermInfo@Clear
+    (ite (is-bsqterm_tuple term) (bsq_tuple_concepts (bsqterm_tuple_value term))
+      (ite (is-bsqterm_record term) (bsq_record_concepts (bsqterm_record_value term))
         (nominalDataKinds (bsqterm_get_nominal_type term))
       )
     )
   )
 )
 
-(define-fun getStructuralSpecialTypeInfoBKey ((term BKeyValue)) StructuralSpecialTypeInfo
-  (ite (= term bsqterm@clear) 3
-    (ite (is-bsqterm_tuple term) (bsqterm_tuple_flag (bsqterm_tuple_value term))
-      (ite (is-bsqterm_record term) (bsqterm_record_flag (bsqterm_record_value term))
-        (nominalDataKinds (bsqterm_get_nominal_type term))
-      )
-    )
-  )
+(define-fun mergeStructuralSpecialTypeInfo ((st1 SpecialTypeTermInfo) (st2 SpecialTypeTermInfo)) SpecialTypeTermInfo
+  (SpecialTypeTermInfo@cons (and (StructuralSpecialTypeInfo$PODType st1) (StructuralSpecialTypeInfo$PODType st2)) (and (StructuralSpecialTypeInfo$APIType st1) (StructuralSpecialTypeInfo$APIType st2)) (and (StructuralSpecialTypeInfo$Parsable st1) (StructuralSpecialTypeInfo$Parsable st2)))
 )
-
-(define-fun mergeStructuralSpecialTypeInfo
 
 
 ;;EPHEMERAL_DECLS;;
@@ -244,14 +238,6 @@
     ( (result_error (error_id Int)) (result_bmc (bmc_id String)) )
     ;;RESULTS;;
 ))
-
-;;current implementation is simple uninterpreted function -- want to implement these in core runtime with bounded checkable impl
-(declare-fun stroi (String) Int)
-
-;;current implementation is simple uninterpreted function -- maybe want to make these return a non-decidable error (or have bounded checkable impl)
-(declare-fun mult_op (Int Int) Int) 
-(declare-fun div_op (Int Int) Int)
-(declare-fun mod_op (Int Int) Int)
 
 (declare-const mirconceptsubtypearray_empty (Array String Bool))
 (assert (= mirconceptsubtypearray_empty ((as const (Array String Bool)) false)))

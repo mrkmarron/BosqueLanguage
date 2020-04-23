@@ -274,11 +274,23 @@ class TypeChecker {
     }
     
     private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): boolean {
-        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(lhs)) {
+        if (!(this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialIntType()) 
+            || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialBigIntType()) 
+            || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) 
+            || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialLogicalTimeType())
+            || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialEnumConceptType())
+            || (lhs.options.length === 1 && this.m_assembly.isSafeStringType(lhs.options[0]))
+            || (lhs.options.length === 1 && this.m_assembly.isStringOfType(lhs.options[0])))) {
             return false;
         }
 
-        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !this.m_assembly.isGroundedType(rhs)) {
+        if (!(this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialIntType()) 
+        || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialBigIntType()) 
+        || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()) 
+        || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialLogicalTimeType())
+        || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialEnumConceptType())
+        || (rhs.options.length === 1 && this.m_assembly.isSafeStringType(rhs.options[0]))
+        || (rhs.options.length === 1 && this.m_assembly.isStringOfType(rhs.options[0])))) {
             return false;
         }
 

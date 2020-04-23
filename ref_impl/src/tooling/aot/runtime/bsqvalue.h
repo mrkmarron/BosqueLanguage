@@ -33,8 +33,6 @@
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(true)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(false)
 
-#define HASH_COMBINE(H1, H2) (((527 + H1) * 31) + H2)
-
 ////
 //Reference counting ops
 
@@ -89,15 +87,17 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_None MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Bool MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_BigInt MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Float64 MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_String MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_GUID MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_UUID MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_LogicalTime MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_DataHash MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_ByteBuffer MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END%%
 
 typedef void* KeyValue;
@@ -226,10 +226,6 @@ struct RCDecFunctor_bool
 {
     inline void operator()(bool b) const { ; }
 };
-struct HashFunctor_bool
-{
-    inline size_t operator()(bool b) const { return (size_t)b; }
-};
 struct EqualFunctor_bool
 {
     inline bool operator()(bool l, bool r) const { return l == r; }
@@ -243,27 +239,23 @@ struct DisplayFunctor_bool
     std::u32string operator()(bool b) const { return b ? U"true" : U"false"; }
 };
 
-struct RCIncFunctor_int
+struct RCIncFunctor_int64_t
 {
     inline int64_t operator()(int64_t i) const { return i; }
 };
-struct RCDecFunctor_int
+struct RCDecFunctor_int64_t
 {
-    inline void operator()(bool b) const { ; }
+    inline void operator()(int64_t i) const { ; }
 };
-struct HashFunctor_int
-{
-    inline size_t operator()(int64_t i) const { return (size_t)i; }
-};
-struct EqualFunctor_int
+struct EqualFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l == r; }
 };
-struct LessFunctor_int
+struct LessFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l < r; }
 };
-struct DisplayFunctor_int
+struct DisplayFunctor_int64_t
 {
     std::u32string operator()(int64_t i) const 
     {
@@ -272,131 +264,31 @@ struct DisplayFunctor_int
     }
 };
 
-//A big integer class for supporting Bosque -- right now it does not do much
-class BSQBigInt : public BSQRef
+struct RCIncFunctor_double
 {
-public:
-    BSQBigInt(int64_t value) : BSQRef(MIRNominalTypeEnum_Int) { ; }
-    BSQBigInt(const char* bigstr) : BSQRef(MIRNominalTypeEnum_Int) { ; }
-
-    ~BSQBigInt()
-    {
-        ;
-    }
-
-    virtual void destroy() 
-    { 
-        ; 
-    }
-
-    size_t hash() const
-    {
-        return 0;
-    }
-
-    std::u32string display() const
-    {
-        return U"[NOT IMPLEMENTED]";
-    }
-
-    static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
-    {
-        return nullptr;
-    }
-
-    bool eqI64(int64_t v) const
-    {
-        return false;
-    }
-
-    bool ltI64(int64_t v) const
-    {
-        return false;
-    }
-
-    static bool eq(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
-    static bool lt(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
-
-    static BSQBigInt* add(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* sub(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* mult(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* div(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* mod(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
+    inline double operator()(double d) const { return d; }
 };
-struct HashFunctor_IntValue
+struct RCDecFunctor_double
 {
-    size_t operator()(IntValue i) const { return BSQ_IS_VALUE_TAGGED_INT(i) ? BSQ_GET_VALUE_TAGGED_INT(i) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->hash(); }
+    inline void operator()(double d) const { ; }
 };
-struct EqualFunctor_IntValue
+struct EqualFunctor_double
 {
-    bool operator()(IntValue l, IntValue r) const 
-    { 
-        if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return l == r; //tagging does not affect equality
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
-            return BSQ_GET_VALUE_PTR(r, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(l));
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return BSQ_GET_VALUE_PTR(l, BSQBigInt)->eqI64(BSQ_GET_VALUE_TAGGED_INT(r));
-        }
-        else {
-            return BSQBigInt::eq(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt));
-        }
-    }
+    inline bool operator()(double l, double r) const { return l == r; }
 };
-struct LessFunctor_IntValue
+struct LessFunctor_double
 {
-    bool operator()(IntValue l, IntValue r) const 
-    { 
-        if(BSQ_IS_VALUE_TAGGED_INT(l) && BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return BSQ_GET_VALUE_TAGGED_INT(l) < BSQ_GET_VALUE_TAGGED_INT(r);
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(l)) {
-            return BSQ_GET_VALUE_PTR(r, BSQBigInt)->ltI64(BSQ_GET_VALUE_TAGGED_INT(l));
-        }
-        else if(BSQ_IS_VALUE_TAGGED_INT(r)) {
-            return BSQ_GET_VALUE_PTR(l, BSQBigInt)->ltI64(BSQ_GET_VALUE_TAGGED_INT(r));
-        }
-        else {
-            return BSQBigInt::lt(BSQ_GET_VALUE_PTR(l, BSQBigInt), BSQ_GET_VALUE_PTR(r, BSQBigInt));
-        }
-    }
+    inline bool operator()(double l, double r) const { return l < r; }
 };
-struct DisplayFunctor_IntValue
+struct DisplayFunctor_double
 {
-    std::u32string operator()(IntValue i) const
-    { 
+    std::u32string operator()(double d) const 
+    {
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return BSQ_IS_VALUE_TAGGED_INT(i) ? conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(i))) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->display();
+        return conv.from_bytes(std::to_string(d));  
     }
 };
+
 
 IntValue op_intNegate(BSQRefScope& scope, IntValue v);
 

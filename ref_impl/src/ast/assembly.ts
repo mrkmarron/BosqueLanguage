@@ -1437,20 +1437,33 @@ class Assembly {
     }
 
     restrictNone(from: ResolvedType): ResolvedType {
-        return this.getSpecialNoneType();
+        return (this.subtypeOf(this.getSpecialNoneType(), from)) ? this.getSpecialNoneType() : ResolvedType.createEmpty();
     }
 
     restrictSome(from: ResolvedType): ResolvedType {
-        if(from.idStr === "NSCore::Any") {
+        const hasany = from.options.some((atom) => ResolvedType.createSingle(atom).isAnyType());
+        const sometypes = from.options.filter((atom) => this.subtypeOf(ResolvedType.createSingle(atom), this.getSpecialSomeConceptType()));
+        if (hasany) {
             return this.getSpecialSomeConceptType();
         }
+        else if (sometypes.length !== 0) {
+            return ResolvedType.create(sometypes);
+        }
         else {
-            return ResolvedType.create(from.options.filter((opt) => opt.idStr === "NSCore::None"));
+            return ResolvedType.createEmpty();
         }
     }
 
     restrictT(from: ResolvedType, t: ResolvedType): ResolvedType {
-        return t;
+        if (t.isNoneType()) {
+            return this.restrictNone(from);
+        }
+        else if (t.isSomeType()) {
+            return this.restrictSome(from);
+        }
+        else {
+            return t;
+        }
     }
 
     restrictNotT(from: ResolvedType, t: ResolvedType): ResolvedType {
