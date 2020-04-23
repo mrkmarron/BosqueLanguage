@@ -50,7 +50,9 @@ typedef uint32_t DATA_KIND_FLAG;
 #define DATA_KIND_CLEAR_FLAG 0x0
 #define DATA_KIND_API_FLAG 0x1
 #define DATA_KIND_POD_FLAG 0x3
-#define DATA_KIND_UNKNOWN_FLAG 0xF
+#define DATA_KIND_PARSABLE_FLAG 0x4
+#define DATA_KIND_ALL_FLAG (DATA_KIND_API_FLAG | DATA_KIND_POD_FLAG | DATA_KIND_PARSABLE_FLAG)
+#define DATA_KIND_UNKNOWN_FLAG 0xFF
 
 namespace BSQ
 {
@@ -60,19 +62,35 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE%%
 };
 
+//Category tags to embed in the type enums
+#define MIRNominalTypeEnum_Category_BigInt 0x1
+#define MIRNominalTypeEnum_Category_String 0x2
+#define MIRNominalTypeEnum_Category_SafeString 0x3
+#define MIRNominalTypeEnum_Category_StringOf 0x4
+#define MIRNominalTypeEnum_Category_UUID 0x5
+#define MIRNominalTypeEnum_Category_LogicalTime 0x6
+#define MIRNominalTypeEnum_Category_CryptoHash 0x7
+#define MIRNominalTypeEnum_Category_Enum 0x8
+#define MIRNominalTypeEnum_Category_IdKeySimple 0x9
+#define MIRNominalTypeEnum_Category_IdKeyCompound 0xA
+
+#define BUILD_MIR_NOMINAL_TYPE(C, T) (MIRNominalTypeEnum)((T << 8) | T)
+#define GET_MIR_TYPE_CATEGORY(T) ((int32_t)T & 0xFF)
+#define GET_MIR_TYPE_POSITION(T) ((int32_t)T >> 8)
+
 enum class MIRNominalTypeEnum
 {
     Invalid = 0x0,
 //%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
-constexpr const char* propertyNames[] = {
-    "Invalid",
+constexpr const char32_t* propertyNames[] = {
+    U"Invalid",
 //%%PROPERTY_NAMES%%
 };
 
-constexpr const char* nominaltypenames[] = {
-    "[INVALID]",
+constexpr const char32_t* nominaltypenames[] = {
+    U"[INVALID]",
 //%%NOMINAL_TYPE_DISPLAY_NAMES%%
 };
 
@@ -100,6 +118,7 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END%%
 
+typedef void* NoneValue;
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -111,11 +130,12 @@ private:
 public:
     MIRNominalTypeEnum nominalType;
 
+    BSQRef() : count(0), nominalType(MIRNominalTypeEnum::Invalid) { ; }
     BSQRef(MIRNominalTypeEnum nominalType) : count(0), nominalType(nominalType) { ; }
     BSQRef(int64_t excount, MIRNominalTypeEnum nominalType) : count(excount), nominalType(nominalType) { ; }
-    virtual ~BSQRef() { ; }
 
-    virtual void destroy() = 0;
+    virtual ~BSQRef() { ; }
+    virtual void destroy() { ; }
 
     inline void increment()
     {
@@ -159,6 +179,22 @@ public:
         {
             BSQ_GET_VALUE_PTR(v, BSQRef)->decrement();
         }
+    }
+};
+
+template <typename T, typename DestroyFunctor>
+class BSQBoxed : public BSQRef
+{
+public:
+    T bval;
+
+    BSQBoxed(MIRNominalTypeEnum nominalType, const T& bval) : BSQRef(nominalType), bval(bval) { ; }
+
+    virtual ~BSQRef() { ; }
+
+    virtual void destroy() 
+    { 
+        DestroyFunctor{}(this->bval); 
     }
 };
 
@@ -218,6 +254,31 @@ public:
     }
 };
 
+struct RCIncFunctor_NoneValue
+{
+    inline void* operator()(void* n) const { return n; }
+};
+struct RCDecFunctor_NoneValue
+{
+    inline void operator()(void* n) const { ; }
+};
+struct RCReturnFunctor_NoneValue
+{
+    inline void operator()(BSQEnum& e, BSQRefScope& scope) const { ; }
+};
+struct EqualFunctor_NoneValue
+{
+    inline bool operator()(void* l, void* r) const { return true; }
+};
+struct LessFunctor_NoneValue
+{
+    inline bool operator()(void* l, void* r) const { return false; }
+};
+struct DisplayFunctor_NoneValue
+{
+    std::u32string operator()(void* n) const { return U"none"; }
+};
+
 struct RCIncFunctor_bool
 {
     inline bool operator()(bool b) const { return b; }
@@ -225,6 +286,10 @@ struct RCIncFunctor_bool
 struct RCDecFunctor_bool
 {
     inline void operator()(bool b) const { ; }
+};
+struct RCReturnFunctor_bool
+{
+    inline void operator()(bool b, BSQRefScope& scope) const { ; }
 };
 struct EqualFunctor_bool
 {
@@ -246,6 +311,10 @@ struct RCIncFunctor_int64_t
 struct RCDecFunctor_int64_t
 {
     inline void operator()(int64_t i) const { ; }
+};
+struct RCReturnFunctor_int64_t
+{
+    inline void operator()(int64_t i, BSQRefScope& scope) const { ; }
 };
 struct EqualFunctor_int64_t
 {
@@ -272,13 +341,9 @@ struct RCDecFunctor_double
 {
     inline void operator()(double d) const { ; }
 };
-struct EqualFunctor_double
+struct RCReturnFunctor_double
 {
-    inline bool operator()(double l, double r) const { return l == r; }
-};
-struct LessFunctor_double
-{
-    inline bool operator()(double l, double r) const { return l < r; }
+    inline void operator()(double d, BSQRefScope& scope) const { ; }
 };
 struct DisplayFunctor_double
 {
@@ -289,60 +354,35 @@ struct DisplayFunctor_double
     }
 };
 
-
-IntValue op_intNegate(BSQRefScope& scope, IntValue v);
-
-IntValue op_intAdd(BSQRefScope& scope, IntValue v1, IntValue v2);
-IntValue op_intSub(BSQRefScope& scope, IntValue v1, IntValue v2);
-IntValue op_intMult(BSQRefScope& scope, IntValue v1, IntValue v2);
-IntValue op_intDiv(BSQRefScope& scope, IntValue v1, IntValue v2);
-IntValue op_intMod(BSQRefScope& scope, IntValue v1, IntValue v2);
-
-size_t bsqKeyValueHash(KeyValue v);
-bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
-bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
-
 MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v);
 MIRNominalTypeEnum getNominalTypeOf_Value(Value v);
+
+bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
+bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
 
 DATA_KIND_FLAG getDataKindFlag(Value v);
 
 std::u32string diagnostic_format(Value v);
 
-struct HashFunctor_KeyValue
+struct RCIncFunctor_KeyValue
 {
-    size_t operator()(const KeyValue& k) const { return bsqKeyValueHash(k); }
+    inline KeyValue operator()(KeyValue k) const { INC_REF_CHECK(KeyValue, k); }
+};
+struct RCDecFunctor_KeyValue
+{
+    inline void operator()(KeyValue k) const { BSQRef::decrementChecked(k); }
 };
 struct EqualFunctor_KeyValue
 {
-    bool operator()(const KeyValue& l, const KeyValue& r) const { return bsqKeyValueEqual(l, r); }
+    bool operator()(KeyValue l, KeyValue r) const { return bsqKeyValueEqual(l, r); }
 };
 struct LessFunctor_KeyValue
 {
-    bool operator()(const KeyValue& l, const KeyValue& r) const { return bsqKeyValueLess(l, r); }
+    bool operator()(KeyValue l, KeyValue r) const { return bsqKeyValueLess(l, r); }
 };
 struct DisplayFunctor_KeyValue
 {
-    std::u32string operator()(const KeyValue& k) const { return diagnostic_format(k); }
-};
-
-enum class BSQBufferFormat {
-    Bosque,
-    JSON,
-    Binary
-};
-
-enum class BSQBufferEncoding {
-    UTF8,
-    URI,
-    Base64
-};
-
-enum class BSQBufferCompression {
-    None,
-    RLE,
-    Time,
-    Space
+    std::u32string operator()(KeyValue k) const { return diagnostic_format(k); }
 };
 
 class BSQBuffer : public BSQRef
@@ -379,13 +419,13 @@ public:
     virtual ~BSQRegex() = default;
 };
 
-class BSQTuple : public BSQRef
+class BSQTuple
 {
 public:
     const std::vector<Value> entries;
     const DATA_KIND_FLAG flag;
 
-    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(entries)), flag(flag) { ; }
+    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
 
     template <uint16_t n>
     static BSQTuple* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const Value(&values)[n])
@@ -446,7 +486,7 @@ public:
         }
     }
 
-    static BSQTuple* _empty;
+    static BSQTuple _empty;
 
     inline bool hasIndex(uint16_t idx) const
     {
@@ -465,13 +505,13 @@ public:
     }
 };
 
-class BSQRecord : public BSQRef
+class BSQRecord
 {
 public:
     const std::map<MIRPropertyEnum, Value> entries;
     const DATA_KIND_FLAG flag;
 
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Record), entries(move(entries)), flag(flag) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
 
     template <uint16_t n>
     static BSQRecord* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const std::pair<MIRPropertyEnum, Value>(&values)[n])
@@ -542,7 +582,7 @@ public:
         }
     }
 
-    static BSQRecord* _empty;
+    static BSQRecord _empty;
 
     inline bool hasProperty(MIRPropertyEnum p) const
     {

@@ -32,7 +32,7 @@
     ( (bsq_logicaltime@cons (bsq_logicaltime_value Int)) )
     ( (bsq_cryptohash@cons (bsq_cryptohash String)) )
     ( (bsq_enum@cons (bsq_enum_type String) (bsq_enum_value Int)) )
-    ( (bsq_idkey@cons (bsq_idkey_type String) (bsq_idkey_value BKeyValue)) )
+    ( (bsq_idkey@cons (bsq_idkey_type String) (bsq_idkey_value (Array Int BKeyValue))) )
     (
       (bsqkey_none) 
       (bsqkey_bool (bsqkey_bool_value Bool))
@@ -222,6 +222,9 @@ false
 
 (declare-const bsqterm_none BTerm)
 (assert (= bsqterm_none (bsqterm_key bsqkey_none)))
+
+(declare-const bsqidkey_array_empty (Array Int BKeyValue))
+(assert (= bsqidkey_array_empty ((as const (Array Int BKeyValue)) bsqkey_none)))
 
 (declare-const bsqtuple_array_empty (Array Int BTerm))
 (assert (= bsqtuple_array_empty ((as const (Array Int BTerm)) bsqterm@clear)))
