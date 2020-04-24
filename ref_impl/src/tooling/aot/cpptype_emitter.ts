@@ -3,10 +3,56 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 
 import * as assert from "assert";
+
+enum TypeEncodingDefaultCategory {
+    Reference,
+    Struct,
+    Either
+}
+
+enum CombinedOptions {
+    None,
+    Variant,
+    KeyValue,
+    Value
+}
+
+const COMBINED_KEY_STRUCT = [CombinedOptions.Variant, CombinedOptions.KeyValue, CombinedOptions.Value];
+const COMBINED_KEY = [CombinedOptions.KeyValue, CombinedOptions.Value];
+const COMBINED_VALUE_STRUCT = [CombinedOptions.Variant, CombinedOptions.Value];
+const COMBINED_VALUE = [CombinedOptions.Value];
+const COMBINED_EPHEMERAL = [CombinedOptions.None];
+
+type TypeEncodingInfo = {
+    base: string,
+    std: string,
+    category: TypeEncodingDefaultCategory
+    copts: CombinedOptions[],
+    boxed?: string
+}
+
+function createTypeEncodingInfo(base: string, std: string, category: TypeEncodingDefaultCategory, copts: CombinedOptions[], boxed?: string): TypeEncodingInfo {
+    return boxed !== undefined ? { base: base, std: std, category: category, copts: copts, boxed: boxed } : { base: base, std: std, category: category, copts: copts };
+}
+
+type TypeEncodingOpPack = {
+    RCIncFunctor: string,
+    RCDecFunctor: string,
+    DisplayFunctor: string
+}
+
+type TypeEncodingOpPackKey = {
+    EqualFunctor: string,
+    LessFunctor: string
+}
+
+type TypeEncodingOpPackStruct = {
+    RCReturnFunctor: string
+}
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -20,6 +66,7 @@ class CPPTypeEmitter {
 
     readonly keyType: MIRType;
     readonly validatorType: MIRType;
+    readonly parsableType: MIRType;
     readonly podType: MIRType;
     readonly apiType: MIRType;
     readonly tupleType: MIRType;
@@ -27,9 +74,6 @@ class CPPTypeEmitter {
 
     readonly enumtype: MIRType;
     readonly idkeytype: MIRType;
-    readonly guididkeytype: MIRType;
-    readonly logicaltimeidkeytype: MIRType;
-    readonly contenthashidkeytype: MIRType;    
 
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -54,9 +98,6 @@ class CPPTypeEmitter {
 
         this.enumtype = assembly.typeMap.get("NSCore::Enum") as MIRType;
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
-        this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
-        this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
-        this.contenthashidkeytype = assembly.typeMap.get("NSCore::ContentHashIdKey") as MIRType;
     }
 
     mangleStringForCpp(name: string): string {
@@ -72,6 +113,10 @@ class CPPTypeEmitter {
         return this.assembly.typeMap.get(tkey) as MIRType;
     }
 
+    typecheckIsName_Option(tt: MIRTypeOption, oftype: RegExp): boolean {
+        return tt instanceof MIREntityType && oftype.test(tt.trkey);
+    }
+
     typecheckIsName(tt: MIRType, oftype: RegExp, match?: "exact" | "may"): boolean {
         match = match || "exact";
         if(match === "exact") {
@@ -80,6 +125,10 @@ class CPPTypeEmitter {
         else {
             return tt.options.some((opt) => (opt instanceof MIREntityType) && oftype.test(opt.trkey));
         }
+    }
+
+    typecheckEntityAndProvidesName_Option(tt: MIRTypeOption, oftype: MIRType): boolean {
+        return tt instanceof MIREntityType && this.assembly.subtypeOf(MIRType.createSingle(tt), oftype);
     }
 
     typecheckEntityAndProvidesName(tt: MIRType, oftype: MIRType, match?: "exact" | "may"): boolean {
@@ -134,6 +183,48 @@ class CPPTypeEmitter {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
     }
 
+    typecheckIsStructuralEntity(tt: MIRType): boolean {
+        if(tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
+            return false;
+        }
+
+        const edecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+        return edecl.attributes.includes("struct");
+    }
+
+    typecheckIsStructuralConcept(tt: MIRType): boolean {
+        if(tt.options.length !== 1 || !(tt.options[0] instanceof MIRConceptType) || (tt.options[0] as MIRConceptType).ckeys.length !== 1) {
+            return false;
+        }
+
+        const cdecl = this.assembly.conceptDecls.get(tt.trkey) as MIRConceptTypeDecl;
+        return cdecl.attributes.includes("struct");
+    }
+
+    typecheckIsParsable_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.parsableType);
+    }
+
+    typecheckIsParsable_Never(tt: MIRType): boolean {
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.parsableType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsParsable_Never(entry.type));
+            }
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsParsable_Never(entry.type));
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
     typecheckIsPOD_Always(tt: MIRType): boolean {
         return this.assembly.subtypeOf(tt, this.podType);
     }
@@ -183,63 +274,140 @@ class CPPTypeEmitter {
     }
 
     generateInitialDataKindFlag(tt: MIRType): string {
-        if(this.typecheckIsPOD_Always(tt)) {
-            return "DATA_KIND_POD_FLAG";
+        if(!(this.typecheckIsParsable_Always(tt) || this.typecheckIsParsable_Never(tt)) 
+            || !(this.typecheckIsPOD_Always(tt) || this.typecheckIsPOD_Never(tt)) 
+            || !(this.typecheckIsAPI_Always(tt) || this.typecheckIsAPI_Never(tt))) {
+            return "DATA_KIND_UNKNOWN_FLAG";
         }
 
-        if(this.typecheckIsAPI_Always(tt)) {
-            return "DATA_KIND_API_FLAG";
-        }
+        const ptt = this.typecheckIsParsable_Always(tt) ? "DATA_KIND_PARSABLE_FLAG" : "DATA_KIND_CLEAR_FLAG";
+        const podtt = this.typecheckIsPOD_Always(tt) ? "DATA_KIND_POD_FLAG" : "DATA_KIND_CLEAR_FLAG";
+        const apitt = this.typecheckIsAPI_Always(tt) ? "DATA_KIND_API_FLAG" : "DATA_KIND_CLEAR_FLAG";
 
-        if(this.typecheckIsAPI_Never(tt) && this.typecheckIsPOD_Never(tt)) {
-            return "DATA_KIND_CLEAR_FLAG";
-        }
-
-        return "DATA_KIND_UNKNOWN_FLAG";
+        return `(${ptt} | ${podtt} | ${apitt})`;
     }
 
-    getCPPTypeFor(tt: MIRType, declspec: "base" | "parameter" | "return" | "storage"): string {
-        if (this.typecheckIsName(tt, /^NSCore::Bool$/)) {
+    getCPPTypeFor_Option(tt: MIRTypeOption): TypeEncodingInfo {
+        if (this.typecheckIsName_Option(tt, /^NSCore::None$/)) {
+            return createTypeEncodingInfo("NoneValue", "NoneValue", TypeEncodingDefaultCategory.Either, COMBINED_KEY_STRUCT, "*");
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::Bool$/)) {
+            return createTypeEncodingInfo("bool", "bool", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "*");
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::Int$/)) {
+            return createTypeEncodingInfo("int64_t", "int64_t", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "*");
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::BigInt$/)) {
+            return createTypeEncodingInfo("BSQBigInt", "BSQBigInt*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::String$/)) {
+            return createTypeEncodingInfo("BSQString", "BSQString*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::SafeString<.*>$/)) {
+            return createTypeEncodingInfo("BSQSafeString", "BSQSafeString*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::StringOf<.*>$/)) {
+            return createTypeEncodingInfo("BSQStringOf", "BSQStringOf*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::UUID$/)) {
+            return createTypeEncodingInfo("BSQUUID", "BSQUUID", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "Boxed_BSQUUID");
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::LogicalTime$/)) {
+            return createTypeEncodingInfo("BSQLogicalTime", "BSQLogicalTime", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "Boxed_BSQLogicalTime");
+        }
+        else if (this.typecheckIsName_Option(tt, /^NSCore::CryptoHash$/)) {
+            return createTypeEncodingInfo("BSQCryptoHash", "BSQCryptoHash*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+        }
+        else if (this.typecheckEntityAndProvidesName_Option(tt, this.enumtype)) {
+            return createTypeEncodingInfo("BSQEnum", "BSQEnum", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "Boxed_BSQEnum");
+        }
+        else if (this.typecheckEntityAndProvidesName_Option(tt, this.idkeytype)) {
+            const iddecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+            if(iddecl.fields.length === 1) {
+                return createTypeEncodingInfo("BSQIdKeySimple", "BSQIdKeySimple", TypeEncodingDefaultCategory.Struct, COMBINED_KEY_STRUCT, "Boxed_BSQIdKeySimple");
+            }
+            else {
+                return createTypeEncodingInfo("BSQIdKeyCompound", "BSQIdKeyCompound*", TypeEncodingDefaultCategory.Reference, COMBINED_KEY);
+            }
+        }
+        else {
+            if (this.typecheckIsName_Option(tt, /^NSCore::Float64$/)) {
+                return createTypeEncodingInfo("double", "double*", TypeEncodingDefaultCategory.Struct, COMBINED_VALUE_STRUCT);
+                return "BSQBuffer" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName_Option(tt, /^NSCore::ByteBuffer$/)) {
+                return "BSQBuffer" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName_Option(tt, /^NSCore::Buffer<.*>$/)) {
+                return "BSQBuffer" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName_Option(tt, /^NSCore::ISOTime$/)) {
+                return "BSQISOTime" + (declspec !== "base" ? "*" : "");
+            }
+            else if (this.typecheckIsName_Option(tt, /^NSCore::Regex$/)) {
+                return "BSQRegex" + (declspec !== "base" ? "*" : "");
+            }
+            else if (tt instanceof MIRTupleType) {
+                return "BSQTuple" + (declspec !== "base" ? "*" : "");
+            }
+            else if (tt instanceof MIRRecordType) {
+                return "BSQRecord" + (declspec !== "base" ? "*" : "");
+            }
+            else if(tt instanceof MIREphemeralListType) {
+                return createTypeEncodingInfo(this.mangleStringForCpp(tt.trkey), this.mangleStringForCpp(tt.trkey), TypeEncodingDefaultCategory.Struct, COMBINED_EPHEMERAL);
+            }
+            else if (tt instanceof MIREntityType) {
+                const iddecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+                if(iddecl.attributes.includes("struct")) {
+                    return createTypeEncodingInfo(this.mangleStringForCpp(tt.trkey), this.mangleStringForCpp(tt.trkey), TypeEncodingDefaultCategory.Struct, COMBINED_VALUE_STRUCT, "Boxed_" + this.mangleStringForCpp(tt.trkey));
+                }
+                else {
+                    return createTypeEncodingInfo(this.mangleStringForCpp(tt.trkey), this.mangleStringForCpp(tt.trkey) + "*", TypeEncodingDefaultCategory.Reference, COMBINED_VALUE);
+                }
+            }
+            else {
+                xxxx; //it is a concept
+            }
+        }
+    }
+
+    getBaseCPPTypeFor(tt: MIRType): string {
+        if (this.typecheckIsName(tt, /^NSCore::None$/)) {
+            return "NoneValue";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Bool$/)) {
             return "bool";
         }
         else if (this.typecheckIsName(tt, /^NSCore::Int$/)) {
-            return "IntValue";
+            return "int64_t";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::BigInt$/)) {
+            return "BSQBigInt";
         }
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
-            return "BSQString" + (declspec !== "base" ? "*" : "");
+            return "BSQString";
         }
         else if (this.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
-            return "BSQSafeString" + (declspec !== "base" ? "*" : "");
+            return "BSQSafeString";
         }
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
-            return "BSQStringOf" + (declspec !== "base" ? "*" : "");
+            return "BSQStringOf";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
-            return "BSQGUID" + (declspec !== "base" ? "*" : "");
+        else if (this.typecheckIsName(tt, /^NSCore::UUID$/)) {
+            return "BSQUUID";
         }
         else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
             return "BSQLogicalTime";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
-            return "BSQDataHash";
-        }
         else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
-            return "BSQCryptoHash" + (declspec !== "base" ? "*" : "");
+            return "BSQCryptoHash";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.enumtype)) {
             return "BSQEnum";
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
-            return "BSQIdKey" + (declspec !== "base" ? "*" : "");
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
-            return "BSQGUIDIdKey" + (declspec !== "base" ? "*" : "");
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
-            return "BSQLogicalTimeIdKey";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
-            return "BSQContentHashIdKey" + (declspec !== "base" ? "*" : "");
+            const iddecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+            return iddecl.fields.length === 1 ? "BSQIdKeySimple" : "BSQIdKeyCompound";
         }
         else {
             if (this.typecheckAllKeys(tt)) {

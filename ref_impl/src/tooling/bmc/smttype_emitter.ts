@@ -22,16 +22,14 @@ class SMTTypeEmitter {
 
     readonly keyType: MIRType;
     readonly validatorType: MIRType;
+    readonly parsableType: MIRType;
     readonly podType: MIRType;
     readonly apiType: MIRType;
     readonly tupleType: MIRType;
     readonly recordType: MIRType;
     
     readonly enumtype: MIRType;
-    readonly idkeytype: MIRType;
-    readonly guididkeytype: MIRType;
-    readonly logicaltimeidkeytype: MIRType;
-    readonly contenthashidkeytype: MIRType;    
+    readonly idkeytype: MIRType; 
 
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
@@ -56,9 +54,6 @@ class SMTTypeEmitter {
 
         this.enumtype = assembly.typeMap.get("NSCore::Enum") as MIRType;
         this.idkeytype = assembly.typeMap.get("NSCore::IdKey") as MIRType;
-        this.guididkeytype = assembly.typeMap.get("NSCore::GUIDIdKey") as MIRType;
-        this.logicaltimeidkeytype = assembly.typeMap.get("NSCore::LogicalTimeIdKey") as MIRType;
-        this.contenthashidkeytype = assembly.typeMap.get("NSCore::ContentHashIdKey") as MIRType;
     }
 
     mangleStringForSMT(name: string): string {
@@ -136,6 +131,30 @@ class SMTTypeEmitter {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
     }
 
+    typecheckIsParsable_Always(tt: MIRType): boolean {
+        return this.assembly.subtypeOf(tt, this.parsableType);
+    }
+
+    typecheckIsParsable_Never(tt: MIRType): boolean {
+        return tt.options.every((opt) => {
+            if(opt instanceof MIREntityType) {
+                return !this.assembly.subtypeOf(this.getMIRType(opt.trkey), this.parsableType);
+            }
+            else if (opt instanceof MIRConceptType) {
+                return false; //TODO: this is very conservative -- we could do better by enumerating possible entities 
+            }
+            else if (opt instanceof MIRTupleType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsParsable_Never(entry.type));
+            }
+            else if (opt instanceof MIRRecordType) {
+                return opt.entries.some((entry) => !entry.isOptional && this.typecheckIsParsable_Never(entry.type));
+            }
+            else {
+                return false;
+            }
+        });
+    }
+
     typecheckIsPOD_Always(tt: MIRType): boolean {
         return this.assembly.subtypeOf(tt, this.podType);
     }
@@ -185,19 +204,17 @@ class SMTTypeEmitter {
     }
 
     generateInitialDataKindFlag(tt: MIRType): string {
-        if(this.typecheckIsPOD_Always(tt)) {
-            return "3";
+        if(!(this.typecheckIsParsable_Always(tt) || this.typecheckIsParsable_Never(tt)) 
+            || !(this.typecheckIsPOD_Always(tt) || this.typecheckIsPOD_Never(tt)) 
+            || !(this.typecheckIsAPI_Always(tt) || this.typecheckIsAPI_Never(tt))) {
+            return "unknown";
         }
 
-        if(this.typecheckIsAPI_Always(tt)) {
-            return "1";
-        }
+        const ptt = this.typecheckIsParsable_Always(tt) ? "true" : "false";
+        const podtt = this.typecheckIsPOD_Always(tt) ? "true" : "false";
+        const apitt = this.typecheckIsAPI_Always(tt) ? "true" : "false";
 
-        if(this.typecheckIsAPI_Never(tt) && this.typecheckIsPOD_Never(tt)) {
-            return "0";
-        }
-
-        return "unknown";
+        return `(StructuralSpecialTypeInfo@cons ${ptt} ${podtt} ${apitt})`;
     }
 
     getSMTTypeFor(tt: MIRType): string {
@@ -205,6 +222,9 @@ class SMTTypeEmitter {
             return "Bool";
         }
         else if (this.typecheckIsName(tt, /^NSCore::Int$/)) {
+            return "Int";
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::BigInt$/)) {
             return "Int";
         }
         else if (this.typecheckIsName(tt, /^NSCore::String$/)) {
@@ -216,14 +236,11 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
             return "bsq_stringof";
         }
-        else if (this.typecheckIsName(tt, /^NSCore::GUID$/)) {
-            return "bsq_guid";
+        else if (this.typecheckIsName(tt, /^NSCore::UUID$/)) {
+            return "bsq_uuid";
         }
         else if (this.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
             return "bsq_logicaltime";
-        }
-        else if (this.typecheckIsName(tt, /^NSCore::DataHash$/)) {
-            return "bsq_datahash";
         }
         else if (this.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
             return "bsq_cryptohash";
@@ -233,15 +250,6 @@ class SMTTypeEmitter {
         }
         else if (this.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
             return "bsq_idkey";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.guididkeytype)) {
-            return "bsq_idkey_guid";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.logicaltimeidkeytype)) {
-            return "bsq_idkey_logicaltime";
-        }
-        else if (this.typecheckEntityAndProvidesName(tt, this.contenthashidkeytype)) {
-            return "bsq_idkey_cryptohash";
         }
         else {
             if(this.typecheckAllKeys(tt)) {
