@@ -405,7 +405,6 @@ public:
     BSQEnum& operator=(const BSQEnum& src) = default;
     BSQEnum& operator=(BSQEnum&& src) = default;
     
-
     inline static bool keyEqual(const BSQEnum& l, const BSQEnum& r)
     {
         return (l.nominalType == r.nominalType) & (l.value == r.value);

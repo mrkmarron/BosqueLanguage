@@ -522,7 +522,7 @@ public:
     }
 
     template <MIRNominalTypeEnum ntype>
-    static BSQList<int64_t, RCDecFunctor_int, DisplayFunctor_int>* list_range(int64_t start, int64_t end)
+    static BSQList<int64_t, RCDecFunctor_int64_t, DisplayFunctor_int64_t>* list_range(int64_t start, int64_t end)
     {
         std::vector<int64_t> entries;
         entries.reserve(end - start);

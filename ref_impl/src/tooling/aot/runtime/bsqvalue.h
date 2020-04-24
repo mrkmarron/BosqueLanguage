@@ -54,6 +54,8 @@ typedef uint32_t DATA_KIND_FLAG;
 #define DATA_KIND_ALL_FLAG (DATA_KIND_API_FLAG | DATA_KIND_POD_FLAG | DATA_KIND_PARSABLE_FLAG)
 #define DATA_KIND_UNKNOWN_FLAG 0xFF
 
+#define DATA_KIND_COMPUTE(KF, COMP) (((KF) == DATA_KIND_UNKNOWN_FLAG) ? (COMP) : (KF)
+
 namespace BSQ
 {
 enum class MIRPropertyEnum
@@ -63,16 +65,37 @@ enum class MIRPropertyEnum
 };
 
 //Category tags to embed in the type enums
-#define MIRNominalTypeEnum_Category_BigInt 0x1
-#define MIRNominalTypeEnum_Category_String 0x2
-#define MIRNominalTypeEnum_Category_SafeString 0x3
-#define MIRNominalTypeEnum_Category_StringOf 0x4
-#define MIRNominalTypeEnum_Category_UUID 0x5
-#define MIRNominalTypeEnum_Category_LogicalTime 0x6
-#define MIRNominalTypeEnum_Category_CryptoHash 0x7
-#define MIRNominalTypeEnum_Category_Enum 0x8
-#define MIRNominalTypeEnum_Category_IdKeySimple 0x9
-#define MIRNominalTypeEnum_Category_IdKeyCompound 0xA
+#define MIRNominalTypeEnum_Category_BigInt          1
+#define MIRNominalTypeEnum_Category_String          2
+#define MIRNominalTypeEnum_Category_SafeString      3
+#define MIRNominalTypeEnum_Category_StringOf        4
+#define MIRNominalTypeEnum_Category_UUID            5
+#define MIRNominalTypeEnum_Category_LogicalTime     6
+#define MIRNominalTypeEnum_Category_CryptoHash      7
+#define MIRNominalTypeEnum_Category_Enum            8
+#define MIRNominalTypeEnum_Category_IdKeySimple     9
+#define MIRNominalTypeEnum_Category_IdKeyCompound   10
+
+#define MIRNominalTypeEnum_Category_KeyTypeLimit    MIRNominalTypeEnum_Category_IdKeyCompound
+
+#define MIRNominalTypeEnum_Category_Float64         20
+#define MIRNominalTypeEnum_Category_Buffer          21
+#define MIRNominalTypeEnum_Category_ByteBuffer      22
+#define MIRNominalTypeEnum_Category_ISOTime         23
+#define MIRNominalTypeEnum_Category_Regex           24
+#define MIRNominalTypeEnum_Category_Tuple           25
+#define MIRNominalTypeEnum_Category_Record          26
+#define MIRNominalTypeEnum_Category_Object          27
+
+#define MIRNominalTypeEnum_Category_NormalTypeLimit MIRNominalTypeEnum_Category_Object
+
+#define MIRNominalTypeEnum_Category_List            40
+#define MIRNominalTypeEnum_Category_Stack           41
+#define MIRNominalTypeEnum_Category_Queue           42
+#define MIRNominalTypeEnum_Category_Set             43
+#define MIRNominalTypeEnum_Category_DynamicSet      44
+#define MIRNominalTypeEnum_Category_Map             45
+#define MIRNominalTypeEnum_Category_DynamicMap      46
 
 #define BUILD_MIR_NOMINAL_TYPE(C, T) (MIRNominalTypeEnum)((T << 8) | T)
 #define GET_MIR_TYPE_CATEGORY(T) ((int32_t)T & 0xFF)
@@ -113,9 +136,9 @@ constexpr DATA_KIND_FLAG nominalDataKinds[] = {
 #define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_ByteBuffer MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
 #define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END%%
 
 typedef void* NoneValue;
@@ -189,8 +212,7 @@ public:
     T bval;
 
     BSQBoxed(MIRNominalTypeEnum nominalType, const T& bval) : BSQRef(nominalType), bval(bval) { ; }
-
-    virtual ~BSQRef() { ; }
+    virtual ~BSQBoxed() { ; }
 
     virtual void destroy() 
     { 
@@ -353,6 +375,7 @@ struct DisplayFunctor_double
         return conv.from_bytes(std::to_string(d));  
     }
 };
+typedef BSQBoxed<double, RCDecFunctor_double> Boxed_double;
 
 MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v);
 MIRNominalTypeEnum getNominalTypeOf_Value(Value v);
@@ -385,30 +408,138 @@ struct DisplayFunctor_KeyValue
     std::u32string operator()(KeyValue k) const { return diagnostic_format(k); }
 };
 
+enum class BSQBufferFormat {
+    Text,
+    Bosque,
+    Json,
+    Binary
+};
+
+enum class BSQBufferEncoding {
+    UTF8,
+    URI,
+    Base64
+};
+
+enum class BSQBufferCompression {
+    Off,
+    RLE,
+    Time,
+    Space
+};
+
+class BSQByteBuffer : public BSQRef
+{
+public:
+    const BSQBufferCompression compression;
+
+    const std::vector<uint8_t> sdata;
+
+    BSQByteBuffer(BSQBufferCompression compression, std::vector<uint8_t>&& sdata) : BSQRef(MIRNominalTypeEnum_ByteBuffer), compression(compression), sdata(move(sdata)) { ; }
+    
+    virtual ~BSQByteBuffer() = default;
+    virtual void destroy() { ; }
+
+    std::u32string display_contents() const
+    {
+        std::u32string rvals(U"");
+        if(this->compression == BSQBufferCompression::Off)
+        {
+            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+            rvals += conv.from_bytes((char*)this->sdata.data(), (char*)this->sdata.data() + this->sdata.size());
+        }
+        else
+        {
+            for (size_t i = 0; i < this->sdata.size(); ++i)
+            {
+                if(i != 0)
+                {
+                    rvals += U", ";
+                }
+
+                rvals += this->sdata[i];
+            }
+        }
+        return rvals;
+    }
+};
+struct DisplayFunctor_BSQByteBuffer
+{
+    std::u32string operator()(const BSQByteBuffer* bb) const 
+    {
+        std::u32string rvals(U"ByteBuffer{");
+        rvals += bb->display_contents();
+        rvals += U"}";
+
+        return rvals;
+    }
+};
+
 class BSQBuffer : public BSQRef
 {
 public:
     const BSQBufferFormat format;
     const BSQBufferEncoding encoding;
-    const BSQBufferCompression compression;
 
-    const std::vector<uint8_t> sdata;
+    BSQByteBuffer* sdata;
 
-    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQBufferCompression compression, std::vector<uint8_t>&& sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), compression(compression), sdata(move(sdata)) { ; }
+    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer*, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
     
     virtual ~BSQBuffer() = default;
-    virtual void destroy() { ; }
+    
+    virtual void destroy() 
+    { 
+        BSQRef::decrementDirect(this->sdata);
+    }
+};
+struct DisplayFunctor_BSQBuffer
+{
+    std::u32string operator()(const BSQBuffer* buff) const 
+    {
+        std::u32string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
+        rvals += U"{";
+        rvals += buff->sdata->display_contents();
+        rvals += U"}";
+
+        return rvals;
+    }
 };
 
-class BSQISOTime : public BSQRef
+class BSQISOTime
 {
 public:
-    const uint64_t isotime;
+    uint64_t isotime;
 
-    BSQISOTime(uint64_t isotime) : BSQRef(MIRNominalTypeEnum_ISOTime), isotime(isotime) { ; }
-    virtual ~BSQISOTime() = default;
-    virtual void destroy() { ; }
+    BSQISOTime() { ; }
+    BSQISOTime(uint64_t isotime) : isotime(isotime) { ; }
+
+    BSQISOTime(const BSQISOTime& src) = default;
+    BSQISOTime(BSQISOTime&& src) = default;
+
+    BSQISOTime& operator=(const BSQISOTime& src) = default;
+    BSQISOTime& operator=(BSQISOTime&& src) = default;
 };
+struct RCIncFunctor_BSQISOTime
+{
+    inline BSQISOTime operator()(BSQISOTime t) const { return t; }
+};
+struct RCDecFunctor_BSQISOTime
+{
+    inline void operator()(BSQISOTime t) const { ; }
+};
+struct RCReturnFunctor_BSQISOTime
+{
+    inline void operator()(BSQISOTime& t, BSQRefScope& scope) const { ; }
+};
+struct DisplayFunctor_BSQISOTime
+{
+    std::u32string operator()(const BSQISOTime& t) const 
+    { 
+        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+        return std::u32string{U"ISOTime={"} + conv.from_bytes(std::to_string(t.isotime)) + U"}";
+    }
+};
+typedef BSQBoxed<BSQISOTime, RCDecFunctor_BSQISOTime> Boxed_BSQISOTime;
 
 class BSQRegex : public BSQRef
 {
@@ -418,178 +549,224 @@ public:
     BSQRegex(const std::u32string& re) : BSQRef(MIRNominalTypeEnum_Regex), re(re) { ; }
     virtual ~BSQRegex() = default;
 };
+struct DisplayFunctor_BSQRegex
+{
+    std::u32string operator()(const BSQRegex* r) const 
+    { 
+        return std::u32string{U"/"} + r->re + std::u32string{U"/"};
+    }
+};
 
 class BSQTuple
 {
 public:
-    const std::vector<Value> entries;
-    const DATA_KIND_FLAG flag;
+    std::vector<Value> entries;
+    DATA_KIND_FLAG flag;
 
+    BSQTuple() { ; }
     BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
 
-    template <uint16_t n>
-    static BSQTuple* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const Value(&values)[n])
+    BSQTuple(const BSQTuple& src) : entries(src.entries), flag(src.flag) { ; };
+    BSQTuple(BSQTuple&& src) : entries(move(src.entries)), flag(src.flag) { ; }
+
+    BSQTuple& operator=(const BSQTuple& src)
     {
-        Value val;
-        std::vector<Value> entries;
-
-        for (int i = 0; i < n; i++)
+        if(this == &src)
         {
-            val = values[i];
-
-            BSQRef::incrementChecked(val);
-            entries.push_back(val);
+            return *this;
         }
 
-        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        this->entries = src.entries;
+        this->flag = src.flag;
+        return *this;
+    }
+
+    BSQTuple& operator=(BSQTuple&& src)
+    {
+        if(this == &src)
+        {
+            return *this;
+        }
+
+        this->entries = std::move(src.entries);
+        this->flag = src.flag;
+        return *this;
+    }
+
+    template <DATA_KIND_FLAG flag>
+    inline static BSQTuple createFromSingle(std::vector<Value>&& values)
+    {
+        auto fv = flag;
+        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
             for(size_t i = 0; i < entries.size(); ++i)
             {
-                flag &= getDataKindFlag(entries[i]);
+                fv &= getDataKindFlag(entries[i]);
             }
         }
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries), flag);
-    }
-
-    static BSQTuple* createFromSingleDynamic(BSQRefScope& scope, DATA_KIND_FLAG flag, const std::vector<Value>& values)
-    {
-        Value val;
-        std::vector<Value> entries;
-
-        for (int i = 0; i < values.size(); i++)
-        {
-            val = values[i];
-
-            BSQRef::incrementChecked(val);
-            entries.push_back(val);
-        }
-
-        if(flag == DATA_KIND_UNKNOWN_FLAG)
-        {
-            for(size_t i = 0; i < entries.size(); ++i)
-            {
-                flag &= getDataKindFlag(entries[i]);
-            }
-        }
-
-        return BSQ_NEW_ADD_SCOPE(scope, BSQTuple, move(entries), flag);
-    }
-
-    virtual ~BSQTuple() = default;
-
-    virtual void destroy()
-    {
-        for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
-        {
-            BSQRef::decrementChecked(*iter);
-        }
+        return BSQTuple(move(entries), fv);
     }
 
     static BSQTuple _empty;
 
-    inline bool hasIndex(uint16_t idx) const
+    template <uint16_t idx>
+    inline bool hasIndex() const
     {
         return idx < this->entries.size();
     }
 
-    inline Value atFixed(uint16_t idx) const
+    template <uint16_t idx>
+    inline Value atFixed() const
     {
-        return (idx < this->entries.size()) ? this->entries[idx] : BSQ_VALUE_NONE;
-    }
-
-    static void _push(std::vector<Value>& entries, Value v)
-    {
-        BSQRef::incrementChecked(v);
-        entries.push_back(v);
+        if constexpr (idx < this->entries.size())
+        {
+            return this->entries[idx];
+        }
+        else
+        {
+            return BSQ_VALUE_NONE;
+        }
     }
 };
+struct RCIncFunctor_BSQTuple
+{
+    inline BSQTuple operator()(BSQTuple tt) const 
+    { 
+        for(size_t i = 0; i < tt.entries.size(); ++i)
+        {
+            BSQRef::incrementChecked(tt.entries[i]);
+        }
+        return tt;
+    }
+};
+struct RCDecFunctor_BSQTuple
+{
+    inline void operator()(BSQTuple tt) const 
+    { 
+        for(size_t i = 0; i < tt.entries.size(); ++i)
+        {
+            BSQRef::decrementChecked(tt.entries[i]);
+        }
+    }
+};
+struct RCReturnFunctor_BSQTuple
+{
+    inline void operator()(BSQTuple& tt, BSQRefScope& scope) const 
+    {
+        for(size_t i = 0; i < tt.entries.size(); ++i)
+        {
+            scope.processReturnChecked(tt.entries[i]);
+        }
+    }
+};
+struct DisplayFunctor_BSQTuple
+{
+    std::u32string operator()(const BSQTuple& tt) const 
+    { 
+        std::u32string tvals(U"[");
+        for(size_t i = 0; i < tt.entries.size(); ++i)
+        {
+            if(i != 0)
+            {
+                tvals += U", ";
+            }
+
+            tvals += diagnostic_format(tt.entries[i]);
+        }
+        tvals += U"]";
+
+        return tvals;
+    }
+};
+typedef BSQBoxed<BSQTuple, RCDecFunctor_BSQTuple> Boxed_BSQTuple;
 
 class BSQRecord
 {
 public:
-    const std::map<MIRPropertyEnum, Value> entries;
-    const DATA_KIND_FLAG flag;
+    std::map<MIRPropertyEnum, Value> entries;
+    DATA_KIND_FLAG flag;
 
+    BSQRecord() { ; }
     BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
 
-    template <uint16_t n>
-    static BSQRecord* createFromSingle(BSQRefScope& scope, DATA_KIND_FLAG flag, const std::pair<MIRPropertyEnum, Value>(&values)[n])
+    BSQRecord(const BSQRecord& src) : entries(src.entries), flag(src.flag) { ; };
+    BSQRecord(BSQRecord&& src) : entries(move(src.entries)), flag(src.flag) { ; }
+
+    BSQRecord& operator=(const BSQRecord& src)
     {
-        std::pair<MIRPropertyEnum, Value> val;
-        std::map<MIRPropertyEnum, Value> entries;
-
-        for (int i = 0; i < n; i++)
+        if(this == &src)
         {
-            val = values[i];
-
-            BSQRef::incrementChecked(val.second);
-            entries.insert(val);
+            return *this;
         }
 
-        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        this->entries = src.entries;
+        this->flag = src.flag;
+        return *this;
+    }
+
+    BSQRecord& operator=(BSQRecord&& src)
+    {
+        if(this == &src)
+        {
+            return *this;
+        }
+
+        this->entries = std::move(src.entries);
+        this->flag = src.flag;
+        return *this;
+    }
+
+    template <DATA_KIND_FLAG flag>
+    static BSQRecord createFromSingle(std::map<MIRPropertyEnum, Value>&& values)
+    {
+        auto fv = flag;
+        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
             for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
             {
-                flag &= getDataKindFlag(iter->second);
+                fv &= getDataKindFlag(entries[i]);
             }
         }
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries), flag);
+        return BSQRecord(move(entries), fv);
     }
 
-    template <uint16_t n>
-    static BSQRecord* createFromUpdate(BSQRefScope& scope, BSQRecord* src, DATA_KIND_FLAG flag, const std::pair<MIRPropertyEnum, Value>(&values)[n])
+    template <DATA_KIND_FLAG flag>
+    static BSQRecord createFromUpdate(const BSQRecord& src, std::map<MIRPropertyEnum, Value>&& values)
     {
-        std::pair<MIRPropertyEnum, Value> val;
-        std::map<MIRPropertyEnum, Value> entries;
-
-        for (int i = 0; i < n; i++)
-        {
-            val = values[i];
-
-            BSQRef::incrementChecked(val.second);
-            entries.insert(val);
-        }
+        std::map<MIRPropertyEnum, Value> entries(move(values));
+        auto fv = flag;
 
         for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
             auto pos = entries.lower_bound(iter->first);
             if(pos != src->entries.cend() && pos->first != iter->first)
             {
-                BSQRef::incrementChecked(iter->second);
                 entries.emplace_hint(pos, *iter);
             }
         }
 
-        if(flag == DATA_KIND_UNKNOWN_FLAG)
+        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
             for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
             {
-                flag &= getDataKindFlag(iter->second);
+                fv &= getDataKindFlag(entries[i]);
             }
         }
 
-        return BSQ_NEW_ADD_SCOPE(scope, BSQRecord, move(entries), flag);
-    }
-
-    virtual ~BSQRecord() = default;
-
-    virtual void destroy()
-    {
-        for(auto iter = this->entries.begin(); iter != this->entries.end(); ++iter)
-        {
-            BSQRef::decrementChecked(iter->second);
-        }
+        return BSQRecord(move(entries), fv);
     }
 
     static BSQRecord _empty;
 
-    inline bool hasProperty(MIRPropertyEnum p) const
+    template <MIRPropertyEnum p>
+    inline bool hasProperty() const
     {
         return this->entries.find(p) != this->entries.end();
     }
 
-    inline Value atFixed(MIRPropertyEnum p) const
+    template <MIRPropertyEnum p>
+    inline Value atFixed() const
     {
         auto iter = this->entries.find(p);
         return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
@@ -618,6 +795,57 @@ public:
         return true;
     }
 };
+struct RCIncFunctor_BSQRecord
+{
+    inline BSQRecord operator()(BSQRecord rr) const 
+    { 
+        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
+        {
+           BSQRef::incrementChecked(iter->second);
+        }
+        return rr;
+    }
+};
+struct RCDecFunctor_BSQRecord
+{
+    inline void operator()(BSQRecord rr) const 
+    { 
+        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
+        {
+           BSQRef::decrementChecked(iter->second);
+        }
+    }
+};
+struct RCReturnFunctor_BSQRecord
+{
+    inline void operator()(BSQRecord& rr, BSQRefScope& scope) const 
+    {
+        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
+        {
+            scope.processReturnChecked(iter->second);
+        } 
+    }
+};
+struct DisplayFunctor_BSQRecord
+{
+    std::u32string operator()(const BSQRecord& rr) const 
+    { 
+        std::u32string rvals(U"{");
+        bool first = true;
+        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
+        {
+            if(!first)
+            {
+                rvals += U", ";
+            }
+            first = false;
+
+            rvals += std::u32string{propertyNames[(int32_t)iter->first]} + U"=" + diagnostic_format(iter->second);
+        }
+        rvals += U"}";
+    }
+};
+typedef BSQBoxed<BSQRecord, RCDecFunctor_BSQRecord> Boxed_BSQRecord;
 
 class BSQObject : public BSQRef
 {
@@ -630,7 +858,7 @@ public:
     template<int32_t k>
     inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
     {
-        if(k < 16)
+        if constexpr (k < 16)
         {
             for(int32_t i = 0; i < k; ++i)
             {

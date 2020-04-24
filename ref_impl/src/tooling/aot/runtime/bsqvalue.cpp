@@ -223,132 +223,22 @@ std::u32string diagnostic_format(Value v)
                 return DisplayFunctor_BSQIdKeySimple{}(dynamic_cast<Boxed_BSQIdKeySimple*>(vv)->bval);
             case MIRNominalTypeEnum_Category_IdKeyCompound:
                 return DisplayFunctor_BSQIdKeyCompound{}(dynamic_cast<BSQIdKeyCompound*>(vv));
-        }
-
-
-
-        if(dynamic_cast<const BSQBigInt*>(vv) != nullptr)
-        {
-            return dynamic_cast<const BSQBigInt*>(vv)->display();
-        }
-        else if(dynamic_cast<const BSQString*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQString{}(dynamic_cast<const BSQString*>(vv));
-        }
-        else if(dynamic_cast<const BSQSafeString*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQSafeString{}(dynamic_cast<const BSQSafeString*>(vv));
-        }
-        else if(dynamic_cast<const BSQStringOf*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQStringOf{}(dynamic_cast<const BSQStringOf*>(vv));
-        }
-        else if(dynamic_cast<const BSQGUID*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQGUID{}(dynamic_cast<const BSQGUID*>(vv));
-        }
-        else if(dynamic_cast<const BSQDataHash*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQDataHash{}(*dynamic_cast<const BSQDataHash*>(vv));
-        }
-        else if(dynamic_cast<const BSQCryptoHash*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQCryptoHash{}(dynamic_cast<const BSQCryptoHash*>(vv));
-        }
-        else if(dynamic_cast<const BSQDataHash*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQDataHash{}(*dynamic_cast<const BSQDataHash*>(vv));
-        }
-        else if(dynamic_cast<const BSQLogicalTime*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQLogicalTime{}(*dynamic_cast<const BSQLogicalTime*>(vv));
-        }
-        else if(dynamic_cast<const BSQEnum*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQEnum{}(*dynamic_cast<const BSQEnum*>(vv));
-        }
-        else if(dynamic_cast<const BSQIdKey*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQIdKey{}(dynamic_cast<const BSQIdKey*>(vv));
-        }
-        else if(dynamic_cast<const BSQGUIDIdKey*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQGUIDIdKey{}(dynamic_cast<const BSQGUIDIdKey*>(vv));
-        }
-        else if(dynamic_cast<const BSQContentHashIdKey*>(vv) != nullptr)
-        {
-            return DisplayFunctor_BSQContentHashIdKey{}(dynamic_cast<const BSQContentHashIdKey*>(vv));
-        }
-        else if(dynamic_cast<const BSQBuffer*>(vv) != nullptr)
-        {
-            auto pbuf = dynamic_cast<const BSQBuffer*>(vv);
-            std::u32string rvals(U"PODBuffer{");
-            for (size_t i = 0; i < pbuf->sdata.size(); ++i)
-            {
-                if(i != 0)
-                {
-                    rvals += U", ";
-                }
-
-                rvals += pbuf->sdata[i];
-            }
-            rvals += U"}";
-
-            return rvals;
-        }
-        else if(dynamic_cast<const BSQISOTime*>(vv) != nullptr)
-        {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            return std::u32string{U"ISOTime="} + conv.from_bytes(std::to_string(dynamic_cast<const BSQISOTime*>(vv)->isotime)) + U"}";
-        }
-        else if(dynamic_cast<const BSQRegex*>(vv) != nullptr)
-        {
-            return std::u32string{U"Regex="} + dynamic_cast<const BSQRegex*>(vv)->re;
-        }
-        else if(dynamic_cast<const BSQTuple*>(vv) != nullptr)
-        {
-            auto tv = dynamic_cast<const BSQTuple*>(vv);
-            std::u32string tvals(U"[");
-            for(size_t i = 0; i < tv->entries.size(); ++i)
-            {
-                if(i != 0)
-                {
-                    tvals += U", ";
-                }
-
-                tvals += diagnostic_format(tv->entries.at(i));
-            }
-            tvals += U"]";
-
-            return tvals;
-        }
-        else if(dynamic_cast<const BSQRecord*>(vv) != nullptr)
-        {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-
-            auto rv = dynamic_cast<const BSQRecord*>(vv);
-            std::u32string rvals(U"{");
-            bool first = true;
-            for(auto iter = rv->entries.cbegin(); iter != rv->entries.cend(); ++iter)
-            {
-                if(!first)
-                {
-                    rvals += U", ";
-                }
-                first = false;
-
-                rvals += conv.from_bytes(propertyNames[(int32_t)iter->first]) + U"=" + diagnostic_format(iter->second);
-            }
-            rvals += U"}";
-
-            return rvals;
-        }
-        else
-        {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            
-            auto obj = dynamic_cast<const BSQObject*>(vv);
-            return conv.from_bytes(nominaltypenames[(uint32_t) obj->nominalType]) + obj->display();
+            case MIRNominalTypeEnum_Category_Float64:
+                return DisplayFunctor_double{}(dynamic_cast<Boxed_double*>(vv)->bval);
+            case MIRNominalTypeEnum_Category_ByteBuffer:
+                return DisplayFunctor_BSQByteBuffer{}(dynamic_cast<BSQByteBuffer*>(vv));
+            case MIRNominalTypeEnum_Category_Buffer:
+                return DisplayFunctor_BSQBuffer{}(dynamic_cast<BSQBuffer*>(vv));
+            case MIRNominalTypeEnum_Category_ISOTime:
+                return DisplayFunctor_BSQISOTime{}(dynamic_cast<Boxed_BSQISOTime*>(vv)->bval);
+            case MIRNominalTypeEnum_Category_Regex:
+                return DisplayFunctor_BSQRegex{}(dynamic_cast<BSQRegex*>(vv));
+            case MIRNominalTypeEnum_Category_Tuple:
+                return DisplayFunctor_BSQTuple{}(dynamic_cast<Boxed_BSQTuple*>(vv)->bval);
+            case MIRNominalTypeEnum_Category_Record:
+                return DisplayFunctor_BSQRecord{}(dynamic_cast<Boxed_BSQRecord*>(vv)->bval);
+            default:
+                return dynamic_cast<BSQObject*>(vv)->display();
         }
     }
 }
