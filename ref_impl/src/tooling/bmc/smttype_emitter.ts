@@ -536,26 +536,6 @@ class SMTTypeEmitter {
         }
     }
 
-    getKeyProjectedTypeFrom(ktype: MIRType): MIRType {
-        if(this.typecheckAllKeys(ktype)) {
-            return ktype;
-        }
-        else {
-            assert(false);
-            return ktype;
-        }
-    }
-
-    getKeyFrom(arg: string, atype: MIRType): string {
-        if(this.typecheckAllKeys(atype)) {
-            return arg;
-        }
-        else {
-            assert(false);
-            return "[NOT IMPLEMENTED]";
-        }
-    }
-
     tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
         if(tt.options.every((opt) => opt instanceof MIRTupleType && idx < opt.entries.length && !opt.entries[idx].isOptional)) {
             return "yes";

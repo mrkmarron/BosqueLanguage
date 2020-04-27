@@ -220,6 +220,66 @@ public:
     }
 };
 
+struct BSQUnionValueOps
+{
+    void* (*RCIncFunctorFP)(void* data);
+    void (*RCDecFunctorFP)(void* data);
+    void (*RCRecFunctorFP)(void* data, BSQRefScope& scope);
+    bool (*EqualFunctorFP)(void* data1, void* data2);
+    bool (*LessFunctorFP)(void* data1, void* data2);
+    std::u32string (*DisplayFunctorFP)(void* data);
+};
+
+template <size_t k>
+class BSQUnionValue
+{
+public:
+    uint8_t udata[k];
+    MIRNominalTypeEnum nominalType;
+    BSQUnionValueOps* ops;
+
+    BSQUnionValue() : { ; }
+    BSQUnionValue(MIRNominalTypeEnum nominalType, UnionValueOps* ops, const uint8_t(&udata)[k]) : nominalType(nominalType), ops(ops) { memcpy(this->udata, udata, 16); }
+    
+    BSQUnionValue(const BSQUnionValue& src) = default;
+    BSQUnionValue(BSQUnionValue&& src) = default;
+
+    BSQUnionValue& operator=(const BSQUnionValue&) = default;
+    BSQUnionValue& operator=(BSQUnionValue&&) = default;
+
+    template <typename T>
+    inline static BSQUnionValue create(T data, MIRNominalTypeEnum nominalType, UnionValueOps* ops)
+    {
+        static_assert(sizeof(T) <= k);
+
+        BSQUnionValue res;
+        res.nominalType = this->nominalType;
+        res.ops = this->ops;
+        memcpy(res.udata, (void*)(&data), sizeof(T));
+
+        return res;
+    }
+
+    template <size_t j>
+    inline BSQUnionValue<j> convert()
+    {
+        BSQUnionValue<j> res;
+        res.nominalType = this->nominalType;
+        res.ops = this->ops;
+        memcpy(res.udata, this->udata, min(k, j));
+
+        return res;
+    }
+
+    template <typename T>
+    inline T extract()
+    {
+        static_assert(sizeof(T) <= k);
+
+        return *((T*)((void*)&this->udata));
+    }
+};
+
 class BSQRefScope
 {
 private:

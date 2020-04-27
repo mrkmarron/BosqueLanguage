@@ -40,10 +40,14 @@ class NoneRepr extends TypeRepr {
 
 class StructRepr extends TypeRepr {
     readonly boxed: string;
+    readonly nominaltype: string;
+    readonly reqspace: number;
 
-    constructor(iskey: boolean, base: string, boxed: string) {
+    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, reqspace: number) {
         super(iskey, base, base);
         this.boxed = boxed;
+        this.nominaltype = nominaltype;
+        this.reqspace = reqspace;
     }
 }
 
@@ -73,10 +77,12 @@ class EphemeralListRepr extends TypeRepr {
 
 class UnionRepr extends TypeRepr {
     readonly opts: TypeRepr[];
+    readonly reqspace: number;
 
-    constructor(iskey: boolean, repr: string, opts: TypeRepr[]) {
+    constructor(iskey: boolean, repr: string, reqspace: number, opts: TypeRepr[]) {
         super(iskey, repr, repr);
         this.opts = opts;
+        this.reqspace = reqspace;
     }
 
     static create(...trl: TypeRepr[]): UnionRepr {
@@ -86,9 +92,11 @@ class UnionRepr extends TypeRepr {
         trl.sort((a, b) => a.base.localeCompare(b.base));
 
         const iskey = trl.every((tr) => tr.iskey);
-        const repr = `std::variant<${trl.map((tr) => tr.std).join(", ")}>`;
+        const size = Math.max(...trl.map((tr) => tr instanceof StructRepr ? tr.reqspace : 8)) + 4;
 
-        return new UnionRepr(iskey, repr, trl);
+        const repr = `UnionValue<${size}>`;
+
+        return new UnionRepr(iskey, repr, size, trl);
     }
 
     extendRepr(tr: TypeRepr): TypeRepr {

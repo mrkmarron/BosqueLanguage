@@ -252,7 +252,7 @@ public:
     uint8_t sdata[16];
 
     BSQUUID() { ; }
-    BSQUUID(const uint8_t sdata[16]) : sdata() { memcpy(this->sdata, sdata, 16); }
+    BSQUUID(const uint8_t(&sdata)[16]) : sdata() { memcpy(this->sdata, sdata, 16); }
 
     BSQUUID(const BSQUUID& src) = default;
     BSQUUID(BSQUUID&& src) = default;
@@ -355,7 +355,7 @@ class BSQCryptoHash : public BSQRef
 public:
     const uint8_t hdata[64];
 
-    BSQCryptoHash(const uint8_t sdata[64]) : BSQRef(MIRNominalTypeEnum_CryptoHash), hdata() { memcpy((void*)this->hdata, hdata, 64); }
+    BSQCryptoHash(const uint8_t(&sdata)[64]) : BSQRef(MIRNominalTypeEnum_CryptoHash), hdata() { memcpy((void*)this->hdata, hdata, 64); }
     
     virtual ~BSQCryptoHash() = default;
 
