@@ -467,6 +467,11 @@ class SMTTypeEmitter {
             return exp;
         }
 
+        if(this.typecheckEphemeral(from) && this.typecheckEphemeral(into)) {
+            const cfunc = this.generateEphemeralListConvert(from, into);
+            return new SMTValue(`(${cfunc} ${exp})`);
+        }
+
         if (from.trkey === "NSCore::None") {
             return this.coerceFromAtomicKey(exp, from, into);
         }
@@ -642,10 +647,6 @@ class SMTTypeEmitter {
         return this.mangleStringForSMT(`${ekey}_collection_has_array_empty`);
     }
 
-    generateEmptyKeyArrayFor(ekey: MIRNominalTypeKey): string {
-        return this.mangleStringForSMT(`${ekey}_collection_key_array_empty`);
-    }
-
     generateEmptyDataArrayFor(ekey: MIRNominalTypeKey): string {
         return this.mangleStringForSMT(`${ekey}_collection_data_array_empty`);
     }
@@ -656,7 +657,6 @@ class SMTTypeEmitter {
 
         const typet = entity.terms.get("T") as MIRType;
 
-        xxxx;
         const fargs = [
             `(${this.generateSpecialTypeFieldName(entity.tkey, "size")} Int)`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "entries")} (Array Int ${this.getSMTTypeFor(typet)}))`
@@ -670,9 +670,47 @@ class SMTTypeEmitter {
         };
     }
 
-    getKeyListTypeForSet(entity: MIREntityTypeDecl): MIRType {
+    generateStackSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string, ocons: string, emptydecl: string } {
+        const tt = this.getMIRType(entity.tkey);
+        const ename = this.mangleStringForSMT(entity.tkey);
+
         const typet = entity.terms.get("T") as MIRType;
-        const typekp = this.getKeyProjectedTypeFrom(typet);
+
+        const fargs = [
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "head")} Int)`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "entries")} (Array Int ${this.getSMTTypeFor(typet)}))`
+        ];
+
+        return {
+            fwddecl: `(${ename} 0)`,
+            fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+            ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
+            emptydecl: `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array Int ${this.getSMTTypeFor(typet)}))`
+        };
+    }
+
+    generateQueueSMTEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string, ocons: string, emptydecl: string } {
+        const tt = this.getMIRType(entity.tkey);
+        const ename = this.mangleStringForSMT(entity.tkey);
+
+        const typet = entity.terms.get("T") as MIRType;
+
+        const fargs = [
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "start")} Int)`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "end")} Int)`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "entries")} (Array Int ${this.getSMTTypeFor(typet)}))`
+        ];
+
+        return {
+            fwddecl: `(${ename} 0)`,
+            fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
+            ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
+            emptydecl: `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array Int ${this.getSMTTypeFor(typet)}))`
+        };
+    }
+
+    getKeyListTypeForSet(entity: MIREntityTypeDecl): MIRType {
+        const typekp = entity.terms.get("T") as MIRType;
         const itypekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
         const rv = [...this.assembly.typeMap].find((entry) => entry[1].options.length == 2 && entry[1].options[0].trkey === itypekl.tkey && entry[1].options[1].trkey === "NSCore::None");
 
@@ -683,14 +721,12 @@ class SMTTypeEmitter {
         const tt = this.getMIRType(entity.tkey);
         const ename = this.mangleStringForSMT(entity.tkey);
 
-        const typet = entity.terms.get("T") as MIRType;
-        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const typekp = entity.terms.get("T") as MIRType;
         const typekl = this.getKeyListTypeForSet(entity);
 
         const fargs =  [
             `(${this.generateSpecialTypeFieldName(entity.tkey, "size")} Int)`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "has")} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
-            `(${this.generateSpecialTypeFieldName(entity.tkey, "values")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(typekl)})`,
         ];
 
@@ -699,7 +735,6 @@ class SMTTypeEmitter {
             fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
             ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
             emptydecl: [
-                `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
                 `(declare-const ${this.generateEmptyHasArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
                 `(assert (= ${this.generateEmptyHasArrayFor(entity.tkey)} ((as const (Array ${this.getSMTTypeFor(typekp)} Bool)) false)))`
             ].join("\n")
@@ -707,8 +742,7 @@ class SMTTypeEmitter {
     }
 
     getKeyListTypeForMap(entity: MIREntityTypeDecl): MIRType {
-        const typet = entity.terms.get("K") as MIRType;
-        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const typekp = entity.terms.get("K") as MIRType;
         const itypekl = ([...this.assembly.entityDecls].find((e) => e[1].ns === "NSCore" && e[1].name === "KeyList" && (e[1].terms.get("K") as MIRType).trkey === typekp.trkey) as [string, MIREntityTypeDecl])[1];
         const rv = [...this.assembly.typeMap].find((entry) => entry[1].options.length == 2 && entry[1].options[0].trkey === itypekl.tkey && entry[1].options[1].trkey === "NSCore::None");
 
@@ -719,16 +753,14 @@ class SMTTypeEmitter {
         const tt = this.getMIRType(entity.tkey);
         const ename = this.mangleStringForSMT(entity.tkey);
 
-        const typet = entity.terms.get("K") as MIRType;
-        const typeu = entity.terms.get("V") as MIRType;
-        const typekp = this.getKeyProjectedTypeFrom(typet);
+        const typekp = entity.terms.get("K") as MIRType;
+        const typev = entity.terms.get("V") as MIRType;
         const typekl = this.getKeyListTypeForMap(entity);
 
         const fargs =  [
             `(${this.generateSpecialTypeFieldName(entity.tkey, "size")} Int)`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "has")} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
-            `(${this.generateSpecialTypeFieldName(entity.tkey, "keys")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
-            `(${this.generateSpecialTypeFieldName(entity.tkey, "values")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typeu)}))`,
+            `(${this.generateSpecialTypeFieldName(entity.tkey, "values")} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typev)}))`,
             `(${this.generateSpecialTypeFieldName(entity.tkey, "keylist")} ${this.getSMTTypeFor(typekl)})`,
         ];
 
@@ -737,8 +769,7 @@ class SMTTypeEmitter {
             fulldecl: `( (${this.generateEntityConstructor(entity.tkey)} ${fargs.join(" ")}) )`,
             ocons: `(cons@bsq_object_from_${ename} (bsqterm_object_${ename}_value ${this.getSMTTypeFor(tt)}))`,
             emptydecl: [
-                `(declare-const ${this.generateEmptyKeyArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typet)}))`,
-                `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typeu)}))`,
+                `(declare-const ${this.generateEmptyDataArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} ${this.getSMTTypeFor(typev)}))`,
                 `(declare-const ${this.generateEmptyHasArrayFor(entity.tkey)} (Array ${this.getSMTTypeFor(typekp)} Bool))`,
                 `(assert (= ${this.generateEmptyHasArrayFor(entity.tkey)} ((as const (Array ${this.getSMTTypeFor(typekp)} Bool)) false)))`
             ].join("\n")
@@ -755,10 +786,16 @@ class SMTTypeEmitter {
         if (this.typecheckIsName(tt, /^NSCore::List<.*>$/)) {
             return this.generateListSMTEntity(entity);
         }
-        else if (this.typecheckIsName(tt, /^NSCore::Set<.*>$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::Stack<.*>$/)) {
+            return this.generateStackSMTEntity(entity);
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Queue<.*>$/)) {
+            return this.generateQueueSMTEntity(entity);
+        }
+        else if (this.typecheckIsName(tt, /^NSCore::Set<.*>$/) || this.typecheckIsName(tt, /^NSCore::DynamicSet<.*>$/)) {
             return this.generateSetSMTEntity(entity);
         }
-        else if (this.typecheckIsName(tt, /^NSCore::Map<.*>$/)) {
+        else if (this.typecheckIsName(tt, /^NSCore::Map<.*>$/) || this.typecheckIsName(tt, /^NSCore::DynamicMap<.*>$/)) {
             return this.generateMapSMTEntity(entity);
         }
         else {

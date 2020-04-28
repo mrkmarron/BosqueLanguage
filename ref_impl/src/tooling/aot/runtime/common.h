@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <assert.h>
+
 #include <cstdlib>
 #include <cstdint>
 #include <stdarg.h>

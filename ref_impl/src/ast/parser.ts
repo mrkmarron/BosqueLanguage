@@ -924,12 +924,8 @@ class Parser {
         else {
             this.consumeToken();
             const ptype = this.parseNominalType();
-            let version = "*";
-            if(this.testAndConsumeTokenIf("-")) {
-                version = this.consumeTokenAndGetValue();
-            }
             
-            return new ProjectTypeSignature(ltype, ptype, version);
+            return new ProjectTypeSignature(ltype, ptype);
         }
     }
 
@@ -3039,7 +3035,7 @@ class Parser {
 
         //[attr] enum NAME {...}
         const pragmas = this.parseDeclPragmas();
-        const attributes = ["byvalue", ...this.parseAttributes()];
+        const attributes = ["struct", ...this.parseAttributes()];
 
         const sinfo = this.getCurrentSrcInfo();
         this.ensureAndConsumeToken("enum");
@@ -3099,7 +3095,7 @@ class Parser {
 
         //[attr] (hash) identifier NAME = 
         const pragmas = this.parseDeclPragmas();
-        const attributes = this.parseAttributes();
+        const attributes = ["struct", ...this.parseAttributes()];
 
         const sinfo = this.getCurrentSrcInfo();
        

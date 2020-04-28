@@ -98,8 +98,8 @@ enum class MIRPropertyEnum
 #define MIRNominalTypeEnum_Category_DynamicMap      46
 
 #define BUILD_MIR_NOMINAL_TYPE(C, T) (MIRNominalTypeEnum)((T << 8) | T)
-#define GET_MIR_TYPE_CATEGORY(T) ((int32_t)T & 0xFF)
-#define GET_MIR_TYPE_POSITION(T) ((int32_t)T >> 8)
+#define GET_MIR_TYPE_CATEGORY(T) (((int32_t)(T)) & 0xFF)
+#define GET_MIR_TYPE_POSITION(T) (((int32_t)(T)) >> 8)
 
 enum class MIRNominalTypeEnum
 {
@@ -220,11 +220,11 @@ public:
     }
 };
 
-struct BSQUnionValueOps
+struct BSQValueOps
 {
     void* (*RCIncFunctorFP)(void* data);
     void (*RCDecFunctorFP)(void* data);
-    void (*RCRecFunctorFP)(void* data, BSQRefScope& scope);
+    void (*RCReturnFunctorFP)(void* data, BSQRefScope& scope);
     bool (*EqualFunctorFP)(void* data1, void* data2);
     bool (*LessFunctorFP)(void* data1, void* data2);
     std::u32string (*DisplayFunctorFP)(void* data);
@@ -236,10 +236,9 @@ class BSQUnionValue
 public:
     uint8_t udata[k];
     MIRNominalTypeEnum nominalType;
-    BSQUnionValueOps* ops;
 
     BSQUnionValue() : { ; }
-    BSQUnionValue(MIRNominalTypeEnum nominalType, UnionValueOps* ops, const uint8_t(&udata)[k]) : nominalType(nominalType), ops(ops) { memcpy(this->udata, udata, 16); }
+    BSQUnionValue(MIRNominalTypeEnum nominalType, const uint8_t(&udata)[k]) : nominalType(nominalType) { memcpy(this->udata, udata, k); }
     
     BSQUnionValue(const BSQUnionValue& src) = default;
     BSQUnionValue(BSQUnionValue&& src) = default;
@@ -248,13 +247,12 @@ public:
     BSQUnionValue& operator=(BSQUnionValue&&) = default;
 
     template <typename T>
-    inline static BSQUnionValue create(T data, MIRNominalTypeEnum nominalType, UnionValueOps* ops)
+    inline static BSQUnionValue create(T data, MIRNominalTypeEnum nominalType)
     {
         static_assert(sizeof(T) <= k);
 
         BSQUnionValue res;
         res.nominalType = this->nominalType;
-        res.ops = this->ops;
         memcpy(res.udata, (void*)(&data), sizeof(T));
 
         return res;
@@ -265,7 +263,6 @@ public:
     {
         BSQUnionValue<j> res;
         res.nominalType = this->nominalType;
-        res.ops = this->ops;
         memcpy(res.udata, this->udata, min(k, j));
 
         return res;
@@ -279,6 +276,9 @@ public:
         return *((T*)((void*)&this->udata));
     }
 };
+//
+//Union struct ops are declared in runtime for forward decls reasons
+//
 
 class BSQRefScope
 {
@@ -338,27 +338,27 @@ public:
 
 struct RCIncFunctor_NoneValue
 {
-    inline void* operator()(void* n) const { return n; }
+    inline void* operator()(NoneValue n) const { return n; }
 };
 struct RCDecFunctor_NoneValue
 {
-    inline void operator()(void* n) const { ; }
+    inline void operator()(NoneValue n) const { ; }
 };
 struct RCReturnFunctor_NoneValue
 {
-    inline void operator()(BSQEnum& e, BSQRefScope& scope) const { ; }
+    inline void operator()(NoneValue& e, BSQRefScope& scope) const { ; }
 };
 struct EqualFunctor_NoneValue
 {
-    inline bool operator()(void* l, void* r) const { return true; }
+    inline bool operator()(NoneValue l, NoneValue r) const { return true; }
 };
 struct LessFunctor_NoneValue
 {
-    inline bool operator()(void* l, void* r) const { return false; }
+    inline bool operator()(NoneValue l, NoneValue r) const { return false; }
 };
 struct DisplayFunctor_NoneValue
 {
-    std::u32string operator()(void* n) const { return U"none"; }
+    std::u32string operator()(NoneValue n) const { return U"none"; }
 };
 
 struct RCIncFunctor_bool
@@ -447,6 +447,19 @@ DATA_KIND_FLAG getDataKindFlag(Value v);
 
 std::u32string diagnostic_format(Value v);
 
+struct RCIncFunctor_BSQRef
+{
+    inline KeyValue operator()(BSQRef* r) const { INC_REF_DIRECT(BSQRef, r); }
+};
+struct RCDecFunctor_BSQRef
+{
+    inline void operator()(BSQRef* r) const { BSQRef::decrementDirect(r); }
+};
+struct DisplayFunctor_BSQRef
+{
+    std::u32string operator()(BSQRef* r) const { return diagnostic_format(r); }
+};
+
 struct RCIncFunctor_KeyValue
 {
     inline KeyValue operator()(KeyValue k) const { INC_REF_CHECK(KeyValue, k); }
@@ -466,6 +479,19 @@ struct LessFunctor_KeyValue
 struct DisplayFunctor_KeyValue
 {
     std::u32string operator()(KeyValue k) const { return diagnostic_format(k); }
+};
+
+struct RCIncFunctor_Value
+{
+    inline Value operator()(Value v) const { INC_REF_CHECK(Value, v); }
+};
+struct RCDecFunctor_Value
+{
+    inline void operator()(Value v) const { BSQRef::decrementChecked(v); }
+};
+struct DisplayFunctor_Value
+{
+    std::u32string operator()(Value v) const { return diagnostic_format(v); }
 };
 
 enum class BSQBufferFormat {
@@ -939,6 +965,21 @@ public:
     static bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
     {
         return std::binary_search(&etypes[0], &etypes[k], tt); 
+    }
+};
+
+template <typename T, typename DestroyFunctor>
+class BSQBoxedObject : public BSQObject
+{
+public:
+    T bval;
+
+    BSQBoxedObject(MIRNominalTypeEnum nominalType, const T& bval) : BSQObject(nominalType), bval(bval) { ; }
+    virtual ~BSQBoxedObject() { ; }
+
+    virtual void destroy() 
+    { 
+        DestroyFunctor{}(this->bval); 
     }
 };
 } // namespace BSQ

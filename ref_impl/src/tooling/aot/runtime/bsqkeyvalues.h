@@ -445,14 +445,22 @@ struct DisplayFunctor_BSQEnum
 };
 typedef BSQBoxed<BSQEnum, RCDecFunctor_BSQEnum> Boxed_BSQEnum;
 
+//TODO: may want to make this into a fully specialized set of types with some FP dispatch for KeyValue ops at some point
 class BSQIdKeySimple
 {
 public:
-    MIRNominalTypeEnum nominalType;
     KeyValue key;
+    MIRNominalTypeEnum nominalType;
 
-    BSQIdKeySimple(KeyValue key, MIRNominalTypeEnum oftype) : nominalType(oftype), key(key) { ; }
+    BSQIdKeySimple() { ; }
+    BSQIdKeySimple(KeyValue key, MIRNominalTypeEnum oftype) : key(key), nominalType(oftype) { ; }
     
+    BSQIdKeySimple(const BSQIdKeySimple& src) = default;
+    BSQIdKeySimple(BSQIdKeySimple&& src) = default;
+
+    BSQIdKeySimple& operator=(const BSQIdKeySimple& src) = default;
+    BSQIdKeySimple& operator=(BSQIdKeySimple&& src) = default;
+
     inline static bool keyEqual(const BSQIdKeySimple& l, const BSQIdKeySimple& r)
     {
         return (l.nominalType == r.nominalType) && bsqKeyValueEqual(l.key, r.key);
@@ -508,33 +516,52 @@ struct DisplayFunctor_BSQIdKeySimple
 };
 typedef BSQBoxed<BSQIdKeySimple, RCDecFunctor_BSQIdKeySimple> Boxed_BSQIdKeySimple;
 
-class BSQIdKeyCompound : public BSQRef
+class BSQIdKeyCompound
 {
 public:
+    std::vector<KeyValue> keys;
     MIRNominalTypeEnum nominalType;
-    const std::vector<KeyValue> keys;
 
-    BSQIdKeyCompound(std::vector<KeyValue>&& keys, MIRNominalTypeEnum oftype) : nominalType(oftype), keys(move(keys)) { ; }
+    BSQIdKeyCompound() { ; }
+    BSQIdKeyCompound(std::vector<KeyValue>&& keys, MIRNominalTypeEnum oftype) : keys(move(keys)), nominalType(oftype) { ; }
 
-    virtual ~BSQIdKeyCompound() = default;
-    virtual void destroy() 
+    BSQIdKeyCompound(const BSQIdKeyCompound& src) : keys(src.keys), nominalType(src.nominalType) { ; };
+    BSQIdKeyCompound(BSQIdKeyCompound&& src) : keys(move(src.keys)), nominalType(src.nominalType) { ; }
+
+    BSQIdKeyCompound& operator=(const BSQIdKeyCompound& src)
     {
-        for(size_t i = 0; i < this->keys.size(); ++i)
+        if(this == &src)
         {
-            BSQRef::decrementChecked(this->keys[i]); 
+            return *this;
         }
+
+        this->keys = src.keys;
+        this->nominalType = src.nominalType;
+        return *this;
     }
 
-    static bool keyEqual(const BSQIdKeyCompound* l, const BSQIdKeyCompound* r)
+    BSQIdKeyCompound& operator=(BSQIdKeyCompound&& src)
     {
-        if(l->nominalType != r->nominalType || l->keys.size() != r->keys.size())
+        if(this == &src)
+        {
+            return *this;
+        }
+
+        this->keys = std::move(src.keys);
+        this->nominalType = src.nominalType;
+        return *this;
+    }
+
+    static bool keyEqual(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
+    {
+        if(l.nominalType != r.nominalType || l.keys.size() != r.keys.size())
         {
             return false;
         }
         
-        for(size_t i = 0; i < l->keys.size(); ++i)
+        for(size_t i = 0; i < l.keys.size(); ++i)
         {
-            if(!bsqKeyValueEqual(l->keys[i], r->keys[i]))
+            if(!bsqKeyValueEqual(l.keys[i], r.keys[i]))
             {
                 return false;
             }
@@ -543,23 +570,23 @@ public:
         return true;
     }
 
-    static bool keyLess(const BSQIdKeyCompound* l, const BSQIdKeyCompound* r)
+    static bool keyLess(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
     {
-        if(l->nominalType != r->nominalType)
+        if(l.nominalType != r.nominalType)
         {
-            return l->nominalType < r->nominalType;
+            return l.nominalType < r.nominalType;
         }
 
-        if(l->keys.size() != r->keys.size())
+        if(l.keys.size() != r.keys.size())
         {
-            return l->keys.size() < r->keys.size();
+            return l.keys.size() < r.keys.size();
         }
         
-        for(size_t i = 0; i < l->keys.size(); ++i)
+        for(size_t i = 0; i < l.keys.size(); ++i)
         {
-            if(!bsqKeyValueEqual(l->keys[i], r->keys[i]))
+            if(!bsqKeyValueEqual(l.keys[i], r.keys[i]))
             {
-                return bsqKeyValueLess(l->keys[i], r->keys[i]);
+                return bsqKeyValueLess(l.keys[i], r.keys[i]);
             }
         }
 
@@ -568,38 +595,52 @@ public:
 };
 struct RCIncFunctor_BSQIdKeyCompound
 {
-    inline BSQIdKeyCompound* operator()(BSQIdKeyCompound* idk) const { return INC_REF_DIRECT(BSQIdKeyCompound, idk); }
+    inline BSQIdKeyCompound operator()(BSQIdKeyCompound idk) const 
+    { 
+        for(size_t i = 0; i < idk.keys.size(); ++i)
+        {
+            BSQRef::incrementChecked(idk.keys[i]);
+        }
+        return idk; 
+    }
 };
 struct RCDecFunctor_BSQIdKeyCompound
 {
-    inline void operator()(BSQIdKeyCompound* idk) const { BSQRef::decrementDirect(idk); }
+    inline void operator()(BSQIdKeyCompound idk) const
+    { 
+        for(size_t i = 0; i < idk.keys.size(); ++i)
+        {
+            BSQRef::decrementChecked(idk.keys[i]);
+        }
+    }
 };
 struct EqualFunctor_BSQIdKeyCompound
 {
-    inline bool operator()(const BSQIdKeyCompound* l, const BSQIdKeyCompound* r) const { return BSQIdKeyCompound::keyEqual(l, r); }
+    inline bool operator()(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r) const { return BSQIdKeyCompound::keyEqual(l, r); }
 };
 struct LessFunctor_BSQIdKeyCompound
 {
-    inline bool operator()(const BSQIdKeyCompound* l, const BSQIdKeyCompound* r) const { return BSQIdKeyCompound::keyLess(l, r); }
+    inline bool operator()(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r) const { return BSQIdKeyCompound::keyLess(l, r); }
 };
 struct DisplayFunctor_BSQIdKeyCompound
 {
-    std::u32string operator()(const BSQIdKeyCompound* idk) const 
+    std::u32string operator()(const BSQIdKeyCompound& idk) const 
     { 
-        std::u32string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk->nominalType)];
+        std::u32string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk.nominalType)];
         rvals +=  U" of ( ";
-        for(size_t i = 0; i < idk->keys.size(); ++i)
+        for(size_t i = 0; i < idk.keys.size(); ++i)
         {
             if(i != 0)
             {
                 rvals += U", ";
             }
 
-            rvals += diagnostic_format(idk->keys[i]);
+            rvals += diagnostic_format(idk.keys[i]);
         }
         rvals += U" )"; 
 
         return rvals;
     }
 };
+typedef BSQBoxed<BSQIdKeyCompound, RCDecFunctor_BSQIdKeyCompound> Boxed_BSQIdKeyCompound;
 }

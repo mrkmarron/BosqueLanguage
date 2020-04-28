@@ -265,7 +265,7 @@ entity CryptoHash provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>All actual enums implicitly provide this.</summary>
-struct concept Enum provides KeyType, Some {
+concept Enum provides KeyType, Some {
 }
 
 //<summary>All actual custom keys implicitly provide this.</summary>
