@@ -34,6 +34,7 @@ class SMTTypeEmitter {
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
     conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
+    ephemeralListConverts: Map<string, string> = new Map<string, string>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -47,6 +48,7 @@ class SMTTypeEmitter {
 
         this.keyType = assembly.typeMap.get("NSCore::KeyType") as MIRType;
         this.validatorType = assembly.typeMap.get("NSCore::Validator") as MIRType;
+        this.parsableType = assembly.typeMap.get("NSCore::Parsable") as MIRType;
         this.podType = assembly.typeMap.get("NSCore::PODType") as MIRType;
         this.apiType = assembly.typeMap.get("NSCore::APIType") as MIRType;
         this.tupleType = assembly.typeMap.get("NSCore::Tuple") as MIRType;
@@ -460,6 +462,27 @@ class SMTTypeEmitter {
         else {
             return new SMTValue(`(bsqterm_object_${this.mangleStringForSMT(into.trkey)}_value (bsqterm_object_value ${exp.emit()}))`);
         }
+    }
+
+    generateEphemeralListConvert(from: MIRType, into: MIRType): string {
+        const elconvsig = `(define-fun convertFROM_${this.mangleStringForSMT(from.trkey)}_TO_${this.mangleStringForSMT(into.trkey)} ((elist ${this.mangleStringForSMT(from.trkey)})) ${this.mangleStringForSMT(into.trkey)}`;
+
+        if (!this.ephemeralListConverts.has(elconvsig)) {
+            const elfrom = from.options[0] as MIREphemeralListType;
+            const elinto = into.options[0] as MIREphemeralListType;
+
+            let argp: string[] = [];
+            for(let i = 0; i < elfrom.entries.length; ++i) {
+                const access = `(${this.generateEntityAccessor(elfrom.trkey, `entry_${i}`)} elist)`;
+                argp.push(this.coerce(new SMTValue(access), elfrom.entries[i], elinto.entries[i]).emit());
+            }
+            const body = `($${this.generateEntityConstructor(into.trkey)} ${argp.join(", ")})`;
+            const elconv = `${elconvsig} ( ${body} ))`;
+
+            this.ephemeralListConverts.set(elconvsig, elconv);
+        }
+
+        return `convertFROM_${this.mangleStringForSMT(from.trkey)}_TO_${this.mangleStringForSMT(into.trkey)}`;
     }
 
     coerce(exp: SMTExp, from: MIRType, into: MIRType): SMTExp {

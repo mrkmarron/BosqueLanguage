@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption, MIRNominalType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { NoneRepr, StructRepr, RefRepr, EphemeralListRepr, ValueRepr, KeyValueRepr, TypeRepr, UnionRepr, joinTypeReprs } from "./type_repr";
 
@@ -33,6 +33,7 @@ class CPPTypeEmitter {
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
     conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
+    ephemeralListConverts: Map<string, string> = new Map<string, string>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -46,6 +47,7 @@ class CPPTypeEmitter {
 
         this.keyType = assembly.typeMap.get("NSCore::KeyType") as MIRType;
         this.validatorType = assembly.typeMap.get("NSCore::Validator") as MIRType;
+        this.parsableType = assembly.typeMap.get("NSCore::Parsable") as MIRType;
         this.podType = assembly.typeMap.get("NSCore::PODType") as MIRType;
         this.apiType = assembly.typeMap.get("NSCore::APIType") as MIRType;
         this.tupleType = assembly.typeMap.get("NSCore::Tuple") as MIRType;
@@ -370,6 +372,26 @@ class CPPTypeEmitter {
     getCPPReprFor(tt: MIRType): TypeRepr {
         const ireprs = tt.options.map((opt) => this.getCPPReprFor_Option(opt));
         return ireprs.length === 1 ? ireprs[0] : joinTypeReprs(...ireprs);
+    }
+
+    generateEphemeralListConvert(from: MIRType, into: MIRType): string {
+        const elconvsig = `${this.mangleStringForCpp(into.trkey)} convertFROM_${this.mangleStringForCpp(from.trkey)}_TO_${this.mangleStringForCpp(into.trkey)}(const ${this.mangleStringForCpp(from.trkey)}& elist)`;
+
+        if (!this.ephemeralListConverts.has(elconvsig)) {
+            const elfrom = from.options[0] as MIREphemeralListType;
+            const elinto = into.options[0] as MIREphemeralListType;
+
+            let argp: string[] = [];
+            for(let i = 0; i < elfrom.entries.length; ++i) {
+                argp.push(this.coerce(`elist.entry_${i}`, elfrom.entries[i], elinto.entries[i]));
+            }
+            const body = `{ return ${this.mangleStringForCpp(into.trkey)}(${argp.join(", ")}); }`;
+            const elconv = `${elconvsig} ${body}`;
+
+            this.ephemeralListConverts.set(elconvsig, elconv);
+        }
+
+        return `convertFROM_${this.mangleStringForCpp(from.trkey)}_TO_${this.mangleStringForCpp(into.trkey)}`;
     }
 
     coercePrimitive(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
