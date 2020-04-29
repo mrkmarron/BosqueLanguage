@@ -17,6 +17,8 @@ class CPPTypeEmitter {
     readonly noneType: MIRType;
     readonly boolType: MIRType;
     readonly intType: MIRType;
+    readonly bigIntType: MIRType;
+    readonly float64Type: MIRType;
     readonly stringType: MIRType;
 
     readonly keyType: MIRType;
@@ -43,6 +45,8 @@ class CPPTypeEmitter {
         this.noneType = assembly.typeMap.get("NSCore::None") as MIRType;
         this.boolType = assembly.typeMap.get("NSCore::Bool") as MIRType;
         this.intType = assembly.typeMap.get("NSCore::Int") as MIRType;
+        this.bigIntType = assembly.typeMap.get("NSCore::BigInt") as MIRType;
+        this.float64Type = assembly.typeMap.get("NSCore::Float64") as MIRType;
         this.stringType = assembly.typeMap.get("NSCore::String") as MIRType;
 
         this.keyType = assembly.typeMap.get("NSCore::KeyType") as MIRType;

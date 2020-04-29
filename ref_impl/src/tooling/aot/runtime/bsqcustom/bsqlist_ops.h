@@ -16,12 +16,6 @@ class BSQListOps
 typedef BSQList<T, RCDecF, DisplayF> Ty;
 
 public:
-    template <uint16_t n>
-    static Ty* createFromSingle(MIRNominalTypeEnum ntype, const T(&values)[n])
-    {
-        return BSQ_NEW_NO_RC(Ty, ntype, move(std::vector<T>(&values, &values + n)));
-    }
-
     template <typename SetT, typename LambdaSC>
     static SetT* list_toset(Ty* l)
     {

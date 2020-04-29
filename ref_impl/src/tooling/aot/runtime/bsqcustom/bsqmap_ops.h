@@ -9,7 +9,6 @@
 
 namespace BSQ
 {
-
 template <typename K, typename K_RCDecF, typename K_DisplayF, typename K_CMP, typename K_EQ, typename V, typename V_RCDecF, typename V_DisplayF>
 class BSQMapOps
 {
@@ -113,7 +112,7 @@ public:
     }
 
     template <typename T, typename T_RCDecF, typename T_DisplayF, typename T_CMP, typename T_EQ, typename U, typename U_RCDecF, typename U_DisplayF, MIRNominalTypeEnum ntype, typename LambdaTC, typename LambdaCC>
-    static BSQMap<T, T_RCDecF, T_DisplayF, T_CMP, T_EQ, U, U_RCDecF, U_DisplayF>* map_cast<T where KeyType, U>(m: Map<K, V>)
+    static BSQMap<T, T_RCDecF, T_DisplayF, T_CMP, T_EQ, U, U_RCDecF, U_DisplayF>* map_cast(m: Map<K, V>)
     {
         std::vector<MEntry<T, U>> entries;
         std::for_each(m->entries.begin(), m->entries.end(), [&entries](MEntry<K, V>& v) -> void {
@@ -314,5 +313,4 @@ public:
         return BSQ_NEW_NO_RC(Ty, m->nominalType, move(entries));
     }
 };
-
 }

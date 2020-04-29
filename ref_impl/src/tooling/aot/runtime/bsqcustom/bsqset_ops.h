@@ -9,7 +9,6 @@
 
 namespace BSQ
 {
-
 template <typename T, typename RCDecF, typename DisplayF, typename T_CMP, typename T_EQ>
 class BSQSetOps
 {

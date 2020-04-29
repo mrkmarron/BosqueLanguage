@@ -11,7 +11,6 @@
 
 namespace BSQ
 {
-
 template <typename K, typename V>
 struct MEntry 
 {
@@ -36,6 +35,22 @@ struct MEntryEQ
         return K_EQ{}(e1.key, e2.key);
     } 
 };
+
+template <typename K, typename K_INC, typename V, typename V_INC, typename K_CMP, typename K_EQ>
+inline std::vector<MEntry<K, V>> processSingletonMapInit(std::vector<std::pair<K, V>> src) {
+    std::vector<MEntry<K, V>> res;
+    res.reserve(src.size());
+
+    std::transform(src.begin(), src.end(), back_inserter(res), [](const std::pair<K, V>& entry) {
+        return MEntry<K, V>(K_INC{}(entry.first), V_INC{}(entry.second));
+    });
+    
+    std::stable_sort(src.begin(), src.end(), MEntryCMP<K, V, K_CMP>{});
+    auto dup = std::adjacent_find(src.begin(), src.end(), MEntryEQ<K, V, K_EQ>{});
+    BSQ_ASSERT(dup == src.end(), "Duplicate key found in Map initialization");
+
+    return src;
+}
 
 template <typename K, typename K_RCDecF, typename K_DisplayF, typename K_CMP, typename K_EQ, typename V, typename V_RCDecF, typename V_DisplayF>
 class BSQMap : public BSQObject 

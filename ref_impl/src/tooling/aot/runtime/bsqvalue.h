@@ -275,6 +275,14 @@ public:
 
         return *((T*)((void*)&this->udata));
     }
+
+    template <typename T>
+    inline T* extractPtr()
+    {
+        static_assert(sizeof(T) <= k);
+
+        return ((T*)((void*)&this->udata));
+    }
 };
 //
 //Union struct ops are declared in runtime for forward decls reasons
@@ -819,7 +827,7 @@ public:
     }
 
     template <DATA_KIND_FLAG flag>
-    static BSQRecord createFromUpdate(const BSQRecord& src, std::map<MIRPropertyEnum, Value>&& values)
+    static BSQRecord createFromUpdate(const BSQRecord* src, std::map<MIRPropertyEnum, Value>&& values)
     {
         std::map<MIRPropertyEnum, Value> entries(move(values));
         auto fv = flag;

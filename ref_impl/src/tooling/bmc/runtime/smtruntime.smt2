@@ -217,6 +217,9 @@ false
   (SpecialTypeTermInfo@cons (and (StructuralSpecialTypeInfo$PODType st1) (StructuralSpecialTypeInfo$PODType st2)) (and (StructuralSpecialTypeInfo$APIType st1) (StructuralSpecialTypeInfo$APIType st2)) (and (StructuralSpecialTypeInfo$Parsable st1) (StructuralSpecialTypeInfo$Parsable st2)))
 )
 
+(define-fun @fj ((term BTerm) (sti SpecialTypeTermInfo)) SpecialTypeTermInfo
+  (mergeStructuralSpecialTypeInfo (getStructuralSpecialTypeInfoTerm term) sti)
+)
 
 ;;EPHEMERAL_DECLS;;
 

@@ -23,9 +23,9 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
         return Map<K, V>::_unsafe_add(m, k, v, KeyList<K>@{hkey=kk, tail=kl});
     }
 
-     hidden static _update(m: Map<K, V>, k: K, v: V): Map<K, V>
+    hidden static _update(m: Map<K, V>, k: K, v: V): Map<K, V>
         requires release Map<K, V>::_has_key(m, k);
-     {
+    {
         return Map<K, V>::_unsafe_update(m, k, v);
     }
 
