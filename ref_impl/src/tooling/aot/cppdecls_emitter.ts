@@ -174,6 +174,15 @@ class CPPEmitter {
             }
         });
 
+        //
+        //TODO: need to process virtual bulk data operations -- also see SMT versions
+        //
+        if(bodyemitter.vfieldProjects.length !== 0 || bodyemitter.vfieldUpdates.length !== 0 || bodyemitter.vobjmerges.length !== 0) {
+            console.log("NOT IMPLEMENTED -- virtual bulk operators for nominal types");
+            process.exit(1);
+        }
+
+
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {

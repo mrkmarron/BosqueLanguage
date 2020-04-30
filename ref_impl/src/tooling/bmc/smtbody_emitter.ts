@@ -37,10 +37,9 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
-    vfieldLookups: { infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
-    vfieldProjects: { infertype: MIRType, fdecls: MIRFieldDecl[], pname: string }[] = [];
-    vfieldUpdates: { infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
-    vobjmerges: { infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
+    vfieldProjects: { infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType, uname: string }[] = [];
+    vfieldUpdates: { infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], resultAccessType: MIRType, uname: string }[] = [];
+    vobjmerges: { infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], resultAccessType: MIRType, mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter) {
         this.assembly = assembly;
@@ -671,44 +670,62 @@ class SMTBodyEmitter {
         return this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.field, resultAccessType);
     }
 
+    generateVFieldProject(arg: MIRArgument, infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType): string {
+        const upnames = fprojs.map((fp) => fp.fkey);
+        const uname = `project_${upnames.sort().join("*")}_in_${infertype.trkey}`;
+        let decl = this.vfieldProjects.find((lookup) => lookup.uname === uname);
+        if(decl === undefined) {
+            this.vfieldProjects.push({ infertype: infertype, fprojs: fprojs, resultAccessType: resultAccessType, uname: uname });
+        }
+
+        return `${this.typegen.mangleStringForSMT(uname)}(${this.argToSMT(arg, infertype)})`;
+    }
+
     generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): SMTExp {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
 
-        if (this.typegen.typecheckEphemeral(resultAccessType)) {
-            let cvals: string[] = [];
-            op.fields.map((f, i) => {
-                const rtype = this.typegen.getEpehmeralType(resultAccessType).entries[i];
-                cvals.push(this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, rtype).emit());
-            });
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            if (this.typegen.typecheckEphemeral(resultAccessType)) {
+                let cvals: string[] = [];
+                op.fields.map((f, i) => {
+                    const rtype = this.typegen.getEpehmeralType(resultAccessType).entries[i];
+                    cvals.push(this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, rtype).emit());
+                });
 
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${cvals.join(" ")})`));
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${cvals.join(" ")})`));
+            }
+            else {
+                let fvals = "SpecialTypeTermInfo@Clear";
+                let cvals = "bsqrecord_array_empty";
+                for (let i = 0; i < op.fields.length; ++i) {
+                    const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
+                    const access = this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.fields[i], this.typegen.anyType);
+
+                    cvals = `(store ${cvals} "${fdecl.name}" ${access})`;
+                    fvals = `(@fj ${access} ${fvals})`;
+                }
+
+                return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultProjectType), fvals)} ${cvals})`));
+            }
         }
         else {
-            let fvals = "SpecialTypeTermInfo@Clear";
-            let cvals = "bsqrecord_array_empty";
-            for (let i = 0; i < op.fields.length; ++i) {
-                const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
-                const access = this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.fields[i], this.typegen.anyType);
-
-                cvals = `(store ${cvals} "${fdecl.name}" ${access})`;
-                fvals = `(@fj ${access} ${fvals})`;
-            }
-
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultProjectType), fvals)} ${cvals})`));
+            const vproject = this.generateVFieldProject(op.arg, inferargtype, op.fields.map((f) => this.assembly.fieldDecls.get(f) as MIRFieldDecl), resultAccessType);
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(vproject));
         }
     }
 
-    generateMIRModifyWithFields(op: MIRModifyWithFields): SMTExp {
-        assert(false, "NOT_IMPLEMENTED_YET");
-        return new SMTValue("[NOT_IMPLEMENTED]");
+    generateVFieldUpdate(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], resultAccessType: MIRType): string {
+        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
+        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
+        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
+        if(decl === undefined) {
+            this.vfieldUpdates.push({ infertype: infertype, fupds: fupds, resultAccessType: resultAccessType, uname: uname });
+        }
 
-        //
-        //TODO: I think I need to collect these and generate a special function for each one
-        //  That takes just the right number of args and does the copy + insert new values correctly
-        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
-        //    and implementations for each possible sub-entity.
-        //
-        /*
+        return `${this.typegen.mangleStringForSMT(uname)}(${this.argToSMT(arg, infertype)}, ${fupds.map((upd) => this.argToSMT(upd[1], this.getArgType(upd[1]))).join(", ")})`;
+    }
+
+    generateMIRModifyWithFields(op: MIRModifyWithFields, resultAccessType: MIRType): SMTExp {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         
         if (this.typegen.typecheckUEntity(inferargtype)) {
@@ -731,23 +748,23 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(ekey)} ${cvals.join(" ")})`));
         }
         else {
-            const access = this.generateVFieldUpdates(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]));
-            return new SMTLet(this.varToSMTName(op.trgt), access);
+            const access = this.generateVFieldUpdate(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]), resultAccessType);
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(access));
         }
-        */
     }
-    
-    generateMIRStructuredExtendObject(op: MIRStructuredExtendObject): SMTExp {
-        assert(false, "NOT_IMPLEMENTED_YET");
-        return new SMTValue("[NOT_IMPLEMENTED]");
 
-        //
-        //TODO: I think I need to collect these and generate a special function for each one
-        //  That takes just the right number of args and does the copy + insert new values correctly
-        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
-        //    and implementations for each possible sub-entity.
-        //
-        /*
+    generateVFieldExtend(arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermerge: MIRType, fieldResolves: [string, MIRFieldDecl][], resultAccessType: MIRType): string {
+        const upnames = fieldResolves.map((fr) => `${fr[0]}->${fr[1].fkey}`);
+        const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
+        let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
+        if(decl === undefined) {
+            this.vobjmerges.push({ infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, resultAccessType: resultAccessType, mname: mname });
+        }
+
+        return `${this.typegen.mangleStringForSMT(mname)}(${this.argToSMT(arg, infertype)}, ${this.argToSMT(merge, infermerge)})`;
+    }
+
+    generateMIRStructuredExtendObject(op: MIRStructuredExtendObject, resultAccessType: MIRType): SMTExp {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         const mergeargtype = this.typegen.getMIRType(op.updateInferType);
         
@@ -784,10 +801,9 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(ekey)} ${cvals.join(" ")})`));
         }
         else {
-            const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]));
-            return new SMTLet(this.varToSMTName(op.trgt), access);
+            const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]), resultAccessType);
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(access));
         }
-        */
     }
 
     generateMIRLoadFromEpehmeralList(op: MIRLoadFromEpehmeralList): SMTExp {
@@ -844,7 +860,6 @@ class SMTBodyEmitter {
             const argl = this.argToSMT(lhs, lhsinfertype).emit();
             const argr = this.argToSMT(rhs, rhsinfertype).emit();
 
-            xxxx;
             if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
                 return "false";
             }
@@ -852,36 +867,35 @@ class SMTBodyEmitter {
                 return `(and (not (bsqkey_bool_value ${argl})) (bsqkey_bool_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::Int$/)) {
-                return "Int";
+                return `(< (bsqkey_int_value ${argl}) (bsqkey_int_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::BigInt$/)) {
-                return "Int";
+                return `(< (bsqkey_bigint_value ${argl}) (bsqkey_bigint_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::String$/)) {
-                return "String";
+                return `(str.< (bsqkey_string_value ${argl}) (bsqkey_string_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
-                return "bsq_safestring";
+                return `(str.< (bsq_safestring_value ${argl}) (bsq_safestring_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
-                return "bsq_stringof";
+                return `(str.< (bsqkey_stringof_value ${argl}) (bsqkey_stringof_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::UUID$/)) {
-                return "bsq_uuid";
+                return ` (< (bsqkey_uuid_value ${argl}) (bsqkey_uuid_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
-                return "bsq_logicaltime";
+                return `(< (bsqkey_logicaltime_value ${argl}) (bsqkey_logicaltime_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
-                return "bsq_cryptohash";
+                return `(< (bsqkey_cryptohash ${argl}) (bsqkey_cryptohash ${argr}))`;
             }
-            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.enumtype)) {
-                return "bsq_enum";
+            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.typegen.enumtype)) {
+                return `(< (bsq_enum_value ${argl}) (bsq_enum_value ${argr}))`;
             }
-            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
-                return "bsq_idkey";
+            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.typegen.idkeytype)) {
+                return `(bsqkeyless_identity$${this.typegen.mangleStringForSMT(tt.trkey)} (bsq_idkey_value ${argl}) (bsq_idkey_value ${argr}))`;
             }
-            coreop = `(= ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
         }
         else {
             return `(bsqkeyless ${this.argToSMT(lhs, this.typegen.keyType).emit()} ${this.argToSMT(rhs, this.typegen.keyType).emit()})`;
@@ -889,7 +903,18 @@ class SMTBodyEmitter {
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {
-        return `(${op} ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
+        if (op === "<") {
+            return this.generateLess(lhsinfertype, lhs, rhsinfertype, rhs, true);
+        }
+        else if (op === "<=") {
+            return `${this.generateLess(lhsinfertype, lhs, rhsinfertype, rhs, true)} || ${this.generateEquals("=", lhsinfertype, lhs, rhsinfertype, rhs, true)}`;
+        }
+        else if (op === ">") {
+            return this.generateLess(rhsinfertype, rhs, lhsinfertype, lhs, true);
+        }
+        else {
+            return `${this.generateLess(rhsinfertype, rhs, lhsinfertype, lhs, true)} || ${this.generateEquals("=", rhsinfertype, rhs, lhsinfertype, lhs, true)}`;
+        }
     }
 
     generateSubtypeTupleCheck(argv: string, argtype: MIRType, oftype: MIRTupleType): string {
@@ -1026,6 +1051,7 @@ class SMTBodyEmitter {
     generateSubtypeConceptCheck(argv: string, argtype: MIRType, oftype: MIRConceptType): string {
         const subtypesig = `subtypeFROM_${this.typegen.mangleStringForSMT(argtype.trkey)}_TO_${this.typegen.mangleStringForSMT(oftype.trkey)} ((val BTerm)) Bool`;
 
+        xxxx;
         if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
             const moftype = this.typegen.getMIRType(oftype.trkey);
@@ -1083,39 +1109,39 @@ class SMTBodyEmitter {
     }
 
     generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType): string {
-        if (this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
+        if (this.typegen.typecheckIsName(argtype, /^NSCore::None$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::BigInt$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
             return "false";
         }
         else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
             return "false";
         }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::GUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/)
-            || this.typegen.typecheckIsName(argtype, /^NSCore::DataHash$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
+        else if (this.typegen.typecheckIsName(argtype, /^NSCore::UUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
             return "false";
         }
-        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
+        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)) {
             return "false";
         }
         else {
             if (this.typegen.typecheckAllKeys(argtype)) {
                 return "false";
             }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Float64$/)) {
+                return "false";
+            }
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ByteBuffer$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
                 return "false";
             }
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
                 return "false";
+            }
+            else if (this.typegen.typecheckTuple(argtype)) {
+                return this.generateSubtypeTupleCheck(`(bsq_tuple_entries ${arg})`, argtype, oftype);
             }
             else if (this.typegen.typecheckRecord(argtype)) {
                 return "false";
             }
             else if(this.typegen.typecheckUEntity(argtype)) {
                 return "false";
-            }
-            else if (this.typegen.typecheckTuple(argtype)) {
-                return this.generateSubtypeTupleCheck(`(bsq_tuple_entries ${arg})`, argtype, oftype);
             }
             else {
                 const tsc = this.generateSubtypeTupleCheck(`(bsq_tuple_entries (bsqterm_tuple_value ${arg}))`, argtype, oftype);
@@ -1125,29 +1151,26 @@ class SMTBodyEmitter {
     }
 
     generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType): string {
-        if (this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
+        if (this.typegen.typecheckIsName(argtype, /^NSCore::None$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::BigInt$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
             return "false";
         }
         else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
             return "false";
         }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::GUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/)
-            || this.typegen.typecheckIsName(argtype, /^NSCore::DataHash$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
+        else if (this.typegen.typecheckIsName(argtype, /^NSCore::UUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
             return "false";
         }
-        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
+        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)) {
             return "false";
         }
         else {
             if (this.typegen.typecheckAllKeys(argtype)) {
                 return "false";
             }
-            if (this.typegen.typecheckAllKeys(argtype)) {
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Float64$/)) {
                 return "false";
             }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ByteBuffer$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
                 return "false";
             }
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
@@ -1156,11 +1179,11 @@ class SMTBodyEmitter {
             else if (this.typegen.typecheckTuple(argtype)) {
                 return "false";
             }
-            else if(this.typegen.typecheckUEntity(argtype)) {
-                return "false";
-            }
             else if (this.typegen.typecheckRecord(argtype)) {
                 return this.generateSubtypeRecordCheck(`(bsq_record_entries ${arg})`, argtype, oftype);
+            }
+            else if(this.typegen.typecheckUEntity(argtype)) {
+                return "false";
             }
             else {
                 const tsc = this.generateSubtypeRecordCheck(`(bsq_record_entries (bsqterm_record_value ${arg}))`, argtype, oftype);
