@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRNominalTypeKey, MIRConstantBigInt, MIRConstantFloat64 } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRNominalTypeKey, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
@@ -645,76 +645,70 @@ class SMTBodyEmitter {
         return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultRecordType), fvals)} ${cvals})`));
     }
 
-    generateVFieldLookup(arg: MIRArgument, infertype: MIRType, fdecl: MIRFieldDecl): SMTExp {
-        const lname = `resolve_${fdecl.fkey}_from_${infertype.trkey}`;
-        let decl = this.vfieldLookups.find((lookup) => lookup.lname === lname);
-        if(decl === undefined) {
-            this.vfieldLookups.push({ infertype: infertype, fdecl: fdecl, lname: lname });
+    generateMIRAccessFromFieldExpression(arg: MIRArgument, inferargtype: MIRType, field: MIRFieldKey, resultAccessType: MIRType): SMTExp {
+        const ftype = this.typegen.getMIRType((this.assembly.fieldDecls.get(field) as MIRFieldDecl).declaredType);
+        
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), field)} ${this.argToSMT(arg, inferargtype).emit()})`);
+            return this.typegen.coerce(access, ftype, resultAccessType);
         }
-
-        return new SMTValue(`(${this.typegen.mangleStringForSMT(lname)} ${this.argToSMT(arg, infertype).emit()})`);
+        else {
+            let tag = "";
+            if(this.typegen.typecheckAllKeys(inferargtype)) {
+                tag = `(bsqkey_get_nominal_type ${this.argToSMT(arg, inferargtype)})`;
+            }
+            else {
+                tag = `(bsqterm_get_nominal_type ${this.argToSMT(arg, inferargtype)})`;
+            }
+            const fvtype = this.typegen.getMIRType((this.assembly.fieldDecls.get(field) as MIRFieldDecl).enclosingDecl);
+            const access = new SMTValue(`(${this.typegen.mangleStringForSMT(field)}$vget ${this.argToSMT(arg, fvtype)} ${tag})`);
+            return this.typegen.coerce(access, ftype, resultAccessType);
+        }
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
-        const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
-        const ftype = this.typegen.getMIRType(fdecl.declaredType);
+        return this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.field, resultAccessType);
+    }
 
-        if (this.typegen.typecheckUEntity(inferargtype)) {
-            const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), op.field)} ${this.argToSMT(op.arg, inferargtype).emit()})`);
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, ftype, resultAccessType));
+    generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): SMTExp {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            let cvals: string[] = [];
+            op.fields.map((f, i) => {
+                const rtype = this.typegen.getEpehmeralType(resultAccessType).entries[i];
+                cvals.push(this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, rtype).emit());
+            });
+
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${cvals.join(" ")})`));
         }
         else {
-            const access = this.generateVFieldLookup(op.arg, inferargtype, fdecl);
-            return new SMTLet(this.varToSMTName(op.trgt), this.typegen.coerce(access, ftype, resultAccessType));
-        }
-    }
-
-    generateVFieldProject(arg: MIRArgument, infertype: MIRType, fdecls: MIRFieldDecl[]): SMTExp {
-        const pname = `project_${fdecls.map((fd) => fd.fkey).sort().join("*")}_from_${infertype.trkey}`;
-        let decl = this.vfieldProjects.find((lookup) => lookup.pname === pname);
-        if(decl === undefined) {
-            this.vfieldProjects.push({ infertype: infertype, fdecls: fdecls, pname: pname });
-        }
-
-        return new SMTValue(`(${this.typegen.mangleStringForSMT(pname)} ${this.argToSMT(arg, infertype)})`);
-    }
-
-    generateMIRProjectFromFields(op: MIRProjectFromFields): SMTExp {
-        const inferargtype = this.typegen.getMIRType(op.argInferType);
-        
-        if (this.typegen.typecheckUEntity(inferargtype)) {
-            let fvals = "3";
+            let fvals = "SpecialTypeTermInfo@Clear";
             let cvals = "bsqrecord_array_empty";
             for (let i = 0; i < op.fields.length; ++i) {
                 const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
-                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+                const access = this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.fields[i], this.typegen.anyType);
 
-                const access = new SMTValue(`(${this.typegen.generateEntityAccessor(this.typegen.getEntityEKey(inferargtype), op.fields[i])} ${this.argToSMT(op.arg, inferargtype).emit()})`);
-                cvals = `(store ${cvals} "${fdecl.name}" ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`;
-                fvals = `(@fj ${this.typegen.coerce(access, ftype, this.typegen.anyType)} ${fvals})`;
+                cvals = `(store ${cvals} "${fdecl.name}" ${access})`;
+                fvals = `(@fj ${access} ${fvals})`;
             }
 
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_record@cons ${this.generateDataKindLoad(this.typegen.getMIRType(op.resultProjectType), fvals)} ${cvals})`));
         }
-        else {
-            const access = this.generateVFieldProject(op.arg, inferargtype, op.fields.map((f) => this.assembly.fieldDecls.get(f) as MIRFieldDecl));
-            return new SMTLet(this.varToSMTName(op.trgt), access);
-        }
-    }
-
-    generateVFieldUpdates(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][]): SMTExp {
-        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
-        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
-        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
-        if(decl === undefined) {
-            this.vfieldUpdates.push({ infertype: infertype, fupds: fupds, uname: uname });
-        }
-
-        return new SMTValue(`(${this.typegen.mangleStringForSMT(uname)} ${this.argToSMT(arg, infertype)} ${fupds.map((upd) => this.argToSMT(upd[1], this.getArgType(upd[1])).emit()).join(" ")})`);
     }
 
     generateMIRModifyWithFields(op: MIRModifyWithFields): SMTExp {
+        assert(false, "NOT_IMPLEMENTED_YET");
+        return new SMTValue("[NOT_IMPLEMENTED]");
+
+        //
+        //TODO: I think I need to collect these and generate a special function for each one
+        //  That takes just the right number of args and does the copy + insert new values correctly
+        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
+        //    and implementations for each possible sub-entity.
+        //
+        /*
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         
         if (this.typegen.typecheckUEntity(inferargtype)) {
@@ -740,20 +734,20 @@ class SMTBodyEmitter {
             const access = this.generateVFieldUpdates(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]));
             return new SMTLet(this.varToSMTName(op.trgt), access);
         }
+        */
     }
     
-    generateVFieldExtend(arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermerge: MIRType, fieldResolves: [string, MIRFieldDecl][]): SMTExp {
-        const upnames = fieldResolves.map((fr) => `${fr[0]}->${fr[1].fkey}`);
-        const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
-        let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
-        if(decl === undefined) {
-            this.vobjmerges.push({ infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
-        }
-
-        return new SMTValue(`(${this.typegen.mangleStringForSMT(mname)} ${this.argToSMT(arg, infertype)} ${this.argToSMT(merge, infermerge)})`);
-    }
-
     generateMIRStructuredExtendObject(op: MIRStructuredExtendObject): SMTExp {
+        assert(false, "NOT_IMPLEMENTED_YET");
+        return new SMTValue("[NOT_IMPLEMENTED]");
+
+        //
+        //TODO: I think I need to collect these and generate a special function for each one
+        //  That takes just the right number of args and does the copy + insert new values correctly
+        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
+        //    and implementations for each possible sub-entity.
+        //
+        /*
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         const mergeargtype = this.typegen.getMIRType(op.updateInferType);
         
@@ -793,6 +787,7 @@ class SMTBodyEmitter {
             const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]));
             return new SMTLet(this.varToSMTName(op.trgt), access);
         }
+        */
     }
 
     generateMIRLoadFromEpehmeralList(op: MIRLoadFromEpehmeralList): SMTExp {
@@ -841,6 +836,56 @@ class SMTBodyEmitter {
         }
 
         return op === "!=" ? `(not ${coreop})` : coreop;
+    }
+
+    generateLess(lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
+        if (isstrict) {
+            const tt = lhsinfertype;
+            const argl = this.argToSMT(lhs, lhsinfertype).emit();
+            const argr = this.argToSMT(rhs, rhsinfertype).emit();
+
+            xxxx;
+            if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
+                return "false";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
+                return `(and (not (bsqkey_bool_value ${argl})) (bsqkey_bool_value ${argr}))`;
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::Int$/)) {
+                return "Int";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::BigInt$/)) {
+                return "Int";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::String$/)) {
+                return "String";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
+                return "bsq_safestring";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
+                return "bsq_stringof";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::UUID$/)) {
+                return "bsq_uuid";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
+                return "bsq_logicaltime";
+            }
+            else if (this.typegen.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
+                return "bsq_cryptohash";
+            }
+            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.enumtype)) {
+                return "bsq_enum";
+            }
+            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.idkeytype)) {
+                return "bsq_idkey";
+            }
+            coreop = `(= ${this.argToSMT(lhs, lhsinfertype).emit()} ${this.argToSMT(rhs, rhsinfertype).emit()})`;
+        }
+        else {
+            return `(bsqkeyless ${this.argToSMT(lhs, this.typegen.keyType).emit()} ${this.argToSMT(rhs, this.typegen.keyType).emit()})`;
+        }
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {

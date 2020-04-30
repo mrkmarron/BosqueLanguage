@@ -34,8 +34,11 @@ type CPPCode = {
     FUNC_DECLS_FWD: string,
     FUNC_DECLS: string,
 
+    VFIELD_DECLS_FWD: string,
+    VMETHOD_DECLS_FWD: string,
     VFIELD_DECLS: string,
     VMETHOD_DECLS: string,
+
     MAIN_CALL: string
 };
 

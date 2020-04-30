@@ -157,18 +157,18 @@ else {
         + "\n\n/*ephemeral decls*/\n"
         + cparams.EPHEMERAL_LIST_DECLARE
         + "\n\n/*vable decls*/\n"
-        + "\n\nclass BSQVable"
-        + "{"
-        + "\npublic:"
-        + "\n  " + cparams.VFIELD_DECLS
-        + "\n  " + cparams.VMETHOD_DECLS
-        + "};"
+        + "\n\n/*forward vable decls*/\n"
+        + cparams.VFIELD_DECLS_FWD
+        + cparams.VMETHOD_DECLS_FWD
         + "\n\n/*forward function decls*/\n"
         + cparams.FUNC_DECLS_FWD
         + "\n\n/*type decls*/\n"
         + cparams.TYPEDECLS
         + "\n\n/*typecheck decls*/\n"
         + cparams.TYPECHECKS
+        + "\n\n/*vable decls*/\n"
+        + cparams.VFIELD_DECLS
+        + cparams.VMETHOD_DECLS
         + "\n\n/*function decls*/\n"
         + cparams.FUNC_DECLS
         + "}\n\n"

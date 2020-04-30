@@ -9,7 +9,7 @@ import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MI
 import { topologicalOrder } from "../../compiler/mir_info";
 
 import * as assert from "assert";
-import { StructRepr, UnionRepr, RefRepr } from "./type_repr";
+import { StructRepr, UnionRepr, RefRepr, ValueRepr, KeyValueRepr } from "./type_repr";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -35,9 +35,6 @@ class CPPBodyEmitter {
 
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
-
-    vfieldUpdates: { arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], uname: string }[] = [];
-    vobjmerges: { arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], mname: string }[] = [];
 
     constructor(assembly: MIRAssembly, typegen: CPPTypeEmitter) {
         this.assembly = assembly;
@@ -526,39 +523,39 @@ class CPPBodyEmitter {
     }
 
     generateMIRAccessFromFieldExpression(arg: MIRArgument, inferargtype: MIRType, field: MIRFieldKey, resultAccessType: MIRType): string {
-        const ntype = this.getArgType(arg);
         const nrepr = this.typegen.getCPPReprFor(inferargtype);
 
         let select = "";
-        if (nrepr instanceof StructRepr) {
-            select = `${this.argToCpp(arg, inferargtype)}.${this.typegen.mangleStringForCpp(field)}`;
-        }
-        else {
-            if(this.typegen.typecheckUEntity(inferargtype)) {
+        if (this.typegen.typecheckUEntity(inferargtype)) {
+            if (nrepr instanceof RefRepr) {
                 select = `${this.argToCpp(arg, inferargtype)}->${this.typegen.mangleStringForCpp(field)}`;
             }
             else {
-                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQVable)->get$${this.typegen.mangleStringForCpp(field)}()`;
+                select = `${this.argToCpp(arg, inferargtype)}.${this.typegen.mangleStringForCpp(field)}`;
             }
         }
+        else {
+            const fvtype = this.typegen.getMIRType((this.assembly.fieldDecls.get(field) as MIRFieldDecl).enclosingDecl);
 
-        return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
+            let tag = "";
+            if (nrepr instanceof KeyValueRepr || nrepr instanceof ValueRepr) {
+                tag = `BSQ_GET_VALUE_PTR(${this.argToCpp(arg, inferargtype)}, BSQRef)->nominalType`;
+            }
+            else {
+                tag = `${this.argToCpp(arg, inferargtype)}.nominalType`;
+            }
+
+            select = `${this.typegen.mangleStringForCpp(field)}$vget(${this.argToCpp(arg, fvtype)}, ${tag})`;
+        }
+
+        const ftype = this.typegen.getMIRType((this.assembly.fieldDecls.get(field) as MIRFieldDecl).declaredType);
+        return `${this.typegen.coerce(select, ftype, resultAccessType)}`;
     }
 
     generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
-        const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
-        const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
-        if (this.typegen.typecheckUEntity(inferargtype)) {
-            const isstruct = this.typegen.getCPPReprFor(inferargtype) instanceof StructRepr;
-            const access = `${this.argToCpp(op.arg, inferargtype)}${isstruct ? "." : "->"}${this.typegen.mangleStringForCpp(op.field)}`;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
-        }
-        else {
-            const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQVable)->get$${this.typegen.mangleStringForCpp(op.field)}()`;
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.coerce(access, ftype, resultAccessType)};`;
-        }
+        return `${this.varToCppName(op.trgt)} = ${this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.field, resultAccessType)};`;
     }
 
     generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): string {
@@ -566,15 +563,9 @@ class CPPBodyEmitter {
 
         if (this.typegen.typecheckEphemeral(resultAccessType)) {
             let cvals: string[] = [];
-            op.fields.map((f) => {
-                const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
-                if (this.typegen.typecheckUEntity(inferargtype)) {
-                    const isstruct = this.typegen.getCPPReprFor(inferargtype) instanceof StructRepr;
-                    cvals.push(`${this.argToCpp(op.arg, inferargtype)}${isstruct ? "." : "->"}${this.typegen.mangleStringForCpp(fdecl.fkey)}`);
-                }
-                else {
-                    cvals.push(`BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQVable)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`);
-                }
+            op.fields.map((f, i) => {
+                const rtype = this.typegen.getEpehmeralType(resultAccessType).entries[i];
+                cvals.push(this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, rtype));
             });
 
             return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(op.resultProjectType)}{${cvals.join(", ")}};`;
@@ -583,37 +574,27 @@ class CPPBodyEmitter {
             let cvals: string[] = [];
             op.fields.map((f) => {
                 const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
-                const ftype = this.typegen.getMIRType(fdecl.declaredType);
+                const val = this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, this.typegen.anyType);
 
-                if (this.typegen.typecheckUEntity(inferargtype)) {
-                    const isstruct = this.typegen.getCPPReprFor(inferargtype) instanceof StructRepr;
-                    const access = `${this.argToCpp(op.arg, inferargtype)}${isstruct ? "." : "->"}${this.typegen.mangleStringForCpp(fdecl.fkey)}`;
-                    cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
-                }
-                else {
-                    const access = `BSQ_GET_VALUE_PTR(${this.argToCpp(op.arg, inferargtype)}, BSQObject)->get$${this.typegen.mangleStringForCpp(fdecl.fkey)}()`;
-                    cvals.push(`std::make_pair<MIRRecordEnum, Value>(MIRRecordEnum::${fdecl.name}, ${this.typegen.coerce(access, ftype, this.typegen.anyType)})`);
-                }
+                cvals.push(`{ MIRRecordEnum::${fdecl.name}, ${val} }`);
             });
 
-            const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultProjectType));
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${cvals.length}>(${scopevar}, ${iflag}, { ${cvals.join(", ")} });`;
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${iflag}>({ ${cvals.join(", ")} });`;
         }
-    }
-
-    generateVFieldUpdates(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][]): string {
-        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
-        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
-        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
-        if(decl === undefined) {
-            this.vfieldUpdates.push({ arg: arg, infertype: infertype, fupds: fupds, uname: uname });
-        }
-
-        return `${this.typegen.mangleStringForCpp(uname)}(${this.argToCpp(arg, infertype)}, ${fupds.map((upd) => this.argToCpp(upd[1], this.getArgType(upd[1]))).join(", ")})`;
     }
 
     generateMIRModifyWithFields(op: MIRModifyWithFields): string {
+        assert(false, "NOT_IMPLEMENTED_YET");
+        return "[NOT_IMPLEMENTED]";
+
+        //
+        //TODO: I think I need to collect these and generate a special function for each one
+        //  That takes just the right number of args and does the copy + insert new values correctly
+        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
+        //    and implementations for each possible sub-entity.
+        //
+        /*
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         
         if (this.typegen.typecheckUEntity(inferargtype)) {
@@ -652,20 +633,20 @@ class CPPBodyEmitter {
             const access = this.generateVFieldUpdates(op.arg, inferargtype, op.updates.map((upd) => [this.assembly.fieldDecls.get(upd[0]) as MIRFieldDecl, upd[1]]));
             return `${this.varToCppName(op.trgt)} = ${access};`;
         }
-    }
-
-    generateVFieldExtend(arg: MIRArgument, infertype: MIRType, merge: MIRArgument, infermerge: MIRType, fieldResolves: [string, MIRFieldDecl][]): string {
-        const upnames = fieldResolves.map((fr) => `${fr[0]}->${fr[1].fkey}`);
-        const mname = `merge_${infertype.trkey}_${upnames.join("*")}_with_${infermerge.trkey}`;
-        let decl = this.vobjmerges.find((lookup) => lookup.mname === mname);
-        if(decl === undefined) {
-            this.vobjmerges.push({ arg: arg, infertype: infertype, merge: merge, infermergetype: infermerge, fieldResolves: fieldResolves, mname: mname });
-        }
-
-        return `${this.typegen.mangleStringForCpp(mname)}(${this.argToCpp(arg, infertype)}, ${this.argToCpp(merge, infermerge)})`;
+        */
     }
 
     generateMIRStructuredExtendObject(op: MIRStructuredExtendObject): string {
+        assert(false, "NOT_IMPLEMENTED_YET");
+        return "[NOT_IMPLEMENTED]";
+
+        //
+        //TODO: I think I need to collect these and generate a special function for each one
+        //  That takes just the right number of args and does the copy + insert new values correctly
+        //  If op.arg is not a unique entity then we need to generate a virtual version with a switch method
+        //    and implementations for each possible sub-entity.
+        //
+        /*
         const inferargtype = this.typegen.getMIRType(op.argInferType);
         const mergeargtype = this.typegen.getMIRType(op.updateInferType);
         
@@ -718,10 +699,10 @@ class CPPBodyEmitter {
             const access = this.generateVFieldExtend(op.arg, inferargtype, op.update, mergeargtype, op.fieldResolves.map((fr) => [fr[0], this.assembly.fieldDecls.get(fr[1]) as MIRFieldDecl]));
             return `${this.varToCppName(op.trgt)} = ${access};`;
         }
+        */
     }
 
     generateMIRLoadFromEpehmeralList(op: MIRLoadFromEpehmeralList): string {
-        //should never need to coearce op
         return `${this.varToCppName(op.trgt)} = ${this.varToCppName(op.arg)}.entry_${op.idx};`;
     }
 
@@ -744,13 +725,24 @@ class CPPBodyEmitter {
     generateEquals(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
         let coreop = "";
         if (isstrict) {
-            coreop = `EqualFunctor_${this.typegen.getCPPTypeFor(lhsinfertype, "base")}{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+            const repr = this.typegen.getCPPReprFor(lhsinfertype);
+            coreop = `EqualFunctor_${repr.base}{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
         }
         else {
             coreop = `EqualFunctor_KeyValue{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
         }
 
         return op === "!=" ? `!${coreop}` : coreop; 
+    }
+
+    generateLess(lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
+        if (isstrict) {
+            const repr = this.typegen.getCPPReprFor(lhsinfertype);
+            return `LessFunctor_${repr.base}{}(${this.argToCpp(lhs, lhsinfertype)}, ${this.argToCpp(rhs, rhsinfertype)})`;
+        }
+        else {
+            return `LessFunctor_KeyValue{}(${this.argToCpp(lhs, this.typegen.keyType)}, ${this.argToCpp(rhs, this.typegen.keyType)})`;
+        }
     }
 
     generateCompare(op: string, lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument): string {

@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRInvokeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
 import { NoneRepr, StructRepr, RefRepr, EphemeralListRepr, ValueRepr, KeyValueRepr, TypeRepr, UnionRepr, joinTypeReprs } from "./type_repr";
 
@@ -561,6 +561,10 @@ class CPPTypeEmitter {
     getEntityEKey(tt: MIRType): MIRNominalTypeKey {
         return (tt.options[0] as MIREntityType).ekey;
     }
+
+    getEpehmeralType(tt: MIRType): MIREphemeralListType {
+        return (tt.options[0] as MIREphemeralListType);
+    }
     
     getRefCountableStatus(tt: MIRType): "no" | "direct" | "checked" | "ephemeral" | "ops" {
         if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/) || this.typecheckIsName(tt, /^NSCore::Int$/)) {
@@ -861,58 +865,16 @@ class CPPTypeEmitter {
                 })
                 .filter((fd) => fd !== undefined);
 
-                const vfield_accessors = entity.fields.map((fd) => {
-                    if (fd.enclosingDecl === entity.tkey) {
-                        return "NA";
-                    }
-                    else {
-                        const fn = `this->${this.mangleStringForCpp(fd.fkey)}`;
-                        const ftype = this.getCPPReprFor(this.getMIRType(fd.declaredType)).std;
-    
-                        const sig = `${ftype} get$${this.mangleStringForCpp(fd.fkey)}()`;
-                        return `${sig} { return ${fn}; };`;
-                    }
-                });
-    
-                const vcalls = [...entity.vcallMap].map((callp) => {
-                    const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-                    if (rcall.enclosingDecl === entity.tkey) {
-                        return "NA";
-                    }
-                    else {
-                        //
-                        //TODO: this does not accout for overrides and/or convertable appropriately we need to generate the explicit switch + action 
-                        //
-                        const resulttype = this.getMIRType(rcall.resultType);
-                        const rtype = this.getCPPReprFor(resulttype).std;
-    
-                        const vargs = rcall.params.slice(1).map((fp) => `${this.getCPPReprFor(this.getMIRType(fp.type)).std} ${fp.name}`);
-                        const cargs = rcall.params.map((fp) => fp.name);
-    
-                        if (this.getRefCountableStatus(resulttype) !== "no") {
-                            vargs.push("BSQRefScope& $callerscope$");
-                            cargs.push("$callerscope$")
-                        }
-    
-                        return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`
-                            + "    {\n"
-                            + `        return ${this.mangleStringForCpp(callp[1])}(${cargs.join(", ")});\n`
-                            + "    }\n";
-                    }
-                });
-
                 return {
                     fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
-                    fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject, public BSQVable\n`
+                    fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
                         + "{\n"
                         + "public:\n"
                         + `    ${fields.join("\n    ")}\n\n`
                         + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
                         + `    virtual ~${this.mangleStringForCpp(entity.tkey)}() { ; }\n\n`
                         + `    virtual void destroy() { ${destructor_list.join(" ")} }\n\n`
-                        + `    ${display}\n\n`
-                        + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
-                        + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
+                        + `    ${display}\n`
                         + "};"
                     };
             }
@@ -946,46 +908,6 @@ class CPPTypeEmitter {
                 + move_assign_ops.join("\n")
                 + `return *this;\n`
                 + `}\n`;
-
-                const vfield_accessors = entity.fields.map((fd) => {
-                    if (fd.enclosingDecl === entity.tkey) {
-                        return "NA";
-                    }
-                    else {
-                        const fn = `this->bval.${this.mangleStringForCpp(fd.fkey)}`;
-                        const ftype = this.getCPPReprFor(this.getMIRType(fd.declaredType)).std;
-    
-                        const sig = `${ftype} get$${this.mangleStringForCpp(fd.fkey)}()`;
-                        return `${sig} { return ${fn}; };`;
-                    }
-                });
-    
-                const vcalls = [...entity.vcallMap].map((callp) => {
-                    const rcall = (this.assembly.invokeDecls.get(callp[1]) || this.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-                    if (rcall.enclosingDecl === entity.tkey) {
-                        return "NA";
-                    }
-                    else {
-                        //
-                        //TODO: this does not accout for overrides and/or convertable appropriately we need to generate the explicit switch + action 
-                        //
-                        const resulttype = this.getMIRType(rcall.resultType);
-                        const rtype = this.getCPPReprFor(resulttype).std;
-    
-                        const vargs = rcall.params.slice(1).map((fp) => `${this.getCPPReprFor(this.getMIRType(fp.type)).std} ${fp.name}`);
-                        const cargs = [`${rcall.params[0].name}->bval`, ...([...rcall.params].slice(1).map((fp) => fp.name))];
-    
-                        if (this.getRefCountableStatus(resulttype) !== "no") {
-                            vargs.push("BSQRefScope& $callerscope$");
-                            cargs.push("$callerscope$")
-                        }
-    
-                        return `${rtype} ${this.mangleStringForCpp(callp[0])}(${vargs.join(", ")})\n`
-                            + "    {\n"
-                            + `        return ${this.mangleStringForCpp(callp[1])}(${cargs.join(", ")});\n`
-                            + "    }\n";
-                    }
-                });
 
                 const incop_ops = entity.fields.map((fd) => {
                     return this.buildIncOpForType(this.getMIRType(fd.declaredType), `this.${this.mangleStringForCpp(fd.fkey)}`) + ";";
@@ -1043,13 +965,11 @@ class CPPTypeEmitter {
                         + `    ${move_assign}\n\n`
                         + `    ${display}\n\n`
                         + "};",
-                    boxeddecl: `class Boxed_${this.mangleStringForCpp(entity.tkey)} : public BSQBoxedObject<${this.mangleStringForCpp(entity.tkey)}, RCDecFunctor_${this.mangleStringForCpp(entity.tkey)}>, public BSQVable\n`
+                    boxeddecl: `class Boxed_${this.mangleStringForCpp(entity.tkey)} : public BSQBoxedObject<${this.mangleStringForCpp(entity.tkey)}, RCDecFunctor_${this.mangleStringForCpp(entity.tkey)}>\n`
                         + "{\n"
                         + "public:\n"
                         + `    Boxed_${this.mangleStringForCpp(entity.tkey)}(const ${this.mangleStringForCpp(entity.tkey)}& bval) : BSQBoxedObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)}), bval(bval) { ; }\n`
                         + `    std::u32string display() const {return this.bval.display(); }\n\n`
-                        + `    ${vfield_accessors.filter((vacf) => vacf !== "NA").join("\n    ")}\n\n`
-                        + `    ${vcalls.filter((vc) => vc !== "NA").join("\n    ")}\n`
                         + "};",
                     ops: [
                         incop,

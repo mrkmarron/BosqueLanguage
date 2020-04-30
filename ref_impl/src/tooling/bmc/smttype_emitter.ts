@@ -608,6 +608,10 @@ class SMTTypeEmitter {
         return (tt.options[0] as MIREntityType).ekey;
     }
 
+    getEpehmeralType(tt: MIRType): MIREphemeralListType {
+        return (tt.options[0] as MIREphemeralListType);
+    }
+    
     isSpecialReprEntity(tt: MIRType): boolean {
         if (this.typecheckIsName(tt, /^NSCore::None$/) || this.typecheckIsName(tt, /^NSCore::Bool$/) || this.typecheckIsName(tt, /^NSCore::Int$/) || this.typecheckIsName(tt, /^NSCore::BigInt$/) || this.typecheckIsName(tt, /^NSCore::String$/)) {
             return true;
