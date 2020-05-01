@@ -220,7 +220,10 @@ entity Buffer<T where PODType | APIType> provides APIValue, Some {
     method bytes(): ByteBuffer # buffer_bytes
 }
 
-//TODO: maybe add a BufferParsable here
+//<summary>An efficient buffer encoding for data.</summary>
+entity BufferOf<T where Parsable> provides APIValue, Some {
+    method bytes(): ByteBuffer # bufferof_bytes
+}
 
 enum BufferFormat {
     text,

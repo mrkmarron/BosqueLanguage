@@ -80,12 +80,13 @@ enum class MIRPropertyEnum
 
 #define MIRNominalTypeEnum_Category_Float64         20
 #define MIRNominalTypeEnum_Category_Buffer          21
-#define MIRNominalTypeEnum_Category_ByteBuffer      22
-#define MIRNominalTypeEnum_Category_ISOTime         23
-#define MIRNominalTypeEnum_Category_Regex           24
-#define MIRNominalTypeEnum_Category_Tuple           25
-#define MIRNominalTypeEnum_Category_Record          26
-#define MIRNominalTypeEnum_Category_Object          27
+#define MIRNominalTypeEnum_Category_BufferOf        22
+#define MIRNominalTypeEnum_Category_ByteBuffer      23
+#define MIRNominalTypeEnum_Category_ISOTime         24
+#define MIRNominalTypeEnum_Category_Regex           25
+#define MIRNominalTypeEnum_Category_Tuple           26
+#define MIRNominalTypeEnum_Category_Record          27
+#define MIRNominalTypeEnum_Category_Object          28
 
 #define MIRNominalTypeEnum_Category_NormalTypeLimit MIRNominalTypeEnum_Category_Object
 
@@ -589,6 +590,36 @@ public:
 struct DisplayFunctor_BSQBuffer
 {
     std::u32string operator()(const BSQBuffer* buff) const 
+    {
+        std::u32string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
+        rvals += U"{";
+        rvals += buff->sdata->display_contents();
+        rvals += U"}";
+
+        return rvals;
+    }
+};
+
+class BSQBufferOf : public BSQRef
+{
+public:
+    const BSQBufferFormat format;
+    const BSQBufferEncoding encoding;
+
+    BSQByteBuffer* sdata;
+
+    BSQBufferOf(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer*, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
+    
+    virtual ~BSQBufferOf() = default;
+    
+    virtual void destroy() 
+    { 
+        BSQRef::decrementDirect(this->sdata);
+    }
+};
+struct DisplayFunctor_BSQBufferOf
+{
+    std::u32string operator()(const BSQBufferOf* buff) const 
     {
         std::u32string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
         rvals += U"{";

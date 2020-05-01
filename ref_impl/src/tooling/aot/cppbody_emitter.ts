@@ -999,7 +999,7 @@ class CPPBodyEmitter {
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::Float64$/)) {
                 return "false";
             }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ByteBuffer$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ByteBuffer$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::BufferOf<.*>$/)) {
                 return "false";
             }
             else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
@@ -1082,7 +1082,7 @@ class CPPBodyEmitter {
         const argrepr = this.typegen.getCPPReprFor(argtype);
 
         const tcc = this.typegen.assembly.subtypeOf(this.typegen.tupleType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.podType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.apiType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.parsableType, oftype);
-        
+
 
         if(argrepr instanceof NoneRepr ) {
             return "false";

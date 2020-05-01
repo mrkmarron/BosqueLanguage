@@ -264,6 +264,9 @@ class SMTTypeEmitter {
             else if (this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/)) {
                 return "bsq_buffer";
             }
+            else if (this.typecheckIsName(tt, /^NSCore::BufferOf<.*>$/)) {
+                return "bsq_bufferof";
+            }
             else if (this.typecheckIsName(tt, /^NSCore::ISOTime$/)) {
                 return "bsq_isotime";
             }
@@ -381,6 +384,9 @@ class SMTTypeEmitter {
         else if (this.typecheckIsName(from, /^NSCore::Buffer<.*>$/)) {
             return new SMTValue(`(bsqterm_buffer ${exp.emit()})`);
         }
+        else if (this.typecheckIsName(from, /^NSCore::BufferOf<.*>$/)) {
+            return new SMTValue(`(bsqterm_bufferof ${exp.emit()})`);
+        }
         else if (this.typecheckIsName(from, /^NSCore::ISOTime$/)) {
             return new SMTValue(`(bsqterm_isotime ${exp.emit()})`);
         }
@@ -450,6 +456,9 @@ class SMTTypeEmitter {
         }
         else if (this.typecheckIsName(into, /^NSCore::Buffer<.*>$/)) {
             return new SMTValue(`(bsqterm_buffer_value ${exp.emit()})`);
+        }
+        else if (this.typecheckIsName(into, /^NSCore::BufferOf<.*>$/)) {
+            return new SMTValue(`(bsqterm_bufferof_value ${exp.emit()})`);
         }
         else if (this.typecheckIsName(into, /^NSCore::ISOTime$/)) {
             return new SMTValue(`(bsqterm_isotime_value ${exp.emit()})`);
@@ -522,7 +531,8 @@ class SMTTypeEmitter {
                 return this.coerceFromOptionsKey(exp, into);
             }
         }
-        else if (this.typecheckIsName(from, /^NSCore::Float64$/) || this.typecheckIsName(from, /^NSCore::ByteBuffer$/) || this.typecheckIsName(from, /^NSCore::Buffer<.*>$/) 
+        else if (this.typecheckIsName(from, /^NSCore::Float64$/) 
+            || this.typecheckIsName(from, /^NSCore::ByteBuffer$/) || this.typecheckIsName(from, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(from, /^NSCore::BufferOf<.*>$/)
             || this.typecheckIsName(from, /^NSCore::ISOTime$/) || this.typecheckIsName(from, /^NSCore::Regex$/)) {
             return this.coerceFromAtomicTerm(exp, from);
         }
@@ -553,7 +563,8 @@ class SMTTypeEmitter {
             else if (this.typecheckAllKeys(into)) {
                 return new SMTValue(`(bsqterm_key_value ${exp.emit()})`);
             }
-            else if (this.typecheckIsName(into, /^NSCore::Float64$/) || this.typecheckIsName(into, /^NSCore::ByteBuffer$/) || this.typecheckIsName(into, /^NSCore::Buffer<.*>$/) 
+            else if (this.typecheckIsName(into, /^NSCore::Float64$/)
+                || this.typecheckIsName(into, /^NSCore::ByteBuffer$/) || this.typecheckIsName(into, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(into, /^NSCore::BufferOf<.*>$/) 
                 || this.typecheckIsName(into, /^NSCore::ISOTime$/) || this.typecheckIsName(into, /^NSCore::Regex$/)) {
                 return this.coerceIntoAtomicTerm(exp, into);
             }
@@ -626,7 +637,8 @@ class SMTTypeEmitter {
            return true;
         }
         else {
-            if (this.typecheckIsName(tt, /^NSCore::Float64$/) || this.typecheckIsName(tt, /^NSCore::ByteBuffer$/) || this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/)
+            if (this.typecheckIsName(tt, /^NSCore::Float64$/)
+                || this.typecheckIsName(tt, /^NSCore::ByteBuffer$/) || this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(tt, /^NSCore::BufferOf<.*>$/)
                 || this.typecheckIsName(tt, /^NSCore::ISOTime$/) || this.typecheckIsName(tt, /^NSCore::Regex$/)) {
                 return true;
             }

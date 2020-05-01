@@ -222,13 +222,15 @@ std::u32string diagnostic_format(Value v)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return DisplayFunctor_BSQIdKeySimple{}(dynamic_cast<Boxed_BSQIdKeySimple*>(vv)->bval);
             case MIRNominalTypeEnum_Category_IdKeyCompound:
-                return DisplayFunctor_BSQIdKeyCompound{}(dynamic_cast<BSQIdKeyCompound*>(vv));
+                return DisplayFunctor_BSQIdKeyCompound{}(dynamic_cast<Boxed_BSQIdKeyCompound*>(vv)->bval);
             case MIRNominalTypeEnum_Category_Float64:
                 return DisplayFunctor_double{}(dynamic_cast<Boxed_double*>(vv)->bval);
             case MIRNominalTypeEnum_Category_ByteBuffer:
                 return DisplayFunctor_BSQByteBuffer{}(dynamic_cast<BSQByteBuffer*>(vv));
             case MIRNominalTypeEnum_Category_Buffer:
                 return DisplayFunctor_BSQBuffer{}(dynamic_cast<BSQBuffer*>(vv));
+            case MIRNominalTypeEnum_Category_BufferOf:
+                return DisplayFunctor_BSQBufferOf{}(dynamic_cast<BSQBufferOf*>(vv));
             case MIRNominalTypeEnum_Category_ISOTime:
                 return DisplayFunctor_BSQISOTime{}(dynamic_cast<Boxed_BSQISOTime*>(vv)->bval);
             case MIRNominalTypeEnum_Category_Regex:

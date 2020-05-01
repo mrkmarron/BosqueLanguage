@@ -51,6 +51,7 @@
 
 (declare-datatypes ( 
     (bsq_buffer 0)
+    (bsq_bufferof 0)
     (bsq_bytebuffer 0)
     (bsq_isotime 0)
     (bsq_regex 0)
@@ -61,6 +62,7 @@
     (BTerm 0)
     ) (
     ( (bsq_buffer@cons (bsq_buffer_type String) (bsq_buffer_contents String)) )
+    ( (bsq_bufferof@cons (bsq_bufferof_type String) (bsq_bufferof_contents String)) )
     ( (bsq_bytebuffer@cons (bsq_bytebuffer_contents (Seq Int))) )
     ( (bsq_isotime@cons (bsq_isotime_value Int)) )
     ( (bsq_regex@cons (bsq_regex_value String)) )
@@ -76,6 +78,7 @@
       (bsqterm_key (bsqterm_key_value BKeyValue))
       (bsqterm_float64 (bsqterm_float64_value (_ FloatingPoint 11 53)))
       (bsqterm_buffer (bsqterm_buffer_value bsq_buffer))
+      (bsqterm_bufferof (bsqterm_bufferof_value bsq_bufferof))
       (bsqterm_bytebuffer (bsqterm_buffer_value bsq_bytebuffer))
       (bsqterm_isotime (bsqterm_isotime_value bsq_isotime))
       (bsqterm_regex (bsqterm_regex_value bsq_regex))
@@ -135,12 +138,14 @@
   (ite (is-bsqterm_float64) MIRNominalTypeEnum_Float64
     (ite (is-bsqterm_key term) (bsqkey_get_nominal_type (bsqterm_key_value term))
       (ite (is-bsqterm_buffer term) (bsq_buffer_type (bsqterm_buffer_value term))
-        (ite (is-bsqterm_bytebuffer term) MIRNominalTypeEnum_ByteBuffer
-          (ite (is-bsqterm_isotime term) MIRNominalTypeEnum_ISOTime
-            (ite (is-bsqterm_regex term) MIRNominalTypeEnum_Regex
-              (ite (is-bsqterm_tuple term) MIRNominalTypeEnum_Tuple
-                (ite (is-bsqterm_record term) MIRNominalTypeEnum_Record
-                  (bsqterm_object_type term)
+        (ite (is-bsqterm_bufferof term) (bsq_bufferof_type (bsqterm_bufferof_value term))
+          (ite (is-bsqterm_bytebuffer term) MIRNominalTypeEnum_ByteBuffer
+            (ite (is-bsqterm_isotime term) MIRNominalTypeEnum_ISOTime
+              (ite (is-bsqterm_regex term) MIRNominalTypeEnum_Regex
+                (ite (is-bsqterm_tuple term) MIRNominalTypeEnum_Tuple
+                  (ite (is-bsqterm_record term) MIRNominalTypeEnum_Record
+                    (bsqterm_object_type term)
+                  )
                 )
               )
             )
@@ -180,12 +185,11 @@
   )
 )
 
-;;GENERATED_ID_KEY_LESS_BEGIN
-
 (define-fun bsqkeyless_identity ((idtype String) (k1 bsq_idkey) (k2 bsq_idkey)) Bool
-;;GENERATED_ID_KEY_LESS_SELECT_BEGIN
+;;
+;;TODO -- need to gas bound and generate this (and bsqkeyless programatically)
+;;
 false
-;;GENERATED_ID_KEY_LESS_SELECT_END
 )
 
 (define-fun bsqkeyless ((k1 BKeyValue) (k2 BKeyValue)) Bool

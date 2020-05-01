@@ -319,6 +319,9 @@ class CPPTypeEmitter {
             else if (this.typecheckIsName_Option(tt, /^NSCore::Buffer<.*>$/)) {
                 return new RefRepr(false, "BSQBuffer", "BSQBuffer*");
             }
+            else if (this.typecheckIsName_Option(tt, /^NSCore::BufferOf<.*>$/)) {
+                return new RefRepr(false, "BSQBufferOf", "BSQBufferOf*");
+            }
             else if (this.typecheckIsName_Option(tt, /^NSCore::ISOTime$/)) {
                 return new StructRepr(false, "BSQISOTime", "Boxed_BSQISOTime", "MIRNominalTypeEnum_ISOTime", 8);
             }
@@ -709,7 +712,8 @@ class CPPTypeEmitter {
            return true;
         }
         else {
-            if (this.typecheckIsName(tt, /^NSCore::Float64$/) || this.typecheckIsName(tt, /^NSCore::ByteBuffer$/) || this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/)
+            if (this.typecheckIsName(tt, /^NSCore::Float64$/) 
+                || this.typecheckIsName(tt, /^NSCore::ByteBuffer$/) || this.typecheckIsName(tt, /^NSCore::Buffer<.*>$/) || this.typecheckIsName(tt, /^NSCore::BufferOf<.*>$/)
                 || this.typecheckIsName(tt, /^NSCore::ISOTime$/) || this.typecheckIsName(tt, /^NSCore::Regex$/)) {
                 return true;
             }
