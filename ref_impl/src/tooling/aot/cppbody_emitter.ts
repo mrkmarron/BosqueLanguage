@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
 
 import * as assert from "assert";
@@ -35,6 +35,7 @@ class CPPBodyEmitter {
 
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
+    checkedConcepts: Set<MIRResolvedTypeKey> = new Set<MIRResolvedTypeKey>();
 
     vfieldProjects: { infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType, uname: string }[] = [];
     vfieldUpdates: { infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], resultAccessType: MIRType, uname: string }[] = [];
@@ -806,23 +807,35 @@ class CPPBodyEmitter {
     }
 
     generateSubtypeTupleCheck(argv: string, argtype: MIRType, oftype: MIRTupleType): string {
-        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(const BSQTuple* atuple)`;
+        const argrepr = this.typegen.getCPPReprFor(argtype);
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TTC(${argrepr.std} arg)`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
+            let ttuple = "";
+            if (argrepr instanceof StructRepr) {
+                ttuple = `BSQTuple* tt = &arg;`;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                ttuple = `BSQTuple* tt = arg.extractPtr<BSQTuple>();`;
+            }
+            else {
+                ttuple = `BSQTuple* tt = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQTuple)->bval);`;
+            }
+
             let checks: string[] = [];
 
-            checks.push(`(atuple->entries.size() <= ${oftype.entries.length})`);
+            checks.push(`(tt->entries.size() <= ${oftype.entries.length})`);
 
             //do all the checks that argtype satisfies all the requirements of oftype -- maybe a bit inefficiently
             for (let i = 0; i < oftype.entries.length; ++i) {
-                const chk = this.generateTypeCheck(`atuple->atFixed<${i}>()`, this.typegen.anyType, this.typegen.anyType, oftype.entries[i].type);
+                const chk = this.generateTypeCheck(`tt->atFixed<${i}>()`, this.typegen.anyType, this.typegen.anyType, oftype.entries[i].type);
 
                 if(oftype.entries[i].isOptional) {
-                    checks.push(`(!atuple->hasIndex<${i}>() || ${chk})`);
+                    checks.push(`(!tt->hasIndex<${i}>() || ${chk})`);
                 }
                 else {
-                    checks.push(`atuple->hasIndex<${i}>()`);
+                    checks.push(`tt->hasIndex<${i}>()`);
                     checks.push(chk);
                 }
             }
@@ -846,32 +859,88 @@ class CPPBodyEmitter {
 
             const decl = subtypesig
             + "\n{\n"
+            + `    ${ttuple}\n`
             + `    return ${op};\n`
             + `}\n`;
 
             this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
         }
 
-        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argv})`;
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TTC(${argv})`;
     }
 
-    generateSubtypeRecordCheck(argv: string, argtype: MIRType, oftype: MIRRecordType): string {
-        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(const BSQRecord* arecord)`;
+    generateTupleSpecialConceptCheck(argv: string, argtype: MIRType, oftype: MIRConceptType): string {
+        const argrepr = this.typegen.getCPPReprFor(argtype);
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TSC(${argrepr.std} arg)`;
 
         if (!this.subtypeFMap.has(subtypesig)) {
             const order = this.subtypeOrderCtr++;
+            let ttuple = "";
+            if (argrepr instanceof StructRepr) {
+                ttuple = `BSQTuple* tt = &arg;`;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                ttuple = `BSQTuple* tt = arg.extractPtr<BSQTuple>();`;
+            }
+            else {
+                ttuple = `BSQTuple* tt = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQTuple)->bval);`;
+            }
+
+            const checks: string[] = [];
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.parsableType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_PARSABLE_FLAG`);
+            }
+
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.podType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_POD_FLAG`);
+            }
+
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.apiType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_POD_FLAG`);
+            }
+
+            const decl = subtypesig
+            + "\n{\n"
+            + `    ${ttuple}\n`
+            + `    DATA_KIND_FLAG cf = (${checks.join(" | ")});\n`
+            + `    return cf == (cf & tt->flag);\n`
+            + `}\n`;
+
+            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
+        }
+
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TSC(${argv})`;
+    }
+
+    generateSubtypeRecordCheck(argv: string, argtype: MIRType, oftype: MIRRecordType): string {
+        const argrepr = this.typegen.getCPPReprFor(argtype);
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TRC(${argrepr.std} arg)`;
+
+        if (!this.subtypeFMap.has(subtypesig)) {
+            const order = this.subtypeOrderCtr++;
+            let trecord = "";
+            if (argrepr instanceof StructRepr) {
+                trecord = `BSQRecord* tr = &arg;`;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                trecord = `BSQRecord* tr = arg.extractPtr<BSQRecord>();`;
+            }
+            else {
+                trecord = `BSQRecord* tr = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQRecord)->bval);`;
+            }
+
             let checks: string[] = [];
 
             //do all the checks that argtype satisfies all the requirements of oftype -- maybe a bit inefficiently
             for (let i = 0; i < oftype.entries.length; ++i) {
                 const pname = oftype.entries[i].name;
-                const chk = this.generateTypeCheck(`arecord->atFixed<MIRPropertyEnum::${pname}>()`, this.typegen.anyType, this.typegen.anyType, oftype.entries[i].type);
+                const chk = this.generateTypeCheck(`tr->atFixed<MIRPropertyEnum::${pname}>()`, this.typegen.anyType, this.typegen.anyType, oftype.entries[i].type);
 
                 if (oftype.entries[i].isOptional) {
-                    checks.push(`(!arecord->hasProperty<MIRPropertyEnum::${pname}>() || ${chk})`);
+                    checks.push(`(!tr->hasProperty<MIRPropertyEnum::${pname}>() || ${chk})`);
                 }
                 else {
-                    checks.push(`arecord->hasProperty<MIRPropertyEnum::${pname}>()`);
+                    checks.push(`tr->hasProperty<MIRPropertyEnum::${pname}>()`);
                     checks.push(chk);
                 }
             }
@@ -883,13 +952,229 @@ class CPPBodyEmitter {
                 for (let i = 0; i < allprops.length; ++i) {
                     const pname = allprops[i];
                     if (oftype.entries.find((entry) => entry.name === pname) === undefined) {
-                        checks.push(`!arecord->hasProperty<MIRPropertyEnum::${pname}>()`);
+                        checks.push(`!tr->hasProperty<MIRPropertyEnum::${pname}>()`);
                     }
                 }
             }
             else {
                 const pprops = oftype.entries.map((entry) => `MIRPropertyEnum::${entry.name}`);
-                checks.push(`arecord->checkPropertySet(${oftype.entries.length}${oftype.entries.length !== 0 ? ", " : ""} ${pprops.join(", ")})`);
+                checks.push(`tr->checkPropertySet(${oftype.entries.length}${oftype.entries.length !== 0 ? ", " : ""} ${pprops.join(", ")})`);
+            }
+
+            let op = "";
+            if (checks.includes("false")) {
+                op = "false";
+            }
+            else {
+                checks = checks.filter((chk) => chk !== "true");
+                if(checks.length === 0) {
+                    op = "true";
+                }
+                else if(checks.length === 1) {
+                    op = checks[0];
+                }
+                else {
+                    op = `(${checks.join(" && ")})`;
+                }
+            }
+
+            const decl = subtypesig
+            + "\n{\n"
+            + `    ${trecord}\n`
+            + `    return ${op};\n`
+            + `}\n`;
+
+            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
+        }
+
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_TRC(${argv})`;
+    }
+
+    generateRecordSpecialConceptCheck(argv: string, argtype: MIRType, oftype: MIRConceptType): string {
+        const argrepr = this.typegen.getCPPReprFor(argtype);
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_RSC(${argrepr.std} arg)`;
+
+        if (!this.subtypeFMap.has(subtypesig)) {
+            const order = this.subtypeOrderCtr++;
+            let ttuple = "";
+            if (argrepr instanceof StructRepr) {
+                ttuple = `BSQRecord* tr = &arg;`;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                ttuple = `BSQRecord* tr = arg.extractPtr<BSQRecord>();`;
+            }
+            else {
+                ttuple = `BSQRecord* tr = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQRecord)->bval);`;
+            }
+
+            const checks: string[] = [];
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.parsableType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_PARSABLE_FLAG`);
+            }
+
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.podType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_POD_FLAG`);
+            }
+
+            if (oftype.ckeys.some((cc) => this.typegen.assembly.subtypeOf(this.typegen.apiType, this.typegen.getMIRType(cc)))) {
+                checks.push(`DATA_KIND_POD_FLAG`);
+            }
+
+            const decl = subtypesig
+            + "\n{\n"
+            + `    ${ttuple}\n`
+            + `    DATA_KIND_FLAG cf = (${checks.join(" | ")});\n`
+            + `    return cf == (cf & tr->flag);\n`
+            + `}\n`;
+
+            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
+        }
+
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_RSC(${argv})`;
+    }
+
+    generateFastTupleTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIRTupleType): string {
+        if (!inferargtype.options.some((opt) => opt instanceof MIRTupleType)) {
+            return "false";
+        }
+        else {
+            const argrepr = this.typegen.getCPPReprFor(argtype);
+            const tsc = this.generateSubtypeTupleCheck(arg, argtype, oftype);
+
+            if (argrepr instanceof StructRepr) {
+                return tsc;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                return `(${arg}.nominalType == MIRNominalTypeEnum_Tuple && ${tsc})`;
+            }
+            else {
+                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
+            }
+        }
+    }
+
+    generateFastRecordTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIRRecordType): string {
+        if (!inferargtype.options.some((opt) => opt instanceof MIRRecordType)) {
+            return "false";
+        }
+        else {
+            const argrepr = this.typegen.getCPPReprFor(argtype);
+            const tsc = this.generateSubtypeTupleCheck(arg, argtype, oftype);
+
+            if (argrepr instanceof StructRepr) {
+                return tsc;
+            }
+            else if (argrepr instanceof UnionRepr) {
+                return `(${arg}.nominalType == MIRNominalTypeEnum_Record && ${tsc})`;
+            }
+            else {
+                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
+            }
+        }
+    }
+
+    generateSubtypeArrayLookup(typeenum: string, oftype: MIRConceptType): string {
+        this.checkedConcepts.add(oftype.trkey);
+        const arraystr = `MIRSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}`;
+        return `BSQObject::checkSubtype(${typeenum}, ${arraystr})`;
+    }
+
+    generateFastConceptTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIRConceptType): string {
+        if (this.typegen.typecheckIsName(inferargtype, /^NSCore::None$/) || this.typegen.typecheckUEntity(inferargtype)) {
+            return this.typegen.assembly.subtypeOf(inferargtype, this.typegen.getMIRType(oftype.trkey)) ? "true" : "false";
+        }
+        else {
+            let enumacc = "";
+            if (this.typegen.typecheckTuple(inferargtype)) {
+                enumacc = "MIRNominalTypeEnum_Tuple";
+            }
+            else if (this.typegen.typecheckRecord(inferargtype)) {
+                enumacc = "MIRNominalTypeEnum_Record";
+            }
+            else {
+                const argrepr = this.typegen.getCPPReprFor(argtype);
+                if (argrepr instanceof UnionRepr) {
+                    enumacc = `${arg}.nominalType`;
+                }
+                else if (argrepr instanceof KeyValueRepr) {
+                    enumacc = `getNominalTypeOf_KeyValue(${arg})`;
+                }
+                else {
+                    enumacc = `getNominalTypeOf_Value(${arg})`;
+                }
+            }
+
+            let ttest = "false";
+            if (inferargtype.options.some((iopt) => iopt instanceof MIRTupleType)) {
+                const tupmax = MIRType.createSingle(MIRConceptType.create([this.typegen.tupleType.trkey, this.typegen.podType.trkey, this.typegen.parsableType.trkey]));
+                const maybespecial = this.typegen.assembly.subtypeOf(tupmax, this.typegen.getMIRType(oftype.trkey)); //if this isn't true then special subtype will never be true
+                const trival = !this.typegen.assembly.subtypeOf(this.typegen.tupleType, this.typegen.getMIRType(oftype.trkey)); //if this is true then the default subtypeArray is enough
+                if (maybespecial && !trival) {
+                   ttest = `(enumacc == MIRNominalTypeEnum_Tuple) && ${this.generateTupleSpecialConceptCheck(arg, argtype, oftype)}`;
+                }
+            }
+
+            let rtest = "false";
+            if (inferargtype.options.some((iopt) => iopt instanceof MIRRecordType)) {
+                if (!this.typegen.assembly.subtypeOf(this.typegen.recordType, this.typegen.getMIRType(oftype.trkey))) {
+                    rtest = `(enumacc == MIRNominalTypeEnum_Record) && ${this.generateRecordSpecialConceptCheck(arg, argtype, oftype)})`;
+                }
+            }
+
+            const ntest = this.generateSubtypeArrayLookup(enumacc, oftype);
+
+            const tests = [ntest, ttest, rtest].filter((test) => test !== "false");
+
+            if (tests.length === 0) {
+                return "false";
+            }
+            else if (tests.includes("true")) {
+                return "true";
+            }
+            else if (tests.length === 1) {
+                return tests[0];
+            }
+            else {
+                return `(${tests.join(" || ")})`
+            }
+        }
+    }
+
+    generateFastEntityTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIREntityType): string {
+        if (this.typegen.typecheckIsName(inferargtype, /^NSCore::None$/) || this.typegen.typecheckUEntity(inferargtype)) {
+            return inferargtype.trkey == oftype.trkey ? "true" : "false";
+        }
+        else {
+            const argrepr = this.typegen.getCPPReprFor(argtype);
+            
+            if (argrepr instanceof StructRepr) {
+                //could be a tuple or record
+                return "false";
+            }
+            else if (argrepr instanceof UnionRepr) {
+                return `(${arg}.nominalType == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
+            }
+            else if (argrepr instanceof KeyValueRepr) {
+                return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
+            }
+            else {
+                return `(getNominalTypeOf_Value(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
+            }
+        }
+    }
+
+    generateEphemeralTypeCheck(argv: string, argtype: MIRType, oftype: MIREphemeralListType): string {
+        const argrepr = this.typegen.getCPPReprFor(argtype);
+        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_EL(${argrepr.std} arg)`;
+
+        if (!this.subtypeFMap.has(subtypesig)) {
+            const order = this.subtypeOrderCtr++;
+            let checks: string[] = [];
+
+            //do all the checks that argtype satisfies all the requirements of oftype 
+            for (let i = 0; i < oftype.entries.length; ++i) {
+                const etype = (argtype.options[0] as MIREphemeralListType).entries[i];
+                checks.push(this.generateTypeCheck(`arg.entry_${i}`, etype, etype, oftype.entries[i]));
             }
 
             let op = "";
@@ -917,292 +1202,7 @@ class CPPBodyEmitter {
             this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
         }
 
-        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argv})`;
-    }
-
-    generateSubtypeConceptCheck(argv: string, argtype: MIRType, oftype: MIRConceptType): string {
-        const argrepr = this.typegen.getCPPReprFor(argtype);
-        const unionrepr = argrepr instanceof UnionRepr; //a concept can either be a 
-
-        xxxx;
-        const subtypesig = `bool subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argrepr.std} val)`;
-        if (!this.subtypeFMap.has(subtypesig)) {
-            const order = this.subtypeOrderCtr++;
-            const moftype = this.typegen.getMIRType(oftype.trkey);
-
-            let getenum = `auto nenum = getNominalTypeOf_Value(val);`;
-
-            let tchk = "[INVALID]";
-            if(this.typegen.assembly.subtypeOf(this.typegen.tupleType, moftype)) {
-                tchk = "true";
-            }
-            else if (this.typegen.assembly.subtypeOf(moftype, this.typegen.apiType)) {
-                tchk = `((BSQ_GET_VALUE_PTR(val, BSQTuple)->flag & DATA_KIND_API_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-            }
-            else if(this.typegen.assembly.subtypeOf(moftype, this.typegen.podType)) {
-                tchk = `((BSQ_GET_VALUE_PTR(val, BSQTuple)->flag & DATA_KIND_POD_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-            }
-            else {
-                tchk = "false";
-            }
-            let chktuple = `if (nenum == MIRNominalTypeEnum_Tuple) { return ${tchk}; }`
-
-            let rchk = "[INVALID]";
-            if(this.typegen.assembly.subtypeOf(this.typegen.recordType, moftype)) {
-                rchk = "true";
-            }
-            else if (this.typegen.assembly.subtypeOf(moftype, this.typegen.apiType)) {
-                rchk = `((BSQ_GET_VALUE_PTR(val, BSQRecord)->flag & DATA_KIND_API_FLAG) != DATA_KIND_CLEAR_FLAG))`;
-            }
-            else if(this.typegen.assembly.subtypeOf(moftype, this.typegen.podType)) {
-                rchk = `((BSQ_GET_VALUE_PTR(val, BSQRecord)->flag & DATA_KIND_POD_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-            }
-            else {
-                rchk = "false";
-            }
-            let chkrecord = `else if (nenum == MIRNominalTypeEnum_Record) { return ${rchk}; }`
-
-            let fchk = this.generateConceptArrayLookup(`getNominalTypeOf_Value(${argv})`, oftype);
-            let chkrest = `else { return ${fchk}; }`;
-
-            const decl = subtypesig
-            + "\n{\n"
-            + `    ${getenum}\n`
-            + `    ${chktuple}\n`
-            + `    ${chkrecord}\n`
-            + `    ${chkrest}\n`
-            + `}\n`;
-
-            this.subtypeFMap.set(subtypesig, { order: order, decl: decl });
-        }
-
-        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}(${argv})`;
-    }
-
-    generateFastTupleTypeCheck(arg: string, argtype: MIRType, oftype: MIRTupleType): string {
-        if (this.typegen.typecheckIsName(argtype, /^NSCore::None$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::BigInt$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::UUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)) {
-            return "false";
-        }
-        else {
-            if (this.typegen.typecheckAllKeys(argtype)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Float64$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ByteBuffer$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::BufferOf<.*>$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckTuple(argtype)) {
-                return this.generateSubtypeTupleCheck(arg, argtype, oftype);
-            }
-            else if (this.typegen.typecheckRecord(argtype)) {
-                return "false";
-            }
-            else if(this.typegen.typecheckUEntity(argtype)) {
-                return "false";
-            }
-            else {
-                const argrepr = this.typegen.getCPPReprFor(argtype);
-                if (argrepr instanceof UnionRepr) {
-                    const tsc = this.generateSubtypeTupleCheck(arg, argtype, oftype);
-                    return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
-                }
-                else {
-                    const tsc = this.generateSubtypeTupleCheck(arg, argtype, oftype);
-                    return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
-                }
-            }
-        }
-    }
-
-    generateFastRecordTypeCheck(arg: string, argtype: MIRType, oftype: MIRRecordType): string {
-        if (this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::GUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/)
-            || this.typegen.typecheckIsName(argtype, /^NSCore::DataHash$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
-            return "false";
-        }
-        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
-            return "false";
-        }
-        else {
-            if (this.typegen.typecheckAllKeys(argtype)) {
-                return "false";
-            }
-            if (this.typegen.typecheckAllKeys(argtype)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckTuple(argtype)) {
-                return "false";
-            }
-            else if(this.typegen.typecheckUEntity(argtype)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckRecord(argtype)) {
-                return this.generateSubtypeRecordCheck(arg, argtype, oftype);
-            }
-            else {
-                const tsc = this.generateSubtypeRecordCheck(`BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`, argtype, oftype);
-                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`
-            }
-        }
-    }
-
-    generateSubtypeArrayLookup(typeenum: string, oftype: MIRType): string {
-        const arraystr = `MIRSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}`;
-        return `BSQObject::checkSubtype(${typeenum}, ${arraystr})`;
-    }
-
-    generateFastConceptTypeCheck(arg: string, argtype: MIRType, oftype: MIRConceptType): string {
-        const argrepr = this.typegen.getCPPReprFor(argtype);
-
-        const tcc = this.typegen.assembly.subtypeOf(this.typegen.tupleType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.podType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.apiType, oftype) || this.typegen.assembly.subtypeOf(this.typegen.parsableType, oftype);
-
-
-        if(argrepr instanceof NoneRepr ) {
-            return "false";
-        }
-        if(argrepr instanceof StructRepr) {
-            return "false"; xxx;
-        }
-        if(argrepr instanceof RefRepr) {
-            return "false";
-        }
-        else if(argrepr instanceof UnionRepr) {
-            return `(${arg}.nominalType == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`; xxx;
-        }
-        else if(argrepr instanceof KeyValueRepr) {
-            return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
-        }
-        else {
-            return `(getNominalTypeOf_Value(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
-        }
-
-
-
-
-        const moftype = this.typegen.getMIRType(oftype.trkey);
-        if (this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
-            return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
-            return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-        }
-        else if (this.typegen.typecheckIsName(argtype, /^NSCore::GUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/)
-            || this.typegen.typecheckIsName(argtype, /^NSCore::DataHash$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
-            return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-        }
-        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
-            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
-            return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-        }
-        else {
-            if(this.typegen.typecheckAllKeys(argtype)) {
-                return this.generateConceptArrayLookup(`getNominalTypeOf_KeyValue(${arg})`, oftype);
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
-                return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-            }
-            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
-                return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-            }
-            else if (this.typegen.typecheckTuple(argtype)) {
-                if(this.typegen.assembly.subtypeOf(this.typegen.tupleType, moftype)) {
-                    return "true";
-                }
-
-                if(this.typegen.assembly.subtypeOf(moftype, this.typegen.apiType)) {
-                    return `((BSQ_GET_VALUE_PTR(${arg}, BSQTuple)->flag & DATA_KIND_API_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-                }
-
-                if(this.typegen.assembly.subtypeOf(moftype, this.typegen.podType)) {
-                    return `((BSQ_GET_VALUE_PTR(${arg}, BSQTuple)->flag & DATA_KIND_POD_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-                }
-
-                return "false";
-            }
-            else if (this.typegen.typecheckRecord(argtype)) {
-                if(this.typegen.assembly.subtypeOf(this.typegen.tupleType, moftype)) {
-                    return "true";
-                }
-
-                if(this.typegen.assembly.subtypeOf(moftype, this.typegen.apiType)) {
-                    return `((BSQ_GET_VALUE_PTR(${arg}, BSQRecord)->flag & DATA_KIND_API_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-                }
-
-                if(this.typegen.assembly.subtypeOf(moftype, this.typegen.podType)) {
-                    return `((BSQ_GET_VALUE_PTR(${arg}, BSQRecord)->flag & DATA_KIND_POD_FLAG) != DATA_KIND_CLEAR_FLAG)`;
-                }
-
-                return "false";
-            }
-            else if(this.typegen.typecheckUEntity(argtype)) {
-                return this.typegen.assembly.subtypeOf(argtype, moftype) ? "true" : "false";
-            }
-            else {
-                const simplenominalok = moftype.options.every((copt) => {
-                    const cc = this.typegen.getMIRType(copt.trkey);
-
-                    const maybetuple = this.typegen.assembly.subtypeOf(this.typegen.tupleType, cc);
-                    const mayberecord = this.typegen.assembly.subtypeOf(this.typegen.recordType, cc);
-                    const maybepod = this.typegen.assembly.subtypeOf(this.typegen.podType, cc);
-                    const maybeapi = this.typegen.assembly.subtypeOf(this.typegen.apiType, cc);
-
-                    return !(maybetuple || mayberecord || maybepod || maybeapi);
-                });
-
-                if(simplenominalok) {
-                    return this.generateConceptArrayLookup(`getNominalTypeOf_Value(${arg})`, oftype);
-                }
-                else {
-                    return this.generateSubtypeConceptCheck(arg, argtype, oftype);
-                }
-            }
-        }
-    }
-
-    generateFastEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIREntityType): string {
-        assert(argtype.trkey !== oftype.trkey, "This should have been handled as a special case in generateTypeCheck");
-
-        const argrepr = this.typegen.getCPPReprFor(argtype);
-        if(argrepr instanceof NoneRepr || argrepr instanceof StructRepr || argrepr instanceof RefRepr) {
-            return "false";
-        }
-        else if(argrepr instanceof UnionRepr) {
-            return `(${arg}.nominalType == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
-        }
-        else if(argrepr instanceof KeyValueRepr) {
-            return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
-        }
-        else {
-            return `(getNominalTypeOf_Value(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
-        }
+        return `subtypeFROM_${this.typegen.mangleStringForCpp(argtype.trkey)}_TO_${this.typegen.mangleStringForCpp(oftype.trkey)}_EL(${argv})`;
     }
 
     generateTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIRType): string {
@@ -1237,20 +1237,22 @@ class CPPBodyEmitter {
             assert(mtype !== undefined, "We should generate all the component types by default??");
 
             if(topt instanceof MIREntityType) {
-                return this.generateFastEntityTypeCheck(arg, argtype, topt);
+                return this.generateFastEntityTypeCheck(arg, argtype, inferargtype, topt);
             }
             else if (topt instanceof MIRConceptType) {
-                return this.generateFastConceptTypeCheck(arg, argtype, topt);
+                return this.generateFastConceptTypeCheck(arg, argtype, inferargtype, topt);
             }
             else if (topt instanceof MIRTupleType) {
-                return this.generateFastTupleTypeCheck(arg, inferargtype, topt);
+                return this.generateFastTupleTypeCheck(arg, argtype, inferargtype, topt);
+            }
+            else if (topt instanceof MIRRecordType) {
+                return this.generateFastRecordTypeCheck(arg, argtype, inferargtype, topt);
             }
             else {
-                assert(topt instanceof MIRRecordType);
+                assert(topt instanceof MIREphemeralListType);
 
-                return this.generateFastRecordTypeCheck(arg, inferargtype, topt as MIRRecordType);
+                return this.generateEphemeralTypeCheck(arg, argtype, topt as MIREphemeralListType);
             }
-            xxxx; //epehmeral
         })
         .filter((test) => test !== "false");
 

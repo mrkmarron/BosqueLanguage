@@ -593,7 +593,7 @@ class MIRAssembly {
             }
         }
 
-        const tcitype = MIRType.createSingle(MIRConceptType.create(tci))
+        const tcitype = MIRType.createSingle(MIRConceptType.create(tci));
         return this.subtypeOf(tcitype, t2type);
     }
 
@@ -643,7 +643,7 @@ class MIRAssembly {
             }
         }
 
-        const tcitype = MIRType.createSingle(MIRConceptType.create(tci))
+        const tcitype = MIRType.createSingle(MIRConceptType.create(tci));
         return this.subtypeOf(tcitype, t2type);
     }
 

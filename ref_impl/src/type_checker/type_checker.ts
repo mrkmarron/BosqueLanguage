@@ -1512,8 +1512,13 @@ class TypeChecker {
 
     private checkSafeStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
+        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialValidatorConceptType()), "Can only use Validator types as SafeString parameters");
+
+        //
+        //TODO: we need to handle a broader range of cases here including unions
+        //
+
         const aoftype = ResolvedType.tryGetOOTypeInfo(oftype);
-        this.raiseErrorIf(sinfo, aoftype === undefined, "Can only make string type using concept or object types");
 
         const oodecl = (aoftype instanceof ResolvedEntityAtomType) ? (aoftype as ResolvedEntityAtomType).object : (aoftype as ResolvedConceptAtomType).conceptTypes[0].concept;
         const oobinds = (aoftype instanceof ResolvedEntityAtomType) ? (aoftype as ResolvedEntityAtomType).binds : (aoftype as ResolvedConceptAtomType).conceptTypes[0].binds;
@@ -1529,6 +1534,10 @@ class TypeChecker {
     private checkTypedStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
         this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialParsableConceptType()), "Can only use Parsable types as StringOf parameters");
+
+        //
+        //TODO: we need to handle a broader range of cases here including unions and structural type options
+        //
 
         const fdecltry = this.m_assembly.tryGetOOMemberDeclUnique(oftype, "static", "tryParse");
         this.raiseErrorIf(sinfo, fdecltry === undefined, `Constant value not defined for type '${oftype.idStr}'`);
@@ -1553,6 +1562,10 @@ class TypeChecker {
         if(this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialValidatorConceptType())) {
             const aoftype = this.checkSafeStringCommon(exp.sinfo, env, exp.stype);
 
+            //
+            //TODO: we need to handle a broader range of cases here including unions
+            //
+    
             const sdecl = aoftype.oftype[0].staticFunctions.get("accepts");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'validate'");
 
@@ -1581,6 +1594,10 @@ class TypeChecker {
         }
         else {
             const aoftype = this.checkTypedStringCommon(exp.sinfo, env, exp.stype);
+
+            //
+            //TODO: we need to handle a broader range of cases here including unions and structural type options
+            //
 
             const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
