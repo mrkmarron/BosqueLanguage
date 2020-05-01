@@ -26,14 +26,12 @@ function isBuildLevelEnabled(check: BuildLevel, enabled: BuildLevel): boolean {
 
 class TemplateTermDecl {
     readonly name: string;
-    readonly isGrounded: boolean;
     readonly constraint: TypeSignature;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
 
-    constructor(name: string, isgrounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
+    constructor(name: string, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
-        this.isGrounded = isgrounded;
         this.constraint = constraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
@@ -45,9 +43,8 @@ class TemplateTypeRestriction {
     readonly isGrounded: boolean;
     readonly constraint: TypeSignature;
 
-    constructor(t: TypeSignature, isGrounded: boolean, constraint: TypeSignature) {
+    constructor(t: TypeSignature, constraint: TypeSignature) {
         this.t = t;
-        this.isGrounded = isGrounded;
         this.constraint = constraint;
     }
 }
@@ -1573,11 +1570,7 @@ class Assembly {
             else {
                 const allok = pcond.constraints.every((consinfo) => {
                     const constype = this.normalizeTypeOnly(consinfo.t, binds)
-
-                    const boundsok = this.subtypeOf(constype, this.normalizeTypeOnly(consinfo.constraint, binds));
-                    const groundok = !consinfo.isGrounded || this.isGroundedType(constype);
-                
-                    return boundsok && groundok;
+                    return this.subtypeOf(constype, this.normalizeTypeOnly(consinfo.constraint, binds));
                 });
 
                 if(allok) {

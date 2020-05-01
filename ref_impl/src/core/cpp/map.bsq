@@ -6,7 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, PODType when K PODType && V PODType, APIType when K APIType && V APIType {
     hidden static _size(m: Map<K, V>): Int # map_size
     hidden static _has_key(m: Map<K, V>, key: K): Bool # map_has_key
     hidden static _at_val(m: Map<K, V>, key: K): V # map_at_val

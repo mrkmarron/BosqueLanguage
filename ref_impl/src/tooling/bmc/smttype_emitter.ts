@@ -646,10 +646,6 @@ class SMTTypeEmitter {
         });
     }
 
-    getSubtypesArrayCount(ckey: MIRNominalTypeKey): number {
-        return (this.conceptSubtypeRelation.get(ckey) as string[]).length
-    }
-
     generateEntityConstructor(ekey: MIRNominalTypeKey): string {
         return `${this.mangleStringForSMT(ekey)}@cons`;
     }

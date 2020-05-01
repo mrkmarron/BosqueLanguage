@@ -729,10 +729,6 @@ class CPPTypeEmitter {
         });
     }
 
-    getSubtypesArrayCount(ckey: MIRNominalTypeKey): number {
-        return (this.conceptSubtypeRelation.get(ckey) as string[]).length;
-    }
-
     generateConstructorArgInc(argtype: MIRType, arg: string): string {
         const rcinfo = this.getRefCountableStatus(argtype);
         if (rcinfo === "no") {

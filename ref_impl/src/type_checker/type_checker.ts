@@ -146,11 +146,6 @@ class TypeChecker {
 
             const boundsok = this.m_assembly.subtypeOf(termtype, this.resolveAndEnsureTypeOnly(sinfo, terminfo.constraint, new Map<string, ResolvedType>()));
             this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
-
-            if(terminfo.isGrounded) {
-                const groundok = this.m_assembly.isGroundedType(termtype);
-                this.raiseErrorIf(sinfo, !groundok, "Term is not grounded as required");
-            }
         }
 
         if (optTypeRestrict !== undefined) {
@@ -160,11 +155,6 @@ class TypeChecker {
 
                 const boundsok = this.m_assembly.subtypeOf(constype, this.resolveAndEnsureTypeOnly(sinfo, consinfo.constraint, binds));
                 this.raiseErrorIf(sinfo, !boundsok, "Template instantiation does not satisfy specified bounds");
-
-                if (consinfo.isGrounded) {
-                    const groundok = this.m_assembly.isGroundedType(constype);
-                    this.raiseErrorIf(sinfo, !groundok, "Term is not grounded as required");
-                }
             }
         }
     }

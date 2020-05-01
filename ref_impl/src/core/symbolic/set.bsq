@@ -6,7 +6,7 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity Set<T where KeyType> provides Object, Expandoable<T>, PODType when T grounded PODType, APIType when T grounded APIType {
+entity Set<T where KeyType> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     hidden static _size(s: Set<T>): Int # set_size
     hidden static _has_key(s: Set<T>, key: T): Bool # set_has_key
     hidden static _get_keylist(s: Set<T>): KeyList<T>? # set_get_keylist

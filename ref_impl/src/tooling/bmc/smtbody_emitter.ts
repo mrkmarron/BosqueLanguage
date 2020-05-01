@@ -1347,13 +1347,56 @@ class SMTBodyEmitter {
         }
     }
 
+    generateFastEntityTypeCheck(arg: string, argtype: MIRType, oftype: MIREntityType): string {
+        if (this.typegen.typecheckIsName(argtype, /^NSCore::Bool$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Int$/) || this.typegen.typecheckIsName(argtype, /^NSCore::String$/)) {
+            return oftype.ekey === argtype.trkey ? "true" : "false";
+        }
+        else if (this.typegen.typecheckIsName(argtype, /^NSCore::SafeString<.*>$/) || this.typegen.typecheckIsName(argtype, /^NSCore::StringOf<.*>$/)) {
+            return oftype.ekey === argtype.trkey ? "true" : "false";
+        }
+        else if (this.typegen.typecheckIsName(argtype, /^NSCore::GUID$/) || this.typegen.typecheckIsName(argtype, /^NSCore::LogicalTime$/)
+            || this.typegen.typecheckIsName(argtype, /^NSCore::DataHash$/) || this.typegen.typecheckIsName(argtype, /^NSCore::CryptoHash$/)) {
+            return oftype.ekey === argtype.trkey ? "true" : "false";
+        }
+        else if (this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.enumtype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.idkeytype)
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.guididkeytype) || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.logicaltimeidkeytype)
+            || this.typegen.typecheckEntityAndProvidesName(argtype, this.typegen.contenthashidkeytype)) {
+            return oftype.ekey === argtype.trkey ? "true" : "false";
+        }
+        else {
+            if(this.typegen.typecheckAllKeys(argtype)) {
+                return `(= (bsqkey_get_nominal_type ${arg}) "${this.typegen.mangleStringForSMT(oftype.ekey)}")`;
+            }
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::Buffer<.*>$/)) {
+                return oftype.ekey === argtype.trkey ? "true" : "false";
+            }
+            else if (this.typegen.typecheckIsName(argtype, /^NSCore::ISOTime$/) || this.typegen.typecheckIsName(argtype, /^NSCore::Regex$/)) {
+                return oftype.ekey === argtype.trkey ? "true" : "false";
+            }
+            else if (this.typegen.typecheckTuple(argtype) || this.typegen.typecheckRecord(argtype)) {
+                return "false";
+            }
+            else if(this.typegen.typecheckUEntity(argtype)) {
+                return oftype.ekey === argtype.trkey ? "true" : "false";
+            }
+            else {
+                return `(= (bsqterm_get_nominal_type ${arg}) "${this.typegen.mangleStringForSMT(oftype.ekey)}")`;
+            }
+        }
+    }
+
     generateTypeCheck(arg: string, argtype: MIRType, inferargtype: MIRType, oftype: MIRType): string {
-        if(inferargtype.trkey !== argtype.trkey) {
-            arg = this.typegen.coerce(new SMTValue(arg), argtype, inferargtype).emit();
+        if(oftype.trkey === "NSCore::Any") {
+            return "true";
         }
 
-        if(this.typegen.assembly.subtypeOf(inferargtype, oftype)) {
-            return "true";
+        if(oftype.trkey === "NSCore::Some") {
+            if(this.typegen.typecheckAllKeys(argtype)) {
+                return `(not (= ${arg} bsqkey_none))`;
+            }
+            else {
+                return `(not (= ${arg} bsqterm_none))`;
+            }
         }
 
         const tests = oftype.options.map((topt) => {

@@ -48,9 +48,9 @@ concept KeyType provides Any {
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
 concept PODType provides APIType {
-    static bufferify<T where grounded PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
-    static parseBuffer<T where grounded PODType>(data: Buffer<T>): T # pod_parsebuffer
-    static tryParseBuffer<T where grounded PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
+    static bufferify<T where PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
+    static parseBuffer<T where PODType>(data: Buffer<T>): T # pod_parsebuffer
+    static tryParseBuffer<T where PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
 }
 
 //<summary>Type to unify Buffers and APITypes at top level for checking</summary>
@@ -59,9 +59,9 @@ concept APIValue provides Any {
 
 //<summary>Type for indicating that a datatype can be exported as part of a stable API.</summary>
 concept APIType provides APIValue {
-    static bufferify<T where grounded APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
-    static parseBuffer<T where grounded APIType>(data: Buffer<T>): T # api_parsebuffer
-    static tryParseBuffer<T where grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
+    static bufferify<T where APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
+    static parseBuffer<T where APIType>(data: Buffer<T>): T # api_parsebuffer
+    static tryParseBuffer<T where APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
 }
 
 //<summary>Type for representing the none-value.</summary>
@@ -211,9 +211,11 @@ entity StringOf<T where Parsable> provides APIValue, KeyType, Some, Convertable 
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity Buffer<T where grounded PODType | APIType | Parsable> provides APIValue, Some {
+entity Buffer<T where PODType | APIType> provides APIValue, Some {
     method bytes(): ByteBuffer # buffer_bytes
 }
+
+//TODO: maybe add a BufferParsable here
 
 enum BufferFormat {
     text,
@@ -308,7 +310,7 @@ concept Tuple provides Some {
 concept Record provides Some {
 }
 
-struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType when K PODType && V PODType, APIType when K APIType && V APIType {
     field key: K;
     field value: V;
 
@@ -322,7 +324,7 @@ struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType w
 }
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
-struct concept Result<T, E=None> provides Some, Convertable {   
+struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
     static cok(result: T): Result<T, E> {
         return ResultOk<T, E>::of(result);
     }

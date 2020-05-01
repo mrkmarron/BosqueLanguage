@@ -42,7 +42,6 @@ const KeywordStrings = [
     "from",
     "function",
     "global",
-    "grounded",
     "identifier",
     "if",
     "invariant",
@@ -2598,7 +2597,6 @@ class Parser {
                 this.ensureToken(TokenStrings.Template);
                 const templatename = this.consumeTokenAndGetValue();
                 const hasconstraint = this.testAndConsumeTokenIf("where");
-                const isgrounded = this.testAndConsumeTokenIf("grounded");
                 const tconstraint = hasconstraint ? this.parseTypeSignature() : this.m_penv.SpecialAnySignature;
 
                 let defaulttype = undefined;
@@ -2612,7 +2610,7 @@ class Parser {
                     }
                 }
 
-                return new TemplateTermDecl(templatename, isgrounded, tconstraint, isinfer, defaulttype);
+                return new TemplateTermDecl(templatename, tconstraint, isinfer, defaulttype);
             })[0];
         }
         return terms;
@@ -2621,10 +2619,9 @@ class Parser {
     private parseSingleTermRestriction(): TemplateTypeRestriction {
         this.ensureToken(TokenStrings.Template);
         const templatename = this.consumeTokenAndGetValue();
-        const isgrounded = this.testAndConsumeTokenIf("grounded")
         const oftype = this.parseTypeSignature();
 
-        return new TemplateTypeRestriction(new TemplateTypeSignature(templatename), isgrounded, oftype);
+        return new TemplateTypeRestriction(new TemplateTypeSignature(templatename), oftype);
     }
 
     private parseTermRestrictionList(): TemplateTypeRestriction[] {
