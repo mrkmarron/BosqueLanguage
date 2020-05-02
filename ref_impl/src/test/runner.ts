@@ -20,7 +20,7 @@ function generateMASM(files: string[], corelibpath: string, functionalize: boole
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const coredir = Path.join(bosque_dir, "core/", corelibpath);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
@@ -63,7 +63,7 @@ if (Commander.typecheck === undefined && Commander.args.length === 0) {
     process.exit(1);
 }
 
-const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", (Commander.symbolic || Commander.result) ? "symbolic" : "cpp")), (Commander.symbolic || Commander.result));
+const massembly = generateMASM(Commander.args, (Commander.symbolic || Commander.result) ? "symbolic" : "cpp", (Commander.symbolic || Commander.result));
 
 if(Commander.typecheck !== undefined) {
     ; //generate MASM will output errors and exit if there are any

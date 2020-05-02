@@ -33,7 +33,7 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const coredir = Path.join(bosque_dir, "core/", corelibpath);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
@@ -76,7 +76,7 @@ if (Commander.args.length === 0) {
 }
 
 process.stdout.write(`Symbolic testing of Bosque sources in files:\n${Commander.args.join("\n")}\n...\n`);
-const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../../", "symbolic")));
+const massembly = generateMASM(Commander.args, "symbolic");
 
 setImmediate(() => {
     process.stdout.write(`Transpiling Bosque assembly to bytecode with entrypoint of ${Commander.entrypoint}...\n`);

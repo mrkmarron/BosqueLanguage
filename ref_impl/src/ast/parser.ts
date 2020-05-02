@@ -165,7 +165,7 @@ const RegexFollows = new Set<string>([
 const LeftScanParens = ["[", "(", "{", "(|", "{|"];
 const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
-const AttributeStrings = ["byvalue", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
+const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
 
 const SpecialInvokeNames = ["update", "merge", "project", "tryProject"];
 
@@ -3136,7 +3136,7 @@ class Parser {
 
             let provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
 
-            const rstrs = components.map((cmp) => new TemplateTypeRestriction(cmp.ctype, true, new NominalTypeSignature("NSCore", "APIType")));
+            const rstrs = components.map((cmp) => new TemplateTypeRestriction(cmp.ctype, new NominalTypeSignature("NSCore", "APIType")));
             provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction(rstrs)]);
                     
             const invariants: InvariantDecl[] = [];
@@ -3155,7 +3155,7 @@ class Parser {
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
             let provides = [[new NominalTypeSignature("NSCore", "IdKey"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
-            provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction([new TemplateTypeRestriction(idval, true, new NominalTypeSignature("NSCore", "APIType"))])]);
+            provides.push([new NominalTypeSignature("NSCore", "APIType"), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", "APIType"))])]);
 
             const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();

@@ -16,7 +16,7 @@ function compile(files: string[], core: string, trgt: string) {
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", core);
+        const coredir = Path.join(bosque_dir, "core/", core);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {

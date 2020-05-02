@@ -21,7 +21,7 @@ function generateMASM(files: string[], blevel: "debug" | "test" | "release", cor
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const coredir = Path.join(bosque_dir, "core/", corelibpath);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
@@ -70,7 +70,7 @@ if(!["debug", "test", "release"].includes(Commander.level)) {
 }
 
 process.stdout.write(`Compiling Bosque sources in files:\n${Commander.args.join("\n")}\n...\n`);
-const massembly = generateMASM(Commander.args, Commander.level, Path.normalize(Path.join(__dirname, "../../", "cpp")));
+const massembly = generateMASM(Commander.args, Commander.level, "cpp");
 
 setImmediate(() => {
     process.stdout.write(`Transpiling Bosque assembly to C++ with entrypoint of ${Commander.entrypoint}...\n`);

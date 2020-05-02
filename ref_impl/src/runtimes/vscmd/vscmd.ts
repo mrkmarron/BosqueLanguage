@@ -34,7 +34,7 @@ function checkMASM(files: string[], corelibpath: string, doemit: boolean): boole
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const coredir = Path.join(bosque_dir, "core/", corelibpath);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
@@ -63,7 +63,7 @@ function generateMASM(files: string[], corelibpath: string, functionalize: boole
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const coredir = Path.join(bosque_dir, "core/", corelibpath);
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
@@ -253,31 +253,27 @@ const config = JSON.parse(FS.readFileSync(Path.join(projectdir, "config.json")).
 const pfiles = config.files.map((f: string) => Path.normalize(Path.join(projectdir, f)));
 
 if(command === "typecheck") {
-    const tccore = Path.normalize(Path.join(__dirname, "../../", "cpp"));
-
-    checkMASM(pfiles, tccore, true);
+    checkMASM(pfiles, "cpp", true);
     process.exit(0);
 }
 else if(command === "compile") {
-    const ccore = Path.normalize(Path.join(__dirname, "../../", "cpp"));
-    const checkok = checkMASM(pfiles, ccore, false);
+    const checkok = checkMASM(pfiles, "cpp", false);
     if(!checkok) {
         process.exit(1);
     }
 
-    const masm = generateMASM(pfiles, ccore, false);
+    const masm = generateMASM(pfiles, "cpp", false);
     const compileok = compile(masm, projectdir, config);
     
     process.exit(compileok ? 0 : 1);
 }
 else if(command === "verify") {
-    const ccore = Path.normalize(Path.join(__dirname, "../../", "symbolic"));
-    const checkok = checkMASM(pfiles, ccore, false);
+    const checkok = checkMASM(pfiles, "symbolic", false);
     if(!checkok) {
         process.exit(1);
     }
 
-    const masm = generateMASM(pfiles, ccore, true);
+    const masm = generateMASM(pfiles, "symbolic", true);
     const verifyyes = verify(masm, config, false);
     if(verifyyes[0] === false) {
         process.exit(1);
