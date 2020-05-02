@@ -225,6 +225,16 @@ false
   (mergeStructuralSpecialTypeInfo (getStructuralSpecialTypeInfoTerm term) sti)
 )
 
+(declare-const @int_min Int)
+(assert (= @int_min -9007199254740991))
+
+(declare-const @int_max Int)
+(assert (= @int_max 9007199254740991))
+
+(define-fun @int_unsafe ((v Int)) 
+  (or (< v @int_min) (> v @int_max))
+)
+
 ;;EPHEMERAL_DECLS;;
 
 (declare-const bsqterm_none BTerm)

@@ -16,16 +16,18 @@ import { SMTEmitter } from "../tooling/bmc/smtdecls_emitter";
 const scratchroot = Path.normalize(Path.join(__dirname, "../scratch/"));
 const binroot = Path.normalize(Path.join(__dirname, "../"));
 
-function generateMASM(files: string[], corelibpath: string): MIRAssembly {
+function generateMASM(files: string[], corelibpath: string, functionalize: boolean): MIRAssembly {
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(corelibpath, "/core.bsq");
-        const coredata = FS.readFileSync(coredir).toString();
+        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const corefiles = FS.readdirSync(coredir);
 
-        const collectionsdir = Path.join(corelibpath, "/collections.bsq");
-        const collectionsdata = FS.readFileSync(collectionsdir).toString();
-
-        code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
+        for (let i = 0; i < corefiles.length; ++i) {
+            const cfpath = Path.join(coredir, corefiles[i]);
+            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
+        }
+ 
         for (let i = 0; i < files.length; ++i) {
             const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
             code.push(file);
@@ -36,7 +38,7 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
         process.exit(1);
     }
 
-    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code);
+    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, functionalize, code);
     if (errors.length !== 0) {
         for (let i = 0; i < errors.length; ++i) {
             process.stdout.write(`Parse error -- ${errors[i]}\n`);
@@ -61,7 +63,7 @@ if (Commander.typecheck === undefined && Commander.args.length === 0) {
     process.exit(1);
 }
 
-const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", (Commander.symbolic || Commander.result) ? "core/direct/" : "core/direct/")));
+const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../", (Commander.symbolic || Commander.result) ? "symbolic" : "cpp")), (Commander.symbolic || Commander.result));
 
 if(Commander.typecheck !== undefined) {
     ; //generate MASM will output errors and exit if there are any
@@ -156,10 +158,7 @@ else {
         + cparams.TYPEDECLS_FWD
         + "\n\n/*ephemeral decls*/\n"
         + cparams.EPHEMERAL_LIST_DECLARE
-        + "\n\n/*vable decls*/\n"
         + "\n\n/*forward vable decls*/\n"
-        + cparams.VFIELD_DECLS_FWD
-        + cparams.VMETHOD_DECLS_FWD
         + "\n\n/*forward function decls*/\n"
         + cparams.FUNC_DECLS_FWD
         + "\n\n/*type decls*/\n"
@@ -167,8 +166,7 @@ else {
         + "\n\n/*typecheck decls*/\n"
         + cparams.TYPECHECKS
         + "\n\n/*vable decls*/\n"
-        + cparams.VFIELD_DECLS
-        + cparams.VMETHOD_DECLS
+        + cparams.VFIELD_ACCESS
         + "\n\n/*function decls*/\n"
         + cparams.FUNC_DECLS
         + "}\n\n"

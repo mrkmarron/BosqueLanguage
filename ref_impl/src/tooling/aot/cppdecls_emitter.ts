@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIREphemeralListType, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
@@ -30,14 +30,11 @@ type CPPCode = {
 
     SPECIAL_NAME_BLOCK_BEGIN: string,
 
+    VFIELD_ACCESS: string,
+    
     TYPECHECKS: string,
     FUNC_DECLS_FWD: string,
     FUNC_DECLS: string,
-
-    VFIELD_DECLS_FWD: string,
-    VMETHOD_DECLS_FWD: string,
-    VFIELD_DECLS: string,
-    VMETHOD_DECLS: string,
 
     MAIN_CALL: string
 };
@@ -49,21 +46,28 @@ class CPPEmitter {
 
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
         
-        const includes = new Map<string, string>()
-            .set("list", "\"./bsqcustom/bsqlist.h\"")
-            .set("set", "\"./bsqcustom/bsqset.h\"")
-            .set("map", "\"./bsqcustom/bsqmap.h\"");
-
         let typedecls_fwd: string[] = [];
-        let typedecls: string[] = [];
+        let typedecls: [string, string[]][] = [];
         let nominaltypeinfo: {enum: string, display: string, datakind: string}[] = [];
         let vfieldaccesses: string[] = [];
-        let vcalls: string[] = [];
         assembly.entityDecls.forEach((edecl) => {
-            const cppdecl = typeemitter.generateCPPEntity(edecl, includes);
+            const cppdecl: any = typeemitter.generateCPPEntity(edecl);
             if (cppdecl !== undefined) {
-                typedecls_fwd.push(cppdecl.fwddecl);
-                typedecls.push(cppdecl.fulldecl);
+                if(cppdecl.fwddecl !== undefined) {
+                    const refdecl = cppdecl as { fwddecl: string, fulldecl: string };
+                    typedecls_fwd.push(refdecl.fwddecl);
+                    typedecls.push([refdecl.fulldecl, []]);
+                }
+                else {
+                    const structdecl = cppdecl as { depon: string[], fulldecl: string, boxeddecl: string, ops: string[] };
+
+                    typedecls.push([structdecl.fulldecl + structdecl.ops.join("\n"), structdecl.depon]);
+                    typedecls.push([structdecl.boxeddecl, [structdecl.fulldecl]]);
+
+                    //
+                    //TODO: buildup ops for STATIC_OPS_DECLARE, NOMINAL_TYPE_TO_OPS, and STATIC_OPS_CREATE
+                    //
+                }
             }
 
             const enumv = typeemitter.mangleStringForCpp(edecl.tkey);
@@ -74,25 +78,11 @@ class CPPEmitter {
 
             edecl.fields.forEach((fd) => {
                 if (fd.enclosingDecl !== edecl.tkey) {
-                    const rftype = typeemitter.getCPPTypeFor(typeemitter.getMIRType(fd.declaredType), "return");
-                    const isig = `virtual ${rftype} get$${typeemitter.mangleStringForCpp(fd.fkey)}() { printf("%s\\n", "Bad v-field resolve -- ${fd.fkey}"); exit(1); return ${typeemitter.typeToCPPDefaultValue(typeemitter.getMIRType(fd.declaredType))}; }`;
+                    const rftype = typeemitter.getCPPReprFor(typeemitter.getMIRType(fd.declaredType)).std;
+                    const isig = `virtual ${rftype} get$${typeemitter.mangleStringForCpp(fd.fkey)}() { printf("%s\\n", "Bad v-field resolve -- ${fd.fkey}"); exit(1); ${rftype} res; return res; }`;
 
                     if (!vfieldaccesses.includes(isig)) {
                         vfieldaccesses.push(isig);
-                    }
-                }
-            });
-
-            [...edecl.vcallMap].map((callp) => {
-                const rcall = (typeemitter.assembly.invokeDecls.get(callp[1]) || typeemitter.assembly.primitiveInvokeDecls.get(callp[1])) as MIRInvokeDecl;
-                if (rcall.enclosingDecl !== edecl.tkey) {
-                    const rtype = typeemitter.getCPPTypeFor(typeemitter.getMIRType(rcall.resultType), "return");
-
-                    const vargs = rcall.params.slice(1).map((fp) => `${typeemitter.getCPPTypeFor(typeemitter.getMIRType(fp.type), "parameter")} ${fp.name}`);
-                    const vcall = `virtual ${rtype} ${typeemitter.mangleStringForCpp(callp[0])}(${vargs.join(", ")}) { printf("%s\\n", "Bad v-call resolve ${callp[1]}"); exit(1); return ${typeemitter.typeToCPPDefaultValue(typeemitter.getMIRType(rcall.resultType))}; }`;
-
-                    if (!vcalls.includes(vcall)) {
-                        vcalls.push(vcall);
                     }
                 }
             });
@@ -125,22 +115,6 @@ class CPPEmitter {
             funcdecls.push(finfo.fulldecl);
         }
 
-        assembly.entityDecls.forEach((edecl) => {
-            const tt = typeemitter.getMIRType(edecl.tkey);
-
-            if(typeemitter.typecheckIsName(tt, /^NSCore::KeyList<.*>$/)) {
-                const alloctype = typeemitter.getCPPTypeFor(tt, "base");
-                const restype = typeemitter.getCPPTypeFor(tt, "return");
-                const keytype = typeemitter.getCPPTypeFor(edecl.terms.get("K") as MIRType, "parameter");
-
-                const cdecl = `${restype} ${typeemitter.mangleStringForCpp(tt.trkey)}$cons(${keytype} khead, Value tail)`;
-                const body = `{ return BSQ_NEW_NO_RC(${alloctype}, khead, tail); }`;
-
-                funcdecls_fwd.push(cdecl + ";");
-                funcdecls.push(cdecl + " " + body);
-            }
-        });
-
         let conceptSubtypes: string[] = [];
         typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
             const nemums = stv.map((ek) => `MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(ek)}`).sort();
@@ -157,9 +131,8 @@ class CPPEmitter {
         [...typeemitter.assembly.typeMap].forEach((te) => {
             const tt = te[1];
 
-            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::String$/)
-                    || typeemitter.typecheckIsName(tt, /^NSCore::GUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) 
-                    || typeemitter.typecheckIsName(tt, /^NSCore::DataHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/)
+            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::BigInt$/) || typeemitter.typecheckIsName(tt, /^NSCore::Float64$/) 
+                    || typeemitter.typecheckIsName(tt, /^NSCore::String$/) || typeemitter.typecheckIsName(tt, /^NSCore::UUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::ByteBuffer$/)
                     || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
                         special_name_decls.push(`#define MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum::${typeemitter.mangleStringForCpp(tt.trkey)}`);
                     }
@@ -174,6 +147,13 @@ class CPPEmitter {
             }
         });
 
+        let vfieldaccess: string[] = [];
+        for(let i = 0; i < bodyemitter.vfieldLookups.length; ++i) {
+            //
+            //TODO: generate vfield switches
+            //
+        }
+
         //
         //TODO: need to process virtual bulk data operations -- also see SMT versions
         //
@@ -181,7 +161,6 @@ class CPPEmitter {
             console.log("NOT IMPLEMENTED -- virtual bulk operators for nominal types");
             process.exit(1);
         }
-
 
         let conststring_declare: string[] = [];
         let conststring_create: string[] = [];
@@ -275,13 +254,13 @@ class CPPEmitter {
             NOMINAL_TYPE_TO_DATA_KIND: [...nominaltypeinfo].map((nti) => nti.datakind).join(",\n    "),
         
             SPECIAL_NAME_BLOCK_BEGIN: special_name_decls.sort().join("\n"),
-        
+
+            VFIELD_ACCESS: vfieldaccess.sort().join("\n"),
+
             TYPECHECKS: typechecks.join("\n"),
             FUNC_DECLS_FWD: funcdecls_fwd.join("\n"),
             FUNC_DECLS: funcdecls.join("\n"),
         
-            VFIELD_DECLS: [...vfieldaccesses].sort().join("\n"),
-            VMETHOD_DECLS: [...vcalls].sort().join("\n"),
             MAIN_CALL: maincall
         };
     }

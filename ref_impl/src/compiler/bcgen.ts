@@ -14,7 +14,6 @@ function compile(files: string[], core: string, trgt: string) {
     process.stdout.write("Reading app code...\n");
 
     let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
-
     let code: { relativePath: string, contents: string }[] = [];
     try {
         const coredir = Path.join(bosque_dir, "src/core/", core);

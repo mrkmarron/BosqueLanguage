@@ -3,12 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
-import { SMTValue } from "./smt_exp";
 
 type SMTCode = {
     NOMINAL_DECLS_FWD: string,
@@ -115,34 +114,9 @@ class SMTEmitter {
 
         let vfieldaccess: string[] = [];
         for(let i = 0; i < bodyemitter.vfieldLookups.length; ++i) {
-            const vl = bodyemitter.vfieldLookups[i];
-
-            const opts = [...assembly.entityDecls].filter((edcl) => {
-                const etype = typeemitter.getMIRType(edcl[0]);
-                return assembly.subtypeOf(etype, vl.infertype) && assembly.subtypeOf(etype, typeemitter.getMIRType(vl.fdecl.enclosingDecl));
-            });
-
-            const ttl = assembly.typeMap.get(opts[opts.length - 1][0]) as MIRType;
-            const cargl = typeemitter.coerce(new SMTValue("$arg$"), vl.infertype, ttl).emit();
-            let body = `(${typeemitter.generateEntityAccessor(typeemitter.getEntityEKey(ttl), vl.fdecl.fkey)} ${cargl})`;
-            
-            for(let i = opts.length - 2; i >= 0; --i) {
-                const tti = assembly.typeMap.get(opts[i][0]) as MIRType;
-                const testi = `(= $objtype$ "${typeemitter.mangleStringForSMT(tti.trkey)}")`
-                const cargi = typeemitter.coerce(new SMTValue("$arg$"), vl.infertype, tti).emit();
-
-                body = `  (ite ${testi} (${typeemitter.generateEntityAccessor(typeemitter.getEntityEKey(tti), vl.fdecl.fkey)} ${cargi})\n`
-                + `  ${body})`
-            }
-
-            const cdcl = `(define-fun ${typeemitter.mangleStringForSMT(vl.lname)} (($arg$ ${typeemitter.getSMTTypeFor(vl.infertype)})) ${typeemitter.getSMTTypeFor(typeemitter.getMIRType(vl.fdecl.declaredType))}\n`;
-            if(opts.length === 1) {
-                vfieldaccess.push(cdcl + body + "\n)");
-            }
-            else {
-                body = `(let (($objtype$ (bsqterm_get_nominal_type $arg$)))\n` + body + "\n)";
-                vfieldaccess.push(cdcl + body + "\n)");
-            }
+            //
+            //TODO: generate vfield switches
+            //
         }
 
         const rrtype = typeemitter.getSMTTypeFor(typeemitter.getMIRType(entrypoint.resultType));
@@ -196,10 +170,9 @@ class SMTEmitter {
         [...typeemitter.assembly.typeMap].forEach((te) => {
             const tt = te[1];
 
-            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::String$/)
-                    || typeemitter.typecheckIsName(tt, /^NSCore::GUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) 
-                    || typeemitter.typecheckIsName(tt, /^NSCore::DataHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/)
-                    || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
+            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::BigInt$/) || typeemitter.typecheckIsName(tt, /^NSCore::Float64$/) 
+            || typeemitter.typecheckIsName(tt, /^NSCore::String$/) || typeemitter.typecheckIsName(tt, /^NSCore::UUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::ByteBuffer$/)
+            || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
                         special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} "${typeemitter.mangleStringForSMT(tt.trkey)}"))`);
                     }
             

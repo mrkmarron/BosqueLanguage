@@ -30,26 +30,28 @@ else {
 const z3path = Path.normalize(Path.join(__dirname, "../../tooling/bmc/runtime", platpathsmt));
 
 function generateMASM(files: string[], corelibpath: string): MIRAssembly {
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(corelibpath, "/core.bsq");
-        const coredata = FS.readFileSync(coredir).toString();
+        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const corefiles = FS.readdirSync(coredir);
 
-        const collectionsdir = Path.join(corelibpath, "/collections.bsq");
-        const collectionsdata = FS.readFileSync(collectionsdir).toString();
-
-        code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
+        for (let i = 0; i < corefiles.length; ++i) {
+            const cfpath = Path.join(coredir, corefiles[i]);
+            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
+        }
+ 
         for (let i = 0; i < files.length; ++i) {
             const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
             code.push(file);
         }
     }
     catch (ex) {
-        process.stdout.write(chalk.red(`Read failed with exception -- ${ex}\n`));
+        process.stdout.write(`Read failed with exception -- ${ex}\n`);
         process.exit(1);
     }
 
-    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code);
+    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", true, true, code);
     if (errors.length !== 0) {
         for (let i = 0; i < errors.length; ++i) {
             process.stdout.write(chalk.red(`Parse error -- ${errors[i]}\n`));
@@ -74,7 +76,7 @@ if (Commander.args.length === 0) {
 }
 
 process.stdout.write(`Symbolic testing of Bosque sources in files:\n${Commander.args.join("\n")}\n...\n`);
-const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../../", "core/direct/")));
+const massembly = generateMASM(Commander.args, Path.normalize(Path.join(__dirname, "../../", "symbolic")));
 
 setImmediate(() => {
     process.stdout.write(`Transpiling Bosque assembly to bytecode with entrypoint of ${Commander.entrypoint}...\n`);

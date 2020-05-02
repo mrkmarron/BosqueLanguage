@@ -40,7 +40,6 @@ class TemplateTermDecl {
 
 class TemplateTypeRestriction {
     readonly t: TypeSignature;
-    readonly isGrounded: boolean;
     readonly constraint: TypeSignature;
 
     constructor(t: TypeSignature, constraint: TypeSignature) {

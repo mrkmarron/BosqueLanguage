@@ -31,15 +31,17 @@ const compilerpath = (process.platform === "win32") ? "\"C:\\Program Files\\LLVM
 const binext = (process.platform === "win32") ? "exe" : "out";
 
 function checkMASM(files: string[], corelibpath: string, doemit: boolean): boolean {
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(corelibpath, "/core.bsq");
-        const coredata = FS.readFileSync(coredir).toString();
+        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const corefiles = FS.readdirSync(coredir);
 
-        const collectionsdir = Path.join(corelibpath, "/collections.bsq");
-        const collectionsdata = FS.readFileSync(collectionsdir).toString();
-
-        code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
+        for (let i = 0; i < corefiles.length; ++i) {
+            const cfpath = Path.join(coredir, corefiles[i]);
+            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
+        }
+ 
         for (let i = 0; i < files.length; ++i) {
             const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
             code.push(file);
@@ -49,7 +51,7 @@ function checkMASM(files: string[], corelibpath: string, doemit: boolean): boole
         return false;
     }
 
-    const errors = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code).errors;
+    const errors = MIREmitter.generateMASM(new PackageConfig(), "debug", true, false, code).errors;
     if (doemit) {
         process.stdout.write(JSON.stringify(errors));
     }
@@ -57,16 +59,18 @@ function checkMASM(files: string[], corelibpath: string, doemit: boolean): boole
     return errors.length === 0;
 }
 
-function generateMASM(files: string[], corelibpath: string): MIRAssembly {
+function generateMASM(files: string[], corelibpath: string, functionalize: boolean): MIRAssembly {
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(corelibpath, "/core.bsq");
-        const coredata = FS.readFileSync(coredir).toString();
+        const coredir = Path.join(bosque_dir, "src/core/", corelibpath);
+        const corefiles = FS.readdirSync(coredir);
 
-        const collectionsdir = Path.join(corelibpath, "/collections.bsq");
-        const collectionsdata = FS.readFileSync(collectionsdir).toString();
-
-        code = [{ relativePath: coredir, contents: coredata }, { relativePath: collectionsdir, contents: collectionsdata }];
+        for (let i = 0; i < corefiles.length; ++i) {
+            const cfpath = Path.join(coredir, corefiles[i]);
+            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
+        }
+ 
         for (let i = 0; i < files.length; ++i) {
             const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
             code.push(file);
@@ -76,7 +80,7 @@ function generateMASM(files: string[], corelibpath: string): MIRAssembly {
         process.exit(1);
     }
 
-    const masm = MIREmitter.generateMASM(new PackageConfig(), "debug", true, code).masm;
+    const masm = MIREmitter.generateMASM(new PackageConfig(), "debug", true, functionalize, code).masm;
 
     return masm as MIRAssembly;
 }
@@ -129,8 +133,6 @@ function compile(masm: MIRAssembly, wsroot: string, config: any): boolean {
             + "\n\n/*ephemeral decls*/\n"
             + cparams.EPHEMERAL_LIST_DECLARE
             + "\n\n/*forward vable decls*/\n"
-            + cparams.VFIELD_DECLS_FWD
-            + cparams.VMETHOD_DECLS_FWD
             + "\n\n/*forward function decls*/\n"
             + cparams.FUNC_DECLS_FWD
             + "\n\n/*type decls*/\n"
@@ -138,8 +140,7 @@ function compile(masm: MIRAssembly, wsroot: string, config: any): boolean {
             + "\n\n/*typecheck decls*/\n"
             + cparams.TYPECHECKS
             + "\n\n/*vable decls*/\n"
-            + cparams.VFIELD_DECLS
-            + cparams.VMETHOD_DECLS
+            + cparams.VFIELD_ACCESS
             + "\n\n/*function decls*/\n"
             + cparams.FUNC_DECLS
             + "}\n\n"
@@ -252,31 +253,31 @@ const config = JSON.parse(FS.readFileSync(Path.join(projectdir, "config.json")).
 const pfiles = config.files.map((f: string) => Path.normalize(Path.join(projectdir, f)));
 
 if(command === "typecheck") {
-    const tccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
+    const tccore = Path.normalize(Path.join(__dirname, "../../", "cpp"));
 
     checkMASM(pfiles, tccore, true);
     process.exit(0);
 }
 else if(command === "compile") {
-    const ccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
+    const ccore = Path.normalize(Path.join(__dirname, "../../", "cpp"));
     const checkok = checkMASM(pfiles, ccore, false);
     if(!checkok) {
         process.exit(1);
     }
 
-    const masm = generateMASM(pfiles, ccore);
+    const masm = generateMASM(pfiles, ccore, false);
     const compileok = compile(masm, projectdir, config);
     
     process.exit(compileok ? 0 : 1);
 }
 else if(command === "verify") {
-    const ccore = Path.normalize(Path.join(__dirname, "../../", "core/direct/"));
+    const ccore = Path.normalize(Path.join(__dirname, "../../", "symbolic"));
     const checkok = checkMASM(pfiles, ccore, false);
     if(!checkok) {
         process.exit(1);
     }
 
-    const masm = generateMASM(pfiles, ccore);
+    const masm = generateMASM(pfiles, ccore, true);
     const verifyyes = verify(masm, config, false);
     if(verifyyes[0] === false) {
         process.exit(1);

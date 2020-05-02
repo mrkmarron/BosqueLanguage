@@ -13,6 +13,8 @@
 #define MIN_BSQ_INT -9007199254740991
 #define MAX_BSQ_INT 9007199254740991
 
+#define INT_OOF_BOUNDS(X) ((< (X) MIN_BSQ_INT) | (> (X) MAX_BSQ_INT))
+
 #define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
 

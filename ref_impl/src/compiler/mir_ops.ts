@@ -190,6 +190,10 @@ class MIRConstantBigInt extends MIRConstantArgument {
         this.value = value;
     }
 
+    digits(): string {
+        return this.value.slice(0, this.value.length - 1);
+    }
+
     stringify(): string {
         return this.value;
     }
