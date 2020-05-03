@@ -38,7 +38,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     hidden recursive? static _oftype<U>(l: List<T>): List<U> # list_oftype
     hidden recursive? static _cast<U>(l: List<T>): List<U> # list_cast
-    hidden recursive? static _slice(l: List<T>, s: Int, e: Int) # list_slice
+    hidden recursive? static _slice(l: List<T>, s: Int, e: Int): List<T> # list_slice
 
     hidden recursive? static _takewhile(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_takewhile
     hidden recursive? static _discardwhile(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_discardwhile
@@ -51,8 +51,8 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     hidden recursive? static _map<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<U> # list_map
     hidden recursive? static _mapindex<U>(l: List<T>, f: recursive? fn(_: Int, _: T) -> U): List<U> # list_mapindex
 
-    hidden static {when T KeyType} _project<U>(l: List<T>, m: IMap<T, U>): List<U> # list_project
-    hidden static {when T KeyType} _tryproject<U>(l: List<T>, m: IMap<T, U>): List<U?> # list_tryproject
+    hidden static {when T KeyType} _project<U>(l: List<T>, m: Map<T, U>): List<U> # list_project
+    hidden static {when T KeyType} _tryproject<U>(l: List<T>, m: Map<T, U>): List<U?> # list_tryproject
 
     hidden static  _zipindex(l: List<T>): List<[Int, T]> # list_zipindex
 
@@ -61,18 +61,18 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     hidden static _append(l: List<T>, lp: List<T>): List<T> # list_append
 
-    hidden recursive? static _partition<K where K KeyType>(l: List<T>, pf: recursive? fn(_: T) -> K): Map<K, List<T>> # list_partition
-    hidden recursive? static sort(l: List<T>, cmp: recursive? fn(_: T, _: T) -> Bool): List<T> # list_sort
+    hidden recursive? static _partition<K where KeyType>(l: List<T>, pf: recursive? fn(_: T) -> K): Map<K, List<T>> # list_partition
+    hidden recursive? static _sort(l: List<T>, cmp: recursive? fn(_: T, _: T) -> Bool): List<T> # list_sort
 
-    hidden recursive? static toMap<K where K KeyType, V>(l: List<T>, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge: Bool): Map<K, V> # list_tomap
-    hidden recursive? static toIndexMap<V>(l: List<T>, vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> # list_toindexmap
+    hidden recursive? static _toMap<K where KeyType, V>(l: List<T>, kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge: Bool): Map<K, V> # list_tomap
+    hidden recursive? static _toIndexMap<V>(l: List<T>, vf: recursive? fn(_: Int, _: T) -> V): Map<Int, V> # list_toindexmap
 
-    hidden _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
+    hidden static _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
         return 0 <= s && s <= e && e <= List<T>::_size(this);
     }
 
-    hidden _rangeInBoundsRev(start?: Int, end?: Int): Bool {
+    hidden static _rangeInBoundsRev(start?: Int, end?: Int): Bool {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
         return -1 <= s && s <= e && e <= List<T>::_size(this) - 1;
     }
@@ -429,25 +429,15 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     }
 
     recursive? method mapIndex<U>(f: recursive? fn(_: Int, _: T) -> U): List<U> {
-        return List<T>::_mapIndex[recursive?](this f);
+        return List<T>::_mapIndex[recursive?](this, f);
     }
 
-    method {when T KeyType} project<U>(m: IMap<T, U>): List<U> {
-        if(m->is<Map<T, U>()) {
-            return List<T>::_projectWMap<U>(this, m->as<Map<T, U>>()); 
-        }
-        else {
-            abort;
-        }
+    method {when T KeyType} project<U>(m: Map<T, U>): List<U> {
+        return List<T>::_projectWMap<U>(this, m); 
     }
 
-    method {when T KeyType} tryProject<U>(m: IMap<T, U>): List<U?> {
-        if(m->is<Map<T, U>()) {
-            return List<T>::_tryProjectWMap<U>(this, m->as<Map<T, U>>());
-        }
-        else {
-            abort;
-        }
+    method {when T KeyType} tryProject<U>(m: Map<T, U>): List<U?> {
+        return List<T>::_tryProjectWMap<U>(this, m);
     }
 
     method zipIndex(): List<[Int, T]> {
@@ -470,7 +460,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::_append(l, this);
     }
 
-    recursive? method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    recursive? method partition<K where KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         return List<T>::_partition<K>[recursive?](this, pf);
     }
 
@@ -478,7 +468,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::_sort[recursive?](this, pf);
     }
 
-    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
+    recursive? method toMap<K where KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
         return List<T>::_toMap<K, V>[recursive?](this, kf, vf, Truthy::truth(merge));
     }
 
@@ -510,7 +500,7 @@ concept ListUtil {
     }
 
     hidden recursive static _concat<T>(l: List<List<T>>, lp: List<T>, idx: Int): List<T> {
-        if(idx === List<T>_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {
@@ -575,7 +565,7 @@ concept ListUtil {
 }
 
 concept ListUtil {
-    hidden static _zip<T>(l1: List<T>, l2: List<U>): # list_zip
+    hidden static _zip<T>(l1: List<T>, l2: List<U>): List<[T, U]> # list_zip
     hidden static _unzip<T>(l: List<[T, U]>): List<T>, List<U> # list_unzip
     hidden static _concat<T>(l: List<List<T>>): List<T> # list_concat
     hidden static _fill<T>(k: Int, val: T): List<T> # list_fill

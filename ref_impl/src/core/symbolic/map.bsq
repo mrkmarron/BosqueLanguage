@@ -311,7 +311,7 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
         if(List<T>::_size(ml) == 0) {
             return Map<K, V>@{};
         }
-        else if(List<T>::_size(ml) == 1) {
+        elif(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
         }
         else {
@@ -327,7 +327,7 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
         if(List<T>::_size(ml) == 0) {
             return Map<K, V>@{};
         }
-        else if(List<T>::_size(ml) == 1) {
+        elif(List<T>::_size(ml) == 1) {
             return List<T>::_unsafe_get(ml, 0);
         }
         else {

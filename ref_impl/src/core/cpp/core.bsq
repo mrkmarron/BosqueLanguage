@@ -74,10 +74,10 @@ struct concept Truthy provides KeyType, Parsable {
         if(str == "none") {
             return ok(none);
         }
-        else if(str == "false") {
+        elif(str == "false") {
             return ok(false);
         }
-        else if(str == "true") {
+        elif(str == "true") {
             return ok(true);
         }
         else {
@@ -104,7 +104,7 @@ struct entity Bool provides Some, Truthy, PODType, APIType {
         if(str == "false") {
             return ok(false);
         }
-        else if(str == "true") {
+        elif(str == "true") {
             return ok(true);
         }
         else {
@@ -124,8 +124,8 @@ struct entity Bool provides Some, Truthy, PODType, APIType {
 
 //<summary>Primitive integer value.</summary>
 struct entity Int provides KeyType, Parsable, PODType, APIType, Some {
-    const min_value = -9007199254740991;
-    const max_value = 9007199254740991;
+    const min_value: Int = -9007199254740991;
+    const max_value: Int = 9007199254740991;
 
     override static tryParse(str: String): Result<Int, String> # int_tryparse
 
@@ -329,11 +329,11 @@ struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType w
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
     static cok(result: T): Result<T, E> {
-        return ResultOk<T, E>::of(result);
+        return Ok<T, E>::of(result);
     }
 
     static cerr(info: E): Result<T, E> {
-        return ResultErr<T, E>::of(info);
+        return Err<T, E>::of(info);
     }
 
     method isOk(): Bool {
@@ -345,11 +345,11 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 
     method result(): T {
-        return this->cast<ResultOk<T, E>>().result;
+        return this->cast<Ok<T, E>>().result;
     }
 
     method failure(): E {
-        return this->cast<ResultErr<T, E>>().failure;
+        return this->cast<Err<T, E>>().failure;
     }
 
     method convert<U, V>(): Result<U, V> {
@@ -357,19 +357,19 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 }
 
-struct entity ResultOk<T, E=None> provides Result<T, E> {
+struct entity Ok<T, E=None> provides Result<T, E> {
     field result: T;
 
-    static of(result: T): ResultOk<T, E> {
-        return ResultOk<T, E>@{ result = result; }
+    static of(result: T): Ok<T, E> {
+        return Ok<T, E>@{ result = result };
     }
 }
 
-struct entity ResultErr<T, E=None> provides Result<T, E> {
+struct entity Err<T, E=None> provides Result<T, E> {
     field failure: E;
 
-    static of(failure: E): ResultErr<T, E> {
-        return ResultErr<T, E>@{ failure = failure; }
+    static of(failure: E): Err<T, E> {
+        return Err<T, E>@{ failure = failure };
     }
 }
 

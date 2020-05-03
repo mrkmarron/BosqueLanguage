@@ -343,7 +343,7 @@ class Lexer {
 
     private static readonly _s_intRe = /(0|[1-9][0-9]*)/y;
     private static readonly _s_bigintRe = /(0|[1-9][0-9]*)n/y;
-    private static readonly _s_floatRe = /[0-9]*\.[0-9]+/y;
+    private static readonly _s_floatRe = /[0-9]+\.[0-9]+f/y;
     private tryLexNumber(): boolean {
         Lexer._s_floatRe.lastIndex = this.m_cpos;
         const mf = Lexer._s_floatRe.exec(this.m_input);
@@ -369,8 +369,8 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_stringRe = /"[^"\\\r\n]*(?:\\(?:.|\r?\n)[^"\\\r\n]*)"/y;
-    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(?:\\(?:.|\r?\n)[^'\\\r\n]*)'/y;
+    private static readonly _s_stringRe = /"[^"\\\r\n]*(?:\\(?:.|\r?\n)[^"\\\r\n]*)*"/y;
+    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(?:\\(?:.|\r?\n)[^'\\\r\n]*)*'/y;
     private tryLexString() {
         Lexer._s_stringRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_stringRe.exec(this.m_input);
@@ -389,7 +389,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_regexRe = /\/(~[\/] | (\\\/))*\//y;
+    private static readonly _s_regexRe = /\/[^"\\\r\n]*(?:\\(?:.)[^"\\\r\n]*)*\//y;
     private tryLexRegex() {
         Lexer._s_regexRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_regexRe.exec(this.m_input);
@@ -2203,7 +2203,7 @@ class Parser {
                     return new VariableDeclarationStatement(sinfo, vars[0].name, isConst, vars[0].vtype, sexp); 
                 }
                 else {
-                    if (exp !== undefined && (exp.length !== 1 || exp.length !== vars.length)) {
+                    if (exp !== undefined && exp.length !== vars.length) {
                         this.raiseError(line, "Mismatch between variables declared and values provided");
                     }
 

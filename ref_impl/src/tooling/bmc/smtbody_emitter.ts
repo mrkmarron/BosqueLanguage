@@ -147,7 +147,7 @@ class SMTBodyEmitter {
             return this.typegen.coerce(new SMTValue(cval.digits()), this.typegen.bigIntType, into);
         }
         else if (cval instanceof MIRConstantFloat64) {
-            return this.typegen.coerce(new SMTValue(cval.value), this.typegen.float64Type, into);
+            return this.typegen.coerce(new SMTValue(cval.digits()), this.typegen.float64Type, into);
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -1528,7 +1528,7 @@ class SMTBodyEmitter {
                             return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`-${(pfx.arg as MIRConstantBigInt).digits()}`));
                         }
                         else if (pfx.arg instanceof MIRConstantFloat64) {
-                            return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`-${(pfx.arg as MIRConstantFloat64).value}`));
+                            return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`-${(pfx.arg as MIRConstantFloat64).digits()}`));
                         }
                         else {
                             const opt = this.getArgType(pfx.trgt);

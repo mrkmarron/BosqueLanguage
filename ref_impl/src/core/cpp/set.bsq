@@ -98,7 +98,7 @@ entity Set<T where KeyType> provides Object, Expandoable<T>, PODType when T PODT
         if(List<T>::_size(sl) == 0) {
             return Set<T>@{};
         }
-        else if(List<T>::_size(sl) == 1) {
+        elif(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
         }
         else {
@@ -110,7 +110,7 @@ entity Set<T where KeyType> provides Object, Expandoable<T>, PODType when T PODT
         if(List<T>::_size(sl) == 0) {
             return Set<T>@{};
         }
-        else if(List<T>::_size(sl) == 1) {
+        elif(List<T>::_size(sl) == 1) {
             return List<T>::_unsafe_get(sl, 0);
         }
         else {

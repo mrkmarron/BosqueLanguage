@@ -116,7 +116,7 @@ class CPPBodyEmitter {
             return this.typegen.coerce(bint, this.typegen.bigIntType, into);
         }
         else if (cval instanceof MIRConstantFloat64) {
-            return this.typegen.coerce(cval.value, this.typegen.float64Type, into);
+            return this.typegen.coerce(cval.digits(), this.typegen.float64Type, into);
         }
         else {
             assert(cval instanceof MIRConstantString);
@@ -1457,7 +1457,7 @@ class CPPBodyEmitter {
                             return `${this.varToCppName(pfx.trgt)} = BSQ_NEW_ADD_SCOPE(${scope}, BSQBigInt, "-${(pfx.arg as MIRConstantBigInt).digits()}");`;
                         }
                         else if (pfx.arg instanceof MIRConstantFloat64) {
-                            return `${this.varToCppName(pfx.trgt)} = -${(pfx.arg as MIRConstantFloat64).value};`;
+                            return `${this.varToCppName(pfx.trgt)} = -${(pfx.arg as MIRConstantFloat64).digits()};`;
                         }
                         else {
                             const opt = this.getArgType(pfx.trgt);

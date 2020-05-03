@@ -126,12 +126,12 @@ class TypeChecker {
         const rrt = ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(rt, binds)]));
         this.m_emitter.registerResolvedTypeReference(rrt);
 
-        const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ResultOk") as EntityTypeDecl;
+        const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
         const rok = ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, binds));
         this.m_emitter.registerResolvedTypeReference(rok);
         this.m_emitter.registerTypeInstantiation(okt, binds);
 
-        const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ResultErr") as EntityTypeDecl;
+        const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
         const rerr = ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, binds));
         this.m_emitter.registerResolvedTypeReference(rerr);
         this.m_emitter.registerTypeInstantiation(errt, binds);
@@ -1812,7 +1812,7 @@ class TypeChecker {
 
         if(exp.rop === "ok") {
             this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(rval.getExpressionResult().etype, rbinds.get("T") as ResolvedType));
-            const oktdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ResultOk") as EntityTypeDecl;
+            const oktdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
             const eok = ResolvedType.createSingle(ResolvedEntityAtomType.create(oktdcl, rbinds));
 
             if(this.m_emitEnabled) {
@@ -1828,7 +1828,7 @@ class TypeChecker {
         else {
             this.raiseErrorIf(exp.sinfo, exp.rop !== "err");
             this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(rval.getExpressionResult().etype, rbinds.get("E") as ResolvedType));
-            const errtdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ResultErr") as EntityTypeDecl;
+            const errtdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
             const eerr = ResolvedType.createSingle(ResolvedEntityAtomType.create(errtdcl, rbinds));
 
             if(this.m_emitEnabled) {
@@ -3209,7 +3209,7 @@ class TypeChecker {
 
                     this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(normaltype, rtype), "Result types do not match");
 
-                    const errobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::ResultErr") as EntityTypeDecl;
+                    const errobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
                     const errbinds = new Map<string, ResolvedType>().set("T", ttype).set("E", etype);
                     const errtype = ResolvedType.createSingle(ResolvedEntityAtomType.create(errobj, errbinds));
 
@@ -4504,7 +4504,7 @@ class TypeChecker {
                 this.raiseErrorIf(stmt.sinfo, !this.m_assembly.subtypeOf(this.m_assembly.getSpecialNoneType(), env.result));
             }
             else {
-                this.raiseErrorIf(stmt.sinfo, errres.options.length !== 1 && !(errres.options[0].idStr.startsWith("NSCore::Result<") || errres.options[0].idStr.startsWith("NSCore::ResultErr<")));
+                this.raiseErrorIf(stmt.sinfo, errres.options.length !== 1 && !(errres.options[0].idStr.startsWith("NSCore::Result<") || errres.options[0].idStr.startsWith("NSCore::Err<")));
             }
 
             this.m_emitter.bodyEmitter.emitReturnAssign(stmt.sinfo, errreg);

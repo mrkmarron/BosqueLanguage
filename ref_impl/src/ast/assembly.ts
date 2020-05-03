@@ -997,7 +997,7 @@ class Assembly {
     isBufferType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Buffer<"); }
     isBufferOfType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::BufferOf<"); }
     isResultConceptType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Result<"); }
-    isResultEntityType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::ResultOk<") || ty.idStr.startsWith("NSCore::ResultErr<"); }
+    isResultEntityType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Ok<") || ty.idStr.startsWith("NSCore::Err<"); }
     
     isListType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::List<"); }
     isSetType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Set<") || ty.idStr.startsWith("NSCore::DynamicSet<"); }

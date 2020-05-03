@@ -494,7 +494,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    hidden recursive static _partitionSingle<K where K KeyType>(kk: K, ol: List<T>, lp: List<T>, idx: Int, pf: recursive? fn(_: T) -> K): List<T> {
+    hidden recursive static _partitionSingle<K where KeyType>(kk: K, ol: List<T>, lp: List<T>, idx: Int, pf: recursive? fn(_: T) -> K): List<T> {
         if(idx == List<T>::_size(ol)) {
             return lp;
         }
@@ -510,7 +510,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    hidden recursive static _partition<K where K KeyType>(l: List<T>, mp: Map<K, List<T>>, idx: Int, pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    hidden recursive static _partition<K where KeyType>(l: List<T>, mp: Map<K, List<T>>, idx: Int, pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         if(idx == List<T>::_size(l)) {
             return lp;
         }
@@ -561,12 +561,12 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    hidden _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
+    hidden static _rangeInBoundsFwd(start?: Int, end?: Int): Bool {
         let s, e = start ?| 0, end ?| List<T>::_size(this);
         return 0 <= s && s <= e && e <= List<T>::_size(this); 
     }
 
-    hidden _rangeInBoundsRev(start?: Int, end?: Int): Bool {
+    hidden static _rangeInBoundsRev(start?: Int, end?: Int): Bool {
         let s, e = start ?| -1, end ?| List<T>::_size(this) - 1;
         return -1 <= s && s <= e && e <= List<T>::_size(this) - 1;
     }
@@ -926,22 +926,12 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::_mapIndex[recursive](this, List<U>@{}, 0, f);
     }
 
-    method {when T KeyType} project<U>(m: IMap<T, U>): List<U> {
-        if(m->is<Map<T, U>()) {
-            return List<T>::_projectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>()); 
-        }
-        else {
-            abort;
-        }
+    method {when T KeyType} project<U>(m: Map<T, U>): List<U> {
+        return List<T>::_projectWMap<U>[recursive](this, List<U>@{}, 0, m); 
     }
 
-    method {when T KeyType} tryProject<U>(m: IMap<T, U>): List<U?> {
-        if(m->is<Map<T, U>()) {
-            return List<T>::_tryProjectWMap<U>[recursive](this, List<U>@{}, 0, m->as<Map<T, U>>());
-        }
-        else {
-            abort;
-        }
+    method {when T KeyType} tryProject<U>(m: Map<T, U>): List<U?> {
+        return List<T>::_tryProjectWMap<U>[recursive](this, List<U>@{}, 0, m);
     }
 
     method zipIndex(): List<[Int, T]> {
@@ -966,7 +956,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::_append[recursive](this, cl, 0);
     }
 
-    recursive? method partition<K where K KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    recursive? method partition<K where KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         return List<T>::_partition<K>[recursive](this, Map<K, List<T>>@{}, 0, pf);
     }
 
@@ -974,7 +964,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::_sort[recursive](this, List<T>@{}, 0, pf);
     }
 
-    recursive? method toMap<K where K KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
+    recursive? method toMap<K where KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V, merge?: Bool): Map<K, V> {
         return List<T>::_toMap<K, V>[recursive](this, Map<K, V>@{}, 0, kf, vf, Truthy::truth(merge));
     }
 
