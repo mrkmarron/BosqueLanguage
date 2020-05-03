@@ -66,7 +66,7 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
     }
 
     override method has(key: K): Bool {
-        return Map<K, V>::_has_key(this, k)
+        return Map<K, V>::_has_key(this, k);
     }
 
     override method hasAll(...kl: List<K>): Bool {

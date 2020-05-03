@@ -43,7 +43,7 @@ entity Bool provides Some, Truthy, Parsable {
         if(str == "true") {
             return true;
         }
-        else if(str == "false") {
+        elif(str == "false") {
             return false;
         }
         else {

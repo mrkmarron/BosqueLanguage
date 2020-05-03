@@ -67,6 +67,7 @@ enum class MIRPropertyEnum
 };
 
 //Category tags to embed in the type enums
+#define MIRNominalTypeEnum_Category_Empty           0
 #define MIRNominalTypeEnum_Category_BigInt          1
 #define MIRNominalTypeEnum_Category_String          2
 #define MIRNominalTypeEnum_Category_SafeString      3
@@ -100,7 +101,7 @@ enum class MIRPropertyEnum
 #define MIRNominalTypeEnum_Category_Map             45
 #define MIRNominalTypeEnum_Category_DynamicMap      46
 
-#define BUILD_MIR_NOMINAL_TYPE(C, T) (MIRNominalTypeEnum)((T << 8) | T)
+#define BUILD_MIR_NOMINAL_TYPE(C, T) ((T << 8) | C)
 #define GET_MIR_TYPE_CATEGORY(T) (((int32_t)(T)) & 0xFF)
 #define GET_MIR_TYPE_POSITION(T) (((int32_t)(T)) >> 8)
 

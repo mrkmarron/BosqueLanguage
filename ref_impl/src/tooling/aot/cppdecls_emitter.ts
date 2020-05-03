@@ -50,7 +50,10 @@ class CPPEmitter {
         let typedecls: [string, string[]][] = [];
         let nominaltypeinfo: {enum: string, display: string, datakind: string}[] = [];
         let vfieldaccesses: string[] = [];
-        assembly.entityDecls.forEach((edecl) => {
+        [...assembly.entityDecls]
+        .sort((a, b) => a[0]
+        .localeCompare(b[0])).map((ee) => ee[1])
+        .forEach((edecl) => {
             const cppdecl: any = typeemitter.generateCPPEntity(edecl);
             if (cppdecl !== undefined) {
                 if(cppdecl.fwddecl !== undefined) {
@@ -70,8 +73,9 @@ class CPPEmitter {
                 }
             }
 
-            const enumv = typeemitter.mangleStringForCpp(edecl.tkey);
-            const displayv = edecl.tkey;
+            const ereprk = typeemitter.getCPPReprFor(typeemitter.getMIRType(edecl.tkey));
+            const enumv = `${typeemitter.mangleStringForCpp(edecl.tkey)} = BUILD_MIR_NOMINAL_TYPE(${ereprk.categoryinfo}, ${nominaltypeinfo.length + 1})`;
+            const displayv = `U"${edecl.tkey}"`;
             const dk = typeemitter.generateInitialDataKindFlag(typeemitter.getMIRType(edecl.tkey));
 
             nominaltypeinfo.push({ enum: enumv, display: displayv, datakind: dk });
@@ -87,16 +91,17 @@ class CPPEmitter {
                 }
             });
         });
-        nominaltypeinfo = nominaltypeinfo.sort((a, b) => a.enum.localeCompare(b.enum));
 
         let concepttypeinfo: {enum: string, display: string, datakind: string}[] = [];
-        assembly.conceptDecls.forEach((cdecl) => {
-            const enumv = typeemitter.mangleStringForCpp(cdecl.tkey);
-            const displayv = cdecl.tkey;
+        [...assembly.conceptDecls]
+        .sort((a, b) => a[0]
+        .localeCompare(b[0])).map((ce) => ce[1])
+        .forEach((cdecl) => {
+            const enumv = `${typeemitter.mangleStringForCpp(cdecl.tkey)} = BUILD_MIR_NOMINAL_TYPE(MIRNominalTypeEnum_Category_Empty, ${concepttypeinfo.length + nominaltypeinfo.length + 1})`;
+            const displayv = `U"${cdecl.tkey}"`;
             concepttypeinfo.push({ enum: enumv, display: displayv, datakind: "-1" });
         });
-        concepttypeinfo = concepttypeinfo.sort((a, b) => a.enum.localeCompare(b.enum));
-
+        
         const cginfo = constructCallGraphInfo(assembly.entryPoints, assembly);
         const rcg = [...cginfo.topologicalOrder].reverse();
 
@@ -180,7 +185,7 @@ class CPPEmitter {
         let propertynames: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(pname);
-            propertynames.add(`"${pname}"`);
+            propertynames.add(`U"${pname}"`);
         });
         assembly.typeMap.forEach((tt) => {
             tt.options.forEach((topt) => {
@@ -248,7 +253,7 @@ class CPPEmitter {
             NOMINAL_TYPE_ENUM_DECLARE: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => nti.enum).join(",\n    "),
         
             PROPERTY_NAMES: [...propertynames].sort().join(",\n  "),
-            NOMINAL_TYPE_DISPLAY_NAMES: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => `"${nti.display}"`).join(",\n  "),
+            NOMINAL_TYPE_DISPLAY_NAMES: [...nominaltypeinfo, ...concepttypeinfo].map((nti) => `${nti.display}`).join(",\n  "),
         
             CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
             NOMINAL_TYPE_TO_DATA_KIND: [...nominaltypeinfo].map((nti) => nti.datakind).join(",\n    "),

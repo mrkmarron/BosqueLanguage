@@ -103,7 +103,7 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return BSQIdKeySimple::keyEqual(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
             default:
-                return BSQIdKeyCompound::keyEqual(dynamic_cast<BSQIdKeyCompound*>(ptr1), dynamic_cast<BSQIdKeyCompound*>(ptr2));
+                return BSQIdKeyCompound::keyEqual(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
         }
     }
 }
@@ -154,7 +154,7 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return BSQIdKeySimple::keyLess(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
             default:
-                return BSQIdKeyCompound::keyLess(dynamic_cast<BSQIdKeyCompound*>(ptr1), dynamic_cast<BSQIdKeyCompound*>(ptr2));
+                return BSQIdKeyCompound::keyLess(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
         }
     }
 }

@@ -24,17 +24,19 @@ abstract class TypeRepr {
     readonly iskey: boolean;
     readonly base: string;
     readonly std: string;
+    readonly categoryinfo: string;
 
-    constructor(iskey: boolean, base: string, std: string) {
+    constructor(iskey: boolean, base: string, std: string, categoryinfo: string) {
         this.iskey = iskey;
         this.base = base;
         this.std = std;
+        this.categoryinfo = categoryinfo;
     }
 }
 
 class NoneRepr extends TypeRepr {
     constructor() {
-        super(true, "NoneValue", "NoneValue");
+        super(true, "NoneValue", "NoneValue", "MIRNominalTypeEnum_Category_Empty");
     }
 }
 
@@ -43,8 +45,8 @@ class StructRepr extends TypeRepr {
     readonly nominaltype: string;
     readonly reqspace: number;
 
-    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, reqspace: number) {
-        super(iskey, base, base);
+    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, reqspace: number, categoryinfo: string) {
+        super(iskey, base, base, categoryinfo);
         this.boxed = boxed;
         this.nominaltype = nominaltype;
         this.reqspace = reqspace;
@@ -52,26 +54,26 @@ class StructRepr extends TypeRepr {
 }
 
 class RefRepr extends TypeRepr {
-    constructor(iskey: boolean, base: string, std: string) {
-        super(iskey, base, std);
+    constructor(iskey: boolean, base: string, std: string, categoryinfo: string) {
+        super(iskey, base, std, categoryinfo);
     }
 }
 
 class KeyValueRepr extends TypeRepr {
     constructor() {
-        super(true, "KeyValue", "KeyValue");
+        super(true, "KeyValue", "KeyValue", "MIRNominalTypeEnum_Category_Empty");
     }
 }
 
 class ValueRepr extends TypeRepr {
     constructor() {
-        super(false, "Value", "Value");
+        super(false, "Value", "Value", "MIRNominalTypeEnum_Category_Empty");
     }
 }
 
 class EphemeralListRepr extends TypeRepr {
     constructor(base: string) {
-        super(false, base, base + "*");
+        super(false, base, base + "*", "MIRNominalTypeEnum_Category_Empty");
     }
 }
 
@@ -80,7 +82,7 @@ class UnionRepr extends TypeRepr {
     readonly reqspace: number;
 
     constructor(iskey: boolean, repr: string, reqspace: number, opts: TypeRepr[]) {
-        super(iskey, repr, repr);
+        super(iskey, repr, repr, "MIRNominalTypeEnum_Category_Empty");
         this.opts = opts;
         this.reqspace = reqspace;
     }

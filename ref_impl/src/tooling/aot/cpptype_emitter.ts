@@ -271,68 +271,68 @@ class CPPTypeEmitter {
             return new NoneRepr();
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::Bool$/)) {
-            return new StructRepr(true, "bool", "*", "MIRNominalTypeEnum_Bool", 1);
+            return new StructRepr(true, "bool", "*", "MIRNominalTypeEnum_Bool", 1, "MIRNominalTypeEnum_Category_Empty");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::Int$/)) {
-            return new StructRepr(true, "int64_t", "*", "MIRNominalTypeEnum_Int", 8);
+            return new StructRepr(true, "int64_t", "*", "MIRNominalTypeEnum_Int", 8, "MIRNominalTypeEnum_Category_Empty");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::BigInt$/)) {
-            return new RefRepr(true, "BigInt", "BigInt*");
+            return new RefRepr(true, "BigInt", "BigInt*", "MIRNominalTypeEnum_Category_BigInt");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::String$/)) {
-            return new RefRepr(true, "BSQString", "BSQString*");
+            return new RefRepr(true, "BSQString", "BSQString*", "MIRNominalTypeEnum_Category_String");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::SafeString<.*>$/)) {
-            return new RefRepr(true, "BSQSafeString", "BSQSafeString*");
+            return new RefRepr(true, "BSQSafeString", "BSQSafeString*", "MIRNominalTypeEnum_Category_SafeString");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::StringOf<.*>$/)) {
-            return new RefRepr(true, "BSQStringOf", "BSQStringOf*");
+            return new RefRepr(true, "BSQStringOf", "BSQStringOf*", "MIRNominalTypeEnum_Category_StringOf");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::UUID$/)) {
-            return new StructRepr(true, "BSQUUID", "Boxed_BSQUUID", "MIRNominalTypeEnum_UUID", 16);
+            return new StructRepr(true, "BSQUUID", "Boxed_BSQUUID", "MIRNominalTypeEnum_UUID", 16, "MIRNominalTypeEnum_Category_UUID");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::LogicalTime$/)) {
-            return new StructRepr(true, "BSQLogicalTime", "Boxed_BSQLogicalTime", "MIRNominalTypeEnum_LogicalTime", 8);
+            return new StructRepr(true, "BSQLogicalTime", "Boxed_BSQLogicalTime", "MIRNominalTypeEnum_LogicalTime", 8, "MIRNominalTypeEnum_Category_LogicalTime");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::CryptoHash$/)) {
-            return new RefRepr(true, "BSQCryptoHash", "BSQCryptoHash*");
+            return new RefRepr(true, "BSQCryptoHash", "BSQCryptoHash*", "MIRNominalTypeEnum_Category_CryptoHash");
         }
         else if (this.typecheckEntityAndProvidesName_Option(tt, this.enumtype)) {
-            return new StructRepr(true, "BSQEnum", "Boxed_BSQEnum", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 8);
+            return new StructRepr(true, "BSQEnum", "Boxed_BSQEnum", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 8, "MIRNominalTypeEnum_Category_Enum");
         }
         else if (this.typecheckEntityAndProvidesName_Option(tt, this.idkeytype)) {
             const iddecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
             if(iddecl.fields.length === 1) {
-                return new StructRepr(true, "BSQIdKeySimple", "Boxed_BSQIdKeySimple", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 16);
+                return new StructRepr(true, "BSQIdKeySimple", "Boxed_BSQIdKeySimple", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 16, "MIRNominalTypeEnum_Category_IdKeySimple");
             }
             else {
-                return new StructRepr(true, "BSQIdKeyCompound", "Boxed_BSQIdKeyCompound", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 32);
+                return new StructRepr(true, "BSQIdKeyCompound", "Boxed_BSQIdKeyCompound", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 32, "MIRNominalTypeEnum_Category_IdKeyCompound");
             }
         }
         else {
             if (this.typecheckIsName_Option(tt, /^NSCore::Float64$/)) {
-                return new StructRepr(false, "double", "Boxed_double", "MIRNominalTypeEnum_Float64", 8);
+                return new StructRepr(false, "double", "Boxed_double", "MIRNominalTypeEnum_Float64", 8, "MIRNominalTypeEnum_Category_Float64");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::ByteBuffer$/)) {
-                return new RefRepr(false, "BSQByteBuffer", "BSQByteBuffer*");
+                return new RefRepr(false, "BSQByteBuffer", "BSQByteBuffer*", "MIRNominalTypeEnum_Category_ByteBuffer");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::Buffer<.*>$/)) {
-                return new RefRepr(false, "BSQBuffer", "BSQBuffer*");
+                return new RefRepr(false, "BSQBuffer", "BSQBuffer*", "MIRNominalTypeEnum_Category_Buffer");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::BufferOf<.*>$/)) {
-                return new RefRepr(false, "BSQBufferOf", "BSQBufferOf*");
+                return new RefRepr(false, "BSQBufferOf", "BSQBufferOf*", "MIRNominalTypeEnum_Category_BufferOf");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::ISOTime$/)) {
-                return new StructRepr(false, "BSQISOTime", "Boxed_BSQISOTime", "MIRNominalTypeEnum_ISOTime", 8);
+                return new StructRepr(false, "BSQISOTime", "Boxed_BSQISOTime", "MIRNominalTypeEnum_ISOTime", 8, "MIRNominalTypeEnum_Category_ISOTime");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::Regex$/)) {
-                return new RefRepr(false, "BSQRegex", "BSQRegex*");
+                return new RefRepr(false, "BSQRegex", "BSQRegex*", "MIRNominalTypeEnum_Category_Regex");
             }
             else if (tt instanceof MIRTupleType) {
-                return new StructRepr(false, "BSQTuple", "Boxed_BSQTuple", "MIRNominalTypeEnum_Tuple", 32);
+                return new StructRepr(false, "BSQTuple", "Boxed_BSQTuple", "MIRNominalTypeEnum_Tuple", 32, "MIRNominalTypeEnum_Category_Tuple");
             }
             else if (tt instanceof MIRRecordType) {
-                return new StructRepr(false, "BSQRecord", "Boxed_BSQRecord", "MIRNominalTypeEnum_Record", 32);
+                return new StructRepr(false, "BSQRecord", "Boxed_BSQRecord", "MIRNominalTypeEnum_Record", 32, "MIRNominalTypeEnum_Category_Record");
             }
             else if(tt instanceof MIREphemeralListType) {
                 const eltypename = this.mangleStringForCpp(tt.trkey);
@@ -348,10 +348,36 @@ class CPPTypeEmitter {
                         .map((tr) => this.getSizeForRepr(tr))
                         .reduce((acc, v) => acc + v, 4);
 
-                    return new StructRepr(false, etname, `Boxed_${etname}`, `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, size);
+                    return new StructRepr(false, etname, `Boxed_${etname}`, `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, size, "MIRNominalTypeEnum_Category_Object");
                 }
                 else {
-                    return new RefRepr(false, etname, etname + "*");
+                    let cat = "[INVALID]";
+                    if(this.typecheckIsName_Option(tt, /^NSCore::List<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_List";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::Stack<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_Stack";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::Queue<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_Queue";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::Set<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_Set";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::DynamicSet<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_DynamicSet";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::Map<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_Map";
+                    }
+                    else if(this.typecheckIsName_Option(tt, /^NSCore::DynamicMap<.*>$/)) {
+                        cat = "MIRNominalTypeEnum_Category_DynamicMap";
+                    }
+                    else {
+                        cat = "MIRNominalTypeEnum_Category_Object";
+                    }
+
+                    return new RefRepr(false, etname, etname + "*", cat);
                 }
             }
             else {
