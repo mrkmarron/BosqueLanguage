@@ -116,7 +116,7 @@ struct LessFunctor_BSQBigInt
 };
 struct DisplayFunctor_BSQBigInt
 {
-    std::u32string operator()(BSQBigInt* i) const { i->display(); }
+    std::u32string operator()(BSQBigInt* i) const { return i->display(); }
 };
 
 class BSQString : public BSQRef

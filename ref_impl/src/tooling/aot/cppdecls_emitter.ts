@@ -56,14 +56,15 @@ class CPPEmitter {
         .forEach((edecl) => {
             const cppdecl: any = typeemitter.generateCPPEntity(edecl);
             if (cppdecl !== undefined) {
-                if(cppdecl.fwddecl !== undefined) {
+                if(cppdecl.isref) {
                     const refdecl = cppdecl as { fwddecl: string, fulldecl: string };
                     typedecls_fwd.push(refdecl.fwddecl);
                     typedecls.push([refdecl.fulldecl, []]);
                 }
                 else {
-                    const structdecl = cppdecl as { depon: string[], fulldecl: string, boxeddecl: string, ops: string[] };
+                    const structdecl = cppdecl as { depon: string[], fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] };
 
+                    typedecls_fwd.push(structdecl.fwddecl);
                     typedecls.push([structdecl.fulldecl + structdecl.ops.join("\n"), structdecl.depon]);
                     typedecls.push([structdecl.boxeddecl, [structdecl.fulldecl]]);
 
@@ -246,7 +247,7 @@ class CPPEmitter {
             STATIC_INT_CREATE: constint_create.sort().join("\n  "),
             
             TYPEDECLS_FWD: typedecls_fwd.sort().join("\n"),
-            TYPEDECLS: typedecls.sort().join("\n"),
+            TYPEDECLS: typedecls.map((tde) => tde[0]).sort().join("\n"),
             EPHEMERAL_LIST_DECLARE: ephdecls.sort().join("\n"),
         
             PROPERTY_ENUM_DECLARE: [...propertyenums].sort().join(",\n  "), 

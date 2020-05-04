@@ -285,19 +285,19 @@ entity Regex provides Some {
     method matchAll(str: String, start?: Int, end?: Int): List<RegexMatch> # regex_matchall
 }
 
-struct entity RegexCapture provides Object {
+entity RegexCapture provides Object {
     field index: Int;
     field length: Int;
     field value: String;
 }
 
-struct entity RegexGroup provides Object {
+entity RegexGroup provides Object {
     field success: Bool;
     field name: String;
     field captures: List<RegexCapture>;
 }
 
-struct entity RegexMatch provides Object {
+entity RegexMatch provides Object {
     field success: Bool;
     field index: Int;
     field length: Int;

@@ -1675,7 +1675,7 @@ class SMTBodyEmitter {
 
         if (block.label === "exit") {
             const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
-            let rexp = new SMTValue(`(result_success@${resulttype} _return_)`) as SMTExp;
+            let rexp = new SMTValue(`(result_success@${resulttype} $$return)`) as SMTExp;
             for (let i = exps.length - 1; i >= 0; --i) {
                 rexp = exps[i].bind(rexp, "#body#");
             }

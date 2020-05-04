@@ -768,7 +768,7 @@ class CPPTypeEmitter {
         return this.buildIncOpForType(argtype, arg);
     }
 
-    generateListCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateListCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const typet = entity.terms.get("T") as MIRType;
 
@@ -778,10 +778,10 @@ class CPPTypeEmitter {
         const cops = this.getFunctorsForType(typet);
         const decl = `typedef BSQList<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
 
-        return { fwddecl: `class ${declrepr.std};`, fulldecl: decl };
+        return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateStackCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateStackCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const typet = entity.terms.get("T") as MIRType;
 
@@ -791,10 +791,10 @@ class CPPTypeEmitter {
         const cops = this.getFunctorsForType(typet);
         const decl = `typedef BSQStack<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
 
-        return { fwddecl: `class ${declrepr.std};`, fulldecl: decl };
+        return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateQueueCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateQueueCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const typet = entity.terms.get("T") as MIRType;
 
@@ -804,10 +804,10 @@ class CPPTypeEmitter {
         const cops = this.getFunctorsForType(typet);
         const decl = `typedef BSQQueue<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
 
-        return { fwddecl: `class ${declrepr.std};`, fulldecl: decl };
+        return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateSetCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateSetCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const typet = entity.terms.get("T") as MIRType;
 
@@ -817,10 +817,10 @@ class CPPTypeEmitter {
         const cops = this.getFunctorsForType(typet);
         const decl = `typedef BSQ${entity.name}<${crepr.std}, ${cops.dec}, ${cops.display}, ${cops.eq}, ${cops.less}> ${declrepr.base};`
 
-        return { fwddecl: `class ${declrepr.std};`, fulldecl: decl };
+        return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateMapCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } {
+    generateMapCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } {
         const tt = this.getMIRType(entity.tkey);
         const typek = entity.terms.get("K") as MIRType;
         const typev = entity.terms.get("V") as MIRType;
@@ -833,10 +833,10 @@ class CPPTypeEmitter {
         const vops = this.getFunctorsForType(typev);
         const decl = `typedef BSQ${entity.name}<${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.eq}, ${kops.less}, ${vrepr.std}, ${vops.dec}, ${vops.display}> ${declrepr.base};`
 
-        return { fwddecl: `class ${declrepr.std};`, fulldecl: decl };
+        return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateCPPEntity(entity: MIREntityTypeDecl): { fwddecl: string, fulldecl: string } | { depon: string[], fulldecl: string, boxeddecl: string, ops: string[] } | undefined {
+    generateCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } | { isref: boolean, depon: string[], fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] } | undefined {
         const tt = this.getMIRType(entity.tkey);
 
         if(this.isSpecialReprEntity(tt)) {
@@ -892,6 +892,7 @@ class CPPTypeEmitter {
                 .filter((fd) => fd !== undefined);
 
                 return {
+                    isref: true,
                     fwddecl: `class ${this.mangleStringForCpp(entity.tkey)};`,
                     fulldecl: `class ${this.mangleStringForCpp(entity.tkey)} : public BSQObject\n`
                         + "{\n"
@@ -978,7 +979,9 @@ class CPPTypeEmitter {
                 + `};\n`;
 
                 return {
+                    isref: false,
                     depon: entity.fields.map((fd) => this.getCPPReprFor(this.getMIRType(fd.declaredType)).base),
+                    fwddecl: `class Boxed_${this.mangleStringForCpp(entity.tkey)};`,
                     fulldecl: `class ${this.mangleStringForCpp(entity.tkey)}\n`
                         + "{\n"
                         + "public:\n"

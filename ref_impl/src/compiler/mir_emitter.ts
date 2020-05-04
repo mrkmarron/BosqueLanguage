@@ -754,12 +754,6 @@ class MIREmitter {
         emitter.registerResolvedTypeReference(assembly.getSpecialLogicalTimeType());
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::CryptoHash") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialCryptoHashType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexCapture") as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialRegexCaptureType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexGroup") as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialRegexGroupType());
-        emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::RegexMatch") as EntityTypeDecl, new Map<string, ResolvedType>());
-        emitter.registerResolvedTypeReference(assembly.getSpecialRegexMatchType());
         emitter.registerTypeInstantiation(assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Regex") as EntityTypeDecl, new Map<string, ResolvedType>());
         emitter.registerResolvedTypeReference(assembly.getSpecialRegexType());
 

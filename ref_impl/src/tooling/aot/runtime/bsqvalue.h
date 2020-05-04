@@ -13,7 +13,7 @@
 #define MIN_BSQ_INT -9007199254740991
 #define MAX_BSQ_INT 9007199254740991
 
-#define INT_OOF_BOUNDS(X) ((< (X) MIN_BSQ_INT) | (> (X) MAX_BSQ_INT))
+#define INT_OOF_BOUNDS(X) (((X) < MIN_BSQ_INT) | ((X) > MAX_BSQ_INT))
 
 #define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
 #define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
@@ -209,6 +209,62 @@ public:
     }
 };
 
+class BSQRefScope
+{
+private:
+    std::vector<BSQRef*> opts;
+
+public:
+    BSQRefScope() : opts()
+    {
+        ;
+    }
+
+    ~BSQRefScope()
+    {
+        for(uint16_t i = 0; i < this->opts.size(); ++i)
+        {
+           this->opts[i]->decrement();
+        }
+    }
+
+    inline BSQRef* addAllocRefDirect(BSQRef* ptr)
+    {
+        ptr->increment();
+        this->opts.push_back(ptr);
+
+        return ptr;
+    }
+
+    inline Value addAllocRefChecked(Value v)
+    {
+        if (BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+            ptr->increment();
+            this->opts.push_back(ptr);
+        }
+
+        return v;
+    }
+
+    inline void callReturnDirect(BSQRef* ptr)
+    {
+        ptr->increment();
+        this->opts.push_back(ptr);
+    }
+
+    inline void processReturnChecked(Value v)
+    {
+        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
+        {
+            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
+            ptr->increment();
+            this->opts.push_back(ptr);
+        }
+    }
+};
+
 template <typename T, typename DestroyFunctor>
 class BSQBoxed : public BSQRef
 {
@@ -291,62 +347,6 @@ public:
 //
 //Union struct ops are declared in runtime for forward decls reasons
 //
-
-class BSQRefScope
-{
-private:
-    std::vector<BSQRef*> opts;
-
-public:
-    BSQRefScope() : opts()
-    {
-        ;
-    }
-
-    ~BSQRefScope()
-    {
-        for(uint16_t i = 0; i < this->opts.size(); ++i)
-        {
-           this->opts[i]->decrement();
-        }
-    }
-
-    inline BSQRef* addAllocRefDirect(BSQRef* ptr)
-    {
-        ptr->increment();
-        this->opts.push_back(ptr);
-
-        return ptr;
-    }
-
-    inline Value addAllocRefChecked(Value v)
-    {
-        if (BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-            ptr->increment();
-            this->opts.push_back(ptr);
-        }
-
-        return v;
-    }
-
-    inline void callReturnDirect(BSQRef* ptr)
-    {
-        ptr->increment();
-        this->opts.push_back(ptr);
-    }
-
-    inline void processReturnChecked(Value v)
-    {
-        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-            ptr->increment();
-            this->opts.push_back(ptr);
-        }
-    }
-};
 
 struct RCIncFunctor_NoneValue
 {
@@ -461,7 +461,7 @@ std::u32string diagnostic_format(Value v);
 
 struct RCIncFunctor_BSQRef
 {
-    inline KeyValue operator()(BSQRef* r) const { INC_REF_DIRECT(BSQRef, r); }
+    inline BSQRef* operator()(BSQRef* r) const { return INC_REF_DIRECT(BSQRef, r); }
 };
 struct RCDecFunctor_BSQRef
 {
@@ -474,7 +474,7 @@ struct DisplayFunctor_BSQRef
 
 struct RCIncFunctor_KeyValue
 {
-    inline KeyValue operator()(KeyValue k) const { INC_REF_CHECK(KeyValue, k); }
+    inline KeyValue operator()(KeyValue k) const { return INC_REF_CHECK(KeyValue, k); }
 };
 struct RCDecFunctor_KeyValue
 {
@@ -495,7 +495,7 @@ struct DisplayFunctor_KeyValue
 
 struct RCIncFunctor_Value
 {
-    inline Value operator()(Value v) const { INC_REF_CHECK(Value, v); }
+    inline Value operator()(Value v) const { return INC_REF_CHECK(Value, v); }
 };
 struct RCDecFunctor_Value
 {
@@ -581,7 +581,7 @@ public:
 
     BSQByteBuffer* sdata;
 
-    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer*, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
+    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer* sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
     
     virtual ~BSQBuffer() = default;
     
@@ -611,7 +611,7 @@ public:
 
     BSQByteBuffer* sdata;
 
-    BSQBufferOf(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer*, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
+    BSQBufferOf(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer* sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
     
     virtual ~BSQBufferOf() = default;
     
@@ -971,6 +971,8 @@ struct DisplayFunctor_BSQRecord
             rvals += std::u32string{propertyNames[(int32_t)iter->first]} + U"=" + diagnostic_format(iter->second);
         }
         rvals += U"}";
+
+        return rvals;
     }
 };
 typedef BSQBoxed<BSQRecord, RCDecFunctor_BSQRecord> Boxed_BSQRecord;

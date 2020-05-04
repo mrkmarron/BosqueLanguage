@@ -967,9 +967,6 @@ class Assembly {
     getSpecialUUIDType(): ResolvedType { return this.internSpecialObjectType("UUID"); }
     getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType("LogicalTime"); }
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType("CryptoHash"); }
-    getSpecialRegexCaptureType(): ResolvedType { return this.internSpecialObjectType("RegexCapture"); }
-    getSpecialRegexGroupType(): ResolvedType { return this.internSpecialObjectType("RegexGroup"); }
-    getSpecialRegexMatchType(): ResolvedType { return this.internSpecialObjectType("RegexMatch"); }
     getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType("Regex"); }
 
     getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType("Any"); }

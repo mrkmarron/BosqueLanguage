@@ -1485,7 +1485,7 @@ class CPPBodyEmitter {
                 if (this.typegen.typecheckIsName(opt, /^NSCore::Int$/)) {
                     if(bop.op !== "/") {
                         const chkedop = new Map<string, string>().set("+", "__builtin_add_overflow").set("-", "__builtin_sub_overflow").set("*", "__builtin_mul_overflow").get(bop.op) as string;
-                        const opp = `if(!${chkedop}(${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, &${this.varToCppName(bop.trgt)}) || INT_OOF_BOUNDS(${this.varToCppName(bop.trgt)})) { BSQ_ABORT("INT Overflow", "${filenameClean(this.currentFile)}", ${bop.sinfo.line}); }`;
+                        const opp = `if(${chkedop}(${this.argToCpp(bop.lhs, this.typegen.intType)}, ${this.argToCpp(bop.rhs, this.typegen.intType)}, &${this.varToCppName(bop.trgt)}) || INT_OOF_BOUNDS(${this.varToCppName(bop.trgt)})) { BSQ_ABORT("INT Overflow", "${filenameClean(this.currentFile)}", ${bop.sinfo.line}); }`;
                         return opp;
                     }
                     else {
@@ -1634,10 +1634,10 @@ class CPPBodyEmitter {
         if (block.label === "exit") {
             const rctype = this.typegen.getRefCountableStatus(this.currentRType);
             if(rctype !== "no") {
-                gblock.push(this.typegen.buildReturnOpForType(this.currentRType, "_return_", "$callerscope$"));
+                gblock.push(this.typegen.buildReturnOpForType(this.currentRType, "$$return", "$callerscope$"));
             }
             
-            gblock.push("return _return_;");
+            gblock.push("return $$return;");
         }
 
         this.generatedBlocks.set(block.label, gblock);
@@ -1726,69 +1726,69 @@ class CPPBodyEmitter {
         let bodystr = ";";
         switch (idecl.implkey) {
             case "enum_create": {
-                bodystr = `auto _return_ = BSQEnum{ (uint32_t)BSQ_GET_VALUE_TAGGED_INT(${params[0]}), MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)} };`;
+                bodystr = `auto $$return = BSQEnum{ (uint32_t)BSQ_GET_VALUE_TAGGED_INT(${params[0]}), MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)} };`;
                 break;
             }
             /*
             case "list_size":
             case "set_size":
             case "map_size": {
-                bodystr = `auto _return_ = (int64_t)(${params[0]}->entries.size());`
+                bodystr = `auto $$return = (int64_t)(${params[0]}->entries.size());`
                 break;
             }
             case "list_unsafe_get": {
-                bodystr = `auto _return_ = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT(${params[1]})];`;
+                bodystr = `auto $$return = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT(${params[1]})];`;
                 break;
             }
             case "list_unsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeAdd(${scopevar}, ${params[1]});`
+                bodystr = `auto $$return = ${params[0]}->unsafeAdd(${scopevar}, ${params[1]});`
                 break;
             }
             case "list_unsafe_set": {
-                bodystr = `auto _return_ = ${params[0]}->unsafeSet(${scopevar}, BSQ_GET_VALUE_TAGGED_INT(${params[1]}), ${params[2]});`
+                bodystr = `auto $$return = ${params[0]}->unsafeSet(${scopevar}, BSQ_GET_VALUE_TAGGED_INT(${params[1]}), ${params[2]});`
                 break;
             }
             case "set_has_key":
             case "map_has_key": {
-                bodystr = `auto _return_ = ${params[0]}->entries.find(${params[1]}) != ${params[0]}->entries.cend();`;
+                bodystr = `auto $$return = ${params[0]}->entries.find(${params[1]}) != ${params[0]}->entries.cend();`;
                 break;
             }
             case "map_at_key": {
-                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second.first;`;
+                bodystr = `auto $$return = (${params[0]}->entries.find(${params[1]}))->second.first;`;
                 break;
             }
             case "set_at_val": {
-                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second;`;
+                bodystr = `auto $$return = (${params[0]}->entries.find(${params[1]}))->second;`;
                 break;
             }
             case "map_at_val": {
-                bodystr = `auto _return_ = (${params[0]}->entries.find(${params[1]}))->second.second;`;
+                bodystr = `auto $$return = (${params[0]}->entries.find(${params[1]}))->second.second;`;
                 break;
             }
             case "set_get_keylist":
             case "map_get_keylist": {
-                bodystr = "auto _return_ = " + `${params[0]}->keys` + ";";
+                bodystr = "auto $$return = " + `${params[0]}->keys` + ";";
                 break;
             }
             case "set_clear_val": 
             case "map_clear_val": {
-                bodystr = "auto _return_ = " + `${params[0]}->clearKey(${params[1]}, ${params[2]}, ${scopevar});`;
+                bodystr = "auto $$return = " + `${params[0]}->clearKey(${params[1]}, ${params[2]}, ${scopevar});`;
                 break;
             }
             case "set_unsafe_update": {
-                bodystr = `auto _return_ = ${params[0]}->update(${params[1]}, ${params[2]}, ${scopevar});`;
+                bodystr = `auto $$return = ${params[0]}->update(${params[1]}, ${params[2]}, ${scopevar});`;
                 break;
             }
             case "map_unsafe_update": {
-                bodystr = `auto _return_ = ${params[0]}->update(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
+                bodystr = `auto $$return = ${params[0]}->update(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
                 break;
             }
             case "set_unsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
+                bodystr = `auto $$return = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${scopevar});`;
                 break;
             }
             case "map_unsafe_add": {
-                bodystr = `auto _return_ = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${params[4]}, ${scopevar});`;
+                bodystr = `auto $$return = ${params[0]}->add(${params[1]}, ${params[2]}, ${params[3]}, ${params[4]}, ${scopevar});`;
                 break;
             }
             */
@@ -1801,10 +1801,10 @@ class CPPBodyEmitter {
         const refscope = `BSQRefScope ${scopevar};`;
         let returnmgr = "";
         if (this.typegen.getRefCountableStatus(this.currentRType) !== "no") {
-            returnmgr = this.typegen.buildReturnOpForType(this.currentRType, "_return_", "$callerscope$");
+            returnmgr = this.typegen.buildReturnOpForType(this.currentRType, "$$return", "$callerscope$");
         }
 
-        return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n    " + "return _return_;\n";
+        return "\n    " + refscope + "\n    " + bodystr + "\n    " + returnmgr + "\n    " + "return $$return;\n";
     }
 }
 
