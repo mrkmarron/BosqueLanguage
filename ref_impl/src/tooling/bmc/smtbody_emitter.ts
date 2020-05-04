@@ -877,31 +877,31 @@ class SMTBodyEmitter {
                 return "false";
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
-                return `(and (not (bsqkey_bool_value ${argl})) (bsqkey_bool_value ${argr}))`;
+                return `(and (not ${argl}) ${argr})`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::Int$/)) {
-                return `(< (bsqkey_int_value ${argl}) (bsqkey_int_value ${argr}))`;
+                return `(< ${argl} ${argr})`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::BigInt$/)) {
-                return `(< (bsqkey_bigint_value ${argl}) (bsqkey_bigint_value ${argr}))`;
+                return `(< ${argl} ${argr})`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::String$/)) {
-                return `(str.< (bsqkey_string_value ${argl}) (bsqkey_string_value ${argr}))`;
+                return `(str.< ${argl}${argr})`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
                 return `(str.< (bsq_safestring_value ${argl}) (bsq_safestring_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
-                return `(str.< (bsqkey_stringof_value ${argl}) (bsqkey_stringof_value ${argr}))`;
+                return `(str.< (bsq_stringof_value ${argl}) (bsq_stringof_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::UUID$/)) {
-                return ` (< (bsqkey_uuid_value ${argl}) (bsqkey_uuid_value ${argr}))`;
+                return ` (str.< (bsq_uuid_value ${argl}) (bsq_uuid_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
-                return `(< (bsqkey_logicaltime_value ${argl}) (bsqkey_logicaltime_value ${argr}))`;
+                return `(< (bsq_logicaltime_value ${argl}) (bsq_logicaltime_value ${argr}))`;
             }
             else if (this.typegen.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
-                return `(< (bsqkey_cryptohash ${argl}) (bsqkey_cryptohash ${argr}))`;
+                return `(str.< (bsq_cryptohash ${argl}) (bsq_cryptohash ${argr}))`;
             }
             else if (this.typegen.typecheckEntityAndProvidesName(tt, this.typegen.enumtype)) {
                 return `(< (bsq_enum_value ${argl}) (bsq_enum_value ${argr}))`;
@@ -922,13 +922,13 @@ class SMTBodyEmitter {
             return this.generateLess(lhsinfertype, lhs, rhsinfertype, rhs, true);
         }
         else if (op === "<=") {
-            return `${this.generateLess(lhsinfertype, lhs, rhsinfertype, rhs, true)} || ${this.generateEquals("=", lhsinfertype, lhs, rhsinfertype, rhs, true)}`;
+            return `(or ${this.generateLess(lhsinfertype, lhs, rhsinfertype, rhs, true)} ${this.generateEquals("=", lhsinfertype, lhs, rhsinfertype, rhs, true)})`;
         }
         else if (op === ">") {
             return this.generateLess(rhsinfertype, rhs, lhsinfertype, lhs, true);
         }
         else {
-            return `${this.generateLess(rhsinfertype, rhs, lhsinfertype, lhs, true)} || ${this.generateEquals("=", rhsinfertype, rhs, lhsinfertype, lhs, true)}`;
+            return `(or ${this.generateLess(rhsinfertype, rhs, lhsinfertype, lhs, true)} ${this.generateEquals("=", rhsinfertype, rhs, lhsinfertype, lhs, true)})`;
         }
     }
 
@@ -1516,8 +1516,7 @@ class SMTBodyEmitter {
             case MIROpTag.MIRPrefixOp: {
                 const pfx = op as MIRPrefixOp;
                 if (pfx.op === "!") {
-                    const tval = this.generateTruthyConvert(pfx.arg);
-                    return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`(not ${tval.emit()})`));
+                    return new SMTLet(this.varToSMTName(pfx.trgt), new SMTValue(`(not ${this.argToSMT(pfx.arg, this.typegen.boolType).emit()})`));
                 }
                 else {
                     if (pfx.op === "-") {
@@ -1641,8 +1640,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
-                const smttest = this.generateTruthyConvert(cjop.arg);
-                return new SMTCond(smttest, SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
+                return new SMTCond(this.argToSMT(cjop.arg, this.typegen.boolType), SMTFreeVar.generate("#true_trgt#"), SMTFreeVar.generate("#false_trgt#"));
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;

@@ -1444,8 +1444,7 @@ class CPPBodyEmitter {
             case MIROpTag.MIRPrefixOp: {
                 const pfx = op as MIRPrefixOp;
                 if (pfx.op === "!") {
-                    const tval = this.generateTruthyConvert(pfx.arg);
-                    return `${this.varToCppName(pfx.trgt)} = !${tval};`;
+                    return `${this.varToCppName(pfx.trgt)} = !${this.argToCpp(pfx.arg, this.typegen.boolType)};`;
                 }
                 else {
                     if (pfx.op === "-") {
@@ -1584,7 +1583,7 @@ class CPPBodyEmitter {
             }
             case MIROpTag.MIRJumpCond: {
                 const cjop = op as MIRJumpCond;
-                return `if(${this.generateTruthyConvert(cjop.arg)}) {goto ${this.labelToCpp(cjop.trueblock)};} else {goto ${cjop.falseblock};}`;
+                return `if(${this.argToCpp(cjop.arg, this.typegen.boolType)}) {goto ${this.labelToCpp(cjop.trueblock)};} else {goto ${cjop.falseblock};}`;
             }
             case MIROpTag.MIRJumpNone: {
                 const njop = op as MIRJumpNone;

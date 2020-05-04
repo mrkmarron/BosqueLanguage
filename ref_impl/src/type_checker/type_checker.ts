@@ -1160,7 +1160,7 @@ class TypeChecker {
 
                 const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
                 const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, ttreg, okblock, failblock);
+                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, ttreg, true, okblock, failblock);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(failblock);
                 this.m_emitter.bodyEmitter.emitAbort(sinfo, "Invariant Failure");
@@ -2263,7 +2263,7 @@ class TypeChecker {
 
                     const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
                     const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
-                    this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, okblock, failblock);
+                    this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, true, okblock, failblock);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(failblock);
                     this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "Invariant Failure");
@@ -2359,7 +2359,7 @@ class TypeChecker {
 
                     const okblock = this.m_emitter.bodyEmitter.createNewBlock("invariantok");
                     const failblock = this.m_emitter.bodyEmitter.createNewBlock("invariantfail");
-                    this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, okblock, failblock);
+                    this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, ttreg, true, okblock, failblock);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(failblock);
                     this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "Invariant Failure");
@@ -2462,7 +2462,7 @@ class TypeChecker {
                         const failblck = this.m_emitter.bodyEmitter.createNewBlock("Las_fail");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
                         this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
-                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, failblck);
+                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, true, doneblck, failblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(failblck);
                         this.m_emitter.bodyEmitter.emitAbort(op.sinfo, "as<T> fail");
@@ -2477,7 +2477,7 @@ class TypeChecker {
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
                         this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
-                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
+                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, true, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
                         this.m_emitter.bodyEmitter.emitLoadConstNone(op.sinfo, trgt);
@@ -2492,7 +2492,7 @@ class TypeChecker {
                         const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ldefaultas_none");
                         const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
                         this.m_emitter.bodyEmitter.emitTypeOf(op.sinfo, creg, mt.trkey, specialm0type, margs.args[0]);
-                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, doneblck, noneblck);
+                        this.m_emitter.bodyEmitter.emitBoolJump(op.sinfo, creg, true, doneblck, noneblck);
 
                         this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
                         this.m_emitter.bodyEmitter.emitLoadConstNone(op.sinfo, trgt);
@@ -2721,8 +2721,9 @@ class TypeChecker {
             const nfstates = fstates.map((state) => state.setExpressionResult(state.getExpressionResult().etype, FlowTypeTruthValue.True));
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitPrefixOp(exp.sinfo, "!", etreg, trgt);
-            }
+                const isstrict = estates.every((state) => this.m_assembly.subtypeOf(state.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                this.m_emitter.bodyEmitter.emitPrefixNot(exp.sinfo, "!", isstrict, etreg, trgt);
+            } 
 
             return [...ntstates, ...nfstates];
         }
@@ -2748,7 +2749,7 @@ class TypeChecker {
                 const failblck = this.m_emitter.bodyEmitter.createNewBlock("Las_fail");
                 const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
                 this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, creg, mt.trkey, infertt.trkey, etreg);
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, creg, doneblck, failblck);
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, creg, true, doneblck, failblck);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(failblck);
                 this.m_emitter.bodyEmitter.emitAbort(exp.sinfo, "typeas fail");
@@ -2765,7 +2766,7 @@ class TypeChecker {
                 const noneblck = this.m_emitter.bodyEmitter.createNewBlock("Ltryas_none");
                 const creg = this.m_emitter.bodyEmitter.generateTmpRegister();
                 this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, creg, mt.trkey, infertt.trkey, etreg);
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, creg, doneblck, noneblck);
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, creg, true, doneblck, noneblck);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(noneblck);
                 this.m_emitter.bodyEmitter.emitLoadConstNone(exp.sinfo, trgt);
@@ -2950,22 +2951,23 @@ class TypeChecker {
         const scblck = this.m_emitter.bodyEmitter.createNewBlock("Llogic_shortcircuit");
         const restblck = this.m_emitter.bodyEmitter.createNewBlock("Llogic_rest");
         if (this.m_emitEnabled) {
+            const isstrict = lhs.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
             if (exp.op === "||") {
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, scblck, restblck);
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, isstrict, scblck, restblck);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(scblck);
                 this.m_emitter.bodyEmitter.emitLoadConstBool(exp.sinfo, true, trgt);
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
             }
             else if (exp.op === "&&") {
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, restblck, scblck);
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, isstrict, restblck, scblck);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(scblck);
                 this.m_emitter.bodyEmitter.emitLoadConstBool(exp.sinfo, false, trgt);
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
             }
             else {
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, restblck, scblck);
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, lhsreg, isstrict, restblck, scblck);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(scblck);
                 this.m_emitter.bodyEmitter.emitLoadConstBool(exp.sinfo, true, trgt);
@@ -2986,7 +2988,13 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                const rhsstrict = rhs.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                if (rhsstrict) {
+                    this.m_emitter.bodyEmitter.emitRegAssign(exp.sinfo, rhsreg, trgt);
+                }
+                else {
+                    this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                }
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
                 this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
             }
@@ -3003,7 +3011,13 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                const rhsstrict = rhs.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                if (rhsstrict) {
+                    this.m_emitter.bodyEmitter.emitRegAssign(exp.sinfo, rhsreg, trgt);
+                }
+                else {
+                    this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                }
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
                 this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
             }
@@ -3020,7 +3034,13 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                const rhsstrict = rhs.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                if (rhsstrict) {
+                    this.m_emitter.bodyEmitter.emitRegAssign(exp.sinfo, rhsreg, trgt);
+                }
+                else {
+                    this.m_emitter.bodyEmitter.emitTruthyConversion(exp.sinfo, rhsreg, trgt);
+                }
                 this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
                 this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
             }
@@ -3143,7 +3163,8 @@ class TypeChecker {
         const trueblck = this.m_emitter.bodyEmitter.createNewBlock("Lselect_true");
         const falseblck = this.m_emitter.bodyEmitter.createNewBlock("Lselect_false");
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, testreg, trueblck, falseblck);
+            const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+            this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, testreg, isstrict, trueblck, falseblck);
         }
 
         if (this.m_emitEnabled) {
@@ -3216,7 +3237,7 @@ class TypeChecker {
                     const chktype = this.m_emitter.registerResolvedTypeReference(errtype).trkey;
 
                     this.m_emitter.bodyEmitter.emitTypeOf(exp.sinfo, treg, chktype, infertype, trgt);
-                    this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, scblck, regularblck);
+                    this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, true, scblck, regularblck);
                     this.m_emitter.bodyEmitter.setActiveBlock(scblck);
                 }
     
@@ -3263,7 +3284,8 @@ class TypeChecker {
             terminaltype = (TypeEnvironment.join(this.m_assembly, ...evalue).getLocalVarInfo("$value") as VarInfo).flowType;
 
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, scblck, regularblck);
+                const isstrict = tvalue.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, treg, isstrict, scblck, regularblck);
                 this.m_emitter.bodyEmitter.setActiveBlock(scblck);
             }
 
@@ -3358,7 +3380,8 @@ class TypeChecker {
             const trueblck = this.m_emitter.bodyEmitter.createNewBlock(`Lifexp_${i}true`);
             const falseblck = this.m_emitter.bodyEmitter.createNewBlock(`Lifexp_${i}false`);
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, testreg, trueblck, falseblck);
+                const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                this.m_emitter.bodyEmitter.emitBoolJump(exp.sinfo, testreg, isstrict, trueblck, falseblck);
             }
 
             if (this.m_emitEnabled) {
@@ -3944,7 +3967,8 @@ class TypeChecker {
             const trueblck = this.m_emitter.bodyEmitter.createNewBlock(`Lifstmt_${i}true`);
             const falseblck = (i < stmt.flow.conds.length - 1 || stmt.flow.elseAction !== undefined) ? this.m_emitter.bodyEmitter.createNewBlock(`Lifstmt_${i}false`) : doneblck;
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, trueblck, falseblck);
+                const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType())); 
+                this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, isstrict, trueblck, falseblck);
             }
 
             if (this.m_emitEnabled) {
@@ -4157,7 +4181,7 @@ class TypeChecker {
                 }
                 else {
                     const eqlabel = this.m_emitter.bodyEmitter.createNewBlock(`match${midx}_sceq`);
-                    this.m_emitter.bodyEmitter.emitBoolJump(sinfo, tcreg, eqlabel, nextlabel);
+                    this.m_emitter.bodyEmitter.emitBoolJump(sinfo, tcreg, true, eqlabel, nextlabel);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(eqlabel);
                     this.m_emitter.bodyEmitter.emitLoadConstBool(sinfo, true, mreg);
@@ -4174,7 +4198,7 @@ class TypeChecker {
                             this.m_emitter.bodyEmitter.emitRegAssign(sinfo, okreg, mreg);
                         }
 
-                        this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, nexttestlabel, filllabel);
+                        this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, true, nexttestlabel, filllabel);
                         this.m_emitter.bodyEmitter.setActiveBlock(nexttestlabel);
                     }
 
@@ -4229,7 +4253,7 @@ class TypeChecker {
 
         if (guard.optionalWhen === undefined) {
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, actionlabel, nextlabel);
+                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, true, actionlabel, nextlabel);
             }
 
             return { envinfo: opts, nexttype: nexttype };
@@ -4239,7 +4263,7 @@ class TypeChecker {
 
             if (this.m_emitEnabled) {
                 const whenblck = this.m_emitter.bodyEmitter.createNewBlock(`match${midx}_when`);
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, whenblck, nextlabel);
+                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, true, whenblck, nextlabel);
 
                 this.m_emitter.bodyEmitter.setActiveBlock(whenblck);
             }
@@ -4247,8 +4271,12 @@ class TypeChecker {
             let wreg = this.m_emitter.bodyEmitter.generateTmpRegister();
             const wopts = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...gtrueflow), guard.optionalWhen, wreg);
 
+            const okType = this.m_assembly.typeUpperBound([this.m_assembly.getSpecialNoneType(), this.m_assembly.getSpecialBoolType()]);
+            this.raiseErrorIf(sinfo, wopts.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
+
             if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, wreg, actionlabel, nextlabel);
+                const isstrict = wopts.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, wreg, isstrict, actionlabel, nextlabel);
             }
 
             const [wtrueflow, wfalseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, wopts);
@@ -4422,7 +4450,8 @@ class TypeChecker {
         if (this.m_emitEnabled && isBuildLevelEnabled(stmt.level, this.m_buildLevel)) {
             const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Lassert_done");
             const failblck = this.m_emitter.bodyEmitter.createNewBlock("Lassert_fail");
-            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, doneblck, failblck);
+            const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, isstrict, doneblck, failblck);
 
             this.m_emitter.bodyEmitter.setActiveBlock(failblck);
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "assert fail");
@@ -4446,7 +4475,8 @@ class TypeChecker {
         if (this.m_emitEnabled) {
             const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Lcheck_done");
             const failblck = this.m_emitter.bodyEmitter.createNewBlock("Lcheck_fail");
-            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, doneblck, failblck);
+            const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, isstrict, doneblck, failblck);
 
             this.m_emitter.bodyEmitter.setActiveBlock(failblck);
             this.m_emitter.bodyEmitter.emitAbort(stmt.sinfo, "check fail");
@@ -4490,7 +4520,8 @@ class TypeChecker {
         const doneblck = this.m_emitter.bodyEmitter.createNewBlock("Lcheck_done");
         const failblck = this.m_emitter.bodyEmitter.createNewBlock("Lcheck_fail");
         if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, doneblck, failblck);
+            const isstrict = test.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
+            this.m_emitter.bodyEmitter.emitBoolJump(stmt.sinfo, testreg, isstrict, doneblck, failblck);
             this.m_emitter.bodyEmitter.setActiveBlock(failblck);
         }
 
@@ -4648,7 +4679,7 @@ class TypeChecker {
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, preject[0], preject[1], [mirbool, mirbool, -1, []], prereg);
-                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, prereg, preok, prefail);
+                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, prereg, true, preok, prefail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(prefail);
                     this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail pre-condition");
@@ -4678,7 +4709,7 @@ class TypeChecker {
                     const postargs = [...postvar.unpack, ...postvar.orefs, ...postject[1]];
 
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, postject[0], postargs, [mirbool, mirbool, -1, []], postreg);
-                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
+                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, true, postok, postfail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(postfail);
                     this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail post-condition");
@@ -4703,7 +4734,7 @@ class TypeChecker {
 
                     const mirbool = this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType());
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, preject[0], preject[1], [mirbool, mirbool, -1, []], prereg);
-                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, prereg, preok, prefail);
+                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, prereg, true, preok, prefail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(prefail);
                     this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail pre-condition");
@@ -4735,7 +4766,7 @@ class TypeChecker {
                     const postargs = [...postvar.unpack, ...postvar.orefs, ...postject[1]];
 
                     this.m_emitter.bodyEmitter.emitInvokeFixedFunction(body.body.sinfo, postject[0], postargs, [mirbool, mirbool, -1, []], postreg);
-                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, postok, postfail);
+                    this.m_emitter.bodyEmitter.emitBoolJump(body.body.sinfo, postreg, true, postok, postfail);
 
                     this.m_emitter.bodyEmitter.setActiveBlock(postfail);
                     this.m_emitter.bodyEmitter.emitAbort(body.body.sinfo, "Fail post-condition");
@@ -4829,7 +4860,7 @@ class TypeChecker {
             be.emitInvokeFixedFunction(sinfo, callkeys[i].ivk, args, [mirbooltype, mirbooltype, -1, []], etreg);
 
             const nexttest = be.createNewBlock("next");
-            be.emitBoolJump(sinfo, etreg, nexttest, failblock);
+            be.emitBoolJump(sinfo, etreg, true, nexttest, failblock);
 
             be.setActiveBlock(nexttest);
         }

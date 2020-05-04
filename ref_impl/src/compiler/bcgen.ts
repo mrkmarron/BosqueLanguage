@@ -13,7 +13,7 @@ import * as Commander from "commander";
 function compile(files: string[], core: string, trgt: string) {
     process.stdout.write("Reading app code...\n");
 
-    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
         const coredir = Path.join(bosque_dir, "core/", core);
@@ -55,7 +55,7 @@ function compile(files: string[], core: string, trgt: string) {
 
 Commander
 .usage("[--output file] <file ...>")
-.option("-cl --core", "Core library version to use")
+.option("-s --symbolic [boolean]", "Core library version to use")
 .option("-f --functionalize [boolean]")
 .option("-j --json", "Compile to json bytecode assembly")
 .option("-o --output [file]", "Optional output file target");
@@ -67,9 +67,4 @@ if (Commander.args.length === 0) {
     process.exit(1);
 }
 
-if (Commander.bytecode === undefined) {
-    process.stdout.write("Error -- Please specify a compiler target (--assembly)");
-    process.exit(1);
-}
-
-setImmediate(() => compile(Commander.args, Commander.core || "cpp",  Commander.output || "a.json"));
+setImmediate(() => compile(Commander.args, Commander.symbolic ? "symbolic" : "cpp",  Commander.output || "a.json"));

@@ -322,6 +322,17 @@ class MIRBodyEmitter {
         }
     }
 
+    emitPrefixNot(sinfo: SourceInfo, op: string, isstrict: boolean, arg: MIRArgument, trgt: MIRTempRegister) {
+        if(isstrict) {
+            this.m_currentBlock.push(new MIRPrefixOp(sinfo, op, arg, trgt));
+        }
+        else {
+            const tr = this.generateTmpRegister();
+            this.m_currentBlock.push(new MIRTruthyConvert(sinfo, arg, tr));
+            this.m_currentBlock.push(new MIRPrefixOp(sinfo, op, tr, trgt));
+        }
+    }
+
     emitPrefixOp(sinfo: SourceInfo, op: string, arg: MIRArgument, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRPrefixOp(sinfo, op, arg, trgt));
     }
@@ -406,8 +417,15 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJump(sinfo, blck));
     }
 
-    emitBoolJump(sinfo: SourceInfo, arg: MIRTempRegister, trueblck: string, falseblck: string) {
-        this.m_currentBlock.push(new MIRJumpCond(sinfo, arg, trueblck, falseblck));
+    emitBoolJump(sinfo: SourceInfo, arg: MIRTempRegister, isstrict: boolean, trueblck: string, falseblck: string) {
+        if(isstrict) {
+            this.m_currentBlock.push(new MIRJumpCond(sinfo, arg, trueblck, falseblck));
+        } 
+        else {
+            const tr = this.generateTmpRegister();
+            this.m_currentBlock.push(new MIRTruthyConvert(sinfo, arg, tr));
+            this.m_currentBlock.push(new MIRJumpCond(sinfo, tr, trueblck, falseblck));
+        }
     }
 
     emitNoneJump(sinfo: SourceInfo, arg: MIRTempRegister, noneblck: string, someblk: string, ) {
@@ -419,6 +437,7 @@ class MIRBodyEmitter {
 
         propagateTmpAssignForBody(ibody);
         removeDeadTempAssignsFromBody(ibody);
+
         convertBodyToSSA(ibody, args);
 
         return ibody;
