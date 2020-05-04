@@ -319,7 +319,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
                 return List<T>::_discardwhile(l, idx + 1, p);
             }
             else {
-                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx)
+                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx);
             }
         }
     }
@@ -349,7 +349,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
                 return List<T>::_discarduntil(l, idx + 1, p);
             }
             else {
-                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx)
+                return List<T>::_takek(l, List<T>@{}, idx, List<T>::_size(l) - idx);
             }
         }
     }
@@ -478,7 +478,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
         else {
             let val = List<T>::_unsafe_get(l, idx);
-            let jl = List<T>::_joinGroupSingle<U>[recursive](val, ol, List<[T, List<U>]>, 0, p);
+            let jl = List<T>::_joinGroupSingle<U>[recursive](val, ol, List<[T, List<U>]>@{}, 0, p);
 
             return List<T>::_joinGroup<U>[recursive](l, ol, List<T>::_unsafe_push(lp, jl), idx + 1, p);
         }
@@ -527,7 +527,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    hidden recursive static _sort(this, List<T>@{}, 0, pf) {
+    hidden recursive static _sort(l: List<T>, ol: List<T>, idx: Int, sf: recursive? fn(_: T, _: T) -> Bool): List<T> {
         abort;
     }
 
@@ -610,7 +610,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     }
 
     method {when T KeyType} toSet(): Set<T> {
-        return List<T>::_toset(this, 0, Set<T>{});
+        return List<T>::_toset(this, 0, Set<T>@{});
     }
 
     recursive? method single(p: recursive? fn(_: T) -> Bool): Bool 
@@ -996,7 +996,7 @@ concept ListUtil {
     }
 
     hidden recursive static _concat<T>(l: List<List<T>>, lp: List<T>, idx: Int): List<T> {
-        if(idx == List<T>_size(l)) {
+        if(idx == List<T>::_size(l)) {
             return lp;
         }
         else {

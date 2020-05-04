@@ -15,7 +15,6 @@
 ))
 
 (declare-datatypes (
-      (bsq_bigint 0)
       (bsq_safestring 0)
       (bsq_stringof 0)
       (bsq_uuid 0)
@@ -25,23 +24,22 @@
       (bsq_idkey 0)
       (BKeyValue 0)
     ) (
-    ( (bsq_bigint@cons (bsq_bigint_value Int)) )
     ( (bsq_safestring@cons (bsq_safestring_type String) (bsq_safestring_value String)) )
     ( (bsq_stringof@cons (bsq_stringof_type String) (bsq_stringof_value String)) )
     ( (bsq_uuid@cons (bsq_uuid_value String)) )
     ( (bsq_logicaltime@cons (bsq_logicaltime_value Int)) )
-    ( (bsq_cryptohash@cons (bsq_cryptohash String)) )
+    ( (bsq_cryptohash@cons (bsq_cryptohash_value String)) )
     ( (bsq_enum@cons (bsq_enum_type String) (bsq_enum_value Int)) )
     ( (bsq_idkey@cons (bsq_idkey_type String) (bsq_idkey_value (Array Int BKeyValue))) )
     (
       (bsqkey_none) 
       (bsqkey_bool (bsqkey_bool_value Bool))
       (bsqkey_int (bsqkey_int_value Int))
-      (bsqkey_bigint (bsqkey_bigint_value bsq_bigint))
+      (bsqkey_bigint (bsqkey_bigint_value Int))
       (bsqkey_string (bsqkey_string_value String))
       (bsqkey_safestring (bsqkey_safestring_value bsq_safestring))
       (bsqkey_stringof (bsqkey_stringof_value bsq_stringof))
-      (bsqkey_uuid (bsqkey_uuid_value bsq_guid))
+      (bsqkey_uuid (bsqkey_uuid_value bsq_uuid))
       (bsqkey_logicaltime (bsqkey_logicaltime_value bsq_logicaltime))
       (bsqkey_cryptohash (bsqkey_cryptohash_value bsq_cryptohash))
       (bsqkey_enum (bsqkey_enum_value bsq_enum))
@@ -79,7 +77,7 @@
       (bsqterm_float64 (bsqterm_float64_value (_ FloatingPoint 11 53)))
       (bsqterm_buffer (bsqterm_buffer_value bsq_buffer))
       (bsqterm_bufferof (bsqterm_bufferof_value bsq_bufferof))
-      (bsqterm_bytebuffer (bsqterm_buffer_value bsq_bytebuffer))
+      (bsqterm_bytebuffer (bsqterm_bytebuffer_value bsq_bytebuffer))
       (bsqterm_isotime (bsqterm_isotime_value bsq_isotime))
       (bsqterm_regex (bsqterm_regex_value bsq_regex))
       (bsqterm_tuple (bsqterm_tuple_value bsq_tuple))
@@ -88,7 +86,7 @@
     )
 ))
 
-(declare-fun nominalDataKinds (String) SpecialTypeTermInfo)
+(declare-fun nominalDataKinds (String) StructuralSpecialTypeInfo)
 ;;NOMINAL_TYPE_TO_DATA_KIND_ASSERTS;;
 
 (declare-const MIRNominalTypeEnum_None String)
@@ -135,7 +133,7 @@
 )
 
 (define-fun bsqterm_get_nominal_type ((term BTerm)) String
-  (ite (is-bsqterm_float64) MIRNominalTypeEnum_Float64
+  (ite (is-bsqterm_float64 term) MIRNominalTypeEnum_Float64
     (ite (is-bsqterm_key term) (bsqkey_get_nominal_type (bsqterm_key_value term))
       (ite (is-bsqterm_buffer term) (bsq_buffer_type (bsqterm_buffer_value term))
         (ite (is-bsqterm_bufferof term) (bsq_bufferof_type (bsqterm_bufferof_value term))
@@ -158,19 +156,19 @@
 
 (define-fun bsqkeyless_basetypes ((k1 BKeyValue) (k2 BKeyValue)) Bool
   (let ((k1t (bsqkey_get_nominal_type k1)) (k2t (bsqkey_get_nominal_type k2)))
-    (ite (not (str.= k1t k2t))
+    (ite (not (= k1t k2t))
       (str.< k1t k2t)
       (ite (and (= k1 bsqkey_none) (= k2 bsqkey_none)) false
         (ite (and (is-bsqkey_bool k1) (is-bsqkey_bool k2)) (and (not (bsqkey_bool_value k1)) (bsqkey_bool_value k2))
           (ite (and (is-bsqkey_int k1) (is-bsqkey_int k2)) (< (bsqkey_int_value k1) (bsqkey_int_value k2))
             (ite (and (is-bsqkey_bigint k1) (is-bsqkey_bigint k2)) (< (bsqkey_bigint_value k1) (bsqkey_bigint_value k2))
               (ite (and (is-bsqkey_string k1) (is-bsqkey_string k2)) (str.< (bsqkey_string_value k1) (bsqkey_string_value k2))
-                (ite (and (is-bsqkey_safestring k1) (is-bsqkey_safestring k2)) (str.< (bsq_safestring_value k1) (bsq_safestring_value k2))
-                  (ite (and (is-bsqkey_stringof k1) (is-bsqkey_stringof k2)) (str.< (bsqkey_stringof_value k1) (bsqkey_stringof_value k2))
-                    (ite (and (is-bsqkey_uuid k1) (is-bsqkey_uuid k2)) (< (bsqkey_uuid_value k1) (bsqkey_uuid_value k2))
-                      (ite (and (is-bsqkey_logicaltime k1) (is-bsqkey_logicaltime k2)) (< (bsqkey_logicaltime_value k1) (bsqkey_logicaltime_value k2))
-                        (ite (and (is-bsqkey_cryptohash k1) (is-bsqkey_cryptohash k2)) (< (bsqkey_cryptohash k1) (bsqkey_cryptohash k2))
-                          (< (bsq_enum_value k1) (bsq_enum_value k2))
+                (ite (and (is-bsqkey_safestring k1) (is-bsqkey_safestring k2)) (str.< (bsq_safestring_value (bsqkey_safestring_value k1)) (bsq_safestring_value (bsqkey_safestring_value k2)))
+                  (ite (and (is-bsqkey_stringof k1) (is-bsqkey_stringof k2)) (str.< (bsq_stringof_value (bsqkey_stringof_value k1)) (bsq_stringof_value (bsqkey_stringof_value k2)))
+                    (ite (and (is-bsqkey_uuid k1) (is-bsqkey_uuid k2)) (str.< (bsq_uuid_value (bsqkey_uuid_value k1)) (bsq_uuid_value (bsqkey_uuid_value k2)))
+                      (ite (and (is-bsqkey_logicaltime k1) (is-bsqkey_logicaltime k2)) (< (bsq_logicaltime_value (bsqkey_logicaltime_value k1)) (bsq_logicaltime_value (bsqkey_logicaltime_value k2)))
+                        (ite (and (is-bsqkey_cryptohash k1) (is-bsqkey_cryptohash k2)) (str.< (bsq_cryptohash_value (bsqkey_cryptohash_value k1)) (bsq_cryptohash_value (bsqkey_cryptohash_value k2)))
+                          (< (bsq_enum_value (bsqkey_enum_value k1)) (bsq_enum_value (bsqkey_enum_value k2)))
                         )
                       )
                     )
@@ -194,21 +192,21 @@ false
 
 (define-fun bsqkeyless ((k1 BKeyValue) (k2 BKeyValue)) Bool
   (let ((k1t (bsqkey_get_nominal_type k1)) (k2t (bsqkey_get_nominal_type k2)))
-    (ite (not (str.= k1t k2t))
+    (ite (not (= k1t k2t))
       (str.< k1t k2t)
-      (ite (and (is-bsq_idkey k1) (is-bsq_idkey k2))
-        (bsqkeyless_identity k1t (bsq_idkey_value k1) (bsq_idkey_value k2))
+      (ite (and (is-bsqkey_idkey k1) (is-bsqkey_idkey k2))
+        (bsqkeyless_identity k1t (bsqkey_idkey_value k1) (bsqkey_idkey_value k2))
         (bsqkeyless_basetypes k1 k2)
       )
     )
   )
 )
 
-(declare-const SpecialTypeTermInfo@Clear SpecialTypeTermInfo)
-(assert (= SpecialTypeTermInfo@Clear (StructuralSpecialTypeInfo@cons true true true))
+(declare-const StructuralSpecialTypeInfo@Clear StructuralSpecialTypeInfo)
+(assert (= StructuralSpecialTypeInfo@Clear (StructuralSpecialTypeInfo@cons true true true)))
 
 (define-fun getStructuralSpecialTypeInfoTerm ((term BTerm)) StructuralSpecialTypeInfo
-  (ite (= term bsqterm@clear) SpecialTypeTermInfo@Clear
+  (ite (= term bsqterm@clear) StructuralSpecialTypeInfo@Clear
     (ite (is-bsqterm_tuple term) (bsq_tuple_concepts (bsqterm_tuple_value term))
       (ite (is-bsqterm_record term) (bsq_record_concepts (bsqterm_record_value term))
         (nominalDataKinds (bsqterm_get_nominal_type term))
@@ -217,11 +215,11 @@ false
   )
 )
 
-(define-fun mergeStructuralSpecialTypeInfo ((st1 SpecialTypeTermInfo) (st2 SpecialTypeTermInfo)) SpecialTypeTermInfo
-  (SpecialTypeTermInfo@cons (and (StructuralSpecialTypeInfo$PODType st1) (StructuralSpecialTypeInfo$PODType st2)) (and (StructuralSpecialTypeInfo$APIType st1) (StructuralSpecialTypeInfo$APIType st2)) (and (StructuralSpecialTypeInfo$Parsable st1) (StructuralSpecialTypeInfo$Parsable st2)))
+(define-fun mergeStructuralSpecialTypeInfo ((st1 StructuralSpecialTypeInfo) (st2 StructuralSpecialTypeInfo)) StructuralSpecialTypeInfo
+  (StructuralSpecialTypeInfo@cons (and (StructuralSpecialTypeInfo$PODType st1) (StructuralSpecialTypeInfo$PODType st2)) (and (StructuralSpecialTypeInfo$APIType st1) (StructuralSpecialTypeInfo$APIType st2)) (and (StructuralSpecialTypeInfo$Parsable st1) (StructuralSpecialTypeInfo$Parsable st2)))
 )
 
-(define-fun @fj ((term BTerm) (sti SpecialTypeTermInfo)) SpecialTypeTermInfo
+(define-fun @fj ((term BTerm) (sti StructuralSpecialTypeInfo)) StructuralSpecialTypeInfo
   (mergeStructuralSpecialTypeInfo (getStructuralSpecialTypeInfoTerm term) sti)
 )
 
@@ -231,7 +229,7 @@ false
 (declare-const @int_max Int)
 (assert (= @int_max 9007199254740991))
 
-(define-fun @int_unsafe ((v Int)) 
+(define-fun @int_unsafe ((v Int)) Bool
   (or (< v @int_min) (> v @int_max))
 )
 

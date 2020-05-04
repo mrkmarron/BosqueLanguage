@@ -431,7 +431,7 @@ class SMTBodyEmitter {
     }
 
     generateMIRConstructorTuple(op: MIRConstructorTuple): SMTExp {
-        let fvals = "SpecialTypeTermInfo@Clear";
+        let fvals = "StructuralSpecialTypeInfo@Clear";
         let cvals = "bsqtuple_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
             cvals = `(store ${cvals} ${i} ${this.argToSMT(op.args[i], this.typegen.anyType).emit()})`;
@@ -442,7 +442,7 @@ class SMTBodyEmitter {
     }
 
     generateMIRConstructorRecord(op: MIRConstructorRecord): SMTExp {
-        let fvals = "SpecialTypeTermInfo@Clear";
+        let fvals = "StructuralSpecialTypeInfo@Clear";
         let cvals = "bsqrecord_array_empty";
         for (let i = 0; i < op.args.length; ++i) {
             cvals = `(store ${cvals} "${op.args[i][0]}" ${this.argToSMT(op.args[i][1], this.typegen.anyType).emit()})`;
@@ -495,7 +495,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${vals.join(" ")})`));
         }
         else {
-            let fvals = "SpecialTypeTermInfo@Clear";
+            let fvals = "StructuralSpecialTypeInfo@Clear";
             let cvals = "bsqtuple_array_empty";
             for (let i = 0; i < vals.length; ++i) {
                 cvals = `(store ${cvals} ${i} ${vals[i]})`;
@@ -509,7 +509,7 @@ class SMTBodyEmitter {
     generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): SMTExp {
         const updmax = Math.max(...op.updates.map((upd) => upd[0] + 1));
 
-        let fvals = "SpecialTypeTermInfo@Clear";
+        let fvals = "StructuralSpecialTypeInfo@Clear";
         let cvals = "bsqtuple_array_empty";
         for (let i = 0; i < updmax; ++i) {
             const upd = op.updates.find((update) => update[0] === i);
@@ -581,7 +581,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${vals.join(" ")})`));
         }
         else {
-            let fvals = "SpecialTypeTermInfo@Clear";
+            let fvals = "StructuralSpecialTypeInfo@Clear";
             let cvals = "bsqrecord_array_empty";
             for (let i = 0; i < vals.length; ++i) {
                 cvals = `(store ${cvals} "${op.properties[i]}" ${vals[i]})`;
@@ -595,7 +595,7 @@ class SMTBodyEmitter {
     generateMIRModifyWithProperties(op: MIRModifyWithProperties, resultRecordType: MIRType): SMTExp {
         const pmax = this.typegen.getMaxPropertySet(resultRecordType);
 
-        let fvals = "SpecialTypeTermInfo@Clear";
+        let fvals = "StructuralSpecialTypeInfo@Clear";
         let cvals = "bsqrecord_array_empty";
         let tc = this.typegen.typecheckRecord(this.getArgType(op.arg)) ? `(bsq_record_entries ${this.varToSMTName(op.arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.arg)}))`;
         for (let i = 0; i < pmax.length; ++i) {
@@ -617,7 +617,7 @@ class SMTBodyEmitter {
     generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultRecordType: MIRType): SMTExp {
         const argvals = this.typegen.typecheckRecord(this.getArgType(op.arg)) ? `(bsq_record_entries ${this.varToSMTName(op.arg)})` : `(bsq_record_entries (bsqterm_record_value ${this.varToSMTName(op.arg)}))`;
         let cvals = argvals;
-        let fvals = "SpecialTypeTermInfo@Clear";
+        let fvals = "StructuralSpecialTypeInfo@Clear";
 
         const rprops = this.typegen.getMaxPropertySet(resultRecordType);
         const mtype = this.typegen.getMIRType(op.updateInferType);
@@ -708,7 +708,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(${this.typegen.generateEntityConstructor(resultAccessType.trkey)} ${cvals.join(" ")})`));
             }
             else {
-                let fvals = "SpecialTypeTermInfo@Clear";
+                let fvals = "StructuralSpecialTypeInfo@Clear";
                 let cvals = "bsqrecord_array_empty";
                 for (let i = 0; i < op.fields.length; ++i) {
                     const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;

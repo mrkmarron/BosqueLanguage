@@ -175,7 +175,7 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
             let k = kl.hkey;
             let v = Map<K, V>::_at_val(m, k);
 
-            return Map<K, V>::_union[recursive](m, Map<K, v>::_add(mp, k, v), kl.tail);
+            return Map<K, V>::_union[recursive](m, Map<K, V>::_add(mp, k, v), kl.tail);
         }
     }
 
@@ -188,10 +188,10 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
             let v = Map<K, V>::_at_val(m, k);
 
             if(!Map<K, V>::_has_key(mp, kl.hkey)) {
-                return Map<K, V>::_merge[recursive](m, Map<K, v>::_add(mp, k, v), kl.tail);
+                return Map<K, V>::_merge[recursive](m, Map<K, V>::_add(mp, k, v), kl.tail);
             }
             else {
-                return Map<K, V>::_merge[recursive](m, Map<K, v>::_update(mp, k, v), kl.tail);
+                return Map<K, V>::_merge[recursive](m, Map<K, V>::_update(mp, k, v), kl.tail);
             }
         }
     }
@@ -245,7 +245,7 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
     }
 
     override method has(key: K): Bool {
-        return Map<K, V>::_has_key(this, k)
+        return Map<K, V>::_has_key(this, k);
     }
 
     override method hasAll(...kl: List<K>): Bool {
