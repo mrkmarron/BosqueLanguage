@@ -96,7 +96,7 @@ class UnionRepr extends TypeRepr {
         const iskey = trl.every((tr) => tr.iskey);
         const size = Math.max(...trl.map((tr) => tr instanceof StructRepr ? tr.reqspace : 8)) + 4;
 
-        const repr = `UnionValue<${size}>`;
+        const repr = `BSQUnionValue<${size}>`;
 
         return new UnionRepr(iskey, repr, size, trl);
     }

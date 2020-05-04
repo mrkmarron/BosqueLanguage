@@ -297,7 +297,7 @@ public:
     uint8_t udata[k];
     MIRNominalTypeEnum nominalType;
 
-    BSQUnionValue() : { ; }
+    BSQUnionValue() { ; }
     BSQUnionValue(MIRNominalTypeEnum nominalType, const uint8_t(&udata)[k]) : nominalType(nominalType) { memcpy(this->udata, udata, k); }
     
     BSQUnionValue(const BSQUnionValue& src) = default;
@@ -312,7 +312,7 @@ public:
         static_assert(sizeof(T) <= k);
 
         BSQUnionValue res;
-        res.nominalType = this->nominalType;
+        res.nominalType = nominalType;
         memcpy(res.udata, (void*)(&data), sizeof(T));
 
         return res;

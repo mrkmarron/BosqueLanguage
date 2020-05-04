@@ -165,7 +165,13 @@ class CPPBodyEmitter {
             return "false";
         }
         else {
-            return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
+            const repr = this.typegen.getCPPReprFor(argtype);
+            if (repr instanceof UnionRepr) {
+                return `${this.varToCppName(arg)}.nominalType == MIRNominalTypeEnum_None`;
+            }
+            else {
+                return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
+            }
         }
     }
     

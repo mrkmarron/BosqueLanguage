@@ -543,7 +543,7 @@ class CPPTypeEmitter {
                 const uinto = trinto as UnionRepr;
 
                 const ntype = trfrom instanceof StructRepr ? trfrom.nominaltype : "MIRNominalTypeEnum_None";
-                return `BSQUnionValue<${uinto}>::create<${trfrom.std}>(${exp}, ${ntype})`;
+                return `BSQUnionValue<${uinto.reqspace}>::create<${trfrom.std}>(${exp}, ${ntype})`;
             }
         }
         else {

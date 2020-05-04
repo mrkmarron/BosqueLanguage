@@ -68,6 +68,7 @@ const KeywordStrings = [
     "using",
     "validate",
     "let",
+    "var",
     "when",
     "where",
     "yield"
@@ -2133,7 +2134,7 @@ class Parser {
         }
         else if (tk === "let" || tk === "var") {
             this.consumeToken();
-            const isConst = !this.testAndConsumeTokenIf("!");
+            const isConst = tk === "let";
 
             if (this.testToken("[") || this.testToken("{") || this.testToken("(|") || this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Type ) || this.testToken(TokenStrings.Type)) {
                 let decls = new Set<string>();
