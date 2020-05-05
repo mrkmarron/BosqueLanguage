@@ -36,8 +36,8 @@ add2(y=2, 5)   //7
 **All odd check using rest parameters and lambda:**
 
 ```none
-function allOdd(...args: List<Int>): Bool {
-    return args->all(fn(x) => Math::mod(x, 2) == 1);
+function allPositive(...args: List<Int>): Bool {
+    return args->allof(fn(x) => x >= 0);
 }
 
 allOdd(1, 3, 4) //false
@@ -47,7 +47,7 @@ allOdd(1, 3, 4) //false
 
 ```none
 function sign(x?: Int): Int {
-    var! y: Int;
+    var y: Int;
 
     if(x == none || x == 0) {
         y = 0;

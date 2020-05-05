@@ -13,31 +13,28 @@ entrypoint function add2C(): Int {
     return add2(2, 3);
 }
 
-function allOdd(...args: List<Int>): Bool {
-    return args->all(fn(x) => Math::mod(x, 2) == 1);
+entrypoint function add2Check(x: Int): Int {
+    return add2(2, x);
 }
 
-entrypoint function allOddC(): Bool {
-    return allOdd(1, 3, 4);
+function allPositive(...args: List<Int>): Bool {
+    return args->allof(fn(x) => x >= 0);
 }
 
-//TODO: implement
-/*
-function updatePoint(point: {x: Int, y: Int, z: Int}, value: Int): {x: Int, y: Int, z: Int} {
-    return point->updatePoint(y=value, x=-point.x);
-}
-*/
-
-function tryGetProperty(r?: {f: Int, k: Int}): Int? {
-    return r?.f;
+entrypoint function allPositiveC(): Bool {
+    return allPositive(1, 3, 4);
 }
 
-entrypoint function tryGetPropertyC2(): Int {
-    return tryGetProperty({f=2, k=1})->as<Int>();
+entrypoint function allPositiveCheck(x: Int): Bool {
+    let b = allPositive(1, 3, x, 4);
+    check b;
+
+    return b; 
 }
 
-entrypoint function tryGetPropertyCnone(): Int? {
-    return tryGetProperty();
+entrypoint function allPositiveCapture(): Bool {
+    let zero = 0;
+    return List<Int>@{1, 2}->allof(fn(x) => x >= zero);
 }
 
 function sign(x?: Int): Int {
@@ -64,3 +61,11 @@ entrypoint function signCm5(): Int {
 entrypoint function signCnone(): Int {
     return sign();
 }
+
+entrypoint function signCheck(x: Int): Int {
+    let v = sign(x);
+    check x != 1;
+
+    return x;
+}
+

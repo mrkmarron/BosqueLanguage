@@ -12,18 +12,13 @@
             },
             {
                 "kind": "aot",
-                "entrypoint": "allOddC",
-                "expected": "false"
+                "entrypoint": "allPositiveC",
+                "expected": "true"
             },
             {
                 "kind": "aot",
-                "entrypoint": "tryGetPropertyC2",
-                "expected": "2"
-            },
-            {
-                "kind": "aot",
-                "entrypoint": "tryGetPropertyCnone",
-                "expected": "none"
+                "entrypoint": "allPositiveCapture",
+                "expected": "true"
             },
             {
                 "kind": "aot",
@@ -46,19 +41,24 @@
                 "expected": "5"
             },
             {
-                "kind": "symexec",
-                "entrypoint": "allOddC",
-                "expected": "false"
+                "kind": "symtest",
+                "entrypoint": "add2Check",
+                "error": true
             },
             {
                 "kind": "symexec",
-                "entrypoint": "tryGetPropertyC2",
-                "expected": "2"
+                "entrypoint": "allPositiveC",
+                "expected": "true"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "allPositiveCheck",
+                "error": true
             },
             {
                 "kind": "symexec",
-                "entrypoint": "tryGetPropertyCnone",
-                "expected": "bsqkey_none"
+                "entrypoint": "allPositiveCapture",
+                "expected": "true"
             },
             {
                 "kind": "symexec",
@@ -74,6 +74,11 @@
                 "kind": "symexec",
                 "entrypoint": "signCnone",
                 "expected": "0"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "signCheck",
+                "error": true
             }
         ]
     }

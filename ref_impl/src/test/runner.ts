@@ -17,7 +17,7 @@ const scratchroot = Path.normalize(Path.join(__dirname, "../scratch/"));
 const binroot = Path.normalize(Path.join(__dirname, "../"));
 
 function generateMASM(files: string[], corelibpath: string, functionalize: boolean): MIRAssembly {
-    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
+    let bosque_dir: string = Path.normalize(Path.join(__dirname, "../"));
     let code: { relativePath: string, contents: string }[] = [];
     try {
         const coredir = Path.join(bosque_dir, "core/", corelibpath);
