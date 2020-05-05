@@ -280,74 +280,6 @@ public:
     }
 };
 
-struct BSQValueOps
-{
-    void* (*RCIncFunctorFP)(void* data);
-    void (*RCDecFunctorFP)(void* data);
-    void (*RCReturnFunctorFP)(void* data, BSQRefScope& scope);
-    bool (*EqualFunctorFP)(void* data1, void* data2);
-    bool (*LessFunctorFP)(void* data1, void* data2);
-    std::u32string (*DisplayFunctorFP)(void* data);
-};
-
-template <size_t k>
-class BSQUnionValue
-{
-public:
-    uint8_t udata[k];
-    MIRNominalTypeEnum nominalType;
-
-    BSQUnionValue() { ; }
-    BSQUnionValue(MIRNominalTypeEnum nominalType, const uint8_t(&udata)[k]) : nominalType(nominalType) { memcpy(this->udata, udata, k); }
-    
-    BSQUnionValue(const BSQUnionValue& src) = default;
-    BSQUnionValue(BSQUnionValue&& src) = default;
-
-    BSQUnionValue& operator=(const BSQUnionValue&) = default;
-    BSQUnionValue& operator=(BSQUnionValue&&) = default;
-
-    template <typename T>
-    inline static BSQUnionValue create(T data, MIRNominalTypeEnum nominalType)
-    {
-        static_assert(sizeof(T) <= k);
-
-        BSQUnionValue res;
-        res.nominalType = nominalType;
-        memcpy(res.udata, (void*)(&data), sizeof(T));
-
-        return res;
-    }
-
-    template <size_t j>
-    inline BSQUnionValue<j> convert()
-    {
-        BSQUnionValue<j> res;
-        res.nominalType = this->nominalType;
-        memcpy(res.udata, this->udata, min(k, j));
-
-        return res;
-    }
-
-    template <typename T>
-    inline T extract()
-    {
-        static_assert(sizeof(T) <= k);
-
-        return *((T*)((void*)&this->udata));
-    }
-
-    template <typename T>
-    inline T* extractPtr()
-    {
-        static_assert(sizeof(T) <= k);
-
-        return ((T*)((void*)&this->udata));
-    }
-};
-//
-//Union struct ops are declared in runtime for forward decls reasons
-//
-
 struct RCIncFunctor_NoneValue
 {
     inline void* operator()(NoneValue n) const { return n; }
@@ -739,13 +671,13 @@ public:
         auto fv = flag;
         if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
-            for(size_t i = 0; i < entries.size(); ++i)
+            for(size_t i = 0; i < values.size(); ++i)
             {
-                fv &= getDataKindFlag(entries[i]);
+                fv &= getDataKindFlag(values[i]);
             }
         }
 
-        return BSQTuple(move(entries), fv);
+        return BSQTuple(move(values), fv);
     }
 
     static BSQTuple _empty;
@@ -759,7 +691,7 @@ public:
     template <uint16_t idx>
     inline Value atFixed() const
     {
-        if constexpr (idx < this->entries.size())
+        if (idx < this->entries.size())
         {
             return this->entries[idx];
         }
@@ -874,13 +806,13 @@ public:
         auto fv = flag;
         if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
-            for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
+            for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
             {
-                fv &= getDataKindFlag(entries[i]);
+                fv &= getDataKindFlag(iter->second);
             }
         }
 
-        return BSQRecord(move(entries), fv);
+        return BSQRecord(move(values), fv);
     }
 
     template <DATA_KIND_FLAG flag>
@@ -890,22 +822,22 @@ public:
         auto fv = flag;
 
         for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
-            auto pos = entries.lower_bound(iter->first);
+            auto pos = values.lower_bound(iter->first);
             if(pos != src->entries.cend() && pos->first != iter->first)
             {
-                entries.emplace_hint(pos, *iter);
+                values.emplace_hint(pos, *iter);
             }
         }
 
         if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
         {
-            for(auto iter = entries.cbegin(); iter != entries.cend(); ++iter)
+            for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
             {
-                fv &= getDataKindFlag(entries[i]);
+                fv &= getDataKindFlag(iter->second);
             }
         }
 
-        return BSQRecord(move(entries), fv);
+        return BSQRecord(move(values), fv);
     }
 
     static BSQRecord _empty;

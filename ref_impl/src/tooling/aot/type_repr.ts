@@ -43,13 +43,11 @@ class NoneRepr extends TypeRepr {
 class StructRepr extends TypeRepr {
     readonly boxed: string;
     readonly nominaltype: string;
-    readonly reqspace: number;
 
-    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, reqspace: number, categoryinfo: string) {
+    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, categoryinfo: string) {
         super(iskey, base, base, categoryinfo);
         this.boxed = boxed;
         this.nominaltype = nominaltype;
-        this.reqspace = reqspace;
     }
 }
 
@@ -77,51 +75,7 @@ class EphemeralListRepr extends TypeRepr {
     }
 }
 
-class UnionRepr extends TypeRepr {
-    readonly opts: TypeRepr[];
-    readonly reqspace: number;
-
-    constructor(iskey: boolean, repr: string, reqspace: number, opts: TypeRepr[]) {
-        super(iskey, repr, repr, "MIRNominalTypeEnum_Category_Empty");
-        this.opts = opts;
-        this.reqspace = reqspace;
-    }
-
-    static create(...trl: TypeRepr[]): UnionRepr {
-        assert(trl.length > 1);
-        assert(trl.every((opt) => opt instanceof NoneRepr || opt instanceof StructRepr));
-
-        trl.sort((a, b) => a.base.localeCompare(b.base));
-
-        const iskey = trl.every((tr) => tr.iskey);
-        const size = Math.max(...trl.map((tr) => tr instanceof StructRepr ? tr.reqspace : 8)) + 4;
-
-        const repr = `BSQUnionValue<${size}>`;
-
-        return new UnionRepr(iskey, repr, size, trl);
-    }
-
-    extendRepr(tr: TypeRepr): TypeRepr {
-        if (tr instanceof NoneRepr) {
-            return UnionRepr.create(tr, ...this.opts);
-        }
-        else if (tr instanceof StructRepr) {
-            return UnionRepr.create(tr, ...this.opts);
-        }
-        else {
-            if (this.iskey && tr.iskey) {
-                return new KeyValueRepr();
-            }
-            else {
-                return new ValueRepr();
-            }
-        }
-    }
-}
-
 function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
-    assert(!(tr1 instanceof UnionRepr) && !(tr2 instanceof UnionRepr), "Use extend instead!!!");
-
     if(tr1.base === tr2.base) {
         return tr1;
     }
@@ -134,9 +88,6 @@ function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
         if (tr2 instanceof NoneRepr) {
             return new NoneRepr();
         }
-        else if (tr2 instanceof StructRepr) {
-            return UnionRepr.create(tr1, tr2);
-        }
         else if (tr1.iskey && tr2.iskey) {
             return new KeyValueRepr();
         }
@@ -145,13 +96,7 @@ function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
         }
     }
     else if (tr1 instanceof StructRepr) {
-        if (tr2 instanceof NoneRepr) {
-            return UnionRepr.create(tr1, tr2);
-        }
-        else if (tr2 instanceof StructRepr) {
-            return UnionRepr.create(tr1, tr2);
-        }
-        else if (tr1.iskey && tr2.iskey) {
+        if (tr1.iskey && tr2.iskey) {
             return new KeyValueRepr();
         }
         else {
@@ -173,12 +118,7 @@ function joinTypeReprs(...trl: TypeRepr[]): TypeRepr {
 
     let ctype = trl[0];
     for(let i = 1; i < trl.length; ++i) {
-        if(ctype instanceof UnionRepr) {
-            ctype = ctype.extendRepr(trl[i]);
-        }
-        else {
-            ctype = joinTypeRepr(ctype, trl[i]);
-        }
+        ctype = joinTypeRepr(ctype, trl[i]);
     }
 
     return ctype;
@@ -186,6 +126,6 @@ function joinTypeReprs(...trl: TypeRepr[]): TypeRepr {
 
 export {
     TypeEncodingOpPack, TypeEncodingOpPackKey, TypeEncodingOpPackStruct,
-    TypeRepr, NoneRepr, StructRepr, RefRepr, KeyValueRepr, ValueRepr, EphemeralListRepr, UnionRepr,
+    TypeRepr, NoneRepr, StructRepr, RefRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
     joinTypeReprs
 };

@@ -710,7 +710,7 @@ class Assembly {
         }
 
         const teph = flattened.filter((tt) => tt instanceof ResolvedEphemeralListType) as ResolvedEphemeralListType[];
-        let merged = flattened.filter((tt) => !(tt instanceof ResolvedTupleAtomType) && !(tt instanceof ResolvedRecordAtomType) && !(tt instanceof ResolvedEphemeralListType));
+        let merged = flattened.filter((tt) => !(tt instanceof ResolvedEphemeralListType));
 
         if (teph.length !== 0) {
             const eet = this.normalizeEphemerals(teph);

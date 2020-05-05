@@ -9,7 +9,7 @@ import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MI
 import { topologicalOrder } from "../../compiler/mir_info";
 
 import * as assert from "assert";
-import { StructRepr, UnionRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr } from "./type_repr";
+import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr } from "./type_repr";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -165,13 +165,7 @@ class CPPBodyEmitter {
             return "false";
         }
         else {
-            const repr = this.typegen.getCPPReprFor(argtype);
-            if (repr instanceof UnionRepr) {
-                return `${this.varToCppName(arg)}.nominalType == MIRNominalTypeEnum_None`;
-            }
-            else {
-                return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
-            }
+            return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
         }
     }
     
@@ -325,9 +319,8 @@ class CPPBodyEmitter {
             return `${this.varToCppName(op.trgt)} = BSQTuple::_empty;`;
         }
         else {
-            const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultTupleType));
-            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${args.length}>(${scopevar}, ${iflag}, { ${args.join(", ")} });`;
+            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${iflag}>({ ${args.join(", ")} });`;
         }
     }
 
@@ -338,9 +331,8 @@ class CPPBodyEmitter {
             return `${this.varToCppName(op.trgt)} = BSQRecord::_empty;`;
         }
         else {
-            const scopevar = this.varNameToCppName("$scope$");
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultRecordType));
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${args.length}>(${scopevar}, ${iflag}, { ${args.join(", ")} });`;
+            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${iflag}>({ ${args.join(", ")} });`;
         }
     }
 
@@ -1078,10 +1070,7 @@ class CPPBodyEmitter {
             }
             else {
                 const argrepr = this.typegen.getCPPReprFor(argtype);
-                if (argrepr instanceof UnionRepr) {
-                    enumacc = `${arg}.nominalType`;
-                }
-                else if (argrepr instanceof KeyValueRepr) {
+                if (argrepr instanceof KeyValueRepr) {
                     enumacc = `getNominalTypeOf_KeyValue(${arg})`;
                 }
                 else {
@@ -1135,9 +1124,6 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 //could be a tuple or record
                 return "false";
-            }
-            else if (argrepr instanceof UnionRepr) {
-                return `(${arg}.nominalType == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
             }
             else if (argrepr instanceof KeyValueRepr) {
                 return `(getNominalTypeOf_KeyValue(${arg}) == MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(oftype.ekey)})`;
@@ -1207,9 +1193,6 @@ class CPPBodyEmitter {
                 }
                 else if (argrepr instanceof RefRepr || argrepr instanceof StructRepr) {
                     return "true";
-                }
-                else if (argrepr instanceof UnionRepr) {
-                    return `(${arg}.nominalType != MIRNominalTypeEnum_None)`;
                 }
                 else {
                     return `BSQ_IS_VALUE_NONNONE(${arg})`;
