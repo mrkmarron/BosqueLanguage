@@ -1952,13 +1952,16 @@ class TypeChecker {
 
         const cargs = [...exp.args.argList, ...captured.map((cv) => new PositionalArgument(false, false, new AccessVariableExpression(exp.sinfo, cv)))];
         const eargs = this.checkArgumentsEvaluationWSig(env, pcode.ftype, new Arguments(cargs), undefined, refok);
-        const margs = this.checkArgumentsSignature(exp.sinfo, env, pcode.ftype, eargs);
+
+        //A little strange since we don't expand captured args on the signature yet and don't expand/rest/etc -- slice them off for the checking
+        const margs = this.checkArgumentsSignature(exp.sinfo, env, pcode.ftype, eargs.slice(0, exp.args.argList.length));
+        const cargsext = eargs.slice(exp.args.argList.length).map((ea) => ea.treg);
 
         this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.pragmas.recursive);
 
         if (this.m_emitEnabled) {
             const refinfo = this.generateRefInfoForCallEmit((pcode as PCode).ftype, margs.refs);
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), margs.args, refinfo, trgt);
+            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), [...margs.args, ...cargsext], refinfo, trgt);
         }
 
         return [env.setExpressionResult((pcode as PCode).ftype.resultType)];

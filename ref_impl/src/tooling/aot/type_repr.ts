@@ -126,6 +126,10 @@ function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
         return tr1;
     }
 
+    if(tr1.base === "BSQTuple" || tr1.base === "BSQRecord" || tr2.base === "BSQTuple" || tr2.base === "BSQRecord") {
+        return new ValueRepr(); 
+    }
+    
     if (tr1 instanceof NoneRepr) {
         if (tr2 instanceof NoneRepr) {
             return new NoneRepr();

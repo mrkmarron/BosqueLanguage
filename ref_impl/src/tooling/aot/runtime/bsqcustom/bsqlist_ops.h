@@ -19,25 +19,26 @@ public:
     template <typename SetT, typename LambdaSC>
     static SetT* list_toset(Ty* l)
     {
-        xxxx;
+        assert(false); //NOT IMPLEMENTED
+        return nullptr;
     }
 
     template <typename LambdaP>
-    static bool list_all(Ty* l)
+    static bool list_all(Ty* l, LambdaP p)
     {
-        return std::all_of(l->entries.begin(), l->entries.end(), LambdaP{});
+        return std::all_of(l->entries.begin(), l->entries.end(), p);
     }
 
     template <typename LambdaP>
-    static bool list_none(Ty* l)
+    static bool list_none(Ty* l, LambdaP p)
     {
-        return std::none_of(l->entries.begin(), l->entries.end(), LambdaP{});
+        return std::none_of(l->entries.begin(), l->entries.end(), p);
     }
 
     template <typename LambdaP>
-    static bool list_any(Ty* l)
+    static bool list_any(Ty* l, LambdaP p)
     {
-        return std::any_of(l->entries.begin(), l->entries.end(), LambdaP{});
+        return std::any_of(l->entries.begin(), l->entries.end(), p);
     }
 
     template <typename LambdaP>
@@ -326,7 +327,7 @@ public:
     }
 
     template <typename U, typename U_RCIncF, typename U_RCDecF, typename U_DisplayF, typename RT, typename RT_RCDecF, typename RT_DisplayF, MIRNominalTypeEnum ntype, typename LambdaP, typename LambdaZip>
-    static static BSQList<RT, RT_RCDecF, RT_DisplayF>* list_joingroup(Ty* l, BSQList<U, U_RCDecF, U_DisplayF>* ol)
+    static BSQList<RT, RT_RCDecF, RT_DisplayF>* list_joingroup(Ty* l, BSQList<U, U_RCDecF, U_DisplayF>* ol)
     {
         std::vector<RT> entries;
 

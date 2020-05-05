@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType, MIRPCode } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey, MIRPackSlice, MIRPackExtend } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
@@ -290,7 +290,7 @@ class CPPBodyEmitter {
             const trepr = this.typegen.getCPPReprFor(oftype);
             const tops = this.typegen.getFunctorsForType(oftype);
 
-            const pvals = `processSingletonSetInit<${trepr.std}, ${tops.inc}, ${tops.less}, ${tops.eq}>({ ${cvals} })`
+            const pvals = `BSQSet<${trepr.std}, ${tops.dec}, ${tops.display}, ${tops.less}, ${tops.eq}>::processSingletonSetInit<${tops.inc}>({ ${cvals} })`
             conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, ${pvals})`;
         }
         else {
@@ -311,7 +311,7 @@ class CPPBodyEmitter {
             const vrepr = this.typegen.getCPPReprFor(vtype);
             const vops = this.typegen.getFunctorsForType(vtype);
 
-            const pvals = `processSingletonMapInit<${krepr.std}, ${kops.inc}, ${vrepr.std}, ${vops.inc}, ${kops.less}, ${kops.eq}>({ ${cvals} })`
+            const pvals = `BSQMap<${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.less}, ${kops.eq}, ${vrepr.std}, ${vops.dec}, ${vops.display}>::processSingletonMapInit<${kops.inc}, ${vops.inc}>({ ${cvals} })`
             conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, ${pvals})`;
         }
 
@@ -368,11 +368,8 @@ class CPPBodyEmitter {
             if(trepr instanceof StructRepr) {
                 select = `${this.varToCppName(arg)}.atFixed<${idx}>()`;
             }
-            else if (trepr instanceof UnionRepr) {
-                select = `${this.varToCppName(arg)}.extractPtr<BSQTuple>()->atFixed<${idx}>()`;
-            }
             else {
-                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, Boxed_BSQTuple)->bval.atFixed<${idx}>()`;
+                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQTuple)->atFixed<${idx}>()`;
             }
 
             return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
@@ -445,11 +442,8 @@ class CPPBodyEmitter {
         if (rrepr instanceof StructRepr) {
             return `${this.varToCppName(arg)}.hasProperty<MIRPropertyEnum::${property}>()`;
         }
-        else if (rrepr instanceof UnionRepr) {
-            return `${this.varToCppName(arg)}.extractPtr<BSQRecord>()->hasProperty<MIRPropertyEnum::${property}>()`;
-        }
         else {
-            return `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, Boxed_BSQRecord)->bval.hasProperty<MIRPropertyEnum::${property}>()`;
+            return `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQRecord)->hasProperty<MIRPropertyEnum::${property}>()`;
         }
     }
 
@@ -467,11 +461,8 @@ class CPPBodyEmitter {
             if(rrepr instanceof StructRepr) {
                 select = `${this.varToCppName(arg)}.atFixed<MIRPropertyEnum::${property}>()`;
             }
-            else if (rrepr instanceof UnionRepr) {
-                select = `${this.varToCppName(arg)}.extractPtr<BSQRecord>()->atFixed<MIRPropertyEnum::${property}>()`;
-            }
             else {
-                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, Boxed_BSQRecord)->bval.atFixed<MIRPropertyEnum::${property}>()`;
+                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQRecord)->atFixed<MIRPropertyEnum::${property}>()`;
             }
 
             return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
@@ -506,11 +497,8 @@ class CPPBodyEmitter {
         if (rrepr instanceof StructRepr) {
             return `&(${arg})`;
         }
-        else if (rrepr instanceof UnionRepr) {
-            return `${arg}.extractPtr<BSQRecord>()`;
-        }
         else {
-            return `&(BSQ_GET_VALUE_PTR(${arg}, Boxed_BSQRecord)->bval)`;
+            return `BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`;
         }
     }
 
@@ -831,11 +819,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 ttuple = `BSQTuple* tt = &arg;`;
             }
-            else if (argrepr instanceof UnionRepr) {
-                ttuple = `BSQTuple* tt = arg.extractPtr<BSQTuple>();`;
-            }
             else {
-                ttuple = `BSQTuple* tt = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQTuple)->bval);`;
+                ttuple = `BSQTuple* tt = BSQ_GET_VALUE_PTR(arg, BSQTuple);`;
             }
 
             let checks: string[] = [];
@@ -894,11 +879,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 ttuple = `BSQTuple* tt = &arg;`;
             }
-            else if (argrepr instanceof UnionRepr) {
-                ttuple = `BSQTuple* tt = arg.extractPtr<BSQTuple>();`;
-            }
             else {
-                ttuple = `BSQTuple* tt = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQTuple)->bval);`;
+                ttuple = `BSQTuple* tt = BSQ_GET_VALUE_PTR(arg, BSQTuple);`;
             }
 
             const checks: string[] = [];
@@ -937,11 +919,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 trecord = `BSQRecord* tr = &arg;`;
             }
-            else if (argrepr instanceof UnionRepr) {
-                trecord = `BSQRecord* tr = arg.extractPtr<BSQRecord>();`;
-            }
             else {
-                trecord = `BSQRecord* tr = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQRecord)->bval);`;
+                trecord = `BSQRecord* tr = BSQ_GET_VALUE_PTR(arg, BSQRecord);`;
             }
 
             let checks: string[] = [];
@@ -1015,11 +994,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 ttuple = `BSQRecord* tr = &arg;`;
             }
-            else if (argrepr instanceof UnionRepr) {
-                ttuple = `BSQRecord* tr = arg.extractPtr<BSQRecord>();`;
-            }
             else {
-                ttuple = `BSQRecord* tr = &(BSQ_GET_VALUE_PTR(arg, Boxed_BSQRecord)->bval);`;
+                ttuple = `BSQRecord* tr = BSQ_GET_VALUE_PTR(arg, BSQRecord);`;
             }
 
             const checks: string[] = [];
@@ -1059,11 +1035,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 return tsc;
             }
-            else if (argrepr instanceof UnionRepr) {
-                return `(${arg}.nominalType == MIRNominalTypeEnum_Tuple && ${tsc})`;
-            }
             else {
-                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
+                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQTuple*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
             }
         }
     }
@@ -1079,11 +1052,8 @@ class CPPBodyEmitter {
             if (argrepr instanceof StructRepr) {
                 return tsc;
             }
-            else if (argrepr instanceof UnionRepr) {
-                return `(${arg}.nominalType == MIRNominalTypeEnum_Record && ${tsc})`;
-            }
             else {
-                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<Boxed_BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
+                return `(BSQ_IS_VALUE_PTR(${arg}) && dynamic_cast<BSQRecord*>(BSQ_GET_VALUE_PTR(${arg}, BSQRef)) != nullptr && ${tsc})`;
             }
         }
     }
@@ -1725,6 +1695,31 @@ class CPPBodyEmitter {
         }
     }
 
+    getListContentsInfoForListOp(idecl: MIRInvokePrimitiveDecl): MIRType {
+        return (this.typegen.assembly.entityDecls.get(idecl.enclosingDecl as string) as MIREntityTypeDecl).terms.get("T") as MIRType;
+    }
+
+    createListOpsFor(ctype: MIRType): string {
+        const crepr = this.typegen.getCPPReprFor(ctype);
+        const cops = this.typegen.getFunctorsForType(ctype);
+        return `BSQListOps<${crepr.std}, ${cops.inc}, ${cops.dec}, ${cops.display}>`;
+    }
+
+    createLambdaFor(pc: MIRPCode): string {
+        const pci = this.assembly.invokeDecls.get(pc.code) || this.assembly.primitiveInvokeDecls.get(pc.code) as MIRInvokeDecl;
+        let params: string[] = [];
+        let args: string[] = [];
+        for(let i = 0; i < pci.params.length - pc.cargs.length; ++i) {
+            const prepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(pci.params[i].type));
+            params.push(`${prepr.std} $arg_${i}`);
+            args.push(`$arg_${i}`);
+        }
+        const cargs = pc.cargs.map((ca) => this.typegen.mangleStringForCpp(ca));
+        const rrepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(pci.resultType));
+
+        return `[&](${params.join(", ")}) -> ${rrepr.std} { return ${this.typegen.mangleStringForCpp(pc.code)}(${[...args, ...cargs].join(", ")}); }`
+    }
+
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
         const scopevar = this.varNameToCppName("$scope$");
 
@@ -1734,17 +1729,33 @@ class CPPBodyEmitter {
                 bodystr = `auto $$return = BSQEnum{ (uint32_t)BSQ_GET_VALUE_TAGGED_INT(${params[0]}), MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)} };`;
                 break;
             }
-            /*
-            case "list_size":
-            case "set_size":
-            case "map_size": {
+            case "list_size": {
                 bodystr = `auto $$return = (int64_t)(${params[0]}->entries.size());`
                 break;
             }
             case "list_unsafe_get": {
-                bodystr = `auto $$return = ${params[0]}->entries[BSQ_GET_VALUE_TAGGED_INT(${params[1]})];`;
+                bodystr = `auto $$return = ${params[0]}->entries[${params[1]}];`;
                 break;
             }
+            case "list_all": {
+                const ctype = this.getListContentsInfoForListOp(idecl);
+                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
+                bodystr = `auto $$return = ${this.createListOpsFor(ctype)}::list_all(${params[0]}, ${lambda});`
+                break;
+            }
+            case "list_any": {
+                const ctype = this.getListContentsInfoForListOp(idecl);
+                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
+                bodystr = `auto $$return = ${this.createListOpsFor(ctype)}::list_any(${params[0]}, ${lambda});`
+                break;
+            }
+            case "list_none": {
+                const ctype = this.getListContentsInfoForListOp(idecl);
+                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
+                bodystr = `auto $$return = ${this.createListOpsFor(ctype)}::list_none(${params[0]}, ${lambda});`
+                break;
+            }
+            /*
             case "list_unsafe_add": {
                 bodystr = `auto $$return = ${params[0]}->unsafeAdd(${scopevar}, ${params[1]});`
                 break;

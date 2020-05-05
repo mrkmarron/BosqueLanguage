@@ -685,17 +685,27 @@ struct DisplayFunctor_BSQRegex
     }
 };
 
-class BSQTuple
+class BSQTuple : public BSQRef
 {
 public:
     std::vector<Value> entries;
     DATA_KIND_FLAG flag;
 
-    BSQTuple() { ; }
-    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
+    BSQTuple() : BSQRef(MIRNominalTypeEnum_Tuple) { ; }
+    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(entries)), flag(flag) { ; }
 
-    BSQTuple(const BSQTuple& src) : entries(src.entries), flag(src.flag) { ; };
-    BSQTuple(BSQTuple&& src) : entries(move(src.entries)), flag(src.flag) { ; }
+    BSQTuple(const BSQTuple& src) : BSQRef(MIRNominalTypeEnum_Tuple), entries(src.entries), flag(src.flag) { ; }
+    BSQTuple(BSQTuple&& src) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(src.entries)), flag(src.flag) { ; }
+
+    virtual ~BSQTuple() = default;
+    
+    virtual void destroy() 
+    { 
+        for(size_t i = 0; i < this->entries.size(); ++i)
+        {
+            BSQRef::decrementChecked(this->entries[i]);
+        }
+    }
 
     BSQTuple& operator=(const BSQTuple& src)
     {
@@ -704,6 +714,7 @@ public:
             return *this;
         }
 
+        //always same nominal type by construction
         this->entries = src.entries;
         this->flag = src.flag;
         return *this;
@@ -716,6 +727,7 @@ public:
             return *this;
         }
 
+        //always same nominal type by construction
         this->entries = std::move(src.entries);
         this->flag = src.flag;
         return *this;
@@ -807,19 +819,28 @@ struct DisplayFunctor_BSQTuple
         return tvals;
     }
 };
-typedef BSQBoxed<BSQTuple, RCDecFunctor_BSQTuple> Boxed_BSQTuple;
 
-class BSQRecord
+class BSQRecord : BSQRef
 {
 public:
     std::map<MIRPropertyEnum, Value> entries;
     DATA_KIND_FLAG flag;
 
-    BSQRecord() { ; }
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : entries(move(entries)), flag(flag) { ; }
+    BSQRecord() : BSQRef(MIRNominalTypeEnum_Record) { ; }
+    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Record), entries(move(entries)), flag(flag) { ; }
 
-    BSQRecord(const BSQRecord& src) : entries(src.entries), flag(src.flag) { ; };
-    BSQRecord(BSQRecord&& src) : entries(move(src.entries)), flag(src.flag) { ; }
+    BSQRecord(const BSQRecord& src) : BSQRef(MIRNominalTypeEnum_Record), entries(src.entries), flag(src.flag) { ; }
+    BSQRecord(BSQRecord&& src) : BSQRef(MIRNominalTypeEnum_Record), entries(move(src.entries)), flag(src.flag) { ; }
+
+    virtual ~BSQRecord() = default;
+    
+    virtual void destroy() 
+    { 
+        for(auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter)
+        {
+            BSQRef::decrementChecked(iter->second);
+        }
+    }
 
     BSQRecord& operator=(const BSQRecord& src)
     {
@@ -828,6 +849,7 @@ public:
             return *this;
         }
 
+        //always same nominal type by construction
         this->entries = src.entries;
         this->flag = src.flag;
         return *this;
@@ -840,6 +862,7 @@ public:
             return *this;
         }
 
+        //always same nominal type by construction
         this->entries = std::move(src.entries);
         this->flag = src.flag;
         return *this;
@@ -975,7 +998,6 @@ struct DisplayFunctor_BSQRecord
         return rvals;
     }
 };
-typedef BSQBoxed<BSQRecord, RCDecFunctor_BSQRecord> Boxed_BSQRecord;
 
 class BSQObject : public BSQRef
 {

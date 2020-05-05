@@ -638,15 +638,15 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     }
 
     recursive? method allof(p: recursive? fn(_: T) -> Bool): Bool {
-        return List<T>::_size(this) == 0 || List<T>::_all[recursive](this, 0, p, List<T>::_size(this));
+        return List<T>::_size(this) == 0 || List<T>::_all[recursive](this, 0, p);
     }
 
     recursive? method noneof(p: recursive? fn(_: T) -> Bool): Bool {
-        return List<T>::_size(this) == 0 || List<T>::_none[recursive](this, 0, List<T>::_size(this), p);
+        return List<T>::_size(this) == 0 || List<T>::_none[recursive](this, 0, p);
     }
 
     recursive? method anyof(p: recursive? fn(_: T) -> Bool): Bool {
-        return List<T>::_size(this) != 0 && List<T>::_any[recursive](this, 0, List<T>::_size(this), p);
+        return List<T>::_size(this) != 0 && List<T>::_any[recursive](this, 0, p);
     }
 
     recursive? method countIf(p: recursive? fn(_: T) -> Bool): Int {

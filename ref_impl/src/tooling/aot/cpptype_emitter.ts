@@ -306,7 +306,7 @@ class CPPTypeEmitter {
                 return new StructRepr(true, "BSQIdKeySimple", "Boxed_BSQIdKeySimple", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 16, "MIRNominalTypeEnum_Category_IdKeySimple");
             }
             else {
-                return new StructRepr(true, "BSQIdKeyCompound", "Boxed_BSQIdKeyCompound", `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, 32, "MIRNominalTypeEnum_Category_IdKeyCompound");
+                return new RefRepr(true, "BSQIdKeyCompound", "BSQIdKeyCompound*", "MIRNominalTypeEnum_Category_IdKeyCompound");
             }
         }
         else {
@@ -329,10 +329,10 @@ class CPPTypeEmitter {
                 return new RefRepr(false, "BSQRegex", "BSQRegex*", "MIRNominalTypeEnum_Category_Regex");
             }
             else if (tt instanceof MIRTupleType) {
-                return new StructRepr(false, "BSQTuple", "Boxed_BSQTuple", "MIRNominalTypeEnum_Tuple", 32, "MIRNominalTypeEnum_Category_Tuple");
+                return new StructRepr(false, "BSQTuple", "BSQTuple", "MIRNominalTypeEnum_Tuple", 1, "MIRNominalTypeEnum_Category_Tuple");
             }
             else if (tt instanceof MIRRecordType) {
-                return new StructRepr(false, "BSQRecord", "Boxed_BSQRecord", "MIRNominalTypeEnum_Record", 32, "MIRNominalTypeEnum_Category_Record");
+                return new StructRepr(false, "BSQRecord", "BSQRecord", "MIRNominalTypeEnum_Record", 1, "MIRNominalTypeEnum_Category_Record");
             }
             else if(tt instanceof MIREphemeralListType) {
                 const eltypename = this.mangleStringForCpp(tt.trkey);
@@ -453,7 +453,12 @@ class CPPTypeEmitter {
             }
             else {
                 const scope = this.mangleStringForCpp("$scope$");
-                cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${trfrom.nominaltype}, ${exp})`
+                if(trfrom.base === "BSQTuple" || trfrom.base === "BSQRecord") {
+                    cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${exp})`
+                }
+                else {
+                    cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${trfrom.nominaltype}, ${exp})`
+                }
             }
 
             if (trinto instanceof KeyValueRepr) {
@@ -485,7 +490,12 @@ class CPPTypeEmitter {
                     return `BSQ_GET_VALUE_TAGGED_INT(${exp})`;
                 }
                 else {
-                    return `BSQ_GET_VALUE_PTR(${exp}, ${trinto.boxed})->bval`;
+                    if(trinto.base === "BSQTuple" || trinto.base === "BSQRecord") {
+                        return `*${exp}`
+                    }
+                    else {
+                        return `BSQ_GET_VALUE_PTR(${exp}, ${trinto.boxed})->bval`;
+                    }
                 }
             }
             else if (trinto instanceof RefRepr) {
@@ -507,7 +517,12 @@ class CPPTypeEmitter {
                     return `BSQ_GET_VALUE_TAGGED_INT(${exp})`;
                 }
                 else {
-                    return `BSQ_GET_VALUE_PTR(${exp}, ${trinto.boxed})->bval`;
+                    if(trinto.base === "BSQTuple" || trinto.base === "BSQRecord") {
+                        return `*${exp}`
+                    }
+                    else {
+                        return `BSQ_GET_VALUE_PTR(${exp}, ${trinto.boxed})->bval`;
+                    }
                 }
             }
             else if (trinto instanceof RefRepr) {
@@ -776,7 +791,14 @@ class CPPTypeEmitter {
         const crepr = this.getCPPReprFor(typet);
 
         const cops = this.getFunctorsForType(typet);
-        const decl = `typedef BSQList<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
+        const bc = `BSQList<${crepr.std}, ${cops.dec}, ${cops.display}>`;
+        const decl = `class ${declrepr.base} : public ${bc}\n`
+        + "{\n"
+        + "public:\n"
+        + `${declrepr.base}(MIRNominalTypeEnum ntype) : ${bc}(ntype) { ; }\n`
+        + `${declrepr.base}(MIRNominalTypeEnum ntype, std::vector<${crepr.std}>&& vals) : ${bc}(ntype, std::move(vals)) { ; }\n`
+        + `virtual ~${declrepr.base}() { ; }\n`
+        + "};\n"
 
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
@@ -789,7 +811,14 @@ class CPPTypeEmitter {
         const crepr = this.getCPPReprFor(typet);
 
         const cops = this.getFunctorsForType(typet);
-        const decl = `typedef BSQStack<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
+        const bc = `BSQStack<${crepr.std}, ${cops.dec}, ${cops.display}>`;
+        const decl = `class ${declrepr.base} : public ${bc}\n`
+        + "{\n"
+        + "public:\n"
+        + `${declrepr.base}(MIRNominalTypeEnum ntype) : ${bc}(ntype) { ; }\n`
+        + `${declrepr.base}(MIRNominalTypeEnum ntype, std::vector<${crepr.std}>&& vals) : ${bc}(ntype, std::move(vals)) { ; }\n`
+        + `virtual ~${declrepr.base}() { ; }\n`
+        + "};\n"
 
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
@@ -802,7 +831,14 @@ class CPPTypeEmitter {
         const crepr = this.getCPPReprFor(typet);
 
         const cops = this.getFunctorsForType(typet);
-        const decl = `typedef BSQQueue<${crepr.std}, ${cops.dec}, ${cops.display}> ${declrepr.base};`
+        const bc = `BSQQueue<${crepr.std}, ${cops.dec}, ${cops.display}>`;
+        const decl = `class ${declrepr.base} : public ${bc}\n`
+        + "{\n"
+        + "public:\n"
+        + `${declrepr.base}(MIRNominalTypeEnum ntype) : ${bc}(ntype) { ; }\n`
+        + `${declrepr.base}(MIRNominalTypeEnum ntype, std::vector<${crepr.std}>&& vals) : ${bc}(ntype, std::move(vals)) { ; }\n`
+        + `virtual ~${declrepr.base}() { ; }\n`
+        + "};\n"
 
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
@@ -815,7 +851,14 @@ class CPPTypeEmitter {
         const crepr = this.getCPPReprFor(typet);
 
         const cops = this.getFunctorsForType(typet);
-        const decl = `typedef BSQ${entity.name}<${crepr.std}, ${cops.dec}, ${cops.display}, ${cops.eq}, ${cops.less}> ${declrepr.base};`
+        const bc = `BSQSet<${crepr.std}, ${cops.dec}, ${cops.display}, ${cops.eq}, ${cops.less}>`;
+        const decl = `class ${declrepr.base} : public ${bc}\n`
+        + "{\n"
+        + "public:\n"
+        + `${declrepr.base}(MIRNominalTypeEnum ntype) : ${bc}(ntype) { ; }\n`
+        + `${declrepr.base}(MIRNominalTypeEnum ntype, std::vector<${crepr.std}>&& vals) : ${bc}(ntype, std::move(vals)) { ; }\n`
+        + `virtual ~${declrepr.base}() { ; }\n`
+        + "};\n"
 
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
@@ -831,7 +874,15 @@ class CPPTypeEmitter {
 
         const kops = this.getFunctorsForType(typek);
         const vops = this.getFunctorsForType(typev);
-        const decl = `typedef BSQ${entity.name}<${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.eq}, ${kops.less}, ${vrepr.std}, ${vops.dec}, ${vops.display}> ${declrepr.base};`
+
+        const bc = `BSQMap<${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.eq}, ${kops.less}, ${vrepr.std}, ${vops.dec}, ${vops.display}>`;
+        const decl = `class ${declrepr.base} : public ${bc}\n`
+        + "{\n"
+        + "public:\n"
+        + `${declrepr.base}(MIRNominalTypeEnum ntype) : ${bc}(ntype) { ; }\n`
+        + `${declrepr.base}(MIRNominalTypeEnum ntype, std::vector<MEntry<${krepr.std}, ${vrepr.std}>>&& vals) : ${bc}(ntype, std::move(vals)) { ; }\n`
+        + `virtual ~${declrepr.base}() { ; }\n`
+        + "};\n"
 
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }

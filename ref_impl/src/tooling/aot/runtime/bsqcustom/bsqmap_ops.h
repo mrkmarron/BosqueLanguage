@@ -90,7 +90,7 @@ public:
         std::for_each(m->entries.begin(), m->entries.end(), [&entries](MEntry<K, V>& v) -> void {
             if(LambdaP{}(v.key, v.value))
             {
-                entries.push_back(MEntry<K, V>{K_RCIncF{}(v.key), V_RCIncF{}(v.value))};
+                entries.push_back(MEntry<K, V>{K_RCIncF{}(v.key), V_RCIncF{}(v.value)});
             }
         });
 
@@ -112,7 +112,7 @@ public:
     }
 
     template <typename T, typename T_RCDecF, typename T_DisplayF, typename T_CMP, typename T_EQ, typename U, typename U_RCDecF, typename U_DisplayF, MIRNominalTypeEnum ntype, typename LambdaTC, typename LambdaCC>
-    static BSQMap<T, T_RCDecF, T_DisplayF, T_CMP, T_EQ, U, U_RCDecF, U_DisplayF>* map_cast(m: Map<K, V>)
+    static BSQMap<T, T_RCDecF, T_DisplayF, T_CMP, T_EQ, U, U_RCDecF, U_DisplayF>* map_cast(Ty* m)
     {
         std::vector<MEntry<T, U>> entries;
         std::for_each(m->entries.begin(), m->entries.end(), [&entries](MEntry<K, V>& v) -> void {

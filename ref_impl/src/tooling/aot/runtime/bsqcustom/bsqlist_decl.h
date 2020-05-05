@@ -16,10 +16,10 @@ class BSQList : public BSQObject
 public:
     std::vector<T> entries;
 
-    Ty(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
-    Ty(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
+    BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
+    BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
 
-    virtual ~Ty()
+    virtual ~BSQList()
     {
         ;
     }

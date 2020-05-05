@@ -1759,6 +1759,14 @@ class SMTBodyEmitter {
                 bodyres = new SMTValue(`(bsq_enum@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
                 break;
             }
+            case "list_size": {
+                bodyres = this.typegen.generateSpecialTypeFieldAccessExp(enclkey, "size", params[0]);
+                break;
+            }
+            case "list_unsafe_get": {
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])} ${params[1]})`);
+                break;
+            }
             /*
             case "list_size":
             case "set_size":

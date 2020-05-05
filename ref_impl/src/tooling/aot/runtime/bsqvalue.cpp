@@ -103,7 +103,7 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return BSQIdKeySimple::keyEqual(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
             default:
-                return BSQIdKeyCompound::keyEqual(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
+                return BSQIdKeyCompound::keyEqual(dynamic_cast<BSQIdKeyCompound*>(ptr1), dynamic_cast<BSQIdKeyCompound*>(ptr2));
         }
     }
 }
@@ -154,7 +154,7 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return BSQIdKeySimple::keyLess(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
             default:
-                return BSQIdKeyCompound::keyLess(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
+                return BSQIdKeyCompound::keyLess(dynamic_cast<BSQIdKeyCompound*>(ptr1), dynamic_cast<BSQIdKeyCompound*>(ptr2));
         }
     }
 }
@@ -170,10 +170,10 @@ DATA_KIND_FLAG getDataKindFlag(Value v)
 
         auto rcategory = GET_MIR_TYPE_CATEGORY(ptr->nominalType);
         if(rcategory == MIRNominalTypeEnum_Category_Tuple) {
-            return dynamic_cast<Boxed_BSQTuple*>(ptr)->bval.flag;
+            return dynamic_cast<BSQTuple*>(ptr)->flag;
         }
         else if(rcategory == MIRNominalTypeEnum_Category_Record) {
-            return dynamic_cast<Boxed_BSQRecord*>(ptr)->bval.flag;
+            return dynamic_cast<BSQRecord*>(ptr)->flag;
         }
         else {
             return nominalDataKinds[GET_MIR_TYPE_POSITION(getNominalTypeOf_Value(v))];
@@ -222,7 +222,7 @@ std::u32string diagnostic_format(Value v)
             case MIRNominalTypeEnum_Category_IdKeySimple:
                 return DisplayFunctor_BSQIdKeySimple{}(dynamic_cast<Boxed_BSQIdKeySimple*>(vv)->bval);
             case MIRNominalTypeEnum_Category_IdKeyCompound:
-                return DisplayFunctor_BSQIdKeyCompound{}(dynamic_cast<Boxed_BSQIdKeyCompound*>(vv)->bval);
+                return DisplayFunctor_BSQIdKeyCompound{}(dynamic_cast<BSQIdKeyCompound*>(vv));
             case MIRNominalTypeEnum_Category_Float64:
                 return DisplayFunctor_double{}(dynamic_cast<Boxed_double*>(vv)->bval);
             case MIRNominalTypeEnum_Category_ByteBuffer:
@@ -236,9 +236,9 @@ std::u32string diagnostic_format(Value v)
             case MIRNominalTypeEnum_Category_Regex:
                 return DisplayFunctor_BSQRegex{}(dynamic_cast<BSQRegex*>(vv));
             case MIRNominalTypeEnum_Category_Tuple:
-                return DisplayFunctor_BSQTuple{}(dynamic_cast<Boxed_BSQTuple*>(vv)->bval);
+                return DisplayFunctor_BSQTuple{}(*dynamic_cast<BSQTuple*>(vv));
             case MIRNominalTypeEnum_Category_Record:
-                return DisplayFunctor_BSQRecord{}(dynamic_cast<Boxed_BSQRecord*>(vv)->bval);
+                return DisplayFunctor_BSQRecord{}(*dynamic_cast<BSQRecord*>(vv));
             default:
                 return dynamic_cast<BSQObject*>(vv)->display();
         }
