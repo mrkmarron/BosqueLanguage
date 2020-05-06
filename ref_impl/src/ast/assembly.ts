@@ -806,16 +806,16 @@ class Assembly {
             return true;
         }
 
-        let tci: ResolvedConceptAtomTypeEntry[] = [...this.getSpecialTupleConceptType().options] as ResolvedConceptAtomTypeEntry[];
+        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialTupleConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
         if (this.checkAllTupleEntriesOfType(t1, this.getSpecialParsableConceptType())) {
-            tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            tci.push(...(this.getSpecialParsableConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
         }
         if (this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             if (this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-                tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+                tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
             else {
-                tci.push(...(this.getSpecialAPITypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+                tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
         }
 
@@ -831,16 +831,16 @@ class Assembly {
             return true;
         }
 
-        let tci: ResolvedConceptAtomTypeEntry[] = [...this.getSpecialRecordConceptType().options] as ResolvedConceptAtomTypeEntry[];
+        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialRecordConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
         if (this.checkAllRecordEntriesOfType(t1, this.getSpecialParsableConceptType())) {
-            tci.push(...(this.getSpecialParsableConceptType().options as ResolvedConceptAtomTypeEntry[]));
+            tci.push(...(this.getSpecialParsableConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
         }
         if (this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
             if (this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-                tci.push(...(this.getSpecialPODTypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+                tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
             else {
-                tci.push(...(this.getSpecialAPITypeConceptType().options as ResolvedConceptAtomTypeEntry[]));
+                tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
         }
 

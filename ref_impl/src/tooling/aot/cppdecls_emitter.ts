@@ -193,7 +193,7 @@ class CPPEmitter {
                 if (topt instanceof MIRRecordType) {
                     topt.entries.forEach((entry) => {
                         propertyenums.add(entry.name);
-                        propertynames.add(`"${entry.name}"`);
+                        propertynames.add(`U"${entry.name}"`);
                     });
                 }
             });
