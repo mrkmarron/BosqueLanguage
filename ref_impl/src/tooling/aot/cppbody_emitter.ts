@@ -1708,6 +1708,16 @@ class CPPBodyEmitter {
 
         let bodystr = ";";
         switch (idecl.implkey) {
+            case "validator_accepts": {
+                //
+                //TODO: this is a bit of a hack -- we need to implement our own regex lib and make sure it is consistent between typechecker, here, and symtest too!
+                //
+                const rs = idecl.pragmas[0][1];
+                const restr = `std::regex re("^(${rs.substring(1, rs.length - 1).replace(/\\/g, "\\\\")})$");`;
+                const conv = "std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;";
+                bodystr = `${restr} ${conv} auto $$return = std::regex_match(conv.to_bytes(${params[0]}->sdata), re);`;
+                break;
+            }
             case "enum_create": {
                 bodystr = `auto $$return = BSQEnum{ (uint32_t)BSQ_GET_VALUE_TAGGED_INT(${params[0]}), MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)} };`;
                 break;

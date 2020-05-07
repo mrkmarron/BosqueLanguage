@@ -113,7 +113,6 @@ NamedGreeting@{name="bob"}->sayHello() //"hello bob"
 ```
 
 **Validated and Typed Strings:**
-[TESTS NEEDED]
 ```
 typedef Letters4 = /\w\w\w\w/;
 typedef Digits4 = /\d\d\d\d/;

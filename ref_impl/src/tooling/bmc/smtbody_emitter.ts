@@ -1750,6 +1750,27 @@ class SMTBodyEmitter {
         let bodyres: SMTExp | undefined = undefined;
         const enclkey = (idecl.enclosingDecl || "[NA]") as MIRNominalTypeKey
         switch (idecl.implkey) {
+            case "validator_accepts": {
+                //
+                //TODO: this is a bit of a hack -- we need to implement our own regex lib and make sure it is consistent between typechecker, compiler, and here too!
+                //          also need to compile regex str into Z3 version!!!
+                //
+                let rs = idecl.pragmas[0][1];
+                let re = "[INVALID]";
+                if(rs === "/\\d/") {
+                    re = `(re.range "0" "9")`;
+                }
+                else if(rs === "/\\w/") {
+                    re = `(re.union (re.range "a" "z") (re.range "A" "Z"))`;
+                }
+                else {
+                    assert(!rs.includes("\\") && !rs.includes("*") && !rs.includes("+") && !rs.includes("|"), "Regex support is very limited!!!");
+                    re = `(str.to.re "${rs.substring(1, rs.length - 1)}"))`;
+                }
+
+                bodyres = new SMTValue(`(str.in.re ${params[0]} ${re})`);
+                break;
+            }
             case "enum_create": {
                 bodyres = new SMTValue(`(bsq_enum@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
                 break;
