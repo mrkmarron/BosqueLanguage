@@ -845,20 +845,22 @@ class MIREmitter {
                 }
             }
 
-            checker.runFinalExhaustiveChecks();
+            if (checker.getErrorList().length === 0) {
+                checker.runFinalExhaustiveChecks();
 
-            //compute closed field and vtable info
-            masm.conceptDecls.forEach((cpt) => emitter.closeConceptDecl(cpt));
-            masm.entityDecls.forEach((entity) => emitter.closeEntityDecl(entity));
+                //compute closed field and vtable info
+                masm.conceptDecls.forEach((cpt) => emitter.closeConceptDecl(cpt));
+                masm.entityDecls.forEach((entity) => emitter.closeEntityDecl(entity));
 
-            masm.invokeDecls.forEach((idecl) => {
-                const args = new Map<string, MIRType>();
-                idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
-                computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
-            });
+                masm.invokeDecls.forEach((idecl) => {
+                    const args = new Map<string, MIRType>();
+                    idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
+                    computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
+                });
 
-            if(functionalize) {
-                functionalizeInvokes(masm);
+                if (functionalize) {
+                    functionalizeInvokes(masm);
+                }
             }
         }
         catch (ex) {

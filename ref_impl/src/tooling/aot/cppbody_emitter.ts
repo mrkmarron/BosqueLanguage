@@ -1712,6 +1712,24 @@ class CPPBodyEmitter {
                 bodystr = `auto $$return = BSQEnum{ (uint32_t)BSQ_GET_VALUE_TAGGED_INT(${params[0]}), MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)} };`;
                 break;
             }
+            case "string_count": {
+                bodystr = `auto $$return = ${params[0]}->sdata.size();`;
+                break;
+            }
+            case "string_charat": {
+                bodystr = `auto $$return = BSQ_NEW_NO_RC(BSQString, ${params[0]}->sdata[${params[1]}]);`;
+                break;
+            }
+            case "string_concat": {
+                const body = `acc.append((*iter)->sdata);`;
+                const sstr = `std::u32string acc; for(auto iter = ${params[0]}->entries.cbegin(); iter != ${params[0]}->entries.cend(); ++iter) { ${body} }`;
+                bodystr = `${sstr}; auto $$return = BSQ_NEW_NO_RC(BSQString, std::move(acc));`
+                break;
+            }
+            case "string_substring": {
+                bodystr = `auto $$return = BSQ_NEW_NO_RC(BSQString, ${params[0]}->substr(${params[1]}, ${params[2]} - ${params[1]})`;
+                break;
+            }
             case "list_size": {
                 bodystr = `auto $$return = (int64_t)(${params[0]}->entries.size());`
                 break;

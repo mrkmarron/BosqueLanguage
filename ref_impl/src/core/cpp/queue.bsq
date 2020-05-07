@@ -7,12 +7,14 @@
 namespace NSCore;
 
 entity Queue<T> provides Object, Expandoable<T> {
+    static s_size(q: Queue<T>): Int # queue_size
+
     method size(): Int {
         abort;
     }
 
     method empty(): Bool {
-        return Queue<T>::_size(this) == 0;
+        return Queue<T>::s_size(this) == 0;
     }
 
     method toList(): List<T> {
@@ -20,19 +22,19 @@ entity Queue<T> provides Object, Expandoable<T> {
     }
 
     method dequeue(): T, Queue<T>
-        requires release Queue<T>::_size(this) != 0;
+        requires release Queue<T>::s_size(this) != 0;
     {
         abort;
     }
 
     static idequeue(ref q: Queue<T>): T 
-        requires release Queue<T>::_size(q) != 0;
+        requires release Queue<T>::s_size(q) != 0;
     {
         abort;
     }
 
     method peek(): T
-        requires release Queue<T>::_size(this) != 0;
+        requires release Queue<T>::s_size(this) != 0;
     {
         abort;
     }
@@ -42,7 +44,7 @@ entity Queue<T> provides Object, Expandoable<T> {
     }
 
     method lookahead(k: Int): T
-        requires release k < Queue<T>::_size(this);
+        requires release k < Queue<T>::s_size(this);
     {
         abort;
     }
@@ -52,13 +54,13 @@ entity Queue<T> provides Object, Expandoable<T> {
     }
 
     method rest(): Queue<T>
-        requires release Queue<T>::_size(this) != 0;
+        requires release Queue<T>::s_size(this) != 0;
     {
         abort;
     }
 
     static irest(ref q: Queue<T>)
-        requires release Queue<T>::_size(q) != 0;
+        requires release Queue<T>::s_size(q) != 0;
     {
        abort;
     }

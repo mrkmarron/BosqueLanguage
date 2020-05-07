@@ -280,9 +280,9 @@ class Lexer {
         return str.length === 1 && /^[A-Z]$/.test(str);
     }
 
-    //TODO: we need to make sure that someone doesn't name a local variable _
+    //TODO: we need to make sure that someone doesn't name a local variable _ -- also want to reserve _X_ for custom operators
     private static isIdentifierName(str: string) {
-        return /^(([$]?[a-z][_a-z0-9])|[_])*/.test(str);
+        return /^([$]?([a-z]|[a-z][_a-zA-Z0-9]*[a-zA-Z0-9]))|[_]$/.test(str);
     }
 
     private recordLexToken(epos: number, kind: string) {

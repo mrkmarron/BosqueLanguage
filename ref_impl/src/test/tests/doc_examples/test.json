@@ -36,6 +36,11 @@
                 "expected": "0"
             },
             {
+                "kind": "aot",
+                "entrypoint": "recordtupleC",
+                "expected": "4"
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -79,6 +84,11 @@
                 "kind": "symtest",
                 "entrypoint": "signCheck",
                 "error": true
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "recordtupleC",
+                "expected": "4"
             }
         ]
     }

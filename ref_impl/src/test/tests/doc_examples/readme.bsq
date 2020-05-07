@@ -69,3 +69,10 @@ entrypoint function signCheck(x: Int): Int {
     return x;
 }
 
+function recordtuple(tup: [Int, Bool], rec: {f: String, g: Int}): Int {
+    return tup.0 + rec.g;
+}
+
+entrypoint function recordtupleC(): Int {
+    return recordtuple([1, false], {f="ok", g=3});
+}

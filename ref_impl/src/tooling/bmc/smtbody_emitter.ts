@@ -261,7 +261,7 @@ class SMTBodyEmitter {
 
     generateMIRInvokeInvariantCheckDirect(ivop: MIRInvokeInvariantCheckDirect): SMTExp {
         const fields = [...(this.typegen.assembly.entityDecls.get(ivop.tkey) as MIREntityTypeDecl).fields].sort((a, b) => a.name.localeCompare(b.name));
-        let vals: string[] = fields.map((f) => `(${this.typegen.generateEntityAccessor(f.enclosingDecl, f.fkey)} ${this.argToSMT(ivop.rcvr, this.typegen.getMIRType(ivop.tkey)).emit()})`);
+        let vals: string[] = fields.map((f) => `(${this.typegen.generateEntityAccessor(ivop.tkey, f.fkey)} ${this.argToSMT(ivop.rcvr, this.typegen.getMIRType(ivop.tkey)).emit()})`);
         
         const tv = this.generateTempName();
         const ivrtype = this.typegen.getSMTTypeFor(this.typegen.boolType);
@@ -676,11 +676,6 @@ class SMTBodyEmitter {
             const access = this.generateVFieldLookup(arg, tag, inferargtype, this.assembly.fieldDecls.get(field) as MIRFieldDecl);
             return this.typegen.coerce(access, ftype, resultAccessType);
         }
-    }
-
-    generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): SMTExp {
-        const inferargtype = this.typegen.getMIRType(op.argInferType);
-        return this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.field, resultAccessType);
     }
 
     generateVFieldProject(arg: MIRArgument, infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType): string {
@@ -1463,7 +1458,7 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRAccessFromField: {
                 const af = op as MIRAccessFromField;
-                return this.generateMIRAccessFromField(af, this.typegen.getMIRType(af.resultAccessType));
+                return new SMTLet(this.varToSMTName(af.trgt), this.generateMIRAccessFromFieldExpression(af.arg, this.typegen.getMIRType(af.argInferType), af.field, this.typegen.getMIRType(af.resultAccessType)));
             }
             case MIROpTag.MIRProjectFromFields: {
                 const pf = op as MIRProjectFromFields;
@@ -1757,6 +1752,22 @@ class SMTBodyEmitter {
         switch (idecl.implkey) {
             case "enum_create": {
                 bodyres = new SMTValue(`(bsq_enum@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
+                break;
+            }
+            case "string_count": {
+                bodyres = new SMTValue(`(str.len ${params[0]})`);
+                break;
+            }
+            case "string_charat": {
+                bodyres = new SMTValue(`(str.at ${params[0]} ${params[1]})`);
+                break;
+            }
+            case "string_concat": {
+                bodyres = new SMTValue(`(str.++ ${params[0]} ${params[1]})`);
+                break;
+            }
+            case "string_substring": {
+                bodyres = new SMTValue(`(str.substr ${params[0]} ${params[1]} ${params[2]})`);
                 break;
             }
             case "list_size": {

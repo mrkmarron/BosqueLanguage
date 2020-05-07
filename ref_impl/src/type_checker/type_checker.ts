@@ -4831,7 +4831,7 @@ class TypeChecker {
             [...fields].sort((a, b) => a[0].localeCompare(b[0]))
                 .forEach((finfo) => {
                     const fname = `$${finfo[1][1].name}`;
-                    const ftype = this.m_assembly.normalizeTypeOnly(finfo[1][1], finfo[1][2]);
+                    const ftype = this.m_assembly.normalizeTypeOnly(finfo[1][1].declaredType, finfo[1][2]);
                     const mirftype = this.m_emitter.registerResolvedTypeReference(ftype);
 
                     fps.push(new MIRFunctionParameter(fname, mirftype.trkey));
@@ -4871,7 +4871,7 @@ class TypeChecker {
         be.emitReturnAssign(sinfo, etreg);
         be.emitDirectJump(sinfo, "returnassign");
 
-        be.setActiveBlock("failure");
+        be.setActiveBlock(failblock);
         be.emitReturnAssign(sinfo, etreg);
         be.emitDirectJump(sinfo, "returnassign");
 
@@ -4883,7 +4883,7 @@ class TypeChecker {
         let argTypes = new Map<string, MIRType>();
         fields.forEach((finfo) => {
                 const fname = `$${finfo[1].name}`;
-                const ftype = this.m_assembly.normalizeTypeOnly(finfo[1], finfo[2]);
+                const ftype = this.m_assembly.normalizeTypeOnly(finfo[1].declaredType, finfo[2]);
                 const mirftype = this.m_emitter.registerResolvedTypeReference(ftype);
 
                 mirparams.push(new MIRFunctionParameter(fname, mirftype.trkey));
@@ -5042,7 +5042,7 @@ class TypeChecker {
                     const icall =  MIRKeyGenerator.generateStaticKey(invinfo[1], "@invariant_direct", invinfo[2], []);
 
                     const fields = [...this.m_assembly.getAllOOFields(tdecl, binds)].sort((a, b) => a[0].localeCompare(b[0]));
-                    const cargs = fields.map((finfo) => ({name: `$${finfo[1][1].name}`, t: this.m_assembly.normalizeTypeOnly(finfo[1][1], finfo[1][2])}));
+                    const cargs = fields.map((finfo) => ({name: `$${finfo[1][1].name}`, t: this.m_assembly.normalizeTypeOnly(finfo[1][1].declaredType, finfo[1][2])}));
 
                     return {ivk: icall, args: cargs};
                 });

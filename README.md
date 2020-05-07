@@ -9,7 +9,7 @@ The Bosque programming language is a breakthrough research project from [_Micros
 Small samples of code and unique Bosque tooling are below in the [Code Snippets](#Code-Snippets) and [Tooling](#Tooling) sections. A rundown of notable and/or unique features in the Bosque language is provided in the [language overview section 0](docs/language/overview.md#0-Highlight-Features).
 For a look at how the language works and flows _in the large_ please see the code for a [simple tic-tac-toe](ref_impl/src/test/apps/tictactoe/main.bsq) program.
 
-**Note:** This repository and code represent an alpha state. This means that the language is subject to revision, there are bugs and missing functionality, and the performance is limited. Thus, we **do not** recommend the use of the Bosque language for _any_ production work and instead encourage experimentation only with small/experimental side projects at this point in time.
+**Note:** This repository and code are currently still experimental. This means that the language is subject to revision, there are bugs and missing functionality, and the performance is limited. 
 
 ## Documentation
 
@@ -43,6 +43,16 @@ function allPositive(...args: List<Int>): Bool {
 allOdd(1, 3, 4) //false
 ```
 
+**Tuples and Records:**
+
+```none
+function doit(tup: [Int, Bool], rec: {f: String, g: Int}): Int {
+    return tup.0 + rec.g;
+}
+
+doit([1, false], {f="ok", g=3}) //4
+```
+
 **Sign (with optional argument):**
 
 ```none
@@ -65,7 +75,6 @@ sign()     //0
 ```
 
 **Nominal Types Data Invariants:**
-[TESTS NEEDED]
 ```
 concept WithName {
     invariant $name != "";

@@ -172,7 +172,7 @@ class CPPEmitter {
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
             conststring_declare.push(`static BSQString ${v};`);
-            conststring_create.push(`BSQString Runtime::${v}(${k}, 1);`);
+            conststring_create.push(`BSQString Runtime::${v}(U${k}, 1);`);
         });
 
         let constint_declare: string[] = [];

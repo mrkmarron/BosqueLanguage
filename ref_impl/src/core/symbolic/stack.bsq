@@ -7,88 +7,88 @@
 namespace NSCore;
 
 entity Stack<T> provides Object, Expandoable<T> {
-    hidden static _size(s: Stack<T>): Int # stack_size
-    hidden static _unsafe_top(s: Stack<T>): T # stack_unsafe_top
-    hidden static _unsafe_at(s: Stack<T>, idx: Int): T # stack_unsafe_at
-    hidden static _unsafe_push(s: Stack<T>, v: T): Stack<T> # stack_unsafe_push
-    hidden static _unsafe_pop(s: Stack<T>): Stack<T> # stack_unsafe_pop
+    hidden static s_size(s: Stack<T>): Int # stack_size
+    hidden static s_unsafe_top(s: Stack<T>): T # stack_unsafe_top
+    hidden static s_unsafe_at(s: Stack<T>, idx: Int): T # stack_unsafe_at
+    hidden static s_unsafe_push(s: Stack<T>, v: T): Stack<T> # stack_unsafe_push
+    hidden static s_unsafe_pop(s: Stack<T>): Stack<T> # stack_unsafe_pop
 
-    hidden static _toList(q: Stack<T>, lp: List<T>, idx: Int): List<T> {
-        if(idx == Stack<T>::_size(q)) {
+    hidden static s_toList(q: Stack<T>, lp: List<T>, idx: Int): List<T> {
+        if(idx == Stack<T>::s_size(q)) {
             return lp;
         }
         else {
-            let val = Stack<T>::_unsafe_at(q, idx);
-            return Stack<T>::_toList(q, List<T>::_unsafe_push(lp, val), idx + 1);
+            let val = Stack<T>::s_unsafe_at(q, idx);
+            return Stack<T>::s_toList(q, List<T>::s_unsafe_push(lp, val), idx + 1);
         }
     }
 
     method size(): Int {
-        return Stack<T>::_size(this);
+        return Stack<T>::s_size(this);
     }
 
     method empty(): Bool {
-        return Stack<T>::_size(this) == 0;
+        return Stack<T>::s_size(this) == 0;
     }
 
     method toList(): List<T> {
-        return Stack<T>::_toList(this, List<T>@{}, 0);
+        return Stack<T>::s_toList(this, List<T>@{}, 0);
     }
 
     method pop(): T, Stack<T>
-        requires release Stack<T>::_size(this) != 0;
+        requires release Stack<T>::s_size(this) != 0;
     {
-        return Stack<T>::_unsafe_top(this), Stack<T>::_unsafe_pop(this);
+        return Stack<T>::s_unsafe_top(this), Stack<T>::s_unsafe_pop(this);
     }
 
     static ipop(ref s: Stack<T>): T 
-        requires release Stack<T>::_size(s) != 0;
+        requires release Stack<T>::s_size(s) != 0;
     {
-        let res = Stack<T>::_unsafe_top(s);
-        s = Stack<T>::_unsafe_pop(s);
+        let res = Stack<T>::s_unsafe_top(s);
+        s = Stack<T>::s_unsafe_pop(s);
 
         return res;
     }
 
     method peek(): T
-        requires release Stack<T>::_size(this) != 0;
+        requires release Stack<T>::s_size(this) != 0;
     {
-        return Stack<T>::_unsafe_top(this);
+        return Stack<T>::s_unsafe_top(this);
     }
 
     method tryPeek(): T? {
-        return Stack<T>::_size(this) != 0 ? Stack<T>::_unsafe_top(this) : none;
+        return Stack<T>::s_size(this) != 0 ? Stack<T>::s_unsafe_top(this) : none;
     }
 
     method lookahead(k: Int): T
-        requires release k < Stack<T>::_size(this);
+        requires release k < Stack<T>::s_size(this);
     {
-        return Stack<T>::_unsafe_at(this, k);
+        return Stack<T>::s_unsafe_at(this, k);
     }
 
     method tryLookahead(k: Int): T? {
-        return k < Stack<T>::_size(this) ? Stack<T>::_unsafe_at(this, k) : none;
+        return k < Stack<T>::s_size(this) ? Stack<T>::s_unsafe_at(this, k) : none;
     }
 
     method rest(): Stack<T> 
-        requires release Stack<T>::_size(this) != 0;
+        requires release Stack<T>::s_size(this) != 0;
     {
-        return Stack<T>::_unsafe_pop(this);
+        return Stack<T>::s_unsafe_pop(this);
     }
 
     static irest(ref s: Stack<T>)
-        requires release Stack<T>::_size(s) != 0;
+        requires release Stack<T>::s_size(s) != 0;
     {
-        s = Queue<T>::_unsafe_pop(s);
+        s = Queue<T>::s_unsafe_pop(s);
         return none;
     }
 
     method push(v: T): Stack<T> {
-        return Queue<T>::_unsafe_push(this, v);
+        return Queue<T>::s_unsafe_push(this, v);
     }
 
     static ipush(ref s: Stack<T>, v: T) {
-        s = Stack<T>::_unsafe_push(s, v);
+        s = Stack<T>::s_unsafe_push(s, v);
         return none;
     }
 }

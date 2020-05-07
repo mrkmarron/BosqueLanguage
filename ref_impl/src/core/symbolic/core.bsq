@@ -168,13 +168,56 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
 
 //<summary>Primitive string value.</summary>
 entity String provides KeyType, PODType, APIType, Some {
-    method length(): Int # string_count
+    private static s_length(s: String): Int # string_count
+    private static s_charat(s: String): Int # string_charat
 
-    method charAt(idx: Int): String # string_charat
-    method charCodeAt(idx: Int): Int # string_charcodeat
+    private static s_concat2(s1: String, s2: String): String # string_concat
 
-    static concat(...args: List<String>): String # string_concat
-    method substring(start?: Int, end?: Int): String # string_substring
+    private recursive static s_concat(sl: List<String>, idx: Int, rs: String): String {
+        if(idx == List<String>::s_size(sl)) {
+            return rs;
+        }
+        else {
+            let s = List<String>::s_unsafe_get(sl, idx);
+            return String::s_concat[recursive](sl, idx + 1, String::s_concat2(rs, s));
+        }
+    }
+
+    private static s_rangeInBounds(str: String, start?: Int, end?: Int): Bool {
+        let s, e = start ?| 0, end ?| String::s_length(str);
+        return 0 <= s && s <= e && e <= String::s_length(str);
+    }
+
+    private static s_substring(s: String, start: Int, end: Int): String # string_substring
+
+    method length(): Int {
+        return String::s_length(this);
+    }
+
+    method charAt(idx: Int): String
+        requires release 0 <= idx && idx < String::s_length(this);
+    {
+        return String::s_charat(this, idx);
+    }
+
+    static concat(...args: List<String>): String {
+        if(List<String>::s_size(args) == 0) {
+            return "";
+        }
+        elif(List<String>::s_size(args) == 1) {
+            return args->front();
+        }
+        else {
+            return String::s_concat[recursive](args, 1, args->front());
+        }
+    }
+
+    method substring(start?: Int, end?: Int): String
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let s, e = start ?| 0, end ?| String::s_length(this);
+        return String::s_substring(this, s, e);
+    }
 
     method includes(str: String): Bool # string_includes
     method startsWith(str: String): Bool # string_startswith
