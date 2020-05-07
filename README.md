@@ -90,26 +90,26 @@ concept Greeting {
     }
 }
 
-entity genericGreeting provides Hello {
-    const instance: genericGreeting = genericGreeting@{};
+entity GenericGreeting provides Greeting {
+    const instance: GenericGreeting = GenericGreeting@{};
 
-    override method sayHello: String {
+    override method sayHello(): String {
         return "hello world";
     }
 }
 
-entity namedGreeting provides WithName, Hello {
-    override method sayHello: String {
+entity NamedGreeting provides WithName, Greeting {
+    override method sayHello(): String {
         return String::concat("hello", " ", this.name);
     }
 }
 
-genericGreeting@{}->sayHello()        //"hello world"
-genericGreeting::instance->sayHello() //"hello world"
+GenericGreeting@{}->sayHello()         //"hello world"
+GenericGreeting::instance->sayHello()  //"hello world"
 
-namedGreeting@{}->sayHello()           //type error no value provided for "name" field
-namedGreeting@{name=""}->sayHello()    //invariant error
-namedGreeting@{name="bob"}->sayHello() //"hello bob"
+NamedGreeting@{}->sayHello()           //type error no value provided for "name" field
+NamedGreeting@{name=""}->sayHello()    //invariant error
+NamedGreeting@{name="bob"}->sayHello() //"hello bob"
 ```
 
 **Validated and Typed Strings:**

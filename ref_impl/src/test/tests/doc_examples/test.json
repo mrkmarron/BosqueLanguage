@@ -41,6 +41,16 @@
                 "expected": "4"
             },
             {
+                "kind": "aot",
+                "entrypoint": "checkInvsAndObjs",
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "checkInvsAndObjsFail",
+                "expected": null
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -89,6 +99,21 @@
                 "kind": "symexec",
                 "entrypoint": "recordtupleC",
                 "expected": "4"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "checkInvsAndObjs",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "checkInvsAndObjsFail",
+                "expected": null
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "checkInvsAndObjsPuzzle",
+                "error": true
             }
         ]
     }

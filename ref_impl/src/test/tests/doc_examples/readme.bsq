@@ -5,6 +5,40 @@
 
 namespace NSTest;
 
+////
+//Misc Defs
+
+concept WithName {
+    invariant $name != "";
+
+    field name: String;
+}
+
+concept Greeting {
+    abstract method sayHello(): String;
+
+    virtual method sayGoodbye(): String {
+        return "goodbye";
+    }
+}
+
+entity GenericGreeting provides Greeting {
+    const instance: GenericGreeting = GenericGreeting@{};
+
+    override method sayHello(): String {
+        return "hello world";
+    }
+}
+
+entity NamedGreeting provides WithName, Greeting {
+    override method sayHello(): String {
+        return String::concat("hello", " ", this.name);
+    }
+}
+
+////
+//Tests
+
 function add2(x: Int, y: Int): Int {
     return x + y;
 }
@@ -75,4 +109,24 @@ function recordtuple(tup: [Int, Bool], rec: {f: String, g: Int}): Int {
 
 entrypoint function recordtupleC(): Int {
     return recordtuple([1, false], {f="ok", g=3});
+}
+
+entrypoint function checkInvsAndObjs(): Bool {
+    check GenericGreeting@{}->sayHello() == "hello world";
+    check GenericGreeting::instance->sayHello() == "hello world";
+
+    check NamedGreeting@{name="bob"}->sayHello() == "hello bob";
+
+    return true;
+}
+
+entrypoint function checkInvsAndObjsFail(): String {
+    return NamedGreeting@{name=""}->sayHello();
+}
+
+entrypoint function checkInvsAndObjsPuzzle(n: String): String {
+    let say = NamedGreeting@{name=(n == "" ? "bob" : n)}->sayHello();
+    check say != "hello chuck";
+
+    return say;
 }
