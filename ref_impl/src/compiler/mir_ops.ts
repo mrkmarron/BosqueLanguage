@@ -570,13 +570,15 @@ class MIRLoadConstTypedString extends MIRValueOp {
     readonly tkey: MIRNominalTypeKey;
     readonly tskey: MIRResolvedTypeKey;
     readonly pfunckey: MIRInvokeKey | undefined;
+    readonly errtype: MIRResolvedTypeKey | undefined;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, errtype: MIRResolvedTypeKey | undefined, trgt: MIRTempRegister) {
         super(MIROpTag.MIRLoadConstTypedString, sinfo, trgt);
         this.ivalue = ivalue;
         this.tkey = tkey;
         this.tskey = tskey;
         this.pfunckey = pfunckey;
+        this.errtype = errtype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return []; }
@@ -586,11 +588,11 @@ class MIRLoadConstTypedString extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), ivalue: this.ivalue, tkey: this.tkey, tskey: this.tskey, pfunckey: this.pfunckey };
+        return { ...this.jbemit(), ivalue: this.ivalue, tkey: this.tkey, tskey: this.tskey, pfunckey: this.pfunckey, errtype: this.errtype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConstTypedString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.pfunckey, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadConstTypedString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.pfunckey, jobj.errtype, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

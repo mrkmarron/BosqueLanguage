@@ -2480,10 +2480,14 @@ class Parser {
         }
         else {
             let varinfo: "let" | "var" | undefined = undefined;
-            if (this.testToken("var")) {
-                varinfo = "var";
+            if (this.testToken("var") || this.testToken("let")) {
+                if (this.testToken("var")) {
+                    varinfo = "var";
+                }
+
+                this.consumeToken();
             }
-            this.consumeToken();
+
             layoutcheck = this.parseStructuredAssignment(sinfo, varinfo, true, true, decls);
         }
 

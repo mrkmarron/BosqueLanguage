@@ -223,7 +223,7 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
 
         const bmap = new Map<string, MIRBasicBlock>();
         bproc.nblocks.map((bb) => bmap.set(bb.label, bb));
-        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, [...inv.pragmas], inv.sourceLocation, inv.srcFile, bproc.nparams, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
+        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, [...inv.pragmas], inv.sourceLocation, inv.srcFile, bproc.nparams, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
         rbl.push(ninv);
 
         let ninvargs = new Map<string, MIRType>();

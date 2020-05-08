@@ -142,6 +142,10 @@ entrypoint function sstringAccepts(): Bool {
     return !Digit::accepts("a") && Digit::accepts("2");
 }
 
+entrypoint function sstringLiteral(): Bool {
+    return fss(Digit'3');
+}
+
 entrypoint function sstringAsError(): Bool {
     return fss(SafeString<Digit>::from("a"));
 }

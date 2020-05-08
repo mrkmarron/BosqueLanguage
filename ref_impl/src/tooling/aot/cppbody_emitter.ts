@@ -50,6 +50,10 @@ class CPPBodyEmitter {
         this.currentRType = typegen.noneType;
     }
 
+    private static cleanStrRepr(s: string): string {
+        return "\"" + s.substring(1, s.length - 1) + "\"";
+    }
+
     labelToCpp(label: string): string {
         return label;
     }
@@ -108,7 +112,7 @@ class CPPBodyEmitter {
             return this.typegen.coerce(cval.value, this.typegen.intType, into);
         }
         else if (cval instanceof MIRConstantBigInt) {
-            const sname = "BIGINT__" + this.allConstStrings.size;
+            const sname = "BIGINT__" + this.allConstBigInts.size;
             if (!this.allConstBigInts.has(cval.value)) {
                 this.allConstBigInts.set(cval.value, sname);
             }
@@ -122,7 +126,7 @@ class CPPBodyEmitter {
         else {
             assert(cval instanceof MIRConstantString);
 
-            const sval = (cval as MIRConstantString).value;
+            const sval = CPPBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
             const sname = "STR__" + this.allConstStrings.size;
             if (!this.allConstStrings.has(sval)) {
                 this.allConstStrings.set(sval, sname);
@@ -169,34 +173,42 @@ class CPPBodyEmitter {
             return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
         }
     }
-    
+
     generateLoadConstSafeString(op: MIRLoadConstSafeString): string {
+        const sval = CPPBodyEmitter.cleanStrRepr(op.ivalue);
         const sname = "STR__" + this.allConstStrings.size;
-        if (!this.allConstStrings.has(op.ivalue)) {
-            this.allConstStrings.set(op.ivalue, sname);
+
+        if (!this.allConstStrings.has(sval)) {
+            this.allConstStrings.set(sval, sname);
         }
-        const strval = `Runtime::${this.allConstStrings.get(op.ivalue) as string}`;
+        const strval = `Runtime::${this.allConstStrings.get(sval) as string}`;
 
         const scopevar = this.varNameToCppName("$scope$");
-        return `${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`;
+        return `${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQSafeString, ${strval}.sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`;
     }
 
     generateLoadConstTypedString(op: MIRLoadConstTypedString): string {
+        const sval = CPPBodyEmitter.cleanStrRepr(op.ivalue);
         const sname = "STR__" + this.allConstStrings.size;
-        if (!this.allConstStrings.has(op.ivalue)) {
-            this.allConstStrings.set(op.ivalue, sname);
+
+        if (!this.allConstStrings.has(sval)) {
+            this.allConstStrings.set(sval, sname);
         }
-        const strval = `Runtime::${this.allConstStrings.get(op.ivalue) as string}`;
+        const strval = `Runtime::${this.allConstStrings.get(sval) as string}`;
 
         const scopevar = this.varNameToCppName("$scope$");
 
         let opstrs: string[] = [];
         if(op.pfunckey !== undefined) {
-            const chkexp = `${this.invokenameToCPP(op.pfunckey)}(${strval}, ${scopevar})`;
-            opstrs.push(`if(!${chkexp}.success) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
+            const pfunc = (this.typegen.assembly.invokeDecls.get(op.pfunckey) || this.typegen.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
+            const errtype = this.typegen.getMIRType(op.errtype as MIRResolvedTypeKey);
+
+            const pexp = `${this.invokenameToCPP(op.pfunckey)}(&${strval}, ${scopevar})`;
+            const tcexp = this.generateTypeCheck(pexp, this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(pfunc.resultType), errtype);
+            opstrs.push(`if(${tcexp}) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
         }
 
-        opstrs.push(`${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`);
+        opstrs.push(`${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}.sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`);
 
         return opstrs.join(" ");
     }
@@ -230,7 +242,7 @@ class CPPBodyEmitter {
                 return this.argToCpp(arg, ftype);
             });
 
-            return `${this.varToCppName(cp.trgt)} = std::move(${cppcrepr.base}(${fvals.length !== 0 ? (", " + fvals.join(", ")) : ""}));`
+            return `${this.varToCppName(cp.trgt)} = std::move(${cppcrepr.base}(${fvals.join(", ")}));`
         }
         else {
             const fvals = cp.args.map((arg, i) => {

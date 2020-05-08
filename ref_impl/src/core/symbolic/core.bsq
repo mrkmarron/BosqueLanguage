@@ -394,11 +394,11 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 
     method isOk(): Bool {
-        return this->is<Ok>();
+        return this->is<Ok<T, E>>();
     }
 
     method isErr(): Bool {
-        return this->is<Err>();
+        return this->is<Err<T, E>>();
     }
 
     method result(): T {

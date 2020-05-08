@@ -325,7 +325,7 @@ class CPPTypeEmitter {
                 const etname = this.mangleStringForCpp(tt.trkey);
 
                 if(iddecl.attributes.includes("struct")) {
-                    return new StructRepr(false, etname, `Boxed_${etname}`, `MIRNominalTypeEnum_${this.mangleStringForCpp(tt.trkey)}`, "MIRNominalTypeEnum_Category_Object");
+                    return new StructRepr(false, etname, `Boxed_${etname}`, `MIRNominalTypeEnum::${this.mangleStringForCpp(tt.trkey)}`, "MIRNominalTypeEnum_Category_Object");
                 }
                 else {
                     let cat = "[INVALID]";
@@ -428,12 +428,7 @@ class CPPTypeEmitter {
             }
             else {
                 const scope = this.mangleStringForCpp("$scope$");
-                if(trfrom.base === "BSQTuple" || trfrom.base === "BSQRecord") {
-                    cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${exp})`
-                }
-                else {
-                    cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${trfrom.nominaltype}, ${exp})`
-                }
+                cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${exp})`;
             }
 
             if (trinto instanceof KeyValueRepr) {
@@ -924,27 +919,27 @@ class CPPTypeEmitter {
                 const move_cons = `${this.mangleStringForCpp(entity.tkey)}(${this.mangleStringForCpp(entity.tkey)}&& src) ${move_constructor_initializer.length !== 0 ? ":" : ""} ${move_constructor_initializer.join(", ")} { ; }`;
 
                 const copy_assign_ops = entity.fields.map((fd) => {
-                    return `${this.mangleStringForCpp(fd.fkey)} = src.${this.mangleStringForCpp(fd.fkey)};`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)} = src.${this.mangleStringForCpp(fd.fkey)};`;
                 });
                 const copy_assign = `${this.mangleStringForCpp(entity.tkey)}& operator=(const ${this.mangleStringForCpp(entity.tkey)}& src)`
                 + `{\n`
-                + `if (this == &src) return *this;\n\n`
-                + copy_assign_ops.join("\n")
+                + `  if (this == &src) return *this;\n\n  `
+                + copy_assign_ops.join("\n  ")
                 + `return *this;\n`
                 + `}\n`;
 
                 const move_assign_ops = entity.fields.map((fd) => {
-                    return `${this.mangleStringForCpp(fd.fkey)} = std::move(src.${this.mangleStringForCpp(fd.fkey)});`;
+                    return `this->${this.mangleStringForCpp(fd.fkey)} = std::move(src.${this.mangleStringForCpp(fd.fkey)});`;
                 });
                 const move_assign = `${this.mangleStringForCpp(entity.tkey)}& operator=(${this.mangleStringForCpp(entity.tkey)}&& src)`
                 + `{\n`
-                + `if (this == &src) return *this;\n\n`
-                + move_assign_ops.join("\n")
+                + `  if (this == &src) return *this;\n\n  `
+                +  move_assign_ops.join("\n  ")
                 + `return *this;\n`
                 + `}\n`;
 
                 const incop_ops = entity.fields.map((fd) => {
-                    return this.buildIncOpForType(this.getMIRType(fd.declaredType), `this.${this.mangleStringForCpp(fd.fkey)}`) + ";";
+                    return this.buildIncOpForType(this.getMIRType(fd.declaredType), `tt.${this.mangleStringForCpp(fd.fkey)}`) + ";";
                 });
                 const incop = `struct RCIncFunctor_${this.mangleStringForCpp(entity.tkey)}`
                 + `{\n`
@@ -956,7 +951,7 @@ class CPPTypeEmitter {
                 + `};\n`;
 
                 const decop_ops = entity.fields.map((fd) => {
-                    return this.buildDecOpForType(this.getMIRType(fd.declaredType), `this.${this.mangleStringForCpp(fd.fkey)}`) + ";";
+                    return this.buildDecOpForType(this.getMIRType(fd.declaredType), `tt.${this.mangleStringForCpp(fd.fkey)}`) + ";";
                 });
                 const decop = `struct RCDecFunctor_${this.mangleStringForCpp(entity.tkey)}`
                 + `{\n`
@@ -967,7 +962,7 @@ class CPPTypeEmitter {
                 + `};\n`;
 
                 const returnop_ops = entity.fields.map((fd) => {
-                    return this.buildReturnOpForType(this.getMIRType(fd.declaredType), `this.${this.mangleStringForCpp(fd.fkey)}`, "scope") + ";";
+                    return this.buildReturnOpForType(this.getMIRType(fd.declaredType), `tt.${this.mangleStringForCpp(fd.fkey)}`, "scope") + ";";
                 });
                 const returnop = `struct RCReturnFunctor_${this.mangleStringForCpp(entity.tkey)}`
                 + `{\n`
@@ -994,7 +989,7 @@ class CPPTypeEmitter {
                         + "public:\n"
                         + `    ${fields.join("\n    ")}\n\n`
                         + `    ${this.mangleStringForCpp(entity.tkey)}() { ; }\n`
-                        + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) : BSQObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)})${constructor_initializer.length !== 0 ? ", " : ""}${constructor_initializer.join(", ")} { ; }\n`
+                        + `    ${this.mangleStringForCpp(entity.tkey)}(${constructor_args.join(", ")}) ${constructor_initializer.length !== 0 ? ": " : ""}${constructor_initializer.join(", ")} { ; }\n`
                         + `    ${copy_cons}\n`
                         + `    ${move_cons}\n\n`
                         + `    ${copy_assign}\n`
@@ -1004,8 +999,8 @@ class CPPTypeEmitter {
                     boxeddecl: `class Boxed_${this.mangleStringForCpp(entity.tkey)} : public BSQBoxedObject<${this.mangleStringForCpp(entity.tkey)}, RCDecFunctor_${this.mangleStringForCpp(entity.tkey)}>\n`
                         + "{\n"
                         + "public:\n"
-                        + `    Boxed_${this.mangleStringForCpp(entity.tkey)}(const ${this.mangleStringForCpp(entity.tkey)}& bval) : BSQBoxedObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)}), bval(bval) { ; }\n`
-                        + `    std::u32string display() const {return this.bval.display(); }\n\n`
+                        + `    Boxed_${this.mangleStringForCpp(entity.tkey)}(const ${this.mangleStringForCpp(entity.tkey)}& bval) : BSQBoxedObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)}, bval) { ; }\n`
+                        + `    std::u32string display() const {return this->bval.display(); }\n\n`
                         + "};",
                     ops: [
                         incop,

@@ -51,6 +51,10 @@ class SMTBodyEmitter {
         this.currentRType = typegen.noneType;
     }
 
+    private static cleanStrRepr(s: string): string {
+        return "\"" + s.substring(1, s.length - 1) + "\"";
+    }
+
     generateTempName(): string {
         return `@tmpvar@${this.tmpvarctr++}`;
     }
@@ -153,7 +157,8 @@ class SMTBodyEmitter {
         else {
             assert(cval instanceof MIRConstantString);
 
-            return this.typegen.coerce(new SMTValue((cval as MIRConstantString).value), this.typegen.stringType, into);
+            const sval = SMTBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
+            return this.typegen.coerce(new SMTValue(sval), this.typegen.stringType, into);
         }
     }
 
@@ -201,22 +206,26 @@ class SMTBodyEmitter {
     }
 
     generateLoadConstSafeString(op: MIRLoadConstSafeString): SMTExp {
-        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_safestring@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${op.ivalue})`));
+        const sval = SMTBodyEmitter.cleanStrRepr(op.ivalue);
+
+        return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_safestring@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${sval})`));
     }
 
     generateLoadConstTypedString(op: MIRLoadConstTypedString): SMTExp {
+        const sval = SMTBodyEmitter.cleanStrRepr(op.ivalue);
+
         if (op.pfunckey === undefined) {
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${op.ivalue})`));
+            return new SMTLet(this.varToSMTName(op.trgt), new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${sval})`));
         }
         else {
             const pfunc = (this.assembly.invokeDecls.get(op.pfunckey) || this.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
 
-            const rval = new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${op.ivalue})`);
+            const rval = new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${sval})`);
             const tv = this.generateTempName();
             const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(pfunc.resultType));
             const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
         
-            const ichk = new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${op.ivalue})`));
+            const ichk = new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${sval})`));
             const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
             const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.getSMTTypeFor(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
 
