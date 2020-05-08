@@ -405,7 +405,10 @@ class CPPTypeEmitter {
         return `convertFROM_${this.mangleStringForCpp(from.trkey)}_TO_${this.mangleStringForCpp(into.trkey)}`;
     }
 
-    coercePrimitive(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    coercePrimitive(exp: string, from: MIRType, into: MIRType): string {
+        const trfrom = this.getCPPReprFor(from);
+        const trinto = this.getCPPReprFor(into);
+
         if (trfrom instanceof NoneRepr) {
             assert(!(trinto instanceof NoneRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
@@ -428,7 +431,8 @@ class CPPTypeEmitter {
             }
             else {
                 const scope = this.mangleStringForCpp("$scope$");
-                cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${exp})`;
+                const ops = this.getFunctorsForType(from);
+                cc = `BSQ_NEW_ADD_SCOPE(${scope}, ${trfrom.boxed}, ${ops.inc}{}(${exp}))`;
             }
 
             if (trinto instanceof KeyValueRepr) {
@@ -517,7 +521,7 @@ class CPPTypeEmitter {
             return `${cfunc}(${exp})`;
         }
 
-        return this.coercePrimitive(exp, trfrom, trinto);
+        return this.coercePrimitive(exp, from, into);
     }
     
     tupleHasIndex(tt: MIRType, idx: number): "yes" | "no" | "maybe" {
@@ -838,7 +842,7 @@ class CPPTypeEmitter {
         return { isref: true, fwddecl: `class ${declrepr.base};`, fulldecl: decl };
     }
 
-    generateCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } | { isref: boolean, depon: string[], fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] } | undefined {
+    generateCPPEntity(entity: MIREntityTypeDecl): { isref: boolean, fwddecl: string, fulldecl: string } | { isref: boolean, fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] } | undefined {
         const tt = this.getMIRType(entity.tkey);
 
         if(this.isSpecialReprEntity(tt)) {
@@ -982,7 +986,6 @@ class CPPTypeEmitter {
 
                 return {
                     isref: false,
-                    depon: entity.fields.map((fd) => this.getCPPReprFor(this.getMIRType(fd.declaredType)).base),
                     fwddecl: `class Boxed_${this.mangleStringForCpp(entity.tkey)};`,
                     fulldecl: `class ${this.mangleStringForCpp(entity.tkey)}\n`
                         + "{\n"

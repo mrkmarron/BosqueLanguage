@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRRecordType, MIRInvokeDecl, MIRInvokeBodyDecl, MIREphemeralListType, MIREntityTypeDecl, MIRType, MIREntityType, MIRConceptType, MIRTupleType, MIRConceptTypeDecl } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { CPPBodyEmitter } from "./cppbody_emitter";
 import { constructCallGraphInfo } from "../../compiler/mir_callg";
@@ -39,6 +39,68 @@ type CPPCode = {
     MAIN_CALL: string
 };
 
+function getDepFromType(root: MIRType, tt: MIRType, typeemitter: CPPTypeEmitter, deps: Set<string>) {
+    tt.options.map((opt) => {
+        if (opt instanceof MIREntityType) {
+            const edcl = typeemitter.assembly.entityDecls.get(opt.ekey) as MIREntityTypeDecl;
+            edcl.provides.forEach((pv) => getDepFromType(root, typeemitter.getMIRType(pv), typeemitter, deps));
+            edcl.terms.forEach((v) => getDepFromType(root, v, typeemitter, deps));
+            edcl.fields.forEach((fd) => getDepFromType(root, typeemitter.getMIRType(fd.declaredType), typeemitter, deps));
+
+            if(root.trkey !== opt.trkey) {
+                deps.add(opt.trkey);
+            }
+        }
+        else if (opt instanceof MIRConceptType) {
+            return opt.ckeys.forEach((cc) => {
+                const cpt = typeemitter.assembly.conceptDecls.get(cc) as MIRConceptTypeDecl;
+                cpt.provides.forEach((pv) => getDepFromType(root, typeemitter.getMIRType(pv), typeemitter, deps));
+                cpt.terms.forEach((v) => getDepFromType(root, v, typeemitter, deps));
+            });
+        }
+        else if (opt instanceof MIRTupleType) {
+            return opt.entries.forEach((entry) => getDepFromType(root, entry.type, typeemitter, deps));
+        }
+        else {
+            return (opt as MIRRecordType).entries.forEach((entry) => getDepFromType(root, entry.type, typeemitter, deps));
+        }
+    });
+}
+
+function getDepOn(dcl: MIREntityTypeDecl, typeemitter: CPPTypeEmitter): Set<string> {
+    const deps = new Set<string>();
+    getDepFromType(typeemitter.getMIRType(dcl.tkey), typeemitter.getMIRType(dcl.tkey), typeemitter, deps);
+
+    return deps;
+}
+
+function depOrderSingle(decls: {name: string, decl: string, deps: Set<string>, ops: string[]}[], cdecl: {name: string, decl: string, deps: Set<string>, ops: string[]}, order: {name: string, decl: string,ops: string[]}[]) {
+    if(order.find((dc) => dc.name === cdecl.name) !== undefined) {
+        return; //already in the order
+    }
+
+    //insert all my deps
+    cdecl.deps.forEach((dep) => {
+        const ddcl = decls.find((dc) => dc.name === dep);
+        if(ddcl !== undefined) {
+            depOrderSingle(decls, ddcl, order);
+        }
+    });
+
+    order.push({name: cdecl.name, decl: cdecl.decl, ops: cdecl.ops});
+}
+
+function depOrderDecls(alldecls: {name: string, decl: string, deps: Set<string>, ops: string[]}[]): {decl: string, ops: string[]}[] {
+    let res: {name: string, decl: string, ops: string[]}[] = [];
+
+    for (let i = 0; i < alldecls.length; ++i) {
+        const dcl = alldecls[i];
+        depOrderSingle(alldecls, dcl, res);
+    }
+
+    return res.map((rr) => { return {decl: rr.decl, ops: rr.ops} });
+}
+
 class CPPEmitter {
     static emit(assembly: MIRAssembly, entrypointname: string): CPPCode {
         const typeemitter = new CPPTypeEmitter(assembly);
@@ -47,29 +109,30 @@ class CPPEmitter {
         const bodyemitter = new CPPBodyEmitter(assembly, typeemitter);
         
         let typedecls_fwd: string[] = [];
-        let typedecls: [string, string[]][] = [];
+        let itypedecls: {name: string, decl: string, deps: Set<string>, ops: string[]}[] = [];
         let nominaltypeinfo: {enum: string, display: string, datakind: string}[] = [];
         let vfieldaccesses: string[] = [];
         [...assembly.entityDecls]
-        .sort((a, b) => a[0]
-        .localeCompare(b[0])).map((ee) => ee[1])
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map((ee) => ee[1])
         .forEach((edecl) => {
             const cppdecl: any = typeemitter.generateCPPEntity(edecl);
+            const deps = getDepOn(edecl, typeemitter);
             if (cppdecl !== undefined) {
                 if(cppdecl.isref) {
                     const refdecl = cppdecl as { fwddecl: string, fulldecl: string };
                     typedecls_fwd.push(refdecl.fwddecl);
-                    typedecls.push([refdecl.fulldecl, []]);
+                    itypedecls.push({name: edecl.tkey, decl: refdecl.fulldecl, deps: deps, ops: []});
                 }
                 else {
-                    const structdecl = cppdecl as { depon: string[], fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] };
+                    const structdecl = cppdecl as { fwddecl: string, fulldecl: string, boxeddecl: string, ops: string[] };
 
                     typedecls_fwd.push(structdecl.fwddecl);
-                    typedecls.push([structdecl.fulldecl + structdecl.ops.join("\n"), structdecl.depon]);
-                    typedecls.push([structdecl.boxeddecl, [structdecl.fulldecl]]);
+                    itypedecls.push({name: edecl.tkey, decl: structdecl.fulldecl + structdecl.ops.join("\n"), deps: deps, ops: []});
+                    itypedecls.push({name: "[BOXED]", decl: structdecl.boxeddecl, deps: deps, ops: []});
 
                     //
-                    //TODO: buildup ops for STATIC_OPS_DECLARE, NOMINAL_TYPE_TO_OPS, and STATIC_OPS_CREATE
+                    //TODO: buildup ops for unions as well later
                     //
                 }
             }
@@ -92,6 +155,7 @@ class CPPEmitter {
                 }
             });
         });
+        let typedecls = depOrderDecls(itypedecls);
 
         let concepttypeinfo: {enum: string, display: string, datakind: string}[] = [];
         [...assembly.conceptDecls]
@@ -238,7 +302,6 @@ class CPPEmitter {
 
         const maincall = `${mainsig} {\n${chkarglen}\n\n${convdecl}\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
-
         return {
             STATIC_STRING_DECLARE: conststring_declare.sort().join("\n  "),
             STATIC_STRING_CREATE: conststring_create.sort().join("\n  "),
@@ -247,7 +310,7 @@ class CPPEmitter {
             STATIC_INT_CREATE: constint_create.sort().join("\n  "),
             
             TYPEDECLS_FWD: typedecls_fwd.sort().join("\n"),
-            TYPEDECLS: typedecls.map((tde) => tde[0]).sort().join("\n"),
+            TYPEDECLS: [...typedecls.map((tde) => tde.decl), ...(([] as string[]).concat(...typedecls.map((tde) => tde.ops)))].join("\n"),
             EPHEMERAL_LIST_DECLARE: ephdecls.sort().join("\n"),
         
             PROPERTY_ENUM_DECLARE: [...propertyenums].sort().join(",\n  "), 
