@@ -11,7 +11,7 @@ import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedSt
 import { PCode, MIREmitter, MIRKeyGenerator, MIRBodyEmitter } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRRegisterArgument, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey } from "../compiler/mir_ops";
 import { SourceInfo } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType, MIRRegex } from "../compiler/mir_assembly";
 
 class TypeError extends Error {
     readonly file: string;
@@ -5417,6 +5417,19 @@ class TypeChecker {
             this.m_emitEnabled = false;
             this.abortIfTooManyErrors();
         }
+    }
+
+    processRegexInfo() {
+        //TODO: check regexs here and convert to MIRRegex IR too!!!
+
+        this.m_assembly.getAllLiteralRegexs().forEach((lre) => {
+            this.m_emitter.masm.literalRegexs.set(lre, new MIRRegex(lre));
+        })
+
+        this.m_assembly.getAllValidators().forEach((vre) => {
+            const vkey = MIRKeyGenerator.generateTypeKey(vre[0].object, vre[0].binds);
+            this.m_emitter.masm.validatorRegexs.set(vkey, vre[1]);
+        });
     }
 
     runFinalExhaustiveChecks() {

@@ -846,6 +846,7 @@ class MIREmitter {
             }
 
             if (checker.getErrorList().length === 0) {
+                checker.processRegexInfo();
                 checker.runFinalExhaustiveChecks();
 
                 //compute closed field and vtable info

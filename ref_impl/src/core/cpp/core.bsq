@@ -223,10 +223,19 @@ entity String provides KeyType, PODType, APIType, Some {
 
 //<summary>Primitive safe string value.</summary>
 entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType, Convertable {
+    private static s_unsafe_from(str: String): SafeString<T> # safestring_unsafe_from
+
     method string(): String # safestring_string
 
-    static as(str: String): SafeString<T> # safestring_as
-    static tryAs(str: String): SafeString<T>? # safestring_tryas
+    static from(str: String): SafeString<T>
+        requires release T::accepts(str);
+    {
+        return SafeString<T>::s_unsafe_from(str);
+    }
+
+    static tryFrom(str: String): SafeString<T>? {
+        return T::accepts(str) ? SafeString<T>::s_unsafe_from(str) : none;
+    }
 
     method convert<U where Validator>(): SafeString<U> # stringof_convert
     method tryConvert<U where Validator>(): SafeString<U>? # stringof_tryconvert
@@ -236,8 +245,8 @@ entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType, C
 entity StringOf<T where Parsable> provides APIValue, KeyType, Some, Convertable {
     method string(): String # stringof_string
 
-    static as(str: String): StringOf<T> # stringof_as
-    static tryAs(str: String): StringOf<T>? # stringof_tryas
+    static from(str: String): StringOf<T> # stringof_from
+    static tryFrom(str: String): StringOf<T>? # stringof_tryfrom
 
     method convert<U where Parsable>(): StringOf<U> # stringof_convert
     method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert

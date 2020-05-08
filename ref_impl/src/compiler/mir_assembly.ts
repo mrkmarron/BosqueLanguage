@@ -44,6 +44,23 @@ class MIRFunctionParameter {
     }
 }
 
+class MIRRegex {
+    readonly re: string;
+    //TODO: later we want to have the parsed regex IR here too
+
+    constructor(re: string) {
+        this.re = re;
+    }
+
+    jemit(): object {
+        return { re: this.re };
+    }
+
+    static jparse(jobj: any): MIRRegex {
+        return new MIRRegex(jobj.re);
+    }
+}
+
 class MIRConstantDecl {
     readonly enclosingDecl: MIRNominalTypeKey | undefined;
     readonly cname: string;
@@ -528,6 +545,9 @@ class MIRAssembly {
     readonly srcFiles: { relativePath: string, contents: string }[];
     readonly srcHash: string;
 
+    readonly literalRegexs: Map<string, MIRRegex> = new Map<string, MIRRegex>();
+    readonly validatorRegexs: Map<MIRNominalTypeKey, string> = new Map<MIRNominalTypeKey, string>();
+
     readonly constantDecls: Map<MIRConstantKey, MIRConstantDecl> = new Map<MIRConstantKey, MIRConstantDecl>();
     readonly fieldDecls: Map<MIRFieldKey, MIRFieldDecl> = new Map<MIRFieldKey, MIRFieldDecl>();
 
@@ -794,6 +814,8 @@ class MIRAssembly {
             package: this.package.jemit(),
             srcFiles: this.srcFiles,
             srcHash: this.srcHash,
+            literalRegexs: [...this.literalRegexs].map((lre) => [lre[0], lre[1].jemit()]),
+            validatorRegexs: [...this.validatorRegexs].map((vre) => [vre[0], vre[1]]),
             constantDecls: [...this.constantDecls].map((cd) => [cd[0], cd[1].jemit()]),
             fieldDecls: [...this.fieldDecls].map((fd) => [fd[0], fd[1].jemit()]),
             entryPoints: this.entryPoints,
@@ -808,6 +830,8 @@ class MIRAssembly {
     static jparse(jobj: any): MIRAssembly {
         let masm = new MIRAssembly(PackageConfig.jparse(jobj.package), jobj.srcFiles, jobj.srcHash);
 
+        jobj.literalRegexs.forEach((lre: any) => masm.literalRegexs.set(lre[0], MIRRegex.jparse(lre[1])));
+        jobj.validatorRegexs.forEach((vre: any) => masm.validatorRegexs.set(vre[0], vre[1]));
         jobj.constantDecls.forEach((cd: any) => masm.constantDecls.set(cd[0], MIRConstantDecl.jparse(cd[1])));
         jobj.fieldDecls.forEach((fd: any) => masm.fieldDecls.set(fd[0], MIRFieldDecl.jparse(fd[1])));
         jobj.entryPoints.forEach((ep: any) => masm.entryPoints.push(ep));
@@ -822,7 +846,7 @@ class MIRAssembly {
 }
 
 export {
-    MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
+    MIRRegex, MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
     MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
     MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,

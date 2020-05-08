@@ -36,6 +36,13 @@ entity NamedGreeting provides WithName, Greeting {
     }
 }
 
+typedef Letter = /^\w$/;
+typedef Digit = /^\d$/;
+
+function fss(s1: SafeString<Digit>): Bool {
+    return s1->string() == "3";
+}
+
 ////
 //Tests
 
@@ -129,4 +136,24 @@ entrypoint function checkInvsAndObjsPuzzle(n: String): String {
     check say != "hello chuck";
 
     return say;
+}
+
+entrypoint function sstringAccepts(): Bool {
+    return !Digit::accepts("a") && Digit::accepts("2");
+}
+
+entrypoint function sstringAsError(): Bool {
+    return fss(SafeString<Digit>::from("a"));
+}
+
+entrypoint function sstringAsOk(): Bool {
+    return fss(SafeString<Digit>::from("3"));
+}
+
+entrypoint function sstringAsChk(s: String): Bool {
+    if(Digit::accepts(s)) {
+        check !fss(SafeString<Digit>::from(s));
+    }
+
+    return true;
 }

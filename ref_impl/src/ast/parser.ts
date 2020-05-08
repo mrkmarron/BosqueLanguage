@@ -39,7 +39,6 @@ const KeywordStrings = [
     "false",
     "field",
     "fn",
-    "from",
     "function",
     "global",
     "identifier",
@@ -65,7 +64,6 @@ const KeywordStrings = [
     "typeas",
     "typetry",
     "typedef",
-    "using",
     "validate",
     "let",
     "var",
@@ -1345,6 +1343,8 @@ class Parser {
         }
         else if (tk === TokenStrings.Regex) {
             const restr = this.consumeTokenAndGetValue(); //keep in escaped format
+
+            this.m_penv.assembly.addLiteralRegex(restr);
             return new LiteralRegexExpression(sinfo, restr);
         }
         else if(tk === "err" || tk === "ok") {
@@ -2709,13 +2709,12 @@ class Parser {
     }
 
     private parseNamespaceUsing(currentDecl: NamespaceDeclaration) {
-        //from NS using {...} ;
+        //import NS {...} ;
 
-        this.ensureAndConsumeToken("from");
+        this.ensureAndConsumeToken("import");
         this.ensureToken(TokenStrings.Namespace);
         const fromns = this.consumeTokenAndGetValue();
 
-        this.ensureAndConsumeToken("using");
         const names = this.parseListOf<string>("{", "}", ",", () => {
             return this.consumeTokenAndGetValue();
         })[0];
@@ -2751,16 +2750,15 @@ class Parser {
 
             const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, vregex));
             const param = new FunctionParameter("arg", new NominalTypeSignature("NSCore", "String"), false, false);
-            const pragma = [new NominalTypeSignature("NSCore", "Validator"), vregex] as [NominalTypeSignature, string];
             const acceptsbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "validator_accepts");
-            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [pragma], [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), acceptsbody);
+            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), acceptsbody);
             const accepts = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "accepts", acceptsinvoke);
             const provides = [[new NominalTypeSignature("NSCore", "Validator"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
             const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [], currentDecl.ns, tyname, [], provides, [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>().set("accepts", accepts), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>());
 
             currentDecl.objects.set(tyname, validatortype);
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, currentDecl.objects.get(tyname) as EntityTypeDecl);
-            this.m_penv.assembly.addValidatorDecl(currentDecl.ns + "::" + tyname, vregex);
+            this.m_penv.assembly.addValidatorRegex(currentDecl.ns + "::" + tyname, vregex);
         }
         else {
             const btype = this.parseTypeSignature();
@@ -3304,10 +3302,10 @@ class Parser {
         this.setNamespaceAndFile(ns, file);
         const nsdecl = this.m_penv.assembly.ensureNamespace(ns);
 
-        let usingok = true;
+        let importok = true;
         let parseok = true;
         while (this.m_cpos < this.m_epos) {
-            const rpos = this.scanTokenOptions("function", "global", "using", "typedef", "concept", "entity", "enum", "identifier", TokenStrings.EndOfStream);
+            const rpos = this.scanTokenOptions("function", "global", "import", "typedef", "concept", "entity", "enum", "identifier", TokenStrings.EndOfStream);
 
             try {
                 if (rpos === this.m_epos) {
@@ -3315,9 +3313,9 @@ class Parser {
                 }
 
                 const tk = this.m_tokens[rpos].kind;
-                usingok = usingok && tk === "using";
-                if (tk === "using") {
-                    if (!usingok) {
+                importok = importok && tk === "import";
+                if (tk === "import") {
+                    if (!importok) {
                         this.raiseError(this.getCurrentLine(), "Using statements must come before other declarations");
                     }
 

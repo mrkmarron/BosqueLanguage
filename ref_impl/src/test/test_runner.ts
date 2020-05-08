@@ -267,7 +267,7 @@ class TestRunner {
             const tstart = Date.now();
 
             const cr = this.runAOTTest(testsrc, ctest);
-            if (ctest.expected === cr || (ctest.expected === null && (cr.includes("abort") || cr.includes("assert") || cr.includes("check") || cr.includes("Invariant")))) {
+            if (ctest.expected === cr || (ctest.expected === null && (cr.includes("abort") || cr.includes("assert") || cr.includes("check") || cr.includes("Invariant") || cr.includes("pre-condition") || cr.includes("post-condition")))) {
                 process.stdout.write(chalk.green("pass\n"));
                 tresults.push(`<testcase name="${ctest.name}" class="" time="${(Date.now() - tstart) / 1000}"/>`);
 

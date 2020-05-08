@@ -3,13 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType, MIRRegex } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRLoadConstRegex, MIRNominalTypeKey, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRPackSlice, MIRPackExtend, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 
 import * as assert from "assert";
+import { compileRegexSMTMatch } from "./smt_regex";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -1751,24 +1752,8 @@ class SMTBodyEmitter {
         const enclkey = (idecl.enclosingDecl || "[NA]") as MIRNominalTypeKey
         switch (idecl.implkey) {
             case "validator_accepts": {
-                //
-                //TODO: this is a bit of a hack -- we need to implement our own regex lib and make sure it is consistent between typechecker, compiler, and here too!
-                //          also need to compile regex str into Z3 version!!!
-                //
-                let rs = idecl.pragmas[0][1];
-                let re = "[INVALID]";
-                if(rs === "/\\d/") {
-                    re = `(re.range "0" "9")`;
-                }
-                else if(rs === "/\\w/") {
-                    re = `(re.union (re.range "a" "z") (re.range "A" "Z"))`;
-                }
-                else {
-                    assert(!rs.includes("\\") && !rs.includes("*") && !rs.includes("+") && !rs.includes("|"), "Regex support is very limited!!!");
-                    re = `(str.to.re "${rs.substring(1, rs.length - 1)}"))`;
-                }
-
-                bodyres = new SMTValue(`(str.in.re ${params[0]} ${re})`);
+                const rs = this.assembly.literalRegexs.get(this.assembly.validatorRegexs.get(idecl.enclosingDecl as MIRNominalTypeKey) as string) as MIRRegex;
+                bodyres = compileRegexSMTMatch(rs, params[0]);
                 break;
             }
             case "enum_create": {
@@ -1789,6 +1774,14 @@ class SMTBodyEmitter {
             }
             case "string_substring": {
                 bodyres = new SMTValue(`(str.substr ${params[0]} ${params[1]} ${params[2]})`);
+                break;
+            }
+            case "safestring_string": {
+                bodyres = new SMTValue(`(bsq_safestring_value ${params[0]})`);
+                break;
+            }
+            case "safestring_unsafe_from": {
+                bodyres = new SMTValue(`(bsq_safestring@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
                 break;
             }
             case "list_size": {

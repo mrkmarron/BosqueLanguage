@@ -496,7 +496,9 @@ class Assembly {
     private m_namespaceMap: Map<string, NamespaceDeclaration> = new Map<string, NamespaceDeclaration>();
     private m_conceptMap: Map<string, ConceptTypeDecl> = new Map<string, ConceptTypeDecl>();
     private m_objectMap: Map<string, EntityTypeDecl> = new Map<string, EntityTypeDecl>();
-    private m_validatorMap: Map<string, string> = new Map<string, string>();
+
+    private m_literalRegexs: Set<string> = new Set<string>();
+    private m_validatorRegexs: Map<string, string> = new Map<string, string>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
@@ -1026,7 +1028,7 @@ class Assembly {
     }
 
     tryGetValidatorForFullyResolvedName(name: string): string | undefined {
-        return this.m_validatorMap.get(name);
+        return this.m_validatorRegexs.get(name);
     }
 
     hasNamespace(ns: string): boolean {
@@ -1061,9 +1063,25 @@ class Assembly {
         this.m_objectMap.set(resolvedName, object);
     }
 
-    addValidatorDecl(resolvedName: string, validator: string) {
-        this.m_validatorMap.set(resolvedName, validator);
+    addValidatorRegex(resolvedName: string, validator: string) {
+        this.m_literalRegexs.add(validator);
+        this.m_validatorRegexs.set(resolvedName, validator);
     }
+
+    addLiteralRegex(re: string) {
+        this.m_literalRegexs.add(re);
+    }
+
+    getAllLiteralRegexs(): Set<string> {
+        return this.m_literalRegexs;
+    }
+
+    getAllValidators(): [ResolvedEntityAtomType, string][] {
+        return [...this.m_validatorRegexs].map((vre) => {
+            const ve = ResolvedEntityAtomType.create(this.m_objectMap.get(vre[0]) as EntityTypeDecl, new Map<string, ResolvedType>());
+            return [ve, vre[1]];
+        });
+    } 
 
     ////
     //Type representation, normalization, and operations

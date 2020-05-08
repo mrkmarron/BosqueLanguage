@@ -51,6 +51,21 @@
                 "expected": null
             },
             {
+                "kind": "aot",
+                "entrypoint": "sstringAccepts",
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "sstringAsError",
+                "expected": null
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "sstringAsOk",
+                "expected": "true"
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -113,6 +128,26 @@
             {
                 "kind": "symtest",
                 "entrypoint": "checkInvsAndObjsPuzzle",
+                "error": true
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "sstringAccepts",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "sstringAsError",
+                "expected": null
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "sstringAsOk",
+                "expected": "true"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "sstringAsChk",
                 "error": true
             }
         ]

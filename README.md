@@ -114,22 +114,21 @@ NamedGreeting@{name="bob"}->sayHello() //"hello bob"
 
 **Validated and Typed Strings:**
 ```
-typedef Letters4 = /\w\w\w\w/;
-typedef Digits4 = /\d\d\d\d/;
+typedef Letter = /^\w$/;
+typedef Digit = /^\d$/;
 
-function fss(s1: SafeString<Digits4>): Bool {
-    return s1->string() == "1234";
+function fss(s1: SafeString<Digit>): Bool {
+    return s1->string() == "3";
 }
 
-Digits4::accepts("abcd") //false
-Digits4::accepts("1234") //true
+Digit::accepts("a"); //false
+Digit::accepts("2"); //true
 
-fss("1234")                           //type error String is not a SafeString
-fss(SafeString<Letters4>::as("abcd")) //type error incompatible SafeString types
-fss(Digits4'abcd')                    //type error 'abcd' is incompatible with Digits4 
-fss(SafeString<Digits4>::as("abcd"))  //runtime error 'abcd' is incompatible with Digits4
-
-fss(SafeString<Digits4>::as("1234"))  //true
+fss("1234")                         //type error String is not a SafeString
+fss(SafeString<Letter>::from("a"))  //type error incompatible SafeString types
+fss(Digit'a')                       //type error 'a' is incompatible with Digit 
+fss(SafeString<Digit>::from("a"))   //runtime error 'a' is incompatible with Digit
+fss(SafeString<Digit>::from("3"))   //true
 ```
 
 ```
