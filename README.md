@@ -132,31 +132,31 @@ fss(SafeString<Digit>::from("3"))   //true
 ```
 
 ```
-entity ErrorCode provides Parsable {
+entity StatusCode provides Parsable {
     field code: Int;
     field name: String;
 
-    override static tryParse(err: String): Result<Any, String> {
-        return switch(err) {
-            case "IO"     => Result<Any, String>::ok(ErrorCode@{code=1, name=err})
-            case "Assert" => Result<Any, String>::ok(ErrorCode@{code=2, name=err})
-            case _        => Result<Any, String>::err("Unknown error")
-        }
+    override static tryParse(name: String): Result<StatusCode, String> {
+        return switch(name) {
+            case "IO"      => ok(StatusCode@{1, name})
+            case "Network" => ok(StatusCode@{2, name})
+            case _         => err("Unknown code")
+        };
     }
 }
 
-function isIOErr(s: StringOf<ErrorCode>): ErrorCode {
-    return s == ErrorCode'IO';
+function isIOCode(s: StringOf<StatusCode>): Bool {
+    return s == StatusCode'IO';
 }
 
-isIOErr("IO")                             //type error not a StringOf<ErrorCode>
-isIOErr(ErrorCode'Input')                 //type error not a valid ErrorCode string
-isIOErr(StringOf<ErrorCode>::as('Input')) //runtime error not a valid ErrorCode string
+isIOCode("IO");                               //type error not a StringOf<StatusCode>
+isIOCode(StatusCode'Input')                   //type error not a valid StatusCode string
+isIOCode(StringOf<StatusCode>::from("Input")) //runtime error not a valid StatusCode string
 
-isIOErr(ErrorCode'Assert')             //false
-isIOErr(StringOf<ErrorCode>::as('IO')) //true
+isIOCode(StatusCode'Assert')               //false
+isIOCode(StringOf<StatusCode>::from("IO")) //true
 
-let ec: ErrorCode = StringOf<ErrorCode>@'IO';
+let ec: StatusCode = StatusCode@'IO';
 assert(ec.code == 1); //true
 ```
 

@@ -71,6 +71,26 @@
                 "expected": "true"
             },
             {
+                "kind": "aot",
+                "entrypoint": "stringofFromErr",
+                "expected": null
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "stringofIsIONo",
+                "expected": "false"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "stringofIsIOYes",
+                "expected": "true"
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "stringofIsIOCons",
+                "expected": "1"
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -158,6 +178,31 @@
             {
                 "kind": "symtest",
                 "entrypoint": "sstringAsChk",
+                "error": true
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "stringofFromErr",
+                "expected": null
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "stringofIsIONo",
+                "expected": "false"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "stringofIsIOYes",
+                "expected": "true"
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "stringofIsIOCons",
+                "expected": "1"
+            },
+            {
+                "kind": "symtest",
+                "entrypoint": "stringofIsChk",
                 "error": true
             }
         ]

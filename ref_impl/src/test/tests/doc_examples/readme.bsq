@@ -43,6 +43,23 @@ function fss(s1: SafeString<Digit>): Bool {
     return s1->string() == "3";
 }
 
+entity StatusCode provides Parsable {
+    field code: Int;
+    field name: String;
+
+    override static tryParse(name: String): Result<StatusCode, String> {
+        return switch(name) {
+            case "IO"      => ok(StatusCode@{1, name})
+            case "Network" => ok(StatusCode@{2, name})
+            case _         => err("Unknown code")
+        };
+    }
+}
+
+function isIOCode(s: StringOf<StatusCode>): Bool {
+    return s == StatusCode'IO';
+}
+
 ////
 //Tests
 
@@ -160,4 +177,30 @@ entrypoint function sstringAsChk(s: String): Bool {
     }
 
     return true;
+}
+
+entrypoint function stringofFromErr(): Bool {
+    return isIOCode(StringOf<StatusCode>::from("Input"));
+}
+
+entrypoint function stringofIsIONo(): Bool {
+    return isIOCode(StringOf<StatusCode>::from("Network"));
+}
+
+entrypoint function stringofIsIOYes(): Bool {
+    return isIOCode(StringOf<StatusCode>::from("IO"));
+}
+
+entrypoint function stringofIsIOCons(): Int {
+    let sc: StatusCode = StatusCode@'IO';
+    return sc.code;
+}
+
+entrypoint function stringofIsChk(s: String): Int {
+    let sc = StatusCode::tryParse(s);
+    if(sc->isOk()) {
+        check sc->result().code != 2;
+    }
+
+    return 0;
 }

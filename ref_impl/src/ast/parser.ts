@@ -2792,11 +2792,11 @@ class Parser {
                 provides.push([pv, res]);
             }
         }
-        else {
-            if (!iscorens) {
-                provides.push([new NominalTypeSignature("NSCore", "Object"), undefined]);
-            }
+        
+        if (!iscorens) {
+            provides.push([new NominalTypeSignature("NSCore", "Object"), undefined]);
         }
+
         return provides;
     }
 

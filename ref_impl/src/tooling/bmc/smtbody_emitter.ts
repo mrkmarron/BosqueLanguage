@@ -229,7 +229,7 @@ class SMTBodyEmitter {
             const tv = this.generateTempName();
             const iserr = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
             const errchk = this.generateTypeCheck(`(result_success_value@${ivrtype} ${tv})`, this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(op.errtype as MIRResolvedTypeKey));
-            const condop = new SMTCond(new SMTValue(`(or ${iserr.emit()} (not ${errchk}))`), failchk, emitstr);
+            const condop = new SMTCond(new SMTValue(`(or ${iserr.emit()} ${errchk})`), failchk, emitstr);
     
             return new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${sval})`), condop);
         }
