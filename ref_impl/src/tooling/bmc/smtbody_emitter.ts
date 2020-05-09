@@ -221,21 +221,17 @@ class SMTBodyEmitter {
             const pfunc = (this.assembly.invokeDecls.get(op.pfunckey) || this.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
 
             const rval = new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(op.tskey)}" ${sval})`);
-            const tv = this.generateTempName();
             const ivrtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(pfunc.resultType));
-            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
-        
-            const ichk = new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${sval})`));
-            const checkerror = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
-            const extracterror = (ivrtype !== resulttype) ? new SMTValue(`(result_error@${this.typegen.getSMTTypeFor(this.currentRType)} (result_error_code@${ivrtype} ${tv}))`) : new SMTValue(tv);
+            
+            const emitstr = new SMTLet(this.varToSMTName(op.trgt), rval);
+            const failchk = this.generateErrorCreate(op.sinfo, this.typegen.getSMTTypeFor(this.currentRType));
 
-            const resultT = (this.typegen.assembly.conceptDecls.get(pfunc.resultType) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const errtname = [...this.typegen.assembly.entityDecls].find((dcl) => dcl[0].startsWith("NSCore::Err<") && (dcl[1].terms.get("T") as MIRType).trkey === resultT.trkey) as [string, MIREntityTypeDecl];
-            const successf = this.typegen.generateConstructorTest(errtname[0]);
-
-            const resultv = ichk.bind(new SMTValue(`(result_success_value@${ivrtype} ${tv})`));
-            const cond = new SMTValue(`(or ${checkerror} (${successf} ${resultv}))`)
-            return new SMTLet(this.varToSMTName(op.trgt), new SMTCond(cond, extracterror, rval))
+            const tv = this.generateTempName();
+            const iserr = new SMTValue(`(is-result_error@${ivrtype} ${tv})`);
+            const errchk = this.generateTypeCheck(`(result_success_value@${ivrtype} ${tv})`, this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(op.errtype as MIRResolvedTypeKey));
+            const condop = new SMTCond(new SMTValue(`(or ${iserr.emit()} (not ${errchk}))`), failchk, emitstr);
+    
+            return new SMTLet(tv, new SMTValue(`(${this.invokenameToSMT(op.pfunckey)} ${sval})`), condop);
         }
     }
 
@@ -1791,6 +1787,14 @@ class SMTBodyEmitter {
             }
             case "safestring_unsafe_from": {
                 bodyres = new SMTValue(`(bsq_safestring@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
+                break;
+            }
+            case "stringof_string": {
+                bodyres = new SMTValue(`(bsq_stringof_value ${params[0]})`);
+                break;
+            }
+            case "stringof_unsafe_from": {
+                bodyres = new SMTValue(`(bsq_stringof@cons "${this.typegen.mangleStringForSMT(enclkey)}" ${params[0]})`);
                 break;
             }
             case "list_size": {

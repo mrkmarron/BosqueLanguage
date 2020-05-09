@@ -243,10 +243,19 @@ entity SafeString<T where Validator> provides KeyType, Some, PODType, APIType, C
 
 //<summary>Primitive stringof value.</summary>
 entity StringOf<T where Parsable> provides APIValue, KeyType, Some, Convertable {
+    private static s_unsafe_from(str: String): StringOf<T> # stringof_unsafe_from
+
     method string(): String # stringof_string
 
-    static from(str: String): StringOf<T> # stringof_from
-    static tryFrom(str: String): StringOf<T>? # stringof_tryfrom
+    static from(str: String): StringOf<T> 
+        requires release T::tryParse(str)->isOk();
+    {
+        return StringOf<T>::s_unsafe_from(str);
+    }
+
+    static tryFrom(str: String): StringOf<T>? {
+        return T::tryParse(str)->isOk() ? StringOf<T>::s_unsafe_from(str) : none;
+    }
 
     method convert<U where Parsable>(): StringOf<U> # stringof_convert
     method tryConvert<U where Parsable>(): StringOf<U>? # stringof_tryconvert
@@ -370,11 +379,11 @@ struct entity MapEntry<K where KeyType, V> provides Some, Convertable, PODType w
 
 //<summary>Providing this concept allows for an entity to be compared or stored in a key based container using the key field.</summary>
 struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
-    static cok(result: T): Result<T, E> {
+    static createOk(result: T): Result<T, E> {
         return Ok<T, E>::of(result);
     }
 
-    static cerr(info: E): Result<T, E> {
+    static createErr(info: E): Result<T, E> {
         return Err<T, E>::of(info);
     }
 
@@ -395,7 +404,7 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 
     method convert<U, V>(): Result<U, V> {
-        return this->isOk() ? Result<U, V>::cok(this->result()->as<U>()) : Result<U, V>::cerr(this->failure()->as<V>());
+        return this->isOk() ? Result<U, V>::createOk(this->result()->as<U>()) : Result<U, V>::createErr(this->failure()->as<V>());
     }
 }
 

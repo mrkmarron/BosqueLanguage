@@ -1756,6 +1756,14 @@ class CPPBodyEmitter {
                 bodystr = `auto $$return = BSQ_NEW_NO_RC(BSQSafeString, ${params[0]}->sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)});`;
                 break;
             }
+            case "stringof_string": {
+                bodystr = `auto $$return =  BSQ_NEW_NO_RC(BSQString, BSQ_GET_VALUE_PTR(${params[0]}, BSQStringOf)->sdata);`;
+                break;
+            }
+            case "stringof_unsafe_from": {
+                bodystr = `auto $$return = BSQ_NEW_NO_RC(BSQStringOf, ${params[0]}->sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(this.currentRType.trkey)});`;
+                break;
+            }
             case "list_size": {
                 bodystr = `auto $$return = (int64_t)(${params[0]}->entries.size());`
                 break;

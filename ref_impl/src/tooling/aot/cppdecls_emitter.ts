@@ -129,7 +129,7 @@ class CPPEmitter {
 
                     typedecls_fwd.push(structdecl.fwddecl);
                     itypedecls.push({name: edecl.tkey, decl: structdecl.fulldecl + structdecl.ops.join("\n"), deps: deps, ops: []});
-                    itypedecls.push({name: "[BOXED]", decl: structdecl.boxeddecl, deps: deps, ops: []});
+                    itypedecls.push({name: `BOXED_${edecl.tkey}`, decl: structdecl.boxeddecl, deps: deps, ops: []});
 
                     //
                     //TODO: buildup ops for unions as well later

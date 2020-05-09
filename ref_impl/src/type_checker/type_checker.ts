@@ -2393,7 +2393,15 @@ class TypeChecker {
 
         const specialcall = (op.name === "isNone" || op.name === "isSome" || op.name === "is" || op.name === "as" || op.name === "tryAs" || op.name === "defaultAs");
 
-        if (!specialcall && (op.specificResolve !== undefined || (texp.isUniqueCallTargetType() && this.m_assembly.tryGetOOMemberDeclUnique(texp, "method", op.name)))) {
+        //three ways an invoke can be to a single known target
+        const isspecific = op.specificResolve !== undefined;
+        const isuniquetype = texp.isUniqueCallTargetType();
+        const muniqlookup = this.m_assembly.tryGetOOMemberDeclUnique(texp, "method", op.name);
+        const isnonvirtdecl = muniqlookup !== undefined && !(muniqlookup.decl as MemberMethodDecl).attributes.includes("abstract") && !(muniqlookup.decl as MemberMethodDecl).attributes.includes("virtual") && !(muniqlookup.decl as MemberMethodDecl).attributes.includes("override");
+
+        const isknown = isspecific || isuniquetype || isnonvirtdecl;
+
+        if (!specialcall && isknown) {
             const resolveType = op.specificResolve !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.specificResolve, env.terms) : texp;
 
             this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, resolveType), "This is not a subtype of specified resolve type");
