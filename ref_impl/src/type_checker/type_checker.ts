@@ -324,7 +324,7 @@ class TypeChecker {
 
     private getInfoForLoadFromPropertyName(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
         const options = rtype.options.map((atom) => {
-            if (atom instanceof ResolvedEntityAtomType) {
+            if (atom instanceof ResolvedConceptAtomType) {
                 const catom = ResolvedType.createSingle(atom);
                 
                 if (this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {

@@ -752,7 +752,7 @@ struct DisplayFunctor_BSQTuple
     }
 };
 
-class BSQRecord : BSQRef
+class BSQRecord : public BSQRef
 {
 public:
     std::map<MIRPropertyEnum, Value> entries;

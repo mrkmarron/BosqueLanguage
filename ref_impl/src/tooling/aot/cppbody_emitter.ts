@@ -1065,7 +1065,7 @@ class CPPBodyEmitter {
 
     generateSubtypeArrayLookup(typeenum: string, oftype: MIRConceptType): string {
         this.checkedConcepts.add(oftype.trkey);
-        const arraystr = `MIRSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}`;
+        const arraystr = `MIRConceptSubtypeArray__${this.typegen.mangleStringForCpp(oftype.trkey)}`;
         return `BSQObject::checkSubtype(${typeenum}, ${arraystr})`;
     }
 
@@ -1095,7 +1095,7 @@ class CPPBodyEmitter {
             if (inferargtype.options.some((iopt) => iopt instanceof MIRTupleType)) {
                 const tupmax = MIRType.createSingle(MIRConceptType.create([this.typegen.tupleType.trkey, this.typegen.podType.trkey, this.typegen.parsableType.trkey]));
                 const maybespecial = this.typegen.assembly.subtypeOf(tupmax, this.typegen.getMIRType(oftype.trkey)); //if this isn't true then special subtype will never be true
-                const trival = !this.typegen.assembly.subtypeOf(this.typegen.tupleType, this.typegen.getMIRType(oftype.trkey)); //if this is true then the default subtypeArray is enough
+                const trival = this.typegen.assembly.subtypeOf(this.typegen.tupleType, this.typegen.getMIRType(oftype.trkey)); //if this is true then the default subtypeArray is enough
                 if (maybespecial && !trival) {
                    ttest = `(enumacc == MIRNominalTypeEnum_Tuple) && ${this.generateTupleSpecialConceptCheck(arg, argtype, oftype)}`;
                 }
@@ -1103,7 +1103,10 @@ class CPPBodyEmitter {
 
             let rtest = "false";
             if (inferargtype.options.some((iopt) => iopt instanceof MIRRecordType)) {
-                if (!this.typegen.assembly.subtypeOf(this.typegen.recordType, this.typegen.getMIRType(oftype.trkey))) {
+                const recmax = MIRType.createSingle(MIRConceptType.create([this.typegen.recordType.trkey, this.typegen.podType.trkey, this.typegen.parsableType.trkey]));
+                const maybespecial = this.typegen.assembly.subtypeOf(recmax, this.typegen.getMIRType(oftype.trkey)); //if this isn't true then special subtype will never be true
+                const trival = this.typegen.assembly.subtypeOf(this.typegen.recordType, this.typegen.getMIRType(oftype.trkey)); //if this is true then the default subtypeArray is enough
+                if (maybespecial && !trival) {
                     rtest = `(enumacc == MIRNominalTypeEnum_Record) && ${this.generateRecordSpecialConceptCheck(arg, argtype, oftype)})`;
                 }
             }

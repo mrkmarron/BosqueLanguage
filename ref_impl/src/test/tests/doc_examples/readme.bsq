@@ -60,6 +60,23 @@ function isIOCode(s: StringOf<StatusCode>): Bool {
     return s == StatusCode'IO';
 }
 
+entity Person {
+    field name: String; 
+}
+
+function foo(arg?: {f: Int, n?: String} | String | Person): String {
+    if(arg == none) {
+        return "Blank";
+    }
+    else {
+        return switch(arg) {
+            type Record => arg.n ?| "Blank"
+            type String => arg
+            type Person => arg.name
+        };
+    }
+}
+
 ////
 //Tests
 
@@ -203,4 +220,24 @@ entrypoint function stringofIsChk(s: String): Int {
     }
 
     return 0;
+}
+
+entrypoint function ttoOptional(): String {
+    return foo();
+}
+
+entrypoint function ttoString(): String {
+    return foo("Bob");
+}
+
+entrypoint function ttoEntity(): String {
+    return foo(Person@{name="Bob"});
+}
+
+entrypoint function ttoRecordOptional(): String {
+    return foo({f=5});
+}
+
+entrypoint function ttoRecordExplicit(): String {
+    return foo({f=1, n="Bob"});
 }

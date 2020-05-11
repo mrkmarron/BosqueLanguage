@@ -525,6 +525,276 @@ class Assembly {
         return fullbinds;
     }
 
+    private restrictConceptTypes(ofc: ResolvedConceptAtomType, withc: ResolvedConceptAtomType): ResolvedConceptAtomType | undefined {
+        if(ofc.idStr === withc.idStr) {
+            return ofc;
+        }
+
+        const itypes = [...ofc.conceptTypes, ...withc.conceptTypes].sort((cte1, cte2) => cte1.idStr.localeCompare(cte2.idStr));
+
+        //do a simplification based on A & B when A \Subtypeeq B is A
+        let simplifiedTypes: ResolvedConceptAtomTypeEntry[] = [];
+        for (let i = 0; i < itypes.length; ++i) {
+            let docopy = true;
+            for (let j = 0; j < itypes.length; ++j) {
+                if (i === j) {
+                    continue; //ignore check on same element
+                }
+
+                //if \exists a Tj s.t. Ti \Subtypeeq Tj then we discard Tj
+                if (this.atomSubtypeOf(ResolvedConceptAtomType.create([itypes[j]]), ResolvedConceptAtomType.create([itypes[i]]))) {
+                    docopy = (itypes[i].idStr === itypes[j].idStr) && i < j; //if same type only keep one copy
+                    break;
+                }
+            }
+
+            if (docopy) {
+                simplifiedTypes.push(itypes[i]);
+            }
+        }
+
+        if (simplifiedTypes.length === 0) {
+            return undefined;
+        }
+
+        return ResolvedConceptAtomType.create(simplifiedTypes);
+    }
+
+    private restrictEntityConceptTypes(ofe: ResolvedEntityAtomType, withc: ResolvedConceptAtomType): ResolvedEntityAtomType | undefined {
+        return this.atomSubtypeOf(ofe, withc) ? ofe : undefined;
+    }
+
+    private restrictEntityTypes(ofe: ResolvedEntityAtomType, withe: ResolvedEntityAtomType): ResolvedEntityAtomType | undefined {
+        return (ofe.idStr === withe.idStr) ? ofe : undefined;
+    }
+
+    private restrictTupleTypes(oft: ResolvedTupleAtomType, witht: ResolvedTupleAtomType): ResolvedTupleAtomType | undefined {
+        let imax = Math.min(oft.types.length, witht.types.length);
+        if((imax < oft.types.length && !oft.types[imax].isOptional) || (imax < witht.types.length && !witht.types[imax].isOptional)) {
+            return undefined;
+        }
+
+        let itypes: ResolvedTupleAtomTypeEntry[] = [];
+        for(let i = 0; i < imax; ++i) {
+            const t1e = oft.types[i];
+            const t2e = witht.types[i];
+
+            const isopt = t1e.isOptional && t2e.isOptional;
+            const etype = this.restrictTypes(t1e.type, t2e.type);
+            if (!etype.isEmptyType()) {
+                itypes.push(new ResolvedTupleAtomTypeEntry(etype, isopt));
+            }
+            else {
+                if (!isopt) {
+                    return undefined; //this entry is not optional and no valid types inhabit it so intersection is empty
+                }
+                else {
+                    break; //this entry is optional but must not exist so truncate the tuple here
+                }
+            }
+        }
+
+        return ResolvedTupleAtomType.create(itypes);
+    }
+
+    private restrictTupleEntries(oft: ResolvedTupleAtomType, witht: ResolvedType): ResolvedTupleAtomType | undefined {
+        const rentries = oft.types.map((entry) => new ResolvedTupleAtomTypeEntry(witht, entry.isOptional));
+        const rtuple = ResolvedTupleAtomType.create(rentries);
+
+        return this.restrictTupleTypes(oft, rtuple);
+    }
+
+    restrictTupleConcept(oft: ResolvedTupleAtomType, withc: ResolvedConceptAtomType): ResolvedTupleAtomType | undefined {
+
+        //
+        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
+        //
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+            return this.restrictTupleEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+            return this.restrictTupleEntries(oft, this.getSpecialAPITypeConceptType());
+        }
+
+        if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(withc))) {
+            return oft;
+        }
+
+        return undefined;
+    }
+
+    private restrictRecordTypes(ofr: ResolvedRecordAtomType, withr: ResolvedRecordAtomType): ResolvedRecordAtomType | undefined {
+        let itypes: ResolvedRecordAtomTypeEntry[] = [];
+        for(let i = 0; i < ofr.entries.length; ++i) {
+            const r1e = ofr.entries[i];
+            const r2e = withr.entries.find((entry) => entry.name === r1e.name);
+
+            if(r2e === undefined) {
+                if (!r1e.isOptional) {
+                    return undefined; //we have a requrired type in r1 that is not in r2
+                }
+                //else it just can't be in the intersection
+            }
+            else {
+                const isopt = r1e.isOptional && r2e.isOptional;
+                const etype = this.restrictTypes(r1e.type, r2e.type);
+                if (!etype.isEmptyType()) {
+                    itypes.push(new ResolvedRecordAtomTypeEntry(r1e.name, etype, isopt));
+                }
+                else {
+                    if (!isopt) {
+                        return undefined; //this entry is not optional and no valid types inhabit it so intersection is empty
+                    }
+                    //this entry is optional but must not exist so it can't be in the intersection
+                }
+            }
+        }
+
+        for(let i = 0; i < withr.entries.length; ++i) {
+            const r2e = withr.entries[i];
+            const r1e = withr.entries.find((entry) => entry.name === r2e.name);
+            if(r1e === undefined) {
+                if (!r2e.isOptional) {
+                    return undefined; //we have a requrired type in r2 that is not in the intersection
+                }
+                //else it just can't be in the intersection
+            }
+        }
+
+        return ResolvedRecordAtomType.create(itypes);
+    }
+
+    private restrictRecordEntries(oft: ResolvedRecordAtomType, witht: ResolvedType): ResolvedRecordAtomType | undefined {
+        const rentries = oft.entries.map((entry) => new ResolvedRecordAtomTypeEntry(entry.name, witht, entry.isOptional));
+        const rrecord = ResolvedRecordAtomType.create(rentries);
+
+        return this.restrictRecordTypes(oft, rrecord);
+    }
+
+    restrictRecordConcept(oft: ResolvedRecordAtomType, withc: ResolvedConceptAtomType): ResolvedRecordAtomType | undefined {
+
+        //
+        //TODO: this is actually over approximate as Tuple & Parsable should be empty but this will return oft -- ok but we may want to do better in the future
+        //
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialPODTypeConceptType())) {
+            return this.restrictRecordEntries(oft, this.getSpecialPODTypeConceptType());
+        }
+
+        if (this.subtypeOf(ResolvedType.createSingle(withc), this.getSpecialAPITypeConceptType())) {
+            return this.restrictRecordEntries(oft, this.getSpecialAPITypeConceptType());
+        }
+
+        if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(withc))) {
+            return oft;
+        }
+
+        return undefined;
+    }
+
+    private restrictEphemeralListTypes(oft: ResolvedEphemeralListType, witht: ResolvedEphemeralListType): ResolvedEphemeralListType | undefined {
+        if(oft.types.length !== witht.types.length) {
+            return undefined;
+        }
+
+        let itypes: ResolvedType[] = [];
+        for(let i = 0; i < oft.types.length; ++i) {
+            const t1e = oft.types[i];
+            const t2e = witht.types[i];
+
+            const etype = this.restrictTypes(t1e, t2e);
+            itypes.push(etype);
+        }
+
+        return ResolvedEphemeralListType.create(itypes);
+    }
+
+    private restrictAtomTypes(ofa: ResolvedAtomType, witha: ResolvedAtomType): ResolvedAtomType | undefined {
+        if(ofa.idStr === witha.idStr) {
+            return ofa;
+        }
+
+        if(ofa instanceof ResolvedConceptAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictConceptTypes(ofa, witha);
+            }
+            else if (witha instanceof ResolvedEntityAtomType) {
+                return this.restrictEntityConceptTypes(witha, ofa);
+            }
+            else if (witha instanceof ResolvedTupleAtomType) {
+                return this.restrictTupleConcept(witha, ofa);
+            }
+            else if (witha instanceof ResolvedRecordAtomType) {
+                return this.restrictRecordConcept(witha, ofa);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedEntityAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictEntityConceptTypes(ofa, witha);
+            }
+            else if (witha instanceof ResolvedEntityAtomType) {
+                return this.restrictEntityTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedTupleAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictTupleConcept(ofa, witha);
+            }
+            else if (witha instanceof ResolvedTupleAtomType) {
+                return this.restrictTupleTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (ofa instanceof ResolvedRecordAtomType) {
+            if(witha instanceof ResolvedConceptAtomType) {
+                return this.restrictRecordConcept(ofa, witha);
+            }
+            else if (witha instanceof ResolvedRecordAtomType) {
+                return this.restrictRecordTypes(ofa, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else {
+            const ofaeph = ofa as ResolvedEphemeralListType;
+            if(witha instanceof ResolvedEphemeralListType) {
+                return this.restrictEphemeralListTypes(ofaeph, witha);
+            }
+            else {
+                return undefined;
+            }
+        }
+    }
+
+    private restrictAtomWithType(ofa: ResolvedAtomType, witht: ResolvedType): ResolvedType {
+        const types = witht.options.map((opt) => this.restrictAtomTypes(ofa, opt)).filter((opt) => opt !== undefined) as ResolvedAtomType[];
+        return ResolvedType.create(types);
+    }
+
+    private restrictTypes(oft: ResolvedType, witht: ResolvedType): ResolvedType {
+        if (oft.idStr === witht.idStr) {
+            return oft;
+        }
+
+        if (oft.isEmptyType() || witht.isEmptyType()) {
+            return ResolvedType.createEmpty();
+        }
+
+        const opttypes = oft.options.map((opt) => this.restrictAtomWithType(opt, witht));
+        return this.typeUpperBound(opttypes);
+    }
+
     getTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {
         if(oftype.idStr === "NSCore::APIType") {
             //
@@ -1449,33 +1719,15 @@ class Assembly {
     }
 
     restrictNone(from: ResolvedType): ResolvedType {
-        return (this.subtypeOf(this.getSpecialNoneType(), from)) ? this.getSpecialNoneType() : ResolvedType.createEmpty();
+        return this.restrictTypes(from, this.getSpecialNoneType());
     }
 
     restrictSome(from: ResolvedType): ResolvedType {
-        const hasany = from.options.some((atom) => ResolvedType.createSingle(atom).isAnyType());
-        const sometypes = from.options.filter((atom) => this.subtypeOf(ResolvedType.createSingle(atom), this.getSpecialSomeConceptType()));
-        if (hasany) {
-            return this.getSpecialSomeConceptType();
-        }
-        else if (sometypes.length !== 0) {
-            return ResolvedType.create(sometypes);
-        }
-        else {
-            return ResolvedType.createEmpty();
-        }
+        return this.restrictTypes(from, this.getSpecialSomeConceptType());
     }
 
     restrictT(from: ResolvedType, t: ResolvedType): ResolvedType {
-        if (t.isNoneType()) {
-            return this.restrictNone(from);
-        }
-        else if (t.isSomeType()) {
-            return this.restrictSome(from);
-        }
-        else {
-            return t;
-        }
+        return this.restrictTypes(from, t);
     }
 
     restrictNotT(from: ResolvedType, t: ResolvedType): ResolvedType {

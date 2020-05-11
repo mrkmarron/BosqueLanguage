@@ -91,6 +91,31 @@
                 "expected": "1"
             },
             {
+                "kind": "aot",
+                "entrypoint": "ttoOptional",
+                "expected": "\"Blank\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ttoString",
+                "expected": "\"Bob\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ttoEntity",
+                "expected": "\"Bob\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ttoRecordOptional",
+                "expected": "\"Blank\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "ttoRecordExplicit",
+                "expected": "\"Bob\""
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -204,6 +229,31 @@
                 "kind": "symtest",
                 "entrypoint": "stringofIsChk",
                 "error": true
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ttoOptional",
+                "expected": "\"Blank\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ttoString",
+                "expected": "\"Bob\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ttoEntity",
+                "expected": "\"Bob\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ttoRecordOptional",
+                "expected": "\"Blank\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "ttoRecordExplicit",
+                "expected": "\"Bob\""
             }
         ]
     }

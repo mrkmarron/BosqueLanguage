@@ -160,34 +160,33 @@ let ec: StatusCode = StatusCode@'IO';
 assert(ec.code == 1); //true
 ```
 
-**Structural, Nominal, and Union Types**
-[TESTS NEEDED]
+**Structural, Nominal, and Union Types (plus optional arguments)**
 ```
 entity Person {
     field name: String; 
 }
 
 function foo(arg?: {f: Int, n?: String} | String | Person): String {
-    if(arg->is<Tuple>()) {
-        return arg.n ?| "Blank";
+    if(arg == none) {
+        return "Blank";
     }
     else {
         return switch(arg) {
-            type None => "N/A"
+            type Record => arg.n ?| "Blank"
             type String => arg
             type Person => arg.name
-        }
+        };
     }
 }
 
-foo()                    //"N/A"
+foo()                    //"Blank"
+foo(none)                //Type error - none not allowed
 foo("Bob")               //Bob
 foo(Person@{name="Bob"}) //Bob
 foo({f=5})               //"Blank"
-foo({f=1, n="Bob"})      //"Bob"
 
-Foo({g=1, n="Bob"}) //Missing f property
-foo(none) //Error
+foo({f=1, n="Bob"})      //"Bob"
+foo({g=1, n="Bob"})      //Type error - Missing f property
 ```
 
 **Pre/Post Conditions**

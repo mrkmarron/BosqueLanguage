@@ -525,7 +525,7 @@ class SMTTypeEmitter {
         else if (this.typecheckAllKeys(from)) {
             const intotype = this.getSMTTypeFor(into);
             if(intotype === "BTerm") {
-                return new SMTValue(`(bsqterm_key ${exp})`);
+                return new SMTValue(`(bsqterm_key ${exp.emit()})`);
             }
             else {
                 return this.coerceFromOptionsKey(exp, into);
@@ -652,6 +652,14 @@ class SMTTypeEmitter {
         this.assembly.conceptDecls.forEach((tt) => {
             const cctype = this.getMIRType(tt.tkey);
             const est = [...this.assembly.entityDecls].map((edecl) => this.getMIRType(edecl[0])).filter((et) => this.assembly.subtypeOf(et, cctype));
+
+            if(this.assembly.subtypeOf(this.tupleType, cctype)) {
+                est.push(this.tupleType);
+            }
+            if(this.assembly.subtypeOf(this.recordType, cctype)) {
+                est.push(this.recordType);
+            }
+
             const keyarray = est.map((et) => et.trkey).sort();
 
             this.conceptSubtypeRelation.set(tt.tkey, keyarray);
