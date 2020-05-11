@@ -283,7 +283,7 @@ class CPPEmitter {
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
-                const conv = `BSQString ${p.name}(argv[${i}+1], 1);`;
+                const conv = `BSQString ${p.name}(conv.from_bytes(argv[${i}+1]), 1);`;
                 return "    " + conv;
             }
         });

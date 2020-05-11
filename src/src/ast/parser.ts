@@ -2672,7 +2672,7 @@ class Parser {
                     level = this.parseBuildInfo(level);
                 }
 
-                const exp = this.parseExpression();
+                const exp = this.parseSelectExpression(); //don't want to get the ExpOrExpression
 
                 let err: Expression | undefined = undefined;
                 if (isvalidate) {

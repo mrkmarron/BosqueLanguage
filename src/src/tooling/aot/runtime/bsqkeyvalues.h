@@ -128,7 +128,7 @@ public:
     BSQString(std::u32string&& str) : BSQRef(MIRNominalTypeEnum_String), sdata(std::move(str)) { ; }
 
     BSQString(char32_t c) : BSQRef(MIRNominalTypeEnum_String), sdata({ c }) { ; }
-    BSQString(const char32_t* str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
+    BSQString(const std::u32string& str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
 
     virtual ~BSQString() = default;
 

@@ -4956,7 +4956,7 @@ class TypeChecker {
     private processGenerateSpecialPreFunction_ResultT(sinfo: SourceInfo, exps: PreConditionDecl[], body: BodyImplementation): BodyImplementation {
         if (body.body instanceof Expression) {
             const ops = exps.map((pc) => {
-                return new CondBranchEntry<Expression>(pc.exp, pc.err as Expression);
+                return new CondBranchEntry<Expression>(new PrefixOp(pc.sinfo, "!", pc.exp), pc.err as Expression);
             });
             const ite = new IfExpression(sinfo, new IfElse<Expression>(ops, body.body as Expression));
 
@@ -4964,7 +4964,7 @@ class TypeChecker {
         }
         else {
             const ops = exps.map((pc) => {
-                return new CondBranchEntry<BlockStatement>(pc.exp, new BlockStatement((pc.err as Expression).sinfo, [new ReturnStatement((pc.err as Expression).sinfo, [pc.err as Expression])]));
+                return new CondBranchEntry<BlockStatement>(new PrefixOp(pc.sinfo, "!", pc.exp), new BlockStatement((pc.err as Expression).sinfo, [new ReturnStatement((pc.err as Expression).sinfo, [pc.err as Expression])]));
             });
             const ite = new IfElseStatement(sinfo, new IfElse<BlockStatement>(ops, body.body as BlockStatement));
 
