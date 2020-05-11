@@ -14,7 +14,7 @@ public:
     const std::u32string sdata;
 
     BSQString(const std::u32string& str) : BSQRef(MIRNominalTypeEnum_String), sdata(str) { ; }
-    BSQString(const char* str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t>().from_bytes(str)) { ; }
+    BSQString(const std::u32string& str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
 
     virtual ~BSQString() = default;
     virtual void destroy() { ; }

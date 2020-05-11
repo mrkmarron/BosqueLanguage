@@ -7,7 +7,7 @@
 The Bosque programming language is a breakthrough research project from [_Microsoft Research_](https://www.microsoft.com/en-us/research/project/bosque-programming-language/). Bosque simultaneously supports a high productivity development experience expected by modern cloud developers, coming from say a TypeScript/Node stack, while also providing a resource efficient and predictable runtime with a performance profile similar to a native C++ application. Beyond supporting these, previously conflicting objectives in one language, Bosque also brings an unprecedented tooling ecosystem including zero-effort verification, symbolic testing, dependency management validation, time-travel debugging, and more. 
 
 Small samples of code and unique Bosque tooling are below in the [Code Snippets](#Code-Snippets) and [Tooling](#Tooling) sections. A rundown of notable and/or unique features in the Bosque language is provided in the [language overview section 0](docs/language/overview.md#0-Highlight-Features).
-For a look at how the language works and flows _in the large_ please see the code for a [simple tic-tac-toe](src/src/test/apps/tictactoe/main.bsq) program.
+For a look at how the language works and flows _in the large_ please see the code for a [simple tic-tac-toe](impl/src/test/apps/tictactoe/main.bsq) program.
 
 **Note:** This repository and code are currently still experimental. This means that the language is subject to revision, there are bugs and missing functionality, and the performance is limited. 
 
@@ -291,7 +291,7 @@ Un-commenting the second requires line tells the tester that this, and similar e
 
 Note: we recommend specifying preconditions as always checked, `requires release`, on entrypoint functions to ensure that these externally exposed API endpdoints are not misused.
 
-More details on this symbolic checker can be found in the [readme](./src/src/runtimes/symtest/README.md).
+More details on this symbolic checker can be found in the [readme](./impl/src/runtimes/symtest/README.md).
 
 **Ahead-of-Time Compilation**
 
@@ -313,7 +313,7 @@ entrypoint function main(x: Int, y: Int): Int {
 ```
 Then run the following command to produce the `max.exe` (on Windows executable) which can then be invoked with:
 ```
-> node src\bin\runtimes\exegen\exegen.js -o max.exe max.bsq
+> node impl\bin\runtimes\exegen\exegen.js -o max.exe max.bsq
 ```
 Which will create an executable named `max.exe` in the current directory.
 
@@ -323,7 +323,7 @@ Running this executable:
 ```
 Will output `5`.
 
-More details on the `exeGen` tool can be found in the [readme](./src/src/runtimes/exegen/README.md).
+More details on the `exeGen` tool can be found in the [readme](./impl/src/runtimes/exegen/README.md).
 
 ## Using the Bosque Language
 
@@ -340,7 +340,7 @@ In order to build the language the following are needed:
 
 ### Build & Test
 
-The `src` directory contains the reference implementation parser, type checker, interpreter, and command line runner. In this directory, build and test the Bosque reference implementation with:
+The `impl` directory contains the reference implementation parser, type checker, interpreter, and command line runner. In this directory, build and test the Bosque reference implementation with:
 
 ```none
 npm install && npm test

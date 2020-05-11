@@ -8,11 +8,11 @@ steps:
 
 - script: npm install
   displayName: 'npm install'
-  workingDirectory: 'src'
+  workingDirectory: 'impl'
 
 - script: npm test
   displayName: 'npm test'
-  workingDirectory: 'src'
+  workingDirectory: 'impl'
 
 - task: PublishTestResults@2
   inputs:
