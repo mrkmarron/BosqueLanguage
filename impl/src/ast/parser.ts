@@ -11,7 +11,6 @@ import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, Stati
 const KeywordStrings = [
     "pragma",
 
-    "api",
     "struct",
     "hidden",
     "private",

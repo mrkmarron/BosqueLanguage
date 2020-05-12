@@ -116,6 +116,22 @@
                 "expected": "\"Bob\""
             },
             {
+                "kind": "aot",
+                "entrypoint": "animalCreateOk",
+                "expected": "\"ribbit\""
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "animalCreateFail",
+                "expected": null
+            },
+            {
+                "kind": "aot",
+                "entrypoint": "animalSays",
+                "args": ["dog", "woof"],
+                "expected": "NSCore::Ok<E={data?:NSCore::Any, msg:NSCore::String}|NSCore::None, T=NSCore::String>{ \"The dog says woof\" }"
+            },
+            {
                 "kind": "symexec",
                 "entrypoint": "add2C",
                 "expected": "5"
@@ -254,6 +270,16 @@
                 "kind": "symexec",
                 "entrypoint": "ttoRecordExplicit",
                 "expected": "\"Bob\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "animalCreateOk",
+                "expected": "\"ribbit\""
+            },
+            {
+                "kind": "symexec",
+                "entrypoint": "animalCreateFail",
+                "expected": null
             }
         ]
     }

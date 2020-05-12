@@ -77,6 +77,31 @@ function foo(arg?: {f: Int, n?: String} | String | Person): String {
     }
 }
 
+entity Animal {
+    invariant $says != "";
+
+    field says: String;
+}
+
+function createAnimal(catchPhrase: String): Animal
+{
+    return Animal@{says=catchPhrase};
+}
+
+function createAnimal(catchPhrase: String): Animal
+    requires catchPhrase != "";
+{
+    return Animal@{says=catchPhrase};
+}
+
+function createAnimalPreSafe(catchPhrase: String): Animal
+    requires release catchPhrase != "";
+{
+    return Animal@{says=catchPhrase};
+}
+
+typedef ErrData = {msg: String, data?: Any};
+
 ////
 //Tests
 
@@ -241,3 +266,19 @@ entrypoint function ttoRecordOptional(): String {
 entrypoint function ttoRecordExplicit(): String {
     return foo({f=1, n="Bob"});
 }
+
+entrypoint function animalCreateOk(): String {
+    return createAnimal("ribbit").says;
+}
+
+entrypoint function animalCreateFail(): String {
+    return createAnimal("").says;
+}
+
+entrypoint function animalSays(animal: String, catchPhrase: String): Result<String, ErrData?>
+    validate animal != "" or return err({ msg="Invalid animal" });
+    validate catchPhrase != "" or return err({ msg="Invalid catchPhrase" });
+{
+    return ok(String::concat("The ", animal, " says ", createAnimal(catchPhrase).says));
+}
+
