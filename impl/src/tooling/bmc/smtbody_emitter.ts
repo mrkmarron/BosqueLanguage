@@ -1808,6 +1808,10 @@ class SMTBodyEmitter {
                 bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "entries", params[0])} ${params[1]})`);
                 break;
             }
+            case "set_has_key": {
+                bodyres = new SMTValue(`(select ${this.typegen.generateSpecialTypeFieldAccess(enclkey, "has", params[0])} ${params[1]})`)
+                break;
+            }
             /*
             case "list_size":
             case "set_size":

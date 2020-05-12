@@ -249,14 +249,14 @@ The **symtest** tool implements the symbolic testing algorithm and works as foll
 ```
 namespace NSMain;
 
-global _ops: Set<String> = Set<String>@{
+global ops: Set<String> = Set<String>@{
     "negate",
     "add",
     "sub"
 };
 
 entrypoint function processOp(op: String, arg1: Int, arg2: Int?): Int 
-    requires release NSMain::_ops->has(op);
+    requires release NSMain::ops->has(op);
     //requires release (op == "add" || op == "sub") ==> arg2 != none;
 {
     if(op == "negate") {

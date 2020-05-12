@@ -269,23 +269,51 @@ class CPPEmitter {
         const entrypoint = assembly.invokeDecls.get(entrypointname) as MIRInvokeBodyDecl;
         const restype = typeemitter.getMIRType(entrypoint.resultType);
         const mainsig = `int main(int argc, char** argv)`;
-        const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
+        let oprarms = 0;
         const convargs = entrypoint.params.map((p, i) => {
-            if(p.type === "NSCore::Bool") {
-                const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
-                const conv = `bool ${p.name} = std::string(argv[${i}+1]) == "true";`;
-                return "    " + fchk + "\n    " + conv;
+            let ptype = p.type;
+            if(ptype.includes("NSCore::None")) {
+                oprarms++;
+                const ndecl = `KeyValue ${p.name} = nullptr;`;
+                let ivv = "";
+
+                ptype = p.type.replace(" | NSCore::None", "");
+                if (ptype === "NSCore::Bool") {
+                    const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
+                    const conv = `${p.name} = BSQ_ENCODE_VALUE_BOOL(std::string(argv[${i}+1]) == "true");`;
+                    ivv = "     {\n    " + fchk + "\n    " + conv + "\n    }";
+                }
+                else if (ptype === "NSCore::Int") {
+                    const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
+                    const conv = `${p.name} = BSQ_ENCODE_VALUE_TAGGED_INT(std::stoi(std::string(argv[${i}+1])));`;
+                    ivv = "    {\n    " + fchk + "\n    " + conv + "\n    }";
+                }
+                else {
+                    const conv = `BSQString __arg${i + 1}__(argv[${i}+1], 1); ${p.name} = &__arg${i + 1}__;`;
+                    ivv = "    {\n    " + conv + "\n    }";
+                }
+
+                return ndecl + "\n" + `if (argc > ${i} + 1)\n` + ivv;
             }
-            else if(p.type === "NSCore::Int") {
-                const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
-                const conv = `int64_t ${p.name} = std::stoi(std::string(argv[${i}+1]));`;
-                return "    \n    " + fchk + "\n    " + conv;
-            } 
-            else  {
-                const conv = `BSQString ${p.name}(argv[${i}+1], 1);`;
-                return "    " + conv;
+            else {
+                if (ptype === "NSCore::Bool") {
+                    const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
+                    const conv = `bool ${p.name} = std::string(argv[${i}+1]) == "true";`;
+                    return "    " + fchk + "\n    " + conv;
+                }
+                else if (ptype === "NSCore::Int") {
+                    const fchk = `if(!std::regex_match(std::string(argv[${i}+1]), std::regex("^([+]|[-])?[0-9]{1,8}$"))) { fprintf(stderr, "Bad argument for ${p.name} -- expected (small) Int got %s\\n", argv[${i}+1]); exit(1); }`;
+                    const conv = `int64_t ${p.name} = std::stoi(std::string(argv[${i}+1]));`;
+                    return "    \n    " + fchk + "\n    " + conv;
+                }
+                else {
+                    const conv = `BSQString ${p.name}(argv[${i}+1], 1);`;
+                    return "    " + conv;
+                }
             }
         });
+
+        const chkarglen = `    if(argc > ${entrypoint.params.length} + 1 || argc < ${entrypoint.params.length} + 1 - ${oprarms}) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
 
         let scopev = "";
         const scopevar = bodyemitter.varNameToCppName("$scope$");

@@ -1698,6 +1698,10 @@ class CPPBodyEmitter {
         return (this.typegen.assembly.entityDecls.get(idecl.enclosingDecl as string) as MIREntityTypeDecl).terms.get("T") as MIRType;
     }
 
+    getSetContentsInfoForListOp(idecl: MIRInvokePrimitiveDecl): MIRType {
+        return (this.typegen.assembly.entityDecls.get(idecl.enclosingDecl as string) as MIREntityTypeDecl).terms.get("T") as MIRType;
+    }
+
     createListOpsFor(ctype: MIRType): string {
         const crepr = this.typegen.getCPPReprFor(ctype);
         const cops = this.typegen.getFunctorsForType(ctype);
@@ -1791,6 +1795,11 @@ class CPPBodyEmitter {
                 const ctype = this.getListContentsInfoForListOp(idecl);
                 const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
                 bodystr = `auto $$return = ${this.createListOpsFor(ctype)}::list_none(${params[0]}, ${lambda});`
+                break;
+            }
+            case "set_has_key": {
+                const tcmp = this.typegen.getFunctorsForType(this.getSetContentsInfoForListOp(idecl)).eq;
+                bodystr = `auto $$return = std::binary_search(${params[0]}->entries.begin(), ${params[0]}->entries.end(), ${params[1]}, ${tcmp}{});`;
                 break;
             }
             /*

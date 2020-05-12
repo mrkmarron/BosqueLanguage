@@ -129,8 +129,22 @@ class SMTEmitter {
 
             argscall.push(`@${param.name}`);
             argsdecls.push(`(declare-const @${param.name} ${typeemitter.getSMTTypeFor(paramtype)})`);
-            const tcops = paramtype.options.map((opt) => bodyemitter.generateTypeCheck("@" + param.name, paramtype, paramtype, typeemitter.getMIRType(opt.trkey)));
-            if(!tcops.some((tcr) => tcr === "true")) {
+            if(paramtype.options.length !== 1) {
+                const tcops = paramtype.options.map((opt) => {
+                    if(opt.trkey === "NSCore::None") {
+                        return `(= @${param.name} bsqkey_none)`;
+                    }
+                    else if(opt.trkey === "NSCore::Bool") {
+                        return `(is-bsqkey_bool @${param.name})`;
+                    }
+                    else if(opt.trkey === "NSCore::Int") {
+                        return `(is-bsqkey_int @${param.name})`;
+                    }
+                    else {
+                        return `(is-bsqkey_string @${param.name})`;
+                    }
+                });
+
                 argsdecls.push(`(assert (or ${tcops.join(" ")}))`);
             }
         }

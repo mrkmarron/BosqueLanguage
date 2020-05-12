@@ -932,7 +932,7 @@ class TypeChecker {
 
             if (this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
                 const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
-                const klbinds = new Map<string, ResolvedType>().set("K", this.m_assembly.getTypeProjection(oftype.binds.get("T") as ResolvedType, this.m_assembly.getSpecialKeyTypeConceptType()));
+                const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get("T") as ResolvedType);
                 const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
                 this.m_emitter.registerResolvedTypeReference(kltype);
                 this.m_emitter.registerTypeInstantiation(klobj, klbinds);

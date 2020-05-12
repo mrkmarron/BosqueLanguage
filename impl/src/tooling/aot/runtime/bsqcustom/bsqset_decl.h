@@ -23,7 +23,7 @@ public:
         auto end = std::unique(src.begin(), src.end(), T_EQ{});
 
         std::vector<T> res;
-        res.reserve(std::distance(src.begin(), end);
+        res.reserve(std::distance(src.begin(), end));
         std::transform(src.begin(), end, back_inserter(res), T_INC{});
 
         return res;
@@ -56,7 +56,7 @@ public:
             }
             first = false;
 
-            ss += FDisplay{}(entries->second);
+            ss += DisplayF{}(*iter);
         }
         ss += "}";
 
