@@ -36,7 +36,7 @@ public:
 
 //%%EPHEMERAL_LIST_DECLARE
 };
-
+/*
 class BSQParseError
 {
 public:
@@ -313,4 +313,5 @@ class APITypeParser
 public:
     APITypeParser(const std::string* data) { ; }
 };
+*/
 } // namespace BSQ

@@ -9,7 +9,7 @@ namespace BSQ
 //%%STATIC_STRING_CREATE%%
 
 //%%STATIC_INT_CREATE%%
-
+/*
 std::regex LexerRegexs::whitespaceRe("\\s+"); 
 std::regex LexerRegexs::commentRe("/((\\/\\/.*)|(\\/\\*[\\s\\S]*?\\/\\*))/");
 std::regex LexerRegexs::intRe("([+|-]?[0-9]+)");
@@ -25,5 +25,5 @@ std::regex LexerRegexs::hashRe("#[0-9a-fA-F]{64}");
 std::regex LexerRegexs::nameRe("[_a-zA-Z](_a-zA-Z0-9)*");
 
 std::regex LexerRegexs::newlineRe("\\n"); 
-
+*/
 } // namespace BSQ
