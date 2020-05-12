@@ -886,11 +886,11 @@ class CPPTypeEmitter {
             });
 
             const faccess = entity.fields.map((f) => this.coerce(`this->${this.mangleStringForCpp(f.fkey)}`, this.getMIRType(f.declaredType), this.anyType));
-            const fjoins = faccess.length !== 0 ? faccess.map((fa) => `diagnostic_format(${fa})`).join(" + std::u32string(U\", \") + ") : "U\" \"";
-            const display = "std::u32string display() const\n"
+            const fjoins = faccess.length !== 0 ? faccess.map((fa) => `diagnostic_format(${fa})`).join(" + std::string(\", \") + ") : "\" \"";
+            const display = "std::string display() const\n"
                 + "    {\n"
                 + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
-                + `        return std::u32string(U"${entity.tkey}{ ") + ${fjoins} + std::u32string(U" }");\n`
+                + `        return std::string("${entity.tkey}{ ") + ${fjoins} + std::string(" }");\n`
                 + "    }";
 
             if(!entity.attributes.includes("struct")) {
@@ -986,7 +986,7 @@ class CPPTypeEmitter {
 
                 const displayop = `struct RCDisplayFunctor_${this.mangleStringForCpp(entity.tkey)}`
                 + `{\n`
-                + `  std::u32string operator()(${this.mangleStringForCpp(entity.tkey)}& tt) const\n` 
+                + `  std::string operator()(${this.mangleStringForCpp(entity.tkey)}& tt) const\n` 
                 + `  {\n` 
                 + `    return tt.display();`
                 + `  }\n`
@@ -1011,7 +1011,7 @@ class CPPTypeEmitter {
                         + "{\n"
                         + "public:\n"
                         + `    Boxed_${this.mangleStringForCpp(entity.tkey)}(const ${this.mangleStringForCpp(entity.tkey)}& bval) : BSQBoxedObject(MIRNominalTypeEnum::${this.mangleStringForCpp(entity.tkey)}, bval) { ; }\n`
-                        + `    std::u32string display() const {return this->bval.display(); }\n\n`
+                        + `    std::string display() const {return this->bval.display(); }\n\n`
                         + "};",
                     ops: [
                         incop,
@@ -1055,11 +1055,11 @@ class CPPTypeEmitter {
             constructor_initializer.push(`entry_${i}(e${i})`);
         }
 
-        const fjoins = displayvals.map((dv) => `diagnostic_format(${dv})`).join(" + std::u32string(U\", \") + ");
-        const display = "std::u32string display() const\n"
+        const fjoins = displayvals.map((dv) => `diagnostic_format(${dv})`).join(" + std::string(\", \") + ");
+        const display = "std::string display() const\n"
             + "    {\n"
             + `        BSQRefScope ${this.mangleStringForCpp("$scope$")};\n`
-            + `        return std::u32string(U"(|) ") + ${fjoins} + std::u32string(U" |)");\n`
+            + `        return std::string("(|) ") + ${fjoins} + std::string(" |)");\n`
             + "    }";
 
         const processForCallReturn = "void processForCallReturn(BSQRefScope& scope)\n"

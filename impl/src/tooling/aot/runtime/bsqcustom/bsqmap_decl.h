@@ -74,22 +74,21 @@ public:
         });
     }
 
-    virtual std::u32string display() const
+    virtual std::string display() const
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        std::u32string ms(U"{");
+        std::string ms("{");
         bool first = true;
         for (auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter)
         {
             if (!first)
             {
-                ms += U", ";
+                ms += ", ";
             }
             first = false;
 
-            ms += K_Display(iter->key) + U" => " + V_Display(iter->value);
+            ms += K_Display(iter->key) + " => " + V_Display(iter->value);
         }
-        ms += U"}";
+        ms += "}";
 
         return ms;
     }

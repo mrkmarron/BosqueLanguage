@@ -111,13 +111,13 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
-constexpr const char32_t* propertyNames[] = {
-    U"Invalid",
+constexpr const char* propertyNames[] = {
+    "Invalid",
 //%%PROPERTY_NAMES%%
 };
 
-constexpr const char32_t* nominaltypenames[] = {
-    U"[INVALID]",
+constexpr const char* nominaltypenames[] = {
+    "[INVALID]",
 //%%NOMINAL_TYPE_DISPLAY_NAMES%%
 };
 
@@ -302,7 +302,7 @@ struct LessFunctor_NoneValue
 };
 struct DisplayFunctor_NoneValue
 {
-    std::u32string operator()(NoneValue n) const { return U"none"; }
+    std::string operator()(NoneValue n) const { return "none"; }
 };
 
 struct RCIncFunctor_bool
@@ -327,7 +327,7 @@ struct LessFunctor_bool
 };
 struct DisplayFunctor_bool
 {
-    std::u32string operator()(bool b) const { return b ? U"true" : U"false"; }
+    std::string operator()(bool b) const { return b ? "true" : "false"; }
 };
 
 struct RCIncFunctor_int64_t
@@ -352,10 +352,9 @@ struct LessFunctor_int64_t
 };
 struct DisplayFunctor_int64_t
 {
-    std::u32string operator()(int64_t i) const 
+    std::string operator()(int64_t i) const 
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(std::to_string(i));  
+        return std::to_string(i);  
     }
 };
 
@@ -373,10 +372,9 @@ struct RCReturnFunctor_double
 };
 struct DisplayFunctor_double
 {
-    std::u32string operator()(double d) const 
+    std::string operator()(double d) const 
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(std::to_string(d));  
+        return std::to_string(d);  
     }
 };
 typedef BSQBoxed<double, RCDecFunctor_double> Boxed_double;
@@ -389,7 +387,7 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
 
 DATA_KIND_FLAG getDataKindFlag(Value v);
 
-std::u32string diagnostic_format(Value v);
+std::string diagnostic_format(Value v);
 
 struct RCIncFunctor_BSQRef
 {
@@ -401,7 +399,7 @@ struct RCDecFunctor_BSQRef
 };
 struct DisplayFunctor_BSQRef
 {
-    std::u32string operator()(BSQRef* r) const { return diagnostic_format(r); }
+    std::string operator()(BSQRef* r) const { return diagnostic_format(r); }
 };
 
 struct RCIncFunctor_KeyValue
@@ -422,7 +420,7 @@ struct LessFunctor_KeyValue
 };
 struct DisplayFunctor_KeyValue
 {
-    std::u32string operator()(KeyValue k) const { return diagnostic_format(k); }
+    std::string operator()(KeyValue k) const { return diagnostic_format(k); }
 };
 
 struct RCIncFunctor_Value
@@ -435,20 +433,21 @@ struct RCDecFunctor_Value
 };
 struct DisplayFunctor_Value
 {
-    std::u32string operator()(Value v) const { return diagnostic_format(v); }
+    std::string operator()(Value v) const { return diagnostic_format(v); }
 };
 
 enum class BSQBufferFormat {
-    Text,
+    Char,
     Bosque,
-    Json,
-    Binary
+    EBosque,
+    Json
 };
 
 enum class BSQBufferEncoding {
     UTF8,
     URI,
-    Base64
+    Base64,
+    Binary
 };
 
 enum class BSQBufferCompression {
@@ -470,13 +469,12 @@ public:
     virtual ~BSQByteBuffer() = default;
     virtual void destroy() { ; }
 
-    std::u32string display_contents() const
+    std::string display_contents() const
     {
-        std::u32string rvals(U"");
+        std::string rvals("");
         if(this->compression == BSQBufferCompression::Off)
         {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            rvals += conv.from_bytes((char*)this->sdata.data(), (char*)this->sdata.data() + this->sdata.size());
+            rvals += std::string((char*)this->sdata.data(), (char*)this->sdata.data() + this->sdata.size());
         }
         else
         {
@@ -484,7 +482,7 @@ public:
             {
                 if(i != 0)
                 {
-                    rvals += U", ";
+                    rvals += ", ";
                 }
 
                 rvals += this->sdata[i];
@@ -495,11 +493,11 @@ public:
 };
 struct DisplayFunctor_BSQByteBuffer
 {
-    std::u32string operator()(const BSQByteBuffer* bb) const 
+    std::string operator()(const BSQByteBuffer* bb) const 
     {
-        std::u32string rvals(U"ByteBuffer{");
+        std::string rvals("ByteBuffer{");
         rvals += bb->display_contents();
-        rvals += U"}";
+        rvals += "}";
 
         return rvals;
     }
@@ -524,12 +522,12 @@ public:
 };
 struct DisplayFunctor_BSQBuffer
 {
-    std::u32string operator()(const BSQBuffer* buff) const 
+    std::string operator()(const BSQBuffer* buff) const 
     {
-        std::u32string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
-        rvals += U"{";
+        std::string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
+        rvals += "{";
         rvals += buff->sdata->display_contents();
-        rvals += U"}";
+        rvals += "}";
 
         return rvals;
     }
@@ -554,12 +552,12 @@ public:
 };
 struct DisplayFunctor_BSQBufferOf
 {
-    std::u32string operator()(const BSQBufferOf* buff) const 
+    std::string operator()(const BSQBufferOf* buff) const 
     {
-        std::u32string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
-        rvals += U"{";
+        std::string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
+        rvals += "{";
         rvals += buff->sdata->display_contents();
-        rvals += U"}";
+        rvals += "}";
 
         return rvals;
     }
@@ -593,10 +591,9 @@ struct RCReturnFunctor_BSQISOTime
 };
 struct DisplayFunctor_BSQISOTime
 {
-    std::u32string operator()(const BSQISOTime& t) const 
+    std::string operator()(const BSQISOTime& t) const 
     { 
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return std::u32string{U"ISOTime={"} + conv.from_bytes(std::to_string(t.isotime)) + U"}";
+        return std::string{"ISOTime={"} + std::to_string(t.isotime) + "}";
     }
 };
 typedef BSQBoxed<BSQISOTime, RCDecFunctor_BSQISOTime> Boxed_BSQISOTime;
@@ -604,16 +601,16 @@ typedef BSQBoxed<BSQISOTime, RCDecFunctor_BSQISOTime> Boxed_BSQISOTime;
 class BSQRegex : public BSQRef
 {
 public:
-    const std::u32string re;
+    const std::string re;
 
-    BSQRegex(const std::u32string& re) : BSQRef(MIRNominalTypeEnum_Regex), re(re) { ; }
+    BSQRegex(const std::string& re) : BSQRef(MIRNominalTypeEnum_Regex), re(re) { ; }
     virtual ~BSQRegex() = default;
 };
 struct DisplayFunctor_BSQRegex
 {
-    std::u32string operator()(const BSQRegex* r) const 
+    std::string operator()(const BSQRegex* r) const 
     { 
-        return std::u32string{U"/"} + r->re + std::u32string{U"/"};
+        return std::string{"/"} + r->re + std::string{"/"};
     }
 };
 
@@ -734,19 +731,19 @@ struct RCReturnFunctor_BSQTuple
 };
 struct DisplayFunctor_BSQTuple
 {
-    std::u32string operator()(const BSQTuple& tt) const 
+    std::string operator()(const BSQTuple& tt) const 
     { 
-        std::u32string tvals(U"[");
+        std::string tvals("[");
         for(size_t i = 0; i < tt.entries.size(); ++i)
         {
             if(i != 0)
             {
-                tvals += U", ";
+                tvals += ", ";
             }
 
             tvals += diagnostic_format(tt.entries[i]);
         }
-        tvals += U"]";
+        tvals += "]";
 
         return tvals;
     }
@@ -911,21 +908,21 @@ struct RCReturnFunctor_BSQRecord
 };
 struct DisplayFunctor_BSQRecord
 {
-    std::u32string operator()(const BSQRecord& rr) const 
+    std::string operator()(const BSQRecord& rr) const 
     { 
-        std::u32string rvals(U"{");
+        std::string rvals("{");
         bool first = true;
         for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
         {
             if(!first)
             {
-                rvals += U", ";
+                rvals += ", ";
             }
             first = false;
 
-            rvals += std::u32string{propertyNames[(int32_t)iter->first]} + U"=" + diagnostic_format(iter->second);
+            rvals += std::string{propertyNames[(int32_t)iter->first]} + "=" + diagnostic_format(iter->second);
         }
-        rvals += U"}";
+        rvals += "}";
 
         return rvals;
     }
@@ -937,7 +934,7 @@ public:
     BSQObject(MIRNominalTypeEnum ntype) : BSQRef(ntype) { ; }
     virtual ~BSQObject() = default;
 
-    virtual std::u32string display() const = 0;
+    virtual std::string display() const = 0;
 
     template<int32_t k>
     inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])

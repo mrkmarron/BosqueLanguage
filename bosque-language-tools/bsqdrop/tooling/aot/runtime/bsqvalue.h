@@ -232,7 +232,7 @@ struct LessFunctor_bool
 };
 struct DisplayFunctor_bool
 {
-    std::u32string operator()(bool b) const { return b ? U"true" : U"false"; }
+    std::string operator()(bool b) const { return b ? "true" : "false"; }
 };
 
 //A big integer class for supporting Bosque -- right now it does not do much
@@ -257,9 +257,9 @@ public:
         return 0;
     }
 
-    std::u32string display() const
+    std::string display() const
     {
-        return U"[NOT IMPLEMENTED]";
+        return "[NOT IMPLEMENTED]";
     }
 
     static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
@@ -311,10 +311,6 @@ public:
     {
         return nullptr;
     }
-};
-struct HashFunctor_IntValue
-{
-    size_t operator()(IntValue i) const { return BSQ_IS_VALUE_TAGGED_INT(i) ? BSQ_GET_VALUE_TAGGED_INT(i) : BSQ_GET_VALUE_PTR(i, BSQBigInt)->hash(); }
 };
 struct EqualFunctor_IntValue
 {

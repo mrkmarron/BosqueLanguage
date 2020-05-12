@@ -44,22 +44,21 @@ public:
         });
     }
 
-    virtual std::u32string display() const
+    virtual std::string display() const
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        std::u32string ss(U"{");
+        std::string ss("{");
         bool first = true;
         for (auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter)
         {
             if (!first)
             {
-                ss += U", ";
+                ss += ", ";
             }
             first = false;
 
             ss += FDisplay{}(entries->second);
         }
-        ss += U"}";
+        ss += "}";
 
         return ss;
     }

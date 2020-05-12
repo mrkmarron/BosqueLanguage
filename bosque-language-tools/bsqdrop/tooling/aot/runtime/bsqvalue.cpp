@@ -310,20 +310,19 @@ DATA_KIND_FLAG getDataKindFlag(Value v)
     }
 }
 
-std::u32string diagnostic_format(Value v)
+std::string diagnostic_format(Value v)
 {
     if(BSQ_IS_VALUE_NONE(v))
     {
-        return std::u32string(U"none");
+        return std::string(U"none");
     }
     else if(BSQ_IS_VALUE_BOOL(v))
     {
-        return BSQ_GET_VALUE_BOOL(v) ? std::u32string(U"true") : std::u32string(U"false");
+        return BSQ_GET_VALUE_BOOL(v) ? std::string(U"true") : std::string(U"false");
     }
     else if(BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(v)));
+        return std::to_string(BSQ_GET_VALUE_TAGGED_INT(v));
     }
     else
     {
@@ -383,73 +382,68 @@ std::u32string diagnostic_format(Value v)
         else if(dynamic_cast<const BSQBuffer*>(vv) != nullptr)
         {
             auto pbuf = dynamic_cast<const BSQBuffer*>(vv);
-            std::u32string rvals(U"PODBuffer{");
+            std::string rvals("PODBuffer{");
             for (size_t i = 0; i < pbuf->sdata.size(); ++i)
             {
                 if(i != 0)
                 {
-                    rvals += U", ";
+                    rvals += ", ";
                 }
 
                 rvals += pbuf->sdata[i];
             }
-            rvals += U"}";
+            rvals += "}";
 
             return rvals;
         }
         else if(dynamic_cast<const BSQISOTime*>(vv) != nullptr)
         {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            return std::u32string{U"ISOTime="} + conv.from_bytes(std::to_string(dynamic_cast<const BSQISOTime*>(vv)->isotime)) + U"}";
+            return std::string{"ISOTime="} + std::to_string(dynamic_cast<const BSQISOTime*>(vv)->isotime) + "}";
         }
         else if(dynamic_cast<const BSQRegex*>(vv) != nullptr)
         {
-            return std::u32string{U"Regex="} + dynamic_cast<const BSQRegex*>(vv)->re;
+            return std::string{"Regex="} + dynamic_cast<const BSQRegex*>(vv)->re;
         }
         else if(dynamic_cast<const BSQTuple*>(vv) != nullptr)
         {
             auto tv = dynamic_cast<const BSQTuple*>(vv);
-            std::u32string tvals(U"[");
+            std::string tvals("[");
             for(size_t i = 0; i < tv->entries.size(); ++i)
             {
                 if(i != 0)
                 {
-                    tvals += U", ";
+                    tvals += ", ";
                 }
 
                 tvals += diagnostic_format(tv->entries.at(i));
             }
-            tvals += U"]";
+            tvals += "]";
 
             return tvals;
         }
         else if(dynamic_cast<const BSQRecord*>(vv) != nullptr)
         {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-
             auto rv = dynamic_cast<const BSQRecord*>(vv);
-            std::u32string rvals(U"{");
+            std::string rvals("{");
             bool first = true;
             for(auto iter = rv->entries.cbegin(); iter != rv->entries.cend(); ++iter)
             {
                 if(!first)
                 {
-                    rvals += U", ";
+                    rvals += ", ";
                 }
                 first = false;
 
-                rvals += conv.from_bytes(propertyNames[(int32_t)iter->first]) + U"=" + diagnostic_format(iter->second);
+                rvals += std::string(propertyNames[(int32_t)iter->first]) + "=" + diagnostic_format(iter->second);
             }
-            rvals += U"}";
+            rvals += "}";
 
             return rvals;
         }
         else
         {
-            std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-            
             auto obj = dynamic_cast<const BSQObject*>(vv);
-            return conv.from_bytes(nominaltypenames[(uint32_t) obj->nominalType]) + obj->display();
+            return std::string(nominaltypenames[(uint32_t) obj->nominalType]) + obj->display();
         }
     }
 }

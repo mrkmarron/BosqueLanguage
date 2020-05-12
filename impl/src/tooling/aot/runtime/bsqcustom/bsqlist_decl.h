@@ -31,20 +31,18 @@ public:
         });
     }
 
-    virtual std::u32string display() const
+    virtual std::string display() const
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-
-        std::u32string ls(U"{");
+        std::string ls("{");
         for (size_t i = 0; i < this->entries.size(); ++i)
         {
             if (i != 0)
             {
-                ls += U", ";
+                ls += ", ";
             }
             ls += DisplayF{}(this->entries[i]);
         }
-        ls += U"}";
+        ls += "}";
 
         return ls;
     }

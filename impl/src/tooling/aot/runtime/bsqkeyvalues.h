@@ -43,9 +43,9 @@ public:
     ~BSQBigInt() { ; }
     virtual void destroy() { ; }
 
-    std::u32string display() const
+    std::string display() const
     {
-        return U"[NOT IMPLEMENTED]";
+        return "[NOT IMPLEMENTED]";
     }
 
     static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
@@ -116,19 +116,19 @@ struct LessFunctor_BSQBigInt
 };
 struct DisplayFunctor_BSQBigInt
 {
-    std::u32string operator()(BSQBigInt* i) const { return i->display(); }
+    std::string operator()(BSQBigInt* i) const { return i->display(); }
 };
 
 class BSQString : public BSQRef
 {
 public:
-    const std::u32string sdata;
+    const std::string sdata;
 
-    BSQString(const std::u32string& str) : BSQRef(MIRNominalTypeEnum_String), sdata(str) { ; }
-    BSQString(std::u32string&& str) : BSQRef(MIRNominalTypeEnum_String), sdata(std::move(str)) { ; }
+    BSQString(const std::string& str) : BSQRef(MIRNominalTypeEnum_String), sdata(str) { ; }
+    BSQString(std::string&& str) : BSQRef(MIRNominalTypeEnum_String), sdata(std::move(str)) { ; }
 
-    BSQString(char32_t c) : BSQRef(MIRNominalTypeEnum_String), sdata({ c }) { ; }
-    BSQString(const std::u32string& str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
+    BSQString(char c) : BSQRef(MIRNominalTypeEnum_String), sdata({ c }) { ; }
+    BSQString(const std::string& str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
 
     virtual ~BSQString() = default;
 
@@ -160,15 +160,15 @@ struct LessFunctor_BSQString
 };
 struct DisplayFunctor_BSQString
 {
-    std::u32string operator()(const BSQString* s) const { return std::u32string(U"\"") + std::u32string(s->sdata.cbegin(), s->sdata.cend()) + std::u32string(U"\""); }
+    std::string operator()(const BSQString* s) const { return std::string("\"") + std::string(s->sdata.cbegin(), s->sdata.cend()) + std::string("\""); }
 };
 
 class BSQSafeString : public BSQRef
 {
 public:
-    const std::u32string sdata;
+    const std::string sdata;
   
-    BSQSafeString(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
+    BSQSafeString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
 
     virtual ~BSQSafeString() = default;
 
@@ -200,18 +200,18 @@ struct LessFunctor_BSQSafeString
 };
 struct DisplayFunctor_BSQSafeString
 {
-    std::u32string operator()(const BSQSafeString* s) const 
+    std::string operator()(const BSQSafeString* s) const 
     { 
-        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::u32string(U"'") + s->sdata + std::u32string(U"'"); 
+        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::string("'") + s->sdata + std::string("'"); 
     }
 };
 
 class BSQStringOf : public BSQRef
 {
 public:
-    const std::u32string sdata;
+    const std::string sdata;
   
-    BSQStringOf(const std::u32string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
+    BSQStringOf(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
 
     virtual ~BSQStringOf() = default;
 
@@ -243,9 +243,9 @@ struct LessFunctor_BSQStringOf
 };
 struct DisplayFunctor_BSQStringOf
 {
-    std::u32string operator()(const BSQStringOf* s) const 
+    std::string operator()(const BSQStringOf* s) const 
     { 
-        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::u32string(U"'") + s->sdata + std::u32string(U"'"); 
+        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::string("'") + s->sdata + std::string("'"); 
     }
 };
 
@@ -295,7 +295,7 @@ struct LessFunctor_BSQUUID
 };
 struct DisplayFunctor_BSQUUID
 {
-    std::u32string operator()(const BSQUUID& u) const { return std::u32string(U"DataHash@") + std::u32string(u.sdata, u.sdata + 16); }
+    std::string operator()(const BSQUUID& u) const { return std::string("DataHash@") + std::string(u.sdata, u.sdata + 16); }
 };
 typedef BSQBoxed<BSQUUID, RCDecFunctor_BSQUUID> Boxed_BSQUUID;
 
@@ -345,10 +345,9 @@ struct LessFunctor_BSQLogicalTime
 };
 struct DisplayFunctor_BSQLogicalTime
 {
-    std::u32string operator()(const BSQLogicalTime& et) const 
+    std::string operator()(const BSQLogicalTime& et) const 
     { 
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return std::u32string(U"LogicalTime@") + conv.from_bytes(std::to_string(et.timestamp)); 
+        return std::string("LogicalTime@") + std::to_string(et.timestamp); 
     }
 };
 typedef BSQBoxed<BSQLogicalTime, RCDecFunctor_BSQLogicalTime> Boxed_BSQLogicalTime;
@@ -390,7 +389,7 @@ struct LessFunctor_BSQCryptoHash
 };
 struct DisplayFunctor_BSQCryptoHash
 {
-    std::u32string operator()(const BSQCryptoHash* h) const { return std::u32string(U"CryptoHash@") + std::u32string(h->hdata, h->hdata + 64); }
+    std::string operator()(const BSQCryptoHash* h) const { return std::string("CryptoHash@") + std::string(h->hdata, h->hdata + 64); }
 };
 
 class BSQEnum
@@ -440,10 +439,9 @@ struct LessFunctor_BSQEnum
 };
 struct DisplayFunctor_BSQEnum
 {
-    std::u32string operator()(const BSQEnum& e) const 
+    std::string operator()(const BSQEnum& e) const 
     { 
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return nominaltypenames[GET_MIR_TYPE_POSITION(e.nominalType)] + std::u32string(U"::") + conv.from_bytes(std::to_string(e.value)); 
+        return nominaltypenames[GET_MIR_TYPE_POSITION(e.nominalType)] + std::string("::") + std::to_string(e.value); 
     }
 };
 typedef BSQBoxed<BSQEnum, RCDecFunctor_BSQEnum> Boxed_BSQEnum;
@@ -511,10 +509,10 @@ struct LessFunctor_BSQIdKeySimple
 };
 struct DisplayFunctor_BSQIdKeySimple
 {
-    std::u32string operator()(const BSQIdKeySimple& idk) const 
+    std::string operator()(const BSQIdKeySimple& idk) const 
     { 
-        std::u32string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk.nominalType)];
-        return rvals + U" of " + diagnostic_format(idk.key);
+        std::string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk.nominalType)];
+        return rvals + " of " + diagnostic_format(idk.key);
     }
 };
 typedef BSQBoxed<BSQIdKeySimple, RCDecFunctor_BSQIdKeySimple> Boxed_BSQIdKeySimple;
@@ -609,20 +607,20 @@ struct LessFunctor_BSQIdKeyCompound
 };
 struct DisplayFunctor_BSQIdKeyCompound
 {
-    std::u32string operator()(const BSQIdKeyCompound* idk) const 
+    std::string operator()(const BSQIdKeyCompound* idk) const 
     { 
-        std::u32string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk->nominalType)];
-        rvals +=  U" of ( ";
+        std::string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk->nominalType)];
+        rvals +=  " of ( ";
         for(size_t i = 0; i < idk->keys.size(); ++i)
         {
             if(i != 0)
             {
-                rvals += U", ";
+                rvals += ", ";
             }
 
             rvals += diagnostic_format(idk->keys[i]);
         }
-        rvals += U" )"; 
+        rvals += " )"; 
 
         return rvals;
     }

@@ -1549,7 +1549,7 @@ class CPPBodyEmitter {
                     return "assert(false);";
                 }
                 else {
-                    return `{ std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv; std::cout << conv.to_bytes(diagnostic_format(${this.argToCpp(dbgop.value, this.typegen.anyType)})) << "\\n"; }`;
+                    return `{ std::cout << diagnostic_format(${this.argToCpp(dbgop.value, this.typegen.anyType)}) << "\\n"; }`;
                 }
             }
             case MIROpTag.MIRJump: {
@@ -1743,7 +1743,7 @@ class CPPBodyEmitter {
             }
             case "string_concat": {
                 const body = `acc.append((*iter)->sdata);`;
-                const sstr = `std::u32string acc; for(auto iter = ${params[0]}->entries.cbegin(); iter != ${params[0]}->entries.cend(); ++iter) { ${body} }`;
+                const sstr = `std::string acc; for(auto iter = ${params[0]}->entries.cbegin(); iter != ${params[0]}->entries.cend(); ++iter) { ${body} }`;
                 bodystr = `${sstr}; auto $$return = BSQ_NEW_NO_RC(BSQString, std::move(acc));`
                 break;
             }

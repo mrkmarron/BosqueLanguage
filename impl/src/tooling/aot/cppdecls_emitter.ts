@@ -139,7 +139,7 @@ class CPPEmitter {
 
             const ereprk = typeemitter.getCPPReprFor(typeemitter.getMIRType(edecl.tkey));
             const enumv = `${typeemitter.mangleStringForCpp(edecl.tkey)} = BUILD_MIR_NOMINAL_TYPE(${ereprk.categoryinfo}, ${nominaltypeinfo.length + 1})`;
-            const displayv = `U"${edecl.tkey}"`;
+            const displayv = `"${edecl.tkey}"`;
             const dk = typeemitter.generateInitialDataKindFlag(typeemitter.getMIRType(edecl.tkey));
 
             nominaltypeinfo.push({ enum: enumv, display: displayv, datakind: dk });
@@ -163,7 +163,7 @@ class CPPEmitter {
         .localeCompare(b[0])).map((ce) => ce[1])
         .forEach((cdecl) => {
             const enumv = `${typeemitter.mangleStringForCpp(cdecl.tkey)} = BUILD_MIR_NOMINAL_TYPE(MIRNominalTypeEnum_Category_Empty, ${concepttypeinfo.length + nominaltypeinfo.length + 1})`;
-            const displayv = `U"${cdecl.tkey}"`;
+            const displayv = `"${cdecl.tkey}"`;
             concepttypeinfo.push({ enum: enumv, display: displayv, datakind: "-1" });
         });
         
@@ -236,7 +236,7 @@ class CPPEmitter {
         let conststring_create: string[] = [];
         bodyemitter.allConstStrings.forEach((v, k) => {
             conststring_declare.push(`static BSQString ${v};`);
-            conststring_create.push(`BSQString Runtime::${v}(U${k}, 1);`);
+            conststring_create.push(`BSQString Runtime::${v}(${k}, 1);`);
         });
 
         let constint_declare: string[] = [];
@@ -250,14 +250,14 @@ class CPPEmitter {
         let propertynames: Set<string> = new Set<string>();
         bodyemitter.allPropertyNames.forEach((pname) => {
             propertyenums.add(pname);
-            propertynames.add(`U"${pname}"`);
+            propertynames.add(`"${pname}"`);
         });
         assembly.typeMap.forEach((tt) => {
             tt.options.forEach((topt) => {
                 if (topt instanceof MIRRecordType) {
                     topt.entries.forEach((entry) => {
                         propertyenums.add(entry.name);
-                        propertynames.add(`U"${entry.name}"`);
+                        propertynames.add(`"${entry.name}"`);
                     });
                 }
             });
@@ -270,7 +270,6 @@ class CPPEmitter {
         const restype = typeemitter.getMIRType(entrypoint.resultType);
         const mainsig = `int main(int argc, char** argv)`;
         const chkarglen = `    if(argc != ${entrypoint.params.length} + 1) { fprintf(stderr, "Expected ${entrypoint.params.length} arguments but got %i\\n", argc - 1); exit(1); }`;
-        const convdecl = "    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;";
         const convargs = entrypoint.params.map((p, i) => {
             if(p.type === "NSCore::Bool") {
                 const fchk = `if(std::string(argv[${i}+1]) != "true" && std::string(argv[${i}+1]) != "false") { fprintf(stderr, "Bad argument for ${p.name} -- expected Bool got %s\\n", argv[${i}+1]); exit(1); }`;
@@ -283,7 +282,7 @@ class CPPEmitter {
                 return "    \n    " + fchk + "\n    " + conv;
             } 
             else  {
-                const conv = `BSQString ${p.name}(conv.from_bytes(argv[${i}+1]), 1);`;
+                const conv = `BSQString ${p.name}(argv[${i}+1], 1);`;
                 return "    " + conv;
             }
         });
@@ -298,9 +297,9 @@ class CPPEmitter {
             callargs.push(scopevar);
         }        
         const callv = `${bodyemitter.invokenameToCPP(entrypointname)}(${callargs.join(", ")})`;
-        const fcall = `std::cout << conv.to_bytes(diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)})) << "\\n"`;
+        const fcall = `std::cout << diagnostic_format(${typeemitter.coerce(callv, restype, typeemitter.anyType)}) << "\\n"`;
 
-        const maincall = `${mainsig} {\n${chkarglen}\n\n${convdecl}\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
+        const maincall = `${mainsig} {\n${chkarglen}\n\n${convargs.join("\n")}\n\n  try {\n    ${scopev}\n    ${fcall};\n    fflush(stdout);\n    return 0;\n  } catch (BSQAbort& abrt) HANDLE_BSQ_ABORT(abrt) \n}\n`;
 
         return {
             STATIC_STRING_DECLARE: conststring_declare.sort().join("\n  "),

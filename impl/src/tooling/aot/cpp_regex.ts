@@ -11,8 +11,7 @@ import { MIRRegex } from "../../compiler/mir_assembly";
 
 function compileRegexCppMatch(re: MIRRegex, str: string, av: string): string {
     const restr = `std::regex re("(${re.re.substring(1, re.re.length - 1).replace(/\\/g, "\\\\")})");`;
-    const conv = "std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;";
-    return `${restr} ${conv} auto ${av} = std::regex_match(conv.to_bytes(${str}->sdata), re);`;
+    return `${restr} auto ${av} = std::regex_match(${str}->sdata, re);`;
 }
 
 function compileRegexCppSearch(re: MIRRegex): string {

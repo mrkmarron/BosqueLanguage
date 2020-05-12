@@ -181,20 +181,19 @@ DATA_KIND_FLAG getDataKindFlag(Value v)
     }
 }
 
-std::u32string diagnostic_format(Value v)
+std::string diagnostic_format(Value v)
 {
     if(BSQ_IS_VALUE_NONE(v))
     {
-        return std::u32string(U"none");
+        return std::string("none");
     }
     else if(BSQ_IS_VALUE_BOOL(v))
     {
-        return BSQ_GET_VALUE_BOOL(v) ? std::u32string(U"true") : std::u32string(U"false");
+        return BSQ_GET_VALUE_BOOL(v) ? std::string("true") : std::string("false");
     }
     else if(BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-        return conv.from_bytes(std::to_string(BSQ_GET_VALUE_TAGGED_INT(v)));
+        return std::to_string(BSQ_GET_VALUE_TAGGED_INT(v));
     }
     else
     {
