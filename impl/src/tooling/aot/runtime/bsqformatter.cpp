@@ -15,14 +15,14 @@ namespace BSQ
 {
 std::regex LexerRegexs::whitespaceRe("\\s+"); 
 std::regex LexerRegexs::commentRe("/((\\/\\/.*)|(\\/\\*[\\s\\S]*?\\/\\*))/");
-std::regex LexerRegexs::intRe("([+|-]?[0-9]+)");
-std::regex LexerRegexs::bigintRe("([+|-]?[0-9]+)n");
-std::regex LexerRegexs::floatRe("(([+|-]?([0-9]*\\.[0-9]+)|Infty)|NaN)");
+std::regex LexerRegexs::intRe("([+-]?(0|[1-9][0-9]*))");
+std::regex LexerRegexs::bigintRe("([+-]?(0|[1-9][0-9]*))n");
+std::regex LexerRegexs::floatRe("(([+-]?(([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?)|Infty)|NaN)");
 std::regex LexerRegexs::stringRe("\"[^\"\\\\\\r\\n]*(?:\\\\(?:.|\\r?\\n)[^\"\\\\\\r\\n]*)*\"");
 std::regex LexerRegexs::typedStringRe("\'[^\"\\\\\\r\\n]*(?:\\\\(?:.|\\r?\\n)[^\"\\\\\\r\\n]*)*\'");
 std::regex LexerRegexs::isotimeRe("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{3}Z");
 std::regex LexerRegexs::uuidRe("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
-std::regex LexerRegexs::logicaltimeRe("@[0-9]+");
+std::regex LexerRegexs::logicaltimeRe("@(0|[1-9][0-9]*)");
 std::regex LexerRegexs::hashRe("#[0-9a-fA-F]{64}");
 
 std::regex LexerRegexs::nameRe("[_a-zA-Z](_a-zA-Z0-9)*");
@@ -102,7 +102,7 @@ BSQString* BosqueAPIType_TextParser::parseString()
 
 BSQSafeString* BosqueAPIType_TextParser::parseSafeString()
 {
-
+    xxxx;
 }
 
 BSQISOTime BosqueAPIType_TextParser::parseISOTime()
@@ -129,7 +129,67 @@ BSQUUID BosqueAPIType_TextParser::parseUUID()
     xxxx;
 }
 
-BSQLogicalTime BosqueAPIType_TextParser::parseLogicalTime();
+BSQLogicalTime BosqueAPIType_TextParser::parseLogicalTime()
+{
+    xxxx;
+}
 
-BSQCryptoHash* BosqueAPIType_TextParser::parseCryptoHash();
+BSQCryptoHash* BosqueAPIType_TextParser::parseCryptoHash()
+{
+    xxxx;
+}
+
+
+void BosqueAPIType_TextEmitter::emitNone()
+{
+    this->emitLiteral("none");
+}
+
+void BosqueAPIType_TextEmitter::emitBool(bool b)
+{
+    if(b)
+    {
+        this->emitLiteral("true");
+    }
+    else
+    {
+        this->emitLiteral("false");
+    }
+}
+
+void BosqueAPIType_TextEmitter::emitInt(int64_t i)
+{
+    this->emitStr(std::to_string(i));
+}
+
+void BosqueAPIType_TextEmitter::emitBigInt(const BSQBigInt* i)
+{
+    assert(false);
+}
+
+void BosqueAPIType_TextEmitter::emitFloat64(double d)
+{
+    this->emitStr(std::to_string(d));
+}
+    
+void BosqueAPIType_TextEmitter::emitString(const BSQString* s)
+{
+    //
+    //TODO: escape string contents
+    //
+
+    this->emitChar('"');
+    this->emitStr(s->sdata);
+    this->emitChar('"');
+}
+
+void BosqueAPIType_TextEmitter::emitSafeString(const BSQSafeString*)
+{
+    xxxx;
+}
+
+    void BosqueAPIType_TextEmitter::emitISOTime(const BSQISOTime& t);
+    void BosqueAPIType_TextEmitter::emitUUID(const BSQUUID& u);
+    void BosqueAPIType_TextEmitter::emitLogicalTime(const BSQLogicalTime& lt);
+    void BosqueAPIType_TextEmitter::emitCryptoHash(const BSQCryptoHash* h);
 } // namespace BSQ

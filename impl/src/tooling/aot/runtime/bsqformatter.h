@@ -327,4 +327,63 @@ public:
     ResultErr,
 };
 
+class BosqueAPIType_TextEmitter
+{
+private:
+    std::deque<char> data;
+
+    void emitChar(char c)
+    {
+        this->data.push_back(c);
+    }
+
+    template <size_t n>
+    void emitLiteral(const char(&literal)[n])
+    {
+        auto a = &literal;
+        std::copy(&literal, &literal + n, std::back_inserter(data));
+    }
+
+    void emitStr(const std::string& s)
+    {
+        std::copy(s.cbegin(), s.cend(), std::back_inserter(data));
+    }
+
+public:
+    BosqueAPIType_TextEmitter() : data() { ; }
+
+    void emitNone();
+
+    void emitBool(bool b);
+    void emitInt(int64_t i);
+    void emitBigInt(const BSQBigInt* i);
+    void emitFloat64(double d);
+    
+    void emitString(const BSQString* s);
+    void emitSafeString(const BSQSafeString*);
+
+    void emitISOTime(const BSQISOTime& t);
+    void emitUUID(const BSQUUID& u);
+    void emitLogicalTime(const BSQLogicalTime& lt);
+    void emitCryptoHash(const BSQCryptoHash* h);
+
+    Enum,
+    IDKey,
+    Comma,
+    Colon,
+    Arrow,
+    LBrack,
+    RBrack,
+    LBrace,
+    RBrace,
+    ListStart,
+    ListEnd,
+    MapStart,
+    MapEnd,
+    LParen,
+    RParen,
+    ResultOk,
+    ResultErr,
+};
+
 } // namespace BSQ

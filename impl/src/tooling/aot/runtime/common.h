@@ -19,6 +19,7 @@
 
 #include <regex>
 #include <vector>
+#include <deque>
 #include <set>
 #include <map>
 
