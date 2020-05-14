@@ -439,14 +439,11 @@ struct DisplayFunctor_Value
 enum class BSQBufferFormat {
     Char,
     Bosque,
-    EBosque,
     Json
 };
 
 enum class BSQBufferEncoding {
-    UTF8,
-    URI,
-    Base64,
+    Text,
     Binary
 };
 

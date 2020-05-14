@@ -274,14 +274,11 @@ entity BufferOf<T where Parsable> provides APIValue, Some {
 enum BufferFormat {
     char,
     bosque,
-    ebosque,
     json
 }
 
 enum BufferEncoding {
-    utf8,
-    uri,
-    base64,
+    text,
     binary
 }
 
