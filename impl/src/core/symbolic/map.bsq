@@ -36,7 +36,6 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
         return Map<K, V>::s_unsafe_update(m, k, v);
     }
 
-    pragma KnownSafe
     hidden recursive static s_key_list(kl: KeyList<K>?, l: List<K>): List<K> {
         if(kl == none) {
             return l;

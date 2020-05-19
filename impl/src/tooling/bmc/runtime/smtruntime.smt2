@@ -262,6 +262,8 @@ false
 (declare-const mirconceptsubtypearray_empty (Array Int Bool))
 (assert (= mirconceptsubtypearray_empty ((as const (Array Int Bool)) false)))
 
+;;REGEX_DECLS;;
+
 ;;CONCEPT_SUBTYPE_RELATION_DECLARE;;
 
 ;;SUBTYPE_DECLS;;

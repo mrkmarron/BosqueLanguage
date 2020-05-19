@@ -10,6 +10,8 @@ import { constructCallGraphInfo } from "../../compiler/mir_callg";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
 
 type SMTCode = {
+    REGEX_DECLS: string,
+
     NOMINAL_DECLS_FWD: string,
     NOMINAL_CONSTRUCTORS: string,
     NOMINAL_OBJECT_CONSTRUCTORS: string,
@@ -208,7 +210,7 @@ class SMTEmitter {
             if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::BigInt$/) || typeemitter.typecheckIsName(tt, /^NSCore::Float64$/) 
             || typeemitter.typecheckIsName(tt, /^NSCore::String$/) || typeemitter.typecheckIsName(tt, /^NSCore::UUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::ByteBuffer$/)
             || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
-                        special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} "${typeemitter.mangleStringForSMT(tt.trkey)}"))`);
+                        special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum_${typeemitter.mangleStringForSMT(tt.trkey)}))`);
                     }
             
             if (tt.trkey === "NSCore::Tuple" || tt.trkey === "NSCore::Record") {
@@ -237,6 +239,11 @@ class SMTEmitter {
             + "\n))"
         }
 
+        let constregexs: string[] = [];
+        bodyemitter.allConstRegexes.forEach((v, k) => {
+            constregexs.push(`;;${k} = ${v}`);
+        });
+
         const resv = `(declare-const @smtres@ Result@${rrtype})`;
         const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
         const cassert = `(assert (= @smtres@ ${call}))`;
@@ -263,6 +270,8 @@ class SMTEmitter {
             RESULTS_FWD: resultdecls_fwd.sort().join("\n    "),
             RESULTS: resultdecls.sort().join("\n    "),
         
+            REGEX_DECLS: constregexs.sort().join("\n    "),
+
             CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
             SUBTYPE_DECLS: typechecks.join("\n    "),
         

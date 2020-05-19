@@ -107,6 +107,7 @@ setImmediate(() => {
             .replace(";;EMPTY_CONTENT_ARRAY_DECLS;;", sparams.EMPTY_CONTENT_ARRAY_DECLS)
             .replace(";;RESULTS_FWD;;", sparams.RESULTS_FWD)
             .replace(";;RESULTS;;", sparams.RESULTS)
+            .replace(";;REGEX_DECLS;;", sparams.REGEX_DECLS)
             .replace(";;CONCEPT_SUBTYPE_RELATION_DECLARE;;", sparams.CONCEPT_SUBTYPE_RELATION_DECLARE)
             .replace(";;SUBTYPE_DECLS;;", sparams.SUBTYPE_DECLS)
             .replace(";;VFIELD_ACCESS;;", sparams.VFIELD_ACCESS)

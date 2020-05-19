@@ -10,7 +10,6 @@ entity KeyList<K where KeyType> provides Object {
     field hkey: K;
     field tail: KeyList<K>?;
 
-    pragma KnownSafe
     hidden recursive static s_insert(kl: KeyList<K>, val: K): KeyList<T> {
         if(!KeyType::less(val, kl.hkey)) {
             return KeyList<K>@{hkey=val, tail=kl};
@@ -26,7 +25,6 @@ entity KeyList<K where KeyType> provides Object {
         }
     }
 
-    pragma KnownSafe
     hidden recursive static s_sort(kl: KeyList<K>, rkl: KeyList<K>): KeyList<K> {
         let tl = kl.tail;
         if(tl == none) {
@@ -37,7 +35,6 @@ entity KeyList<K where KeyType> provides Object {
         }
     }
 
-    pragma KnownSafe
     static sort(kl: KeyList<K>?): KeyList<K>? {
         if(kl == none) {
             return none;

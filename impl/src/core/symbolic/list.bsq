@@ -567,11 +567,13 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    pragma KnownSafe
     hidden static s_rangeInBoundsFwd(l: List<T>, start: Int?, end: Int?): Bool {
         let s, e = start ?| 0, end ?| List<T>::s_size(l);
         return 0 <= s && s <= e && e <= List<T>::s_size(l); 
     }
 
+    pragma KnownSafe
     hidden static s_rangeInBoundsRev(l: List<T>, start: Int?, end: Int?): Bool {
         let s, e = start ?| -1, end ?| List<T>::s_size(l) - 1;
         return -1 <= s && s <= e && e <= List<T>::s_size(l) - 1;

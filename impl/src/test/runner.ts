@@ -97,6 +97,7 @@ else if ((Commander.symbolic || Commander.result) !== undefined) {
         .replace(";;EMPTY_CONTENT_ARRAY_DECLS;;", sparams.EMPTY_CONTENT_ARRAY_DECLS)
         .replace(";;RESULTS_FWD;;", sparams.RESULTS_FWD)
         .replace(";;RESULTS;;", sparams.RESULTS)
+        .replace(";;REGEX_DECLS;;", sparams.REGEX_DECLS)
         .replace(";;CONCEPT_SUBTYPE_RELATION_DECLARE;;", sparams.CONCEPT_SUBTYPE_RELATION_DECLARE)
         .replace(";;SUBTYPE_DECLS;;", sparams.SUBTYPE_DECLS)
         .replace(";;VFIELD_ACCESS;;", sparams.VFIELD_ACCESS)
@@ -123,6 +124,8 @@ else {
             let bcontents = contents
             .replace("//%%STATIC_STRING_DECLARE%%", cparams.STATIC_STRING_DECLARE)
             .replace("//%%STATIC_STRING_CREATE%%", cparams.STATIC_STRING_CREATE)
+            .replace("//%%STATIC_REGEX_DECLARE%%", cparams.STATIC_REGEX_DECLARE)
+            .replace("//%%STATIC_REGEX_CREATE%%", cparams.STATIC_REGEX_CREATE)
             .replace("//%%STATIC_INT_DECLARE%%", cparams.STATIC_INT_DECLARE)
             .replace("//%%STATIC_INT_CREATE%%", cparams.STATIC_INT_CREATE)
             .replace("//%%PROPERTY_ENUM_DECLARE%%", cparams.PROPERTY_ENUM_DECLARE) 
