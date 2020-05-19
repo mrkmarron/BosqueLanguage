@@ -202,6 +202,7 @@ function verify(masm: MIRAssembly, config: any, genmodel: boolean): [boolean, bo
             .replace(";;NOMINAL_DECLS_FWD;;", sparams.NOMINAL_DECLS_FWD)
             .replace(";;NOMINAL_CONSTRUCTORS;;", sparams.NOMINAL_CONSTRUCTORS)
             .replace(";;NOMINAL_OBJECT_CONSTRUCTORS;;", sparams.NOMINAL_OBJECT_CONSTRUCTORS)
+            .replace(";;NOMINAL_TYPE_KIND_DECLS;;", sparams.NOMINAL_TYPE_KIND_DECLS)
             .replace(";;NOMINAL_TYPE_TO_DATA_KIND_ASSERTS;;", sparams.NOMINAL_TYPE_TO_DATA_KIND_ASSERTS)
             .replace(";;SPECIAL_NAME_BLOCK_ASSERTS;;", sparams.SPECIAL_NAME_BLOCK_ASSERTS)
             .replace(";;EPHEMERAL_DECLS;;", sparams.EPHEMERAL_DECLS)

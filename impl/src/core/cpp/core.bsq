@@ -337,24 +337,10 @@ entity Regex provides Some {
     method matchAll(str: String, start?: Int, end?: Int): List<RegexMatch> # regex_matchall
 }
 
-entity RegexCapture provides Object {
-    field index: Int;
-    field length: Int;
-    field value: String;
-}
-
-entity RegexGroup provides Object {
-    field success: Bool;
-    field name: String;
-    field captures: List<RegexCapture>;
-}
-
 entity RegexMatch provides Object {
     field success: Bool;
     field index: Int;
     field length: Int;
-    field value: String;
-    field groups: List<RegexGroup>; 
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>

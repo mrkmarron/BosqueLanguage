@@ -1251,8 +1251,7 @@ class Parser {
                 }
                 else {
                     const ptype = this.parseTypeSignature();
-                    this.ensureToken(TokenStrings.TypedString);
-                    const pstr = this.consumeTokenAndGetValue();
+                    const pstr = this.testToken(TokenStrings.TypedString) ? this.consumeTokenAndGetValue() : "";
 
                     pargs.push([ptype, pstr]);
                 }
@@ -2591,9 +2590,7 @@ class Parser {
         let pragmas: [TypeSignature, string][] = [];
         while (this.testToken("pragma")) {
             const ts = this.parseTypeSignature();
-
-            this.ensureToken(TokenStrings.TypedString);
-            const sl = this.consumeTokenAndGetValue();
+            const sl = this.testToken(TokenStrings.TypedString) ? this.consumeTokenAndGetValue() : "";
 
             pragmas.push([ts, sl]);
         }
