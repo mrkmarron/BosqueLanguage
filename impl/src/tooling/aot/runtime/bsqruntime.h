@@ -3,6 +3,9 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+
+#pragma once
+
 #include "common.h"
 #include "bsqvalue.h"
 #include "bsqkeyvalues.h"
@@ -15,10 +18,6 @@
 #include "bsqcustom/bsqset_ops.h"
 #include "bsqcustom/bsqmap_decl.h"
 #include "bsqcustom/bsqmap_ops.h"
-
-#pragma once
-
-#define GET_RC_OPS(TAG) (bsq_ops[GET_MIR_TYPE_POSITION(TAG)])
 
 #define PARSER_INTERNAL_CHECK(C, M) { if(C) { printf("\"%s\" in %s on line %i\n", M, __FILE__, __LINE__); fflush(stdout); exit(1); } }
 #define PARSER_PARSE_ERROR(M, P) BSQParseError(M, P->line, P->column, P->computeContext())

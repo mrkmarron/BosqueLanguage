@@ -3,11 +3,11 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+#pragma once
+
 #include "../bsqvalue.h"
 #include "bsqlist_decl.h"
 #include "bsqset_decl.h"
-
-#pragma once
 
 namespace BSQ
 {

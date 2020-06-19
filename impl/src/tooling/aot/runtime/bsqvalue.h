@@ -3,9 +3,12 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+#pragma once
+
 #include "common.h"
 
-#pragma once
+#include "bsqmetadata.h"
+#include "bsqmemory.h"
 
 ////
 //Value ops
@@ -40,27 +43,7 @@ typedef uint8_t BSQBool;
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(BSQFALSE)
 
 ////
-//Reference counting ops
-
-#define BSQ_NEW_NO_RC(T, ...) (new T(__VA_ARGS__))
-#define BSQ_NEW_ADD_SCOPE(SCOPE, T, ...) ((T*)((SCOPE).addAllocRefDirect(BSQ_NEW_NO_RC(T, __VA_ARGS__))))
-
-#define INC_REF_DIRECT(T, V) ((T*) BSQRef::incrementDirect(V))
-#define INC_REF_CHECK(T, V) ((T*) BSQRef::incrementChecked(V))
-
-////
 //Type ops
-
-//Note POD => API
-typedef uint32_t DATA_KIND_FLAG;
-#define DATA_KIND_CLEAR_FLAG 0x0
-#define DATA_KIND_API_FLAG 0x1
-#define DATA_KIND_POD_FLAG 0x3
-#define DATA_KIND_PARSABLE_FLAG 0x4
-#define DATA_KIND_ALL_FLAG (DATA_KIND_API_FLAG | DATA_KIND_POD_FLAG | DATA_KIND_PARSABLE_FLAG)
-#define DATA_KIND_UNKNOWN_FLAG 0xFF
-
-#define DATA_KIND_COMPUTE(KF, COMP) (((KF) == DATA_KIND_UNKNOWN_FLAG) ? (COMP) : (KF)
 
 namespace BSQ
 {
@@ -70,216 +53,14 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE%%
 };
 
-//Category tags to embed in the type enums
-#define MIRNominalTypeEnum_Category_Empty           0
-#define MIRNominalTypeEnum_Category_BigInt          1
-#define MIRNominalTypeEnum_Category_String          2
-#define MIRNominalTypeEnum_Category_SafeString      3
-#define MIRNominalTypeEnum_Category_StringOf        4
-#define MIRNominalTypeEnum_Category_UUID            5
-#define MIRNominalTypeEnum_Category_LogicalTime     6
-#define MIRNominalTypeEnum_Category_CryptoHash      7
-#define MIRNominalTypeEnum_Category_Enum            8
-#define MIRNominalTypeEnum_Category_IdKeySimple     9
-#define MIRNominalTypeEnum_Category_IdKeyCompound   10
-
-#define MIRNominalTypeEnum_Category_KeyTypeLimit    MIRNominalTypeEnum_Category_IdKeyCompound
-
-#define MIRNominalTypeEnum_Category_Float64         20
-#define MIRNominalTypeEnum_Category_Buffer          21
-#define MIRNominalTypeEnum_Category_BufferOf        22
-#define MIRNominalTypeEnum_Category_ByteBuffer      23
-#define MIRNominalTypeEnum_Category_ISOTime         24
-#define MIRNominalTypeEnum_Category_Regex           25
-#define MIRNominalTypeEnum_Category_Tuple           26
-#define MIRNominalTypeEnum_Category_Record          27
-#define MIRNominalTypeEnum_Category_Object          28
-
-#define MIRNominalTypeEnum_Category_NormalTypeLimit MIRNominalTypeEnum_Category_Object
-
-#define MIRNominalTypeEnum_Category_List            40
-#define MIRNominalTypeEnum_Category_Stack           41
-#define MIRNominalTypeEnum_Category_Queue           42
-#define MIRNominalTypeEnum_Category_Set             43
-#define MIRNominalTypeEnum_Category_DynamicSet      44
-#define MIRNominalTypeEnum_Category_Map             45
-#define MIRNominalTypeEnum_Category_DynamicMap      46
-
-#define BUILD_MIR_NOMINAL_TYPE(C, T) ((T << 8) | C)
-#define GET_MIR_TYPE_CATEGORY(T) (((int32_t)(T)) & 0xFF)
-#define GET_MIR_TYPE_POSITION(T) (((int32_t)(T)) >> 8)
-
-enum class MIRNominalTypeEnum
-{
-    Invalid = 0x0,
-//%%NOMINAL_TYPE_ENUM_DECLARE%%
-};
-
 constexpr const char* propertyNames[] = {
     "Invalid",
 //%%PROPERTY_NAMES%%
 };
 
-constexpr const char* nominaltypenames[] = {
-    "[INVALID]",
-//%%NOMINAL_TYPE_DISPLAY_NAMES%%
-};
-
-//%%CONCEPT_SUBTYPE_RELATION_DECLARE%%
-
-constexpr DATA_KIND_FLAG nominalDataKinds[] = {
-  DATA_KIND_CLEAR_FLAG,
-//%%NOMINAL_TYPE_TO_DATA_KIND%%
-};
-
-//%%SPECIAL_NAME_BLOCK_BEGIN%%
-#define MIRNominalTypeEnum_None MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Bool MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_BigInt MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Float64 MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_String MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_UUID MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_LogicalTime MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_ByteBuffer MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
-#define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
-//%%SPECIAL_NAME_BLOCK_END%%
-
 typedef void* NoneValue;
 typedef void* KeyValue;
 typedef void* Value;
-
-class BSQRef
-{
-private:
-    uint64_t count;
-
-public:
-    MIRNominalTypeEnum nominalType;
-
-    BSQRef() : count(0), nominalType(MIRNominalTypeEnum::Invalid) { ; }
-    BSQRef(MIRNominalTypeEnum nominalType) : count(0), nominalType(nominalType) { ; }
-    BSQRef(int64_t excount, MIRNominalTypeEnum nominalType) : count(excount), nominalType(nominalType) { ; }
-
-    virtual ~BSQRef() { ; }
-    virtual void destroy() { ; }
-
-    inline void increment()
-    {
-        this->count++;
-    }
-
-    inline void decrement()
-    {
-        this->count--;
-
-        if(this->count == 0)
-        {
-            this->destroy();
-            BSQ_DELETE(this);    
-        }
-    }
-
-    inline static void* incrementDirect(void* v)
-    {
-        ((BSQRef*)v)->increment();
-        return v;
-    }
-
-    inline static Value incrementChecked(Value v)
-    {
-        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQ_GET_VALUE_PTR(v, BSQRef)->increment();
-        }
-        return v;
-    }
-
-    inline static void decrementDirect(void* v)
-    {
-        ((BSQRef*)v)->decrement();
-    }
-
-    inline static void decrementChecked(Value v)
-    {
-        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQ_GET_VALUE_PTR(v, BSQRef)->decrement();
-        }
-    }
-};
-
-class BSQRefScope
-{
-private:
-    std::vector<BSQRef*> opts;
-    bool passdirect;
-
-public:
-    BSQRefScope() : opts(), passdirect(false)
-    {
-        ;
-    }
-
-    BSQRefScope(bool passdirect) : opts(), passdirect(passdirect)
-    {
-        ;
-    }
-
-    ~BSQRefScope()
-    {
-        for (uint16_t i = 0; i < this->opts.size(); ++i)
-        {
-            this->opts[i]->decrement();
-        }
-    }
-
-    inline BSQRef* addAllocRefDirect(BSQRef* ptr)
-    {
-        ptr->increment();
-        this->opts.push_back(ptr);
-
-        return ptr;
-    }
-
-    inline Value addAllocRefChecked(Value v)
-    {
-        if (BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-            ptr->increment();
-            this->opts.push_back(ptr);
-        }
-
-        return v;
-    }
-
-    inline void callReturnDirect(BSQRef* ptr)
-    {
-        ptr->increment();
-        if (!passdirect)
-        {
-            this->opts.push_back(ptr);
-        }
-    }
-
-    inline void processReturnChecked(Value v)
-    {
-        if(BSQ_IS_VALUE_PTR(v) & BSQ_IS_VALUE_NONNONE(v))
-        {
-            BSQRef* ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-            ptr->increment();
-            if (!passdirect)
-            {
-                this->opts.push_back(ptr);
-            }
-        }
-    }
-};
 
 template <typename T, typename DestroyFunctor>
 class BSQBoxed : public BSQRef
