@@ -13,82 +13,58 @@ namespace BSQ
 struct BSQBigInt
 {
     MetaData* mdata;
-    //TODO: bigint data here
+    void* bigint; //right now this should always be null and ignored
+    int64_t simpleint;
 
     std::wstring display() const
     {
-        return L"[NOT IMPLEMENTED]";
-    }
-
-    static BSQBigInt* negate(const BSQBigInt* v)
-    {
-        return nullptr;
+        return std::to_wstring(this->simpleint);
     }
 
     bool eqI64(int64_t v) const
     {
-        return false;
+        return this->simpleint == v;
     }
 
     bool ltI64(int64_t v) const
     {
-        return false;
+        return this->simpleint < v;
     }
 
-    static bool eq(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
+    static BSQBigInt negate(const BSQBigInt& v);
 
-    static bool lt(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return false;
-    }
+    static bool eq(const BSQBigInt& l, const BSQBigInt& r);
+    static bool lt(const BSQBigInt& l, const BSQBigInt& r);
 
-    static BSQBigInt* add(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* sub(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* mult(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* div(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
-
-    static BSQBigInt* mod(const BSQBigInt* l, const BSQBigInt* r)
-    {
-        return nullptr;
-    }
+    static BSQBigInt add(const BSQBigInt& l, const BSQBigInt& r);
+    static BSQBigInt sub(const BSQBigInt& l, const BSQBigInt& r);
+    static BSQBigInt mult(const BSQBigInt& l, const BSQBigInt& r);
+    static BSQBigInt div(const BSQBigInt& l, const BSQBigInt& r);
+    static BSQBigInt mod(const BSQBigInt& l, const BSQBigInt& r);
 };
 struct EqualFunctor_BSQBigInt
 {
-    inline bool operator()(BSQBigInt* l, BSQBigInt* r) const { return BSQBigInt::eq(l, r); }
+    inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::eq(l, r); }
 };
 struct LessFunctor_BSQBigInt
 {
-    inline bool operator()(BSQBigInt* l, BSQBigInt* r) const { return BSQBigInt::lt(l, r); }
+    inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::lt(l, r); }
 };
+
+typedef BSQBoxedWithMeta<BSQBigInt> Boxed_BigInt;
 struct DisplayFunctor_BSQBigInt
 {
-    std::wstring operator()(BSQBigInt* i) const { return i->display(); }
+    std::wstring operator()(BSQBigInt i) const { return i.display(); }
 };
+
+void* ExtractGeneralRepr_BSQBigInt(void* v);
 std::wstring DisplayFunction_BSQBigInt(void* v);
 constexpr MetaData MetaData_BSQBigInt = {
     MIRNominalTypeEnum_BigInt,
     MIRNominalTypeEnum_Category_BigInt,
     DATA_KIND_ALL_FLAG,
-    ExtractFlag::Pointer,
-    sizeof(BSQBigInt),
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_BigInt),
     ObjectLayoutKind::Packed,
     1,
     nullptr,
@@ -98,37 +74,47 @@ constexpr MetaData MetaData_BSQBigInt = {
     &ExtractGeneralRepr_Identity
 };
 
-
-class BSQString : public BSQRef
+struct BSQString
 {
-public:
-    const std::string sdata;
-
-    BSQString(const std::string& str) : BSQRef(MIRNominalTypeEnum_String), sdata(str) { ; }
-    BSQString(std::string&& str) : BSQRef(MIRNominalTypeEnum_String), sdata(std::move(str)) { ; }
-
-    BSQString(char c) : BSQRef(MIRNominalTypeEnum_String), sdata({ c }) { ; }
-    BSQString(const std::string& str, int64_t excount) : BSQRef(excount, MIRNominalTypeEnum_String), sdata(str) { ; }
-
-    virtual ~BSQString() = default;
+    MetaData* mdata;
+    size_t count;
 
     inline static bool keyEqual(const BSQString* l, const BSQString* r)
     {
-        return l->sdata == r->sdata;
+        if(l->count != r->count)
+        {
+            return false;
+        }
+        else
+        {
+            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
+            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
+        }
     }
 
     inline static bool keyLess(const BSQString* l, const BSQString* r)
     {
-        return l->sdata < r->sdata;
+        if(l->count != r->count)
+        {
+            return l->count - r->count;
+        }
+        else
+        {
+            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
+            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
+
+            if(mmiter.first == ldata + l->count)
+            {
+                return 0;
+            }
+            else
+            {
+                return *(mmiter.first) - *(mmiter.second);
+            }
+        }
     }
-};
-struct RCIncFunctor_BSQString
-{
-    inline BSQString* operator()(BSQString* s) const { return INC_REF_DIRECT(BSQString, s); }
-};
-struct RCDecFunctor_BSQString
-{
-    inline void operator()(BSQString* s) const { BSQRef::decrementDirect(s); }
 };
 struct EqualFunctor_BSQString
 {
@@ -140,13 +126,33 @@ struct LessFunctor_BSQString
 };
 struct DisplayFunctor_BSQString
 {
-    std::string operator()(const BSQString* s) const { return std::string("\"") + std::string(s->sdata.cbegin(), s->sdata.cend()) + std::string("\""); }
+    std::wstring operator()(const BSQString* s) const 
+    {
+        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s); 
+        return std::wstring(L"\"") + std::wstring(data, data + s->count) + std::wstring(L"\""); 
+    }
 };
 
-class BSQSafeString : public BSQRef
+std::wstring DisplayFunction_BSQString(void* v);
+constexpr MetaData MetaData_BSQString = {
+    MIRNominalTypeEnum_String,
+    MIRNominalTypeEnum_Category_String,
+    DATA_KIND_API_FLAG,
+    ExtractFlag::Pointer,
+    sizeof(BSQString),
+    ObjectLayoutKind::CollectionNoRef,
+    0,
+    nullptr,
+    1,
+    L"String",
+    &DisplayFunction_BSQString,
+    &ExtractGeneralRepr_Identity
+};
+
+struct BSQSafeString
 {
-public:
-    const std::string sdata;
+    MetaData* mdata;
+    BSQString* sdata;
   
     BSQSafeString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
 

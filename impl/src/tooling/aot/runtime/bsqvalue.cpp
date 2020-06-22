@@ -26,17 +26,17 @@ void* ExtractGeneralRepr__int64_t(void* v)
 void* ExtractGeneralRepr__double(void* v)
 {
     double dval = *(double*)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_double>(&MetaData_double, dval);
+    return Allocator::GlobalAllocator.objectNew<Boxed_double>(META_DATA_LOAD_DECL(MetaData_double), dval);
 }
 void* ExtractGeneralRepr_BSQISOTime(void* v)
 {
     uint64_t tval = *(uint64_t*)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(&MetaData_BSQISOTime, tval);
+    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), tval);
 }
 void* ExtractGeneralRepr_Regex(void* v)
 {
     std::wregex rval = *(std::wregex**)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(&MetaData_BSQISOTime, tval);
+    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), tval);
 }
 
 std::wstring DisplayFunction_NoneValue(void* v)
@@ -76,19 +76,19 @@ std::wstring DisplayFunction_Regex(void* v)
     return DisplayFunction_BSQRegex{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQRegex)->bval)
 }
 
-const MetaData* getMetaData(void* v)
+MetaData* getMetaData(void* v)
 {
     if (BSQ_IS_VALUE_NONE(v))
     {
-        return &MetaData_NoneValue;
+        return META_DATA_LOAD_DECL(MetaData_NoneValue);
     }
     else if (BSQ_IS_VALUE_BOOL(v))
     {
-        return &MetaData_BSQBool;
+        return META_DATA_LOAD_DECL(MetaData_BSQBool);
     }
     else if (BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        return &MetaData_int64_t;
+        return META_DATA_LOAD_DECL(MetaData_int64_t);
     }
     else
     {
@@ -102,21 +102,21 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         return true;
     }
 
-    const MetaData* kt1 = getMetaData(v1);
-    const MetaData* kt2 = getMetaData(v2);
+    MetaData* kt1 = getMetaData(v1);
+    MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
         return false;
     }
 
-    if((kt1 == &MetaData_NoneValue) & (kt2 == &MetaData_NoneValue))
+    if((kt1 == META_DATA_LOAD_DECL(MetaData_NoneValue)) & (kt2 == META_DATA_LOAD_DECL(MetaData_NoneValue)))
     {
         return true;
     }
-    else if((kt1 == &MetaData_BSQBool) & (kt2 == &MetaData_BSQBool))
+    else if((kt1 == META_DATA_LOAD_DECL(MetaData_BSQBool)) & (kt2 == META_DATA_LOAD_DECL(MetaData_BSQBool)))
     {
         return EqualFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == &MetaData_int64_t) & (kt2 == &MetaData_int64_t))
+    else if((kt1 == META_DATA_LOAD_DECL(MetaData_int64_t)) & (kt2 == META_DATA_LOAD_DECL(MetaData_int64_t)))
     {
         return EqualFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }
@@ -153,21 +153,21 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
 
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
 {
-    const MetaData* kt1 = getMetaData(v1);
-    const MetaData* kt2 = getMetaData(v2);
+    MetaData* kt1 = getMetaData(v1);
+    MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
         return kt1->nominaltype < kt2->nominaltype;
     }
 
-    if((kt1 == &MetaData_NoneValue) & (kt2 == &MetaData_NoneValue))
+    if((kt1 == META_DATA_LOAD_DECL(MetaData_NoneValue)) & (kt2 == META_DATA_LOAD_DECL(MetaData_NoneValue)))
     {
         return false;
     }
-    else if((kt1 == &MetaData_BSQBool) & (kt2 == &MetaData_BSQBool))
+    else if((kt1 == META_DATA_LOAD_DECL(MetaData_BSQBool)) & (kt2 == META_DATA_LOAD_DECL(MetaData_BSQBool)))
     {
         return LessFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == &MetaData_int64_t) & (kt2 == &MetaData_int64_t))
+    else if((kt1 == META_DATA_LOAD_DECL(MetaData_int64_t)) & (kt2 == META_DATA_LOAD_DECL(MetaData_int64_t)))
     {
         return LessFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }

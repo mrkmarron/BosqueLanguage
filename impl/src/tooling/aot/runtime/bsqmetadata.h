@@ -59,6 +59,8 @@ typedef uint32_t DATA_KIND_FLAG;
 #define PTR_FIELD_MASK_UNION (char)4
 #define PTR_FIELD_MASK_END (chat)0
 
+#define META_DATA_LOAD_DECL(X) const_cast<MetaData*>(&(X))
+
 namespace BSQ
 {
 enum class MIRNominalTypeEnum

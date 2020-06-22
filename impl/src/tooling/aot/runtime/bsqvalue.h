@@ -188,7 +188,7 @@ constexpr MetaData MetaData_double = {
     &ExtractGeneralRepr_double
 };
 
-const MetaData* getMetaData(void* v);
+MetaData* getMetaData(void* v);
 
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
