@@ -85,6 +85,7 @@ class MetaData
 public:
     MIRNominalTypeEnum nominaltype;
     uint32_t typecategory;
+    uint32_t dataflag;
 
     size_t allocsize;
 
@@ -95,6 +96,9 @@ public:
     size_t entrysize; //if this is a container then this is the size of each contained element
 
     const wchar_t* displayname;
+
+    //display function pointer
+    std::wstring (*displayFP)(void*);
 };
 
 //%%METADATA_STRUCT_DECLS%%

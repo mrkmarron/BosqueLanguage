@@ -11,7 +11,7 @@ namespace BSQ
 BSQTuple BSQTuple::_empty({}, DATA_KIND_ALL_FLAG);
 BSQRecord BSQRecord::_empty({}, DATA_KIND_ALL_FLAG);
 
-MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v)
+MetaData* getMetaData(void* v)
 {
     if (BSQ_IS_VALUE_NONE(v))
     {
@@ -27,29 +27,7 @@ MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v)
     }
     else
     {
-        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-        return ptr->nominalType;
-    }
-}
-
-MIRNominalTypeEnum getNominalTypeOf_Value(Value v)
-{
-    if (BSQ_IS_VALUE_NONE(v))
-    {
-        return MIRNominalTypeEnum_None;
-    }
-    else if (BSQ_IS_VALUE_BOOL(v))
-    {
-        return MIRNominalTypeEnum_Bool;
-    }
-    else if (BSQ_IS_VALUE_TAGGED_INT(v))
-    {
-        return MIRNominalTypeEnum_Int;
-    }
-    else
-    {
-        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-        return ptr->nominalType;
+        return GET_TYPE_META_DATA(v);
     }
 }
 
@@ -59,8 +37,8 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         return true;
     }
 
-    MIRNominalTypeEnum kt1 = getNominalTypeOf_KeyValue(v1);
-    MIRNominalTypeEnum kt2 = getNominalTypeOf_KeyValue(v2);
+    MetaData* kt1 = getMetaData(v1);
+    MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
         return false;
     }
@@ -79,42 +57,41 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
     }
     else
     {
-        auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
-        auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef);
+        auto ptr1 = BSQ_GET_VALUE_PTR(v1, void*); 
+        auto ptr2 = BSQ_GET_VALUE_PTR(v2, void*);
 
-        auto rcategory = GET_MIR_TYPE_CATEGORY(ptr1->nominalType);
-        switch(rcategory)
+        switch(kt1->typecategory)
         {
             case MIRNominalTypeEnum_Category_BigInt:
-                return BSQBigInt::eq(dynamic_cast<BSQBigInt*>(ptr1), dynamic_cast<BSQBigInt*>(ptr2));
+                return BSQBigInt::eq(BSQ_GET_VALUE_PTR(v1, BSQBigInt), BSQ_GET_VALUE_PTR(v2, BSQBigInt));
             case MIRNominalTypeEnum_Category_String:
-                return BSQString::keyEqual(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
+                return BSQString::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQString), BSQ_GET_VALUE_PTR(v2, BSQString));
             case MIRNominalTypeEnum_Category_SafeString:
-                return BSQSafeString::keyEqual(dynamic_cast<BSQSafeString*>(ptr1), dynamic_cast<BSQSafeString*>(ptr2));
+                return BSQSafeString::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQSafeString), BSQ_GET_VALUE_PTR(v2, BSQSafeString));
             case MIRNominalTypeEnum_Category_StringOf:
-                return BSQStringOf::keyEqual(dynamic_cast<BSQStringOf*>(ptr1), dynamic_cast<BSQStringOf*>(ptr2));
+                return BSQStringOf::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQStringOf), BSQ_GET_VALUE_PTR(v2, BSQStringOf));
             case MIRNominalTypeEnum_Category_UUID:
-                return BSQUUID::keyEqual(dynamic_cast<Boxed_BSQUUID*>(ptr1)->bval, dynamic_cast<Boxed_BSQUUID*>(ptr2)->bval);
+                return BSQUUID::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQUUID)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQUUID)->bval);
             case MIRNominalTypeEnum_Category_LogicalTime:
-                return BSQLogicalTime::keyEqual(dynamic_cast<Boxed_BSQLogicalTime*>(ptr1)->bval, dynamic_cast<Boxed_BSQLogicalTime*>(ptr2)->bval);
+                return BSQLogicalTime::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQLogicalTime)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQLogicalTime)->bval);
             case MIRNominalTypeEnum_Category_CryptoHash:
-                return BSQCryptoHash::keyEqual(dynamic_cast<BSQCryptoHash*>(ptr1), dynamic_cast<BSQCryptoHash*>(ptr2));
+                return BSQCryptoHash::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQCryptoHash), BSQ_GET_VALUE_PTR(v2, BSQCryptoHash));
             case MIRNominalTypeEnum_Category_Enum:
-                return BSQEnum::keyEqual(dynamic_cast<Boxed_BSQEnum*>(ptr1)->bval, dynamic_cast<Boxed_BSQEnum*>(ptr2)->bval);
+                return BSQEnum::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQEnum)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQEnum)->bval);
             case MIRNominalTypeEnum_Category_IdKeySimple:
-                return BSQIdKeySimple::keyEqual(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
+                return BSQIdKeySimple::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeySimple)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeySimple)->bval);
             default:
-                return BSQIdKeyCompound::keyEqual(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
+                return BSQIdKeyCompound::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeyCompound)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeyCompound)->bval);
         }
     }
 }
 
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
 {
-    MIRNominalTypeEnum kt1 = getNominalTypeOf_KeyValue(v1);
-    MIRNominalTypeEnum kt2 = getNominalTypeOf_KeyValue(v2);
+    MetaData* kt1 = getMetaData(v1);
+    MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
-        return kt1 < kt2;
+        return kt1->nominaltype < kt2->nominaltype;
     }
 
     if((kt1 == MIRNominalTypeEnum_None) & (kt2 == MIRNominalTypeEnum_None))
@@ -131,32 +108,28 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
     }
     else
     {
-        auto ptr1 = BSQ_GET_VALUE_PTR(v1, BSQRef); 
-        auto ptr2 = BSQ_GET_VALUE_PTR(v2, BSQRef);
-        
-        auto rcategory = GET_MIR_TYPE_CATEGORY(ptr1->nominalType);
-        switch(rcategory)
+        switch(kt1->typecategory)
         {
             case MIRNominalTypeEnum_Category_BigInt:
-                return BSQBigInt::lt(dynamic_cast<BSQBigInt*>(ptr1), dynamic_cast<BSQBigInt*>(ptr2));
+                return BSQBigInt::lt(BSQ_GET_VALUE_PTR(v1, BSQBigInt), BSQ_GET_VALUE_PTR(v2, BSQBigInt));
             case MIRNominalTypeEnum_Category_String:
-                return BSQString::keyLess(dynamic_cast<BSQString*>(ptr1), dynamic_cast<BSQString*>(ptr2));
+                return BSQString::keyLess(BSQ_GET_VALUE_PTR(v1, BSQString), BSQ_GET_VALUE_PTR(v2, BSQString));
             case MIRNominalTypeEnum_Category_SafeString:
-                return BSQSafeString::keyLess(dynamic_cast<BSQSafeString*>(ptr1), dynamic_cast<BSQSafeString*>(ptr2));
+                return BSQSafeString::keyLess(BSQ_GET_VALUE_PTR(v1, BSQSafeString), BSQ_GET_VALUE_PTR(v2, BSQSafeString));
             case MIRNominalTypeEnum_Category_StringOf:
-                return BSQStringOf::keyLess(dynamic_cast<BSQStringOf*>(ptr1), dynamic_cast<BSQStringOf*>(ptr2));
+                return BSQStringOf::keyLess(BSQ_GET_VALUE_PTR(v1, BSQStringOf), BSQ_GET_VALUE_PTR(v2, BSQStringOf));
             case MIRNominalTypeEnum_Category_UUID:
-                return BSQUUID::keyLess(dynamic_cast<Boxed_BSQUUID*>(ptr1)->bval, dynamic_cast<Boxed_BSQUUID*>(ptr2)->bval);
+                return BSQUUID::keyLess(BSQ_GET_VALUE_PTR(v1, Boxed_BSQUUID)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQUUID)->bval);
             case MIRNominalTypeEnum_Category_LogicalTime:
-                return BSQLogicalTime::keyLess(dynamic_cast<Boxed_BSQLogicalTime*>(ptr1)->bval, dynamic_cast<Boxed_BSQLogicalTime*>(ptr2)->bval);
+                return BSQLogicalTime::keyLess(BSQ_GET_VALUE_PTR(v1, Boxed_BSQLogicalTime)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQLogicalTime)->bval);
             case MIRNominalTypeEnum_Category_CryptoHash:
-                return BSQCryptoHash::keyLess(dynamic_cast<BSQCryptoHash*>(ptr1), dynamic_cast<BSQCryptoHash*>(ptr2));
+                return BSQCryptoHash::keyLess(BSQ_GET_VALUE_PTR(v1, BSQCryptoHash), BSQ_GET_VALUE_PTR(v2, BSQCryptoHash));
             case MIRNominalTypeEnum_Category_Enum:
-                return BSQEnum::keyLess(dynamic_cast<Boxed_BSQEnum*>(ptr1)->bval, dynamic_cast<Boxed_BSQEnum*>(ptr2)->bval);
+                return BSQEnum::keyLess(BSQ_GET_VALUE_PTR(v1, Boxed_BSQEnum)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQEnum)->bval);
             case MIRNominalTypeEnum_Category_IdKeySimple:
-                return BSQIdKeySimple::keyLess(dynamic_cast<Boxed_BSQIdKeySimple*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeySimple*>(ptr2)->bval);
+                return BSQIdKeySimple::keyLess(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeySimple)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeySimple)->bval);
             default:
-                return BSQIdKeyCompound::keyLess(dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr1)->bval, dynamic_cast<Boxed_BSQIdKeyCompound*>(ptr2)->bval);
+                return BSQIdKeyCompound::keyLess(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeyCompound)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeyCompound)->bval);
         }
     }
 }
@@ -168,41 +141,36 @@ DATA_KIND_FLAG getDataKindFlag(Value v)
         return DATA_KIND_ALL_FLAG;
     }
     else {
-        auto ptr = BSQ_GET_VALUE_PTR(v, BSQRef);
-
-        auto rcategory = GET_MIR_TYPE_CATEGORY(ptr->nominalType);
+        auto rcategory = GET_TYPE_META_DATA(v)->typecategory;
         if(rcategory == MIRNominalTypeEnum_Category_Tuple) {
-            return dynamic_cast<BSQTuple*>(ptr)->flag;
+            return BSQ_GET_VALUE_PTR(v, BSQTuple)->flag;
         }
         else if(rcategory == MIRNominalTypeEnum_Category_Record) {
-            return dynamic_cast<BSQRecord*>(ptr)->flag;
+            return BSQ_GET_VALUE_PTR(v, BSQRecord)->flag;
         }
         else {
-            return nominalDataKinds[GET_MIR_TYPE_POSITION(getNominalTypeOf_Value(v))];
+            return GET_TYPE_META_DATA(v)->dataflag;
         }
     }
 }
 
-std::string diagnostic_format(Value v)
+std::wstring diagnostic_format(void* v)
 {
     if(BSQ_IS_VALUE_NONE(v))
     {
-        return std::string("none");
+        return L"none";
     }
     else if(BSQ_IS_VALUE_BOOL(v))
     {
-        return BSQ_GET_VALUE_BOOL(v) ? std::string("true") : std::string("false");
+        return BSQ_GET_VALUE_BOOL(v) ? L"true" : L"false";
     }
     else if(BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        return std::to_string(BSQ_GET_VALUE_TAGGED_INT(v));
+        return std::to_wstring(BSQ_GET_VALUE_TAGGED_INT(v));
     }
     else
     {
-        BSQRef* vv = BSQ_GET_VALUE_PTR(v, BSQRef);
-    
-        auto rcategory = GET_MIR_TYPE_CATEGORY(vv->nominalType);
-        switch(rcategory)
+        switch(GET_TYPE_META_DATA(v)->typecategory)
         {
             case MIRNominalTypeEnum_Category_BigInt:
                 return DisplayFunctor_BSQBigInt{}(dynamic_cast<BSQBigInt*>(vv));

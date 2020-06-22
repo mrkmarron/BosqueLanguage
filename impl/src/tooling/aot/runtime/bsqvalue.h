@@ -53,8 +53,8 @@ enum class MIRPropertyEnum
 //%%PROPERTY_ENUM_DECLARE%%
 };
 
-constexpr const char* propertyNames[] = {
-    "Invalid",
+constexpr const wchar_t* propertyNames[] = {
+    L"Invalid",
 //%%PROPERTY_NAMES%%
 };
 
@@ -62,33 +62,19 @@ typedef void* NoneValue;
 typedef void* KeyValue;
 typedef void* Value;
 
-template <typename T, typename DestroyFunctor>
-class BSQBoxed : public BSQRef
+template <typename T>
+struct BSQBoxedDirect
 {
-public:
     T bval;
-
-    BSQBoxed(MIRNominalTypeEnum nominalType, const T& bval) : BSQRef(nominalType), bval(bval) { ; }
-    virtual ~BSQBoxed() { ; }
-
-    virtual void destroy() 
-    { 
-        DestroyFunctor{}(this->bval); 
-    }
 };
 
-struct RCIncFunctor_NoneValue
+template <typename T>
+struct BSQBoxedWithMeta
 {
-    inline void* operator()(NoneValue n) const { return n; }
+    MetaData* mdata;
+    T bval;
 };
-struct RCDecFunctor_NoneValue
-{
-    inline void operator()(NoneValue n) const { ; }
-};
-struct RCReturnFunctor_NoneValue
-{
-    inline void operator()(NoneValue& e, BSQRefScope& scope) const { ; }
-};
+
 struct EqualFunctor_NoneValue
 {
     inline bool operator()(NoneValue l, NoneValue r) const { return true; }
@@ -99,21 +85,9 @@ struct LessFunctor_NoneValue
 };
 struct DisplayFunctor_NoneValue
 {
-    std::string operator()(NoneValue n) const { return "none"; }
+    std::wstring operator()(NoneValue n) const { return L"none"; }
 };
 
-struct RCIncFunctor_BSQBool
-{
-    inline BSQBool operator()(bool b) const { return b; }
-};
-struct RCDecFunctor_BSQBool
-{
-    inline void operator()(BSQBool b) const { ; }
-};
-struct RCReturnFunctor_BSQBool
-{
-    inline void operator()(BSQBool b, BSQRefScope& scope) const { ; }
-};
 struct EqualFunctor_BSQBool
 {
     inline bool operator()(BSQBool l, BSQBool r) const { return l == r; }
@@ -124,21 +98,9 @@ struct LessFunctor_BSQBool
 };
 struct DisplayFunctor_BSQBool
 {
-    std::string operator()(BSQBool b) const { return b ? "true" : "false"; }
+    std::wstring operator()(BSQBool b) const { return b ? L"true" : L"false"; }
 };
 
-struct RCIncFunctor_int64_t
-{
-    inline int64_t operator()(int64_t i) const { return i; }
-};
-struct RCDecFunctor_int64_t
-{
-    inline void operator()(int64_t i) const { ; }
-};
-struct RCReturnFunctor_int64_t
-{
-    inline void operator()(int64_t i, BSQRefScope& scope) const { ; }
-};
 struct EqualFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l == r; }
@@ -149,65 +111,29 @@ struct LessFunctor_int64_t
 };
 struct DisplayFunctor_int64_t
 {
-    std::string operator()(int64_t i) const 
-    {
-        return std::to_string(i);  
-    }
+    std::wstring operator()(int64_t i) const { return std::to_wstring(i); }
 };
 
-struct RCIncFunctor_double
-{
-    inline double operator()(double d) const { return d; }
-};
-struct RCDecFunctor_double
-{
-    inline void operator()(double d) const { ; }
-};
-struct RCReturnFunctor_double
-{
-    inline void operator()(double d, BSQRefScope& scope) const { ; }
-};
 struct DisplayFunctor_double
 {
-    std::string operator()(double d) const 
-    {
-        return std::to_string(d);  
-    }
+    std::wstring operator()(double d) const { return std::to_wstring(d); }
 };
-typedef BSQBoxed<double, RCDecFunctor_double> Boxed_double;
+typedef BSQBoxedWithMeta<double> Boxed_double;
 
-MIRNominalTypeEnum getNominalTypeOf_KeyValue(KeyValue v);
-MIRNominalTypeEnum getNominalTypeOf_Value(Value v);
+MetaData* getMetaData(void* v);
 
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
 
 DATA_KIND_FLAG getDataKindFlag(Value v);
 
-std::string diagnostic_format(Value v);
+std::wstring diagnostic_format(void* v);
 
-template <typename T>
-struct RCIncFunctor_BSQRef
-{
-    inline T* operator()(BSQRef* r) const { return INC_REF_DIRECT(T, r); }
-};
-struct RCDecFunctor_BSQRef
-{
-    inline void operator()(BSQRef* r) const { BSQRef::decrementDirect(r); }
-};
 struct DisplayFunctor_BSQRef
 {
-    std::string operator()(BSQRef* r) const { return diagnostic_format(r); }
+    std::wstring operator()(void* v) const { return diagnostic_format(v); }
 };
 
-struct RCIncFunctor_KeyValue
-{
-    inline KeyValue operator()(KeyValue k) const { return INC_REF_CHECK(KeyValue, k); }
-};
-struct RCDecFunctor_KeyValue
-{
-    inline void operator()(KeyValue k) const { BSQRef::decrementChecked(k); }
-};
 struct EqualFunctor_KeyValue
 {
     bool operator()(KeyValue l, KeyValue r) const { return bsqKeyValueEqual(l, r); }
@@ -218,20 +144,12 @@ struct LessFunctor_KeyValue
 };
 struct DisplayFunctor_KeyValue
 {
-    std::string operator()(KeyValue k) const { return diagnostic_format(k); }
+    std::wstring operator()(KeyValue k) const { return diagnostic_format(k); }
 };
 
-struct RCIncFunctor_Value
-{
-    inline Value operator()(Value v) const { return INC_REF_CHECK(Value, v); }
-};
-struct RCDecFunctor_Value
-{
-    inline void operator()(Value v) const { BSQRef::decrementChecked(v); }
-};
 struct DisplayFunctor_Value
 {
-    std::string operator()(Value v) const { return diagnostic_format(v); }
+    std::wstring operator()(Value v) const { return diagnostic_format(v); }
 };
 
 enum class BSQBufferFormat {
@@ -255,17 +173,11 @@ enum class BSQBufferCompression {
     Space
 };
 
-class BSQByteBuffer : public BSQRef
+struct BSQByteBuffer
 {
-public:
-    const BSQBufferCompression compression;
-
-    const std::vector<uint8_t> sdata;
-
-    BSQByteBuffer(BSQBufferCompression compression, std::vector<uint8_t>&& sdata) : BSQRef(MIRNominalTypeEnum_ByteBuffer), compression(compression), sdata(move(sdata)) { ; }
-    
-    virtual ~BSQByteBuffer() = default;
-    virtual void destroy() { ; }
+    MetaData* mdata;
+    BSQBufferCompression compression;
+    //std::vector<uint8_t> sdata;
 
     std::string display_contents() const
     {
