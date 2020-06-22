@@ -10,47 +10,17 @@
 
 namespace BSQ
 {
-class BSQBigInt : public BSQRef
+struct BSQBigInt
 {
-public:
-    BSQBigInt(int64_t value) : BSQRef(MIRNominalTypeEnum_BigInt) { ; }
-    BSQBigInt(const char* bigstr) : BSQRef(MIRNominalTypeEnum_Int) { ; }
+    MetaData* mdata;
+    //TODO: bigint data here
 
-    BSQBigInt(const BSQBigInt& src) : BSQRef(MIRNominalTypeEnum_BigInt) 
-    { 
-        ; 
-    }
-
-    BSQBigInt(BSQBigInt&& src) : BSQRef(MIRNominalTypeEnum_BigInt) 
-    { 
-        ;
-    }
-
-    BSQBigInt& operator=(const BSQBigInt& src) {
-        if(this == &src) {
-            return *this;
-        }
-
-        return *this;
-    }
-
-    BSQBigInt& operator=(BSQBigInt&& src) {
-        if(this == &src) {
-            return *this;
-        }
-
-        return *this;
-    }
-
-    ~BSQBigInt() { ; }
-    virtual void destroy() { ; }
-
-    std::string display() const
+    std::wstring display() const
     {
-        return "[NOT IMPLEMENTED]";
+        return L"[NOT IMPLEMENTED]";
     }
 
-    static BSQBigInt* negate(BSQRefScope& scope, const BSQBigInt* v)
+    static BSQBigInt* negate(const BSQBigInt* v)
     {
         return nullptr;
     }
@@ -75,38 +45,30 @@ public:
         return false;
     }
 
-    static BSQBigInt* add(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* add(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* sub(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* sub(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* mult(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* mult(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* div(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* div(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
 
-    static BSQBigInt* mod(BSQRefScope& scope, const BSQBigInt* l, const BSQBigInt* r)
+    static BSQBigInt* mod(const BSQBigInt* l, const BSQBigInt* r)
     {
         return nullptr;
     }
-};
-struct RCIncFunctor_BSQBigInt
-{
-    inline BSQBigInt* operator()(BSQBigInt* i) const { return INC_REF_DIRECT(BSQBigInt, i); }
-};
-struct RCDecFunctor_BSQBigInt
-{
-    inline void operator()(BSQBigInt* i) const { BSQRef::decrementDirect(i); }
 };
 struct EqualFunctor_BSQBigInt
 {
@@ -118,8 +80,24 @@ struct LessFunctor_BSQBigInt
 };
 struct DisplayFunctor_BSQBigInt
 {
-    std::string operator()(BSQBigInt* i) const { return i->display(); }
+    std::wstring operator()(BSQBigInt* i) const { return i->display(); }
 };
+std::wstring DisplayFunction_BSQBigInt(void* v);
+constexpr MetaData MetaData_BSQBigInt = {
+    MIRNominalTypeEnum_BigInt,
+    MIRNominalTypeEnum_Category_BigInt,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::Pointer,
+    sizeof(BSQBigInt),
+    ObjectLayoutKind::Packed,
+    1,
+    nullptr,
+    0,
+    L"BigInt",
+    &DisplayFunction_BSQBigInt,
+    &ExtractGeneralRepr_Identity
+};
+
 
 class BSQString : public BSQRef
 {

@@ -13,6 +13,7 @@
 #include <math.h>
 
 #include <string>
+#include <regex>
 #include <iostream>
 #include <codecvt>
 

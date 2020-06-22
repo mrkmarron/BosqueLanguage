@@ -77,6 +77,14 @@ enum class ObjectLayoutKind
     CollectionMasked
 };
 
+enum class ExtractFlag
+{
+    Invalid,
+    Pointer,
+    StructAllocNoMeta,
+    StructFullSize
+};
+
 typedef const char* RefMask;
 typedef const char* StackRefMask;
 
@@ -86,6 +94,7 @@ public:
     MIRNominalTypeEnum nominaltype;
     uint32_t typecategory;
     uint32_t dataflag;
+    ExtractFlag extractop;
 
     size_t allocsize;
 
@@ -99,24 +108,27 @@ public:
 
     //display function pointer
     std::wstring (*displayFP)(void*);
+
+    //extract as a KeyValue or Value from a union
+    void* (*extractGeneralRepr)(void*);
 };
 
 //%%METADATA_STRUCT_DECLS%%
 }
 
 //%%SPECIAL_NAME_BLOCK_BEGIN%%
-#define MIRNominalTypeEnum_None nullptr
-#define MIRNominalTypeEnum_Bool nullptr
-#define MIRNominalTypeEnum_Int nullptr
-#define MIRNominalTypeEnum_BigInt nullptr
-#define MIRNominalTypeEnum_Float64 nullptr
-#define MIRNominalTypeEnum_String nullptr
-#define MIRNominalTypeEnum_UUID nullptr
-#define MIRNominalTypeEnum_LogicalTime nullptr
-#define MIRNominalTypeEnum_CryptoHash nullptr
-#define MIRNominalTypeEnum_ByteBuffer nullptr
-#define MIRNominalTypeEnum_ISOTime nullptr
-#define MIRNominalTypeEnum_Regex nullptr
-#define MIRNominalTypeEnum_Tuple nullptr
-#define MIRNominalTypeEnum_Record nullptr
+#define MIRNominalTypeEnum_None MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Bool MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Int MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_BigInt MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Float64 MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_String MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_UUID MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_LogicalTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_CryptoHash MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_ByteBuffer MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_ISOTime MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Regex MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Tuple MIRNominalTypeEnum::Invalid
+#define MIRNominalTypeEnum_Record MIRNominalTypeEnum::Invalid
 //%%SPECIAL_NAME_BLOCK_END%%

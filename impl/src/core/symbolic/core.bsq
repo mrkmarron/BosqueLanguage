@@ -144,7 +144,7 @@ struct entity Int provides KeyType, Parsable, PODType, APIType, Some {
 }
 
 //<summary>Primitive big-integer value.</summary>
-entity BigInt provides KeyType, Parsable, PODType, APIType, Some {
+struct entity BigInt provides KeyType, Parsable, PODType, APIType, Some {
     override static tryParse(str: String): Result<BigInt, String> # bigint_tryparse
 
     static stringify(i: BigInt): String # bigint_tostring

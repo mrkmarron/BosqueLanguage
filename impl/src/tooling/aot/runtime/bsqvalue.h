@@ -75,6 +75,8 @@ struct BSQBoxedWithMeta
     T bval;
 };
 
+void* ExtractGeneralRepr_Identity(void* v);
+
 struct EqualFunctor_NoneValue
 {
     inline bool operator()(NoneValue l, NoneValue r) const { return true; }
@@ -86,6 +88,21 @@ struct LessFunctor_NoneValue
 struct DisplayFunctor_NoneValue
 {
     std::wstring operator()(NoneValue n) const { return L"none"; }
+};
+std::wstring DisplayFunction_NoneValue(void* v);
+constexpr MetaData MetaData_NoneValue = {
+    MIRNominalTypeEnum_None,
+    MIRNominalTypeEnum_Category_Empty,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::Pointer,
+    0,
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"None",
+    &DisplayFunction_NoneValue,
+    &ExtractGeneralRepr_Identity
 };
 
 struct EqualFunctor_BSQBool
@@ -101,6 +118,23 @@ struct DisplayFunctor_BSQBool
     std::wstring operator()(BSQBool b) const { return b ? L"true" : L"false"; }
 };
 
+void* ExtractGeneralRepr_BSQBool(void* v);
+std::wstring DisplayFunction_BSQBool(void* v);
+constexpr MetaData MetaData_BSQBool = {
+    MIRNominalTypeEnum_Bool,
+    MIRNominalTypeEnum_Category_Empty,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructFullSize,
+    sizeof(BSQBool),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"Bool",
+    &DisplayFunction_BSQBool,
+    &ExtractGeneralRepr_BSQBool
+};
+
 struct EqualFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l == r; }
@@ -114,13 +148,47 @@ struct DisplayFunctor_int64_t
     std::wstring operator()(int64_t i) const { return std::to_wstring(i); }
 };
 
+void* ExtractGeneralRepr_int64_t(void* v);
+std::wstring DisplayFunction_int64_t(void* v);
+constexpr MetaData MetaData_int64_t = {
+    MIRNominalTypeEnum_Int,
+    MIRNominalTypeEnum_Category_Empty,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructFullSize,
+    sizeof(int64_t),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"Int",
+    &DisplayFunction_int64_t,
+    &ExtractGeneralRepr_int64_t
+};
+
+typedef BSQBoxedWithMeta<double> Boxed_double;
 struct DisplayFunctor_double
 {
     std::wstring operator()(double d) const { return std::to_wstring(d); }
 };
-typedef BSQBoxedWithMeta<double> Boxed_double;
 
-MetaData* getMetaData(void* v);
+void* ExtractGeneralRepr_double(void* v);
+std::wstring DisplayFunction_double(void* v);
+constexpr MetaData MetaData_double = {
+    MIRNominalTypeEnum_Float64,
+    MIRNominalTypeEnum_Category_Float64,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_double),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"Float64",
+    &DisplayFunction_double,
+    &ExtractGeneralRepr_double
+};
+
+const MetaData* getMetaData(void* v);
 
 bool bsqKeyValueEqual(KeyValue v1, KeyValue v2);
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2);
@@ -176,26 +244,28 @@ enum class BSQBufferCompression {
 struct BSQByteBuffer
 {
     MetaData* mdata;
+    size_t count;
     BSQBufferCompression compression;
-    //std::vector<uint8_t> sdata;
 
-    std::string display_contents() const
+    std::wstring display_contents() const
     {
-        std::string rvals("");
+        std::wstring rvals(L"");
         if(this->compression == BSQBufferCompression::Off)
         {
-            rvals += std::string((char*)this->sdata.data(), (char*)this->sdata.data() + this->sdata.size());
+            uint8_t* sdata = GC_GET_FIRST_COLLECTION_LOC(this);
+            rvals += std::wstring(sdata, sdata + this->count);
         }
         else
         {
-            for (size_t i = 0; i < this->sdata.size(); ++i)
+            uint8_t* sdata = GC_GET_FIRST_COLLECTION_LOC(this);
+            for (size_t i = 0; i < this->count; ++i)
             {
                 if(i != 0)
                 {
-                    rvals += ", ";
+                    rvals += L", ";
                 }
 
-                rvals += this->sdata[i];
+                rvals += sdata[i];
             }
         }
         return rvals;
@@ -203,145 +273,168 @@ struct BSQByteBuffer
 };
 struct DisplayFunctor_BSQByteBuffer
 {
-    std::string operator()(const BSQByteBuffer* bb) const 
+    std::wstring operator()(const BSQByteBuffer* bb) const 
     {
-        std::string rvals("ByteBuffer{");
+        std::wstring rvals(L"ByteBuffer{");
         rvals += bb->display_contents();
-        rvals += "}";
+        rvals += L"}";
 
         return rvals;
     }
 };
+std::wstring DisplayFunction_BSQByteBuffer(void* v);
+constexpr MetaData MetaData_BSQByteBuffer = {
+    MIRNominalTypeEnum_ByteBuffer,
+    MIRNominalTypeEnum_Category_ByteBuffer,
+    DATA_KIND_CLEAR_FLAG,
+    ExtractFlag::Pointer,
+    sizeof(BSQByteBuffer),
+    ObjectLayoutKind::CollectionNoRef,
+    0,
+    nullptr,
+    1,
+    L"ByteBuffer",
+    &DisplayFunction_BSQByteBuffer,
+    &ExtractGeneralRepr_Identity
+};
 
-class BSQBuffer : public BSQRef
+struct BSQBuffer
 {
-public:
-    const BSQBufferFormat format;
-    const BSQBufferEncoding encoding;
-
+    MetaData* mdata;
     BSQByteBuffer* sdata;
-
-    BSQBuffer(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer* sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
     
-    virtual ~BSQBuffer() = default;
-    
-    virtual void destroy() 
-    { 
-        BSQRef::decrementDirect(this->sdata);
-    }
+    BSQBufferFormat format;
+    BSQBufferEncoding encoding;
 };
 struct DisplayFunctor_BSQBuffer
 {
-    std::string operator()(const BSQBuffer* buff) const 
+    std::wstring operator()(const BSQBuffer* buff) const 
     {
-        std::string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
-        rvals += "{";
+        std::wstring rvals(GET_TYPE_META_DATA(buff)->displayname);
+        rvals += L"{";
         rvals += buff->sdata->display_contents();
-        rvals += "}";
+        rvals += L"}";
 
         return rvals;
     }
 };
+std::wstring DisplayFunction_BSQBuffer(void* v);
+constexpr MetaData MetaData_BSQBuffer_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) {
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_Buffer,
+        DATA_KIND_CLEAR_FLAG,
+        ExtractFlag::Pointer,
+        sizeof(BSQBuffer),
+        ObjectLayoutKind::CollectionPacked,
+        1,
+        nullptr,
+        0,
+        displayname,
+        &DisplayFunction_BSQBuffer,
+        &ExtractGeneralRepr_Identity
+    };
+}
 
-class BSQBufferOf : public BSQRef
+struct BSQBufferOf
 {
-public:
-    const BSQBufferFormat format;
-    const BSQBufferEncoding encoding;
-
+    MetaData* mdata;
     BSQByteBuffer* sdata;
 
-    BSQBufferOf(BSQBufferFormat format, BSQBufferEncoding encoding, BSQByteBuffer* sdata, MIRNominalTypeEnum oftype) : BSQRef(oftype), format(format), encoding(encoding), sdata(sdata) { ; }
-    
-    virtual ~BSQBufferOf() = default;
-    
-    virtual void destroy() 
-    { 
-        BSQRef::decrementDirect(this->sdata);
-    }
+    const BSQBufferFormat format;
+    const BSQBufferEncoding encoding;
 };
 struct DisplayFunctor_BSQBufferOf
 {
-    std::string operator()(const BSQBufferOf* buff) const 
+    std::wstring operator()(const BSQBufferOf* buff) const 
     {
-        std::string rvals(nominaltypenames[GET_MIR_TYPE_POSITION(buff->nominalType)]);
-        rvals += "{";
+        std::wstring rvals(GET_TYPE_META_DATA(buff)->displayname);
+        rvals += L"{";
         rvals += buff->sdata->display_contents();
-        rvals += "}";
+        rvals += L"}";
 
         return rvals;
     }
 };
+std::wstring DisplayFunction_BSQBufferOf(void* v);
+constexpr MetaData MetaData_BSQBufferOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) {
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_BufferOf,
+        DATA_KIND_CLEAR_FLAG,
+        ExtractFlag::Pointer,
+        sizeof(BSQBufferOf),
+        ObjectLayoutKind::CollectionPacked,
+        1,
+        nullptr,
+        0,
+        displayname,
+        &DisplayFunction_BSQBufferOf,
+        &ExtractGeneralRepr_Identity
+    };
+}
 
-class BSQISOTime
+struct BSQISOTime
 {
-public:
     uint64_t isotime;
+};
 
-    BSQISOTime() { ; }
-    BSQISOTime(uint64_t isotime) : isotime(isotime) { ; }
-
-    BSQISOTime(const BSQISOTime& src) = default;
-    BSQISOTime(BSQISOTime&& src) = default;
-
-    BSQISOTime& operator=(const BSQISOTime& src) = default;
-    BSQISOTime& operator=(BSQISOTime&& src) = default;
-};
-struct RCIncFunctor_BSQISOTime
-{
-    inline BSQISOTime operator()(BSQISOTime t) const { return t; }
-};
-struct RCDecFunctor_BSQISOTime
-{
-    inline void operator()(BSQISOTime t) const { ; }
-};
-struct RCReturnFunctor_BSQISOTime
-{
-    inline void operator()(BSQISOTime& t, BSQRefScope& scope) const { ; }
-};
+typedef BSQBoxedWithMeta<BSQISOTime> Boxed_BSQISOTime;
 struct DisplayFunctor_BSQISOTime
 {
-    std::string operator()(const BSQISOTime& t) const 
+    std::wstring operator()(const BSQISOTime& t) const 
     { 
-        return std::string{"ISOTime={"} + std::to_string(t.isotime) + "}";
+        return std::wstring{L"ISOTime={"} + std::to_wstring(t.isotime) + L"}";
     }
 };
-typedef BSQBoxed<BSQISOTime, RCDecFunctor_BSQISOTime> Boxed_BSQISOTime;
 
-class BSQRegex
-{
-public:
-    const std::regex* re;
+void* ExtractGeneralRepr_BSQISOTime(void* v);
+std::wstring DisplayFunction_BSQISOTime(void* v);
+constexpr MetaData MetaData_BSQISOTime = {
+    MIRNominalTypeEnum_ISOTime,
+    MIRNominalTypeEnum_Category_ISOTime,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_BSQISOTime),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"ISOTime",
+    &DisplayFunction_BSQISOTime,
+    &ExtractGeneralRepr_BSQISOTime
+};
 
-    BSQRegex() { ; }
-    BSQRegex(std::regex* re) : re(re) { ; }
+struct BSQRegex
+{
+    const std::wregex* re; //these are all constant to this is a scalar as far as GC is concerned
+};
 
-    BSQRegex(const BSQRegex& src) = default;
-    BSQRegex(BSQRegex&& src) = default;
-
-    BSQRegex& operator=(const BSQRegex& src) = default;
-    BSQRegex& operator=(BSQRegex&& src) = default;
-};
-struct RCIncFunctor_BSQRegex
-{
-    inline BSQRegex operator()(BSQRegex re) const { return re; }
-};
-struct RCDecFunctor_BSQRegex
-{
-    inline void operator()(BSQRegex re) const { ; }
-};
-struct RCReturnFunctor_BSQRegex
-{
-    inline void operator()(BSQRegex& re, BSQRefScope& scope) const { ; }
-};
+typedef BSQBoxedWithMeta<BSQRegex> Boxed_BSQRegex;
 struct DisplayFunctor_BSQRegex
 {
-    std::string operator()(const BSQRegex& r) const 
+    std::wstring operator()(const BSQRegex& r) const 
     { 
-        return std::string{"[REGEX]"};
+        return L"[REGEX]";
     }
 };
-typedef BSQBoxed<BSQRegex, RCDecFunctor_BSQRegex> Boxed_BSQRegex;
+
+void* ExtractGeneralRepr_Regex(void* v);
+std::wstring DisplayFunction_Regex(void* v);
+constexpr MetaData MetaData_BSQRegex = {
+    MIRNominalTypeEnum_Regex,
+    MIRNominalTypeEnum_Category_Regex,
+    DATA_KIND_CLEAR_FLAG,
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_BSQRegex),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"Regex",
+    &DisplayFunction_Regex,
+    &ExtractGeneralRepr_Regex
+};
 
 class BSQTuple : public BSQRef
 {

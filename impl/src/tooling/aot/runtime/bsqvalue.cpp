@@ -11,19 +11,84 @@ namespace BSQ
 BSQTuple BSQTuple::_empty({}, DATA_KIND_ALL_FLAG);
 BSQRecord BSQRecord::_empty({}, DATA_KIND_ALL_FLAG);
 
-MetaData* getMetaData(void* v)
+void* ExtractGeneralRepr_Identity(void* v)
+{
+    return (*((void**)GC_GET_FIRST_DATA_LOC(v)));
+}
+void* ExtractGeneralRepr_BSQBool(void* v)
+{
+    return BSQ_ENCODE_VALUE_BOOL(*(BSQBool*)(GC_GET_FIRST_DATA_LOC(v)));
+}
+void* ExtractGeneralRepr__int64_t(void* v)
+{
+    return BSQ_ENCODE_VALUE_TAGGED_INT(*(int64_t*)(GC_GET_FIRST_DATA_LOC(v)));
+}
+void* ExtractGeneralRepr__double(void* v)
+{
+    double dval = *(double*)(GC_GET_FIRST_DATA_LOC(v));
+    return Allocator::GlobalAllocator.objectNew<Boxed_double>(&MetaData_double, dval);
+}
+void* ExtractGeneralRepr_BSQISOTime(void* v)
+{
+    uint64_t tval = *(uint64_t*)(GC_GET_FIRST_DATA_LOC(v));
+    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(&MetaData_BSQISOTime, tval);
+}
+void* ExtractGeneralRepr_Regex(void* v)
+{
+    std::wregex rval = *(std::wregex**)(GC_GET_FIRST_DATA_LOC(v));
+    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(&MetaData_BSQISOTime, tval);
+}
+
+std::wstring DisplayFunction_NoneValue(void* v)
+{
+    return DisplayFunctor_NoneValue{}((NoneValue)v);
+}
+std::wstring DisplayFunction_BSQBool(void* v)
+{
+    return DisplayFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v));
+}
+std::wstring DisplayFunction_int64_t(void* v)
+{
+    return DisplayFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v));
+}
+std::wstring DisplayFunction_double(void* v)
+{
+    return DisplayFunctor_double{}(BSQ_GET_VALUE_PTR(v, Boxed_double)->bval);
+}
+std::wstring DisplayFunction_BSQByteBuffer(void* v)
+{
+    return DisplayFunctor_BSQByteBuffer{}(BSQ_GET_VALUE_PTR(v, BSQByteBuffer));
+}
+std::wstring DisplayFunction_BSQBuffer(void* v)
+{
+    return DisplayFunctor_BSQBuffer{}(BSQ_GET_VALUE_PTR(v, BSQBuffer));
+}
+std::wstring DisplayFunction_BSQBufferOf(void* v)
+{
+    return DisplayFunctor_BSQBufferOf{}(BSQ_GET_VALUE_PTR(v, BSQBufferOf));
+}
+std::wstring DisplayFunction_BSQISOTime(void* v)
+{
+    return DisplayFunction_BSQISOTime{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQISOTime)->bval);
+}
+std::wstring DisplayFunction_Regex(void* v)
+{
+    return DisplayFunction_BSQRegex{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQRegex)->bval)
+}
+
+const MetaData* getMetaData(void* v)
 {
     if (BSQ_IS_VALUE_NONE(v))
     {
-        return MIRNominalTypeEnum_None;
+        return &MetaData_NoneValue;
     }
     else if (BSQ_IS_VALUE_BOOL(v))
     {
-        return MIRNominalTypeEnum_Bool;
+        return &MetaData_BSQBool;
     }
     else if (BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        return MIRNominalTypeEnum_Int;
+        return &MetaData_int64_t;
     }
     else
     {
@@ -37,21 +102,21 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         return true;
     }
 
-    MetaData* kt1 = getMetaData(v1);
-    MetaData* kt2 = getMetaData(v2);
+    const MetaData* kt1 = getMetaData(v1);
+    const MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
         return false;
     }
 
-    if((kt1 == MIRNominalTypeEnum_None) & (kt2 == MIRNominalTypeEnum_None))
+    if((kt1 == &MetaData_NoneValue) & (kt2 == &MetaData_NoneValue))
     {
         return true;
     }
-    else if((kt1 == MIRNominalTypeEnum_Bool) & (kt2 == MIRNominalTypeEnum_Bool))
+    else if((kt1 == &MetaData_BSQBool) & (kt2 == &MetaData_BSQBool))
     {
         return EqualFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == MIRNominalTypeEnum_Int) & (kt2 == MIRNominalTypeEnum_Int))
+    else if((kt1 == &MetaData_int64_t) & (kt2 == &MetaData_int64_t))
     {
         return EqualFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }
@@ -88,21 +153,21 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
 
 bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
 {
-    MetaData* kt1 = getMetaData(v1);
-    MetaData* kt2 = getMetaData(v2);
+    const MetaData* kt1 = getMetaData(v1);
+    const MetaData* kt2 = getMetaData(v2);
     if(kt1 != kt2) {
         return kt1->nominaltype < kt2->nominaltype;
     }
 
-    if((kt1 == MIRNominalTypeEnum_None) & (kt2 == MIRNominalTypeEnum_None))
+    if((kt1 == &MetaData_NoneValue) & (kt2 == &MetaData_NoneValue))
     {
         return false;
     }
-    else if((kt1 == MIRNominalTypeEnum_Bool) & (kt2 == MIRNominalTypeEnum_Bool))
+    else if((kt1 == &MetaData_BSQBool) & (kt2 == &MetaData_BSQBool))
     {
         return LessFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == MIRNominalTypeEnum_Int) & (kt2 == MIRNominalTypeEnum_Int))
+    else if((kt1 == &MetaData_int64_t) & (kt2 == &MetaData_int64_t))
     {
         return LessFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }

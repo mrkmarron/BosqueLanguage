@@ -39,7 +39,7 @@
 #define BSQ_ALLOC_LARGE_BLOCK_SIZE 4096
 
 #define BSQ_MEM_ALIGNMENT 8
-#define BSQ_WORD_ALIGN_ALLOC_SIZE(ASIZE) (((ASIZE) + 0x7) & 0xFFFFFFFFFFFFFFFC)
+#define BSQ_ALIGN_ALLOC_SIZE(ASIZE) (((ASIZE) + 0x7) & 0xFFFFFFFFFFFFFFFC)
 
 #define BSQ_ALLIGNED_MALLOC(SIZE) _aligned_malloc(SIZE, BSQ_MEM_ALIGNMENT)
 
@@ -63,7 +63,7 @@
 #define IS_UNREACHABLE(M, XY) (IS_ZERO_COUNT(M) & (GET_RC_MARK(M) != XY))
 
 #define TYPE_INFO_FORWARD_SENTINAL nullptr
-#define GET_TYPE_META_DATA(M) ((MetaData*)M)
+#define GET_TYPE_META_DATA(M) ((const MetaData*)M)
 #define SET_TYPE_META_DATA_FORWARD_SENTINAL(M) ((MetaData*)M) = nullptr
 
 #define GET_FORWARD_PTR(M) *((void**)(((uint8_t*)M) + sizeof(MetaData*)))
@@ -159,19 +159,25 @@ namespace BSQ
         inline uintptr_t getBumpStartAddr() const { return (uintptr_t)this->m_block; }
         inline uintptr_t getBumpEndAddr() const { return (uintptr_t)this->m_currPos; }
 
+        size_t currentAllocatedBytes() const
+        {
+            return this->m_currPos - this->m_block;
+        }
+
         //Allocate a byte* of the the template size (word aligned)
         template <typename T>
         inline T* allocateTypeRawSize()
         {
-            MEM_STATS_OP(this->totalalloc += sizeof(T));
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            MEM_STATS_OP(this->totalalloc += asize);
 
-            if (this->m_currPos + sizeof(T) > this->m_endPos)
+            if (this->m_currPos + asize > this->m_endPos)
             {
                 this->gc.collect();
             }
 
             T* res = (T*)this->m_currPos;
-            this->m_currPos += sizeof(T);
+            this->m_currPos += asize;
 
             return res;
         }
@@ -180,16 +186,17 @@ namespace BSQ
         template <typename T, typename U>
         inline T* allocateTypeRawSizePlus(size_t csize, U** contents)
         {
-            MEM_STATS_OP(this->totalalloc += sizeof(T) + csize);
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            MEM_STATS_OP(this->totalalloc += asize + csize);
 
-            if (this->m_currPos + sizeof(T) + csize > this->m_endPos)
+            if (this->m_currPos + asize + csize > this->m_endPos)
             {
                 this->gc.collect();
             }
 
             T* res = (T*)this->m_currPos;
-            *contents = (U*)(this->m_currPos + sizeof(T));
-            this->m_currPos += sizeof(T) + csize;
+            *contents = (U*)(this->m_currPos + asize);
+            this->m_currPos += asize + csize;
         }
     };
 
@@ -233,7 +240,7 @@ namespace BSQ
         template <typename T>
         T* allocateTypeRawSize()
         {
-            constexpr size_t tsize = sizeof(RCMeta) + sizeof(T);
+            constexpr size_t tsize = sizeof(RCMeta) + BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             MEM_STATS_OP(this->livealloc += tsize);
             MEM_STATS_OP(this->totalalloc += tsize);
 
@@ -247,7 +254,7 @@ namespace BSQ
         template <typename T, typename U>
         T* allocateTypeRawSizePlus(size_t csize, U** contents)
         {
-            constexpr size_t tsize = sizeof(RCMeta) + sizeof(T);
+            constexpr size_t tsize = sizeof(RCMeta) + BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             MEM_STATS_OP(this->livealloc += tsize + csize);
             MEM_STATS_OP(this->totalalloc += tsize + csize);
 
@@ -283,12 +290,11 @@ namespace BSQ
         std::queue<void*> worklist;
 
         std::queue<void*> releaselist;
-
+        
 #ifdef ENABLE_MEM_STATS
         size_t gccount;
-        size_t promoted;
-
-        size_t max;
+        size_t promotedbytes;
+        size_t maxheap;
 #endif
 
         template <uint64_t mark>
@@ -331,7 +337,7 @@ namespace BSQ
         }
 
         template <uint64_t mark>
-        void rcDecObjectMixed(void* obj, MetaData* meta, ObjectLayoutKind layout)
+        void rcDecObjectMixed(void* obj, const MetaData* meta, ObjectLayoutKind layout)
         {
             if(layout == ObjectLayoutKind::Masked)
             {
@@ -353,7 +359,7 @@ namespace BSQ
         template <uint64_t mark>
         inline void rcDecObject(void* obj)
         {
-            MetaData* meta = GET_TYPE_META_DATA(obj);
+            const MetaData* meta = GET_TYPE_META_DATA(obj);
             ObjectLayoutKind layout = meta->mkind;
 
             if(layout == ObjectLayoutKind::Packed)
@@ -440,7 +446,7 @@ namespace BSQ
             this->processMixed<true, mark>(slots, mask);
         }
 
-        void processObjectMixed(void* obj, MetaData* meta, ObjectLayoutKind layout)
+        void processObjectMixed(void* obj, const MetaData* meta, ObjectLayoutKind layout)
         {
             if(layout == ObjectLayoutKind::Masked)
             {
@@ -480,7 +486,7 @@ namespace BSQ
 
         inline void processObject(void* obj)
         {
-            MetaData* meta = GET_TYPE_META_DATA(obj);
+            const MetaData* meta = GET_TYPE_META_DATA(obj);
             ObjectLayoutKind layout = meta->mkind;
 
             if(layout == ObjectLayoutKind::Packed)
@@ -549,10 +555,27 @@ namespace BSQ
             }
         }
 
+        template <uint64_t mark>
+        void collectMark()
+        {
+            MEM_STATS_OP(this->maxheap = std::max(this->maxheap, this->balloc.currentAllocatedBytes() + this->ralloc.livealloc()));
+            MEM_STATS_OP(this->gccount++);
+
+            this->processRoots<mark>();
+            this->processHeap();
+
+            this->checkZeroCountList<mark>();
+            this->processRelease<mark>();
+        }
+
     public:
         Allocator() : balloc(this), ralloc(), maybeZeroCounts(), mark(GC_MARK_BLACK_X), bstart(0), bend(0), worklist(), releaselist()
         {
-            maybeZeroCounts.reserve(256);
+            this->maybeZeroCounts.reserve(256);
+
+            MEM_STATS_OP(this->gccount = 0);
+            MEM_STATS_OP(this->promotedbytes = 0);
+            MEM_STATS_OP(this->maxheap = 0);
         }
 
         ~Allocator()
@@ -560,13 +583,12 @@ namespace BSQ
             ;
         }
 
-        //Allocate with "new" from the slab allocator
-        template<typename T, typename... Args>
-        inline T* ObjectNew(Args... args)
-        {
-            static_assert(BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) == sizeof(T));
+        static Allocator GlobalAllocator;
 
-            if constexpr (sizeof(T) <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
+        template<typename T, typename... Args>
+        inline T* objectNew(Args... args)
+        {
+            if constexpr (BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
             {
                 return new (this->balloc.allocateTypeRawSize<T>()){args...};
             }
@@ -576,15 +598,12 @@ namespace BSQ
             }
         }
 
-        //Allocate T* of the size needed to hold count elements of the given type
         template <typename T, typename U, typename... Args>
-        T* CollectionNew(size_t count, U** contents, Args... args)
+        T* collectionNew(size_t count, U** contents, Args... args)
         {
-            static_assert(BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) == sizeof(T));
-
             size_t csize = BSQ_WORD_ALIGN_ALLOC_SIZE(count * sizeof(U));
     
-            if (sizeof(T) + csize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
+            if (BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) + csize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
             {
                 return new (this->balloc.allocateTypeRawSizePlus<T, U>(csize, contents)){*contents, args...};
             }
