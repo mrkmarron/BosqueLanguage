@@ -8,9 +8,6 @@
 
 namespace BSQ
 {
-BSQTuple BSQTuple::_empty({}, DATA_KIND_ALL_FLAG);
-BSQRecord BSQRecord::_empty({}, DATA_KIND_ALL_FLAG);
-
 void* ExtractGeneralRepr_Identity(void* v)
 {
     return (*((void**)GC_GET_FIRST_DATA_LOC(v)));
@@ -35,8 +32,8 @@ void* ExtractGeneralRepr_BSQISOTime(void* v)
 }
 void* ExtractGeneralRepr_Regex(void* v)
 {
-    std::wregex rval = *(std::wregex**)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), tval);
+    std::wregex* rval = *(std::wregex**)(GC_GET_FIRST_DATA_LOC(v));
+    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), rval);
 }
 
 std::wstring DisplayFunction_NoneValue(void* v)
@@ -69,11 +66,11 @@ std::wstring DisplayFunction_BSQBufferOf(void* v)
 }
 std::wstring DisplayFunction_BSQISOTime(void* v)
 {
-    return DisplayFunction_BSQISOTime{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQISOTime)->bval);
+    return DisplayFunctor_BSQISOTime{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQISOTime)->bval);
 }
 std::wstring DisplayFunction_Regex(void* v)
 {
-    return DisplayFunction_BSQRegex{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQRegex)->bval)
+    return DisplayFunctor_BSQRegex{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQRegex)->bval);
 }
 
 MetaData* getMetaData(void* v)
@@ -108,15 +105,15 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         return false;
     }
 
-    if((kt1 == META_DATA_LOAD_DECL(MetaData_NoneValue)) & (kt2 == META_DATA_LOAD_DECL(MetaData_NoneValue)))
+    if((kt1->nominaltype == MIRNominalTypeEnum_None) & (kt2->nominaltype == MIRNominalTypeEnum_None))
     {
         return true;
     }
-    else if((kt1 == META_DATA_LOAD_DECL(MetaData_BSQBool)) & (kt2 == META_DATA_LOAD_DECL(MetaData_BSQBool)))
+    else if((kt1->nominaltype == MIRNominalTypeEnum_Bool) & (kt2->nominaltype == MIRNominalTypeEnum_Bool))
     {
         return EqualFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == META_DATA_LOAD_DECL(MetaData_int64_t)) & (kt2 == META_DATA_LOAD_DECL(MetaData_int64_t)))
+    else if((kt1->nominaltype == MIRNominalTypeEnum_Int) & (kt2->nominaltype == MIRNominalTypeEnum_Int))
     {
         return EqualFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }
@@ -128,7 +125,7 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
         switch(kt1->typecategory)
         {
             case MIRNominalTypeEnum_Category_BigInt:
-                return BSQBigInt::eq(BSQ_GET_VALUE_PTR(v1, BSQBigInt), BSQ_GET_VALUE_PTR(v2, BSQBigInt));
+                return BSQBigInt::eq(BSQ_GET_VALUE_PTR(v1, Boxed_BigInt)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BigInt)->bval);
             case MIRNominalTypeEnum_Category_String:
                 return BSQString::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQString), BSQ_GET_VALUE_PTR(v2, BSQString));
             case MIRNominalTypeEnum_Category_SafeString:
@@ -142,11 +139,11 @@ bool bsqKeyValueEqual(KeyValue v1, KeyValue v2)
             case MIRNominalTypeEnum_Category_CryptoHash:
                 return BSQCryptoHash::keyEqual(BSQ_GET_VALUE_PTR(v1, BSQCryptoHash), BSQ_GET_VALUE_PTR(v2, BSQCryptoHash));
             case MIRNominalTypeEnum_Category_Enum:
-                return BSQEnum::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQEnum)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQEnum)->bval);
+                return BSQEnum::keyEqual(*BSQ_GET_VALUE_PTR(v1, BSQEnum), *BSQ_GET_VALUE_PTR(v2, BSQEnum));
             case MIRNominalTypeEnum_Category_IdKeySimple:
-                return BSQIdKeySimple::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeySimple)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeySimple)->bval);
+                return BSQIdKeySimple::keyEqual(*BSQ_GET_VALUE_PTR(v1, BSQIdKeySimple), *BSQ_GET_VALUE_PTR(v2, BSQIdKeySimple));
             default:
-                return BSQIdKeyCompound::keyEqual(BSQ_GET_VALUE_PTR(v1, Boxed_BSQIdKeyCompound)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BSQIdKeyCompound)->bval);
+                return BSQIdKeyCompound::keyEqual(*BSQ_GET_VALUE_PTR(v1, BSQIdKeyCompound), *BSQ_GET_VALUE_PTR(v2, BSQIdKeyCompound));
         }
     }
 }
@@ -159,15 +156,15 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         return kt1->nominaltype < kt2->nominaltype;
     }
 
-    if((kt1 == META_DATA_LOAD_DECL(MetaData_NoneValue)) & (kt2 == META_DATA_LOAD_DECL(MetaData_NoneValue)))
+    if((kt1->nominaltype == MIRNominalTypeEnum_None) & (kt2->nominaltype == MIRNominalTypeEnum_None))
     {
         return false;
     }
-    else if((kt1 == META_DATA_LOAD_DECL(MetaData_BSQBool)) & (kt2 == META_DATA_LOAD_DECL(MetaData_BSQBool)))
+    else if((kt1->nominaltype == MIRNominalTypeEnum_Bool) & (kt2->nominaltype == MIRNominalTypeEnum_Bool))
     {
         return LessFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v1), BSQ_GET_VALUE_BOOL(v2));
     }
-    else if((kt1 == META_DATA_LOAD_DECL(MetaData_int64_t)) & (kt2 == META_DATA_LOAD_DECL(MetaData_int64_t)))
+    else if((kt1->nominaltype == MIRNominalTypeEnum_Int) & (kt2->nominaltype == MIRNominalTypeEnum_Int))
     {
         return LessFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v1), BSQ_GET_VALUE_TAGGED_INT(v2));
     }
@@ -176,7 +173,7 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
         switch(kt1->typecategory)
         {
             case MIRNominalTypeEnum_Category_BigInt:
-                return BSQBigInt::lt(BSQ_GET_VALUE_PTR(v1, BSQBigInt), BSQ_GET_VALUE_PTR(v2, BSQBigInt));
+                return BSQBigInt::lt(BSQ_GET_VALUE_PTR(v1, Boxed_BigInt)->bval, BSQ_GET_VALUE_PTR(v2, Boxed_BigInt)->bval);
             case MIRNominalTypeEnum_Category_String:
                 return BSQString::keyLess(BSQ_GET_VALUE_PTR(v1, BSQString), BSQ_GET_VALUE_PTR(v2, BSQString));
             case MIRNominalTypeEnum_Category_SafeString:

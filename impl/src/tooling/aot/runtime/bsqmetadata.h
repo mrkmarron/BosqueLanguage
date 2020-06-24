@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <cstdint>
+#include <string>
 
 //Note POD => API
 typedef uint32_t DATA_KIND_FLAG;
@@ -19,47 +20,16 @@ typedef uint32_t DATA_KIND_FLAG;
 
 #define DATA_KIND_COMPUTE(KF, COMP) (((KF) == DATA_KIND_UNKNOWN_FLAG) ? (COMP) : (KF)
 
-//Category tags to embed in the type enums
-#define MIRNominalTypeEnum_Category_Empty           0
-#define MIRNominalTypeEnum_Category_BigInt          1
-#define MIRNominalTypeEnum_Category_String          2
-#define MIRNominalTypeEnum_Category_SafeString      3
-#define MIRNominalTypeEnum_Category_StringOf        4
-#define MIRNominalTypeEnum_Category_UUID            5
-#define MIRNominalTypeEnum_Category_LogicalTime     6
-#define MIRNominalTypeEnum_Category_CryptoHash      7
-#define MIRNominalTypeEnum_Category_Enum            8
-#define MIRNominalTypeEnum_Category_IdKeySimple     9
-#define MIRNominalTypeEnum_Category_IdKeyCompound   10
-
-#define MIRNominalTypeEnum_Category_KeyTypeLimit    MIRNominalTypeEnum_Category_IdKeyCompound
-
-#define MIRNominalTypeEnum_Category_Float64         20
-#define MIRNominalTypeEnum_Category_Buffer          21
-#define MIRNominalTypeEnum_Category_BufferOf        22
-#define MIRNominalTypeEnum_Category_ByteBuffer      23
-#define MIRNominalTypeEnum_Category_ISOTime         24
-#define MIRNominalTypeEnum_Category_Regex           25
-#define MIRNominalTypeEnum_Category_Tuple           26
-#define MIRNominalTypeEnum_Category_Record          27
-#define MIRNominalTypeEnum_Category_Object          28
-
-#define MIRNominalTypeEnum_Category_NormalTypeLimit MIRNominalTypeEnum_Category_Object
-
-#define MIRNominalTypeEnum_Category_List            40
-#define MIRNominalTypeEnum_Category_Stack           41
-#define MIRNominalTypeEnum_Category_Queue           42
-#define MIRNominalTypeEnum_Category_Set             43
-#define MIRNominalTypeEnum_Category_DynamicSet      44
-#define MIRNominalTypeEnum_Category_Map             45
-#define MIRNominalTypeEnum_Category_DynamicMap      46
-
 #define PTR_FIELD_MASK_SCALAR (char)1
 #define PTR_FIELD_MASK_PTR (char)2
 #define PTR_FIELD_MASK_UNION (char)4
-#define PTR_FIELD_MASK_END (chat)0
+#define PTR_FIELD_MASK_END (char)0
 
 #define META_DATA_LOAD_DECL(X) const_cast<MetaData*>(&(X))
+
+#define META_DATA_DECLARE_NO_PTR(NAME, TYPE, FLAG, SCORE, SFULL, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, DISPLAY}
+#define META_DATA_DECLARE_SIMPLE_PTR(NAME, TYPE, FLAG, SCORE, SFULL, PCOUNT, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, PCOUNT, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, GCIncSimplePtrObj, GCDecSimplePtrObj, GCProcessSimplePtrObj, DISPLAY}
+#define META_DATA_DECLARE_COMPOUND_PTR(NAME, TYPE, FLAG, SCORE, SFULL, MASK, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, 0, MASK, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, GCIncCompoundPtrObj, GCDecCompoundPtrObj, GCProcessCompoundPtrObj, DISPLAY}
 
 namespace BSQ
 {
@@ -69,50 +39,68 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
-enum class ObjectLayoutKind
-{
-    NoRef,
-    Packed,
-    Masked,
-    CollectionNoRef,
-    CollectionPacked,
-    CollectionMasked
-};
-
-enum class ExtractFlag
-{
-    Invalid,
-    Pointer,
-    StructAllocNoMeta,
-    StructFullSize
-};
-
 typedef const char* RefMask;
-typedef const char* StackRefMask;
+
+enum class OPFlag
+{
+    IncOp,
+    DecOp,
+    ProcessOp
+};
+
+typedef void (*MetaData_UnionOperatorFP)(void*, void*);
+typedef void (*MetaData_GCOperatorFP)(MetaData*, void**);
 
 class MetaData
 {
 public:
     MIRNominalTypeEnum nominaltype;
-    uint32_t typecategory;
     uint32_t dataflag;
-    ExtractFlag extractop;
 
-    size_t allocsize;
+    uint32_t sizecore; //size of the object in it's raw state (when it may optionally not have a header)
+    uint32_t sizefullalloc; //size of object in bytes *always including* metadata header
+    int32_t sizeentry; //if this is a container then this is the size of each contained element (-1) if not a container
 
-    ObjectLayoutKind mkind;
-    uint32_t simpleptrcount;
-    RefMask refmask;
+    uint32_t ptrcount; //if this is a simple packed layout (or contents are simple packed layouts) then this is the number of pointers
+    RefMask refmask; //if this is a mixed layout (or contents are mixed layouts) then this is the mask to use
 
-    size_t entrysize; //if this is a container then this is the size of each contained element
+    //Less and Equal operations for the object when it is in boxed form (or null if they are not supported)
+    bool (*less)(void* v1, void* v2);
+    bool (*eq)(void* v1, void* v2);
 
-    const wchar_t* displayname;
+    //box/unbox the object
+    void (*boxInto)(void* src, void* dstbox);
+    void (*unboxFrom)(void* srcbox, void* dst);
+
+    //inject and extract from union representations
+    MetaData_UnionOperatorFP injectIntoUnion;
+    MetaData_UnionOperatorFP extractFromUnion;
+    MetaData_UnionOperatorFP coerceUnionToBox;
+
+    //How to do gc mark/inc/dec on the object
+    MetaData_GCOperatorFP incObj;
+    MetaData_GCOperatorFP decObj;
+    MetaData_GCOperatorFP processObj;
 
     //display function pointer
-    std::wstring (*displayFP)(void*);
+    std::wstring (*displayFP)(void* obj);
 
-    //extract as a KeyValue or Value from a union
-    void* (*extractGeneralRepr)(void*);
+    template <OPFlag op>
+    inline MetaData_GCOperatorFP getOpFP() const
+    {
+        if constexpr(op == OPFlag::IncOp)
+        {
+            return this->incObj;
+        }
+        else if constexpr (op == OPFlag::DecOp)
+        {
+            return this->decObj;
+        }
+        else 
+        {
+            return this->processObj;
+        }
+    }
 };
 
 //%%METADATA_STRUCT_DECLS%%

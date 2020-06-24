@@ -51,7 +51,7 @@ struct LessFunctor_BSQBigInt
     inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::lt(l, r); }
 };
 
-typedef BSQBoxedWithMeta<BSQBigInt> Boxed_BigInt;
+typedef BSQBoxed<BSQBigInt> Boxed_BigInt;
 struct DisplayFunctor_BSQBigInt
 {
     std::wstring operator()(BSQBigInt i) const { return i.display(); }
@@ -79,7 +79,7 @@ struct BSQString
     MetaData* mdata;
     size_t count;
 
-    inline static bool keyEqual(const BSQString* l, const BSQString* r)
+    static bool keyEqual(const BSQString* l, const BSQString* r)
     {
         if(l->count != r->count)
         {
@@ -93,11 +93,11 @@ struct BSQString
         }
     }
 
-    inline static bool keyLess(const BSQString* l, const BSQString* r)
+    static bool keyLess(const BSQString* l, const BSQString* r)
     {
         if(l->count != r->count)
         {
-            return l->count - r->count;
+            return l->count < r->count;
         }
         else
         {
@@ -107,11 +107,11 @@ struct BSQString
 
             if(mmiter.first == ldata + l->count)
             {
-                return 0;
+                return false;
             }
             else
             {
-                return *(mmiter.first) - *(mmiter.second);
+                return *(mmiter.first) < *(mmiter.second);
             }
         }
     }
@@ -152,29 +152,52 @@ constexpr MetaData MetaData_BSQString = {
 struct BSQSafeString
 {
     MetaData* mdata;
-    BSQString* sdata;
-  
-    BSQSafeString(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
+    size_t count;
+    MIRNominalTypeEnum nominalType;
 
-    virtual ~BSQSafeString() = default;
-
-    inline static bool keyEqual(const BSQSafeString* l, const BSQSafeString* r)
+    static bool keyEqual(const BSQSafeString* l, const BSQSafeString* r)
     {
-        return l->nominalType == r->nominalType && l->sdata == r->sdata;
+        if(l->nominalType != r->nominalType)
+        {
+            return false;
+        }
+        else
+        {
+            if (l->count != r->count)
+            {
+                return false;
+            }
+            else
+            {
+                const wchar_t *ldata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(l);
+                const wchar_t *rdata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(r);
+                std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
+            }
+        }
     }
 
-    inline static bool keyLess(const BSQSafeString* l, const BSQSafeString* r)
+    static bool keyLess(const BSQSafeString* l, const BSQSafeString* r)
     {
-        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
+        if(l->nominalType != r->nominalType)
+        {
+            return l->nominalType < r->nominalType;
+        }
+        else
+        {
+            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
+            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
+
+            if(mmiter.first == ldata + l->count)
+            {
+                return false;
+            }
+            else
+            {
+                return *(mmiter.first) < *(mmiter.second);
+            }
+        }
     }
-};
-struct RCIncFunctor_BSQSafeString
-{
-    inline BSQSafeString* operator()(BSQSafeString* s) const { return INC_REF_DIRECT(BSQSafeString, s); }
-};
-struct RCDecFunctor_BSQSafeString
-{
-    inline void operator()(BSQSafeString* s) const { BSQRef::decrementDirect(s); }
 };
 struct EqualFunctor_BSQSafeString
 {
@@ -186,38 +209,80 @@ struct LessFunctor_BSQSafeString
 };
 struct DisplayFunctor_BSQSafeString
 {
-    std::string operator()(const BSQSafeString* s) const 
-    { 
-        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::string("'") + s->sdata + std::string("'"); 
-    }
-};
-
-class BSQStringOf : public BSQRef
-{
-public:
-    const std::string sdata;
-  
-    BSQStringOf(const std::string& str, MIRNominalTypeEnum oftype) : BSQRef(oftype), sdata(str) { ; }
-
-    virtual ~BSQStringOf() = default;
-
-    inline static bool keyEqual(const BSQStringOf* l, const BSQStringOf* r)
+    std::wstring operator()(const BSQSafeString* s) const 
     {
-        return l->nominalType == r->nominalType && l->sdata == r->sdata;
+        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s);
+        return std::wstring(s->mdata->displayname) + std::wstring(L"'") + std::wstring(data, data + s->count) + std::wstring(L"'"); 
+    }
+};
+std::wstring DisplayFunction_BSQSafeString(void* v);
+constexpr MetaData MetaData_BSQSafeString_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
+{
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_SafeString,
+        DATA_KIND_ALL_FLAG,
+        ExtractFlag::Pointer,
+        sizeof(BSQSafeString),
+        ObjectLayoutKind::CollectionNoRef,
+        0,
+        nullptr,
+        1,
+        displayname,
+        &DisplayFunction_BSQSafeString,
+        &ExtractGeneralRepr_Identity
+    };
+}
+
+struct BSQStringOf
+{
+    MetaData* mdata;
+    size_t count;
+    MIRNominalTypeEnum nominalType;
+
+    static bool keyEqual(const BSQStringOf* l, const BSQStringOf* r)
+    {
+        if(l->mdata->nominaltype != r->mdata->nominaltype)
+        {
+            return false;
+        }
+        else
+        {
+            if (l->count != r->count)
+            {
+                return false;
+            }
+            else
+            {
+                const wchar_t *ldata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(l);
+                const wchar_t *rdata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(r);
+                std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
+            }
+        }
     }
 
-    inline static bool keyLess(const BSQStringOf* l, const BSQStringOf* r)
+    static bool keyLess(const BSQStringOf* l, const BSQStringOf* r)
     {
-        return (l->nominalType != r->nominalType) ? (l->nominalType < r->nominalType) : (l->sdata < r->sdata);
+        if(l->nominalType != r->nominalType)
+        {
+            return l->nominalType < r->nominalType;
+        }
+        else
+        {
+            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
+            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
+
+            if(mmiter.first == ldata + l->count)
+            {
+                return false;
+            }
+            else
+            {
+                return *(mmiter.first) < *(mmiter.second);
+            }
+        }
     }
-};
-struct RCIncFunctor_BSQStringOf
-{
-    inline BSQStringOf* operator()(BSQStringOf* s) const { return INC_REF_DIRECT(BSQStringOf, s); }
-};
-struct RCDecFunctor_BSQStringOf
-{
-    inline void operator()(BSQStringOf* s) const { BSQRef::decrementDirect(s); }
 };
 struct EqualFunctor_BSQStringOf
 {
@@ -229,25 +294,34 @@ struct LessFunctor_BSQStringOf
 };
 struct DisplayFunctor_BSQStringOf
 {
-    std::string operator()(const BSQStringOf* s) const 
+    std::wstring operator()(const BSQStringOf* s) const 
     { 
-        return nominaltypenames[GET_MIR_TYPE_POSITION(s->nominalType)] + std::string("'") + s->sdata + std::string("'"); 
+        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s);
+        return std::wstring(s->mdata->displayname) + std::wstring(L"'") + std::wstring(data, data + s->count) + std::wstring(L"'");  
     }
 };
-
-class BSQUUID
+std::wstring DisplayFunction_BSQStringOf(void* v);
+constexpr MetaData MetaData_BSQStringOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
 {
-public:
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_StringOf,
+        DATA_KIND_CLEAR_FLAG,
+        ExtractFlag::Pointer,
+        sizeof(BSQStringOf),
+        ObjectLayoutKind::CollectionNoRef,
+        0,
+        nullptr,
+        1,
+        displayname,
+        &DisplayFunction_BSQStringOf,
+        &ExtractGeneralRepr_Identity
+    };
+}
+
+struct BSQUUID
+{
     uint8_t sdata[16];
-
-    BSQUUID() { ; }
-    BSQUUID(const uint8_t(&sdata)[16]) { memcpy(this->sdata, sdata, 16); }
-
-    BSQUUID(const BSQUUID& src) = default;
-    BSQUUID(BSQUUID&& src) = default;
-
-    BSQUUID& operator=(const BSQUUID&) = default;
-    BSQUUID& operator=(BSQUUID&&) = default;
 
     inline static bool keyEqual(const BSQUUID& l, const BSQUUID& r)
     {
@@ -259,18 +333,6 @@ public:
         return memcmp(l.sdata, r.sdata, 16) < 0;
     }
 };
-struct RCIncFunctor_BSQUUID
-{
-    inline BSQUUID operator()(BSQUUID uuid) const { return uuid; }
-};
-struct RCDecFunctor_BSQUUID
-{
-    inline void operator()(BSQUUID uuid) const { ; }
-};
-struct RCReturnFunctor_BSQUUID
-{
-    inline void operator()(BSQUUID& uuid, BSQRefScope& scope) const { ; }
-};
 struct EqualFunctor_BSQUUID
 {
     inline bool operator()(const BSQUUID& l, const BSQUUID& r) const { return BSQUUID::keyEqual(l, r); }
@@ -279,25 +341,33 @@ struct LessFunctor_BSQUUID
 {
     inline bool operator()(const BSQUUID& l, const BSQUUID& r) const { return BSQUUID::keyLess(l, r); }
 };
+
+typedef BSQBoxed<BSQUUID> Boxed_BSQUUID;
 struct DisplayFunctor_BSQUUID
 {
-    std::string operator()(const BSQUUID& u) const { return std::string("DataHash@") + std::string(u.sdata, u.sdata + 16); }
+    std::wstring operator()(const BSQUUID& u) const { return std::wstring(L"UUID@") + std::wstring(u.sdata, u.sdata + 16); }
 };
-typedef BSQBoxed<BSQUUID, RCDecFunctor_BSQUUID> Boxed_BSQUUID;
 
-class BSQLogicalTime
+void* ExtractGeneralRepr_BSQUUID(void* v);
+std::wstring DisplayFunction_BSQUUID(void* v);
+constexpr MetaData MetaData_BSQUUID = {
+    MIRNominalTypeEnum_UUID,
+    MIRNominalTypeEnum_Category_UUID,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_BSQUUID),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"UUID",
+    &DisplayFunction_BSQUUID,
+    &ExtractGeneralRepr_BSQUUID
+};
+
+struct BSQLogicalTime
 {
-public:
     uint64_t timestamp;
-
-    BSQLogicalTime() { ; }
-    BSQLogicalTime(uint64_t timestamp) : timestamp(timestamp) { ; }
-
-    BSQLogicalTime(const BSQLogicalTime& src) = default;
-    BSQLogicalTime(BSQLogicalTime&& src) = default;
-
-    BSQLogicalTime& operator=(const BSQLogicalTime& src) = default;
-    BSQLogicalTime& operator=(BSQLogicalTime&& src) = default;
 
     inline static bool keyEqual(const BSQLogicalTime& l, const BSQLogicalTime& r)
     {
@@ -309,18 +379,6 @@ public:
         return l.timestamp < r.timestamp;
     }
 };
-struct RCIncFunctor_BSQLogicalTime
-{
-    inline BSQLogicalTime operator()(BSQLogicalTime lt) const { return lt; }
-};
-struct RCDecFunctor_BSQLogicalTime
-{
-    inline void operator()(BSQLogicalTime lt) const { ; }
-};
-struct RCReturnFunctor_BSQLogicalTime
-{
-    inline void operator()(BSQLogicalTime& lt, BSQRefScope& scope) const { ; }
-};
 struct EqualFunctor_BSQLogicalTime
 {
     inline bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) const { return BSQLogicalTime::keyEqual(l, r); }
@@ -329,23 +387,36 @@ struct LessFunctor_BSQLogicalTime
 {
     inline bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) const { return BSQLogicalTime::keyLess(l, r); }
 };
+
+typedef BSQBoxed<BSQLogicalTime> Boxed_BSQLogicalTime;
 struct DisplayFunctor_BSQLogicalTime
 {
-    std::string operator()(const BSQLogicalTime& et) const 
+    std::wstring operator()(const BSQLogicalTime& et) const 
     { 
-        return std::string("LogicalTime@") + std::to_string(et.timestamp); 
+        return std::wstring(L"LogicalTime@") + std::to_wstring(et.timestamp); 
     }
 };
-typedef BSQBoxed<BSQLogicalTime, RCDecFunctor_BSQLogicalTime> Boxed_BSQLogicalTime;
 
-class BSQCryptoHash : public BSQRef
+void* ExtractGeneralRepr_BSQLogicalTime(void* v);
+std::wstring DisplayFunction_BSQLogicalTime(void* v);
+constexpr MetaData MetaData_BSQLogicalTime = {
+    MIRNominalTypeEnum_LogicalTime,
+    MIRNominalTypeEnum_Category_LogicalTime,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::StructAllocNoMeta,
+    sizeof(Boxed_BSQLogicalTime),
+    ObjectLayoutKind::NoRef,
+    0,
+    nullptr,
+    0,
+    L"LogicalTime",
+    &DisplayFunction_BSQLogicalTime,
+    &ExtractGeneralRepr_BSQLogicalTime
+};
+
+struct BSQCryptoHash
 {
-public:
     uint8_t hdata[64];
-
-    BSQCryptoHash(const uint8_t(&sdata)[64]) : BSQRef(MIRNominalTypeEnum_CryptoHash) { memcpy((void*)this->hdata, hdata, 64); }
-    
-    virtual ~BSQCryptoHash() = default;
 
     inline static bool keyEqual(const BSQCryptoHash* l, const BSQCryptoHash* r)
     {
@@ -357,14 +428,6 @@ public:
         return memcmp(l->hdata, r->hdata, 64) < 0;
     }
 };
-struct RCIncFunctor_BSQCryptoHash
-{
-    inline BSQCryptoHash* operator()(BSQCryptoHash* h) const { return INC_REF_DIRECT(BSQCryptoHash, h); }
-};
-struct RCDecFunctor_BSQCryptoHash
-{
-    inline void operator()(BSQCryptoHash* h) const { BSQRef::decrementDirect(h); }
-};
 struct EqualFunctor_BSQCryptoHash
 {
     inline bool operator()(const BSQCryptoHash* l, const BSQCryptoHash* r) const { return BSQCryptoHash::keyEqual(l, r); }
@@ -375,24 +438,31 @@ struct LessFunctor_BSQCryptoHash
 };
 struct DisplayFunctor_BSQCryptoHash
 {
-    std::string operator()(const BSQCryptoHash* h) const { return std::string("CryptoHash@") + std::string(h->hdata, h->hdata + 64); }
+    std::wstring operator()(const BSQCryptoHash* h) const { return std::wstring(L"CryptoHash@") + std::wstring(h->hdata, h->hdata + 64); }
+};
+std::wstring DisplayFunction_BSQCryptoHash(void* v);
+constexpr MetaData MetaData_BSQCryptoHash = {
+    MIRNominalTypeEnum_CryptoHash,
+    MIRNominalTypeEnum_Category_CryptoHash,
+    DATA_KIND_ALL_FLAG,
+    ExtractFlag::Pointer,
+    sizeof(BSQCryptoHash),
+    ObjectLayoutKind::CollectionNoRef,
+    0,
+    nullptr,
+    1,
+    L"CryptoHash",
+    &DisplayFunction_BSQCryptoHash,
+    &ExtractGeneralRepr_Identity
 };
 
-class BSQEnum
+struct BSQEnum
 {
 public:
+    MetaData* mdata;
     MIRNominalTypeEnum nominalType;
     uint32_t value;
 
-    BSQEnum() { ; }
-    BSQEnum(uint32_t value, MIRNominalTypeEnum oftype) : nominalType(oftype), value(value) { ; }
-
-    BSQEnum(const BSQEnum& src) = default;
-    BSQEnum(BSQEnum&& src) = default;
-
-    BSQEnum& operator=(const BSQEnum& src) = default;
-    BSQEnum& operator=(BSQEnum&& src) = default;
-    
     inline static bool keyEqual(const BSQEnum& l, const BSQEnum& r)
     {
         return (l.nominalType == r.nominalType) & (l.value == r.value);
@@ -403,18 +473,6 @@ public:
         return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.value < r.value);
     }
 };
-struct RCIncFunctor_BSQEnum
-{
-    inline BSQEnum operator()(BSQEnum e) const { return e; }
-};
-struct RCDecFunctor_BSQEnum
-{
-    inline void operator()(BSQEnum e) const { ; }
-};
-struct RCReturnFunctor_BSQEnum
-{
-    inline void operator()(BSQEnum& e, BSQRefScope& scope) const { ; }
-};
 struct EqualFunctor_BSQEnum
 {
     inline bool operator()(const BSQEnum& l, const BSQEnum& r) const { return BSQEnum::keyEqual(l, r); }
@@ -423,30 +481,40 @@ struct LessFunctor_BSQEnum
 {
     inline bool operator()(const BSQEnum& l, const BSQEnum& r) const { return BSQEnum::keyLess(l, r); }
 };
+
 struct DisplayFunctor_BSQEnum
 {
-    std::string operator()(const BSQEnum& e) const 
+    std::wstring operator()(const BSQEnum& e) const 
     { 
-        return nominaltypenames[GET_MIR_TYPE_POSITION(e.nominalType)] + std::string("::") + std::to_string(e.value); 
+        return std::wstring(L"Enum") + std::wstring(L"::") + std::to_wstring(e.value); 
     }
 };
-typedef BSQBoxed<BSQEnum, RCDecFunctor_BSQEnum> Boxed_BSQEnum;
 
-//TODO: may want to make this into a fully specialized set of types with some FP dispatch for KeyValue ops at some point
-class BSQIdKeySimple
+void* ExtractGeneralRepr_BSQEnum(void* v);
+std::wstring DisplayFunction_BSQEnum(void* v);
+constexpr MetaData MetaData_BSQEnum_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
 {
-public:
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_Enum,
+        DATA_KIND_API_FLAG,
+        ExtractFlag::StructAllocNoMeta,
+        sizeof(BSQEnum),
+        ObjectLayoutKind::NoRef,
+        0,
+        nullptr,
+        0,
+        displayname,
+        &DisplayFunction_BSQEnum,
+        &ExtractGeneralRepr_BSQEnum
+    };
+}
+
+struct BSQIdKeySimple
+{
+    MetaData* mdata;
     KeyValue key;
     MIRNominalTypeEnum nominalType;
-
-    BSQIdKeySimple() { ; }
-    BSQIdKeySimple(KeyValue key, MIRNominalTypeEnum oftype) : key(key), nominalType(oftype) { ; }
-    
-    BSQIdKeySimple(const BSQIdKeySimple& src) = default;
-    BSQIdKeySimple(BSQIdKeySimple&& src) = default;
-
-    BSQIdKeySimple& operator=(const BSQIdKeySimple& src) = default;
-    BSQIdKeySimple& operator=(BSQIdKeySimple&& src) = default;
 
     inline static bool keyEqual(const BSQIdKeySimple& l, const BSQIdKeySimple& r)
     {
@@ -463,28 +531,6 @@ public:
         return bsqKeyValueLess(l.key, r.key);
     }
 };
-struct RCIncFunctor_BSQIdKeySimple
-{
-    inline BSQIdKeySimple operator()(BSQIdKeySimple idk) const 
-    { 
-        BSQRef::incrementChecked(idk.key);
-        return idk;
-    }
-};
-struct RCDecFunctor_BSQIdKeySimple
-{
-    inline void operator()(BSQIdKeySimple idk) const 
-    { 
-        BSQRef::decrementChecked(idk.key); 
-    }
-};
-struct RCReturnFunctor_BSQIdKeySimple
-{
-    inline void operator()(BSQIdKeySimple& idk, BSQRefScope& scope) const 
-    { 
-        scope.processReturnChecked(idk.key); 
-    }
-};
 struct EqualFunctor_BSQIdKeySimple
 {
     inline bool operator()(const BSQIdKeySimple& l, const BSQIdKeySimple& r) const { return BSQIdKeySimple::keyEqual(l, r); }
@@ -493,6 +539,7 @@ struct LessFunctor_BSQIdKeySimple
 {
     inline bool operator()(const BSQIdKeySimple& l, const BSQIdKeySimple& r) const { return BSQIdKeySimple::keyLess(l, r); }
 };
+
 struct DisplayFunctor_BSQIdKeySimple
 {
     std::string operator()(const BSQIdKeySimple& idk) const 
@@ -501,42 +548,54 @@ struct DisplayFunctor_BSQIdKeySimple
         return rvals + " of " + diagnostic_format(idk.key);
     }
 };
-typedef BSQBoxed<BSQIdKeySimple, RCDecFunctor_BSQIdKeySimple> Boxed_BSQIdKeySimple;
 
-class BSQIdKeyCompound
+void* ExtractGeneralRepr_BSQIdKeySimple(void* v);
+std::wstring DisplayFunction_BSQIdKeySimple(void* v);
+constexpr MetaData MetaData_BSQIdKeySimple_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
 {
-public:
-    //
-    //TODO: when we add back unions this needs to be changed to a template <n> thing since vector is not POD
-    //
-    std::vector<KeyValue> keys;
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_IdKeySimple,
+        DATA_KIND_API_FLAG,
+        ExtractFlag::StructFullSize,
+        sizeof(BSQIdKeySimple),
+        ObjectLayoutKind::Packed,
+        1,
+        nullptr,
+        0,
+        displayname,
+        &DisplayFunction_BSQIdKeySimple,
+        &ExtractGeneralRepr_BSQIdKeySimple
+    };
+}
+
+struct BSQIdKeyCompound
+{
+    MetaData* mdata;
+    size_t count;
     MIRNominalTypeEnum nominalType;
-
-    BSQIdKeyCompound() { ; }
-    BSQIdKeyCompound(std::vector<KeyValue>&& keys, MIRNominalTypeEnum oftype) : keys(std::move(keys)), nominalType(oftype) { ; }
-    
-    BSQIdKeyCompound(const BSQIdKeyCompound& src) = default;
-    BSQIdKeyCompound(BSQIdKeyCompound&& src) = default;
-
-    BSQIdKeyCompound& operator=(const BSQIdKeyCompound& src) = default;
-    BSQIdKeyCompound& operator=(BSQIdKeyCompound&& src) = default;
 
     static bool keyEqual(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
     {
-        if(l.nominalType != r.nominalType || l.keys.size() != r.keys.size())
+        if(l.nominalType != r.nominalType)
         {
             return false;
         }
-        
-        for(size_t i = 0; i < l.keys.size(); ++i)
+        else
         {
-            if(!bsqKeyValueEqual(l.keys[i], r.keys[i]))
+            if (l.count != r.count)
             {
                 return false;
             }
+            else
+            {
+                const KeyValue* ldata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&l);
+                const KeyValue* rdata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&r);
+                std::equal(ldata, ldata + l.count, rdata, rdata + r.count, [](KeyValue v1, KeyValue v2) -> bool {
+                    return bsqKeyValueEqual(v1, v2);
+                });
+            }
         }
-
-        return true;
     }
 
     static bool keyLess(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
@@ -545,46 +604,22 @@ public:
         {
             return l.nominalType < r.nominalType;
         }
-
-        for(size_t i = 0; i < l.keys.size(); ++i)
+        else
         {
-            if(!bsqKeyValueEqual(l.keys[i], r.keys[i]))
+            const KeyValue* ldata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&l);
+            const KeyValue* rdata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&r);
+            auto mmiter = std::mismatch(ldata, ldata + l.count, rdata, rdata + r.count, [](KeyValue v1, KeyValue v2) -> bool {
+                return bsqKeyValueLess(v1, v2);
+            });
+
+            if(mmiter.first == ldata + l.count)
             {
-                return bsqKeyValueLess(l.keys[i], r.keys[i]);
+                return false;
             }
-        }
-
-        return false;
-    }
-};
-struct RCIncFunctor_BSQIdKeyCompound
-{
-    inline BSQIdKeyCompound operator()(BSQIdKeyCompound idk) const 
-    { 
-        for(size_t i = 0; i < idk.keys.size(); ++i)
-        {
-            BSQRef::incrementChecked(idk.keys[i]);
-        }
-        return idk; 
-    }
-};
-struct RCDecFunctor_BSQIdKeyCompound
-{
-    inline void operator()(BSQIdKeyCompound idk) const
-    { 
-        for(size_t i = 0; i < idk.keys.size(); ++i)
-        {
-            BSQRef::decrementChecked(idk.keys[i]);
-        }
-    }
-};
-struct RCReturnFunctor_BSQIdKeyCompound
-{
-    inline void operator()(BSQIdKeyCompound& idk, BSQRefScope& scope) const 
-    { 
-        for(size_t i = 0; i < idk.keys.size(); ++i)
-        {
-            scope.processReturnChecked(idk.keys[i]);
+            else
+            {
+                return bsqKeyValueLess(*(mmiter.first), *(mmiter.second));
+            }
         }
     }
 };
@@ -596,6 +631,7 @@ struct LessFunctor_BSQIdKeyCompound
 {
     inline bool operator()(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r) const { return BSQIdKeyCompound::keyLess(l, r); }
 };
+
 struct DisplayFunctor_BSQIdKeyCompound
 {
     std::string operator()(const BSQIdKeyCompound& idk) const 
@@ -616,5 +652,24 @@ struct DisplayFunctor_BSQIdKeyCompound
         return rvals;
     }
 };
-typedef BSQBoxed<BSQIdKeyCompound, RCDecFunctor_BSQIdKeyCompound> Boxed_BSQIdKeyCompound;
+
+void* ExtractGeneralRepr_BSQIdKeyCompound(void* v);
+std::wstring DisplayFunction_BSQIdKeyCompound(void* v);
+constexpr MetaData MetaData_BSQIdKeyCompound_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
+{
+    return {
+        oftype,
+        MIRNominalTypeEnum_Category_IdKeyCompound,
+        DATA_KIND_API_FLAG,
+        ExtractFlag::StructFullSizePlus,
+        sizeof(BSQIdKeyCompound),
+        ObjectLayoutKind::CollectionPacked,
+        0,
+        nullptr,
+        sizeof(KeyValue),
+        displayname,
+        &DisplayFunction_BSQIdKeyCompound,
+        &ExtractGeneralRepr_BSQIdKeyCompound
+    };
+}
 }

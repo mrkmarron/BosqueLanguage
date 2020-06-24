@@ -3083,7 +3083,7 @@ class Parser {
             const tryparsedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [tpparam], undefined, undefined, tryParseResult, [], [], false, new Set<string>(), tpbody);
             const tryparse = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", tryparsedecl);
 
-            const provides = [[new NominalTypeSignature("NSCore", "Enum"), undefined], [new NominalTypeSignature("NSCore", "Parsable"), undefined], [new NominalTypeSignature("NSCore", "APIType"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+            const provides = [[new NominalTypeSignature("NSCore", "Enum"), undefined], [new NominalTypeSignature("NSCore", "APIType"), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
             const invariants: InvariantDecl[] = [];
             const staticMembers = new Map<string, StaticMemberDecl>();
             const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create).set("tryParse", tryparse);

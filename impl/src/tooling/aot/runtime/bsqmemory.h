@@ -43,10 +43,9 @@
 
 #define BSQ_ALLIGNED_MALLOC(SIZE) _aligned_malloc(SIZE, BSQ_MEM_ALIGNMENT)
 
-#define GC_MARK_BLACK_X ((uint64_t)(1 << 60))
-#define GC_MARK_BLACK_Y ((uint64_t)(2 << 60))
-
 #define GC_RC_CLEAR ((uint64_t)0)
+
+#define GC_MARK_FROM_ROOT ((uint64_t)(1 << 60))
 #define GC_COUNT_GET_MASK 0xFFFFFFFFFFFF
 #define GC_MARK_GET_MASK 0xFFFF000000000000
 
@@ -57,14 +56,14 @@
 
 #define INC_RC_HEADER(M) (GET_RC_VALUE(M)++)
 #define DEC_RC_HEADER(M) (GET_RC_VALUE(M)--)
-#define MARK_RC_HEADER(M, XY) (GET_RC_VALUE(M) = (GET_RC_COUNT(M) | XY))
+#define MARK_HEADER_SET(M) (GET_RC_VALUE(M) = (GET_RC_COUNT(M) | GC_MARK_FROM_ROOT))
+#define Mark_HEADER_CLEAR(M) (GET_RC_VALUE(M) = GET_RC_COUNT(M))
 
-#define IS_ZERO_COUNT(M) (GET_RC_COUNT(M) == 0)
-#define IS_UNREACHABLE(M, XY) (IS_ZERO_COUNT(M) & (GET_RC_MARK(M) != XY))
+#define IS_UNREACHABLE(M) (GET_RC_VALUE(M) == GC_RC_CLEAR)
 
 #define TYPE_INFO_FORWARD_SENTINAL nullptr
-#define GET_TYPE_META_DATA(M) ((const MetaData*)M)
-#define SET_TYPE_META_DATA_FORWARD_SENTINAL(M) ((MetaData*)M) = nullptr
+#define GET_TYPE_META_DATA(M) ((MetaData*)M)
+#define SET_TYPE_META_DATA_FORWARD_SENTINAL(M) *((void**)M) = TYPE_INFO_FORWARD_SENTINAL
 
 #define GET_FORWARD_PTR(M) *((void**)(((uint8_t*)M) + sizeof(MetaData*)))
 #define SET_FORWARD_PTR(M, P) *((void**)(((uint8_t*)M) + sizeof(MetaData*))) = (void*)P
@@ -89,7 +88,7 @@ namespace BSQ
         uint32_t refslots;
 
         void** mixedframep;
-        StackRefMask mask;
+        RefMask mask;
     };
 
     class GCStack
@@ -98,7 +97,7 @@ namespace BSQ
         static GCStackEntry frames[8192];
         static uint32_t stackp;
 
-        inline static void pushFrame(void** reffp, uint32_t refslots, void** structfp=nullptr, StackRefMask mask=nullptr)
+        inline static void pushFrame(void** reffp, uint32_t refslots, void** structfp=nullptr, RefMask mask=nullptr)
         {
             if(GCStack::stackp >= 8192)
             {
@@ -144,11 +143,10 @@ namespace BSQ
         BumpAllocator(Allocator* alloc) : m_currPos(nullptr), m_endPos(nullptr), m_block(nullptr), gc(alloc)
         { 
             MEM_STATS_OP(this->totalalloc = 0);
+
             this->m_block = (uint8_t*)BSQ_ALLIGNED_MALLOC(BSQ_NURSERY_SIZE);
             this->m_currPos = this->m_block;
             this->m_endPos = this->m_block + BSQ_NURSERY_SIZE;
-
-            MEM_STATS_OP(this->totalalloc = 0);
         }
 
         ~BumpAllocator()
@@ -164,11 +162,10 @@ namespace BSQ
             return this->m_currPos - this->m_block;
         }
 
-        //Allocate a byte* of the the template size (word aligned)
-        template <typename T>
-        inline T* allocateTypeRawSize()
+        //Allocate a byte* of the the template size (aligned)
+        template <size_t asize>
+        inline uint8_t* allocateTypeRawSize()
         {
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             MEM_STATS_OP(this->totalalloc += asize);
 
             if (this->m_currPos + asize > this->m_endPos)
@@ -176,17 +173,16 @@ namespace BSQ
                 this->gc.collect();
             }
 
-            T* res = (T*)this->m_currPos;
+            uint8_t* res = this->m_currPos;
             this->m_currPos += asize;
 
             return res;
         }
 
-        //Allocate a byte* of the the template size (word aligned) plus an extra block
-        template <typename T, typename U>
-        inline T* allocateTypeRawSizePlus(size_t csize, U** contents)
+        //Allocate a byte* of the the template size (aligned) plus an extra block
+        template <size_t asize>
+        inline uint8_t* allocateTypeRawSizePlus(size_t csize, uint8_t** contents)
         {
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             MEM_STATS_OP(this->totalalloc += asize + csize);
 
             if (this->m_currPos + asize + csize > this->m_endPos)
@@ -194,8 +190,8 @@ namespace BSQ
                 this->gc.collect();
             }
 
-            T* res = (T*)this->m_currPos;
-            *contents = (U*)(this->m_currPos + asize);
+            uint8_t* res = this->m_currPos;
+            *contents = this->m_currPos + asize;
             this->m_currPos += asize + csize;
         }
     };
@@ -224,6 +220,7 @@ namespace BSQ
         inline uint8_t* allocateSize(size_t size)
         {
             size_t tsize = sizeof(RCMeta) + size;
+            MEM_STATS_OP(this->livealloc += tsize);
             MEM_STATS_OP(this->totalalloc += tsize);
 
             uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
@@ -236,33 +233,33 @@ namespace BSQ
             return (rr + sizeof(RCMeta));
         }
 
-        //Allocate a byte* of the the template size (word aligned)
-        template <typename T>
-        T* allocateTypeRawSize()
+        //Allocate a byte* of the the template size (aligned)
+        template <size_t asize>
+        uint8_t* allocateTypeRawSize()
         {
-            constexpr size_t tsize = sizeof(RCMeta) + BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t tsize = sizeof(RCMeta) + asize;
             MEM_STATS_OP(this->livealloc += tsize);
             MEM_STATS_OP(this->totalalloc += tsize);
 
             uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
-            ((RCMeta*)rr)->rcount = 0;
+            *((RCMeta*)rr) = GC_RC_CLEAR;
 
-            return (T*)(rr + sizeof(RCMeta));
+            return (rr + sizeof(RCMeta));
         }
 
-        //Allocate a byte* of the the template size (word aligned) plus an extra block
-        template <typename T, typename U>
-        T* allocateTypeRawSizePlus(size_t csize, U** contents)
+        //Allocate a byte* of the the template size (aligned) plus an extra block
+        template <size_t asize>
+        uint8_t* allocateTypeRawSizePlus(size_t csize, uint8_t** contents)
         {
-            constexpr size_t tsize = sizeof(RCMeta) + BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t tsize = sizeof(RCMeta) + asize;
             MEM_STATS_OP(this->livealloc += tsize + csize);
             MEM_STATS_OP(this->totalalloc += tsize + csize);
 
             uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize + csize);
-            ((RCMeta*)rr)->rcount = 0;
+            *((RCMeta*)rr) = GC_RC_CLEAR;
 
-            *contents = (U*)(rr + sizeof(RCMeta) + sizeof(T));
-            return (T*)(rr + sizeof(RCMeta));
+            *contents = (rr + sizeof(RCMeta) + asize);
+            return (rr + sizeof(RCMeta));
         }
 
         
@@ -275,7 +272,7 @@ namespace BSQ
             free(m - sizeof(RCMeta));
         }
     };
-    
+
     class Allocator
     {
     private:
@@ -284,7 +281,6 @@ namespace BSQ
 
         std::vector<void*> maybeZeroCounts;
 
-        RCMeta mark;
         uintptr_t bstart;
         uintptr_t bend;
         std::queue<void*> worklist;
@@ -296,6 +292,279 @@ namespace BSQ
         size_t promotedbytes;
         size_t maxheap;
 #endif
+
+    public:
+        static Allocator GlobalAllocator;
+
+        //If we visit an object in the bump space that has not been seen before then we need to copy it to the RC space and set the forwarding info
+        template<bool isRoot>
+        void* moveObjectToRCSpace(void* obj)
+        {
+            const MetaData* ometa = GET_TYPE_META_DATA(obj);
+            size_t osize = ometa->sizefullalloc;
+            if(ometa->sizeentry != 0)
+            {   
+                size_t elemcount = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+                osize += BSQ_WORD_ALIGN_ALLOC_SIZE((elemcount * ometa->sizeentry));
+            }
+            MEM_STATS_OP(this->promotedbytes += ometa->sizefullalloc);
+
+            void* nobj = this->ralloc.allocateSize(ometa->sizefullalloc);
+            GC_MEM_COPY(nobj, obj, ometa->allocsize);
+            if(ometa->processObj != nullptr)
+            {
+                this->worklist.push(nobj);
+            }
+
+            if constexpr (isRoot)
+            {
+                MARK_RC_HEADER(nobj);
+                this->maybeZeroCounts.push_back(nobj);
+            }
+            else
+            {
+                INC_RC_HEADER(nobj);
+            }
+
+            SET_TYPE_META_DATA_FORWARD_SENTINAL(obj);
+            SET_FORWARD_PTR(obj, nobj);
+
+            return nobj;
+        }
+
+        struct RCIncOp
+        {
+            inline void operator()(void** slot)
+            {
+                void* v = *slot;
+                if(GC_CHECK_IS_PTR(v) & (v != nullptr))
+                {
+                    INC_RC_HEADER(v);
+                }
+            }
+        };
+
+        struct RCDecOp
+        {
+            inline void operator()(void** slot)
+            {
+                void* v = *slot;
+                if(GC_CHECK_IS_PTR(v) & (v != nullptr))
+                {
+                    assert(GET_RC_COUNT(v) > 0); //otherwise we lost a count somewhere
+
+                    DEC_RC_HEADER(v);
+                    if(IS_UNREACHABLE(v))
+                    {
+                        Allocator::GlobalAllocator.releaselist.push(v);
+                    }
+                }
+            }
+        };
+
+        struct RCClearMarkOp
+        {
+            void* v = *slot;
+            inline void operator()(void** slot)
+            {
+                if(GC_CHECK_IS_PTR(v) & (v != nullptr))
+                {
+                    Mark_HEADER_CLEAR(v);
+                }
+            }
+        };
+
+        template<bool isRoot>
+        struct RCProcessOp
+        {
+            inline void operator()(void** slot)
+            {
+                void* v = *slot;
+                if(GC_CHECK_IS_PTR(v) & (v != nullptr))
+                {
+                    if(IS_RC_ALLOCATION(v, Allocator::GlobalAllocator->bstart, Allocator::GlobalAllocator->bend))
+                    {
+                        if constexpr (isRoot)
+                        {
+                            MARK_HEADER_SET(v);
+                        }
+                        else
+                        {
+                            INC_RC_HEADER(v);
+                        }
+                    }
+                    else
+                    {
+                        *slot = Allocator::GlobalAllocator->moveObjectToRCSpace(v);
+                    }
+                }
+            }
+        };
+
+        template <typename OP>
+        inline static void applyOpToSlots(void** slots, size_t limit)
+        {  
+            void** cslot = slots;
+            void* end = slots + limit;
+            
+            while (cslot != end)
+            {
+                OP{}(cslot++);
+            }
+        }
+
+        template <typename OP, OPFlag opflag>
+        inline static void applyOpToSlotsWithUnion(void** slots)
+        {  
+            MetaData* umeta = ((MetaData*)(*slots++));
+            umeta->getOpFP<opflag>()(umeta, slots);
+        }
+
+        template <typename OP, OPFlag opflag>
+        inline static void applyOpToSlotsWithMask(void** slots, const char* mask)
+        {  
+            void** cslot = slots;
+            const char* cmaskop = mask;
+            
+            while (*cmaskop)
+            {
+                char op = *cmaskop++;
+                if(op == PTR_FIELD_MASK_SCALAR) 
+                {
+                    cslot++;
+                }    
+                else if(op == PTR_FIELD_MASK_PTR)
+                {
+                    OP{}(cslot++);
+                }
+                else
+                {
+                    Allocator::applyOpToSlotsWithUnion<OP, opflag>(cslot++);
+                }
+            }
+        }
+
+
+
+        
+
+
+
+        template <typename OP>
+        inline static void applyOpToObjectWithPackedLayout(void* obj, const MetaData* meta)
+        {  
+            void** slotcurr = (void**)GC_GET_FIRST_DATA_LOC(obj);
+            void** slotend = slotcurr + meta->ptrcount;
+            while(slotcurr != slotend)
+            {
+                OP{}(slotcurr++);
+            }
+        }
+
+        template <typename OP>
+        inline static void applyOpToObjectWithMaskedLayout(void* obj, const MetaData* meta)
+        {  
+            Allocator::applyOpToSlotsWithMask<OP>((void**)GC_GET_FIRST_DATA_LOC(obj), meta->refmask);
+        }
+
+        template <typename OP>
+        static void applyOpToCollectionWithPointers(void* obj, const MetaData* meta)
+        {  
+            size_t count = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+            void** elemscurr = (void**)GC_GET_FIRST_COLLECTION_LOC(obj);
+            void** elemsend = elemscurr + count;
+            while(elemscurr != elemsend)
+            {
+                OP{}(elemscurr++);
+            }
+        }
+
+        template <typename OP>
+        static void applyOpToCollectionWithPackedLayout(void* obj, const MetaData* meta)
+        {  
+            size_t count = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+            size_t stride = meta->sizeentry / sizeof(void*);
+
+            void** elemscurr = (void**)GC_GET_FIRST_COLLECTION_LOC(obj);
+            void** elemsend = elemscurr + count;
+            while(elemscurr != elemsend)
+            {
+                Allocator::applyOpToObjectWithPackedLayout(*elemscurr, meta);
+                elemscurr += stride;
+            }
+        }
+
+        template <typename OP>
+        static void applyOpToCollectionWithMaskedLayout(void* obj, const MetaData* meta)
+        {  
+            size_t count = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+            size_t stride = meta->sizeentry / sizeof(void*);
+
+            void** elemscurr = (void**)GC_GET_FIRST_COLLECTION_LOC(obj);
+            void** elemsend = elemscurr + count;
+            while(elemscurr != elemsend)
+            {
+                Allocator::applyOpToObjectWithMaskedLayout(*elemscurr, meta);
+                elemscurr += stride;
+            }
+        }
+
+
+
+
+
+
+        static inline void applyOpToObject(void* obj)
+        {
+            const MetaData* meta = GET_TYPE_META_DATA(obj);
+
+            if(meta->)
+            {
+                void** slotcurr = (void**)GC_GET_FIRST_DATA_LOC(obj);
+                void** slotend = slotcurr + meta->simpleptrcount;
+                while(slotcurr != slotend)
+                {
+                    this->rcIncRef(*slotcurr++);
+                }
+            }
+            else if(layout == ObjectLayoutKind::CollectionPacked)
+            {
+                size_t count = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+                void** elemscurr = (void**)GC_GET_FIRST_COLLECTION_LOC(obj);
+                void** elemsend = elemscurr + count;
+                while(elemscurr != elemsend)
+                {
+                    this->rcIncRef(*elemscurr++);
+                }
+            }
+            else
+            {
+                this->rcIncObjectMixed(obj, meta, layout);
+            }
+        }
+
+
+
+
+        void rcOpToObjectObjectMixed(void* obj, const MetaData* meta, ObjectLayoutKind layout)
+        {
+            if(layout == ObjectLayoutKind::Masked)
+            {
+                void** slots = (void**)GC_GET_FIRST_DATA_LOC(obj);
+                this->rcIncMixed(slots, meta->refmask);
+            }
+            else
+            {
+                size_t count = *((size_t*)GC_GET_FIRST_DATA_LOC(obj));
+                void** elemscurr = (void**)GC_GET_FIRST_COLLECTION_LOC(obj);
+                for(size_t i = 0; i < count; ++i)
+                {
+                    this->rcIncMixed(elemscurr, meta->refmask);
+                    elemscurr = (void**)(((uint8_t*)elemscurr) + meta->entrysize);
+                }
+            }
+        }
+
 
         template <uint64_t mark>
         inline void rcDecRef(void* obj)
@@ -368,7 +637,7 @@ namespace BSQ
                 void** slotend = slotcurr + meta->simpleptrcount;
                 while(slotcurr != slotend)
                 {
-                    this->rcDecObject<mark>(*slotcurr++);
+                    this->rcDecRef<mark>(*slotcurr++);
                 }
             }
             else if(layout == ObjectLayoutKind::CollectionPacked)
@@ -378,41 +647,12 @@ namespace BSQ
                 void** elemsend = elemscurr + count;
                 while(elemscurr != elemsend)
                 {
-                    this->rcDecObject<mark>(*elemscurr++);
+                    this->rcDecRef<mark>(*elemscurr++);
                 }
             }
             else
             {
                 this->rcDecObjectMixed(obj, meta, layout);
-            }
-        }
-
-        //If we visit an object in the bump space that has not been seen before then we need to copy it to the RC space and set the forwarding info
-        template<bool isRoot>
-        void* moveObjectToRCSpace(void* obj);
-
-        //Process the reference in the given slot (updating the slot contents if needed)
-        template<bool isRoot, uint64_t mark>
-        inline void processRefSlot(void** slot)
-        {
-            void* v = *slot;
-            if(GC_CHECK_IS_PTR(v) | (v != nullptr))
-            {
-                if(IS_RC_ALLOCATION(v, this->bstart, this->bend))
-                {
-                    if constexpr (isRoot)
-                    {
-                        MARK_RC_HEADER(v, mark);
-                    }
-                    else
-                    {
-                        INC_RC_HEADER(v);
-                    }
-                }
-                else
-                {
-                    *slot = this->moveObjectToRCSpace(v);
-                }
             }
         }
 
@@ -583,8 +823,6 @@ namespace BSQ
             ;
         }
 
-        static Allocator GlobalAllocator;
-
         template<typename T, typename... Args>
         inline T* objectNew(Args... args)
         {
@@ -594,22 +832,65 @@ namespace BSQ
             }
             else
             {
-                return new (this->ralloc.allocateTypeRawSize<T>()){args...};
+                T* res = new (this->ralloc.allocateTypeRawSize<T>()){args...};
+                asdf; //add to zero alloc list
+                this->rcIncObject(res);
+
+                return res;
             }
         }
 
         template <typename T, typename U, typename... Args>
-        T* collectionNew(size_t count, U** contents, Args... args)
+        inline T* collectionNew(size_t count, U** contents, bool* increq, Args... args)
         {
             size_t csize = BSQ_WORD_ALIGN_ALLOC_SIZE(count * sizeof(U));
     
             if (BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) + csize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
             {
-                return new (this->balloc.allocateTypeRawSizePlus<T, U>(csize, contents)){*contents, args...};
+                *increq = false;
+                return new (this->balloc.allocateTypeRawSizePlus<T, U>(csize, contents)){args...};
             }
             else
             {
-                return new (this->ralloc.allocateTypeRawSizePlus<T, U>(csize, contents)){*contents, args...};
+                *increq = true;
+                asdf; //add to zero alloc list
+                return new (this->ralloc.allocateTypeRawSizePlus<T, U>(csize, contents)){args...};
+            }
+        }
+
+        template <typename T>
+        inline T* objectCopy(void* obj)
+        {
+            const MetaData* ometa = GET_TYPE_META_DATA(obj);
+            
+            if (BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) + csize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
+            {
+                T* res = this->balloc.allocateTypeRawSize<T>();
+                GC_MEM_COPY(res, obj, ometa->)
+            }
+            else
+            {
+                *increq = true;
+                asdf; //add to zero alloc list?????
+                return new (this->ralloc.allocateTypeRawSizePlus<T, U>(csize, contents)){args...};
+            }
+        }
+
+        template <typename T, typename U>
+        inline T* collectionCopy(size_t count, U** contents, bool* increq, Args... args)
+        {
+            size_t csize = BSQ_WORD_ALIGN_ALLOC_SIZE(count * sizeof(U));
+    
+            if (BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T)) + csize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
+            {
+                *increq = false;
+                return new (this->balloc.allocateTypeRawSizePlus<T, U>(csize, contents)){args...};
+            }
+            else
+            {
+                *increq = true;
+                asdf; //add to zero alloc list????
+                return new (this->ralloc.allocateTypeRawSizePlus<T, U>(csize, contents)){args...};
             }
         }
 

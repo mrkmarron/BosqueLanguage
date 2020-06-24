@@ -63,13 +63,7 @@ typedef void* KeyValue;
 typedef void* Value;
 
 template <typename T>
-struct BSQBoxedDirect
-{
-    T bval;
-};
-
-template <typename T>
-struct BSQBoxedWithMeta
+struct BSQBoxed
 {
     MetaData* mdata;
     T bval;
@@ -165,7 +159,7 @@ constexpr MetaData MetaData_int64_t = {
     &ExtractGeneralRepr_int64_t
 };
 
-typedef BSQBoxedWithMeta<double> Boxed_double;
+typedef BSQBoxed<double> Boxed_double;
 struct DisplayFunctor_double
 {
     std::wstring operator()(double d) const { return std::to_wstring(d); }
@@ -319,14 +313,15 @@ struct DisplayFunctor_BSQBuffer
     }
 };
 std::wstring DisplayFunction_BSQBuffer(void* v);
-constexpr MetaData MetaData_BSQBuffer_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) {
+constexpr MetaData MetaData_BSQBuffer_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
+{
     return {
         oftype,
         MIRNominalTypeEnum_Category_Buffer,
         DATA_KIND_CLEAR_FLAG,
         ExtractFlag::Pointer,
         sizeof(BSQBuffer),
-        ObjectLayoutKind::CollectionPacked,
+        ObjectLayoutKind::Packed,
         1,
         nullptr,
         0,
@@ -357,14 +352,15 @@ struct DisplayFunctor_BSQBufferOf
     }
 };
 std::wstring DisplayFunction_BSQBufferOf(void* v);
-constexpr MetaData MetaData_BSQBufferOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) {
+constexpr MetaData MetaData_BSQBufferOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
+{
     return {
         oftype,
         MIRNominalTypeEnum_Category_BufferOf,
         DATA_KIND_CLEAR_FLAG,
         ExtractFlag::Pointer,
         sizeof(BSQBufferOf),
-        ObjectLayoutKind::CollectionPacked,
+        ObjectLayoutKind::Packed,
         1,
         nullptr,
         0,
