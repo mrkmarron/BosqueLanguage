@@ -39,17 +39,18 @@ enum class MIRNominalTypeEnum
 //%%NOMINAL_TYPE_ENUM_DECLARE%%
 };
 
+class MetaData;
 typedef const char* RefMask;
 
-enum class OPFlag
-{
-    IncOp,
-    DecOp,
-    ProcessOp
-};
+typedef size_t (*MemSizeFP)(const MetaData*, void*);
+
+typedef bool (*MetaData_RelationalOpFP)(void*, void*);
 
 typedef void (*MetaData_UnionOperatorFP)(void*, void*);
-typedef void (*MetaData_GCOperatorFP)(MetaData*, void**);
+
+typedef void (*MetaData_GCDecOperatorFP)(const MetaData*, void**);
+typedef void (*MetaData_GCClearMarkOperatorFP)(const MetaData*, void**);
+typedef void (*MetaData_GCProcessOperatorFP)(const MetaData*, void**);
 
 class MetaData
 {
@@ -57,49 +58,50 @@ public:
     MIRNominalTypeEnum nominaltype;
     uint32_t dataflag;
 
-    uint32_t sizecore; //size of the object in it's raw state (when it may optionally not have a header)
-    uint32_t sizefullalloc; //size of object in bytes *always including* metadata header
+    uint32_t datasize; //size of the object in it's raw state (excluding any headers)
     int32_t sizeentry; //if this is a container then this is the size of each contained element (-1) if not a container
+    int32_t sizeadvance; //if this is a container then this is the size (in void* increments) that each entry represents
 
     uint32_t ptrcount; //if this is a simple packed layout (or contents are simple packed layouts) then this is the number of pointers
     RefMask refmask; //if this is a mixed layout (or contents are mixed layouts) then this is the mask to use
 
-    //Less and Equal operations for the object when it is in boxed form (or null if they are not supported)
-    bool (*less)(void* v1, void* v2);
-    bool (*eq)(void* v1, void* v2);
+    MemSizeFP computeMemorySize;
 
-    //box/unbox the object
-    void (*boxInto)(void* src, void* dstbox);
-    void (*unboxFrom)(void* srcbox, void* dst);
+    //Less and Equal operations for the object when it is in boxed form (or null if they are not supported)
+    MetaData_RelationalOpFP less;
+    MetaData_RelationalOpFP eq;
 
     //inject and extract from union representations
-    MetaData_UnionOperatorFP injectIntoUnion;
-    MetaData_UnionOperatorFP extractFromUnion;
     MetaData_UnionOperatorFP coerceUnionToBox;
 
-    //How to do gc mark/inc/dec on the object
-    MetaData_GCOperatorFP incObj;
-    MetaData_GCOperatorFP decObj;
-    MetaData_GCOperatorFP processObj;
+    //How to do gc ops on the object
+    MetaData_GCDecOperatorFP decObj;
+    MetaData_GCClearMarkOperatorFP clearObj;
+    MetaData_GCProcessOperatorFP processObjRoot;
+    MetaData_GCProcessOperatorFP processObjHeap;
 
     //display function pointer
     std::wstring (*displayFP)(void* obj);
 
-    template <OPFlag op>
-    inline MetaData_GCOperatorFP getOpFP() const
+    //true if this may have reference fields that need to be processed
+    bool hasRefs;
+
+    template <bool isRoot>
+    inline MetaData_GCProcessOperatorFP getProcessFP() const
     {
-        if constexpr(op == OPFlag::IncOp)
-        {
-            return this->incObj;
-        }
-        else if constexpr (op == OPFlag::DecOp)
-        {
-            return this->decObj;
-        }
-        else 
-        {
-            return this->processObj;
-        }
+        return nullptr;
+    }
+
+    template <>
+    inline MetaData_GCProcessOperatorFP getProcessFP<true>() const
+    {
+        return this->processObjRoot;
+    }
+
+    template <>
+    inline MetaData_GCProcessOperatorFP getProcessFP<false>() const
+    {
+        return this->processObjHeap;
     }
 };
 

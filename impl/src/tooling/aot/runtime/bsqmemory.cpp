@@ -16,16 +16,4 @@ namespace BSQ
     }
 
     Allocator Allocator::GlobalAllocator;
-
-    void Allocator::collect()
-    {
-        if(this->mark == GC_MARK_BLACK_X)
-        {
-            this->collectMark<GC_MARK_BLACK_X>();
-        }
-        else
-        {
-            this->collectMark<GC_MARK_BLACK_Y>();
-        }
-    }
 }
