@@ -62,125 +62,93 @@ typedef void* NoneValue;
 typedef void* KeyValue;
 typedef void* Value;
 
-template <typename T>
-struct BSQBoxed
-{
-    MetaData* mdata;
-    T bval;
-};
+void* coerceUnionToBox_RefValue(void* uv);
 
-void* ExtractGeneralRepr_Identity(void* v);
+struct UnionValue
+{
+    MetaData* umeta;
+    void* udata;
+};
 
 struct EqualFunctor_NoneValue
 {
     inline bool operator()(NoneValue l, NoneValue r) const { return true; }
+    static bool eq(KeyValue v1, KeyValue v2) { return true; }
 };
 struct LessFunctor_NoneValue
 {
     inline bool operator()(NoneValue l, NoneValue r) const { return false; }
+    static bool less(KeyValue v1, KeyValue v2) { return false; }
 };
 struct DisplayFunctor_NoneValue
 {
     std::wstring operator()(NoneValue n) const { return L"none"; }
+    static std::wstring display(void* v) { return L"none"; }
 };
-std::wstring DisplayFunction_NoneValue(void* v);
+std::wstring DisplayFunction_NoneValue(void* Uv);
 constexpr MetaData MetaData_NoneValue = {
     MIRNominalTypeEnum_None,
-    MIRNominalTypeEnum_Category_Empty,
     DATA_KIND_ALL_FLAG,
-    ExtractFlag::Pointer,
     0,
-    ObjectLayoutKind::NoRef,
+    -1,
+    -1,
     0,
     nullptr,
-    0,
-    L"None",
-    &DisplayFunction_NoneValue,
-    &ExtractGeneralRepr_Identity
+    nullptr,
+    LessFunctor_NoneValue::less,
+    EqualFunctor_NoneValue::eq,
+    coerceUnionToBox_RefValue,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    DisplayFunctor_NoneValue::display,
+    false
 };
 
 struct EqualFunctor_BSQBool
 {
     inline bool operator()(BSQBool l, BSQBool r) const { return l == r; }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(l), BSQ_GET_VALUE_BOOL(r)); }
 };
 struct LessFunctor_BSQBool
 {
     inline bool operator()(BSQBool l, BSQBool r) const { return (!l) & r; }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(l), BSQ_GET_VALUE_BOOL(r)); }
 };
 struct DisplayFunctor_BSQBool
 {
     std::wstring operator()(BSQBool b) const { return b ? L"true" : L"false"; }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v)); }
 };
-
-void* ExtractGeneralRepr_BSQBool(void* v);
-std::wstring DisplayFunction_BSQBool(void* v);
-constexpr MetaData MetaData_BSQBool = {
-    MIRNominalTypeEnum_Bool,
-    MIRNominalTypeEnum_Category_Empty,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructFullSize,
-    sizeof(BSQBool),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"Bool",
-    &DisplayFunction_BSQBool,
-    &ExtractGeneralRepr_BSQBool
-};
+void* coerceUnionToBox_BSQBool(void* uv);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_BSQBool, MIRNominalTypeEnum_Bool, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBool)), LessFunctor_BSQBool::less, EqualFunctor_BSQBool::eq, coerceUnionToBox_BSQBool, DisplayFunctor_BSQBool::display);
 
 struct EqualFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l == r; }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(l), BSQ_GET_VALUE_TAGGED_INT(r)); }
 };
 struct LessFunctor_int64_t
 {
     inline bool operator()(int64_t l, int64_t r) const { return l < r; }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(l), BSQ_GET_VALUE_TAGGED_INT(r)); }
 };
 struct DisplayFunctor_int64_t
 {
     std::wstring operator()(int64_t i) const { return std::to_wstring(i); }
+    static std::wstring display(void* v) { return DisplayFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v)); }
 };
+void* coerceUnionToBox_int64_t(void* uv);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_int64_t, MIRNominalTypeEnum_Int, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(int64_t)), LessFunctor_int64_t::less, EqualFunctor_int64_t::eq, coerceUnionToBox_int64_t, DisplayFunctor_int64_t::display);
 
-void* ExtractGeneralRepr_int64_t(void* v);
-std::wstring DisplayFunction_int64_t(void* v);
-constexpr MetaData MetaData_int64_t = {
-    MIRNominalTypeEnum_Int,
-    MIRNominalTypeEnum_Category_Empty,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructFullSize,
-    sizeof(int64_t),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"Int",
-    &DisplayFunction_int64_t,
-    &ExtractGeneralRepr_int64_t
-};
-
-typedef BSQBoxed<double> Boxed_double;
 struct DisplayFunctor_double
 {
     std::wstring operator()(double d) const { return std::to_wstring(d); }
+    static std::wstring display(void* v) { return DisplayFunctor_double{}(*((double*)v)); }
 };
-
-void* ExtractGeneralRepr_double(void* v);
-std::wstring DisplayFunction_double(void* v);
-constexpr MetaData MetaData_double = {
-    MIRNominalTypeEnum_Float64,
-    MIRNominalTypeEnum_Category_Float64,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_double),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"Float64",
-    &DisplayFunction_double,
-    &ExtractGeneralRepr_double
-};
+void* coerceUnionToBox_double(void* uv);
+META_DATA_DECLARE_NO_PTR(MetaData_double, MIRNominalTypeEnum_Float64, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(double)), coerceUnionToBox_double, DisplayFunctor_double::display);
 
 MetaData* getMetaData(void* v);
 

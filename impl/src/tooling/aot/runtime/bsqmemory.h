@@ -685,7 +685,10 @@ namespace BSQ
                 void* obj = this->releaselist.front();
                 
                 const MetaData* umeta = GET_TYPE_META_DATA(obj);
-                umeta->decObj(umeta, (void**)obj);
+                if(umeta->hasRefs)
+                {
+                    umeta->decObj(umeta, (void**)obj);
+                }
 
                 size_t asize = umeta->computeMemorySize(umeta, obj);
                 this->osalloc.release(obj, asize);
@@ -727,10 +730,23 @@ namespace BSQ
             ;
         }
 
+        template<typename T>
+        inline T* valueNew(MetaData* mdata, T value)
+        {
+            constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            uint8_t* alloc = this->nsalloc.allocateSize<asize>();
+
+            *((MetaData*)alloc) = mdata;
+            T* res = (T*)(alloc + sizeof(MetaData));
+            *alloc = value;
+
+            return alloc;
+        }
+
         template<typename T, typename... Args>
         inline T* objectNew(MetaData* mdata, Args... args)
         {
-            constexpr asize = BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
 
             *((MetaData*)alloc) = mdata;
@@ -743,8 +759,8 @@ namespace BSQ
         template <typename T, typename U, typename... Args>
         inline T* collectionNew(MetaData* mdata, size_t count, U** contents, Args... args)
         {
-            size_t csize = BSQ_WORD_ALIGN_ALLOC_SIZE(count * sizeof(U));
-            size_t asize = BSQ_WORD_ALIGN_ALLOC_SIZE(sizeof(T));
+            size_t csize = BSQ_ALIGN_ALLOC_SIZE(count * sizeof(U));
+            size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
     
             uint8_t* alloc = this->nsalloc.allocateSizePlus<asize>(csize, (uint8_t**)contents);
 
@@ -785,8 +801,13 @@ namespace BSQ
         struct GCOperator_Dec_Union { void operator()(void** slot) { Allocator::gcDecrementSlotsWithUnion(slot); } };
         struct GCOperator_Clear_Union { void operator()(void** slot) { Allocator::gcClearMarkSlotsWithUnion(slot); } };
 
+        inline static void MetaData_GCOperatorFP_NoRefs(const MetaData* meta, void** data)
+        {
+            ;
+        }
+
         template <typename OP>
-        inline static void MetaData_GCOperatorFP_Packed(MetaData* meta, void** data)
+        inline static void MetaData_GCOperatorFP_Packed(const MetaData* meta, void** data)
         {
             void** slotcurr = data;
             void** slotend = slotcurr + meta->ptrcount;
@@ -797,7 +818,7 @@ namespace BSQ
         }
 
         template <typename OP>
-        inline static void MetaData_GCOperatorFP_PackedEntries(MetaData* meta, void** data)
+        inline static void MetaData_GCOperatorFP_PackedEntries(const MetaData* meta, void** data)
         {
             size_t count = *((size_t*)data);
             uint32_t advancesize = meta->sizeadvance;
@@ -918,6 +939,17 @@ namespace BSQ
 
                 slotcurr += advancesize;
             }
+        }
+
+        inline static size_t MetaData_ComputeSize_Simple(const MetaData* meta, void* data)
+        {
+            return sizeof(MetaData) + meta->datasize;
+        }
+
+        inline static size_t MetaData_ComputeSize_SimpleCollection(const MetaData* meta, void* data)
+        {
+            size_t count = *((size_t*)data);
+            return sizeof(MetaData) + meta->datasize + BSQ_ALIGN_ALLOC_SIZE(count * meta->sizeentry);
         }
     };
 }

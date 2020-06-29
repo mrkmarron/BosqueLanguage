@@ -27,9 +27,9 @@ typedef uint32_t DATA_KIND_FLAG;
 
 #define META_DATA_LOAD_DECL(X) const_cast<MetaData*>(&(X))
 
-#define META_DATA_DECLARE_NO_PTR(NAME, TYPE, FLAG, SCORE, SFULL, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, 0, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, DISPLAY}
-#define META_DATA_DECLARE_SIMPLE_PTR(NAME, TYPE, FLAG, SCORE, SFULL, PCOUNT, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, PCOUNT, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, GCIncSimplePtrObj, GCDecSimplePtrObj, GCProcessSimplePtrObj, DISPLAY}
-#define META_DATA_DECLARE_COMPOUND_PTR(NAME, TYPE, FLAG, SCORE, SFULL, MASK, DISPLAY) constexpr NAME = MetaData{TYPE, FLAG, SCORE, SFULL, -1, 0, MASK, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, GCIncCompoundPtrObj, GCDecCompoundPtrObj, GCProcessCompoundPtrObj, DISPLAY}
+#define META_DATA_DECLARE_NO_PTR(NAME, TYPE, FLAG, SIZE, CUNIONFP, DISPLAY) constexpr MetaData NAME = MetaData{ TYPE, FLAG, SIZE, -1, -1, 0, nullptr, Allocator::MetaData_ComputeSize_Simple, nullptr, nullptr, CUNIONFP, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, DISPLAY, false }
+#define META_DATA_DECLARE_NO_PTR_KEY(NAME, TYPE, FLAG, SIZE, LESSFP, EQFP, CUNIONFP, DISPLAY) constexpr MetaData NAME = MetaData{ TYPE, FLAG, SIZE, -1, -1, 0, nullptr, Allocator::MetaData_ComputeSize_Simple, LESSFP, EQFP, CUNIONFP, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, Allocator::MetaData_GCOperatorFP_NoRefs, DISPLAY, false }
+
 
 namespace BSQ
 {
@@ -46,11 +46,13 @@ typedef size_t (*MemSizeFP)(const MetaData*, void*);
 
 typedef bool (*MetaData_RelationalOpFP)(void*, void*);
 
-typedef void (*MetaData_UnionOperatorFP)(void*, void*);
+typedef void* (*MetaData_UnionOperatorFP)(void*);
 
 typedef void (*MetaData_GCDecOperatorFP)(const MetaData*, void**);
 typedef void (*MetaData_GCClearMarkOperatorFP)(const MetaData*, void**);
 typedef void (*MetaData_GCProcessOperatorFP)(const MetaData*, void**);
+
+typedef std::wstring (*MetaData_DisplayFP)(void* obj);
 
 class MetaData
 {
@@ -81,7 +83,7 @@ public:
     MetaData_GCProcessOperatorFP processObjHeap;
 
     //display function pointer
-    std::wstring (*displayFP)(void* obj);
+    MetaData_DisplayFP displayFP;
 
     //true if this may have reference fields that need to be processed
     bool hasRefs;
