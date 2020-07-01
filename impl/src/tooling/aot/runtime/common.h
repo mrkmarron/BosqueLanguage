@@ -17,8 +17,8 @@
 #include <iostream>
 #include <codecvt>
 
+#include <initializer_list>
 #include <algorithm>
-#include <numeric>
 
 #ifdef BDEBUG
 #define BSQ_ASSERT(C, MSG) if(!(C)) { throw BSQAbort(MSG, __FILE__, __LINE__, __FILE__, __LINE__); }

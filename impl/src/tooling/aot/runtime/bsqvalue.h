@@ -10,6 +10,8 @@
 #include "bsqmetadata.h"
 #include "bsqmemory.h"
 
+#include <set>
+
 ////
 //Value ops
 
@@ -42,6 +44,8 @@ typedef uint8_t BSQBool;
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(BSQTRUE)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(BSQFALSE)
 
+#define META_DATA_DECLARE_SPECIAL_BUFFER(NAME, TYPE, DSTR) META_DATA_DECLARE_PTR_PACKED(NAME, TYPE, DATA_KIND_CLEAR_FLAG, sizeof(BSQBuffer), 1, coerceUnionToBox_RefValue, DisplayFunctor_BSQByteBuffer::display, DSTR);
+
 ////
 //Type ops
 
@@ -51,6 +55,12 @@ enum class MIRPropertyEnum
 {
     Invalid = 0,
 //%%PROPERTY_ENUM_DECLARE%%
+};
+
+enum class MIRRecordPropertySetsEnum
+{
+    ps__ = 0,
+//%%RECORD_PROPERTY_SETS_ENUM_DECLARE%%
 };
 
 constexpr const wchar_t* propertyNames[] = {
@@ -86,7 +96,7 @@ struct DisplayFunctor_NoneValue
     static std::wstring display(void* v) { return L"none"; }
 };
 std::wstring DisplayFunction_NoneValue(void* Uv);
-constexpr MetaData MetaData_NoneValue = {
+constexpr MetaData MetaData_None = {
     MIRNominalTypeEnum_None,
     DATA_KIND_ALL_FLAG,
     0,
@@ -122,7 +132,7 @@ struct DisplayFunctor_BSQBool
     static std::wstring display(void* v) { return DisplayFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v)); }
 };
 void* coerceUnionToBox_BSQBool(void* uv);
-META_DATA_DECLARE_NO_PTR_KEY(MetaData_BSQBool, MIRNominalTypeEnum_Bool, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBool)), LessFunctor_BSQBool::less, EqualFunctor_BSQBool::eq, coerceUnionToBox_BSQBool, DisplayFunctor_BSQBool::display);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_Bool, MIRNominalTypeEnum_Bool, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBool)), LessFunctor_BSQBool::less, EqualFunctor_BSQBool::eq, coerceUnionToBox_BSQBool, DisplayFunctor_BSQBool::display, L"Bool");
 
 struct EqualFunctor_int64_t
 {
@@ -140,7 +150,7 @@ struct DisplayFunctor_int64_t
     static std::wstring display(void* v) { return DisplayFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v)); }
 };
 void* coerceUnionToBox_int64_t(void* uv);
-META_DATA_DECLARE_NO_PTR_KEY(MetaData_int64_t, MIRNominalTypeEnum_Int, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(int64_t)), LessFunctor_int64_t::less, EqualFunctor_int64_t::eq, coerceUnionToBox_int64_t, DisplayFunctor_int64_t::display);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_Int, MIRNominalTypeEnum_Int, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(int64_t)), LessFunctor_int64_t::less, EqualFunctor_int64_t::eq, coerceUnionToBox_int64_t, DisplayFunctor_int64_t::display, L"Int");
 
 struct DisplayFunctor_double
 {
@@ -148,7 +158,7 @@ struct DisplayFunctor_double
     static std::wstring display(void* v) { return DisplayFunctor_double{}(*((double*)v)); }
 };
 void* coerceUnionToBox_double(void* uv);
-META_DATA_DECLARE_NO_PTR(MetaData_double, MIRNominalTypeEnum_Float64, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(double)), coerceUnionToBox_double, DisplayFunctor_double::display);
+META_DATA_DECLARE_NO_PTR(MetaData_Float64, MIRNominalTypeEnum_Float64, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(double)), coerceUnionToBox_double, DisplayFunctor_double::display, L"Float64");
 
 MetaData* getMetaData(void* v);
 
@@ -183,29 +193,24 @@ struct DisplayFunctor_Value
 };
 
 enum class BSQBufferFormat {
-    Char,
+    Text,
     Bosque,
-    EBosque,
     Json
 };
 
 enum class BSQBufferEncoding {
     UTF8,
-    URI,
-    Base64,
     Binary
 };
 
 enum class BSQBufferCompression {
     Off,
-    RLE,
     Time,
     Space
 };
 
 struct BSQByteBuffer
 {
-    MetaData* mdata;
     size_t count;
     BSQBufferCompression compression;
 
@@ -214,12 +219,12 @@ struct BSQByteBuffer
         std::wstring rvals(L"");
         if(this->compression == BSQBufferCompression::Off)
         {
-            uint8_t* sdata = GC_GET_FIRST_COLLECTION_LOC(this);
+            uint8_t* sdata = GET_COLLECTION_START(this);
             rvals += std::wstring(sdata, sdata + this->count);
         }
         else
         {
-            uint8_t* sdata = GC_GET_FIRST_COLLECTION_LOC(this);
+            uint8_t* sdata = GET_COLLECTION_START(this);
             for (size_t i = 0; i < this->count; ++i)
             {
                 if(i != 0)
@@ -243,26 +248,15 @@ struct DisplayFunctor_BSQByteBuffer
 
         return rvals;
     }
+    static std::wstring display(void* v)
+    {
+        return DisplayFunctor_BSQByteBuffer{}((BSQByteBuffer*)v);
+    }
 };
-std::wstring DisplayFunction_BSQByteBuffer(void* v);
-constexpr MetaData MetaData_BSQByteBuffer = {
-    MIRNominalTypeEnum_ByteBuffer,
-    MIRNominalTypeEnum_Category_ByteBuffer,
-    DATA_KIND_CLEAR_FLAG,
-    ExtractFlag::Pointer,
-    sizeof(BSQByteBuffer),
-    ObjectLayoutKind::CollectionNoRef,
-    0,
-    nullptr,
-    1,
-    L"ByteBuffer",
-    &DisplayFunction_BSQByteBuffer,
-    &ExtractGeneralRepr_Identity
-};
+META_DATA_DECLARE_NO_PTR_COLLECTION(MetaData_ByteBuffer, MIRNominalTypeEnum_ByteBuffer, DATA_KIND_CLEAR_FLAG, sizeof(BSQByteBuffer), sizeof(uint8_t), coerceUnionToBox_RefValue, DisplayFunctor_BSQByteBuffer::display, L"ByteBuffer");
 
 struct BSQBuffer
 {
-    MetaData* mdata;
     BSQByteBuffer* sdata;
     
     BSQBufferFormat format;
@@ -279,29 +273,15 @@ struct DisplayFunctor_BSQBuffer
 
         return rvals;
     }
+    static std::wstring display(void* v)
+    {
+        return DisplayFunctor_BSQBuffer{}((BSQBuffer*)v);
+    }
 };
-std::wstring DisplayFunction_BSQBuffer(void* v);
-constexpr MetaData MetaData_BSQBuffer_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_Buffer,
-        DATA_KIND_CLEAR_FLAG,
-        ExtractFlag::Pointer,
-        sizeof(BSQBuffer),
-        ObjectLayoutKind::Packed,
-        1,
-        nullptr,
-        0,
-        displayname,
-        &DisplayFunction_BSQBuffer,
-        &ExtractGeneralRepr_Identity
-    };
-}
+//Declare metadata for each instantiation
 
 struct BSQBufferOf
 {
-    MetaData* mdata;
     BSQByteBuffer* sdata;
 
     const BSQBufferFormat format;
@@ -318,165 +298,80 @@ struct DisplayFunctor_BSQBufferOf
 
         return rvals;
     }
+    static std::wstring display(void* v)
+    {
+        return DisplayFunctor_BSQBufferOf{}((BSQBufferOf*)v);
+    }
 };
-std::wstring DisplayFunction_BSQBufferOf(void* v);
-constexpr MetaData MetaData_BSQBufferOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_BufferOf,
-        DATA_KIND_CLEAR_FLAG,
-        ExtractFlag::Pointer,
-        sizeof(BSQBufferOf),
-        ObjectLayoutKind::Packed,
-        1,
-        nullptr,
-        0,
-        displayname,
-        &DisplayFunction_BSQBufferOf,
-        &ExtractGeneralRepr_Identity
-    };
-}
+//Declare metadata for each instantiation
 
 struct BSQISOTime
 {
     uint64_t isotime;
 };
-
-typedef BSQBoxedWithMeta<BSQISOTime> Boxed_BSQISOTime;
 struct DisplayFunctor_BSQISOTime
 {
-    std::wstring operator()(const BSQISOTime& t) const 
-    { 
-        return std::wstring{L"ISOTime={"} + std::to_wstring(t.isotime) + L"}";
-    }
+    std::wstring operator()(const BSQISOTime& t) const { return std::wstring{L"ISOTime={"} + std::to_wstring(t.isotime) + L"}";}
+    static std::wstring display(void* v) { return DisplayFunctor_BSQISOTime{}(*((BSQISOTime*)v)); }
 };
-
-void* ExtractGeneralRepr_BSQISOTime(void* v);
-std::wstring DisplayFunction_BSQISOTime(void* v);
-constexpr MetaData MetaData_BSQISOTime = {
-    MIRNominalTypeEnum_ISOTime,
-    MIRNominalTypeEnum_Category_ISOTime,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_BSQISOTime),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"ISOTime",
-    &DisplayFunction_BSQISOTime,
-    &ExtractGeneralRepr_BSQISOTime
-};
+void* coerceUnionToBox_BSQISOTime(void* uv);
+META_DATA_DECLARE_NO_PTR(MetaData_ISOTime, MIRNominalTypeEnum_ISOTime, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQISOTime)), coerceUnionToBox_BSQISOTime, DisplayFunctor_BSQISOTime::display, L"ISOTime");
 
 struct BSQRegex
 {
     const std::wregex* re; //these are all constant to this is a scalar as far as GC is concerned
 };
-
-typedef BSQBoxedWithMeta<BSQRegex> Boxed_BSQRegex;
 struct DisplayFunctor_BSQRegex
 {
-    std::wstring operator()(const BSQRegex& r) const 
-    { 
-        return L"[REGEX]";
-    }
+    std::wstring operator()(const BSQRegex& r) const { return L"[REGEX]"; }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQRegex{}(*((BSQRegex*)v)); }
 };
+void* coerceUnionToBox_BSQRegex(void* uv);
+META_DATA_DECLARE_NO_PTR(MetaData_Regex, MIRNominalTypeEnum_Regex, DATA_KIND_CLEAR_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQRegex)), coerceUnionToBox_BSQRegex, DisplayFunctor_BSQRegex::display, L"Regex");
 
-void* ExtractGeneralRepr_Regex(void* v);
-std::wstring DisplayFunction_Regex(void* v);
-constexpr MetaData MetaData_BSQRegex = {
-    MIRNominalTypeEnum_Regex,
-    MIRNominalTypeEnum_Category_Regex,
-    DATA_KIND_CLEAR_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_BSQRegex),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"Regex",
-    &DisplayFunction_Regex,
-    &ExtractGeneralRepr_Regex
-};
-
-class BSQTuple : public BSQRef
+struct BSQTuple
 {
-public:
-    std::vector<Value> entries;
+    size_t count;
     DATA_KIND_FLAG flag;
 
-    BSQTuple() : BSQRef(MIRNominalTypeEnum_Tuple) { ; }
-    BSQTuple(std::vector<Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(entries)), flag(flag) { ; }
-
-    BSQTuple(const BSQTuple& src) : BSQRef(MIRNominalTypeEnum_Tuple), entries(src.entries), flag(src.flag) { ; }
-    BSQTuple(BSQTuple&& src) : BSQRef(MIRNominalTypeEnum_Tuple), entries(move(src.entries)), flag(src.flag) { ; }
-
-    virtual ~BSQTuple() = default;
-    
-    virtual void destroy() 
-    { 
-        for(size_t i = 0; i < this->entries.size(); ++i)
-        {
-            BSQRef::decrementChecked(this->entries[i]);
-        }
-    }
-
-    BSQTuple& operator=(const BSQTuple& src)
+    template <size_t count, DATA_KIND_FLAG flag>
+    inline static void createFromSingle(BSQTuple* into, std::initializer_list<Value> values)
     {
-        if(this == &src)
-        {
-            return *this;
-        }
+        into->count = count;
+        into->flag = flag;
 
-        //always same nominal type by construction
-        this->entries = src.entries;
-        this->flag = src.flag;
-        return *this;
+        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        std::copy(values.begin(), values.end(), tcurr);
     }
 
-    BSQTuple& operator=(BSQTuple&& src)
-    {
-        if(this == &src)
-        {
-            return *this;
-        }
-
-        //always same nominal type by construction
-        this->entries = std::move(src.entries);
-        this->flag = src.flag;
-        return *this;
-    }
-
-    template <DATA_KIND_FLAG flag>
-    inline static BSQTuple createFromSingle(std::vector<Value>&& values)
+    template <size_t count>
+    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQTuple* into, std::initializer_list<Value> values)
     {
         auto fv = flag;
-        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
+        for(size_t i = 0; i < values.size(); ++i)
         {
-            for(size_t i = 0; i < values.size(); ++i)
-            {
-                fv &= getDataKindFlag(values[i]);
-            }
+            fv &= getDataKindFlag(values[i]);
         }
 
-        return BSQTuple(move(values), fv);
-    }
+        into->count = count;
+        into->flag = flag;
 
-    static BSQTuple _empty;
+        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        std::copy(values.begin(), values.end(), tcurr);
+    }
 
     template <uint16_t idx>
     inline bool hasIndex() const
     {
-        return idx < this->entries.size();
+        return idx < this->count;
     }
 
     template <uint16_t idx>
     inline Value atFixed() const
     {
-        if (idx < this->entries.size())
+        if (idx < this->count)
         {
-            return this->entries[idx];
+            return *(((Value*)GET_COLLECTION_START(this)) + idx);
         }
         else
         {
@@ -484,157 +379,162 @@ public:
         }
     }
 };
-struct RCIncFunctor_BSQTuple
-{
-    inline BSQTuple operator()(BSQTuple tt) const 
-    { 
-        for(size_t i = 0; i < tt.entries.size(); ++i)
-        {
-            BSQRef::incrementChecked(tt.entries[i]);
-        }
-        return tt;
-    }
-};
-struct RCDecFunctor_BSQTuple
-{
-    inline void operator()(BSQTuple tt) const 
-    { 
-        for(size_t i = 0; i < tt.entries.size(); ++i)
-        {
-            BSQRef::decrementChecked(tt.entries[i]);
-        }
-    }
-};
-struct RCReturnFunctor_BSQTuple
-{
-    inline void operator()(BSQTuple& tt, BSQRefScope& scope) const 
-    {
-        for(size_t i = 0; i < tt.entries.size(); ++i)
-        {
-            scope.processReturnChecked(tt.entries[i]);
-        }
-    }
-};
 struct DisplayFunctor_BSQTuple
 {
-    std::string operator()(const BSQTuple& tt) const 
-    { 
-        std::string tvals("[");
-        for(size_t i = 0; i < tt.entries.size(); ++i)
+    std::wstring operator()(const BSQTuple& tt) const 
+    {
+        Value* values = (Value*)GET_COLLECTION_START(&tt);
+        std::wstring tvals(L"[");
+        for(size_t i = 0; i < tt.count; ++i)
         {
             if(i != 0)
             {
-                tvals += ", ";
+                tvals += L", ";
             }
 
-            tvals += diagnostic_format(tt.entries[i]);
+            tvals += diagnostic_format(values[i]);
         }
-        tvals += "]";
+        tvals += L"]";
 
         return tvals;
     }
+    static std::wstring display(void* v) 
+    { 
+        return DisplayFunctor_BSQTuple{}(*((BSQTuple*)v)); 
+    }
 };
+void* coerceUnionToBox_BSQTuple(void* uv);
+META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Tuple, MIRNominalTypeEnum_Tuple, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQTuple), coerceUnionToBox_BSQTuple, DisplayFunctor_BSQTuple::display, L"Tuple");
 
-class BSQRecord : public BSQRef
+class BSQDynamicPropertySetEntry
 {
 public:
-    std::map<MIRPropertyEnum, Value> entries;
+    std::vector<MIRPropertyEnum> propertySet;
+    std::map<MIRPropertyEnum, BSQDynamicPropertySetEntry*> extensions;
+
+    BSQDynamicPropertySetEntry() : propertySet(), extensions() 
+    { 
+        ; 
+    }
+
+    BSQDynamicPropertySetEntry(std::vector<MIRPropertyEnum>&& properties) : propertySet(move(properties)), extensions() 
+    { 
+        ; 
+    }
+
+    ~BSQDynamicPropertySetEntry()
+    {
+        for(auto iter = this->extensions.begin(); iter != this->extensions.end(); iter++)
+        {
+            delete iter->second;
+        }
+    }
+};
+
+struct BSQRecord
+{
+    size_t count;
+    MIRPropertyEnum* properties;
     DATA_KIND_FLAG flag;
 
-    BSQRecord() : BSQRef(MIRNominalTypeEnum_Record) { ; }
-    BSQRecord(std::map<MIRPropertyEnum, Value>&& entries, DATA_KIND_FLAG flag) : BSQRef(MIRNominalTypeEnum_Record), entries(move(entries)), flag(flag) { ; }
+    static std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> knownRecordPropertySets;
+    static BSQDynamicPropertySetEntry emptyDynamicPropertySetEntry;
 
-    BSQRecord(const BSQRecord& src) : BSQRef(MIRNominalTypeEnum_Record), entries(src.entries), flag(src.flag) { ; }
-    BSQRecord(BSQRecord&& src) : BSQRef(MIRNominalTypeEnum_Record), entries(move(src.entries)), flag(src.flag) { ; }
+    static BSQDynamicPropertySetEntry* getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext);
 
-    virtual ~BSQRecord() = default;
-    
-    virtual void destroy() 
-    { 
-        for(auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter)
-        {
-            BSQRef::decrementChecked(iter->second);
-        }
-    }
-
-    BSQRecord& operator=(const BSQRecord& src)
+    template <size_t count, DATA_KIND_FLAG flag>
+    static BSQRecord createFromSingle(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
-        if(this == &src)
-        {
-            return *this;
-        }
+        into->count = count;
+        into->properties = properties;
+        into->flag = flag;
 
-        //always same nominal type by construction
-        this->entries = src.entries;
-        this->flag = src.flag;
-        return *this;
+        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        std::copy(values.begin(), values.end(), tcurr);
     }
 
-    BSQRecord& operator=(BSQRecord&& src)
-    {
-        if(this == &src)
-        {
-            return *this;
-        }
-
-        //always same nominal type by construction
-        this->entries = std::move(src.entries);
-        this->flag = src.flag;
-        return *this;
-    }
-
-    template <DATA_KIND_FLAG flag>
-    static BSQRecord createFromSingle(std::map<MIRPropertyEnum, Value>&& values)
+    template <size_t count>
+    static BSQRecord createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
         auto fv = flag;
-        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
+        for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
         {
-            for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
-            {
-                fv &= getDataKindFlag(iter->second);
-            }
+            fv &= getDataKindFlag(iter->second);
         }
 
-        return BSQRecord(move(values), fv);
+        into->count = count;
+        into->properties = properties;
+        into->flag = fv;
+
+        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        std::copy(values.begin(), values.end(), tcurr);
     }
 
-    template <DATA_KIND_FLAG flag>
-    static BSQRecord createFromUpdate(const BSQRecord* src, std::map<MIRPropertyEnum, Value>&& values)
+    template <size_t maxsize, DATA_KIND_FLAG flag>
+    static BSQRecord createFromUpdate(BSQRecord* into, const BSQRecord* src, std::initializer_list<std::pair<MIRPropertyEnum, Value>>&& nvals)
     {
+        Value values[maxsize];
+        size_t valuespos = 0;
+
+        BSQDynamicPropertySetEntry* pse = &BSQRecord::emptyDynamicPropertySetEntry
         auto fv = flag;
 
-        for(auto iter = src->entries.begin(); iter != src->entries.end(); ++iter) {
-            auto pos = values.lower_bound(iter->first);
-            if(pos == values.cend() || pos->first != iter->first)
-            {
-                values.emplace_hint(pos, *iter);
-            }
-        }
+        auto srcdata = (Value*)GET_COLLECTION_START(src);
+        auto srcpos = 0;
+        auto nvalspos = nvals.begin();
+        auto nvalend = nvals.end();
 
-        if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
+        while(srcpos != src->count || nvalspos != nvalend)
         {
-            for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
+            if(srcpos == src->count || nvalspos->first < src->properties[srcpos])
             {
-                fv &= getDataKindFlag(iter->second);
+                values[valuespos] = nvalspos->second;
+                pse = BSQRecord::getExtendedProperties(pse, nvalspos->first);
+
+                nvalspos++;
             }
+            else if(nvalspos == nvalend || src->properties[srcpos] < nvalspos->first)
+            {
+                values[valuespos] = srcdata[srcpos];
+                pse = BSQRecord::getExtendedProperties(pse, src->properties[srcpos]);
+
+                srcpos++;
+            }
+            else
+            {
+                values[valuespos] = nvalspos->second;
+                pse = BSQRecord::getExtendedProperties(pse, nvalspos->first);
+
+                nvalspos++;
+                srcpos++;
+            }
+
+            if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
+            {
+                fv &= getDataKindFlag(values[valuespos]);
+            }
+            valuespos++;
         }
 
-        return BSQRecord(move(values), fv);
-    }
+        into->count = valuespos;
+        into->properties = pse->propertySet.data();
+        into->flag = fv;
 
-    static BSQRecord _empty;
+        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        std::copy(values, values + valuespos, tcurr);
+    }
 
     template <MIRPropertyEnum p>
     inline bool hasProperty() const
     {
-        return this->entries.find(p) != this->entries.end();
+        return std::find(this->properties, this->properties + this->count, p) != this->properties + this->count;
     }
 
     template <MIRPropertyEnum p>
     inline Value atFixed() const
     {
-        auto iter = this->entries.find(p);
-        return iter != this->entries.end() ? iter->second : BSQ_VALUE_NONE;
+        auto iter = std::find(this->properties, this->properties + this->count, p) != this->properties + this->count;
+        return iter != this->properties + this->count ? *((Value*)GET_COLLECTION_START(this) + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
     }
 
     bool checkPropertySet(int n, ...) const
@@ -651,8 +551,10 @@ public:
         }
         va_end(vl);
 
-        for(auto iter = this->entries.cbegin(); iter != this->entries.cend(); ++iter) {
-            if(props.find(iter->first) == props.cend()) {
+        for(size_t i = 0; i < this->count; ++i) 
+        {
+            if(props.find(this->properties[i]) == props.cend()) 
+            {
                 return false;
             }
         }
@@ -660,106 +562,57 @@ public:
         return true;
     }
 };
-struct RCIncFunctor_BSQRecord
-{
-    inline BSQRecord operator()(BSQRecord rr) const 
-    { 
-        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
-        {
-           BSQRef::incrementChecked(iter->second);
-        }
-        return rr;
-    }
-};
-struct RCDecFunctor_BSQRecord
-{
-    inline void operator()(BSQRecord rr) const 
-    { 
-        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
-        {
-           BSQRef::decrementChecked(iter->second);
-        }
-    }
-};
-struct RCReturnFunctor_BSQRecord
-{
-    inline void operator()(BSQRecord& rr, BSQRefScope& scope) const 
-    {
-        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
-        {
-            scope.processReturnChecked(iter->second);
-        } 
-    }
-};
 struct DisplayFunctor_BSQRecord
 {
-    std::string operator()(const BSQRecord& rr) const 
+    std::wstring operator()(const BSQRecord& rr) const 
     { 
-        std::string rvals("{");
-        bool first = true;
-        for(auto iter = rr.entries.cbegin(); iter != rr.entries.cend(); ++iter)
-        {
-            if(!first)
-            {
-                rvals += ", ";
-            }
-            first = false;
+        Value* values = (Value*)GET_COLLECTION_START(&rr);
 
-            rvals += std::string{propertyNames[(int32_t)iter->first]} + "=" + diagnostic_format(iter->second);
+        std::wstring rvals(L"{");
+        for(size_t i = 0; i < rr.count; ++i)
+        {
+            if(i != 0)
+            {
+                rvals += L", ";
+            }
+
+            rvals += std::wstring{propertyNames[(size_t)rr.properties[i]]} + L"=" + diagnostic_format(values[i]);
         }
-        rvals += "}";
+        rvals += L"}";
 
         return rvals;
     }
-};
-
-class BSQObject : public BSQRef
-{
-public:
-    BSQObject(MIRNominalTypeEnum ntype) : BSQRef(ntype) { ; }
-    virtual ~BSQObject() = default;
-
-    virtual std::string display() const = 0;
-
-    template<int32_t k>
-    inline static bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
-    {
-        if constexpr (k < 16)
-        {
-            for(int32_t i = 0; i < k; ++i)
-            {
-                if(etypes[i] == tt)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        else
-        {
-            return BSQObject::checkSubtypeSlow<k>(tt, etypes);
-        }
-    }
-
-    template<int32_t k>
-    static bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
-    {
-        return std::binary_search(&etypes[0], &etypes[k], tt); 
-    }
-};
-
-template <typename T, typename DestroyFunctor>
-class BSQBoxedObject : public BSQObject
-{
-public:
-    T bval;
-
-    BSQBoxedObject(MIRNominalTypeEnum nominalType, const T& bval) : BSQObject(nominalType), bval(bval) { ; }
-    virtual ~BSQBoxedObject() { ; }
-
-    virtual void destroy() 
+    static std::wstring display(void* v) 
     { 
-        DestroyFunctor{}(this->bval); 
+        return DisplayFunctor_BSQRecord{}(*((BSQRecord*)v)); 
     }
 };
+void* coerceUnionToBox_BSQRecord(void* uv);
+META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Record, MIRNominalTypeEnum_Record, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQRecord), coerceUnionToBox_BSQRecord, DisplayFunctor_BSQRecord::display, L"Record");
+
+template<int32_t k>
+inline bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
+{
+    if constexpr (k < 16)
+    {
+        for(int32_t i = 0; i < k; ++i)
+        {
+            if(etypes[i] == tt)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    else
+    {
+            return BSQObject::checkSubtypeSlow<k>(tt, etypes);
+    }
+}
+
+template<int32_t k>
+bool checkSubtypeSlow(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])
+{
+    return std::binary_search(&etypes[0], &etypes[k], tt); 
+}
 } // namespace BSQ

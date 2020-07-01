@@ -51,7 +51,7 @@
 #define GET_FORWARD_PTR(M) *((void**)M)
 #define SET_FORWARD_PTR(M, P) *((void**)M) = (void*)P
 
-#define GET_COLLECTION_START(M, T) (((uint8_t*)M) + sizeof(size_t))
+#define GET_COLLECTION_START(M) (((uint8_t*)M) + sizeof(size_t))
 
 #define GC_RC_CLEAR ((uint64_t)0)
 #define GC_RC_MARK_FROM_ROOT ((uint64_t)(1 << 60))
@@ -731,7 +731,7 @@ namespace BSQ
         }
 
         template<typename T>
-        inline T* valueNew(MetaData* mdata, T value)
+        inline T* copyNew(MetaData* mdata, const T& value)
         {
             constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
@@ -814,6 +814,18 @@ namespace BSQ
             while(slotcurr != slotend)
             {
                 OP{}(slotcurr++);
+            }
+        }
+
+        template <typename OP>
+        inline static void MetaData_GCOperatorFP_PackedEntries_Direct(const MetaData* meta, void** data)
+        {
+            size_t count = *((size_t*)data);
+
+            void** slotcurr = (void**)GET_COLLECTION_START(data);
+            for(size_t i = 0; i < count; ++i)
+            {
+               OP{}(slotcurr++);
             }
         }
 

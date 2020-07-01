@@ -27,59 +27,82 @@ void* coerceUnionToBox_double(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
     double dv = *((double*)ruv->udata);
-    return Allocator::GlobalAllocator.valueNew<double>(META_DATA_LOAD_DECL(MetaData_double), dv);
+    return Allocator::GlobalAllocator.copyNew<double>(META_DATA_LOAD_DECL(MetaData_Float64), dv);
+}
+void* coerceUnionToBox_BSQISOTime(void* uv)
+{
+    UnionValue* ruv = (UnionValue*)uv;
+    BSQISOTime tv = *((BSQISOTime*)ruv->udata);
+    return Allocator::GlobalAllocator.copyNew<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), tv);
+}
+void* coerceUnionToBox_Regex(void* uv)
+{
+    UnionValue* ruv = (UnionValue*)uv;
+    BSQRegex rv = *((BSQRegex*)ruv->udata);
+    return Allocator::GlobalAllocator.copyNew<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), rv);
+}
+void* coerceUnionToBox_Tuple(void* uv)
+{
+    UnionValue* ruv = (UnionValue*)uv;
+    BSQTuple* tv = (BSQTuple*)ruv->udata;
+
+    Value* contents;
+    BSQTuple* res = Allocator::GlobalAllocator.collectionNew<BSQTuple, Value>(META_DATA_LOAD_DECL(MetaData_Tuple), tv->count, &contents, tv->count, tv->flag);
+    GC_MEM_COPY(GET_COLLECTION_START(res), GET_COLLECTION_START(tv), tv->count * sizeof(Value));
+
+    return res; 
+}
+void* coerceUnionToBox_Record(void* uv)
+{
+    UnionValue* ruv = (UnionValue*)uv;
+    BSQRecord* rv = (BSQRecord*)ruv->udata;
+
+    Value* contents;
+    BSQRecord* res = Allocator::GlobalAllocator.collectionNew<BSQRecord, Value>(META_DATA_LOAD_DECL(MetaData_Record), rv->count, &contents, rv->count, rv->flag);
+    GC_MEM_COPY(GET_COLLECTION_START(res), GET_COLLECTION_START(rv), rv->count * sizeof(Value));
+
+    return res; 
 }
 
-void* ExtractGeneralRepr__double(void* v)
-{
-    double dval = *(double*)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_double>(META_DATA_LOAD_DECL(MetaData_double), dval);
-}
-void* ExtractGeneralRepr_BSQISOTime(void* v)
-{
-    uint64_t tval = *(uint64_t*)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), tval);
-}
-void* ExtractGeneralRepr_Regex(void* v)
-{
-    std::wregex* rval = *(std::wregex**)(GC_GET_FIRST_DATA_LOC(v));
-    return Allocator::GlobalAllocator.objectNew<Boxed_BSQISOTime>(META_DATA_LOAD_DECL(MetaData_BSQISOTime), rval);
-}
+std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> BSQRecord::knownRecordPropertySets = {
+    {MIRRecordPropertySetsEnum::ps__, {}},
+    //%%KNOWN_RECORD_PROPERTY_SETS_DECLARE%%
+};
+    
+BSQDynamicPropertySetEntry BSQRecord::emptyDynamicPropertySetEntry;
 
-std::wstring DisplayFunction_BSQByteBuffer(void* v)
+BSQDynamicPropertySetEntry* BSQRecord::getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext)
 {
-    return DisplayFunctor_BSQByteBuffer{}(BSQ_GET_VALUE_PTR(v, BSQByteBuffer));
-}
-std::wstring DisplayFunction_BSQBuffer(void* v)
-{
-    return DisplayFunctor_BSQBuffer{}(BSQ_GET_VALUE_PTR(v, BSQBuffer));
-}
-std::wstring DisplayFunction_BSQBufferOf(void* v)
-{
-    return DisplayFunctor_BSQBufferOf{}(BSQ_GET_VALUE_PTR(v, BSQBufferOf));
-}
-std::wstring DisplayFunction_BSQISOTime(void* v)
-{
-    return DisplayFunctor_BSQISOTime{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQISOTime)->bval);
-}
-std::wstring DisplayFunction_Regex(void* v)
-{
-    return DisplayFunctor_BSQRegex{}(BSQ_GET_VALUE_PTR(v, Boxed_BSQRegex)->bval);
+    auto extrs = curr->extensions.find(ext);
+    if(extrs != curr->extensions.end())
+    {
+        return extrs->second;
+    }
+    else
+    {
+        std::vector<MIRPropertyEnum> mps(curr->propertySet);
+        mps.push_back(ext);
+
+        auto next = new BSQDynamicPropertySetEntry(move(mps));
+        curr->extensions[ext] = next;
+
+        return next;
+    }
 }
 
 MetaData* getMetaData(void* v)
 {
     if (BSQ_IS_VALUE_NONE(v))
     {
-        return META_DATA_LOAD_DECL(MetaData_NoneValue);
+        return META_DATA_LOAD_DECL(MetaData_None);
     }
     else if (BSQ_IS_VALUE_BOOL(v))
     {
-        return META_DATA_LOAD_DECL(MetaData_BSQBool);
+        return META_DATA_LOAD_DECL(MetaData_Bool);
     }
     else if (BSQ_IS_VALUE_TAGGED_INT(v))
     {
-        return META_DATA_LOAD_DECL(MetaData_int64_t);
+        return META_DATA_LOAD_DECL(MetaData_Int);
     }
     else
     {
