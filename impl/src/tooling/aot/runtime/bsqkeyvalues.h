@@ -8,12 +8,18 @@
 #include "common.h"
 #include "bsqvalue.h"
 
+#define META_DATA_DECLARE_SPECIAL_TYPED_STRING(NAME, TYPE, CUNION, DISPLAY, DSTR) META_DATA_DECLARE_PTR_PACKED_KEY(NAME, TYPE, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQString)), 1, LessFunctor_BSQString::less, EqualFunctor_BSQString::eq, CUNION, DISPLAY, DSTR)
+
 namespace BSQ
 {
+struct BigIntFullRepr
+{
+
+};
+
 struct BSQBigInt
 {
-    MetaData* mdata;
-    void* bigint; //right now this should always be null and ignored
+    BigIntFullRepr* bigint; //right now this should always be null and ignored
     int64_t simpleint;
 
     std::wstring display() const
@@ -45,41 +51,68 @@ struct BSQBigInt
 struct EqualFunctor_BSQBigInt
 {
     inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::eq(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQBigInt{}(*((BSQBigInt*)l), *((BSQBigInt*)r)); }
 };
 struct LessFunctor_BSQBigInt
 {
     inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::lt(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQBigInt{}(*((BSQBigInt*)l), *((BSQBigInt*)r)); }
 };
-
-typedef BSQBoxed<BSQBigInt> Boxed_BigInt;
 struct DisplayFunctor_BSQBigInt
 {
     std::wstring operator()(BSQBigInt i) const { return i.display(); }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQBigInt{}(*((BSQBigInt*)v)); }
 };
+void* coerceUnionToBox_BSQBigInt(void* uv);
+META_DATA_DECLARE_PTR_PACKED_KEY(MetaData_BigInt, MIRNominalTypeEnum_BigInt, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBigInt)), 1, LessFunctor_BSQBigInt::less, EqualFunctor_BSQBigInt::eq, coerceUnionToBox_BSQBigInt, DisplayFunctor_BSQBigInt::display, L"BigInt");
 
-void* ExtractGeneralRepr_BSQBigInt(void* v);
-std::wstring DisplayFunction_BSQBigInt(void* v);
-constexpr MetaData MetaData_BSQBigInt = {
-    MIRNominalTypeEnum_BigInt,
-    MIRNominalTypeEnum_Category_BigInt,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_BigInt),
-    ObjectLayoutKind::Packed,
-    1,
-    nullptr,
-    0,
-    L"BigInt",
-    &DisplayFunction_BSQBigInt,
-    &ExtractGeneralRepr_Identity
-};
-
-struct BSQString
+struct BSQStringInlineContents
 {
-    MetaData* mdata;
+    wchar_t data[4];
+
+    static bool keyEqual(const BSQStringInlineContents& l, const BSQStringInlineContents& r)
+    {
+        if(l.data[3] != r.data[3])
+        {
+            return false;
+        }
+        else
+        {
+            std::equal(l.data, l.data + l.data[3], r.data, r.data + r.data[3]);
+        }
+    }
+
+    static bool keyLess(const BSQStringInlineContents& l, const BSQStringInlineContents& r)
+    {
+        if(l.data[3] != r.data[3])
+        {
+            return l.data[3] < r.data[3];
+        }
+        else
+        {
+            auto mmiter = std::mismatch(l.data, l.data + l.data[3], r.data, r.data + r.data[3]);
+
+            if(mmiter.first == l.data + 3)
+            {
+                return false;
+            }
+            else
+            {
+                return *(mmiter.first) < *(mmiter.second);
+            }
+        }
+    }
+
+    static std::wstring display(const BSQStringInlineContents& v)
+    {
+        return std::wstring(v.data, v.data + v.data[3]);
+    }
+};
+struct BSQStringFlatContents
+{
     size_t count;
 
-    static bool keyEqual(const BSQString* l, const BSQString* r)
+    static bool keyEqual(const BSQStringFlatContents* l, const BSQStringFlatContents* r)
     {
         if(l->count != r->count)
         {
@@ -87,13 +120,13 @@ struct BSQString
         }
         else
         {
-            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
-            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START(l);
+            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START(r);
             std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
         }
     }
 
-    static bool keyLess(const BSQString* l, const BSQString* r)
+    static bool keyLess(const BSQStringFlatContents* l, const BSQStringFlatContents* r)
     {
         if(l->count != r->count)
         {
@@ -101,8 +134,8 @@ struct BSQString
         }
         else
         {
-            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
-            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
+            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START(l);
+            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START(r);
             auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
 
             if(mmiter.first == ldata + l->count)
@@ -115,209 +148,158 @@ struct BSQString
             }
         }
     }
+
+    static std::wstring display(const BSQStringFlatContents* v)
+    {
+        const wchar_t* data = (wchar_t*)GET_COLLECTION_START(v); 
+        return std::wstring(data, data + v->count);
+    }
 };
+META_DATA_DECLARE_NO_PTR_COLLECTION(MetaData_StringFlatContents, MIRNominalTypeEnum::Invalid, DATA_KIND_CLEAR_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQStringFlatContents)), sizeof(wchar_t), nullptr, nullptr, L"[StringFlatContents]");
+//
+//TODO: in the future we want other contents types so we can do substring and string append fast -- like JavaScript
+//
+
+struct BSQString
+{
+    union
+    {
+        void* u_sdata; //pointer to contents
+        BSQStringInlineContents u_inline;
+    };
+
+    inline static void initializeSmall(size_t count, wchar_t* chars, BSQString* into)
+    {
+        into->u_sdata = nullptr;
+        GC_MEM_COPY(into->u_inline.data, chars, count);
+        into->u_inline.data[4] = (wchar_t)count;
+    }
+
+    static void initializeLargeFlat(size_t count, wchar_t* chars, BSQString* into)
+    {
+        wchar_t* contents = nullptr;
+        into->u_sdata = Allocator::GlobalAllocator.collectionNew<BSQStringFlatContents, wchar_t>(META_DATA_LOAD_DECL(MetaData_StringFlatContents), count, &contents, count);
+        GC_MEM_COPY(contents, chars, count);
+    }
+
+    inline static bool keyEqual(const BSQString& l, const BSQString& r)
+    {
+        if(l.u_sdata == nullptr)
+        {
+            return r.u_sdata == nullptr; 
+        }
+        else if(!BSQ_IS_VALUE_PTR(l.u_sdata))
+        {
+            if(BSQ_IS_VALUE_PTR(r.u_sdata))
+            {
+                return false;
+            }
+            else
+            {
+                return BSQStringInlineContents::keyEqual(l.u_inline, r.u_inline);
+            }
+        }
+        else
+        {
+            if(BSQ_IS_VALUE_PTR(r.u_sdata))
+            {
+                return false;
+            }
+            else
+            {
+                return BSQStringFlatContents::keyEqual((BSQStringFlatContents*)l.u_sdata, (BSQStringFlatContents*)r.u_sdata);
+            }
+        }
+    }
+
+    inline static bool keyLess(const BSQString& l, const BSQString& r)
+    {
+        if(l.u_sdata == nullptr)
+        {
+            return r.u_sdata != nullptr; //empty string is less than everything 
+        }
+        else if(!BSQ_IS_VALUE_PTR(l.u_sdata))
+        {
+            if(BSQ_IS_VALUE_PTR(r.u_sdata))
+            {
+                return true; //always shorter then
+            }
+            else
+            {
+                return BSQStringInlineContents::keyLess(l.u_inline, r.u_inline);
+            }
+        }
+        else
+        {
+            if(!BSQ_IS_VALUE_PTR(r.u_sdata))
+            {
+                return false; //always longer
+            }
+            else
+            {
+                return BSQStringFlatContents::keyEqual((BSQStringFlatContents*)l.u_sdata, (BSQStringFlatContents*)r.u_sdata);
+            }
+        }
+    }
+
+    static std::wstring display(const BSQString& v)
+    {
+        if(BSQ_IS_VALUE_TAGGED_INT(v.u_sdata))
+        {
+            return BSQStringInlineContents::display(v.u_inline);
+        }
+        else
+        {
+            return BSQStringFlatContents::display((BSQStringFlatContents*)v.u_sdata);
+        }
+    }
+};
+constexpr BSQString EmptyString = {nullptr};
+
 struct EqualFunctor_BSQString
 {
-    inline bool operator()(const BSQString* l, const BSQString* r) const { return BSQString::keyEqual(l, r); }
+    inline bool operator()(const BSQString& l, const BSQString& r) const { return BSQString::keyEqual(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQString{}(*((BSQString*)l), *((BSQString*)r)); }
 };
 struct LessFunctor_BSQString
 {
-    inline bool operator()(const BSQString* l, const BSQString* r) const { return BSQString::keyLess(l, r); }
+    inline bool operator()(const BSQString& l, const BSQString& r) const { return BSQString::keyLess(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQString{}(*((BSQString*)l), *((BSQString*)r)); }
 };
 struct DisplayFunctor_BSQString
 {
-    std::wstring operator()(const BSQString* s) const 
-    {
-        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s); 
-        return std::wstring(L"\"") + std::wstring(data, data + s->count) + std::wstring(L"\""); 
-    }
+    std::wstring operator()(const BSQString& s) const { return std::wstring(L"\"") +BSQString::display(s) + std::wstring(L"\""); }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQString{}(*((BSQString*)v)); }
 };
+void* coerceUnionToBox_BSQString(void* uv);
+META_DATA_DECLARE_PTR_PACKED_KEY(MetaData_String, MIRNominalTypeEnum_String, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQString)), 1, LessFunctor_BSQString::less, EqualFunctor_BSQString::eq, coerceUnionToBox_BSQString, DisplayFunctor_BSQString::display, L"String");
 
-std::wstring DisplayFunction_BSQString(void* v);
-constexpr MetaData MetaData_BSQString = {
-    MIRNominalTypeEnum_String,
-    MIRNominalTypeEnum_Category_String,
-    DATA_KIND_API_FLAG,
-    ExtractFlag::Pointer,
-    sizeof(BSQString),
-    ObjectLayoutKind::CollectionNoRef,
-    0,
-    nullptr,
-    1,
-    L"String",
-    &DisplayFunction_BSQString,
-    &ExtractGeneralRepr_Identity
-};
+//
+//SafeString and StringOf only differ from string in their metadata so we just define that and use the same string representation
+//-- See META_DATA_DECLARE_SPECIAL_TYPED_STRING
+//
 
-struct BSQSafeString
-{
-    MetaData* mdata;
-    size_t count;
-    MIRNominalTypeEnum nominalType;
-
-    static bool keyEqual(const BSQSafeString* l, const BSQSafeString* r)
-    {
-        if(l->nominalType != r->nominalType)
-        {
-            return false;
-        }
-        else
-        {
-            if (l->count != r->count)
-            {
-                return false;
-            }
-            else
-            {
-                const wchar_t *ldata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(l);
-                const wchar_t *rdata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(r);
-                std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
-            }
-        }
-    }
-
-    static bool keyLess(const BSQSafeString* l, const BSQSafeString* r)
-    {
-        if(l->nominalType != r->nominalType)
-        {
-            return l->nominalType < r->nominalType;
-        }
-        else
-        {
-            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
-            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
-            auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
-
-            if(mmiter.first == ldata + l->count)
-            {
-                return false;
-            }
-            else
-            {
-                return *(mmiter.first) < *(mmiter.second);
-            }
-        }
-    }
-};
-struct EqualFunctor_BSQSafeString
-{
-    inline bool operator()(const BSQSafeString* l, const BSQSafeString* r) const { return BSQSafeString::keyEqual(l, r); }
-};
-struct LessFunctor_BSQSafeString
-{
-    inline bool operator()(const BSQSafeString* l, const BSQSafeString* r) const { return BSQSafeString::keyLess(l, r); }
-};
 struct DisplayFunctor_BSQSafeString
 {
-    std::wstring operator()(const BSQSafeString* s) const 
-    {
-        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s);
-        return std::wstring(s->mdata->displayname) + std::wstring(L"'") + std::wstring(data, data + s->count) + std::wstring(L"'"); 
+    std::wstring operator()(const BSQString& s) const { return std::wstring(L"'") + BSQString::display(s) + std::wstring(L"'"); }
+    static std::wstring display(void* v) 
+    { 
+        const MetaData* mdata = GET_TYPE_META_DATA(v);
+        return std::wstring(mdata->displayname) + DisplayFunctor_BSQSafeString{}(*((BSQString*)v)); 
     }
 };
-std::wstring DisplayFunction_BSQSafeString(void* v);
-constexpr MetaData MetaData_BSQSafeString_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_SafeString,
-        DATA_KIND_ALL_FLAG,
-        ExtractFlag::Pointer,
-        sizeof(BSQSafeString),
-        ObjectLayoutKind::CollectionNoRef,
-        0,
-        nullptr,
-        1,
-        displayname,
-        &DisplayFunction_BSQSafeString,
-        &ExtractGeneralRepr_Identity
-    };
-}
+void* coerceUnionToBox_BSQSafeString(void* uv);
 
-struct BSQStringOf
-{
-    MetaData* mdata;
-    size_t count;
-    MIRNominalTypeEnum nominalType;
-
-    static bool keyEqual(const BSQStringOf* l, const BSQStringOf* r)
-    {
-        if(l->mdata->nominaltype != r->mdata->nominaltype)
-        {
-            return false;
-        }
-        else
-        {
-            if (l->count != r->count)
-            {
-                return false;
-            }
-            else
-            {
-                const wchar_t *ldata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(l);
-                const wchar_t *rdata = (wchar_t *)GC_GET_FIRST_COLLECTION_LOC(r);
-                std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
-            }
-        }
-    }
-
-    static bool keyLess(const BSQStringOf* l, const BSQStringOf* r)
-    {
-        if(l->nominalType != r->nominalType)
-        {
-            return l->nominalType < r->nominalType;
-        }
-        else
-        {
-            const wchar_t* ldata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(l);
-            const wchar_t* rdata = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(r);
-            auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
-
-            if(mmiter.first == ldata + l->count)
-            {
-                return false;
-            }
-            else
-            {
-                return *(mmiter.first) < *(mmiter.second);
-            }
-        }
-    }
-};
-struct EqualFunctor_BSQStringOf
-{
-    inline bool operator()(const BSQStringOf* l, const BSQStringOf* r) const { return BSQStringOf::keyEqual(l, r); }
-};
-struct LessFunctor_BSQStringOf
-{
-    inline bool operator()(const BSQStringOf* l, const BSQStringOf* r) const { return BSQStringOf::keyLess(l, r); }
-};
 struct DisplayFunctor_BSQStringOf
 {
-    std::wstring operator()(const BSQStringOf* s) const 
+    std::wstring operator()(const BSQString& s) const { return std::wstring(L"'") + BSQString::display(s) + std::wstring(L"'"); }
+    static std::wstring display(void* v) 
     { 
-        const wchar_t* data = (wchar_t*)GC_GET_FIRST_COLLECTION_LOC(s);
-        return std::wstring(s->mdata->displayname) + std::wstring(L"'") + std::wstring(data, data + s->count) + std::wstring(L"'");  
+        const MetaData* mdata = GET_TYPE_META_DATA(v);
+        return std::wstring(mdata->displayname) + DisplayFunctor_BSQStringOf{}(*((BSQString*)v)); 
     }
 };
-std::wstring DisplayFunction_BSQStringOf(void* v);
-constexpr MetaData MetaData_BSQStringOf_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_StringOf,
-        DATA_KIND_CLEAR_FLAG,
-        ExtractFlag::Pointer,
-        sizeof(BSQStringOf),
-        ObjectLayoutKind::CollectionNoRef,
-        0,
-        nullptr,
-        1,
-        displayname,
-        &DisplayFunction_BSQStringOf,
-        &ExtractGeneralRepr_Identity
-    };
-}
+void* coerceUnionToBox_BSQStringOf(void* uv);
 
 struct BSQUUID
 {
@@ -336,34 +318,20 @@ struct BSQUUID
 struct EqualFunctor_BSQUUID
 {
     inline bool operator()(const BSQUUID& l, const BSQUUID& r) const { return BSQUUID::keyEqual(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQUUID{}(*((BSQUUID*)l), *((BSQUUID*)r)); }
 };
 struct LessFunctor_BSQUUID
 {
     inline bool operator()(const BSQUUID& l, const BSQUUID& r) const { return BSQUUID::keyLess(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQUUID{}(*((BSQUUID*)l), *((BSQUUID*)r)); }
 };
-
-typedef BSQBoxed<BSQUUID> Boxed_BSQUUID;
 struct DisplayFunctor_BSQUUID
 {
     std::wstring operator()(const BSQUUID& u) const { return std::wstring(L"UUID@") + std::wstring(u.sdata, u.sdata + 16); }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQUUID{}(*((BSQUUID*)v)); }
 };
-
-void* ExtractGeneralRepr_BSQUUID(void* v);
-std::wstring DisplayFunction_BSQUUID(void* v);
-constexpr MetaData MetaData_BSQUUID = {
-    MIRNominalTypeEnum_UUID,
-    MIRNominalTypeEnum_Category_UUID,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_BSQUUID),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"UUID",
-    &DisplayFunction_BSQUUID,
-    &ExtractGeneralRepr_BSQUUID
-};
+void* coerceUnionToBox_BSQUUID(void* uv);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_UUID, MIRNominalTypeEnum_UUID, DATA_KIND_ALL_FLAG, sizeof(BSQUUID), LessFunctor_BSQUUID::less, EqualFunctor_BSQUUID::eq, coerceUnionToBox_BSQUUID, DisplayFunctor_BSQUUID::display, L"UUID");
 
 struct BSQLogicalTime
 {
@@ -382,37 +350,21 @@ struct BSQLogicalTime
 struct EqualFunctor_BSQLogicalTime
 {
     inline bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) const { return BSQLogicalTime::keyEqual(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)l), *((BSQLogicalTime*)r)); }
 };
 struct LessFunctor_BSQLogicalTime
 {
     inline bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) const { return BSQLogicalTime::keyLess(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)l), *((BSQLogicalTime*)r)); }
 };
-
-typedef BSQBoxed<BSQLogicalTime> Boxed_BSQLogicalTime;
 struct DisplayFunctor_BSQLogicalTime
 {
-    std::wstring operator()(const BSQLogicalTime& et) const 
-    { 
-        return std::wstring(L"LogicalTime@") + std::to_wstring(et.timestamp); 
-    }
+    std::wstring operator()(const BSQLogicalTime& et) const { return std::wstring(L"LogicalTime@") + std::to_wstring(et.timestamp); }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)v)); }
 };
+void* coerceUnionToBox_BSQLogicalTime(void* uv);
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_LogicalTime, MIRNominalTypeEnum_LogicalTime, DATA_KIND_ALL_FLAG, sizeof(BSQLogicalTime), LessFunctor_BSQLogicalTime::less, EqualFunctor_BSQLogicalTime::eq, coerceUnionToBox_BSQLogicalTime, DisplayFunctor_BSQLogicalTime::display, L"LogicalTime");
 
-void* ExtractGeneralRepr_BSQLogicalTime(void* v);
-std::wstring DisplayFunction_BSQLogicalTime(void* v);
-constexpr MetaData MetaData_BSQLogicalTime = {
-    MIRNominalTypeEnum_LogicalTime,
-    MIRNominalTypeEnum_Category_LogicalTime,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::StructAllocNoMeta,
-    sizeof(Boxed_BSQLogicalTime),
-    ObjectLayoutKind::NoRef,
-    0,
-    nullptr,
-    0,
-    L"LogicalTime",
-    &DisplayFunction_BSQLogicalTime,
-    &ExtractGeneralRepr_BSQLogicalTime
-};
 
 struct BSQCryptoHash
 {

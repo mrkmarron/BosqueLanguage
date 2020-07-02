@@ -26,20 +26,17 @@ void* coerceUnionToBox_int64_t(void* uv)
 void* coerceUnionToBox_double(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    double dv = *((double*)ruv->udata);
-    return Allocator::GlobalAllocator.copyNew<double>(META_DATA_LOAD_DECL(MetaData_Float64), dv);
+    return Allocator::GlobalAllocator.copyNew<double>(META_DATA_LOAD_DECL(MetaData_Float64), ruv->udata);
 }
 void* coerceUnionToBox_BSQISOTime(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    BSQISOTime tv = *((BSQISOTime*)ruv->udata);
-    return Allocator::GlobalAllocator.copyNew<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), tv);
+    return Allocator::GlobalAllocator.copyNew<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), ruv->udata);
 }
 void* coerceUnionToBox_Regex(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    BSQRegex rv = *((BSQRegex*)ruv->udata);
-    return Allocator::GlobalAllocator.copyNew<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), rv);
+    return Allocator::GlobalAllocator.copyNew<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), ruv->udata);
 }
 void* coerceUnionToBox_Tuple(void* uv)
 {

@@ -731,14 +731,14 @@ namespace BSQ
         }
 
         template<typename T>
-        inline T* copyNew(MetaData* mdata, const T& value)
+        inline T* copyNew(MetaData* mdata, void* value)
         {
             constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
 
             *((MetaData*)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
-            *alloc = value;
+            *alloc = *((T*)value);
 
             return alloc;
         }
