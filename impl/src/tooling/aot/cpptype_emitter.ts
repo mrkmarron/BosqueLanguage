@@ -5,9 +5,10 @@
 
 import { MIRAssembly, MIRType, MIREntityTypeDecl, MIRTupleType, MIRRecordType, MIREntityType, MIRConceptType, MIREphemeralListType, MIRRecordTypeEntry, MIRConceptTypeDecl, MIRTypeOption } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey, MIRNominalTypeKey } from "../../compiler/mir_ops";
-import { NoneRepr, StructRepr, RefRepr, EphemeralListRepr, ValueRepr, KeyValueRepr, TypeRepr, joinTypeReprs } from "./type_repr";
+import { NoneRepr, StructRepr, RefRepr, EphemeralListRepr, ValueRepr, KeyValueRepr, TypeRepr, joinTypeReprs, UnionRepr } from "./type_repr";
 
 import * as assert from "assert";
+import { create } from "domain";
 
 class CPPTypeEmitter {
     readonly assembly: MIRAssembly;
@@ -37,6 +38,8 @@ class CPPTypeEmitter {
 
     conceptSubtypeRelation: Map<MIRNominalTypeKey, MIRNominalTypeKey[]> = new Map<MIRNominalTypeKey, MIRNominalTypeKey[]>();
     ephemeralListConverts: Map<string, string> = new Map<string, string>();
+
+    private reprCache: Map<string, TypeRepr> = new Map<string, TypeRepr>();
 
     constructor(assembly: MIRAssembly) {
         this.assembly = assembly;
@@ -146,15 +149,6 @@ class CPPTypeEmitter {
         return tt.options.some((opt) => (opt instanceof MIREntityType) && opt.trkey === "NSCore::None");
     }
 
-    typecheckIsStructuralEntity(tt: MIRType): boolean {
-        if(tt.options.length !== 1 || !(tt.options[0] instanceof MIREntityType)) {
-            return false;
-        }
-
-        const edecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
-        return edecl.attributes.includes("struct");
-    }
-
     typecheckIsStructuralConcept(tt: MIRType): boolean {
         if(tt.options.length !== 1 || !(tt.options[0] instanceof MIRConceptType) || (tt.options[0] as MIRConceptType).ckeys.length !== 1) {
             return false;
@@ -261,16 +255,16 @@ class CPPTypeEmitter {
             return new StructRepr(true, "int64_t", "*", "MIRNominalTypeEnum_Int", "MIRNominalTypeEnum_Category_Empty");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::BigInt$/)) {
-            return new RefRepr(true, "BigInt", "BigInt*", "MIRNominalTypeEnum_Category_BigInt");
+            return new StructRepr(true, "BigInt", "BigInt*", "MIRNominalTypeEnum_Category_BigInt");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::String$/)) {
-            return new RefRepr(true, "BSQString", "BSQString*", "MIRNominalTypeEnum_Category_String");
+            return new StructRepr(true, "BSQString", "BSQString*", "MIRNominalTypeEnum_Category_String");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::SafeString<.*>$/)) {
-            return new RefRepr(true, "BSQSafeString", "BSQSafeString*", "MIRNominalTypeEnum_Category_SafeString");
+            return new StructRepr(true, "BSQSafeString", "BSQSafeString*", "MIRNominalTypeEnum_Category_SafeString");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::StringOf<.*>$/)) {
-            return new RefRepr(true, "BSQStringOf", "BSQStringOf*", "MIRNominalTypeEnum_Category_StringOf");
+            return new StructRepr(true, "BSQStringOf", "BSQStringOf*", "MIRNominalTypeEnum_Category_StringOf");
         }
         else if (this.typecheckIsName_Option(tt, /^NSCore::UUID$/)) {
             return new StructRepr(true, "BSQUUID", "Boxed_BSQUUID", "MIRNominalTypeEnum_UUID", "MIRNominalTypeEnum_Category_UUID");
@@ -301,10 +295,10 @@ class CPPTypeEmitter {
                 return new RefRepr(false, "BSQByteBuffer", "BSQByteBuffer*", "MIRNominalTypeEnum_Category_ByteBuffer");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::Buffer<.*>$/)) {
-                return new RefRepr(false, "BSQBuffer", "BSQBuffer*", "MIRNominalTypeEnum_Category_Buffer");
+                return new StructRepr(false, "BSQBuffer", "BSQBuffer*", "MIRNominalTypeEnum_Category_Buffer");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::BufferOf<.*>$/)) {
-                return new RefRepr(false, "BSQBufferOf", "BSQBufferOf*", "MIRNominalTypeEnum_Category_BufferOf");
+                return new StructRepr(false, "BSQBufferOf", "BSQBufferOf*", "MIRNominalTypeEnum_Category_BufferOf");
             }
             else if (this.typecheckIsName_Option(tt, /^NSCore::ISOTime$/)) {
                 return new StructRepr(false, "BSQISOTime", "Boxed_BSQISOTime", "MIRNominalTypeEnum_ISOTime", "MIRNominalTypeEnum_Category_ISOTime");
@@ -330,32 +324,6 @@ class CPPTypeEmitter {
                     return new StructRepr(false, etname, `Boxed_${etname}`, `MIRNominalTypeEnum::${this.mangleStringForCpp(tt.trkey)}`, "MIRNominalTypeEnum_Category_Object");
                 }
                 else {
-                    let cat = "[INVALID]";
-                    if(this.typecheckIsName_Option(tt, /^NSCore::List<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_List";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::Stack<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_Stack";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::Queue<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_Queue";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::Set<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_Set";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::DynamicSet<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_DynamicSet";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::Map<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_Map";
-                    }
-                    else if(this.typecheckIsName_Option(tt, /^NSCore::DynamicMap<.*>$/)) {
-                        cat = "MIRNominalTypeEnum_Category_DynamicMap";
-                    }
-                    else {
-                        cat = "MIRNominalTypeEnum_Category_Object";
-                    }
-
                     return new RefRepr(false, etname, etname + "*", cat);
                 }
             }
@@ -363,12 +331,9 @@ class CPPTypeEmitter {
                 const cdecl = this.assembly.conceptDecls.get(tt.trkey) as MIRConceptTypeDecl;
                 
                 if(cdecl.attributes.includes("struct")) {
-                    if(this.assembly.subtypeOf(MIRType.createSingle(tt), this.keyType)) {
-                        return new KeyValueRepr();
-                    }
-                    else {
-                        return new ValueRepr();
-                    }
+                    const ctype = this.getMIRType(tt.trkey);
+                    const allestructs = [...this.assembly.entityDecls].filter((ed) => this.assembly.subtypeOf(this.getMIRType(ed[0]), ctype));
+                    return joinTypeReprs(...allestructs.map((estruct) => this.getCPPReprFor(this.getMIRType(estruct[0]))));
                 }
                 else {
                     if(this.assembly.subtypeOf(MIRType.createSingle(tt), this.keyType)) {
@@ -383,13 +348,18 @@ class CPPTypeEmitter {
     }
 
     getCPPReprFor(tt: MIRType): TypeRepr {
-        const ireprs = tt.options.map((opt) => this.getCPPReprFor_Option(opt));
-        return ireprs.length === 1 ? ireprs[0] : joinTypeReprs(...ireprs);
+        if (!this.reprCache.has(tt.trkey)) {
+            const ireprs = tt.options.map((opt) => this.getCPPReprFor_Option(opt));
+            this.reprCache.set(tt.trkey, ireprs.length === 1 ? ireprs[0] : joinTypeReprs(...ireprs));
+        }
+
+        return this.reprCache.get(tt.trkey) as TypeRepr;
     }
 
-    generateEphemeralListConvert(from: MIRType, into: MIRType): string {
+    generateEphemeralListConvert(from: MIRType, into: MIRType): [string, string] {
         const elconvsig = `${this.mangleStringForCpp(into.trkey)} convertFROM_${this.mangleStringForCpp(from.trkey)}_TO_${this.mangleStringForCpp(into.trkey)}(const ${this.mangleStringForCpp(from.trkey)}& elist)`;
 
+        const ops = xxxx;
         if (!this.ephemeralListConverts.has(elconvsig)) {
             const elfrom = from.options[0] as MIREphemeralListType;
             const elinto = into.options[0] as MIREphemeralListType;
@@ -515,17 +485,17 @@ class CPPTypeEmitter {
         }
     }
 
-    coerce(exp: string, from: MIRType, into: MIRType): string {
+    coerce(exp: string, from: MIRType, into: MIRType): {exp: string, op: string | undefined} {
         const trfrom = this.getCPPReprFor(from);
         const trinto = this.getCPPReprFor(into);
 
         if (trfrom.base === trinto.base) {
-            return exp;
+            return {exp: exp, op: undefined};
         }
 
         if(this.typecheckEphemeral(from) && this.typecheckEphemeral(into)) {
-            const cfunc = this.generateEphemeralListConvert(from, into);
-            return `${cfunc}(${exp})`;
+            const [cfunc, op] = this.generateEphemeralListConvert(from, into);
+            return {exp: `${cfunc}(${exp})`, op: op};
         }
 
         return this.coercePrimitive(exp, from, into);

@@ -21,6 +21,8 @@
 
 namespace BSQ
 {
+//%%META_DATA_AND_SPECIALIZED_KEY_DECLARE%%
+
 class Runtime
 {
 public:

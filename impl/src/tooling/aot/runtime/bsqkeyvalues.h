@@ -56,7 +56,7 @@ struct EqualFunctor_BSQBigInt
 struct LessFunctor_BSQBigInt
 {
     inline bool operator()(const BSQBigInt& l, const BSQBigInt& r) const { return BSQBigInt::lt(l, r); }
-    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQBigInt{}(*((BSQBigInt*)l), *((BSQBigInt*)r)); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQBigInt{}(*((BSQBigInt*)l), *((BSQBigInt*)r)); }
 };
 struct DisplayFunctor_BSQBigInt
 {
@@ -264,7 +264,7 @@ struct EqualFunctor_BSQString
 struct LessFunctor_BSQString
 {
     inline bool operator()(const BSQString& l, const BSQString& r) const { return BSQString::keyLess(l, r); }
-    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQString{}(*((BSQString*)l), *((BSQString*)r)); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQString{}(*((BSQString*)l), *((BSQString*)r)); }
 };
 struct DisplayFunctor_BSQString
 {
@@ -323,7 +323,7 @@ struct EqualFunctor_BSQUUID
 struct LessFunctor_BSQUUID
 {
     inline bool operator()(const BSQUUID& l, const BSQUUID& r) const { return BSQUUID::keyLess(l, r); }
-    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQUUID{}(*((BSQUUID*)l), *((BSQUUID*)r)); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQUUID{}(*((BSQUUID*)l), *((BSQUUID*)r)); }
 };
 struct DisplayFunctor_BSQUUID
 {
@@ -355,7 +355,7 @@ struct EqualFunctor_BSQLogicalTime
 struct LessFunctor_BSQLogicalTime
 {
     inline bool operator()(const BSQLogicalTime& l, const BSQLogicalTime& r) const { return BSQLogicalTime::keyLess(l, r); }
-    static bool less(KeyValue l, KeyValue r) { return EqualFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)l), *((BSQLogicalTime*)r)); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)l), *((BSQLogicalTime*)r)); }
 };
 struct DisplayFunctor_BSQLogicalTime
 {
@@ -364,7 +364,6 @@ struct DisplayFunctor_BSQLogicalTime
 };
 void* coerceUnionToBox_BSQLogicalTime(void* uv);
 META_DATA_DECLARE_NO_PTR_KEY(MetaData_LogicalTime, MIRNominalTypeEnum_LogicalTime, DATA_KIND_ALL_FLAG, sizeof(BSQLogicalTime), LessFunctor_BSQLogicalTime::less, EqualFunctor_BSQLogicalTime::eq, coerceUnionToBox_BSQLogicalTime, DisplayFunctor_BSQLogicalTime::display, L"LogicalTime");
-
 
 struct BSQCryptoHash
 {
@@ -383,245 +382,57 @@ struct BSQCryptoHash
 struct EqualFunctor_BSQCryptoHash
 {
     inline bool operator()(const BSQCryptoHash* l, const BSQCryptoHash* r) const { return BSQCryptoHash::keyEqual(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQCryptoHash{}((BSQCryptoHash*)l, (BSQCryptoHash*)r); }
 };
 struct LessFunctor_BSQCryptoHash
 {
     inline bool operator()(const BSQCryptoHash* l, const BSQCryptoHash* r) const { return BSQCryptoHash::keyLess(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQCryptoHash{}((BSQCryptoHash*)l, (BSQCryptoHash*)r); }
 };
 struct DisplayFunctor_BSQCryptoHash
 {
     std::wstring operator()(const BSQCryptoHash* h) const { return std::wstring(L"CryptoHash@") + std::wstring(h->hdata, h->hdata + 64); }
+    static std::wstring display(void* v) { return DisplayFunctor_BSQCryptoHash{}((BSQCryptoHash*)v); }
 };
-std::wstring DisplayFunction_BSQCryptoHash(void* v);
-constexpr MetaData MetaData_BSQCryptoHash = {
-    MIRNominalTypeEnum_CryptoHash,
-    MIRNominalTypeEnum_Category_CryptoHash,
-    DATA_KIND_ALL_FLAG,
-    ExtractFlag::Pointer,
-    sizeof(BSQCryptoHash),
-    ObjectLayoutKind::CollectionNoRef,
-    0,
-    nullptr,
-    1,
-    L"CryptoHash",
-    &DisplayFunction_BSQCryptoHash,
-    &ExtractGeneralRepr_Identity
-};
+META_DATA_DECLARE_NO_PTR_KEY(MetaData_CryptoHash, MIRNominalTypeEnum_CryptoHash, DATA_KIND_ALL_FLAG, sizeof(BSQCryptoHash), LessFunctor_BSQCryptoHash::less, EqualFunctor_BSQCryptoHash::eq, coerceUnionToBox_RefValue, DisplayFunctor_BSQCryptoHash::display, L"CryptoHash");
 
 struct BSQEnum
 {
 public:
-    MetaData* mdata;
-    MIRNominalTypeEnum nominalType;
     uint32_t value;
 
     inline static bool keyEqual(const BSQEnum& l, const BSQEnum& r)
     {
-        return (l.nominalType == r.nominalType) & (l.value == r.value);
+        return l.value == r.value;
     }
 
     inline static bool keyLess(const BSQEnum& l, const BSQEnum& r)
     {
-        return (l.nominalType != r.nominalType) ? (l.nominalType < r.nominalType) : (l.value < r.value);
+        return l.value < r.value;
     }
 };
 struct EqualFunctor_BSQEnum
 {
     inline bool operator()(const BSQEnum& l, const BSQEnum& r) const { return BSQEnum::keyEqual(l, r); }
+    static bool eq(KeyValue l, KeyValue r) { return EqualFunctor_BSQEnum{}(*((BSQEnum*)l), *((BSQEnum*)r)); }
 };
 struct LessFunctor_BSQEnum
 {
     inline bool operator()(const BSQEnum& l, const BSQEnum& r) const { return BSQEnum::keyLess(l, r); }
+    static bool less(KeyValue l, KeyValue r) { return LessFunctor_BSQEnum{}(*((BSQEnum*)l), *((BSQEnum*)r)); }
 };
-
 struct DisplayFunctor_BSQEnum
 {
-    std::wstring operator()(const BSQEnum& e) const 
+    std::wstring operator()(const BSQEnum& e) const { return std::to_wstring(e.value); }
+    static std::wstring display(void* v) 
     { 
-        return std::wstring(L"Enum") + std::wstring(L"::") + std::to_wstring(e.value); 
+        const MetaData* mdata = GET_TYPE_META_DATA(v);
+        return std::wstring(mdata->displayname) + std::wstring(L"::") + DisplayFunctor_BSQEnum{}(*((BSQEnum*)v)); 
     }
 };
+void* coerceUnionToBox_BSQEnum(void* uv);
 
-void* ExtractGeneralRepr_BSQEnum(void* v);
-std::wstring DisplayFunction_BSQEnum(void* v);
-constexpr MetaData MetaData_BSQEnum_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_Enum,
-        DATA_KIND_API_FLAG,
-        ExtractFlag::StructAllocNoMeta,
-        sizeof(BSQEnum),
-        ObjectLayoutKind::NoRef,
-        0,
-        nullptr,
-        0,
-        displayname,
-        &DisplayFunction_BSQEnum,
-        &ExtractGeneralRepr_BSQEnum
-    };
-}
-
-struct BSQIdKeySimple
-{
-    MetaData* mdata;
-    KeyValue key;
-    MIRNominalTypeEnum nominalType;
-
-    inline static bool keyEqual(const BSQIdKeySimple& l, const BSQIdKeySimple& r)
-    {
-        return (l.nominalType == r.nominalType) && bsqKeyValueEqual(l.key, r.key);
-    }
-
-    inline static bool keyLess(const BSQIdKeySimple& l, const BSQIdKeySimple& r)
-    {
-        if(l.nominalType != r.nominalType)
-        {
-            return l.nominalType < r.nominalType;
-        }
-
-        return bsqKeyValueLess(l.key, r.key);
-    }
-};
-struct EqualFunctor_BSQIdKeySimple
-{
-    inline bool operator()(const BSQIdKeySimple& l, const BSQIdKeySimple& r) const { return BSQIdKeySimple::keyEqual(l, r); }
-};
-struct LessFunctor_BSQIdKeySimple
-{
-    inline bool operator()(const BSQIdKeySimple& l, const BSQIdKeySimple& r) const { return BSQIdKeySimple::keyLess(l, r); }
-};
-
-struct DisplayFunctor_BSQIdKeySimple
-{
-    std::string operator()(const BSQIdKeySimple& idk) const 
-    { 
-        std::string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk.nominalType)];
-        return rvals + " of " + diagnostic_format(idk.key);
-    }
-};
-
-void* ExtractGeneralRepr_BSQIdKeySimple(void* v);
-std::wstring DisplayFunction_BSQIdKeySimple(void* v);
-constexpr MetaData MetaData_BSQIdKeySimple_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_IdKeySimple,
-        DATA_KIND_API_FLAG,
-        ExtractFlag::StructFullSize,
-        sizeof(BSQIdKeySimple),
-        ObjectLayoutKind::Packed,
-        1,
-        nullptr,
-        0,
-        displayname,
-        &DisplayFunction_BSQIdKeySimple,
-        &ExtractGeneralRepr_BSQIdKeySimple
-    };
-}
-
-struct BSQIdKeyCompound
-{
-    MetaData* mdata;
-    size_t count;
-    MIRNominalTypeEnum nominalType;
-
-    static bool keyEqual(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
-    {
-        if(l.nominalType != r.nominalType)
-        {
-            return false;
-        }
-        else
-        {
-            if (l.count != r.count)
-            {
-                return false;
-            }
-            else
-            {
-                const KeyValue* ldata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&l);
-                const KeyValue* rdata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&r);
-                std::equal(ldata, ldata + l.count, rdata, rdata + r.count, [](KeyValue v1, KeyValue v2) -> bool {
-                    return bsqKeyValueEqual(v1, v2);
-                });
-            }
-        }
-    }
-
-    static bool keyLess(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r)
-    {
-        if(l.nominalType != r.nominalType)
-        {
-            return l.nominalType < r.nominalType;
-        }
-        else
-        {
-            const KeyValue* ldata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&l);
-            const KeyValue* rdata = (KeyValue*)GC_GET_FIRST_COLLECTION_LOC(&r);
-            auto mmiter = std::mismatch(ldata, ldata + l.count, rdata, rdata + r.count, [](KeyValue v1, KeyValue v2) -> bool {
-                return bsqKeyValueLess(v1, v2);
-            });
-
-            if(mmiter.first == ldata + l.count)
-            {
-                return false;
-            }
-            else
-            {
-                return bsqKeyValueLess(*(mmiter.first), *(mmiter.second));
-            }
-        }
-    }
-};
-struct EqualFunctor_BSQIdKeyCompound
-{
-    inline bool operator()(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r) const { return BSQIdKeyCompound::keyEqual(l, r); }
-};
-struct LessFunctor_BSQIdKeyCompound
-{
-    inline bool operator()(const BSQIdKeyCompound& l, const BSQIdKeyCompound& r) const { return BSQIdKeyCompound::keyLess(l, r); }
-};
-
-struct DisplayFunctor_BSQIdKeyCompound
-{
-    std::string operator()(const BSQIdKeyCompound& idk) const 
-    { 
-        std::string rvals = nominaltypenames[GET_MIR_TYPE_POSITION(idk.nominalType)];
-        rvals +=  " of ( ";
-        for(size_t i = 0; i < idk.keys.size(); ++i)
-        {
-            if(i != 0)
-            {
-                rvals += ", ";
-            }
-
-            rvals += diagnostic_format(idk.keys[i]);
-        }
-        rvals += " )"; 
-
-        return rvals;
-    }
-};
-
-void* ExtractGeneralRepr_BSQIdKeyCompound(void* v);
-std::wstring DisplayFunction_BSQIdKeyCompound(void* v);
-constexpr MetaData MetaData_BSQIdKeyCompound_Constructor(MIRNominalTypeEnum oftype, const wchar_t* displayname) 
-{
-    return {
-        oftype,
-        MIRNominalTypeEnum_Category_IdKeyCompound,
-        DATA_KIND_API_FLAG,
-        ExtractFlag::StructFullSizePlus,
-        sizeof(BSQIdKeyCompound),
-        ObjectLayoutKind::CollectionPacked,
-        0,
-        nullptr,
-        sizeof(KeyValue),
-        displayname,
-        &DisplayFunction_BSQIdKeyCompound,
-        &ExtractGeneralRepr_BSQIdKeyCompound
-    };
-}
+//
+//Auto generate the code for each simple and compound key type since they need to specialize per the types of keys
+//
 }

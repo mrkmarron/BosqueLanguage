@@ -9,43 +9,27 @@
 
 namespace BSQ
 {
-
-template <typename T, typename RCDecF, typename DisplayF>
-class BSQList : public BSQObject
+template <typename T>
+struct BSQList
 {
-public:
-    std::vector<T> entries;
+    size_t count;
 
-    BSQList(MIRNominalTypeEnum ntype) : BSQObject(ntype), entries() { ; }
-    BSQList(MIRNominalTypeEnum ntype, std::vector<T>&& vals) : BSQObject(ntype), entries(move(vals)) { ; }
-
-    virtual ~BSQList()
+    template <typename DisplayF>
+    std::wstring display() const
     {
-        ;
-    }
-
-    virtual void destroy()
-    {
-        std::for_each(this->entries.begin(), this->entries.end(), [](T& v) {
-            RCDecF{}(v);
-        });
-    }
-
-    virtual std::string display() const
-    {
-        std::string ls("{");
-        for (size_t i = 0; i < this->entries.size(); ++i)
+        T* vals = GET_COLLECTION_START(this);
+        std::wstring ls(L"{");
+        for (size_t i = 0; i < this->count; ++i)
         {
             if (i != 0)
             {
-                ls += ", ";
+                ls += L", ";
             }
-            ls += DisplayF{}(this->entries[i]);
+            ls += DisplayF{}(vals[i]);
         }
-        ls += "}";
+        ls += L"}";
 
         return ls;
     }
 };
-
 }

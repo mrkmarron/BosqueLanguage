@@ -5,32 +5,30 @@
 
 import * as assert from "assert";
 
-type TypeEncodingOpPack = {
-    RCIncFunctor: string,
-    RCDecFunctor: string,
-    DisplayFunctor: string
-}
-
-type TypeEncodingOpPackKey = {
-    EqualFunctor: string,
-    LessFunctor: string
-}
-
-type TypeEncodingOpPackStruct = {
-    RCReturnFunctor: string
-}
-
 abstract class TypeRepr {
     readonly iskey: boolean;
+    
     readonly base: string;
     readonly std: string;
-    readonly categoryinfo: string;
 
-    constructor(iskey: boolean, base: string, std: string, categoryinfo: string) {
+    readonly metadataName: string;
+    readonly hasPointers: boolean;
+    readonly realSize: number;
+    readonly alignedSize: number;
+    readonly packedPtrCount: number;
+    readonly layoutmask: number[];
+
+    constructor(iskey: boolean, base: string, std: string, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: number[]) {
         this.iskey = iskey;
         this.base = base;
         this.std = std;
-        this.categoryinfo = categoryinfo;
+        
+        this.metadataName = metadataName;
+        this.hasPointers = hasPointers;
+        this.realSize = realSize;
+        this.alignedSize = alignedSize;
+        this.packedPtrCount = packedPtrCount;
+        this.layoutmask = layoutmask;
     }
 }
 
@@ -57,6 +55,25 @@ class RefRepr extends TypeRepr {
     }
 }
 
+class UnionRepr extends TypeRepr {
+    readonly oftypes: (NoneRepr | StructRepr | RefRepr)[];
+
+    constructor(iskey: boolean, hasPointers: boolean, realSize: number, alignedSize: number, oftypes: (NoneRepr | StructRepr | RefRepr)[]) {
+        super(iskey, "UnionValue", "UnionValue", "[NO META]", hasPointers, realSize, alignedSize, -1, []);
+
+        this.oftypes = oftypes;
+    }
+
+    static create(oftypes: (NoneRepr | StructRepr | RefRepr)[]): TypeRepr {
+        const iskey = oftypes.every((tr) => tr.iskey);
+        const hasptrs = oftypes.some((tr) => tr.hasPointers);
+        const realSize = oftypes.reduce((acc, v) => Math.max(acc, v.realSize), 0) + 4;
+        const alignedSize = oftypes.reduce((acc, v) => Math.max(acc, v.alignedSize), 0) + 4;
+
+        return new UnionRepr(iskey, hasptrs, realSize, alignedSize, oftypes);
+    }
+}
+
 class KeyValueRepr extends TypeRepr {
     constructor() {
         super(true, "KeyValue", "KeyValue", "MIRNominalTypeEnum_Category_Empty");
@@ -80,9 +97,7 @@ function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
         return tr1;
     }
 
-    if(tr1.base === "BSQTuple" || tr1.base === "BSQRecord" || tr2.base === "BSQTuple" || tr2.base === "BSQRecord") {
-        return new ValueRepr(); 
-    }
+    xxxx; //Union types!!!
     
     if (tr1 instanceof NoneRepr) {
         if (tr2 instanceof NoneRepr) {
@@ -125,7 +140,6 @@ function joinTypeReprs(...trl: TypeRepr[]): TypeRepr {
 }
 
 export {
-    TypeEncodingOpPack, TypeEncodingOpPackKey, TypeEncodingOpPackStruct,
-    TypeRepr, NoneRepr, StructRepr, RefRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
+    TypeRepr, NoneRepr, StructRepr, RefRepr, UnionRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
     joinTypeReprs
 };

@@ -212,20 +212,19 @@ enum class BSQBufferCompression {
 struct BSQByteBuffer
 {
     size_t count;
-    BSQBufferCompression compression;
+    //BSQBufferCompression compression; is stored as the first byte in the buffer contents
 
     std::wstring display_contents() const
     {
         std::wstring rvals(L"");
-        if(this->compression == BSQBufferCompression::Off)
+        uint8_t* sdata = GET_COLLECTION_START(this);
+        if((BSQBufferCompression)sdata[0] == BSQBufferCompression::Off)
         {
-            uint8_t* sdata = GET_COLLECTION_START(this);
-            rvals += std::wstring(sdata, sdata + this->count);
+            rvals += std::wstring(sdata + 1, sdata + this->count);
         }
         else
         {
-            uint8_t* sdata = GET_COLLECTION_START(this);
-            for (size_t i = 0; i < this->count; ++i)
+            for (size_t i = 1; i < this->count; ++i)
             {
                 if(i != 0)
                 {
