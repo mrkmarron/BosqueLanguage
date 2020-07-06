@@ -212,19 +212,19 @@ enum class BSQBufferCompression {
 struct BSQByteBuffer
 {
     size_t count;
-    //BSQBufferCompression compression; is stored as the first byte in the buffer contents
+    BSQBufferCompression compression;
 
     std::wstring display_contents() const
     {
         std::wstring rvals(L"");
-        uint8_t* sdata = GET_COLLECTION_START(this);
-        if((BSQBufferCompression)sdata[0] == BSQBufferCompression::Off)
+        uint8_t* sdata = GET_COLLECTION_START_FIXED(this, sizeof(BSQByteBuffer));
+        if(this->compression == BSQBufferCompression::Off)
         {
-            rvals += std::wstring(sdata + 1, sdata + this->count);
+            rvals += std::wstring(sdata, sdata + this->count);
         }
         else
         {
-            for (size_t i = 1; i < this->count; ++i)
+            for (size_t i = 0; i < this->count; ++i)
             {
                 if(i != 0)
                 {
@@ -339,7 +339,7 @@ struct BSQTuple
         into->count = count;
         into->flag = flag;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQTuple));
         std::copy(values.begin(), values.end(), tcurr);
     }
 
@@ -355,7 +355,7 @@ struct BSQTuple
         into->count = count;
         into->flag = flag;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQTuple));
         std::copy(values.begin(), values.end(), tcurr);
     }
 
@@ -370,7 +370,7 @@ struct BSQTuple
     {
         if (idx < this->count)
         {
-            return *(((Value*)GET_COLLECTION_START(this)) + idx);
+            return *(((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQTuple))) + idx);
         }
         else
         {
@@ -382,7 +382,7 @@ struct DisplayFunctor_BSQTuple
 {
     std::wstring operator()(const BSQTuple& tt) const 
     {
-        Value* values = (Value*)GET_COLLECTION_START(&tt);
+        Value* values = (Value*)GET_COLLECTION_START_FIXED(&tt, sizeof(BSQTuple));
         std::wstring tvals(L"[");
         for(size_t i = 0; i < tt.count; ++i)
         {
@@ -442,18 +442,18 @@ struct BSQRecord
     static BSQDynamicPropertySetEntry* getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext);
 
     template <size_t count, DATA_KIND_FLAG flag>
-    static BSQRecord createFromSingle(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
+    inline static BSQRecord createFromSingle(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
         into->count = count;
         into->properties = properties;
         into->flag = flag;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQRecord));
         std::copy(values.begin(), values.end(), tcurr);
     }
 
     template <size_t count>
-    static BSQRecord createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
+    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
         auto fv = flag;
         for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
@@ -465,12 +465,12 @@ struct BSQRecord
         into->properties = properties;
         into->flag = fv;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQRecord));
         std::copy(values.begin(), values.end(), tcurr);
     }
 
     template <size_t maxsize, DATA_KIND_FLAG flag>
-    static BSQRecord createFromUpdate(BSQRecord* into, const BSQRecord* src, std::initializer_list<std::pair<MIRPropertyEnum, Value>>&& nvals)
+    static void createFromUpdate(BSQRecord* into, const BSQRecord* src, std::initializer_list<std::pair<MIRPropertyEnum, Value>> nvals)
     {
         Value values[maxsize];
         size_t valuespos = 0;
@@ -478,7 +478,7 @@ struct BSQRecord
         BSQDynamicPropertySetEntry* pse = &BSQRecord::emptyDynamicPropertySetEntry
         auto fv = flag;
 
-        auto srcdata = (Value*)GET_COLLECTION_START(src);
+        auto srcdata = (Value*)GET_COLLECTION_START_FIXED(src, sizeof(BSQRecord));
         auto srcpos = 0;
         auto nvalspos = nvals.begin();
         auto nvalend = nvals.end();
@@ -519,7 +519,7 @@ struct BSQRecord
         into->properties = pse->propertySet.data();
         into->flag = fv;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START(into);
+        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQRecord));
         std::copy(values, values + valuespos, tcurr);
     }
 
@@ -533,7 +533,7 @@ struct BSQRecord
     inline Value atFixed() const
     {
         auto iter = std::find(this->properties, this->properties + this->count, p) != this->properties + this->count;
-        return iter != this->properties + this->count ? *((Value*)GET_COLLECTION_START(this) + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
+        return iter != this->properties + this->count ? *((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQRecord)) + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
     }
 
     bool checkPropertySet(int n, ...) const
@@ -565,7 +565,7 @@ struct DisplayFunctor_BSQRecord
 {
     std::wstring operator()(const BSQRecord& rr) const 
     { 
-        Value* values = (Value*)GET_COLLECTION_START(&rr);
+        Value* values = (Value*)GET_COLLECTION_START_FIXED(&rr, sizeof(BSQRecord));
 
         std::wstring rvals(L"{");
         for(size_t i = 0; i < rr.count; ++i)

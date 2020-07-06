@@ -26,17 +26,17 @@ void* coerceUnionToBox_int64_t(void* uv)
 void* coerceUnionToBox_double(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyNew<double>(META_DATA_LOAD_DECL(MetaData_Float64), ruv->udata);
+    return Allocator::GlobalAllocator.copyInto<double>(META_DATA_LOAD_DECL(MetaData_Float64), (double*)(&ruv->udata));
 }
 void* coerceUnionToBox_BSQISOTime(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyNew<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), ruv->udata);
+    return Allocator::GlobalAllocator.copyInto<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), (BSQISOTime*)(&ruv->udata));
 }
 void* coerceUnionToBox_Regex(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyNew<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), ruv->udata);
+    return Allocator::GlobalAllocator.copyInto<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), (BSQRegex*)(&ruv->udata));
 }
 void* coerceUnionToBox_Tuple(void* uv)
 {
@@ -45,7 +45,7 @@ void* coerceUnionToBox_Tuple(void* uv)
 
     Value* contents;
     BSQTuple* res = Allocator::GlobalAllocator.collectionNew<BSQTuple, Value>(META_DATA_LOAD_DECL(MetaData_Tuple), tv->count, &contents, tv->count, tv->flag);
-    GC_MEM_COPY(GET_COLLECTION_START(res), GET_COLLECTION_START(tv), tv->count * sizeof(Value));
+    GC_MEM_COPY(GET_COLLECTION_START_FIXED(res, sizeof(BSQTuple)), GET_COLLECTION_START_FIXED(tv, sizeof(BSQTuple)), tv->count * sizeof(Value));
 
     return res; 
 }
@@ -56,7 +56,7 @@ void* coerceUnionToBox_Record(void* uv)
 
     Value* contents;
     BSQRecord* res = Allocator::GlobalAllocator.collectionNew<BSQRecord, Value>(META_DATA_LOAD_DECL(MetaData_Record), rv->count, &contents, rv->count, rv->flag);
-    GC_MEM_COPY(GET_COLLECTION_START(res), GET_COLLECTION_START(rv), rv->count * sizeof(Value));
+    GC_MEM_COPY(GET_COLLECTION_START_FIXED(res, sizeof(BSQRecord)), GET_COLLECTION_START_FIXED(rv, sizeof(BSQRecord)), rv->count * sizeof(Value));
 
     return res; 
 }

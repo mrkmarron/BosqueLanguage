@@ -120,8 +120,8 @@ struct BSQStringFlatContents
         }
         else
         {
-            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START(l);
-            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START(r);
+            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START_FIXED(l, sizeof(BSQStringFlatContents));
+            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START_FIXED(r, sizeof(BSQStringFlatContents));
             std::equal(ldata, ldata + l->count, rdata, rdata + r->count);
         }
     }
@@ -134,8 +134,8 @@ struct BSQStringFlatContents
         }
         else
         {
-            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START(l);
-            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START(r);
+            const wchar_t* ldata = (wchar_t*)GET_COLLECTION_START_FIXED(l, sizeof(BSQStringFlatContents));
+            const wchar_t* rdata = (wchar_t*)GET_COLLECTION_START_FIXED(r, sizeof(BSQStringFlatContents));
             auto mmiter = std::mismatch(ldata, ldata + l->count, rdata, rdata + r->count);
 
             if(mmiter.first == ldata + l->count)
@@ -151,7 +151,7 @@ struct BSQStringFlatContents
 
     static std::wstring display(const BSQStringFlatContents* v)
     {
-        const wchar_t* data = (wchar_t*)GET_COLLECTION_START(v); 
+        const wchar_t* data = (wchar_t*)GET_COLLECTION_START_FIXED(v, sizeof(BSQStringFlatContents)); 
         return std::wstring(data, data + v->count);
     }
 };

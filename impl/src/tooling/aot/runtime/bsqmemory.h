@@ -51,7 +51,8 @@
 #define GET_FORWARD_PTR(M) *((void**)M)
 #define SET_FORWARD_PTR(M, P) *((void**)M) = (void*)P
 
-#define GET_COLLECTION_START(M) (((uint8_t*)M) + sizeof(size_t))
+#define GET_COLLECTION_START_FIXED(M, X) (((uint8_t*)M) + BSQ_ALIGN_ALLOC_SIZE(X))
+#define GET_COLLECTION_START_META(M, META) (((uint8_t*)M) + BSQ_ALIGN_ALLOC_SIZE((META)->datasize))
 
 #define GC_RC_CLEAR ((uint64_t)0)
 #define GC_RC_MARK_FROM_ROOT ((uint64_t)(1 << 60))
@@ -731,44 +732,47 @@ namespace BSQ
         }
 
         template<typename T>
-        inline T* copyNew(MetaData* mdata, void* value)
+        inline T* allocateT(MetaData* mdata) 
         {
-            constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
 
             *((MetaData*)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
-            *alloc = *((T*)value);
-
+            
             return alloc;
         }
 
-        template<typename T, typename... Args>
-        inline T* objectNew(MetaData* mdata, Args... args)
-        {
-            constexpr asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
-            uint8_t* alloc = this->nsalloc.allocateSize<asize>();
-
-            *((MetaData*)alloc) = mdata;
-            T* res = (T*)(alloc + sizeof(MetaData));
-            *alloc = {args...};
-
-            return alloc;
-        }
-
-        template <typename T, typename U, typename... Args>
-        inline T* collectionNew(MetaData* mdata, size_t count, U** contents, Args... args)
+        template <typename T, typename U>
+        inline T* allocateTPlus(MetaData* mdata, size_t count, U** contents) 
         {
             size_t csize = BSQ_ALIGN_ALLOC_SIZE(count * sizeof(U));
-            size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
     
             uint8_t* alloc = this->nsalloc.allocateSizePlus<asize>(csize, (uint8_t**)contents);
 
             *((MetaData*)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
-            *alloc = {args...};
-
+            
             return alloc;
+        }
+
+        template<typename T>
+        inline T* copyInto(MetaData* mdata, T* src)
+        {
+            T* res = this->allocateT<T>(mdata);
+            GC_MEM_COPY(res, src, mdata->datasize);
+
+            return res;
+        }
+
+        template<typename T, size_t size>
+        inline T* copyIntoFixedPlus(MetaData* mdata, T* src)
+        {
+            T* res = this->allocateT<T>(mdata);
+            GC_MEM_COPY(res, src, size);
+
+            return res;
         }
 
         void collect()
@@ -822,7 +826,7 @@ namespace BSQ
         {
             size_t count = *((size_t*)data);
 
-            void** slotcurr = (void**)GET_COLLECTION_START(data);
+            void** slotcurr = (void**)GET_COLLECTION_START_META(data, meta);
             for(size_t i = 0; i < count; ++i)
             {
                OP{}(slotcurr++);
@@ -835,7 +839,7 @@ namespace BSQ
             size_t count = *((size_t*)data);
             uint32_t advancesize = meta->sizeadvance;
 
-            void** slotcurr = (void**)GET_COLLECTION_START(data);
+            void** slotcurr = (void**)GET_COLLECTION_START_META(data, meta);
             for(size_t i = 0; i < count; ++i)
             {
                 void** slotend = slotcurr + meta->ptrcount;
@@ -873,7 +877,7 @@ namespace BSQ
             size_t count = *((size_t*)data);
             uint32_t advancesize = meta->sizeadvance;
 
-            void** slotcurr = (void**)GET_COLLECTION_START(data);
+            void** slotcurr = (void**)GET_COLLECTION_START_META(data, meta);
             for(size_t i = 0; i < count; ++i)
             {
                 void** cslot = slotcurr;
@@ -926,7 +930,7 @@ namespace BSQ
             size_t count = *((size_t*)data);
             uint32_t advancesize = meta->sizeadvance;
 
-            void** slotcurr = (void**)GET_COLLECTION_START(data);
+            void** slotcurr = (void**)GET_COLLECTION_START_META(data, meta);
             for(size_t i = 0; i < count; ++i)
             {
                 void** cslot = slotcurr;

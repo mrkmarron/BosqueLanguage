@@ -17,7 +17,7 @@ struct BSQList
     template <typename DisplayF>
     std::wstring display() const
     {
-        T* vals = GET_COLLECTION_START(this);
+        T* vals = GET_COLLECTION_START_FIXED(this, sizeof(BSQList<T>));
         std::wstring ls(L"{");
         for (size_t i = 0; i < this->count; ++i)
         {

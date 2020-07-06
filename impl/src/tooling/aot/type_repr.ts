@@ -5,24 +5,39 @@
 
 import * as assert from "assert";
 
+enum LayoutMaskEnum {
+    End = 0,
+    Scalar = 1,
+    Ptr = 2,
+    Union = 4
+};
+
+const MemoryByteAlignment = 8;
+
 abstract class TypeRepr {
     readonly iskey: boolean;
     
     readonly base: string;
     readonly std: string;
 
+    readonly isStack: boolean; //if this must always be stored in our shaddow stack
+    readonly isSimplePtr: boolean; //if this is always a pointer to the value
+
     readonly metadataName: string;
     readonly hasPointers: boolean;
     readonly realSize: number;
     readonly alignedSize: number;
     readonly packedPtrCount: number;
-    readonly layoutmask: number[];
+    readonly layoutmask: LayoutMaskEnum[];
 
-    constructor(iskey: boolean, base: string, std: string, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: number[]) {
+    constructor(iskey: boolean, base: string, std: string, isforcedstack: boolean, issimpleptr: boolean, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: LayoutMaskEnum[]) {
         this.iskey = iskey;
         this.base = base;
         this.std = std;
         
+        this.isStack = isforcedstack;
+        this.isSimplePtr = issimpleptr;
+
         this.metadataName = metadataName;
         this.hasPointers = hasPointers;
         this.realSize = realSize;
@@ -34,15 +49,26 @@ abstract class TypeRepr {
 
 class NoneRepr extends TypeRepr {
     constructor() {
-        super(true, "NoneValue", "NoneValue", "MIRNominalTypeEnum_Category_Empty");
+        super(true, "NoneValue", "NoneValue", false, true, "MetaData_None", false, MemoryByteAlignment, MemoryByteAlignment, -1, [LayoutMaskEnum.Scalar]);
     }
 }
 
 class StructRepr extends TypeRepr {
-    readonly boxed: string;
-    readonly nominaltype: string;
+    constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, categoryinfo: string) {
+        super(iskey, base, base, categoryinfo);
+        this.boxed = boxed;
+        this.nominaltype = nominaltype;
+    }
+}
+
+class TRRepr extends TypeRepr {
+    readonly isTuple: boolean;
+    readonly isRecord: boolean;
 
     constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, categoryinfo: string) {
+        //
+        //todo -- size here is the BSQX size + the data elements size
+        //
         super(iskey, base, base, categoryinfo);
         this.boxed = boxed;
         this.nominaltype = nominaltype;
@@ -56,19 +82,19 @@ class RefRepr extends TypeRepr {
 }
 
 class UnionRepr extends TypeRepr {
-    readonly oftypes: (NoneRepr | StructRepr | RefRepr)[];
+    readonly oftypes: (NoneRepr | StructRepr | TRRepr | RefRepr)[];
 
     constructor(iskey: boolean, hasPointers: boolean, realSize: number, alignedSize: number, oftypes: (NoneRepr | StructRepr | RefRepr)[]) {
-        super(iskey, "UnionValue", "UnionValue", "[NO META]", hasPointers, realSize, alignedSize, -1, []);
+        super(iskey, "UnionValue", "UnionValue", true, false, "[NO META]", hasPointers, realSize, alignedSize, -1, []);
 
         this.oftypes = oftypes;
     }
 
-    static create(oftypes: (NoneRepr | StructRepr | RefRepr)[]): TypeRepr {
+    static create(oftypes: (NoneRepr | StructRepr | TRRepr | RefRepr)[]): TypeRepr {
         const iskey = oftypes.every((tr) => tr.iskey);
         const hasptrs = oftypes.some((tr) => tr.hasPointers);
-        const realSize = oftypes.reduce((acc, v) => Math.max(acc, v.realSize), 0) + 4;
-        const alignedSize = oftypes.reduce((acc, v) => Math.max(acc, v.alignedSize), 0) + 4;
+        const realSize = oftypes.reduce((acc, v) => Math.max(acc, (v instanceof RefRepr) ? MemoryByteAlignment : v.realSize), 0) + 4;
+        const alignedSize = oftypes.reduce((acc, v) => Math.max(acc, (v instanceof RefRepr) ? MemoryByteAlignment : v.alignedSize), 0) + 4;
 
         return new UnionRepr(iskey, hasptrs, realSize, alignedSize, oftypes);
     }
@@ -97,7 +123,7 @@ function joinTypeRepr(tr1: TypeRepr, tr2: TypeRepr): TypeRepr {
         return tr1;
     }
 
-    xxxx; //Union types!!!
+    xxxx; //Union types and TR types!!!
     
     if (tr1 instanceof NoneRepr) {
         if (tr2 instanceof NoneRepr) {
@@ -140,6 +166,7 @@ function joinTypeReprs(...trl: TypeRepr[]): TypeRepr {
 }
 
 export {
-    TypeRepr, NoneRepr, StructRepr, RefRepr, UnionRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
-    joinTypeReprs
+    LayoutMaskEnum, TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
+    joinTypeReprs,
+    MemoryByteAlignment
 };
