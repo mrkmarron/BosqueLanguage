@@ -79,7 +79,9 @@
 
 #define GET_SLAB_BASE(M) ((void*)((uint8_t*)M - sizeof(MetaData)))
 #define GET_FREE_LIST_BASE(M) ((void*)((uint8_t*)M - (sizeof(RCMeta) + sizeof(MetaData))))
+
 #define GC_MEM_COPY(DST, SRC, BYTES) memcpy_s(DST, BYTES, SRC, BYTES)
+#define GC_MEM_ZERO(DST, BYTES) std::fill((uint8_t*)DST, ((uint8_t*)DST) + BYTES, 0)
 
 namespace BSQ
 {
@@ -157,6 +159,7 @@ namespace BSQ
         {
             this->m_allocsize = asize;
             this->m_block = (uint8_t*)BSQ_ALLIGNED_MALLOC(asize);
+            GC_MEM_ZERO(this->m_block, asize);
 
             this->m_currPos = this->m_block;
             this->m_endPos = this->m_block + asize;
@@ -167,7 +170,11 @@ namespace BSQ
             bool shouldgrow = this->m_allocsize < BSQ_MAX_NURSERY_SIZE && this->m_allocsize < rcalloc * 0.5;
             bool shouldshrink = BSQ_MIN_NURSERY_SIZE < this->m_allocsize && rcalloc < this->m_allocsize;
 
-            if(shouldgrow || shouldshrink)
+            if(!(shouldgrow || shouldshrink))
+            {
+                GC_MEM_ZERO(this->m_block, this->m_allocsize);
+            }
+            else
             {
                 free(this->m_block);
                 if(shouldgrow)
@@ -262,6 +269,7 @@ namespace BSQ
                 MEM_STATS_OP(this->totalalloc += tsize);
 
                 uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
+                GC_MEM_ZERO(rr, tsize);
 
                 *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
                 this->m_largeallocs[rr] = asize;
@@ -300,10 +308,47 @@ namespace BSQ
                 MEM_STATS_OP(this->totalalloc += fsize);
 
                 uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(fsize);
+                GC_MEM_ZERO(rr, tsize);
+
                 *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
                 this->m_largeallocs[rr] = asize + csize;
 
                 *contents = (rr + tsize);
+                return (rr + sizeof(RCMeta));
+            }
+        }
+
+        //Return uint8_t* of given asize + sizeof(MetaData)
+        //If it is a large alloc then the RCMeta is just before the return pointer 
+        inline uint8_t* allocateDynamic(size_t asize)
+        {
+            size_t rsize = asize + sizeof(MetaData);
+
+            if (rsize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
+            {
+                MEM_STATS_OP(this->totalalloc += rsize);
+
+                if (this->m_currPos + rsize > this->m_endPos)
+                {
+                    this->gc.collect();
+                }
+
+                uint8_t* res = this->m_currPos;
+                this->m_currPos += rsize;
+
+                return res;
+            }
+            else
+            {
+                size_t tsize = sizeof(RCMeta) + rsize;
+                MEM_STATS_OP(this->totalalloc += tsize);
+
+                uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
+                GC_MEM_ZERO(rr, tsize);
+
+                *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
+                this->m_largeallocs[rr] = asize;
+
                 return (rr + sizeof(RCMeta));
             }
         }
@@ -758,21 +803,14 @@ namespace BSQ
         }
 
         template<typename T>
-        inline T* copyInto(MetaData* mdata, T* src)
+        inline T* allocateTDynamic(MetaData* mdata, size_t asize) 
         {
-            T* res = this->allocateT<T>(mdata);
-            GC_MEM_COPY(res, src, mdata->datasize);
+            uint8_t* alloc = this->nsalloc.allocateDynamic(asize);
 
-            return res;
-        }
-
-        template<typename T, size_t size>
-        inline T* copyIntoFixedPlus(MetaData* mdata, T* src)
-        {
-            T* res = this->allocateT<T>(mdata);
-            GC_MEM_COPY(res, src, size);
-
-            return res;
+            *((MetaData*)alloc) = mdata;
+            T* res = (T*)(alloc + sizeof(MetaData));
+            
+            return alloc;
         }
 
         void collect()

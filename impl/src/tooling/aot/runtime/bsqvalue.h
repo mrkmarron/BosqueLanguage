@@ -38,7 +38,7 @@ typedef uint8_t BSQBool;
 #define BSQ_ENCODE_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
 #define BSQ_ENCODE_VALUE_TAGGED_INT(I) ((void*)((((uint64_t) I) << 0x3) | 0x4))
 
-#define BSQ_GET_VALUE_TRUTHY(V) ((BSQBool)(((uintptr_t)(V)) & 0x1))
+#define BSQ_GET_VALUE_TRUTHY(UV) ((BSQBool)(((uintptr_t)((UV)->udata)) & 0x1))
 
 #define BSQ_VALUE_NONE nullptr
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(BSQTRUE)
@@ -239,7 +239,7 @@ struct BSQByteBuffer
 };
 struct DisplayFunctor_BSQByteBuffer
 {
-    std::wstring operator()(const BSQByteBuffer* bb) const 
+    std::wstring operator()(const BSQByteBuffer* bb) const
     {
         std::wstring rvals(L"ByteBuffer{");
         rvals += bb->display_contents();
@@ -588,6 +588,43 @@ struct DisplayFunctor_BSQRecord
 };
 void* coerceUnionToBox_BSQRecord(void* uv);
 META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Record, MIRNominalTypeEnum_Record, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQRecord), coerceUnionToBox_BSQRecord, DisplayFunctor_BSQRecord::display, L"Record");
+
+
+struct EqualFunctor_Union
+{
+    inline bool operator()(UnionValue& l, UnionValue& r) const 
+    { 
+        if(l.umeta->nominaltype != r.umeta->nominaltype)
+        {
+            return false;
+        }
+        else
+        {
+            return l.umeta->eq(l.udata, r.udata);
+        }
+    }
+};
+struct LessFunctor_Union
+{
+    inline bool operator()(UnionValue& l, UnionValue& r) const 
+    {
+        if(l.umeta->nominaltype != r.umeta->nominaltype)
+        {
+            return l.umeta->nominaltype < r.umeta->nominaltype;
+        }
+        else
+        {
+            return l.umeta->eq(l.udata, r.udata);
+        }
+    }
+};
+struct DisplayFunctor_Union
+{
+    std::wstring operator()(UnionValue& n) const 
+    { 
+        return n.umeta->displayFP(n.udata); 
+    }
+};
 
 template<int32_t k>
 inline bool checkSubtype(MIRNominalTypeEnum tt, const MIRNominalTypeEnum(&etypes)[k])

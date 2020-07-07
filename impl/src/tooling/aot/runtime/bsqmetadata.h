@@ -51,13 +51,16 @@ enum class MIRNominalTypeEnum
 };
 
 class MetaData;
+struct UnionValue;
+
 typedef const char* RefMask;
 
 typedef size_t (*MemSizeFP)(const MetaData*, void*);
 
 typedef bool (*MetaData_RelationalOpFP)(void*, void*);
 
-typedef void* (*MetaData_UnionOperatorFP)(void*);
+typedef void (*MetaData_UnionBoxOperatorFP)(UnionValue*, void**);
+typedef void (*MetaData_UnionUnBoxOperatorFP)(void**, UnionValue*);
 
 typedef void (*MetaData_GCDecOperatorFP)(const MetaData*, void**);
 typedef void (*MetaData_GCClearMarkOperatorFP)(const MetaData*, void**);
@@ -85,7 +88,8 @@ public:
     MetaData_RelationalOpFP eq;
 
     //inject and extract from union representations
-    MetaData_UnionOperatorFP coerceUnionToBox;
+    MetaData_UnionBoxOperatorFP coerceUnionToBox;
+    MetaData_UnionUnBoxOperatorFP coerceBoxToUnion;
 
     //How to do gc ops on the object
     MetaData_GCDecOperatorFP decObj;

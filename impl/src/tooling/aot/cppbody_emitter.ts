@@ -5,12 +5,13 @@
 
 import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIRFunctionParameter, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType, MIRPCode, MIRRegex } from "../../compiler/mir_assembly";
 import { CPPTypeEmitter } from "./cpptype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey, MIRPackSlice, MIRPackExtend, MIRNominalTypeKey, MIRBinLess, MIRConstantRegex } from "../../compiler/mir_ops";
+import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey, MIRPackSlice, MIRPackExtend, MIRNominalTypeKey, MIRBinLess, MIRConstantRegex, MIRVariable } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
+import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr } from "./type_repr";
+import { compileRegexCppMatch } from "./cpp_regex";
+import { CPPFrame } from "./cpp_frame";
 
 import * as assert from "assert";
-import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr } from "./type_repr";
-import { compileRegexCppMatch } from "./cpp_regex";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -23,6 +24,7 @@ function filenameClean(file: string): string {
 class CPPBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: CPPTypeEmitter;
+    readonly cppframe: CPPFrame;
     
     readonly allPropertyNames: Set<string> = new Set<string>();
     readonly allConstStrings: Map<string, string> = new Map<string, string>();
@@ -51,7 +53,7 @@ class CPPBodyEmitter {
         this.currentRType = typegen.noneType;
     }
 
-    private static cleanStrRepr(s: string): string {
+    private static cleanLiteralStrRepr(s: string): string {
         return "\"" + s.substring(1, s.length - 1) + "\"";
     }
 
@@ -102,18 +104,62 @@ class CPPBodyEmitter {
         }
     }
 
-    generateConstantExp(cval: MIRConstantArgument, into: MIRType): string {
+    generateMoveFromSrcIntoFrame(fvar: MIRRegisterArgument, src: string, srctype: MIRType): string {
+        return this.cppframe.generateMoveFromSrcIntoFrame(this.varToCppName(fvar), this.typegen.getCPPReprFor(this.getArgType(fvar)), src, this.typegen.getCPPReprFor(srctype));
+    }
+
+    generateMoveIntoDstFromFrame(fvar: MIRRegisterArgument, dst: string, dsttype: MIRType): string {
+        return this.cppframe.generateMoveIntoDstFromFrame(this.varToCppName(fvar), dst, this.typegen.getCPPReprFor(dsttype));
+    }
+
+    generateMoveOperation(dst: string, dsttype: MIRType, src: string, srctype: MIRType): string {
+        return this.cppframe.generateMoveOperation(dst, this.typegen.getCPPReprFor(dsttype), src, this.typegen.getCPPReprFor(srctype));
+    }
+
+    generateMoveFromSrcIntoFrameTemp(temptype: MIRType, src: string, srctype: MIRType): {tmp: string, op: string} {
+        const tmp = this.cppframe.generateFreshName();
+        this.cppframe.ensureLocationForVariable(tmp, this.typegen.getCPPReprFor(temptype));
+
+        return {tmp: tmp, op: this.cppframe.generateMoveFromSrcIntoFrame(tmp, this.typegen.getCPPReprFor(temptype), src, this.typegen.getCPPReprFor(srctype))};
+    }
+
+    generateInvokeIntoFrame(fvar: MIRRegisterArgument, inv: MIRInvokeKey, rtype: MIRType, args: string[]): string {
+        const rrepr = this.typegen.getCPPReprFor(rtype);
+        if (!rrepr.isStack || rrepr.isSimpleAssignable) {
+            return this.cppframe.generateMoveOnCallReturn(fvar, `${this.invokenameToCPP(inv)}(${args.join(", ")})`, rtype);
+        }
+        else {
+            args.push(this.cppframe.getExpressionForName(this.varToCppName(fvar)));
+            return `${this.invokenameToCPP(inv)}(${args.join(", ")})`;
+        }
+    }
+
+    generateInvokeIntoFrameTemp(inv: MIRInvokeKey, rtype: MIRType, args: string[]): {tmp: string, op: string} {
+        const tmp = this.cppframe.generateFreshName();
+        this.cppframe.ensureLocationForVariable(tmp, this.typegen.getCPPReprFor(rtype));
+
+        const rrepr = this.typegen.getCPPReprFor(rtype);
+        if (!rrepr.isStack || rrepr.isSimpleAssignable) {
+            return {tmp: tmp, op: this.cppframe.generateMoveOnCallReturn(tmp, `${this.invokenameToCPP(inv)}(${args.join(", ")})`, rrepr)};
+        }
+        else {
+            args.push(this.cppframe.getExpressionForName(tmp));
+            return {tmp: tmp, op: `${this.invokenameToCPP(inv)}(${args.join(", ")})`};
+        }
+    }
+
+    getConstantSrc(cval: MIRConstantArgument): {src: string, stype: MIRType} {
         if (cval instanceof MIRConstantNone) {
-            return this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, into);
+            return {src: "BSQ_VALUE_NONE", stype: this.typegen.noneType};
         }
         else if (cval instanceof MIRConstantTrue) {
-            return this.typegen.coerce("BSQTRUE", this.typegen.boolType, into);
+            return {src: "BSQTRUE", stype: this.typegen.boolType};
         }
         else if (cval instanceof MIRConstantFalse) {
-            return this.typegen.coerce("BSQFALSE", this.typegen.boolType, into);
+            return {src: "BSQFALSE", stype: this.typegen.boolType};
         }
         else if (cval instanceof MIRConstantInt) {
-            return this.typegen.coerce(cval.value, this.typegen.intType, into);
+            return {src: cval.value, stype: this.typegen.intType};
         }
         else if (cval instanceof MIRConstantBigInt) {
             const sname = "BIGINT__" + this.allConstBigInts.size;
@@ -121,23 +167,21 @@ class CPPBodyEmitter {
                 this.allConstBigInts.set(cval.value, sname);
             }
 
-            const bint = `(Runtime::${this.allConstBigInts.get(cval.value) as string})`;
-            return this.typegen.coerce(bint, this.typegen.bigIntType, into);
+            return {src: `&Runtime::${this.allConstBigInts.get(cval.value) as string}`, stype: this.typegen.bigIntType};
         }
         else if (cval instanceof MIRConstantFloat64) {
-            return this.typegen.coerce(cval.digits(), this.typegen.float64Type, into);
+            return {src: cval.digits(), stype: this.typegen.float64Type};
         }
         else if (cval instanceof MIRConstantString) {
             assert(cval instanceof MIRConstantString);
 
-            const sval = CPPBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
+            const sval = CPPBodyEmitter.cleanLiteralStrRepr((cval as MIRConstantString).value);
             const sname = "STR__" + this.allConstStrings.size;
             if (!this.allConstStrings.has(sval)) {
                 this.allConstStrings.set(sval, sname);
             }
 
-            const strval = `(&Runtime::${this.allConstStrings.get(sval) as string})`;
-            return this.typegen.coerce(strval, this.typegen.stringType, into);
+            return {src: `&Runtime::${this.allConstStrings.get(sval) as string}`, stype: this.typegen.stringType};
         }
         else {
             assert(cval instanceof MIRConstantRegex);
@@ -148,17 +192,16 @@ class CPPBodyEmitter {
                 this.allConstRegexes.set(rval, rname);
             }
 
-            const strval = `(&Runtime::${this.allConstRegexes.get(rval) as string})`;
-            return this.typegen.coerce(strval, this.typegen.regexType, into);
+            return {src: `&Runtime::${this.allConstRegexes.get(rval) as string}`, stype: this.typegen.regexType};
         }
     }
 
-    argToCpp(arg: MIRArgument, into: MIRType): string {
+    generateArgSrc(arg: MIRArgument): {src: string, stype: MIRType} {
         if (arg instanceof MIRRegisterArgument) {
-            return this.typegen.coerce(this.varToCppName(arg), this.getArgType(arg), into);
+            return {src: this.cppframe.getExpressionForName(this.varToCppName(arg)), stype: this.getArgType(arg)};
         }
         else {
-            return this.generateConstantExp(arg as MIRConstantArgument, into);
+            return this.getConstantSrc(arg as MIRConstantArgument);
         }
     }
 
@@ -169,10 +212,12 @@ class CPPBodyEmitter {
             return "false";
         }
         else if (this.assembly.subtypeOf(argtype, this.typegen.boolType)) {
-            return this.argToCpp(arg, this.typegen.boolType);
+            return this.generateArgSrc(arg).src;
         }
         else {
-            return `BSQ_GET_VALUE_TRUTHY(${this.varToCppName(arg)})`;
+            assert(this.getArgType(arg) instanceof UnionRepr);
+
+            return `BSQ_GET_VALUE_TRUTHY(${this.generateArgSrc(arg).src}->udata)`;
         }
     }
 
@@ -186,52 +231,58 @@ class CPPBodyEmitter {
             return "false";
         }
         else {
-            return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
+            const arepr = this.getArgType(arg);
+            if(arepr instanceof UnionRepr) {
+                return `BSQ_IS_VALUE_NONE(${this.generateArgSrc(arg).src}->udata)`;
+            }
+            else {
+                assert((arepr instanceof KeyValueRepr) || (arepr instanceof ValueRepr));
+
+                return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
+            }
         }
     }
 
     generateLoadConstSafeString(op: MIRLoadConstSafeString): string {
-        const sval = CPPBodyEmitter.cleanStrRepr(op.ivalue);
+        const sval = CPPBodyEmitter.cleanLiteralStrRepr(op.ivalue);
         const sname = "STR__" + this.allConstStrings.size;
 
         if (!this.allConstStrings.has(sval)) {
             this.allConstStrings.set(sval, sname);
         }
-        const strval = `Runtime::${this.allConstStrings.get(sval) as string}`;
+        const strval = `&(Runtime::${this.allConstStrings.get(sval) as string})`;
 
-        const scopevar = this.varNameToCppName("$scope$");
-        return `${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQSafeString, ${strval}.sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`;
+        return this.generateMoveFromSrcIntoFrame(op.trgt, strval, this.typegen.getMIRType(op.tskey));
     }
 
     generateLoadConstTypedString(op: MIRLoadConstTypedString): string {
-        const sval = CPPBodyEmitter.cleanStrRepr(op.ivalue);
+        const sval = CPPBodyEmitter.cleanLiteralStrRepr(op.ivalue);
         const sname = "STR__" + this.allConstStrings.size;
 
         if (!this.allConstStrings.has(sval)) {
             this.allConstStrings.set(sval, sname);
         }
-        const strval = `Runtime::${this.allConstStrings.get(sval) as string}`;
-
-        const scopevar = this.varNameToCppName("$scope$");
+        const strval = `&(Runtime::${this.allConstStrings.get(sval) as string})`;
 
         let opstrs: string[] = [];
         if(op.pfunckey !== undefined) {
             const pfunc = (this.typegen.assembly.invokeDecls.get(op.pfunckey) || this.typegen.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
             const errtype = this.typegen.getMIRType(op.errtype as MIRResolvedTypeKey);
 
-            const pexp = `${this.invokenameToCPP(op.pfunckey)}(&${strval}, ${scopevar})`;
+            const pexp = `${this.invokenameToCPP(op.pfunckey)}(${strval})`;
+            xxxx;
             const tcexp = this.generateTypeCheck(pexp, this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(pfunc.resultType), errtype);
             opstrs.push(`if(${tcexp}) { BSQ_ABORT("Failed string validation", "${filenameClean(this.currentFile)}", ${op.sinfo.line}); }`);
         }
 
-        opstrs.push(`${this.varToCppName(op.trgt)} =  BSQ_NEW_ADD_SCOPE(${scopevar}, BSQStringOf, ${strval}.sdata, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(op.tskey)});`);
+        opstrs.push(this.generateMoveFromSrcIntoFrame(op.trgt, strval, this.typegen.getMIRType(op.tskey)));
 
         return opstrs.join(" ");
     }
 
     generateAccessConstantValue(cp: MIRAccessConstantValue): string {
         const cdecl = this.assembly.constantDecls.get(cp.ckey) as MIRConstantDecl;
-        const scopevar = this.typegen.getRefCountableStatus(this.typegen.getMIRType(cdecl.declaredType)) !== "no" ? this.varNameToCppName("$scope$") : "";
+
         return `${this.varToCppName(cp.trgt)} = ${this.invokenameToCPP(cdecl.value)}(${scopevar});`;
     }
 

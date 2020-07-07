@@ -16,12 +16,12 @@ const MemoryByteAlignment = 8;
 
 abstract class TypeRepr {
     readonly iskey: boolean;
-    
     readonly base: string;
-    readonly std: string;
+    readonly storage: string;
+    readonly passing: string;
 
     readonly isStack: boolean; //if this must always be stored in our shaddow stack
-    readonly isSimplePtr: boolean; //if this is always a pointer to the value
+    readonly isSimpleAssignable: boolean; //if this is always void* or smaller (then we can just = assign instead of memcopy)
 
     readonly metadataName: string;
     readonly hasPointers: boolean;
@@ -30,13 +30,14 @@ abstract class TypeRepr {
     readonly packedPtrCount: number;
     readonly layoutmask: LayoutMaskEnum[];
 
-    constructor(iskey: boolean, base: string, std: string, isforcedstack: boolean, issimpleptr: boolean, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: LayoutMaskEnum[]) {
+    constructor(iskey: boolean, base: string, storage: string, passing: string, isstack: boolean, issimpleassign: boolean, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: LayoutMaskEnum[]) {
         this.iskey = iskey;
         this.base = base;
-        this.std = std;
+        this.storage = storage;
+        this.passing = passing;
         
-        this.isStack = isforcedstack;
-        this.isSimplePtr = issimpleptr;
+        this.isStack = isstack;
+        this.isSimpleAssignable = issimpleassign;
 
         this.metadataName = metadataName;
         this.hasPointers = hasPointers;
@@ -83,16 +84,19 @@ class RefRepr extends TypeRepr {
 
 class UnionRepr extends TypeRepr {
     readonly oftypes: (NoneRepr | StructRepr | TRRepr | RefRepr)[];
+    readonly datasize: number;
 
-    constructor(iskey: boolean, hasPointers: boolean, realSize: number, alignedSize: number, oftypes: (NoneRepr | StructRepr | RefRepr)[]) {
+    constructor(iskey: boolean, hasPointers: boolean, datasize: number, realSize: number, alignedSize: number, oftypes: (NoneRepr | StructRepr | RefRepr)[]) {
         super(iskey, "UnionValue", "UnionValue", true, false, "[NO META]", hasPointers, realSize, alignedSize, -1, []);
 
         this.oftypes = oftypes;
+        this.datasize = datasize;
     }
 
     static create(oftypes: (NoneRepr | StructRepr | TRRepr | RefRepr)[]): TypeRepr {
         const iskey = oftypes.every((tr) => tr.iskey);
         const hasptrs = oftypes.some((tr) => tr.hasPointers);
+        const datasize = oftypes.reduce((acc, v) => Math.max(acc, (v instanceof RefRepr) ? MemoryByteAlignment : v.alignedSize), 0);
         const realSize = oftypes.reduce((acc, v) => Math.max(acc, (v instanceof RefRepr) ? MemoryByteAlignment : v.realSize), 0) + 4;
         const alignedSize = oftypes.reduce((acc, v) => Math.max(acc, (v instanceof RefRepr) ? MemoryByteAlignment : v.alignedSize), 0) + 4;
 
@@ -113,6 +117,8 @@ class ValueRepr extends TypeRepr {
 }
 
 class EphemeralListRepr extends TypeRepr {
+    readonly elist: TypeRepr[];
+
     constructor(base: string) {
         super(false, base, base, "MIRNominalTypeEnum_Category_Empty");
     }
