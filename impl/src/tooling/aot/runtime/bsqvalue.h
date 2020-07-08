@@ -51,6 +51,7 @@ typedef uint8_t BSQBool;
 
 namespace BSQ
 {
+
 enum class MIRPropertyEnum
 {
     Invalid = 0,
@@ -68,7 +69,7 @@ constexpr const wchar_t* propertyNames[] = {
 //%%PROPERTY_NAMES%%
 };
 
-typedef void* NoneValue;
+typedef void* None;
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -78,6 +79,12 @@ struct UnionValue
 {
     MetaData* umeta;
     void* udata;
+};
+
+
+struct NoneStorage
+{
+    static None home;
 };
 
 struct EqualFunctor_NoneValue
@@ -366,15 +373,15 @@ struct BSQTuple
     }
 
     template <uint16_t idx>
-    inline Value atFixed() const
+    inline Value& atFixed() const
     {
         if (idx < this->count)
         {
-            return *(((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQTuple))) + idx);
+            return ((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQTuple))) + idx;
         }
         else
         {
-            return BSQ_VALUE_NONE;
+            return xxx; //need constexpr
         }
     }
 };

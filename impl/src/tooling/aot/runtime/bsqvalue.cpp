@@ -8,6 +8,8 @@
 
 namespace BSQ
 {
+None NoneStorage::home = nullptr;
+
 void* coerceUnionToBox_RefValue(void* uv)
 {
     UnionValue* ruv = (UnionValue*)uv;
