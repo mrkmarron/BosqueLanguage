@@ -5,44 +5,57 @@
 
 import * as assert from "assert";
 
-import { TypeRepr, StructRepr, RefRepr, KeyValueRepr, UnionRepr, ValueRepr, LayoutMaskEnum, MemoryByteAlignment, TRRepr } from "./type_repr";
+import { TypeRepr, ReprStorageKind } from "./type_repr";
 import { moveCPPValue } from "./cpp_loadstore";
+
+const pointerframe = "$pframe$";
+const valuestructframe = "$vsframe$";
+const generalstructframe = "$gframe$";
 
 abstract class FrameLocation {
     readonly name: string;
+    readonly access: string;
     readonly trepr: TypeRepr;
 
-    constructor(name: string, trepr: TypeRepr) {
+    constructor(name: string, access: string, trepr: TypeRepr) {
         this.name = name;
+        this.access = access;
         this.trepr = trepr;
     }
 }
 
-class NamedLocation extends FrameLocation {
+class ArgLocation extends FrameLocation {
     constructor(name: string, trepr: TypeRepr) {
-        super(name, trepr);
+        super(name, name, trepr);
     }
 }
 
-class StackLocation extends FrameLocation {
-    readonly alignedStart: number;
+class PrimitiveLocation extends FrameLocation {
+    constructor(name: string, trepr: TypeRepr) {
+        super(name, name, trepr);
+    }
+}
 
-    constructor(name: string, trepr: TypeRepr, alignedStart: number) {
-        super(name, trepr);
+class PointerLocation extends FrameLocation {
+    constructor(name: string, trepr: TypeRepr) {
+        super(name, `${pointerframe}.${name}`, trepr);
+    }
+}
 
-        this.alignedStart = alignedStart;
+class ValueStructLocation extends FrameLocation {
+    constructor(name: string, trepr: TypeRepr) {
+        super(name, `${valuestructframe}.${name}`, trepr);
+    }
+}
+
+class GeneralStructLocation extends FrameLocation {
+    constructor(name: string, trepr: TypeRepr) {
+        super(name, `${generalstructframe}.${name}`, trepr);
     }
 }
 
 class CPPFrame {
-    private currentHead = 0;
-    private frameMask: LayoutMaskEnum[] = [];
-
-    private namedArgs: Map<string, NamedLocation> = new Map<string, NamedLocation>();
-    private frameArgs: Map<string, FrameLocation> = new Map<string, NamedLocation>();
-
-    private namedVars: Map<string, NamedLocation> = new Map<string, NamedLocation>();
-    private frameVars: Map<string, FrameLocation> = new Map<string, FrameLocation>();
+    private registeredNames: Map<string, FrameLocation> = new Map<string, FrameLocation>();
 
     private tempnamectr = 0;
     
@@ -50,68 +63,33 @@ class CPPFrame {
         return `$$_${bn || "fresh"}_${this.tempnamectr++}_$$`;
     }
 
+    addArgumentVariable(name: string, trepr: TypeRepr) {
+        this.registeredNames.set(name, new ArgLocation(name, trepr));
+    }
+
     ensureLocationForVariable(name: string, trepr: TypeRepr) {
-        if(!trepr.isStack) {
-            if(!this.namedArgs.has(name) && !this.namedVars.has(name)) {
-                this.namedVars.set(name, new NamedLocation(name, trepr));
+        if(!this.registeredNames.has(name)) {
+            if(trepr.storage === ReprStorageKind.Primitive) {
+                this.registeredNames.set(name, new PrimitiveLocation(name, trepr));
             }
-        }
-        else {
-            if(!this.frameArgs.has(name) && !this.frameVars.has(name)) {
-                this.frameVars.set(name, new StackLocation(name, trepr, this.currentHead));
-
-                if(trepr instanceof StructRepr) {
-                    this.frameMask = [...this.frameMask, ...trepr.layoutmask];
-                    this.currentHead += trepr.alignedSize;
-                }
-                else if(trepr instanceof TRRepr) {
-                    this.frameMask = [...this.frameMask, ...trepr.layoutmask];
-                    this.currentHead += trepr.alignedSize;
-                }
-                else if(trepr instanceof RefRepr) {
-                    this.frameMask.push(LayoutMaskEnum.Ptr);
-                    this.currentHead += MemoryByteAlignment;
-                }
-                else if(trepr instanceof UnionRepr) {
-                    this.frameMask.push(LayoutMaskEnum.Union);
-                    
-                    //the above will mark everything this scans past the size of the enum
-                    for(let i = 0; i < trepr.alignedSize / MemoryByteAlignment; ++i) {
-                        this.frameMask.push(LayoutMaskEnum.Scalar);
-                    }
-
-                    this.currentHead += trepr.alignedSize;
-                }
-                else if(trepr instanceof KeyValueRepr) {
-                    this.frameMask.push(LayoutMaskEnum.Ptr);
-                    this.currentHead += MemoryByteAlignment;
-                }
-                else if(trepr instanceof ValueRepr) {
-                    this.frameMask.push(LayoutMaskEnum.Ptr);
-                    this.currentHead += MemoryByteAlignment;
-                }
-                else {
-                    assert(false);
-                }
+            else if(trepr.storage === ReprStorageKind.Pointer) {
+                this.registeredNames.set(name, new PointerLocation(name, trepr));
+            }
+            else if(trepr.storage === ReprStorageKind.ValueStruct) {
+                this.registeredNames.set(name, new ValueStructLocation(name, trepr));
+            }
+            else {
+                this.registeredNames.set(name, new GeneralStructLocation(name, trepr));
             }
         }
     }
 
     getTypeReprForName(name: string): TypeRepr {
-        return ((this.namedArgs.get(name) || this.frameArgs.get(name) || this.namedVars.get(name) || this.frameVars.get(name)) as FrameLocation).trepr;
+        return (this.registeredNames.get(name) as FrameLocation).trepr;
     }
 
     getExpressionForName(name: string): string {
-        if (this.namedArgs.has(name) || this.namedVars.has(name)) {
-            return name;
-        }
-        else if (this.frameArgs.has(name)) {
-            return name;
-        }
-        else {
-            const sl = this.frameVars.get(name) as StackLocation;
-            return `((${sl.trepr.storage}*)($sp$ + ${sl.alignedStart}))`;
-        }
+        return (this.registeredNames.get(name) as FrameLocation).access;
     }
 
     generateMoveFromSrcIntoFrame(name: string, nrepr: TypeRepr, src: string, srepr: TypeRepr): string {
@@ -136,15 +114,6 @@ class CPPFrame {
 
         const sl = this.frameVars.get(name) as StackLocation;
         return `*((${sl.trepr.base}**)($sp$ + ${sl.alignedStart})) = ${allocsrc};`;
-    }
-
-    addArgumentVariable(name: string, trepr: TypeRepr) {
-        if(!trepr.isStack) {
-            this.namedArgs.set(name, new NamedLocation(name, trepr));
-        }
-        else {
-            this.frameArgs.set(name, new NamedLocation(name, trepr));
-        }
     }
 }
 

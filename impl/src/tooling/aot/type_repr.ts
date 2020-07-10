@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
+import { MIRType } from "../../compiler/mir_assembly";
 
 enum LayoutMaskEnum {
     End = 0,
@@ -12,43 +13,58 @@ enum LayoutMaskEnum {
     Union = 4
 };
 
-const MemoryByteAlignment = 8;
+const StorageByteAlignment = 8;
+
+enum ReprStorageKind
+{
+    Primitive,
+    Pointer,
+    ValueStruct,
+    GeneralStruct
+}
 
 abstract class TypeRepr {
-    readonly iskey: boolean;
-    readonly base: string;
-    readonly storage: string;
-    readonly passing: string;
+    readonly mirtype: MIRType;
 
-    readonly isStack: boolean; //if this must always be stored in our shaddow stack
-    readonly isSimpleAssignable: boolean; //if this is always void* or smaller (then we can just = assign instead of memcopy)
+    readonly iskey: boolean;
+    readonly basetype: string;
+    readonly storagetype: string;
+    readonly passingtype: string;
+
+    readonly storage: ReprStorageKind;
 
     readonly metadataName: string;
-    readonly hasPointers: boolean;
     readonly realSize: number;
     readonly alignedSize: number;
     readonly packedPtrCount: number;
     readonly layoutmask: LayoutMaskEnum[];
 
-    constructor(iskey: boolean, base: string, storage: string, passing: string, isstack: boolean, issimpleassign: boolean, metadataName: string, hasPointers: boolean, realSize: number, alignedSize: number, packedPtrCount: number, layoutmask: LayoutMaskEnum[]) {
+    constructor(mirtype: MIRType, iskey: boolean, basetype: string, storagetype: string, storage: ReprStorageKind, metadataName: string, realSize: number, packedPtrCount: number, layoutmask: LayoutMaskEnum[]) {
+        this.mirtype = mirtype;
+
         this.iskey = iskey;
-        this.base = base;
-        this.storage = storage;
-        this.passing = passing;
+        this.basetype = basetype;
+        this.storagetype = storagetype;
+        this.passingtype = this.storagetype + (storage !== ReprStorageKind.Primitive ? "&" : "");
         
-        this.isStack = isstack;
-        this.isSimpleAssignable = issimpleassign;
+        this.storage = storage;
 
         this.metadataName = metadataName;
-        this.hasPointers = hasPointers;
         this.realSize = realSize;
-        this.alignedSize = alignedSize;
+        this.alignedSize = (((this.realSize) + 0x7) & 0xFFFFFFFFFFFC);
+
         this.packedPtrCount = packedPtrCount;
         this.layoutmask = layoutmask;
     }
 }
 
 class NoneRepr extends TypeRepr {
+    constructor() {
+        super(true, "NoneValue", "NoneValue", false, true, "MetaData_None", false, MemoryByteAlignment, MemoryByteAlignment, -1, [LayoutMaskEnum.Scalar]);
+    }
+}
+
+class PrimitiveRepr extends TypeRepr {
     constructor() {
         super(true, "NoneValue", "NoneValue", false, true, "MetaData_None", false, MemoryByteAlignment, MemoryByteAlignment, -1, [LayoutMaskEnum.Scalar]);
     }
@@ -63,13 +79,10 @@ class StructRepr extends TypeRepr {
 }
 
 class TRRepr extends TypeRepr {
-    readonly isTuple: boolean;
-    readonly isRecord: boolean;
-
+    readonly kind: "tuple" | "record";
+    readonly elemcount: number;
+    
     constructor(iskey: boolean, base: string, boxed: string, nominaltype: string, categoryinfo: string) {
-        //
-        //todo -- size here is the BSQX size + the data elements size
-        //
         super(iskey, base, base, categoryinfo);
         this.boxed = boxed;
         this.nominaltype = nominaltype;
@@ -172,7 +185,7 @@ function joinTypeReprs(...trl: TypeRepr[]): TypeRepr {
 }
 
 export {
-    LayoutMaskEnum, TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
+    ReprStorageKind, LayoutMaskEnum, TypeRepr, NoneRepr, PrimitiveRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, ValueRepr, EphemeralListRepr,
     joinTypeReprs,
-    MemoryByteAlignment
+    StorageByteAlignment
 };

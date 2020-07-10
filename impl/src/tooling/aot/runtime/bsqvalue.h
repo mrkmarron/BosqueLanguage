@@ -24,25 +24,25 @@ typedef uint8_t BSQBool;
 
 #define INT_OOF_BOUNDS(X) (((X) < MIN_BSQ_INT) | ((X) > MAX_BSQ_INT))
 
-#define BSQ_IS_VALUE_NONE(V) ((V) == nullptr)
-#define BSQ_IS_VALUE_NONNONE(V) ((V) != nullptr)
-
 #define BSQ_IS_VALUE_BOOL(V) ((((uintptr_t)(V)) & 0x2) == 0x2)
 #define BSQ_IS_VALUE_TAGGED_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x4)
-#define BSQ_IS_VALUE_PTR(V) ((((uintptr_t)(V)) & 0x7) == 0)
 
 #define BSQ_GET_VALUE_BOOL(V) ((BSQBool)(((uintptr_t)(V)) & 0x1))
 #define BSQ_GET_VALUE_TAGGED_INT(V) (int64_t)(((int64_t)(V)) >> 0x3)
-#define BSQ_GET_VALUE_PTR(V, T) (reinterpret_cast<T*>(V))
 
 #define BSQ_ENCODE_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
 #define BSQ_ENCODE_VALUE_TAGGED_INT(I) ((void*)((((uint64_t) I) << 0x3) | 0x4))
 
 #define BSQ_GET_VALUE_TRUTHY(UV) ((BSQBool)(((uintptr_t)((UV)->udata)) & 0x1))
 
-#define BSQ_VALUE_NONE nullptr
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(BSQTRUE)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(BSQFALSE)
+
+typedef uint64_t None;
+typedef void* NoneValue;
+
+#define BSQ_NONE 0
+#define BSQ_NONE_VALUE nullptr
 
 #define META_DATA_DECLARE_SPECIAL_BUFFER(NAME, TYPE, DSTR) META_DATA_DECLARE_PTR_PACKED(NAME, TYPE, DATA_KIND_CLEAR_FLAG, sizeof(BSQBuffer), 1, coerceUnionToBox_RefValue, DisplayFunctor_BSQByteBuffer::display, DSTR)
 
@@ -69,22 +69,97 @@ constexpr const wchar_t* propertyNames[] = {
 //%%PROPERTY_NAMES%%
 };
 
-typedef void* None;
 typedef void* KeyValue;
 typedef void* Value;
 
-void* coerceUnionToBox_RefValue(void* uv);
-
+template <uint16_t k>
 struct UnionValue
 {
     MetaData* umeta;
-    void* udata;
-};
+    uint8_t udata[k];
 
+    template <uint16_t j>
+    inline static void convert(const UnionValue& from, UnionValue& into)
+    {
+        into.umeta = from.umeta;
+        GC_MEM_COPY(into.udata, from.udata, std::min(k, j));
+    }
+
+    inline static void convertToUnionNone(MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+    }
+
+    template <typename T>
+    inline static void convertToUnionPrimitive(T from, MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+        *((T*)into.udata) = from;
+    }
+
+    template <typename T>
+    inline static void convertToUnionPointer(T* from, MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+        *((T**)into.udata) = from;
+    }
+
+    template <typename T>
+    inline static void convertToUnionStruct(const T& from, MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+        GC_MEM_COPY(into.udata, (uint8_t*)(&from), mdata->datasize);
+    }
+
+    template <typename T>
+    inline static void convertToUnionTuple(const T& from, MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+        GC_MEM_COPY(into.udata, (uint8_t*)(&from), mdata->computeMemorySize(mdata, &from));
+    }
+
+    template <typename T>
+    inline static void convertToUnionRecord(const T& from, MetaData* mdata, UnionValue& into)
+    {
+        into.umeta = mdata;
+        GC_MEM_COPY(into.udata, (uint8_t*)(&from), mdata->computeMemorySize(mdata, &from));
+    }
+
+    template <typename T>
+    inline static T extractFromUnionPrimitive(const UnionValue& from)
+    {
+        return *((T*)into.udata);
+    }
+
+    template <typename T>
+    inline static T* extractFromUnionPointer(const UnionValue& from)
+    {
+        return *((T**)into.udata);
+    }
+
+    template <typename T>
+    inline static void extractFromUnionStruct(const UnionValue& from, T& into)
+    {
+        GC_MEM_COPY(&into, from.udata, from.mdata->datasize);
+    }
+
+    template <typename T>
+    inline static void extractFromUnionTuple(const UnionValue& from, T& into)
+    {
+        GC_MEM_COPY(&into, from.udata, from.umeta->computeMemorySize(from.umeta, from.udata));
+    }
+
+    template <typename T>
+    inline static void extractFromUnionRecord(const UnionValue& from, T& into)
+    {
+        GC_MEM_COPY(&into, from.udata, from.umeta->computeMemorySize(from.umeta, from.udata));
+    }
+};
 
 struct NoneStorage
 {
-    static None home;
+    static None nhome;
+    static NoneValue nvhome;
 };
 
 struct EqualFunctor_NoneValue
@@ -138,7 +213,6 @@ struct DisplayFunctor_BSQBool
     std::wstring operator()(BSQBool b) const { return b ? L"true" : L"false"; }
     static std::wstring display(void* v) { return DisplayFunctor_BSQBool{}(BSQ_GET_VALUE_BOOL(v)); }
 };
-void* coerceUnionToBox_BSQBool(void* uv);
 META_DATA_DECLARE_NO_PTR_KEY(MetaData_Bool, MIRNominalTypeEnum_Bool, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBool)), LessFunctor_BSQBool::less, EqualFunctor_BSQBool::eq, coerceUnionToBox_BSQBool, DisplayFunctor_BSQBool::display, L"Bool");
 
 struct EqualFunctor_int64_t
@@ -156,7 +230,6 @@ struct DisplayFunctor_int64_t
     std::wstring operator()(int64_t i) const { return std::to_wstring(i); }
     static std::wstring display(void* v) { return DisplayFunctor_int64_t{}(BSQ_GET_VALUE_TAGGED_INT(v)); }
 };
-void* coerceUnionToBox_int64_t(void* uv);
 META_DATA_DECLARE_NO_PTR_KEY(MetaData_Int, MIRNominalTypeEnum_Int, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(int64_t)), LessFunctor_int64_t::less, EqualFunctor_int64_t::eq, coerceUnionToBox_int64_t, DisplayFunctor_int64_t::display, L"Int");
 
 struct DisplayFunctor_double
@@ -164,7 +237,6 @@ struct DisplayFunctor_double
     std::wstring operator()(double d) const { return std::to_wstring(d); }
     static std::wstring display(void* v) { return DisplayFunctor_double{}(*((double*)v)); }
 };
-void* coerceUnionToBox_double(void* uv);
 META_DATA_DECLARE_NO_PTR(MetaData_Float64, MIRNominalTypeEnum_Float64, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(double)), coerceUnionToBox_double, DisplayFunctor_double::display, L"Float64");
 
 MetaData* getMetaData(void* v);
@@ -320,7 +392,6 @@ struct DisplayFunctor_BSQISOTime
     std::wstring operator()(const BSQISOTime& t) const { return std::wstring{L"ISOTime={"} + std::to_wstring(t.isotime) + L"}";}
     static std::wstring display(void* v) { return DisplayFunctor_BSQISOTime{}(*((BSQISOTime*)v)); }
 };
-void* coerceUnionToBox_BSQISOTime(void* uv);
 META_DATA_DECLARE_NO_PTR(MetaData_ISOTime, MIRNominalTypeEnum_ISOTime, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQISOTime)), coerceUnionToBox_BSQISOTime, DisplayFunctor_BSQISOTime::display, L"ISOTime");
 
 struct BSQRegex
@@ -332,26 +403,42 @@ struct DisplayFunctor_BSQRegex
     std::wstring operator()(const BSQRegex& r) const { return L"[REGEX]"; }
     static std::wstring display(void* v) { return DisplayFunctor_BSQRegex{}(*((BSQRegex*)v)); }
 };
-void* coerceUnionToBox_BSQRegex(void* uv);
 META_DATA_DECLARE_NO_PTR(MetaData_Regex, MIRNominalTypeEnum_Regex, DATA_KIND_CLEAR_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQRegex)), coerceUnionToBox_BSQRegex, DisplayFunctor_BSQRegex::display, L"Regex");
 
+template <uint16_t k>
 struct BSQTuple
 {
     size_t count;
     DATA_KIND_FLAG flag;
+    Value entries[k];
 
-    template <size_t count, DATA_KIND_FLAG flag>
-    inline static void createFromSingle(BSQTuple* into, std::initializer_list<Value> values)
-    {
-        into->count = count;
-        into->flag = flag;
+    template <uint16_t j>
+    inline static void convert(const BSQTuple<k>& from, BSQTuple<j>& into) {
+        into.count = from.count;
+        into.flag = from.flag;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQTuple));
-        std::copy(values.begin(), values.end(), tcurr);
+        std::copy(from.entries, from.entries + std::min(j, k), into.entries);
     }
 
-    template <size_t count>
-    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQTuple* into, std::initializer_list<Value> values)
+    inline static void boxTuple(MetaData* mdata, BSQTuple& from, Value& into) {
+       into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQTuple>(mdata, &from);
+    }
+
+    inline static void unboxTuple(Value from, BSQTuple& into) {
+        GC_MEM_COPY(&into, from, GET_TYPE_META_DATA(from)->computeMemorySize(GET_TYPE_META_DATA(from), from));
+    }
+
+    template <DATA_KIND_FLAG flag>
+    inline static void createFromSingle(BSQTuple& into, std::initializer_list<Value> values)
+    {
+        into->count = k;
+        into->flag = flag;
+
+        std::copy(values.begin(), values.end(), into.entries);
+    }
+
+    template <>
+    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQTuple& into, std::initializer_list<Value> values)
     {
         auto fv = flag;
         for(size_t i = 0; i < values.size(); ++i)
@@ -359,11 +446,10 @@ struct BSQTuple
             fv &= getDataKindFlag(values[i]);
         }
 
-        into->count = count;
+        into->count = k;
         into->flag = flag;
 
-        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQTuple));
-        std::copy(values.begin(), values.end(), tcurr);
+        std::copy(values.begin(), values.end(), into.entries);
     }
 
     template <uint16_t idx>
@@ -377,11 +463,11 @@ struct BSQTuple
     {
         if (idx < this->count)
         {
-            return ((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQTuple))) + idx;
+            return this->entries[idx];
         }
         else
         {
-            return xxx; //need constexpr
+            return NoneStorage::nvhome;
         }
     }
 };
@@ -409,7 +495,6 @@ struct DisplayFunctor_BSQTuple
         return DisplayFunctor_BSQTuple{}(*((BSQTuple*)v)); 
     }
 };
-void* coerceUnionToBox_BSQTuple(void* uv);
 META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Tuple, MIRNominalTypeEnum_Tuple, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQTuple), coerceUnionToBox_BSQTuple, DisplayFunctor_BSQTuple::display, L"Tuple");
 
 class BSQDynamicPropertySetEntry
@@ -447,6 +532,23 @@ struct BSQRecord
     static BSQDynamicPropertySetEntry emptyDynamicPropertySetEntry;
 
     static BSQDynamicPropertySetEntry* getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext);
+
+    template <uint16_t j>
+    inline static void convert(const BSQRecord<k>& from, BSQRecord<j>& into) {
+        into.count = from.count;
+        into.properties = from.properties;
+        into.flag = from.flag;
+
+        std::copy(from.entries, from.entries + std::min(j, k), into.entries);
+    }
+
+    inline static void boxRecord(MetaData* mdata, BSQRecord& from, Value& into) {
+        into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQRecord>(mdata, &from);
+    }
+
+    inline static void unboxRecord(Value from, BSQRecord& into) {
+        GC_MEM_COPY(&into, from, GET_TYPE_META_DATA(from)->computeMemorySize(GET_TYPE_META_DATA(from), from));
+    }
 
     template <size_t count, DATA_KIND_FLAG flag>
     inline static BSQRecord createFromSingle(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
@@ -593,7 +695,6 @@ struct DisplayFunctor_BSQRecord
         return DisplayFunctor_BSQRecord{}(*((BSQRecord*)v)); 
     }
 };
-void* coerceUnionToBox_BSQRecord(void* uv);
 META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Record, MIRNominalTypeEnum_Record, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQRecord), coerceUnionToBox_BSQRecord, DisplayFunctor_BSQRecord::display, L"Record");
 
 

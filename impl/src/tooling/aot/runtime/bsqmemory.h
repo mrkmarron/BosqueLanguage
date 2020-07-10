@@ -318,39 +318,39 @@ namespace BSQ
             }
         }
 
-        //Return uint8_t* of given asize + sizeof(MetaData)
-        //If it is a large alloc then the RCMeta is just before the return pointer 
-        inline uint8_t* allocateDynamic(size_t asize)
+        template <uint16_t required>
+        inline void ensureSpace()
+        {
+            if (this->m_currPos + required > this->m_endPos)
+            {
+                this->gc.collect();
+            }
+        }
+
+        template <size_t asize>
+        inline uint8_t* allocateSafe()
+        {
+            constexpr size_t rsize = asize + sizeof(MetaData);
+            assert(this->m_currPos + rsize <= this->m_endPos);
+            MEM_STATS_OP(this->totalalloc += rsize);
+
+            uint8_t* res = this->m_currPos;
+            this->m_currPos += rsize;
+
+            return res;
+        }
+
+        //Return uint8_t* of given asize + sizeof(MetaData) -- must check that this does not require a GC
+        inline uint8_t* allocateSafeDynamic(size_t asize)
         {
             size_t rsize = asize + sizeof(MetaData);
+            assert(this->m_currPos + rsize <= this->m_endPos);
+            MEM_STATS_OP(this->totalalloc += rsize);
 
-            if (rsize <= BSQ_ALLOC_LARGE_BLOCK_SIZE)
-            {
-                MEM_STATS_OP(this->totalalloc += rsize);
+            uint8_t* res = this->m_currPos;
+            this->m_currPos += rsize;
 
-                if (this->m_currPos + rsize > this->m_endPos)
-                {
-                    this->gc.collect();
-                }
-
-                uint8_t* res = this->m_currPos;
-                this->m_currPos += rsize;
-
-                return res;
-            }
-            else
-            {
-                size_t tsize = sizeof(RCMeta) + rsize;
-                MEM_STATS_OP(this->totalalloc += tsize);
-
-                uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
-                GC_MEM_ZERO(rr, tsize);
-
-                *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
-                this->m_largeallocs[rr] = asize;
-
-                return (rr + sizeof(RCMeta));
-            }
+            return res;
         }
     };
 
@@ -782,10 +782,10 @@ namespace BSQ
             constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
 
-            *((MetaData*)alloc) = mdata;
+            *((MetaData**)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
             
-            return alloc;
+            return res;
         }
 
         template <typename T, typename U>
@@ -796,21 +796,69 @@ namespace BSQ
     
             uint8_t* alloc = this->nsalloc.allocateSizePlus<asize>(csize, (uint8_t**)contents);
 
-            *((MetaData*)alloc) = mdata;
+            *((MetaData**)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
             
-            return alloc;
+            return res;
         }
 
-        template<typename T>
-        inline T* allocateTDynamic(MetaData* mdata, size_t asize) 
+        template <uint16_t required>
+        inline void ensureSpace()
         {
-            uint8_t* alloc = this->nsalloc.allocateDynamic(asize);
+            if (this->m_currPos + required > this->m_endPos)
+            {
+                this->gc.collect();
+            }
+        }
 
-            *((MetaData*)alloc) = mdata;
+        template <typename T>
+        inline T* allocateSafe(MetaData* mdata)
+        {
+            uint8_t* alloc = this->nsalloc.allocateSafeDynamic(asize);
+
+            *((MetaData**)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
             
-            return alloc;
+            return res;
+        }
+
+        //Return uint8_t* of given asize + sizeof(MetaData) -- must check that this does not require a GC
+        inline uint8_t* allocateSafeDynamic(size_t asize, MetaData* mdata)
+        {
+            uint8_t* alloc = this->nsalloc.allocateSafeDynamic(asize);
+
+            *((MetaData**)alloc) = mdata;
+            uint8_t* res = alloc + sizeof(MetaData);
+            
+            return res;
+        }
+
+        template <typename T>
+        inline T* allocateSafePrimitive(MetaData* mdata, T val)
+        {
+            T* res = this->allocateSafe<T>(mdata);
+            *res = val;
+            
+            return res;
+        }
+
+        template <typename T>
+        inline T* allocateSafeStruct(MetaData* mdata, T& val)
+        {
+            T* res = this->allocateSafe<T>(mdata);
+            *res = val;
+            
+            return res;
+        }
+
+        template <typename T>
+        inline T* allocateSafeDynamicCopy(MetaData* mdata, void* val)
+        {
+            size_t bytes = mdata->computeMemorySize(mdata, val);
+            uint8_t* alloc = this->allocateSafeDynamic(bytes, mdata);
+            GC_MEM_COPY(alloc, val, bytes);
+
+            return (T*)res;
         }
 
         void collect()

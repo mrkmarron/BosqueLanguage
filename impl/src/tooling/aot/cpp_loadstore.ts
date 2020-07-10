@@ -3,9 +3,317 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, EphemeralListRepr } from "./type_repr";
+import { TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, EphemeralListRepr, ValueRepr, PrimitiveRepr } from "./type_repr";
 
 import * as assert from "assert";
+
+enum CoerceKind {
+    None,
+    Direct,
+    Convert,
+    Construct
+}
+
+function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind: CoerceKind, alloc: number} {
+    if(trfrom.mirtype.trkey === trinto.mirtype.trkey) {
+        return {kind: CoerceKind.None, alloc: 0};
+    }
+
+    if(trfrom instanceof KeyValueRepr && trinto instanceof KeyValueRepr) {
+        return {kind: CoerceKind.None, alloc: 0};
+    }
+
+    if(trfrom instanceof ValueRepr && trinto instanceof ValueRepr) {
+        return {kind: CoerceKind.None, alloc: 0};
+    }
+
+    if (trfrom instanceof NoneRepr) {
+        assert(!(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+
+        if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+    }
+    else if (trfrom instanceof PrimitiveRepr) {
+        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+
+        if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            if(trinto.basetype === "double") {
+                return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+            }
+            else {
+                return {kind: CoerceKind.Direct, alloc: 0};
+            }
+        }
+    }
+    else if (trfrom instanceof StructRepr) {
+        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+
+        if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+        }
+    }
+    else if (trfrom instanceof TRRepr) {
+        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+        
+        if(trinto instanceof TRRepr) {
+            if (trinto.alignedSize === trfrom.alignedSize) {
+                return {kind: CoerceKind.None, alloc: 0}; //types may differ but if the number of slots is the same then we can just reuse
+            }
+            else {
+                return {kind: CoerceKind.Convert, alloc: 0};
+            }
+        }
+        else if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+        }
+    }
+    else if (trfrom instanceof RefRepr) {
+        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+
+        if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+    }
+    else if(trfrom instanceof UnionRepr) {
+        if(trinto instanceof NoneRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if(trinto instanceof PrimitiveRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if(trinto instanceof StructRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if(trinto instanceof TRRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if(trinto instanceof RefRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if(trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+        }
+    }
+    else if (trfrom instanceof KeyValueRepr) {
+        if (trinto instanceof NoneRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if(trinto instanceof PrimitiveRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if (trinto instanceof StructRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if(trinto instanceof TRRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if (trinto instanceof RefRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+    }
+    else {
+        if (trinto instanceof NoneRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if(trinto instanceof PrimitiveRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if (trinto instanceof StructRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if(trinto instanceof TRRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: 0};
+        }
+        else if (trinto instanceof RefRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+    }
+}
+
+function coerceDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof NoneRepr) {
+        return "BSQ_NONE_VALUE";
+    }
+    else if (trfrom instanceof PrimitiveRepr) {
+        if(trinto.basetype === "BSQBool") {
+            return `BSQ_ENCODE_VALUE_BOOL(${exp})`;
+        }
+        else {
+            return `BSQ_ENCODE_VALUE_TAGGED_INT(${exp})`;
+        }
+    }
+    else if (trfrom instanceof RefRepr) {
+        return exp;
+    }
+    else if(trfrom instanceof UnionRepr) {
+        if(trinto instanceof NoneRepr) {
+            return "BSQ_NONE";
+        }
+        else if (trinto instanceof PrimitiveRepr) {
+            return `${trfrom.basetype}::extractFromUnionPrimitive<${trinto.basetype}>(${exp})`;
+        }
+        else {
+            return `${trfrom.basetype}::extractFromUnionPointer<${trinto.basetype}>(${exp})`;
+        }
+    }
+    else if (trfrom instanceof KeyValueRepr) {
+        if (trinto instanceof NoneRepr) {
+            return "BSQ_NONE";
+        }
+        else if(trinto instanceof PrimitiveRepr) {
+            if(trinto.basetype === "BSQBool") {
+                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            }
+            else {
+                return `BSQ_GET_VALUE_TAGGED_INT(${exp})`;
+            }
+        }
+        else if (trinto instanceof RefRepr) {
+            return `(${trinto.storagetype})${exp}`;
+        }
+        else {
+            return exp;
+        }
+    }
+    else {
+        if (trinto instanceof NoneRepr) {
+            return "BSQ_NONE";
+        }
+        else if(trinto instanceof PrimitiveRepr) {
+            if(trinto.basetype === "BSQBool") {
+                return `BSQ_GET_VALUE_BOOL(${exp})`;
+            }
+            else if (trinto.basetype === "int64_t") {
+                return `BSQ_GET_VALUE_TAGGED_INT(${exp})`;
+            }
+            else {
+                return `*((double*)${exp})`;
+            }
+        }
+        else if (trinto instanceof RefRepr) {
+            return `(${trinto.storagetype})${exp}`;
+        }
+        else {
+            return `(KeyValue)${exp}`;
+        }
+    }
+}
+
+function coerceConvert(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof NoneRepr) {
+        return `${trinto.basetype}::convertToUnionNone(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+    }
+    else if (trfrom instanceof PrimitiveRepr) {
+        return `${trinto.basetype}::convertToUnionPrimitive<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+    }
+    else if (trfrom instanceof StructRepr) {
+        return `${trinto.basetype}::convertToUnionStruct<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+    }
+    else if (trfrom instanceof TRRepr) {
+        if(trfrom.kind === "tuple") {
+            if(trinto instanceof TRRepr) {
+                return `${trinto.basetype}::convert<${trinto.elemcount}>(${exp}, ${trgt});`;
+            }
+            else {
+                return `${trinto.basetype}::convertToUnionTuple<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+            }
+        }
+        else {
+            if(trinto instanceof TRRepr) {
+                return `${trinto.basetype}::convert<${trinto.elemcount}>(${exp}, ${trgt});`;
+            }
+            else {
+                return `${trinto.basetype}::convertToUnionRecord<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+            }
+        }
+    }
+    else if (trfrom instanceof RefRepr) {
+        return `${trinto.basetype}::convertToUnionPointer<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
+    }
+    else if(trfrom instanceof UnionRepr) {
+        if(trinto instanceof StructRepr) {
+            return `${trfrom.basetype}::extractFromUnionStruct<${trinto.basetype}>(${exp}, ${trgt});`;
+        }
+        else if(trinto instanceof TRRepr) {
+            if(trinto.kind === "tuple") {
+                return `${trfrom.basetype}::extractFromUnionTuple<${trinto.basetype}>(${exp}, ${trgt});`;
+            }
+            else {
+                return `${trfrom.basetype}::extractFromUnionRecord<${trinto.basetype}>(${exp}, ${trgt});`;
+            }
+        }
+        else {
+            return `${trfrom.basetype}::convert<${(trinto as UnionRepr).datasize}>(${exp}, ${trgt});`;
+        }
+    }
+    else {
+        if (trinto instanceof StructRepr) {
+            return `GC_MEM_COPY(&${trgt}, ${exp}, GET_TYPE_META_DATA(&${exp})->datasize);`
+        }
+        else if(trinto instanceof TRRepr) {
+            if(trinto.kind === "tuple") {
+                return `${trinto.basetype}::unboxTuple(${exp}, ${trgt});`;
+            }
+            else {
+                return `${trinto.basetype}::unboxRecord(${exp}, ${trgt});`;
+            }
+        }
+        else {
+            return `GET_TYPE_META_DATA(&${exp})->unionUnboxFromVal(${exp}, &${trgt});`;
+        }
+    }
+}
+
+function coerceConstruct(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof PrimitiveRepr) {
+        return `${trgt} = Allocator::GlobalAllocator.allocateSafePrimitive<${trfrom.basetype}>(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+    }
+    else if (trfrom instanceof StructRepr) {
+        return `${trgt} = Allocator::GlobalAllocator.allocateSafeStruct<${trfrom.basetype}>(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+    }
+    else if (trfrom instanceof TRRepr) {
+        if (trfrom.kind === "tuple") {
+            return `${trfrom.basetype}::boxTuple(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp}, ${trgt});`;
+        }
+        else {
+            return `${trfrom.basetype}::boxRecord(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp}, ${trgt});`;
+        }
+    }
+    else {
+        return `${trgt} = GET_TYPE_META_DATA(&${exp})->unionBoxFromVal(${exp});`;
+    }
+}
 
 function coercePrimitive(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
     if (trfrom instanceof NoneRepr) {
@@ -19,6 +327,16 @@ function coercePrimitive(trgt: string, exp: string, trfrom: TypeRepr, trinto: Ty
         }
         else {
             return `*${trgt} = ((Value)BSQ_VALUE_NONE);`;
+        }
+    }
+    else if (trfrom instanceof PrimitiveRepr) {
+        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+
+        if (trinto instanceof UnionRepr) {
+            return {kind: CoerceKind.Convert, alloc: false};
+        }
+        else {
+            return {kind: CoerceKind.Direct, alloc: false};
         }
     }
     else if (trfrom instanceof StructRepr) {

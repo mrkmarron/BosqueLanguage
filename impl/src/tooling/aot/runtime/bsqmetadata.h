@@ -10,7 +10,7 @@
 #include <string>
 
 //Note POD => API
-typedef uint32_t DATA_KIND_FLAG;
+typedef size_t DATA_KIND_FLAG;
 #define DATA_KIND_CLEAR_FLAG 0x0
 #define DATA_KIND_API_FLAG 0x1
 #define DATA_KIND_POD_FLAG 0x3
@@ -51,7 +51,6 @@ enum class MIRNominalTypeEnum
 };
 
 class MetaData;
-struct UnionValue;
 
 typedef const char* RefMask;
 
@@ -59,12 +58,12 @@ typedef size_t (*MemSizeFP)(const MetaData*, void*);
 
 typedef bool (*MetaData_RelationalOpFP)(void*, void*);
 
-typedef void (*MetaData_UnionBoxOperatorFP)(UnionValue*, void**);
-typedef void (*MetaData_UnionUnBoxOperatorFP)(void**, UnionValue*);
-
 typedef void (*MetaData_GCDecOperatorFP)(const MetaData*, void**);
 typedef void (*MetaData_GCClearMarkOperatorFP)(const MetaData*, void**);
 typedef void (*MetaData_GCProcessOperatorFP)(const MetaData*, void**);
+
+typedef void* (*MetaData_UnionBoxToValue)(void*);
+typedef void (*MetaData_UnionUnboxFromValue)(void*, void*);
 
 typedef std::wstring (*MetaData_DisplayFP)(void* obj);
 
@@ -87,10 +86,6 @@ public:
     MetaData_RelationalOpFP less;
     MetaData_RelationalOpFP eq;
 
-    //inject and extract from union representations
-    MetaData_UnionBoxOperatorFP coerceUnionToBox;
-    MetaData_UnionUnBoxOperatorFP coerceBoxToUnion;
-
     //How to do gc ops on the object
     MetaData_GCDecOperatorFP decObj;
     MetaData_GCClearMarkOperatorFP clearObj;
@@ -103,6 +98,10 @@ public:
 
     //true if this may have reference fields that need to be processed
     bool hasRefs;
+
+    //If the representation is tagged (bool or int) or pointer (ref types) in Value representation
+    MetaData_UnionBoxToValue unionBoxToVal;
+    MetaData_UnionUnboxFromValue unionUnboxFromVal;
 
     template <bool isRoot>
     inline MetaData_GCProcessOperatorFP getProcessFP() const

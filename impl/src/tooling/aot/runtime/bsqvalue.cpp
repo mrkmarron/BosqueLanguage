@@ -8,60 +8,8 @@
 
 namespace BSQ
 {
-None NoneStorage::home = nullptr;
-
-void* coerceUnionToBox_RefValue(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return ruv->udata;
-}
-void* coerceUnionToBox_BSQBool(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return BSQ_ENCODE_VALUE_BOOL(ruv->udata);
-}
-void* coerceUnionToBox_int64_t(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return BSQ_ENCODE_VALUE_TAGGED_INT(ruv->udata);
-}
-void* coerceUnionToBox_double(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyInto<double>(META_DATA_LOAD_DECL(MetaData_Float64), (double*)(&ruv->udata));
-}
-void* coerceUnionToBox_BSQISOTime(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyInto<BSQISOTime>(META_DATA_LOAD_DECL(MetaData_ISOTime), (BSQISOTime*)(&ruv->udata));
-}
-void* coerceUnionToBox_Regex(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    return Allocator::GlobalAllocator.copyInto<BSQRegex>(META_DATA_LOAD_DECL(MetaData_Regex), (BSQRegex*)(&ruv->udata));
-}
-void* coerceUnionToBox_Tuple(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    BSQTuple* tv = (BSQTuple*)ruv->udata;
-
-    Value* contents;
-    BSQTuple* res = Allocator::GlobalAllocator.collectionNew<BSQTuple, Value>(META_DATA_LOAD_DECL(MetaData_Tuple), tv->count, &contents, tv->count, tv->flag);
-    GC_MEM_COPY(GET_COLLECTION_START_FIXED(res, sizeof(BSQTuple)), GET_COLLECTION_START_FIXED(tv, sizeof(BSQTuple)), tv->count * sizeof(Value));
-
-    return res; 
-}
-void* coerceUnionToBox_Record(void* uv)
-{
-    UnionValue* ruv = (UnionValue*)uv;
-    BSQRecord* rv = (BSQRecord*)ruv->udata;
-
-    Value* contents;
-    BSQRecord* res = Allocator::GlobalAllocator.collectionNew<BSQRecord, Value>(META_DATA_LOAD_DECL(MetaData_Record), rv->count, &contents, rv->count, rv->flag);
-    GC_MEM_COPY(GET_COLLECTION_START_FIXED(res, sizeof(BSQRecord)), GET_COLLECTION_START_FIXED(rv, sizeof(BSQRecord)), rv->count * sizeof(Value));
-
-    return res; 
-}
+None NoneStorage::nhome = BSQ_NONE;
+NoneValue NoneStorage::nvhome = BSQ_NONE_VALUE;
 
 std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> BSQRecord::knownRecordPropertySets = {
     {MIRRecordPropertySetsEnum::ps__, {}},

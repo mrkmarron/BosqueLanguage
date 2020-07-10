@@ -407,6 +407,9 @@ class CPPTypeEmitter {
         if (tr instanceof NoneRepr) {
             return { eq: "EqualFunctor_NoneValue", less: "LessFunctor_NoneValue", display: "DisplayFunctor_NoneValue" };
         }
+        else if() {
+            xxxx;
+        }
         else if (tr instanceof StructRepr) {
             return { eq: `EqualFunctor_${tr.base}`, less: `LessFunctor_${tr.base}`, display: `DisplayFunctor_${tr.base}` };
         }

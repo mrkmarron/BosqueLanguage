@@ -63,7 +63,6 @@ struct DisplayFunctor_BSQBigInt
     std::wstring operator()(BSQBigInt i) const { return i.display(); }
     static std::wstring display(void* v) { return DisplayFunctor_BSQBigInt{}(*((BSQBigInt*)v)); }
 };
-void* coerceUnionToBox_BSQBigInt(void* uv);
 META_DATA_DECLARE_PTR_PACKED_KEY(MetaData_BigInt, MIRNominalTypeEnum_BigInt, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQBigInt)), 1, LessFunctor_BSQBigInt::less, EqualFunctor_BSQBigInt::eq, coerceUnionToBox_BSQBigInt, DisplayFunctor_BSQBigInt::display, L"BigInt");
 
 struct BSQStringInlineContents
@@ -271,7 +270,6 @@ struct DisplayFunctor_BSQString
     std::wstring operator()(const BSQString& s) const { return std::wstring(L"\"") +BSQString::display(s) + std::wstring(L"\""); }
     static std::wstring display(void* v) { return DisplayFunctor_BSQString{}(*((BSQString*)v)); }
 };
-void* coerceUnionToBox_BSQString(void* uv);
 META_DATA_DECLARE_PTR_PACKED_KEY(MetaData_String, MIRNominalTypeEnum_String, DATA_KIND_ALL_FLAG, BSQ_ALIGN_ALLOC_SIZE(sizeof(BSQString)), 1, LessFunctor_BSQString::less, EqualFunctor_BSQString::eq, coerceUnionToBox_BSQString, DisplayFunctor_BSQString::display, L"String");
 
 //
@@ -288,7 +286,6 @@ struct DisplayFunctor_BSQSafeString
         return std::wstring(mdata->displayname) + DisplayFunctor_BSQSafeString{}(*((BSQString*)v)); 
     }
 };
-void* coerceUnionToBox_BSQSafeString(void* uv);
 
 struct DisplayFunctor_BSQStringOf
 {
@@ -299,7 +296,6 @@ struct DisplayFunctor_BSQStringOf
         return std::wstring(mdata->displayname) + DisplayFunctor_BSQStringOf{}(*((BSQString*)v)); 
     }
 };
-void* coerceUnionToBox_BSQStringOf(void* uv);
 
 struct BSQUUID
 {
@@ -330,7 +326,6 @@ struct DisplayFunctor_BSQUUID
     std::wstring operator()(const BSQUUID& u) const { return std::wstring(L"UUID@") + std::wstring(u.sdata, u.sdata + 16); }
     static std::wstring display(void* v) { return DisplayFunctor_BSQUUID{}(*((BSQUUID*)v)); }
 };
-void* coerceUnionToBox_BSQUUID(void* uv);
 META_DATA_DECLARE_NO_PTR_KEY(MetaData_UUID, MIRNominalTypeEnum_UUID, DATA_KIND_ALL_FLAG, sizeof(BSQUUID), LessFunctor_BSQUUID::less, EqualFunctor_BSQUUID::eq, coerceUnionToBox_BSQUUID, DisplayFunctor_BSQUUID::display, L"UUID");
 
 struct BSQLogicalTime
@@ -362,7 +357,6 @@ struct DisplayFunctor_BSQLogicalTime
     std::wstring operator()(const BSQLogicalTime& et) const { return std::wstring(L"LogicalTime@") + std::to_wstring(et.timestamp); }
     static std::wstring display(void* v) { return DisplayFunctor_BSQLogicalTime{}(*((BSQLogicalTime*)v)); }
 };
-void* coerceUnionToBox_BSQLogicalTime(void* uv);
 META_DATA_DECLARE_NO_PTR_KEY(MetaData_LogicalTime, MIRNominalTypeEnum_LogicalTime, DATA_KIND_ALL_FLAG, sizeof(BSQLogicalTime), LessFunctor_BSQLogicalTime::less, EqualFunctor_BSQLogicalTime::eq, coerceUnionToBox_BSQLogicalTime, DisplayFunctor_BSQLogicalTime::display, L"LogicalTime");
 
 struct BSQCryptoHash
@@ -430,7 +424,6 @@ struct DisplayFunctor_BSQEnum
         return std::wstring(mdata->displayname) + std::wstring(L"::") + DisplayFunctor_BSQEnum{}(*((BSQEnum*)v)); 
     }
 };
-void* coerceUnionToBox_BSQEnum(void* uv);
 
 //
 //Auto generate the code for each simple and compound key type since they need to specialize per the types of keys
