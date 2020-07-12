@@ -3,15 +3,17 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, EphemeralListRepr, ValueRepr, PrimitiveRepr } from "./type_repr";
+import { TypeRepr, NoneRepr, StructRepr, TRRepr, RefRepr, UnionRepr, KeyValueRepr, EphemeralListRepr, ValueRepr, PrimitiveRepr, StorageByteAlignment } from "./type_repr";
 
 import * as assert from "assert";
+import { CPPFrame } from "./cpp_frame";
 
 enum CoerceKind {
     None,
     Direct,
     Convert,
-    Construct
+    Construct,
+    EphemeralConvert
 }
 
 function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind: CoerceKind, alloc: number} {
@@ -45,7 +47,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         }
         else {
             if(trinto.basetype === "double") {
-                return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+                return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
             }
             else {
                 return {kind: CoerceKind.Direct, alloc: 0};
@@ -59,7 +61,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Convert, alloc: 0};
         }
         else {
-            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
         }
     }
     else if (trfrom instanceof TRRepr) {
@@ -77,7 +79,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Convert, alloc: 0};
         }
         else {
-            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
         }
     }
     else if (trfrom instanceof RefRepr) {
@@ -110,7 +112,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Convert, alloc: 0};
         }
         else {
-            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize};
+            return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
         }
     }
     else if (trfrom instanceof KeyValueRepr) {
@@ -159,6 +161,20 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Direct, alloc: 0};
         }
     }
+}
+
+function getRequiredCoerce(trfrom: TypeRepr, trinto: TypeRepr): {kind: CoerceKind, alloc: number} {
+    if(trfrom instanceof EphemeralListRepr && trinto instanceof EphemeralListRepr) {
+        let allocs = 0;
+        for(let i = 0; i < trfrom.elist.length; ++i) {
+            const ccr = getRequiredCoerceOfPrimitive(trfrom.elist[i], trinto.elist[i]);
+            allocs += ccr.alloc;
+        }
+
+        return {kind: CoerceKind.EphemeralConvert, alloc: allocs};
+    }
+
+    return getRequiredCoerceOfPrimitive(trfrom, trinto);
 }
 
 function coerceDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
@@ -315,248 +331,108 @@ function coerceConstruct(trgt: string, exp: string, trfrom: TypeRepr, trinto: Ty
     }
 }
 
-function coercePrimitive(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
-    if (trfrom instanceof NoneRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+function coercePrimitive(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeRepr): [string, string[]] {
+    const cop = getRequiredCoerce(trfrom, trinto);
 
-        if (trinto instanceof UnionRepr) {
-            return `${trgt}->umeta = META_DATA_LOAD_DECL(MetaData_None);`;
-        }
-        else if (trinto instanceof KeyValueRepr) {
-            return `*${trgt} = ((KeyValue)BSQ_VALUE_NONE);`;
-        }
-        else {
-            return `*${trgt} = ((Value)BSQ_VALUE_NONE);`;
-        }
+    if(cop.kind === CoerceKind.None) {
+        return [exp, []];
     }
-    else if (trfrom instanceof PrimitiveRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+    else if(cop.kind === CoerceKind.Direct) {
+        return [coerceDirect(exp, trfrom, trinto), []];
+    }
+    else if(cop.kind === CoerceKind.Convert) {
+        const tmp = cppframe.generateFreshName();
+        cppframe.ensureLocationForVariable(tmp, trinto);
 
-        if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: false};
-        }
-        else {
-            return {kind: CoerceKind.Direct, alloc: false};
-        }
-    }
-    else if (trfrom instanceof StructRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
-
-        if (trinto instanceof UnionRepr) {
-            if(!trfrom.isStack) {
-                if(trfrom.isSimpleAssignable) {
-                    return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); ${trgt}->udata = reinterpret_cast<void*>(${exp});`;
-                }
-                else {
-                    return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); GC_MEM_COPY(${trgt}->udata, &${exp}, ${trfrom.alignedSize});`;
-                }
-            }
-            else {
-                if(trfrom.isSimpleAssignable) {
-                    return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); ${trgt}->udata = *((void**)${exp});`;
-                }
-                else {
-                    return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); GC_MEM_COPY(${trgt}->udata, ${exp}, ${trfrom.alignedSize});`;
-                }
-            }
-        }
-        else {
-            if (trfrom.base === "BSQBool") {
-                return `*${trgt} = BSQ_ENCODE_VALUE_BOOL(${exp});`;
-            }
-            else if (trfrom.base === "int64_t") {
-                return `*${trgt} = BSQ_ENCODE_VALUE_TAGGED_INT(${exp});`;
-            }
-            else {
-                if(!trfrom.isStack) {
-                    return `*${trgt} = Allocator::GlobalAllocator.allocateT<${trfrom.base}>(META_DATA_LOAD_DECL(${trfrom.metadataName})); *${trgt} = ${exp};`;
-                }
-                else {
-                    if(trfrom.isSimpleAssignable) {
-                        return `*${trgt} = Allocator::GlobalAllocator.allocateT<${trfrom.base}>(META_DATA_LOAD_DECL(${trfrom.metadataName})); *${trgt} = *${exp};`;
-                    }
-                    else {
-                        return `*${trgt} = Allocator::GlobalAllocator.allocateT<${trfrom.base}>(META_DATA_LOAD_DECL(${trfrom.metadataName})); GC_MEM_COPY(*${trgt}, ${exp}, ${trfrom.alignedSize});`;
-                    }
-                }
-            }
-        }
-    }
-    else if (trfrom instanceof TRRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof RefRepr), "Should not be possible");
-        
-        if (trinto instanceof UnionRepr) {
-            return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); GC_MEM_COPY(${trgt}->udata, ${exp}, ${Math.min(trfrom.alignedSize, trinto.datasize)});`;
-        }
-        else if(trinto instanceof TRRepr) {
-            return `GC_MEM_COPY(*${trgt}, ${exp}, ${Math.min(trfrom.alignedSize, trinto.alignedSize)});`;
-        }
-        else {
-            const trsizeexp = `Allocator::MetaData_ComputeSize_SimpleCollection(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp})`;
-            return `*${trgt} = Allocator::GlobalAllocator.allocateDynamic<${trfrom.base}>(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trsizeexp}); GC_MEM_COPY(*${trgt}, ${exp}, ${trsizeexp});`;
-        }
-    }
-    else if (trfrom instanceof RefRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
-
-        if (trinto instanceof UnionRepr) {
-            return `${trgt}->umeta = META_DATA_LOAD_DECL(${trfrom.metadataName}); ${trgt}->udata = *${exp};`;
-        }
-        else {
-            return `*${trgt} = *${exp};`;
-        }
-    }
-    else if(trfrom instanceof UnionRepr) {
-        if(trinto instanceof NoneRepr) {
-            return ";";
-        }
-        else if(trinto instanceof StructRepr) {
-            if(!trinto.isStack) {
-                if(trinto.isSimpleAssignable) {
-                    return `${trgt} = reinterpret_cast<${trinto.base}>(${exp}->udata);`;
-                }
-                else {
-                    return `GC_MEM_COPY(&${trgt}, ${exp}->udata, ${trinto.alignedSize});`;
-                }
-            }
-            else {
-                if(trinto.isSimpleAssignable) {
-                    return `*${trgt} = *((${trinto.base}*)${exp});`;
-                }
-                else {
-                    return `GC_MEM_COPY(${trgt}, ${exp}->udata, , ${trinto.alignedSize});`;
-                }
-            }
-        }
-        else if(trinto instanceof TRRepr) {
-            return `GC_MEM_COPY(${trgt}, ${exp}->udata, ${Math.min(trinto.alignedSize, trfrom.datasize)});`;
-        }
-        else if(trinto instanceof RefRepr) {
-            return `*${trgt} = ${exp}->udata;`;
-        }
-        else {
-            return `${exp}->umeta->coerceUnionToBox(${exp}, ${trgt});`;
-        }
-    }
-    else if (trfrom instanceof KeyValueRepr) {
-        if (trinto instanceof NoneRepr) {
-            return `;`;
-        }
-        else if (trinto instanceof StructRepr) {
-            if (trinto.base === "BSQBool") {
-                return `${trgt} = BSQ_GET_VALUE_BOOL(*${exp})`;
-            }
-            else if (trinto.base === "int64_t") {
-                return `${trgt} = BSQ_GET_VALUE_TAGGED_INT(*${exp})`;
-            }
-            else {
-                if(!trfrom.isStack) {
-                    return `${trgt} = *((${trinto.base}*)${exp});`;
-                }
-                else {
-                    if(trfrom.isSimpleAssignable) {
-                        return `*${trgt} = *((${trinto.base}*)${exp});`;
-                    }
-                    else {
-                        return `GC_MEM_COPY(*${trgt}, *${exp}, ${trinto.alignedSize});`;
-                    }
-                }
-            }
-        }
-        else if(trinto instanceof TRRepr) {
-            const trsizeexp = `Allocator::MetaData_ComputeSize_SimpleCollection(META_DATA_LOAD_DECL(${trinto.metadataName}), ${exp})`;
-            return `GC_MEM_COPY(${trgt}, *${exp}, ${trsizeexp});`;
-        }
-        else if (trinto instanceof UnionRepr) {
-            return `GET_TYPE_META_DATA(*${exp})->coerceBoxToUnion(${exp}, ${trgt});`;
-        }
-        else if (trinto instanceof RefRepr) {
-            return `*${trgt} = BSQ_GET_VALUE_PTR(*${exp}, ${trinto.base})`;
-        }
-        else {
-            return `*${trgt} = *((Value*)${exp})`;
-        }
+        return [tmp, [coerceConvert(tmp, exp, trfrom, trinto)]];
     }
     else {
-        if (trinto instanceof NoneRepr) {
-            return `;`;
-        }
-        else if (trinto instanceof StructRepr) {
-            if (trinto.base === "BSQBool") {
-                return `${trgt} = BSQ_GET_VALUE_BOOL(*${exp})`;
-            }
-            else if (trinto.base === "int64_t") {
-                return `${trgt} = BSQ_GET_VALUE_TAGGED_INT(*${exp})`;
-            }
-            else {
-                if(!trfrom.isStack) {
-                    return `${trgt} = *((${trinto.base}*)${exp});`;
-                }
-                else {
-                    if(trfrom.isSimpleAssignable) {
-                        return `*${trgt} = *((${trinto.base}*)${exp});`;
-                    }
-                    else {
-                        return `GC_MEM_COPY(*${trgt}, *${exp}, ${trinto.alignedSize});`;
-                    }
-                }
-            }
-        }
-        else if(trinto instanceof TRRepr) {
-            const trsizeexp = `Allocator::MetaData_ComputeSize_SimpleCollection(META_DATA_LOAD_DECL(${trinto.metadataName}), ${exp})`;
-            return `GC_MEM_COPY(${trgt}, *${exp}, ${trsizeexp});`;
-        }
-        else if (trinto instanceof UnionRepr) {
-            return `GET_TYPE_META_DATA(*${exp})->coerceBoxToUnion(${exp}, ${trgt});`;
-        }
-        else if (trinto instanceof RefRepr) {
-            return `*${trgt} = BSQ_GET_VALUE_PTR(*${exp}, ${trinto.base})`;
-        }
-        else {
-            return `*${trgt} = *((KeyValue*)${exp})`;
-        } 
+        const tmp = cppframe.generateFreshName();
+        cppframe.ensureLocationForVariable(tmp, trinto);
+
+        return [tmp, [coerceConstruct(tmp, exp, trfrom, trinto)]];
     }
 }
 
-function generateEphemeralListConvert(trgt: string, exp: string, elfrom: EphemeralListRepr, elinto: EphemeralListRepr): string {
-    const ops: string[] = [];
-   
-    for(let i = 0; i < elinto.elist.length; ++i) {
-        ops.push(moveCPPValue(`&(${trgt}->entry_${i})`, `&(${exp}->entry_${i})`, elfrom.elist[i], elinto.elist[i]));
-    }
-
-    return `{ ${ops.join("")} }`;
-}
-
-function coerceCPPValue(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
-    assert(trfrom.base !== trinto.base);
-
+function coerce(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeRepr): [string, string[]] {
     if(trfrom instanceof EphemeralListRepr && trinto instanceof EphemeralListRepr) {
-        return generateEphemeralListConvert(trgt, exp, trfrom, trinto);
+        const cop = getRequiredCoerce(trfrom, trinto);
+
+        if(cop.kind === CoerceKind.None) {
+            return [exp, []];
+        }
+
+        let cva: string[] = [];
+        let ops: string[] = [];
+        for(let i = 0; i < trfrom.elist.length; ++i) {
+            const [icv, iops] = coercePrimitive(cppframe, `${exp}.entry_${i}`, trfrom.elist[i], trinto.elist[i]);
+            cva.push(icv);
+            ops = [...ops, ...iops];
+        }
+
+        const cexp = `{ ${cva.join(", ")} }`;
+        return [cexp, ops];
     }
 
-    return coercePrimitive(trgt, exp, trfrom, trinto);
+    return coercePrimitive(cppframe, exp, trfrom, trinto);
 }
 
-function moveCPPValue(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
-    if(trfrom.base !== trinto.base) {
-        return coerceCPPValue(trgt, exp, trfrom, trinto);
+function assignCPPValue(trepr: TypeRepr, dst: string, src: string): string {
+    if(trepr instanceof PrimitiveRepr) {
+        return `${dst} = BSQ_NONE;`;
+    }
+    else if(trepr instanceof PrimitiveRepr) {
+        return `${dst} = ${src};`;
+    }
+    else if(TRRepr instanceof StructRepr) {
+        return `${dst} = ${src};`;
+    }
+    else if(TRRepr instanceof TRRepr) {
+        return `GC_MEM_COPY(&${dst}, &${src}, ${trepr.alignedSize});`;
+    }
+    else if(TRRepr instanceof RefRepr) {
+        return `${dst} = ${src};`;
+    }
+    else if(TRRepr instanceof UnionRepr) {
+        return `GC_MEM_COPY(&${dst}, &${src}, ${trepr.alignedSize});`;
+    }
+    else if(TRRepr instanceof KeyValueRepr) {
+        return `${dst} = ${src};`;
+    }
+    else if(TRRepr instanceof ValueRepr) {
+        return `${dst} = ${src};`;
     }
     else {
-        if(!trinto.isStack) {
-            return `${trgt} = ${exp};`;
-        }
-        else {
-            if(trinto.isSimpleAssignable) {
-                return `*${trgt} = *${exp};`;
-            }
-            else {
-                return `GC_MEM_COPY(${trgt}, ${exp}, ${trinto.alignedSize});`;
-            }
-        }
+        return `${dst} = ${src};`;
     }
+}
+
+function coerseAssignCPPValue(cppframe: CPPFrame, src: string, dst: string, trfrom: TypeRepr, trinto: TypeRepr): string[] {
+    const cop = getRequiredCoerce(trfrom, trinto);
+
+    if(cop.kind === CoerceKind.None) {
+        return [assignCPPValue(trinto, dst, src)];
+    }
+    else if(cop.kind === CoerceKind.Direct) {
+        return [assignCPPValue(trinto, dst, coerceDirect(src, trfrom, trinto))];
+    }
+    else if(cop.kind === CoerceKind.Convert) {
+        return [coerceConvert(dst, src, trfrom, trinto)];
+    }
+    else if (cop.kind === CoerceKind.Construct) {
+        return [coerceConstruct(dst, src, trfrom, trinto)];
+    }
+    else {
+        let [ee, ops] = coerce(cppframe, src, trfrom, trinto);
+        return [...ops, assignCPPValue(trinto, dst, ee)];
+    }
+}
+
+function isDirectReturnValue(trepr: TypeRepr) {
+    return trepr instanceof NoneRepr || trepr instanceof PrimitiveRepr || trepr instanceof RefRepr || trepr instanceof KeyValueRepr || trepr instanceof ValueRepr;
 }
 
 export {
-    moveCPPValue  
+    CoerceKind,
+    getRequiredCoerce, coerce, assignCPPValue, coerseAssignCPPValue, isDirectReturnValue
 };

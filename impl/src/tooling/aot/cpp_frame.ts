@@ -6,7 +6,6 @@
 import * as assert from "assert";
 
 import { TypeRepr, ReprStorageKind } from "./type_repr";
-import { moveCPPValue } from "./cpp_loadstore";
 
 const pointerframe = "$pframe$";
 const valuestructframe = "$vsframe$";
