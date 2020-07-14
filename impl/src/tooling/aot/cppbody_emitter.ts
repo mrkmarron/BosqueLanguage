@@ -7,12 +7,12 @@ import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimit
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey, MIRPackSlice, MIRPackExtend, MIRNominalTypeKey, MIRBinLess, MIRConstantRegex } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
-import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr, StorageByteAlignment } from "./type_repr";
+import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr, StorageByteAlignment, TRRepr } from "./type_repr";
 import { compileRegexCppMatch } from "./cpp_regex";
 import { CPPFrame } from "./cpp_frame";
 
 import * as assert from "assert";
-import { CoerceKind, coerce, assignCPPValue, isDirectReturnValue, getRequiredCoerce, coerseAssignCPPValue } from "./cpp_loadstore";
+import { CoerceKind, coerce, assignCPPValue, isDirectReturnValue, getRequiredCoerce, coerseAssignCPPValue, coerceInline } from "./cpp_loadstore";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -53,10 +53,6 @@ class CPPBodyEmitter {
         
         this.currentRType = typegen.noneType;
         this.cppframe = new CPPFrame();
-    }
-
-    private static cleanLiteralStrRepr(s: string): string {
-        return "\"" + s.substring(1, s.length - 1) + "\"";
     }
 
     labelToCpp(label: string): string {
@@ -106,6 +102,10 @@ class CPPBodyEmitter {
         }
     }
 
+    ensureLocationForTrgt(loc: MIRRegisterArgument) {
+        this.cppframe.ensureLocationForVariable(this.varToCppName(loc), this.typegen.getCPPReprFor(this.getArgType(loc)));
+    }
+
     getConstantSrc(cval: MIRConstantArgument): string {
         if (cval instanceof MIRConstantNone) {
             return "BSQ_NONE";
@@ -133,7 +133,7 @@ class CPPBodyEmitter {
         else if (cval instanceof MIRConstantString) {
             assert(cval instanceof MIRConstantString);
 
-            const sval = CPPBodyEmitter.cleanLiteralStrRepr((cval as MIRConstantString).value);
+            const sval = (cval as MIRConstantString).value;
             const sname = "STR__" + this.allConstStrings.size;
             if (!this.allConstStrings.has(sval)) {
                 this.allConstStrings.set(sval, sname);
@@ -163,7 +163,11 @@ class CPPBodyEmitter {
         }
     }
 
-    coerceArgs(...args: [MIRArgument, MIRType][]): [string[], string[]] {
+    generateArgStore(arg: MIRRegisterArgument): string {
+        return this.cppframe.getExpressionForName(this.varToCppName(arg));
+    }
+
+    coerceArgsPlus(xsize: number, ...args: [MIRArgument, MIRType][]): [string[], string[]] {
         let nargs: string[] = [];
         let ops: string[] = [];
     
@@ -184,17 +188,52 @@ class CPPBodyEmitter {
         }
 
         if(rsize !== 0) {
-            ops = [`Allocator::GlobalAllocator.ensureSpace<${rsize}>();`, ...ops];
+            ops = [`Allocator::GlobalAllocator.ensureSpace<${rsize + xsize}>();`, ...ops];
         }
 
         return [nargs, ops];
     }
 
-    coerceResult(result: string, oftype: MIRType, intovar: MIRRegisterArgument, intotype: MIRType): string[] {
+    coerceArgs(...args: [MIRArgument, MIRType][]): [string[], string[]] {
+        return this.coerceArgsPlus(0, ...args);
+    }
+
+    coerceArgsInlinePlus(xsize: number, ...args: [MIRArgument, MIRType][]): [string[], string[]] {
+        let nargs: string[] = [];
+        let ops: string[] = [];
+    
+        let rsize = 0;
+        for(let i = 0; i < args.length; ++i) {
+            const [arg, into] = args[i];
+            const argrepr = this.typegen.getCPPReprFor(this.getArgType(arg));
+            const intorepr = this.typegen.getCPPReprFor(into);
+    
+            const cci = getRequiredCoerce(argrepr, intorepr);
+            rsize += cci.alloc;
+
+            const argc = this.generateArgSrc(arg);
+            let [nval, nops] = coerceInline(this.cppframe, argc, argrepr, intorepr);
+
+            nargs.push(nval);
+            ops = [...ops, ...nops];
+        }
+
+        if(rsize !== 0) {
+            ops = [`Allocator::GlobalAllocator.ensureSpace<${rsize + xsize}>();`, ...ops];
+        }
+
+        return [nargs, ops];
+    }
+
+    coerceArgsInline(...args: [MIRArgument, MIRType][]): [string[], string[]] {
+        return this.coerceArgsInlinePlus(0, ...args);
+    }
+
+    coerceResult(result: string, oftype: MIRType, intoname: string, intotype: MIRType): string[] {
         const resrepr = this.typegen.getCPPReprFor(oftype);
         const intorepr = this.typegen.getCPPReprFor(intotype);
 
-        const intoloc = this.cppframe.getExpressionForName(this.varToCppName(intovar));
+        const intoloc = this.cppframe.getExpressionForName(intoname);
 
         const cci = getRequiredCoerce(resrepr, intorepr);
         if (cci.alloc === 0) {
@@ -203,51 +242,68 @@ class CPPBodyEmitter {
         else {
             let ops: string[] = [];
 
-            const tmploc = this.cppframe.generateFreshName();
-            this.cppframe.ensureLocationForVariable(tmploc, resrepr);
-
-            ops.push(assignCPPValue(resrepr, tmploc, result));
             ops.push(`Allocator::GlobalAllocator.ensureSpace<${cci.alloc}>();`);
-
-            let caops = coerseAssignCPPValue(this.cppframe, tmploc, intoloc, resrepr, intorepr);
+            let caops = coerseAssignCPPValue(this.cppframe, result, intoloc, resrepr, intorepr);
 
             return [...ops, ...caops];
         }
     }
 
-    generateInvokeIntoFrame(fvar: MIRRegisterArgument, inv: MIRInvokeKey, rtype: MIRType, args: string[]): string {
-        const rrepr = this.typegen.getCPPReprFor(rtype);
-        if (!rrepr.isStack) {
-            return this.cppframe.generateMoveOperation(this.varToCppName(fvar), this.typegen.getCPPReprFor(rtype), `${this.invokenameToCPP(inv)}(${args.join(", ")})`, this.typegen.getCPPReprFor(rtype));
+    isConstInvoke(inv: MIRInvokeDecl): boolean {
+        if (!(inv instanceof MIRInvokeBodyDecl)) {
+            return false;
         }
-        else {
-            args.push(this.cppframe.getExpressionForName(this.varToCppName(fvar)));
-            return `${this.invokenameToCPP(inv)}(${args.join(", ")})`;
-        }
+
+        const op0 = (inv.body.body.get("entry") as MIRBasicBlock).ops[0];
+        return op0 instanceof MIRReturnAssign && op0.src instanceof MIRConstantArgument; 
     }
 
-    generateInvokeIntoFrameTemp(inv: MIRInvokeKey, rtype: MIRType, args: string[]): [string, string] {
-        const tmp = this.cppframe.generateFreshName();
-        this.cppframe.ensureLocationForVariable(tmp, this.typegen.getCPPReprFor(rtype));
-
-        const rrepr = this.typegen.getCPPReprFor(rtype);
-        if (!rrepr.isStack) {
-            return [tmp, this.cppframe.generateMoveOperation(tmp, this.typegen.getCPPReprFor(rtype), `${this.invokenameToCPP(inv)}(${args.join(", ")})`, this.typegen.getCPPReprFor(rtype))];
-        }
-        else {
-            args.push(this.cppframe.getExpressionForName(tmp));
-            return [tmp, `${this.invokenameToCPP(inv)}(${args.join(", ")})`];
-        }
+    getConstantInvokeValue(inv: MIRInvokeDecl): MIRConstantArgument {
+        const op0 = ((inv as MIRInvokeBodyDecl).body.body.get("entry") as MIRBasicBlock).ops[0];
+        return (op0 as MIRReturnAssign).src as MIRConstantArgument;
     }
 
-    generatePrepArgForOp(arg: MIRArgument, into: MIRType): {arg: string, ops: string[]} {
-        const argcc = this.generateArgSrc(arg);
-        if(argcc.stype.trkey === into.trkey) {
-            return {arg: argcc.src, ops: []};
+    generateInvokeInto(intov: string, intot: MIRType, inv: MIRInvokeDecl, args: MIRArgument[]): string[] {
+        const rrepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(inv.resultType));
+        const intorepr = this.typegen.getCPPReprFor(intot);
+
+        if (this.isConstInvoke(inv)) {
+            const cres = this.getConstantInvokeValue(inv);
+            return this.coerceResult(this.getConstantSrc(cres), this.getArgType(cres), intov, intot);
         }
         else {
-            let [tmp, op] = this.generateMoveFromSrcIntoFrameTemp(into, argcc.src, argcc.stype);
-            return {arg: tmp, ops: [op]};
+            let argpairs: [MIRArgument, MIRType][] = [];
+            for (let i = 0; i < args.length; ++i) {
+                argpairs.push([args[i], this.typegen.getMIRType(inv.params[i].type)]);
+            }
+
+            const [cargs, ops] = this.coerceArgs(...argpairs);
+            if (isDirectReturnValue(rrepr)) {
+                const invc = `${this.invokenameToCPP(inv.key)}(${cargs.join(", ")})`;
+                const rvops = this.coerceResult(invc, this.typegen.getMIRType(inv.resultType), intov, intot);
+
+                return [...ops, ...rvops];
+            }
+            else {
+                const cci = getRequiredCoerce(rrepr, intorepr);
+                if (cci.kind === CoerceKind.None) {
+                    cargs.push(intov);
+                    const invc = `${this.invokenameToCPP(inv.key)}(${cargs.join(", ")});`;
+
+                    return [...ops, invc];
+                }
+                else {
+                    const tmploc = this.cppframe.generateFreshName();
+                    this.cppframe.ensureLocationForVariable(tmploc, rrepr);
+
+                    cargs.push(tmploc);
+                    const invc = `${this.invokenameToCPP(inv.key)}(${cargs.join(", ")});`;
+
+                    const rvops = this.coerceResult(tmploc, this.typegen.getMIRType(inv.resultType), intov, intot);
+
+                    return [...ops, invc, ...rvops];
+                }
+            }
         }
     }
 
@@ -260,68 +316,52 @@ class CPPBodyEmitter {
         }
         else {
             const trepr = this.typegen.getCPPReprFor(tuptype);
-            let select = "";
-            if(trepr instanceof StructRepr) {
-                select = `${this.varToCppName(arg)}->atFixed<${idx}>()`;
+            if(trepr instanceof TRRepr) {
+                return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}.atFixed<${idx}>()`;
+            }
+            else if (trepr instanceof UnionRepr) {
+                return `(UnionValue::extractPointerToContent<BSQTupleDynamic>(${this.cppframe.getExpressionForName(this.varToCppName(arg))})->atFixed<${idx}>()`;
             }
             else {
-                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQTuple)->atFixed<${idx}>()`;
+                return `((BSQTupleDynamic*)${this.cppframe.getExpressionForName(this.varToCppName(arg))})->atFixed<${idx}>()`;
             }
-
-            let [tmp, op] = this.generateMoveFromSrcIntoFrame(into, select, this.typegen.anyType);
-            return {arg: tmp, ops: [op]};
         }
     }
 
-    generateMIRAccessFromPropertyExpression(arg: MIRArgument, property: string, into: MIRType): {arg: string, ops: string[]} {
+    generatePropertyExpression(arg: MIRArgument, property: string): string {
         const rectype = this.getArgType(arg);
         const hasproperty = this.typegen.recordHasField(rectype, property);
     
         if(hasproperty === "no") {
-            let [tmp, op] = this.generateMoveFromSrcIntoFrameTemp(into, "BSQ_VALUE_NONE", this.typegen.noneType);
-            return {arg: tmp, ops: [op]};
+            return "BSQ_VALUE_NONE";
         }
         else {
             const rrepr = this.typegen.getCPPReprFor(rectype);
-            let select = "";
-
-            if(rrepr instanceof StructRepr) {
-                select = `${this.varToCppName(arg)}.atFixed<MIRPropertyEnum::${property}>()`;
+            if(rrepr instanceof TRRepr) {
+                return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}.atFixed<MIRPropertyEnum::${property}>()`;
+            }
+            else if (rrepr instanceof UnionRepr) {
+                return `(UnionValue::extractPointerToContent<BSQRecordDynamic>(${this.cppframe.getExpressionForName(this.varToCppName(arg))})->atFixed<${property}>()`;
             }
             else {
-                select = `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQRecord)->atFixed<MIRPropertyEnum::${property}>()`;
+                return `((BSQTupleDynamic*)${this.cppframe.getExpressionForName(this.varToCppName(arg))})->atFixed<${property}>()`;
             }
-
-            return `${this.typegen.coerce(select, this.typegen.anyType, resultAccessType)}`;
         }
     }
 
-    generateMIRAccessFromFieldExpression(arg: MIRArgument, inferargtype: MIRType, field: MIRFieldKey, resultAccessType: MIRType): string {
-        const nrepr = this.typegen.getCPPReprFor(inferargtype);
+    generateFieldExpressionKnown(arg: MIRArgument, infertype: MIRType, field: MIRFieldKey): string {
+        const nrepr = this.typegen.getCPPReprFor(this.getArgType(arg));
+        const irepr = this.typegen.getCPPReprFor(infertype)
 
-        let select = "";
-        if (this.typegen.typecheckUEntity(inferargtype)) {
-            if (nrepr instanceof RefRepr) {
-                select = `${this.argToCpp(arg, inferargtype)}->${this.typegen.mangleStringForCpp(field)}`;
-            }
-            else {
-                select = `${this.argToCpp(arg, inferargtype)}.${this.typegen.mangleStringForCpp(field)}`;
-            }
+        if (nrepr instanceof RefRepr) {
+            return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}->${this.typegen.mangleStringForCpp(field)}`;
+        }
+        else if (nrepr instanceof UnionRepr) {
+            return `(UnionValue::extractPointerToContent<${(irepr.storagetype)}>(${this.cppframe.getExpressionForName(this.varToCppName(arg))})->${this.typegen.mangleStringForCpp(field)}`;
         }
         else {
-            let tag = "";
-            if (nrepr instanceof KeyValueRepr || nrepr instanceof ValueRepr) {
-                tag = `BSQ_GET_VALUE_PTR(${this.argToCpp(arg, inferargtype)}, BSQRef)->nominalType`;
-            }
-            else {
-                tag = `${this.argToCpp(arg, inferargtype)}.nominalType`;
-            }
-
-            select = this.generateVFieldLookup(arg, tag, inferargtype, this.assembly.fieldDecls.get(field) as MIRFieldDecl);
+            return `((${(irepr.storagetype)})${this.cppframe.getExpressionForName(this.varToCppName(arg))})->${this.typegen.mangleStringForCpp(field)}`;
         }
-
-        const ftype = this.typegen.getMIRType((this.assembly.fieldDecls.get(field) as MIRFieldDecl).declaredType);
-        return `${this.typegen.coerce(select, ftype, resultAccessType)}`;
     }
 
     generateTruthyConvert(arg: MIRArgument): string {
@@ -331,12 +371,16 @@ class CPPBodyEmitter {
             return "false";
         }
         else if (this.assembly.subtypeOf(argtype, this.typegen.boolType)) {
-            return this.generateArgSrc(arg).src;
+            return this.generateArgSrc(arg);
         }
         else {
-            assert(this.getArgType(arg) instanceof UnionRepr);
-
-            return `BSQ_GET_VALUE_TRUTHY(${this.generateArgSrc(arg).src}->udata)`;
+            const arepr = this.typegen.getCPPReprFor(this.getArgType(arg));
+            if(arepr instanceof UnionRepr) {
+                return `UnionValue::extractFromUnionPrimitive<BSQBool>(${this.generateArgSrc(arg)})`
+            }
+            else {
+                return `(${this.generateArgSrc(arg)} == BSQ_VALUE_TRUE)`;
+            }
         }
     }
 
@@ -350,135 +394,163 @@ class CPPBodyEmitter {
             return "false";
         }
         else {
-            const arepr = this.getArgType(arg);
-            if(arepr instanceof UnionRepr) {
-                return `BSQ_IS_VALUE_NONE(${this.generateArgSrc(arg).src}->udata)`;
+            const arepr = this.typegen.getCPPReprFor(argtype);
+
+            if(arepr instanceof RefRepr) {
+                return "false";
+            }
+            else if(arepr instanceof UnionRepr) {
+                return `${this.generateArgSrc(arg)}.umeta->nominaltype == MIRNominalTypeEnum_None)`;
             }
             else {
-                assert((arepr instanceof KeyValueRepr) || (arepr instanceof ValueRepr));
-
-                return `BSQ_IS_VALUE_NONE(${this.varToCppName(arg)})`;
+                return `(${this.generateArgSrc(arg)} == BSQ_NONE_VALUE)`;
             }
         }
     }
 
     generateLoadConstSafeString(op: MIRLoadConstSafeString): string {
-        const sval = CPPBodyEmitter.cleanLiteralStrRepr(op.ivalue);
+        const sval = op.ivalue;
         const sname = "STR__" + this.allConstStrings.size;
 
         if (!this.allConstStrings.has(sval)) {
             this.allConstStrings.set(sval, sname);
         }
-        const strval = `&(Runtime::${this.allConstStrings.get(sval) as string})`;
 
-        return this.generateMoveFromSrcIntoFrame(op.trgt, strval, this.typegen.getMIRType(op.tskey));
+        this.ensureLocationForTrgt(op.trgt);
+        return `${this.generateArgStore(op.trgt)} = Runtime::${this.allConstStrings.get(sval) as string};`;
     }
 
-    generateLoadConstTypedString(op: MIRLoadConstTypedString): string {
-        const sval = CPPBodyEmitter.cleanLiteralStrRepr(op.ivalue);
+    generateLoadConstTypedString(op: MIRLoadConstTypedString): string[] {
+        const sval = op.ivalue;
         const sname = "STR__" + this.allConstStrings.size;
 
         if (!this.allConstStrings.has(sval)) {
             this.allConstStrings.set(sval, sname);
         }
-        const strval = `&(Runtime::${this.allConstStrings.get(sval) as string})`;
+        const strval = `Runtime::${this.allConstStrings.get(sval) as string}`;
 
         let opstrs: string[] = [];
         if(op.pfunckey !== undefined) {
             const pfunc = (this.typegen.assembly.invokeDecls.get(op.pfunckey) || this.typegen.assembly.primitiveInvokeDecls.get(op.pfunckey)) as MIRInvokeDecl;
             const errtype = this.typegen.getMIRType(op.errtype as MIRResolvedTypeKey);
 
-            let [tmp, iop] = this.generateInvokeIntoFrameTemp(op.pfunckey, errtype, [strval]);
-            opstrs.push(iop);
+            const tmp = this.cppframe.generateFreshName("strofchk");
+            this.cppframe.ensureLocationForVariable(tmp, this.typegen.getCPPReprFor(this.typegen.getMIRType(pfunc.resultType)));
+            const ops = this.generateInvokeInto(tmp, this.typegen.getMIRType(pfunc.resultType), pfunc, [new MIRConstantString(op.ivalue)]);
 
             const tcexp = this.generateTypeCheck(tmp, this.typegen.getMIRType(pfunc.resultType), this.typegen.getMIRType(pfunc.resultType), errtype);
-            opstrs.push(`BSQ_ASSERT(!${tcexp}, "Failed string validation");`);
+            opstrs = [...ops, `BSQ_ASSERT(!(${tcexp}), "Failed string validation");`];
         }
 
-        opstrs.push(this.generateMoveFromSrcIntoFrame(op.trgt, strval, this.typegen.getMIRType(op.tskey)));
+        this.ensureLocationForTrgt(op.trgt);
+        opstrs.push(`${this.generateArgStore(op.trgt)} = ${strval};`);
 
-        return opstrs.join(" ");
+        return opstrs;
     }
 
-    generateAccessConstantValue(cp: MIRAccessConstantValue): string {
+    generateAccessConstantValue(cp: MIRAccessConstantValue): string[] {
         const cdecl = this.assembly.constantDecls.get(cp.ckey) as MIRConstantDecl;
-        return this.generateInvokeIntoFrame(cp.trgt, cp.ckey, this.typegen.getMIRType(cdecl.declaredType), []);
+        const idecl = (this.assembly.primitiveInvokeDecls.get(cdecl.value) || this.assembly.invokeDecls.get(cdecl.value)) as MIRInvokeDecl;
+
+        this.ensureLocationForTrgt(cp.trgt);
+        return this.generateInvokeInto(this.generateArgStore(cp.trgt), this.typegen.getMIRType(cdecl.declaredType), idecl, []);
     }
 
-    generateLoadFieldDefaultValue(ld: MIRLoadFieldDefaultValue): string {
+    generateLoadFieldDefaultValue(ld: MIRLoadFieldDefaultValue): string[] {
         const fdecl = this.assembly.fieldDecls.get(ld.fkey) as MIRFieldDecl;
-        return this.generateInvokeIntoFrame(ld.trgt, fdecl.value as MIRInvokeKey, this.typegen.getMIRType(fdecl.declaredType), []);
+        const idecl = (this.assembly.primitiveInvokeDecls.get(fdecl.value as MIRInvokeKey) || this.assembly.invokeDecls.get(fdecl.value as MIRInvokeKey)) as MIRInvokeDecl;
+
+        this.ensureLocationForTrgt(ld.trgt);
+        return this.generateInvokeInto(this.generateArgStore(ld.trgt), this.typegen.getMIRType(fdecl.declaredType), idecl, []);
     }
 
     generateMIRInvokeInvariantCheckDirect(ivop: MIRInvokeInvariantCheckDirect): string {
         const fields = [...(this.typegen.assembly.entityDecls.get(ivop.tkey) as MIREntityTypeDecl).fields];
-        const argpreps = fields.map((f) => `${this.argToCpp(ivop.rcvr, this.typegen.getMIRType(ivop.tkey))}->${this.typegen.mangleStringForCpp(f.fkey)}`);
+        const argpreps = fields.map((f) => `${this.generateArgSrc(ivop.rcvr)}->${this.typegen.mangleStringForCpp(f.fkey)}`);
 
-        return `${this.varToCppName(ivop.trgt)} = ${this.invokenameToCPP(ivop.ikey)}(${args.join(", ")});`;
+        this.ensureLocationForTrgt(ivop.trgt);
+        return `${this.generateArgStore(ivop.trgt)} = ${this.invokenameToCPP(ivop.ikey)}(${argpreps.join(", ")});`;
     }
 
-    generateMIRConstructorPrimary(cp: MIRConstructorPrimary): string {
+    generateMIRConstructorPrimary(cp: MIRConstructorPrimary): string[] {
         const ctype = this.assembly.entityDecls.get(cp.tkey) as MIREntityTypeDecl;
-       
+
+        let argpairs: [MIRArgument, MIRType][] = [];
+        for (let i = 0; i < cp.args.length; ++i) {
+            argpairs.push([cp.args[i], this.typegen.getMIRType(ctype.fields[i].declaredType)]);
+        }
+        
         const cppcrepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(cp.tkey));
         if (cppcrepr instanceof StructRepr) {
-            const fvals = cp.args.map((arg, i) => {
-                const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
-                return this.argToCpp(arg, ftype);
-            });
+            const [cargs, ops] = this.coerceArgsInline(...argpairs);
 
-            return `${this.varToCppName(cp.trgt)} = std::move(${cppcrepr.base}(${fvals.join(", ")}));`
+            this.ensureLocationForTrgt(cp.trgt);
+            return [...ops, `${this.generateArgStore(cp.trgt)} = {${cargs.join(", ")}};`];
         }
         else {
-            const fvals = cp.args.map((arg, i) => {
-                const ftype = this.typegen.getMIRType(ctype.fields[i].declaredType);
-                return this.typegen.generateConstructorArgInc(ftype, this.argToCpp(arg, ftype));
-            });
+            const crepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(cp.tkey));
+            const [cargs, ops] = this.coerceArgsInlinePlus(crepr.alignedSize + StorageByteAlignment, ...argpairs);
 
-            const scopevar = this.varNameToCppName("$scope$");
-            return `${this.varToCppName(cp.trgt)} = BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppcrepr.base}${fvals.length !== 0 ? (", " + fvals.join(", ")) : ""});`;
+            this.ensureLocationForTrgt(cp.trgt);
+            const alloc = `${this.generateArgStore(cp.trgt)} = Allocator::GlobalAllocator.allocateT<${cppcrepr.basetype}>(META_DATA_LOAD_DECL(${cppcrepr.metadataName}));`;
+            const assign = `*${this.generateArgStore(cp.trgt)} = {${cargs.join(", ")}};`;
+
+            return [...ops, alloc, assign];
         }
     }
 
     generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): string {
         const cpetype = this.typegen.getMIRType(cpce.tkey);
-        const cppctype = this.typegen.getCPPReprFor(cpetype).base;
+        const cppctype = this.typegen.getCPPReprFor(cpetype).basetype;
 
-        const scopevar = this.varNameToCppName("$scope$");
-        const conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpce.tkey)})`;
-
-        return `${this.varToCppName(cpce.trgt)} = ${conscall};`;
+        return `${this.generateArgStore(cpce.trgt)} = ${cppctype}::empty;`;
     }
 
     generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const cppctype = this.typegen.getCPPReprFor(cpcstype).base;
+        const cppctype = this.typegen.getCPPReprFor(cpcstype).basetype;
 
-        let conscall = "";
-        const scopevar = this.varNameToCppName("$scope$");
+        let oftype = this.typegen.noneType;
+        if (this.typegen.typecheckIsName(cpcstype, /^NSCore::List<.*>$/)) {
+            oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        }
+        else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Stack<.*>$/)) {
+            oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        }
+        else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Queue<.*>$/)) {
+            oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        }
+        else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcstype, /^NSCore::DynamicSet<.*>$/)) {
+            oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+        }
+        else {
+            const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
+            const vtype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
+
+            const entrytype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "MapEntry" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey && (edecl[1].terms.get("V") as MIRType).trkey === vtype.trkey);
+            const entryentity = (entrytype as [string, MIREntityTypeDecl])[1];
+            oftype = this.typegen.getMIRType(entryentity.tkey);
+        }
+
+        let argpairs: [MIRArgument, MIRType][] = [];
+        for (let i = 0; i < cpcs.args.length; ++i) {
+            argpairs.push([cpcs.args[i], oftype]);
+        }
+        const [cargs, ops] = this.coerceArgs(...argpairs);
+
+
+        let conscall = "[INVALID CONS CALL]";
         const ntype = `MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}`
         if (this.typegen.typecheckIsName(cpcstype, /^NSCore::List<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype)));
-
             conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Stack<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype)));
-
             conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Queue<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => this.typegen.generateConstructorArgInc(oftype, this.argToCpp(arg, oftype)));
-
             conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcstype, /^NSCore::DynamicSet<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            const cvals = cpcs.args.map((arg) => this.argToCpp(arg, oftype));
-
             const trepr = this.typegen.getCPPReprFor(oftype);
             const tops = this.typegen.getFunctorsForType(oftype);
 

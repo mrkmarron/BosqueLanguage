@@ -33,8 +33,6 @@ typedef uint8_t BSQBool;
 #define BSQ_ENCODE_VALUE_BOOL(B) ((void*)(((uintptr_t)(B)) | 0x2))
 #define BSQ_ENCODE_VALUE_TAGGED_INT(I) ((void*)((((uint64_t) I) << 0x3) | 0x4))
 
-#define BSQ_GET_VALUE_TRUTHY(UV) ((BSQBool)(((uintptr_t)((UV)->udata)) & 0x1))
-
 #define BSQ_VALUE_TRUE BSQ_ENCODE_VALUE_BOOL(BSQTRUE)
 #define BSQ_VALUE_FALSE BSQ_ENCODE_VALUE_BOOL(BSQFALSE)
 
@@ -83,6 +81,14 @@ struct UnionValue
     {
         into.umeta = from.umeta;
         GC_MEM_COPY(into.udata, from.udata, std::min(k, j));
+    }
+
+    template <uint16_t j>
+    inline static UnionValue& convertDirect(const UnionValue& from)
+    {
+        static_assert(j < k);
+
+        return *(reinterpret_cast<UnionValue<j>*>(&from));
     }
 
     inline static void convertToUnionNone(MetaData* mdata, UnionValue& into)
@@ -153,6 +159,18 @@ struct UnionValue
     inline static void extractFromUnionRecord(const UnionValue& from, T& into)
     {
         GC_MEM_COPY(&into, from.udata, from.umeta->computeMemorySize(from.umeta, from.udata));
+    }
+
+    template <typename T>
+    inline static T& extractFromUnionDirect(const UnionValue& from)
+    {
+        return *(reinterpret_cast<T*>(from.udata));
+    }
+
+    template <typename T>
+    inline static T* extractPointerToContent(const UnionValue& from)
+    {
+        return (T*)from.udata;
     }
 };
 
@@ -420,8 +438,19 @@ struct BSQTuple
         std::copy(from.entries, from.entries + std::min(j, k), into.entries);
     }
 
+    template <uint16_t j>
+    inline static BSQTuple<j>& convertDirect(BSQTuple<k>& from) {
+        static_assert(j < k);
+
+        return *(reinterpret_cast<BSQTuple<j>*>(&from));
+    }
+
     inline static void boxTuple(MetaData* mdata, BSQTuple& from, Value& into) {
        into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQTuple>(mdata, &from);
+    }
+
+    inline static Value boxTupleDirect(MetaData* mdata, BSQTuple& from) {
+       return Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQTuple>(mdata, &from);
     }
 
     inline static void unboxTuple(Value from, BSQTuple& into) {
@@ -459,7 +488,7 @@ struct BSQTuple
     }
 
     template <uint16_t idx>
-    inline Value& atFixed() const
+    inline Value& atFixed()
     {
         if (idx < this->count)
         {
@@ -497,6 +526,32 @@ struct DisplayFunctor_BSQTuple
 };
 META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Tuple, MIRNominalTypeEnum_Tuple, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQTuple), coerceUnionToBox_BSQTuple, DisplayFunctor_BSQTuple::display, L"Tuple");
 
+struct BSQDynamicTuple
+{
+    size_t count;
+    DATA_KIND_FLAG flag;
+    Value entries;
+
+    template <uint16_t idx>
+    inline bool hasIndex() const
+    {
+        return idx < this->count;
+    }
+
+    template <uint16_t idx>
+    inline Value& atFixed()
+    {
+        if (idx < this->count)
+        {
+            return *((&this->entries) + idx);
+        }
+        else
+        {
+            return NoneStorage::nvhome;
+        }
+    }
+};
+
 class BSQDynamicPropertySetEntry
 {
 public:
@@ -522,11 +577,13 @@ public:
     }
 };
 
+template <uint16_t k>
 struct BSQRecord
 {
     size_t count;
     MIRPropertyEnum* properties;
     DATA_KIND_FLAG flag;
+    Value entries[k];
 
     static std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> knownRecordPropertySets;
     static BSQDynamicPropertySetEntry emptyDynamicPropertySetEntry;
@@ -542,8 +599,19 @@ struct BSQRecord
         std::copy(from.entries, from.entries + std::min(j, k), into.entries);
     }
 
+    template <uint16_t j>
+    inline static BSQRecord<j>& convertDirect(BSQRecord<k>& from) {
+        static_assert(j < k);
+
+        return *(reinterpret_cast<BSQRecord<j>*>(&from));
+    }
+
     inline static void boxRecord(MetaData* mdata, BSQRecord& from, Value& into) {
         into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQRecord>(mdata, &from);
+    }
+
+    inline static Value boxRecordDirect(MetaData* mdata, BSQRecord& from) {
+       return Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQRecord>(mdata, &from);
     }
 
     inline static void unboxRecord(Value from, BSQRecord& into) {
@@ -641,8 +709,8 @@ struct BSQRecord
     template <MIRPropertyEnum p>
     inline Value atFixed() const
     {
-        auto iter = std::find(this->properties, this->properties + this->count, p) != this->properties + this->count;
-        return iter != this->properties + this->count ? *((Value*)GET_COLLECTION_START_FIXED(this, sizeof(BSQRecord)) + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
+        auto iter = std::find(this->properties, this->properties + this->count, p);
+        return iter != this->properties + this->count ? *(this->entries + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
     }
 
     bool checkPropertySet(int n, ...) const
@@ -697,6 +765,26 @@ struct DisplayFunctor_BSQRecord
 };
 META_DATA_DECLARE_PTR_PACKED_COLLECTON_DIRECT(MetaData_Record, MIRNominalTypeEnum_Record, DATA_KIND_UNKNOWN_FLAG, sizeof(BSQRecord), coerceUnionToBox_BSQRecord, DisplayFunctor_BSQRecord::display, L"Record");
 
+struct BSQDynamicRecord
+{
+    size_t count;
+    MIRPropertyEnum* properties;
+    DATA_KIND_FLAG flag;
+    Value entries;
+
+    template <MIRPropertyEnum p>
+    inline bool hasProperty() const
+    {
+        return std::find(&(this->properties), &(this->properties) + this->count, p) != &(this->properties) + this->count;
+    }
+
+    template <MIRPropertyEnum p>
+    inline Value atFixed() const
+    {
+        auto iter = std::find(&(this->properties), &(this->properties) + this->count, p);
+        return iter != &(this->properties) + this->count ? *(&(this->properties) + std::distance(&this->properties, iter)) : BSQ_VALUE_NONE;
+    }
+};
 
 struct EqualFunctor_Union
 {

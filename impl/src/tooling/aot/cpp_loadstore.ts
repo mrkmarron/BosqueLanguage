@@ -11,7 +11,8 @@ import { CPPFrame } from "./cpp_frame";
 enum CoerceKind {
     None,
     Direct,
-    Convert,
+    Inject,
+    Extract,
     Construct,
     EphemeralConvert
 }
@@ -33,7 +34,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         assert(!(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
         if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
             return {kind: CoerceKind.Direct, alloc: 0};
@@ -43,7 +44,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
         if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
             if(trinto.basetype === "double") {
@@ -58,7 +59,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
         if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
             return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
@@ -71,12 +72,15 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             if (trinto.alignedSize === trfrom.alignedSize) {
                 return {kind: CoerceKind.None, alloc: 0}; //types may differ but if the number of slots is the same then we can just reuse
             }
+            else if(trinto.alignedSize < trfrom.alignedSize) {
+                return {kind: CoerceKind.Extract, alloc: 0};
+            }
             else {
-                return {kind: CoerceKind.Convert, alloc: 0};
+                return {kind: CoerceKind.Inject, alloc: 0};
             }
         }
         else if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
             return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
@@ -86,7 +90,7 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
         if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
             return {kind: CoerceKind.Direct, alloc: 0};
@@ -100,16 +104,24 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Direct, alloc: 0};
         }
         else if(trinto instanceof StructRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Extract, alloc: 0};
         }
         else if(trinto instanceof TRRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Extract, alloc: 0};
         }
         else if(trinto instanceof RefRepr) {
             return {kind: CoerceKind.Direct, alloc: 0};
         }
         else if(trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            if (trinto.alignedSize === trfrom.alignedSize) {
+                return {kind: CoerceKind.None, alloc: 0}; //types may differ but if the number of slots is the same then we can just reuse
+            }
+            else if(trinto.alignedSize < trfrom.alignedSize) {
+                return {kind: CoerceKind.Extract, alloc: 0};
+            }
+            else {
+                return {kind: CoerceKind.Inject, alloc: 0};
+            }
         }
         else {
             return {kind: CoerceKind.Construct, alloc: trfrom.alignedSize + StorageByteAlignment};
@@ -123,13 +135,13 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Direct, alloc: 0};
         }
         else if (trinto instanceof StructRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if(trinto instanceof TRRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if (trinto instanceof RefRepr) {
             return {kind: CoerceKind.Direct, alloc: 0};
@@ -146,13 +158,13 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
             return {kind: CoerceKind.Direct, alloc: 0};
         }
         else if (trinto instanceof StructRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if(trinto instanceof TRRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if (trinto instanceof UnionRepr) {
-            return {kind: CoerceKind.Convert, alloc: 0};
+            return {kind: CoerceKind.Inject, alloc: 0};
         }
         else if (trinto instanceof RefRepr) {
             return {kind: CoerceKind.Direct, alloc: 0};
@@ -246,7 +258,7 @@ function coerceDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
     }
 }
 
-function coerceConvert(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+function coerceInject(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
     if (trfrom instanceof NoneRepr) {
         return `${trinto.basetype}::convertToUnionNone(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
     }
@@ -278,20 +290,7 @@ function coerceConvert(trgt: string, exp: string, trfrom: TypeRepr, trinto: Type
         return `${trinto.basetype}::convertToUnionPointer<${trfrom.basetype}>(${exp}, META_DATA_LOAD_DECL(${trfrom.metadataName}), ${trgt});`;
     }
     else if(trfrom instanceof UnionRepr) {
-        if(trinto instanceof StructRepr) {
-            return `${trfrom.basetype}::extractFromUnionStruct<${trinto.basetype}>(${exp}, ${trgt});`;
-        }
-        else if(trinto instanceof TRRepr) {
-            if(trinto.kind === "tuple") {
-                return `${trfrom.basetype}::extractFromUnionTuple<${trinto.basetype}>(${exp}, ${trgt});`;
-            }
-            else {
-                return `${trfrom.basetype}::extractFromUnionRecord<${trinto.basetype}>(${exp}, ${trgt});`;
-            }
-        }
-        else {
-            return `${trfrom.basetype}::convert<${(trinto as UnionRepr).datasize}>(${exp}, ${trgt});`;
-        }
+        return `${trfrom.basetype}::convert<${(trinto as UnionRepr).datasize}>(${exp}, ${trgt});`;
     }
     else {
         if (trinto instanceof StructRepr) {
@@ -307,6 +306,60 @@ function coerceConvert(trgt: string, exp: string, trfrom: TypeRepr, trinto: Type
         }
         else {
             return `GET_TYPE_META_DATA(&${exp})->unionUnboxFromVal(${exp}, &${trgt});`;
+        }
+    }
+}
+
+function coerceExtract(trgt: string, exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof TRRepr) {
+        if(trfrom.kind === "tuple") {
+            return `${trinto.basetype}::convert<${(trinto as TRRepr).elemcount}>(${exp}, ${trgt});`;
+        }
+        else {
+            return `${trinto.basetype}::convert<${(trinto as TRRepr).elemcount}>(${exp}, ${trgt});`;
+        }
+    }
+    else {
+        if(trinto instanceof StructRepr) {
+            return `${trfrom.basetype}::extractFromUnionStruct<${trinto.basetype}>(${exp}, ${trgt});`;
+        }
+        else if(trinto instanceof TRRepr) {
+            if(trinto.kind === "tuple") {
+                return `${trfrom.basetype}::extractFromUnionTuple<${trinto.basetype}>(${exp}, ${trgt});`;
+            }
+            else {
+                return `${trfrom.basetype}::extractFromUnionRecord<${trinto.basetype}>(${exp}, ${trgt});`;
+            }
+        }
+        else {
+            return `${trfrom.basetype}::convert<${(trinto as UnionRepr).datasize}>(${exp}, ${trgt});`;
+        }
+    }
+}
+
+function coerceExtractDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof TRRepr) {
+        if(trfrom.kind === "tuple") {
+            return `${trinto.basetype}::convertDirect<${(trinto as TRRepr).elemcount}>(${exp});`;
+        }
+        else {
+            return `${trinto.basetype}::convertDirect<${(trinto as TRRepr).elemcount}>(${exp});`;
+        }
+    }
+    else {
+        if(trinto instanceof StructRepr) {
+            return `${trfrom.basetype}::extractFromUnionDirect<${trinto.basetype}>(${exp});`;
+        }
+        else if(trinto instanceof TRRepr) {
+            if(trinto.kind === "tuple") {
+                return `${trfrom.basetype}::extractFromUnionDirect<${trinto.basetype}>(${exp});`;
+            }
+            else {
+                return `${trfrom.basetype}::extractFromUnionDirect<${trinto.basetype}>(${exp});`;
+            }
+        }
+        else {
+            return `${trfrom.basetype}::convertDirect<${(trinto as UnionRepr).datasize}>(${exp});`;
         }
     }
 }
@@ -331,6 +384,26 @@ function coerceConstruct(trgt: string, exp: string, trfrom: TypeRepr, trinto: Ty
     }
 }
 
+function coerceConstructDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
+    if (trfrom instanceof PrimitiveRepr) {
+        return `Allocator::GlobalAllocator.allocateSafePrimitive<${trfrom.basetype}>(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+    }
+    else if (trfrom instanceof StructRepr) {
+        return `Allocator::GlobalAllocator.allocateSafeStruct<${trfrom.basetype}>(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+    }
+    else if (trfrom instanceof TRRepr) {
+        if (trfrom.kind === "tuple") {
+            return `${trfrom.basetype}::boxTupleDirect(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+        }
+        else {
+            return `${trfrom.basetype}::boxRecordDirect(META_DATA_LOAD_DECL(${trfrom.metadataName}), ${exp});`;
+        }
+    }
+    else {
+        return `GET_TYPE_META_DATA(&${exp})->unionBoxFromVal(${exp});`;
+    }
+}
+
 function coercePrimitive(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeRepr): [string, string[]] {
     const cop = getRequiredCoerce(trfrom, trinto);
 
@@ -340,17 +413,46 @@ function coercePrimitive(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trin
     else if(cop.kind === CoerceKind.Direct) {
         return [coerceDirect(exp, trfrom, trinto), []];
     }
-    else if(cop.kind === CoerceKind.Convert) {
+    else if(cop.kind === CoerceKind.Inject) {
         const tmp = cppframe.generateFreshName();
         cppframe.ensureLocationForVariable(tmp, trinto);
 
-        return [tmp, [coerceConvert(tmp, exp, trfrom, trinto)]];
+        return [tmp, [coerceInject(tmp, exp, trfrom, trinto)]];
+    }
+    else if(cop.kind === CoerceKind.Extract) {
+        const tmp = cppframe.generateFreshName();
+        cppframe.ensureLocationForVariable(tmp, trinto);
+
+        return [tmp, [coerceExtract(tmp, exp, trfrom, trinto)]];
     }
     else {
         const tmp = cppframe.generateFreshName();
         cppframe.ensureLocationForVariable(tmp, trinto);
 
         return [tmp, [coerceConstruct(tmp, exp, trfrom, trinto)]];
+    }
+}
+
+function coercePrimitiveDirect(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeRepr): [string, string[]] {
+    const cop = getRequiredCoerce(trfrom, trinto);
+
+    if(cop.kind === CoerceKind.None) {
+        return [exp, []];
+    }
+    else if(cop.kind === CoerceKind.Direct) {
+        return [coerceDirect(exp, trfrom, trinto), []];
+    }
+    else if(cop.kind === CoerceKind.Inject) {
+        const tmp = cppframe.generateFreshName();
+        cppframe.ensureLocationForVariable(tmp, trinto);
+
+        return [tmp, [coerceInject(tmp, exp, trfrom, trinto)]];
+    }
+    else if(cop.kind === CoerceKind.Extract) {
+        return [coerceExtractDirect(exp, trfrom, trinto), []];
+    }
+    else {
+        return [coerceConstructDirect(exp, trfrom, trinto), []];
     }
 }
 
@@ -375,6 +477,29 @@ function coerce(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeR
     }
 
     return coercePrimitive(cppframe, exp, trfrom, trinto);
+}
+
+function coerceInline(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto: TypeRepr): [string, string[]] {
+    if(trfrom instanceof EphemeralListRepr && trinto instanceof EphemeralListRepr) {
+        const cop = getRequiredCoerce(trfrom, trinto);
+
+        if(cop.kind === CoerceKind.None) {
+            return [exp, []];
+        }
+
+        let cva: string[] = [];
+        let ops: string[] = [];
+        for(let i = 0; i < trfrom.elist.length; ++i) {
+            const [icv, iops] = coercePrimitiveDirect(cppframe, `${exp}.entry_${i}`, trfrom.elist[i], trinto.elist[i]);
+            cva.push(icv);
+            ops = [...ops, ...iops];
+        }
+
+        const cexp = `{ ${cva.join(", ")} }`;
+        return [cexp, ops];
+    }
+
+    return coercePrimitiveDirect(cppframe, exp, trfrom, trinto);
 }
 
 function assignCPPValue(trepr: TypeRepr, dst: string, src: string): string {
@@ -416,8 +541,11 @@ function coerseAssignCPPValue(cppframe: CPPFrame, src: string, dst: string, trfr
     else if(cop.kind === CoerceKind.Direct) {
         return [assignCPPValue(trinto, dst, coerceDirect(src, trfrom, trinto))];
     }
-    else if(cop.kind === CoerceKind.Convert) {
-        return [coerceConvert(dst, src, trfrom, trinto)];
+    else if(cop.kind === CoerceKind.Inject) {
+        return [coerceInject(dst, src, trfrom, trinto)];
+    }
+    else if(cop.kind === CoerceKind.Extract) {
+        return [coerceExtract(dst, src, trfrom, trinto)];
     }
     else if (cop.kind === CoerceKind.Construct) {
         return [coerceConstruct(dst, src, trfrom, trinto)];
@@ -434,5 +562,5 @@ function isDirectReturnValue(trepr: TypeRepr) {
 
 export {
     CoerceKind,
-    getRequiredCoerce, coerce, assignCPPValue, coerseAssignCPPValue, isDirectReturnValue
+    getRequiredCoerce, coerce, coerceInline, assignCPPValue, coerseAssignCPPValue, isDirectReturnValue
 };

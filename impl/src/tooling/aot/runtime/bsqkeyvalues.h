@@ -167,14 +167,14 @@ struct BSQString
         BSQStringInlineContents u_inline;
     };
 
-    inline static void initializeSmall(size_t count, wchar_t* chars, BSQString* into)
+    inline static void initializeSmall(size_t count, const wchar_t* chars, BSQString& into)
     {
         into->u_sdata = nullptr;
         GC_MEM_COPY(into->u_inline.data, chars, count);
         into->u_inline.data[4] = (wchar_t)count;
     }
 
-    static void initializeLargeFlat(size_t count, wchar_t* chars, BSQString* into)
+    static void initializeLargeFlat(size_t count, const wchar_t* chars, BSQString& into)
     {
         wchar_t* contents = nullptr;
         into->u_sdata = Allocator::GlobalAllocator.collectionNew<BSQStringFlatContents, wchar_t>(META_DATA_LOAD_DECL(MetaData_StringFlatContents), count, &contents, count);
