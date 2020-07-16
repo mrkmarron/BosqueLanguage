@@ -17,12 +17,6 @@
 #include "bsqmetadata.h"
 
 ////////
-//GCStack
-
-#define GC_STACK_LOAD(T, BASE, IDX) (*((T*)(BASE + IDX)))
-#define GC_STACK_STORE(T, BASE, IDX, V) (*((T*)(BASE + IDX))) = (V))
-
-////////
 //Memory allocator
 
 #define MEM_STATS
@@ -814,10 +808,37 @@ namespace BSQ
         template <typename T>
         inline T* allocateSafe(MetaData* mdata)
         {
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            uint8_t* alloc = this->nsalloc.allocateSafe<asize>();
+
+            *((MetaData**)alloc) = mdata;
+            T* res = (T*)(alloc + sizeof(MetaData));
+            
+            return res;
+        }
+
+        template <typename T, typename U, uint16_t count>
+        inline T* allocateSafePlus(MetaData* mdata, U** contents)
+        {
+            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T)) + BSQ_ALIGN_ALLOC_SIZE(sizeof(U) * count);
+            uint8_t* alloc = this->nsalloc.allocateSafe(asize);
+
+            *((MetaData**)alloc) = mdata;
+            T* res = (T*)(alloc + sizeof(MetaData));
+            *contents = (U*)(alloc + sizeof(MetaData) + sizeof(T));
+            
+            return res;
+        }
+
+        template <typename T, typename U>
+        inline T* allocateSafePlusDynamic(MetaData* mdata, U** contents, size_t count)
+        {
+            size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T)) + BSQ_ALIGN_ALLOC_SIZE(sizeof(U) * count);
             uint8_t* alloc = this->nsalloc.allocateSafeDynamic(asize);
 
             *((MetaData**)alloc) = mdata;
             T* res = (T*)(alloc + sizeof(MetaData));
+            *contents = (U*)(alloc + sizeof(MetaData) + sizeof(T));
             
             return res;
         }

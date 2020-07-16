@@ -14,6 +14,18 @@ struct BSQList
 {
     size_t count;
 
+    template <typename Ty, uint16_t count>
+    inline static Ty* singletonInit(MetaData* mdata, std::initializer_list<Value> values)
+    {
+        T* contents = nullptr;
+        Ty* alloc = Allocator::GlobalAllocator.allocateSafePlus<Ty, T, count>(mdata);
+
+        alloc->count = count;
+        std::copy(values.begin(), values.end(), contents);
+
+        return alloc;
+    }
+
     template <typename DisplayF>
     std::wstring display() const
     {

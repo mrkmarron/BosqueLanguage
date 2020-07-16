@@ -229,6 +229,66 @@ class CPPBodyEmitter {
         return this.coerceArgsInlinePlus(0, ...args);
     }
 
+    coerceAccessPlus(xsize: number, ...args: [string, MIRType, MIRType][]): [string[], string[]] {
+        let nargs: string[] = [];
+        let ops: string[] = [];
+    
+        let rsize = 0;
+        for(let i = 0; i < args.length; ++i) {
+            const [arg, from, into] = args[i];
+            const argrepr = this.typegen.getCPPReprFor(from);
+            const intorepr = this.typegen.getCPPReprFor(into);
+    
+            const cci = getRequiredCoerce(argrepr, intorepr);
+            rsize += cci.alloc;
+
+            let [nval, nops] = coerce(this.cppframe, arg, argrepr, intorepr);
+
+            nargs.push(nval);
+            ops = [...ops, ...nops];
+        }
+
+        if(rsize !== 0) {
+            ops = [`Allocator::GlobalAllocator.ensureSpace<${rsize + xsize}>();`, ...ops];
+        }
+
+        return [nargs, ops];
+    }
+
+    coerceAccess(...args: [string, MIRType, MIRType][]): [string[], string[]] {
+        return this.coerceAccessPlus(0, ...args);
+    }
+
+    coerceAccessInlinePlus(xsize: number, ...args: [string, MIRType, MIRType][]): [string[], string[]] {
+        let nargs: string[] = [];
+        let ops: string[] = [];
+    
+        let rsize = 0;
+        for(let i = 0; i < args.length; ++i) {
+            const [arg, from, into] = args[i];
+            const argrepr = this.typegen.getCPPReprFor(from);
+            const intorepr = this.typegen.getCPPReprFor(into);
+    
+            const cci = getRequiredCoerce(argrepr, intorepr);
+            rsize += cci.alloc;
+
+            let [nval, nops] = coerceInline(this.cppframe, arg, argrepr, intorepr);
+
+            nargs.push(nval);
+            ops = [...ops, ...nops];
+        }
+
+        if(rsize !== 0) {
+            ops = [`Allocator::GlobalAllocator.ensureSpace<${rsize + xsize}>();`, ...ops];
+        }
+
+        return [nargs, ops];
+    }
+
+    coerceAccessInline(...args: [string, MIRType, MIRType][]): [string[], string[]] {
+        return this.coerceAccessInlinePlus(0, ...args);
+    }
+
     coerceResult(result: string, oftype: MIRType, intoname: string, intotype: MIRType): string[] {
         const resrepr = this.typegen.getCPPReprFor(oftype);
         const intorepr = this.typegen.getCPPReprFor(intotype);
@@ -353,7 +413,10 @@ class CPPBodyEmitter {
         const nrepr = this.typegen.getCPPReprFor(this.getArgType(arg));
         const irepr = this.typegen.getCPPReprFor(infertype)
 
-        if (nrepr instanceof RefRepr) {
+        if (nrepr instanceof StructRepr) {
+            return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}.${this.typegen.mangleStringForCpp(field)}`;
+        } 
+        else if (nrepr instanceof RefRepr) {
             return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}->${this.typegen.mangleStringForCpp(field)}`;
         }
         else if (nrepr instanceof UnionRepr) {
@@ -361,6 +424,23 @@ class CPPBodyEmitter {
         }
         else {
             return `((${(irepr.storagetype)})${this.cppframe.getExpressionForName(this.varToCppName(arg))})->${this.typegen.mangleStringForCpp(field)}`;
+        }
+    }
+
+    generateFieldExpressionVLookup(arg: MIRArgument, field: MIRFieldKey, into: string): string {
+        const fdecl = this.assembly.fieldDecls.get(field) as MIRFieldDecl;
+        const argrepr = this.typegen.getCPPReprFor(this.getArgType(arg));
+        const ftag = `(int32_t)MIRFieldEnum::${this.typegen.mangleStringForCpp(fdecl.fkey)}`;
+        
+        if (argrepr instanceof UnionRepr) {
+            const argexp = this.cppframe.getExpressionForName(this.varToCppName(arg));
+            const metaexp = `${argexp}.umeta->getVFieldOps<${ftag}>().loadFromUnion`;
+            return `${metaexp}(&${argexp}, &${into})`;
+        }
+        else {
+            const argexp = this.cppframe.getExpressionForName(this.varToCppName(arg));
+            let metaexp = `GET_TYPE_META_DATA((${argrepr.storagetype})${argexp}))->getVFieldOps<${ftag}>().loadFromPointer`;
+            return `${metaexp}(${argexp}, &${into})`;
         }
     }
 
@@ -397,7 +477,7 @@ class CPPBodyEmitter {
             const arepr = this.typegen.getCPPReprFor(argtype);
 
             if(arepr instanceof RefRepr) {
-                return "false";
+                return `(${this.generateArgSrc(arg)} == BSQ_NONE_VALUE)`;
             }
             else if(arepr instanceof UnionRepr) {
                 return `${this.generateArgSrc(arg)}.umeta->nominaltype == MIRNominalTypeEnum_None)`;
@@ -492,7 +572,7 @@ class CPPBodyEmitter {
             const [cargs, ops] = this.coerceArgsInlinePlus(crepr.alignedSize + StorageByteAlignment, ...argpairs);
 
             this.ensureLocationForTrgt(cp.trgt);
-            const alloc = `${this.generateArgStore(cp.trgt)} = Allocator::GlobalAllocator.allocateT<${cppcrepr.basetype}>(META_DATA_LOAD_DECL(${cppcrepr.metadataName}));`;
+            const alloc = `${this.generateArgStore(cp.trgt)} = Allocator::GlobalAllocator.allocateSafe<${cppcrepr.basetype}>(META_DATA_LOAD_DECL(${cppcrepr.metadataName}));`;
             const assign = `*${this.generateArgStore(cp.trgt)} = {${cargs.join(", ")}};`;
 
             return [...ops, alloc, assign];
@@ -503,14 +583,16 @@ class CPPBodyEmitter {
         const cpetype = this.typegen.getMIRType(cpce.tkey);
         const cppctype = this.typegen.getCPPReprFor(cpetype).basetype;
 
+        this.ensureLocationForTrgt(cpce.trgt);
         return `${this.generateArgStore(cpce.trgt)} = ${cppctype}::empty;`;
     }
 
-    generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string {
+    generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): string[] {
         const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const cppctype = this.typegen.getCPPReprFor(cpcstype).basetype;
+        const cpcsrepr = this.typegen.getCPPReprFor(cpcstype);
 
         let oftype = this.typegen.noneType;
+        let extraalloc = 1;
         if (this.typegen.typecheckIsName(cpcstype, /^NSCore::List<.*>$/)) {
             oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
         }
@@ -522,6 +604,7 @@ class CPPBodyEmitter {
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcstype, /^NSCore::DynamicSet<.*>$/)) {
             oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+            extraalloc = 2; //we may want to resize
         }
         else {
             const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
@@ -536,304 +619,377 @@ class CPPBodyEmitter {
         for (let i = 0; i < cpcs.args.length; ++i) {
             argpairs.push([cpcs.args[i], oftype]);
         }
-        const [cargs, ops] = this.coerceArgs(...argpairs);
 
+        const crepr = this.typegen.getCPPReprFor(oftype);
+        const csize = cpcsrepr.alignedSize + StorageByteAlignment + (crepr.alignedSize * argpairs.length);
 
+        const [cargs, ops] = this.coerceArgsInlinePlus(extraalloc * csize, ...argpairs);
+
+        this.ensureLocationForTrgt(cpcs.trgt);
         let conscall = "[INVALID CONS CALL]";
-        const ntype = `MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(cpcs.tkey)}`
         if (this.typegen.typecheckIsName(cpcstype, /^NSCore::List<.*>$/)) {
-            conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
+            conscall = `${this.generateArgStore(cpcs.trgt)} = BSQList<${crepr.storagetype}>::processSingletonInit<${cpcsrepr.basetype}, ${argpairs.length}>(META_DATA_LOAD_DECL(${crepr.metadataName}), {${cargs.join(", ")}});`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Stack<.*>$/)) {
-            conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
+            conscall = `${this.generateArgStore(cpcs.trgt)} = BSQStack<${crepr.storagetype}>::processSingletonInit<${cpcsrepr.basetype}, ${argpairs.length}>(META_DATA_LOAD_DECL(${crepr.metadataName}), {${cargs.join(", ")}});`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Queue<.*>$/)) {
-            conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, { ${cvals.join(", ")} })`;
+            conscall = `${this.generateArgStore(cpcs.trgt)} = BSQQueue<${crepr.storagetype}>::processSingletonInit<${cpcsrepr.basetype}, ${argpairs.length}>(META_DATA_LOAD_DECL(${crepr.metadataName}), {${cargs.join(", ")}});`;
         }
         else if (this.typegen.typecheckIsName(cpcstype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcstype, /^NSCore::DynamicSet<.*>$/)) {
-            const trepr = this.typegen.getCPPReprFor(oftype);
             const tops = this.typegen.getFunctorsForType(oftype);
 
-            const pvals = `BSQSet<${trepr.std}, ${tops.dec}, ${tops.display}, ${tops.less}, ${tops.eq}>::processSingletonSetInit<${tops.inc}>({ ${cvals} })`
-            conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, ${pvals})`;
+            conscall = `${this.generateArgStore(cpcs.trgt)} = BSQSet<${crepr.storagetype}, ${tops.less}, ${tops.eq}>::processSingletonInit<${cpcsrepr.basetype}, ${argpairs.length}>(META_DATA_LOAD_DECL(${crepr.metadataName}), {${cargs.join(", ")}});`;
         }
         else {
             const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
             const vtype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
 
-            const entrytype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "MapEntry" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey && (edecl[1].terms.get("V") as MIRType).trkey === vtype.trkey);
-            const entryentity = (entrytype as [string, MIREntityTypeDecl])[1];
-            const oftype = this.typegen.getMIRType(entryentity.tkey);
-
-            const entrykaccess = this.typegen.mangleStringForCpp((entryentity.fields.find((fd) => fd.name === "key") as MIRFieldDecl).fkey);
-            const entryvaccess = this.typegen.mangleStringForCpp((entryentity.fields.find((fd) => fd.name === "value") as MIRFieldDecl).fkey);
-
-            const cvals = cpcs.args.map((arg) => `MEntry<${this.typegen.getCPPReprFor(ktype).std}, ${this.typegen.getCPPReprFor(vtype).std}>{${this.argToCpp(arg, oftype)}.${entrykaccess}, ${this.argToCpp(arg, oftype)}.${entryvaccess}}`);
-            
             const krepr = this.typegen.getCPPReprFor(ktype);
             const kops = this.typegen.getFunctorsForType(ktype);
             const vrepr = this.typegen.getCPPReprFor(vtype);
-            const vops = this.typegen.getFunctorsForType(vtype);
 
-            const pvals = `BSQMap<${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.less}, ${kops.eq}, ${vrepr.std}, ${vops.dec}, ${vops.display}>::processSingletonMapInit<${kops.inc}, ${vops.inc}>({ ${cvals} })`
-            conscall = `BSQ_NEW_ADD_SCOPE(${scopevar}, ${cppctype}, ${ntype}, ${pvals})`;
+            conscall = `${this.generateArgStore(cpcs.trgt)} = BSQMap<${krepr.storagetype}, ${vrepr.storagetype}, ${kops.less}, ${kops.eq}, ${crepr.storagetype}, KGET_${crepr.basetype}, VGET_${crepr.basetype}>::singletonInit<${cpcsrepr.basetype}, ${argpairs.length}(META_DATA_LOAD_DECL(${crepr.metadataName}), {${cargs.join(", ")}});`;
         }
 
-        return `${this.varToCppName(cpcs.trgt)} = ${conscall};`;
+        return [...ops, conscall];
     }
 
-    generateMIRConstructorTuple(op: MIRConstructorTuple): string {
-        const args = op.args.map((arg) => this.argToCpp(arg, this.typegen.anyType));
-
-        if(args.length === 0) {
-            return `${this.varToCppName(op.trgt)} = BSQTuple::_empty;`;
+    generateMIRConstructorTuple(op: MIRConstructorTuple): string[] {
+        if(op.args.length === 0) {
+            //Other fields should be 0 filled by default through zerofill
+            return [`${this.generateArgStore(op.trgt)}.flag = DATA_KIND_ALL_FLAG;`];
         }
         else {
+            let argpairs: [MIRArgument, MIRType][] = [];
+            for (let i = 0; i < op.args.length; ++i) {
+                argpairs.push([op.args[i], this.typegen.anyType]);
+            }
+
+            const [cargs, ops] = this.coerceArgsInline(...argpairs);
+
+            const trepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(op.resultTupleType));
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultTupleType));
-            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${iflag}>({ ${args.join(", ")} });`;
+
+            this.ensureLocationForTrgt(op.trgt);
+            const ctuple = `${trepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+            return [...ops, ctuple];
         }
     }
 
-    generateMIRConstructorRecord(op: MIRConstructorRecord): string {
-        const args = op.args.map((arg) => `std::make_pair(MIRPropertyEnum::${arg[0]}, ${this.argToCpp(arg[1], this.typegen.anyType)})`);
-
-        if(args.length === 0) {
-            return `${this.varToCppName(op.trgt)} = BSQRecord::_empty;`;
+    generateMIRConstructorRecord(op: MIRConstructorRecord): string[] {
+        if(op.args.length === 0) {
+            //Other fields should be 0 filled by default through zerofill
+            return [`${this.generateArgStore(op.trgt)}.flag = DATA_KIND_ALL_FLAG;`];
         }
         else {
+            let argpairs: [MIRArgument, MIRType][] = [];
+            for (let i = 0; i < op.args.length; ++i) {
+                argpairs.push([op.args[i][1], this.typegen.anyType]);
+            }
+
+            const [cargs, ops] = this.coerceArgsInline(...argpairs);
+
+            const trepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(op.resultRecordType));
             const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultRecordType));
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${iflag}>({ ${args.join(", ")} });`;
+
+            const propertyset = `BSQPropertySet::knownRecordPropertySets[MIRRecordPropertySetsEnum::ps${trepr.basetype}].data()`
+
+            this.ensureLocationForTrgt(op.trgt);
+            const crecord = `${trepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, ${propertyset}, { ${cargs.join(", ")} });`;
+
+            return [...ops, crecord];
         }
     }
 
-    generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): string {
+    generateMIRConstructorEphemeralValueList(op: MIRConstructorEphemeralValueList): string[] {
         const etype = this.typegen.getMIRType(op.resultEphemeralListType).options[0] as MIREphemeralListType;
 
-        let args: string[] = [];
-        for(let i = 0; i < op.args.length; ++i) {
-            args.push(this.argToCpp(op.args[i], etype.entries[i]));
+        let argpairs: [MIRArgument, MIRType][] = [];
+        for (let i = 0; i < op.args.length; ++i) {
+            argpairs.push([op.args[i], etype.entries[i]]);
         }
 
-        return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(etype.trkey)}{${args.join(", ")}};`;
+        const [cargs, ops] = this.coerceArgsInline(...argpairs);
+
+        this.ensureLocationForTrgt(op.trgt);
+        const cephemeral = `${this.generateArgStore(op.trgt)} = { ${cargs.join(", ")} };`;
+
+        return [...ops, cephemeral];
     }
 
-    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string {
+    generateMIRProjectFromIndecies(op: MIRProjectFromIndecies, resultAccessType: MIRType): string[] {
         const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
-        let vals: string[] = [];
 
+        let argpairs: [string, MIRType, MIRType][] = [];
         for (let i = 0; i < op.indecies.length; ++i) {
-            vals.push(this.generateMIRAccessFromIndexExpression(op.arg, op.indecies[i], intotypes[i] || this.typegen.anyType));
+            argpairs.push([this.generateIndexExpression(op.arg, op.indecies[i]), this.typegen.anyType, intotypes[i] || this.typegen.anyType]);
         }
 
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        this.ensureLocationForTrgt(op.trgt);
         if (this.typegen.typecheckEphemeral(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}{${vals.join(", ")}};`;
+            const cephemeral = `${this.generateArgStore(op.trgt)} = { ${cargs.join(", ")} };`;
+
+            return [...ops, cephemeral];
         }
         else {
             const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
-            return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${iflag}>({ ${vals.join(", ")} });`;
+            const rrepr = this.typegen.getCPPReprFor(resultAccessType);
+            const ctuple = `${rrepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+            return [...ops, ctuple];
         }
     }
 
-    generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): string {
+    generateMIRModifyWithIndecies(op: MIRModifyWithIndecies, resultTupleType: MIRType): string[] {
         const updmax = Math.max(...op.updates.map((upd) => upd[0] + 1));
 
-        let cvals: string[] = [];
+        let argpairs: [string, MIRType, MIRType][] = [];
         for (let i = 0; i < updmax; ++i) {
             const upd = op.updates.find((update) => update[0] === i);
             if (upd !== undefined) {
-                cvals.push(this.argToCpp(upd[1], this.typegen.anyType));
-            }
+                argpairs.push([this.generateArgSrc(upd[1]), this.getArgType(upd[1]), this.typegen.anyType]);
+            } 
             else {
-                cvals.push(this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType));
+                argpairs.push([this.generateIndexExpression(op.arg, i), this.typegen.anyType, this.typegen.anyType]);
             }
         }
 
         const rmax = this.typegen.getMaxTupleLength(resultTupleType);
         for (let i = updmax; i < rmax; ++i) {
             //may put none in the constructor list but ok since we note correct length and will ignore these if extranious
-            cvals.push(this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType));
+            argpairs.push([this.generateIndexExpression(op.arg, i), this.typegen.anyType, this.typegen.anyType]);
         }
 
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        const trepr = this.typegen.getCPPReprFor(resultTupleType);
+        this.ensureLocationForTrgt(op.trgt);
+
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${iflag}>({ ${cvals.join(", ")} });`; 
+        const ctuple = `${trepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+        return [...ops, ctuple];
     }
 
-    generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): string {
+    generateMIRStructuredExtendTuple(op: MIRStructuredExtendTuple, resultTupleType: MIRType): string[] {
          //this is the exact number of indecies in arg -- see typecheck
          const btuple = this.typegen.getMaxTupleLength(this.typegen.getMIRType(op.argInferType));
 
-        let cvals: string[] = [];
+        let argpairs: [string, MIRType, MIRType][] = [];
         for (let i = 0; i < btuple; ++i) {
-            cvals.push(this.generateMIRAccessFromIndexExpression(op.arg, i, this.typegen.anyType));
+            argpairs.push([this.generateIndexExpression(op.arg, i), this.typegen.anyType, this.typegen.anyType]);
         }
 
         const rmax = this.typegen.getMaxTupleLength(resultTupleType);
         for (let i = btuple; i < rmax; ++i) {
             //may put none in the constructor list but ok since we note correct length and will ignore these if extranious
-            cvals.push(this.generateMIRAccessFromIndexExpression(op.update, i - btuple, this.typegen.anyType));
+            argpairs.push([this.generateIndexExpression(op.update, i - btuple), this.typegen.anyType, this.typegen.anyType]);
         }
 
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        const trepr = this.typegen.getCPPReprFor(resultTupleType);
+        this.ensureLocationForTrgt(op.trgt);
+
         const iflag = this.typegen.generateInitialDataKindFlag(resultTupleType);
-        return `${this.varToCppName(op.trgt)} = BSQTuple::createFromSingle<${iflag}>({ ${cvals.join(", ")} });`; 
+        const ctuple = `${trepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+        return [...ops, ctuple];
     }
 
     generateMIRHasPropertyExpression(arg: MIRArgument, property: string): string {
-        const rrepr = this.typegen.getCPPReprFor(this.getArgType(arg));
-
-        if (rrepr instanceof StructRepr) {
-            return `${this.varToCppName(arg)}.hasProperty<MIRPropertyEnum::${property}>()`;
+        const rectype = this.getArgType(arg);
+        const hasproperty = this.typegen.recordHasField(rectype, property);
+    
+        if(hasproperty === "no") {
+            return "false";
         }
         else {
-            return `BSQ_GET_VALUE_PTR(${this.varToCppName(arg)}, BSQRecord)->hasProperty<MIRPropertyEnum::${property}>()`;
-        }
-    }
-
-    generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): string {
-        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
-        let vals: string[] = [];
-
-        for (let i = 0; i < op.properties.length; ++i) {
-            vals.push(this.generateMIRAccessFromPropertyExpression(op.arg, op.properties[i], intotypes[i] || this.typegen.anyType));
-        }
-
-        if (this.typegen.typecheckEphemeral(resultAccessType)) {
-            return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(resultAccessType.trkey)}{${vals.join(", ")}};`;
-        }
-        else {
-            const rargs: string[] = [];
-            for(let i = 0; i < op.properties.length; ++i) {
-                rargs.push(`{ MIRPropertyEnum::${op.properties[i]}, ${vals[i]} }`);
+            const rrepr = this.typegen.getCPPReprFor(rectype);
+            if(rrepr instanceof TRRepr) {
+                return `${this.cppframe.getExpressionForName(this.varToCppName(arg))}.hasProperty<MIRPropertyEnum::${property}>()`;
             }
-
-            const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
-            return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${iflag}>({ ${rargs.join(", ")} });`;
-        }
-    }
-
-    generateAccessRecordPtr(argv: MIRArgument): string {
-        const arg = this.varToCppName(argv);
-        const rrepr = this.typegen.getCPPReprFor(this.getArgType(argv));
-        if (rrepr instanceof StructRepr) {
-            return `&(${arg})`;
-        }
-        else {
-            return `BSQ_GET_VALUE_PTR(${arg}, BSQRecord)`;
-        }
-    }
-
-    generateMIRModifyWithProperties(op: MIRModifyWithProperties, resultRecordType: MIRType): string {
-        const pmax = this.typegen.getMaxPropertySet(resultRecordType);
-
-        let cvals: string[] = [];
-        for (let i = 0; i < pmax.length; ++i) {
-            const pname = pmax[i];
-            const upd = op.updates.find((update) => update[0] === pname);
-            if (upd !== undefined) {
-                cvals.push(`{ MIRPropertyEnum::${pname}, ${this.argToCpp(upd[1], this.typegen.anyType)} }`);
-            }
-        }
-
-        const iflag = this.typegen.generateInitialDataKindFlag(resultRecordType);
-        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate<${iflag}>(${this.generateAccessRecordPtr(op.arg)}, { ${cvals.join(", ")} });`;
-    }
-
-    generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultRecordType: MIRType): string {
-        const rprops = this.typegen.getMaxPropertySet(resultRecordType);
-        const mtype = this.typegen.getMIRType(op.updateInferType);
-
-        let cvals: string[] = [];
-        for(let i = 0; i < rprops.length; ++i) {
-            const pname = rprops[i];
-            const uhas = this.typegen.recordHasField(mtype, pname);
-            if(uhas === "no") {
-                //nothing to do
-            }
-            else if (uhas === "yes") {
-                cvals.push(`{ MIRPropertyEnum::${pname}, ${this.generateMIRAccessFromPropertyExpression(op.update, pname, this.typegen.anyType)} }`);
+            else if (rrepr instanceof UnionRepr) {
+                return `(UnionValue::extractPointerToContent<BSQRecordDynamic>(${this.cppframe.getExpressionForName(this.varToCppName(arg))})->hasProperty<${property}>()`;
             }
             else {
-                const check = `${this.generateAccessRecordPtr(op.update)}->hasProperty(MIRPropertyEnum::${pname})`;
-                cvals.push(`${check} ? ${this.generateMIRAccessFromPropertyExpression(op.update, pname, this.typegen.anyType)}) : ${this.generateMIRAccessFromPropertyExpression(op.arg, pname, this.typegen.anyType)})`);
+                return `((BSQTupleDynamic*)${this.cppframe.getExpressionForName(this.varToCppName(arg))})->hasProperty<${property}>()`;
             }
+        }
+    }
+
+    generateMIRProjectFromProperties(op: MIRProjectFromProperties, resultAccessType: MIRType): string[] {
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
+       
+        let argpairs: [string, MIRType, MIRType][] = [];
+        for (let i = 0; i < op.properties.length; ++i) {
+            argpairs.push([this.generatePropertyExpression(op.arg, op.properties[i]), this.typegen.anyType, intotypes[i] || this.typegen.anyType]);
+        }
+
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        this.ensureLocationForTrgt(op.trgt);
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            const cephemeral = `${this.generateArgStore(op.trgt)} = { ${cargs.join(", ")} };`;
+
+            return [...ops, cephemeral];
+        }
+        else {
+            const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
+            const rrepr = this.typegen.getCPPReprFor(resultAccessType);
+            const ctuple = `${rrepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+            return [...ops, ctuple];
+        }
+    }
+
+    generateMIRModifyWithProperties(op: MIRModifyWithProperties, resultRecordType: MIRType): string[] {
+        let argpairs: [string, MIRType, MIRType][] = [[this.generateArgSrc(op.arg), this.getArgType(op.arg), this.typegen.getMIRType(op.argInferType)]];
+        for (let i = 0; i < op.updates.length; ++i) {
+            argpairs.push([this.generateArgSrc(op.updates[i][1]), this.getArgType(op.updates[i][1]), this.typegen.anyType]);
+        }
+
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        let updates: string[] = [];
+        for (let i = 0; i < op.updates.length; ++i) {
+            updates.push(`{ MIRPropertyEnum::${op.updates[0]}, ${cargs[i + 1]} }`);
         }
 
         const iflag = this.typegen.generateInitialDataKindFlag(resultRecordType);
-        return `${this.varToCppName(op.trgt)} = BSQRecord::createFromUpdate<${iflag}>(${this.generateAccessRecordPtr(op.arg)}, { ${cvals.join(", ")} });`;
+        const rrepr = this.typegen.getCPPReprFor(resultRecordType);
+        const crecord = `${rrepr.basetype}::createFromUpdate<${iflag}>(${this.generateArgStore(op.trgt)}, ${updates[0]}, { ${updates.join(", ")} });`;
+
+        return [...ops, crecord];
     }
 
-    generateVFieldLookup(arg: MIRArgument, tag: string, infertype: MIRType, fdecl: MIRFieldDecl): string {
-        const lname = `resolve_${fdecl.fkey}_from_${infertype.trkey}`;
-        let decl = this.vfieldLookups.find((lookup) => lookup.lname === lname);
-        if(decl === undefined) {
-            this.vfieldLookups.push({ infertype: infertype, fdecl: fdecl, lname: lname });
-        }
+    generateMIRStructuredExtendRecord(op: MIRStructuredExtendRecord, resultRecordType: MIRType): string[] {
+        let argpairs: [string, MIRType, MIRType][] = [
+            [this.generateArgSrc(op.arg), this.getArgType(op.arg), this.typegen.getMIRType(op.argInferType)],
+            [this.generateArgSrc(op.update), this.getArgType(op.update), this.typegen.getMIRType(op.updateInferType)]
+        ];
+        
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
 
-        return `${this.typegen.mangleStringForCpp(lname)}(${tag}, ${this.argToCpp(arg, infertype)})`;
+        const iflag = this.typegen.generateInitialDataKindFlag(resultRecordType);
+        const rrepr = this.typegen.getCPPReprFor(resultRecordType);
+        const crecord = `${rrepr.basetype}::createFromMerge<${iflag}>(${this.generateArgStore(op.trgt)}, ${cargs[0]}, ${cargs[1]});`;
+
+        return [...ops, crecord];
     }
 
-    generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string {
+    generateMIRAccessFromField(op: MIRAccessFromField, resultAccessType: MIRType): string[] {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
 
-        return `${this.varToCppName(op.trgt)} = ${this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, op.field, resultAccessType)};`;
-    }
-
-    generateVFieldProject(arg: MIRArgument, infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType): string {
-        const upnames = fprojs.map((fp) => fp.fkey);
-        const uname = `project_${upnames.sort().join("*")}_in_${infertype.trkey}`;
-        let decl = this.vfieldProjects.find((lookup) => lookup.uname === uname);
-        if(decl === undefined) {
-            this.vfieldProjects.push({ infertype: infertype, fprojs: fprojs, resultAccessType: resultAccessType, uname: uname });
-        }
-
-        return `${this.typegen.mangleStringForCpp(uname)}(${this.argToCpp(arg, infertype)})`;
-    }
-
-    generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): string {
-        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        const fdecl = this.assembly.fieldDecls.get(op.field) as MIRFieldDecl;
+        const ftype = this.typegen.getMIRType(fdecl.declaredType);
 
         if (this.typegen.typecheckUEntity(inferargtype)) {
-            if (this.typegen.typecheckEphemeral(resultAccessType)) {
-                let cvals: string[] = [];
-                op.fields.map((f, i) => {
-                    const rtype = this.typegen.getEpehmeralType(resultAccessType).entries[i];
-                    cvals.push(this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, rtype));
-                });
+            const access = this.generateFieldExpressionKnown(op.arg, inferargtype, fdecl.fkey);
 
-                return `${this.varToCppName(op.trgt)} = ${this.typegen.mangleStringForCpp(op.resultProjectType)}{${cvals.join(", ")}};`;
-            }
-            else {
-                let cvals: string[] = [];
-                op.fields.map((f) => {
-                    const fdecl = this.assembly.fieldDecls.get(f) as MIRFieldDecl;
-                    const val = this.generateMIRAccessFromFieldExpression(op.arg, inferargtype, f, this.typegen.anyType);
-
-                    cvals.push(`{ MIRPropertyEnum::${fdecl.name}, ${val} }`);
-                });
-
-                const iflag = this.typegen.generateInitialDataKindFlag(this.typegen.getMIRType(op.resultProjectType));
-                return `${this.varToCppName(op.trgt)} = BSQRecord::createFromSingle<${iflag}>({ ${cvals.join(", ")} });`;
-            }
+            this.ensureLocationForTrgt(op.trgt);
+            return coerseAssignCPPValue(this.cppframe, access, this.generateArgStore(op.trgt), this.typegen.getCPPReprFor(ftype), this.typegen.getCPPReprFor(resultAccessType));
         }
         else {
-            const vproject = this.generateVFieldProject(op.arg, inferargtype, op.fields.map((f) => this.assembly.fieldDecls.get(f) as MIRFieldDecl), resultAccessType);
-            return `${this.varToCppName(op.trgt)} = ${vproject};`;
+            const tmpvfl = this.cppframe.generateFreshName("vfl");
+            this.cppframe.ensureLocationForVariable(tmpvfl, this.typegen.getCPPReprFor(ftype));
+            const access = this.generateFieldExpressionVLookup(op.arg, fdecl.fkey, this.cppframe.getExpressionForName(tmpvfl));
+
+            this.ensureLocationForTrgt(op.trgt);
+            return coerseAssignCPPValue(this.cppframe, access, this.generateArgStore(op.trgt), this.typegen.getCPPReprFor(ftype), this.typegen.getCPPReprFor(resultAccessType));
         }
     }
 
-    generateVFieldUpdate(arg: MIRArgument, infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], resultAccessType: MIRType): string {
-        const upnames = fupds.map((fud) => `${fud[0].fkey}->${this.getArgType(fud[1])}`);
-        const uname = `update_${upnames.sort().join("*")}_in_${infertype.trkey}`;
-        let decl = this.vfieldUpdates.find((lookup) => lookup.uname === uname);
-        if(decl === undefined) {
-            this.vfieldUpdates.push({ infertype: infertype, fupds: fupds, resultAccessType: resultAccessType, uname: uname });
+    generateMIRProjectFromFields(op: MIRProjectFromFields, resultAccessType: MIRType): string[] {
+        const inferargtype = this.typegen.getMIRType(op.argInferType);
+        const intotypes = this.typegen.typecheckEphemeral(resultAccessType) ? (resultAccessType.options[0] as MIREphemeralListType).entries : [];
+       
+        let vfpops: string[] = [];
+        let argpairs: [string, MIRType, MIRType][] = [];
+        for (let i = 0; i < op.fields.length; ++i) {
+            const fdecl = this.assembly.fieldDecls.get(op.fields[i]) as MIRFieldDecl;
+            const ftype = this.typegen.getMIRType(fdecl.declaredType);
+            const intotype = intotypes[i] || this.typegen.anyType;
+
+            if(this.typegen.typecheckUEntity(inferargtype)) {
+                argpairs.push([this.generateFieldExpressionKnown(op.arg, inferargtype, op.fields[i]), ftype, intotype]);
+            }
+            else {
+                const into = this.cppframe.generateFreshName("vfp");
+                this.cppframe.ensureLocationForVariable(into, this.typegen.getCPPReprFor(ftype));
+                vfpops.push(this.generateFieldExpressionVLookup(op.arg, op.fields[i], into));
+                argpairs.push([into, ftype, intotype]);
+            }
         }
 
-        return `${this.typegen.mangleStringForCpp(uname)}(${this.argToCpp(arg, infertype)}, ${fupds.map((upd) => this.argToCpp(upd[1], this.getArgType(upd[1]))).join(", ")})`;
+        const [cargs, ops] = this.coerceAccessInline(...argpairs);
+
+        this.ensureLocationForTrgt(op.trgt);
+        if (this.typegen.typecheckEphemeral(resultAccessType)) {
+            const cephemeral = `${this.generateArgStore(op.trgt)} = { ${cargs.join(", ")} };`;
+
+            return [...vfpops, ...ops, cephemeral];
+        }
+        else {
+            const iflag = this.typegen.generateInitialDataKindFlag(resultAccessType);
+            const rrepr = this.typegen.getCPPReprFor(resultAccessType);
+            const ctuple = `${rrepr.basetype}::createFromSingle<${iflag}>(${this.generateArgStore(op.trgt)}, { ${cargs.join(", ")} });`;
+
+            return [...vfpops, ...ops, ctuple];
+        }
     }
 
     generateMIRModifyWithFields(op: MIRModifyWithFields, resultAccessType: MIRType): string {
         const inferargtype = this.typegen.getMIRType(op.argInferType);
+        const inferrepr = this.typegen.getCPPReprFor(inferargtype);
         
+        let argpairs: [string, MIRType, MIRType][] = [[this.generateArgSrc(op.arg), this.getArgType(op.arg), this.typegen.getMIRType(op.argInferType)]];
+        for (let i = 0; i < op.updates.length; ++i) {
+            argpairs.push([this.generateArgSrc(op.updates[i][1]), this.getArgType(op.updates[i][1]), this.typegen.anyType]);
+        }
+
+        const [cargs, ops] = this.coerceAccess(...argpairs);
+
+        const updateops: string[] = [];
+        const caops: string[] = [];
+
+        this.ensureLocationForTrgt(op.trgt);
+        const clonev = this.cppframe.generateFreshName("uclone");
+        if(inferrepr instanceof StructRepr) {
+            this.cppframe.ensureLocationForVariable(clonev, inferrepr);
+            updateops.push(`${this.cppframe.getExpressionForName(clonev)} = ${cargs[0]};`);
+
+            for (let i = 0; i < op.updates.length; ++i) {
+                updateops.push(`${this.cppframe.getExpressionForName(clonev)}.${this.typegen.mangleStringForCpp(op.updates[i][0])} = ${cargs[i + 1]}`);
+            }
+
+            let caops = coerseAssignCPPValue(this.cppframe, clonev, this.generateArgStore(op.trgt), resrepr, intorepr);
+        }
+        else if(inferrepr instanceof RefRepr) {
+            this.cppframe.ensureLocationForVariable(clonev, inferrepr);
+
+            for (let i = 0; i < op.updates.length; ++i) {
+                updates.push(`{ MIRFieldEnum::${this.typegen.mangleStringForCpp(op.updates[i][0])}, ${cargs[i + 1]} }`);
+            }
+            xxxx;
+        }
+        else if (inferrepr instanceof UnionRepr) {
+            this.cppframe.ensureLocationForVariable(clonev, ValueRepr.singleton);
+
+            updateops.push(`${cargs[0]}.umeta->cloneFromUnion(&${cargs[0]}, &${this.cppframe.getExpressionForName(clonev)});`);
+            xxxx;
+        }
+        else {
+            this.cppframe.ensureLocationForVariable(clonev, ValueRepr.singleton);
+
+            xxxx;
+        }
+
+
         if (this.typegen.typecheckUEntity(inferargtype)) {
             const ekey = this.typegen.getEntityEKey(inferargtype);
             const utype = this.typegen.assembly.entityDecls.get(ekey) as MIREntityTypeDecl;

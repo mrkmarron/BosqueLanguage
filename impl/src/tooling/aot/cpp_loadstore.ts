@@ -31,9 +31,12 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
     }
 
     if (trfrom instanceof NoneRepr) {
-        assert(!(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+        assert(!(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr), "Should not be possible");
 
-        if (trinto instanceof UnionRepr) {
+        if (trinto instanceof RefRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if (trinto instanceof UnionRepr) {
             return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
@@ -87,9 +90,12 @@ function getRequiredCoerceOfPrimitive(trfrom: TypeRepr, trinto: TypeRepr): {kind
         }
     }
     else if (trfrom instanceof RefRepr) {
-        assert(!(trinto instanceof NoneRepr) && !(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
+        assert(!(trinto instanceof PrimitiveRepr) && !(trinto instanceof StructRepr) && !(trinto instanceof TRRepr) && !(trinto instanceof RefRepr), "Should not be possible");
 
-        if (trinto instanceof UnionRepr) {
+        if (trinto instanceof NoneRepr) {
+            return {kind: CoerceKind.Direct, alloc: 0};
+        }
+        else if (trinto instanceof UnionRepr) {
             return {kind: CoerceKind.Inject, alloc: 0};
         }
         else {
@@ -191,7 +197,12 @@ function getRequiredCoerce(trfrom: TypeRepr, trinto: TypeRepr): {kind: CoerceKin
 
 function coerceDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
     if (trfrom instanceof NoneRepr) {
-        return "BSQ_NONE_VALUE";
+        if(trinto instanceof RefRepr) {
+            return `(${trinto.storagetype})BSQ_NONE_VALUE`
+        }
+        else {
+            return "BSQ_NONE_VALUE";
+        }
     }
     else if (trfrom instanceof PrimitiveRepr) {
         if(trinto.basetype === "BSQBool") {

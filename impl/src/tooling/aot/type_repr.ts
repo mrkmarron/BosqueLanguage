@@ -127,6 +127,8 @@ class ValueRepr extends TypeRepr {
     constructor() {
         super(false, "Value", "Value", "MIRNominalTypeEnum_Category_Empty");
     }
+
+    static singleton = new ValueRepr();
 }
 
 class EphemeralListRepr extends TypeRepr {

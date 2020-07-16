@@ -67,6 +67,12 @@ constexpr const wchar_t* propertyNames[] = {
 //%%PROPERTY_NAMES%%
 };
 
+enum class MIRFieldEnum
+{
+    Invalid = 0,
+//%%FIELD_ENUM_DECLARE%%
+};
+
 typedef void* KeyValue;
 typedef void* Value;
 
@@ -428,7 +434,7 @@ struct BSQTuple
 {
     size_t count;
     DATA_KIND_FLAG flag;
-    Value entries[k];
+    Value entries[k == 0 ? 1 : k];
 
     template <uint16_t j>
     inline static void convert(const BSQTuple<k>& from, BSQTuple<j>& into) {
@@ -463,14 +469,14 @@ struct BSQTuple
         into->count = k;
         into->flag = flag;
 
-        std::copy(values.begin(), values.end(), into.entries);
+        std::copy(values.begin(), std::advance(values.begin(), k), into.entries);
     }
 
     template <>
     inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQTuple& into, std::initializer_list<Value> values)
     {
         auto fv = flag;
-        for(size_t i = 0; i < values.size(); ++i)
+        for(size_t i = 0; i < k; ++i)
         {
             fv &= getDataKindFlag(values[i]);
         }
@@ -478,7 +484,7 @@ struct BSQTuple
         into->count = k;
         into->flag = flag;
 
-        std::copy(values.begin(), values.end(), into.entries);
+        std::copy(values.begin(), std::advance(values.begin(), k), into.entries);
     }
 
     template <uint16_t idx>
@@ -577,18 +583,21 @@ public:
     }
 };
 
+struct BSQPropertySet
+{
+    static std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> knownRecordPropertySets;
+    static BSQDynamicPropertySetEntry emptyDynamicPropertySetEntry;
+
+    static BSQDynamicPropertySetEntry* getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext);
+};
+
 template <uint16_t k>
 struct BSQRecord
 {
     size_t count;
     MIRPropertyEnum* properties;
     DATA_KIND_FLAG flag;
-    Value entries[k];
-
-    static std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> knownRecordPropertySets;
-    static BSQDynamicPropertySetEntry emptyDynamicPropertySetEntry;
-
-    static BSQDynamicPropertySetEntry* getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext);
+    Value entries[k == 0 ? 1 : k];
 
     template <uint16_t j>
     inline static void convert(const BSQRecord<k>& from, BSQRecord<j>& into) {
@@ -618,10 +627,10 @@ struct BSQRecord
         GC_MEM_COPY(&into, from, GET_TYPE_META_DATA(from)->computeMemorySize(GET_TYPE_META_DATA(from), from));
     }
 
-    template <size_t count, DATA_KIND_FLAG flag>
-    inline static BSQRecord createFromSingle(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
+    template <DATA_KIND_FLAG flag>
+    inline static BSQRecord createFromSingle(BSQRecord& into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
-        into->count = count;
+        into->count = k;
         into->properties = properties;
         into->flag = flag;
 
@@ -629,8 +638,8 @@ struct BSQRecord
         std::copy(values.begin(), values.end(), tcurr);
     }
 
-    template <size_t count>
-    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQRecord* into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
+    template <>
+    inline static void createFromSingle<DATA_KIND_UNKNOWN_FLAG>(BSQRecord& into, MIRPropertyEnum* properties, std::initializer_list<Value> values)
     {
         auto fv = flag;
         for(auto iter = values.cbegin(); iter != values.cend(); ++iter)
@@ -638,7 +647,7 @@ struct BSQRecord
             fv &= getDataKindFlag(iter->second);
         }
 
-        into->count = count;
+        into->count = k;
         into->properties = properties;
         into->flag = fv;
 
@@ -646,40 +655,38 @@ struct BSQRecord
         std::copy(values.begin(), values.end(), tcurr);
     }
 
-    template <size_t maxsize, DATA_KIND_FLAG flag>
-    static void createFromUpdate(BSQRecord* into, const BSQRecord* src, std::initializer_list<std::pair<MIRPropertyEnum, Value>> nvals)
+    template <DATA_KIND_FLAG flag, uint16_t j>
+    static void createFromUpdate(BSQRecord& into, const BSQRecord<j>& src, std::initializer_list<std::pair<MIRPropertyEnum, Value>> nvals)
     {
-        Value values[maxsize];
         size_t valuespos = 0;
 
-        BSQDynamicPropertySetEntry* pse = &BSQRecord::emptyDynamicPropertySetEntry
+        BSQDynamicPropertySetEntry* pse = &BSQPropertySet::emptyDynamicPropertySetEntry
         auto fv = flag;
 
-        auto srcdata = (Value*)GET_COLLECTION_START_FIXED(src, sizeof(BSQRecord));
         auto srcpos = 0;
         auto nvalspos = nvals.begin();
         auto nvalend = nvals.end();
 
-        while(srcpos != src->count || nvalspos != nvalend)
+        while(srcpos != src.count || nvalspos != nvalend)
         {
-            if(srcpos == src->count || nvalspos->first < src->properties[srcpos])
+            if(srcpos == src.count || nvalspos->first < src.properties[srcpos])
             {
-                values[valuespos] = nvalspos->second;
-                pse = BSQRecord::getExtendedProperties(pse, nvalspos->first);
+                into.entries[valuespos] = nvalspos->second;
+                pse = BSQPropertySet::getExtendedProperties(pse, nvalspos->first);
 
                 nvalspos++;
             }
-            else if(nvalspos == nvalend || src->properties[srcpos] < nvalspos->first)
+            else if(nvalspos == nvalend || src.properties[srcpos] < nvalspos->first)
             {
-                values[valuespos] = srcdata[srcpos];
-                pse = BSQRecord::getExtendedProperties(pse, src->properties[srcpos]);
+                into.entries[valuespos] = srcdata[srcpos];
+                pse = BSQPropertySet::getExtendedProperties(pse, src.properties[srcpos]);
 
                 srcpos++;
             }
             else
             {
-                values[valuespos] = nvalspos->second;
-                pse = BSQRecord::getExtendedProperties(pse, nvalspos->first);
+                into.entries[valuespos] = nvalspos->second;
+                pse = BSQPropertySet::getExtendedProperties(pse, nvalspos->first);
 
                 nvalspos++;
                 srcpos++;
@@ -687,7 +694,7 @@ struct BSQRecord
 
             if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
             {
-                fv &= getDataKindFlag(values[valuespos]);
+                fv &= getDataKindFlag(into.entries[valuespos]);
             }
             valuespos++;
         }
@@ -695,9 +702,54 @@ struct BSQRecord
         into->count = valuespos;
         into->properties = pse->propertySet.data();
         into->flag = fv;
+    }
 
-        Value* tcurr = (Value*)GET_COLLECTION_START_FIXED(into, sizeof(BSQRecord));
-        std::copy(values, values + valuespos, tcurr);
+    template <DATA_KIND_FLAG flag, uint16_t i, uint16_t j>
+    static void createFromMerge(BSQRecord& into, const BSQRecord<i>& arg, const BSQRecord<j>& mrg)
+    {
+        size_t valuespos = 0;
+
+        BSQDynamicPropertySetEntry* pse = &BSQPropertySet::emptyDynamicPropertySetEntry
+        auto fv = flag;
+
+        auto argpos = 0;
+        auto mrgpos = 0;
+
+        while(argpos != arg.count || mrgpos != mrg.count)
+        {
+            if(argpos == arg.count || mrg.properties[mrgpos] < src.properties[srcpos])
+            {
+                into.entries[valuespos] = mrg.entries[mrgpos];
+                pse = BSQPropertySet::getExtendedProperties(pse, mrg.properties[mrgpos]);
+
+                mrgpos++;
+            }
+            else if(mrgpos == mrg.count || arg.properties[argpos] < mrg.properties[mrgpos])
+            {
+                into.entries[valuespos] = arg.entries[argpos];
+                pse = BSQPropertySet::getExtendedProperties(pse, arg.properties[argpos]);
+
+                argpos++;
+            }
+            else
+            {
+                into.entries[valuespos] = mrg.entries[mrgpos];
+                pse = BSQPropertySet::getExtendedProperties(pse, mrg.properties[mrgpos]);
+
+                mrgpos++;
+                argpos++;
+            }
+
+            if constexpr (flag == DATA_KIND_UNKNOWN_FLAG)
+            {
+                fv &= getDataKindFlag(into.entries[valuespos]);
+            }
+            valuespos++;
+        }
+
+        into->count = valuespos;
+        into->properties = pse->propertySet.data();
+        into->flag = fv;
     }
 
     template <MIRPropertyEnum p>

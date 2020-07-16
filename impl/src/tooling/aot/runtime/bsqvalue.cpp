@@ -11,14 +11,14 @@ namespace BSQ
 None NoneStorage::nhome = BSQ_NONE;
 NoneValue NoneStorage::nvhome = BSQ_NONE_VALUE;
 
-std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> BSQRecord::knownRecordPropertySets = {
+std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> BSQPropertySet::knownRecordPropertySets = {
     {MIRRecordPropertySetsEnum::ps__, {}},
     //%%KNOWN_RECORD_PROPERTY_SETS_DECLARE%%
 };
     
-BSQDynamicPropertySetEntry BSQRecord::emptyDynamicPropertySetEntry;
+BSQDynamicPropertySetEntry BSQPropertySet::emptyDynamicPropertySetEntry;
 
-BSQDynamicPropertySetEntry* BSQRecord::getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext)
+BSQDynamicPropertySetEntry* BSQPropertySet::getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext)
 {
     auto extrs = curr->extensions.find(ext);
     if(extrs != curr->extensions.end())
@@ -39,7 +39,7 @@ BSQDynamicPropertySetEntry* BSQRecord::getExtendedProperties(BSQDynamicPropertyS
 
 MetaData* getMetaData(void* v)
 {
-    if (BSQ_IS_VALUE_NONE(v))
+    if (v == BSQ_NONE_VALUE)
     {
         return META_DATA_LOAD_DECL(MetaData_None);
     }
@@ -88,17 +88,17 @@ bool bsqKeyValueLess(KeyValue v1, KeyValue v2)
 
 DATA_KIND_FLAG getDataKindFlag(Value v)
 {
-    if(BSQ_IS_VALUE_NONE(v) | BSQ_IS_VALUE_BOOL(v) | BSQ_IS_VALUE_TAGGED_INT(v))
+    if(v == BSQ_NONE_VALUE | BSQ_IS_VALUE_BOOL(v) | BSQ_IS_VALUE_TAGGED_INT(v))
     {
         return DATA_KIND_ALL_FLAG;
     }
     else {
         auto rcategory = GET_TYPE_META_DATA(v)->nominaltype;
         if(rcategory == MIRNominalTypeEnum_Tuple) {
-            return BSQ_GET_VALUE_PTR(v, BSQTuple)->flag;
+            return ((BSQDynamicTuple*)v)->flag;
         }
         else if(rcategory == MIRNominalTypeEnum_Record) {
-            return BSQ_GET_VALUE_PTR(v, BSQRecord)->flag;
+            return ((BSQDynamicRecord*)v)->flag;
         }
         else {
             return GET_TYPE_META_DATA(v)->dataflag;
