@@ -708,7 +708,6 @@ class SMTBodyEmitter {
                 tag = `(bsqterm_get_nominal_type ${this.argToSMT(arg, inferargtype)})`;
             }
 
-            
             const access = this.generateVFieldLookup(arg, tag, inferargtype, this.assembly.fieldDecls.get(field) as MIRFieldDecl);
             return this.typegen.coerce(access, ftype, resultAccessType);
         }

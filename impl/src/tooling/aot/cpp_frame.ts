@@ -6,7 +6,6 @@
 import { TypeRepr, ReprStorageKind } from "./type_repr";
 
 const pointerframe = "$pframe$";
-const valuestructframe = "$vsframe$";
 const generalstructframe = "$gframe$";
 
 abstract class FrameLocation {
@@ -41,7 +40,7 @@ class PointerLocation extends FrameLocation {
 
 class ValueStructLocation extends FrameLocation {
     constructor(name: string, trepr: TypeRepr) {
-        super(name, `${valuestructframe}.${name}`, trepr);
+        super(name, `${name}`, trepr);
     }
 }
 

@@ -24,6 +24,7 @@ typedef uint8_t BSQBool;
 
 #define INT_OOF_BOUNDS(X) (((X) < MIN_BSQ_INT) | ((X) > MAX_BSQ_INT))
 
+#define BSQ_IS_VALUE_TAGGED(V) ((((uintptr_t)(V)) & 0x7) != 0x0)
 #define BSQ_IS_VALUE_BOOL(V) ((((uintptr_t)(V)) & 0x2) == 0x2)
 #define BSQ_IS_VALUE_TAGGED_INT(V) ((((uintptr_t)(V)) & 0x4) == 0x4)
 
@@ -65,12 +66,6 @@ enum class MIRRecordPropertySetsEnum
 constexpr const wchar_t* propertyNames[] = {
     L"Invalid",
 //%%PROPERTY_NAMES%%
-};
-
-enum class MIRFieldEnum
-{
-    Invalid = 0,
-//%%FIELD_ENUM_DECLARE%%
 };
 
 typedef void* KeyValue;
@@ -536,7 +531,7 @@ struct BSQDynamicTuple
 {
     size_t count;
     DATA_KIND_FLAG flag;
-    Value entries;
+    Value* entries;
 
     template <uint16_t idx>
     inline bool hasIndex() const
@@ -549,7 +544,7 @@ struct BSQDynamicTuple
     {
         if (idx < this->count)
         {
-            return *((&this->entries) + idx);
+            return *(&(this->entries) + idx);
         }
         else
         {
@@ -762,7 +757,7 @@ struct BSQRecord
     inline Value atFixed() const
     {
         auto iter = std::find(this->properties, this->properties + this->count, p);
-        return iter != this->properties + this->count ? *(this->entries + std::distance(this->properties, iter)) : BSQ_VALUE_NONE;
+        return iter != this->properties + this->count ? *(this->entries + std::distance(this->properties, iter)) : return NoneStorage::nvhome;
     }
 
     bool checkPropertySet(int n, ...) const
@@ -822,7 +817,7 @@ struct BSQDynamicRecord
     size_t count;
     MIRPropertyEnum* properties;
     DATA_KIND_FLAG flag;
-    Value entries;
+    Value* entries;
 
     template <MIRPropertyEnum p>
     inline bool hasProperty() const
@@ -831,10 +826,10 @@ struct BSQDynamicRecord
     }
 
     template <MIRPropertyEnum p>
-    inline Value atFixed() const
+    inline Value& atFixed() const
     {
         auto iter = std::find(&(this->properties), &(this->properties) + this->count, p);
-        return iter != &(this->properties) + this->count ? *(&(this->properties) + std::distance(&this->properties, iter)) : BSQ_VALUE_NONE;
+        return iter != &(this->properties) + this->count ? *(&(this->entries) + std::distance(&this->properties, iter)) : BSQ_VALUE_NONE;
     }
 };
 

@@ -290,7 +290,10 @@ namespace BSQ
                 }
 
                 uint8_t* res = this->m_currPos;
-                *contents = this->m_currPos + rsize;
+                if(contents != nullptr)
+                {
+                    *contents = this->m_currPos + rsize;
+                }
                 this->m_currPos += fsize;
 
                 return res;
@@ -307,7 +310,10 @@ namespace BSQ
                 *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
                 this->m_largeallocs[rr] = asize + csize;
 
-                *contents = (rr + tsize);
+                if(contents != nullptr)
+                {
+                    *contents = (rr + tsize);
+                }
                 return (rr + sizeof(RCMeta));
             }
         }
@@ -345,6 +351,31 @@ namespace BSQ
             this->m_currPos += rsize;
 
             return res;
+        }
+
+        void shrinkBumpAlloc(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
+        {
+            size_t osize = tsize + (entrysize * ocount);
+            if(this->m_currPos == mem + osize)
+            {
+                size_t nsize = tsize + (entrysize * ncount);
+                this->m_currPos -= (osize - nsize);
+            }
+        }
+
+        void shrinkLargeAlloc(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
+        {
+            size_t nsize = sizeof(RCMeta) + sizeof(MetaData) + tsize + (entrysize * ncount);
+            MEM_STATS_OP(this->totalalloc += nsize);
+
+            uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(nsize);
+            GC_MEM_COPY(rr, GET_FREE_LIST_BASE(mem), nsize);
+
+            this->m_largeallocs[rr] = nsize;
+            this->clearLargeAlloc(GET_FREE_LIST_BASE(mem));
+            free(GET_FREE_LIST_BASE(mem));
+
+            mem = (rr + sizeof(RCMeta) + sizeof(MetaData));
         }
     };
 
@@ -396,6 +427,20 @@ namespace BSQ
             this->livealloc -= sizeof(RCMeta) + sizeof(MetaData) + size;
             free(GET_FREE_LIST_BASE(m));
         }
+
+        void shrinkAlloc(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
+        {
+            size_t osize = sizeof(RCMeta) + sizeof(MetaData) + tsize + (entrysize * ocount);
+            size_t nsize = sizeof(RCMeta) + sizeof(MetaData) + tsize + (entrysize * ncount);
+
+            MEM_STATS_OP(this->totalalloc += nsize);
+            this->livealloc -= (osize - nsize);
+
+            uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(nsize);
+            GC_MEM_COPY(rr, GET_FREE_LIST_BASE(mem), nsize);
+
+            mem = (rr + sizeof(RCMeta) + sizeof(MetaData));
+        }
     };
 
     class Allocator
@@ -406,6 +451,8 @@ namespace BSQ
     private:
         NewSpaceAllocator nsalloc;
         OldSpaceAllocator osalloc;
+
+        std::deque<void**> tempRoots;
 
         std::vector<void*> maybeZeroCounts;
 
@@ -677,6 +724,11 @@ namespace BSQ
                     Allocator::gcProcessSlotsWithMask<true>(GCStack::frames[i].mixedframep, GCStack::frames[i].mask);
                 }
             }
+
+            for(auto iter = Allocator::GlobalAllocator.tempRoots.begin(); iter != Allocator::GlobalAllocator.tempRoots.end(); ++iter)
+            {
+                Allocator::gcProcessSlot<true>(*iter);
+            }
         }
 
         void processHeap()
@@ -752,6 +804,11 @@ namespace BSQ
                 {
                     Allocator::gcClearMarkSlotsWithMask(GCStack::frames[i].mixedframep, GCStack::frames[i].mask);
                 }
+            }
+
+            for(auto iter = Allocator::GlobalAllocator.tempRoots.begin(); iter != Allocator::GlobalAllocator.tempRoots.end(); ++iter)
+            {
+                Allocator::gcClearMark(**iter);
             }
         }
 
@@ -880,6 +937,47 @@ namespace BSQ
             GC_MEM_COPY(alloc, val, bytes);
 
             return (T*)res;
+        }
+
+        void pushRoot(void*& mem)
+        {
+            this->tempRoots.push_back(&mem);
+        }
+
+        template <typename T>
+        T* popRoot()
+        {
+            T* res = *this->tempRoots.back();
+            this->tempRoots.pop_back();
+
+            return res;
+        }
+
+        void shrink(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
+        {
+            if(IS_BUMP_ALLOCATION(mem,  Allocator::GlobalAllocator.bstart, Allocator::GlobalAllocator.bend))
+            {
+                this->nsalloc.shrinkBumpAlloc(mem, tsize, entrysize, ocount, ncount);
+            }
+            else if(IS_LARGE_ALLOCATION(mem))
+            {
+                this->nsalloc.shrinkLargeAlloc(mem, tsize, entrysize, ocount, ncount);
+            }
+            else 
+            {
+                auto iter = std::find(this->maybeZeroCounts.begin(), this->maybeZeroCounts.end(), mem);
+                if(iter != this->maybeZeroCounts.end())
+                {
+                    *iter = nullptr;
+                }
+
+                this->osalloc.shrinkAlloc(mem, tsize, entrysize, ocount, ncount);
+
+                if(iter != this->maybeZeroCounts.end())
+                {
+                    *iter = mem;
+                }
+            }
         }
 
         void collect()

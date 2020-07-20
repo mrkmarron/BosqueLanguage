@@ -67,26 +67,20 @@ typedef void (*MetaData_UnionUnboxFromValue)(void*, void*);
 
 typedef std::wstring (*MetaData_DisplayFP)(void* obj);
 
-typedef void (*MetaData_CloneFromUnionFP)(void* uptr, void** into);
-typedef void (*MetaData_CloneFromReferenceFP)(void* ptr, void** into);
+/*
+//
+//TODO use this pattern to setup a vtable object that can be accessed quickly -- this should include vcalls, vfields, vupdates, and vmerges
+//
+int foo(int x);
+typedef int (*foo_ptr)(int);
 
-typedef void (*MetaData_LoadFieldFromUnionFP)(void* uptr, void** into);
-typedef void (*MetaData_LoadFieldFromReferenceFP)(void* ptr, void** into);
-
-typedef void (*MetaData_StoreFieldFromUnionFP)(void* uptr, void** val);
-typedef void (*MetaData_StoreFieldFromReferenceFP)(void* ptr, void** val);
-
-struct FieldVOps
+struct foometa
 {
-    MetaData_LoadFieldFromUnionFP loadFromUnion;
-    MetaData_LoadFieldFromReferenceFP loadFromPointer;
-
-    MetaData_StoreFieldFromUnionFP storeFromUnion;
-    MetaData_StoreFieldFromReferenceFP storeFromPointer;
+    foo_ptr vfoo;
 };
 
-typedef void(*MetaData_VCallOnUnionFP)(void** args, void** result);
-typedef void(*MetaData_VCallOnPointerFP)(void** args, void** result);
+constexpr foometa fm = {foo};
+*/
 
 class MetaData
 {
@@ -120,34 +114,13 @@ public:
     //true if this may have reference fields that need to be processed
     bool hasRefs;
 
-    //If the representation is tagged (bool or int) or pointer (ref types) in Value representation
+    //true if when stored in a union this is a pointer representation to the heap object
+    bool isPtrReprInUnion;
+
     MetaData_UnionBoxToValue unionBoxToVal;
     MetaData_UnionUnboxFromValue unionUnboxFromVal;
 
-    //always place in a heap allocated location (Value)
-    MetaData_CloneFromUnionFP cloneFromUnion;
-    MetaData_CloneFromReferenceFP cloneFromPointer;
-
-    std::vector<std::pair<int32_t, FieldVOps>> vfieldops;
-    std::vector<std::pair<int32_t, std::pair<MetaData_VCallOnUnionFP, MetaData_VCallOnPointerFP>>> vcalls;
-
-    template <int32_t vtag>
-    inline FieldVOps& getVFieldOps()
-    {
-        return std::find_if(this->vfieldops.begin(), this->vfieldops.end(), [](const std::pair<int32_t, FieldVOps>& v) { return vtag == v.first; }))->second;
-    }
-
-    template <int32_t vtag>
-    inline MetaData_VCallOnUnionFP getVCallOnUnion()
-    {
-        return std::find_if(this->vcalls.begin(), this->vcalls.end(), [](const std::pair<int32_t, std::pair<MetaData_VCallOnUnionFP, MetaData_VCallOnPointerFP>& v) { return vtag == v.first; }))->second.second;
-    }
-
-    template <int32_t vtag>
-    inline MetaData_VCallOnPointerFP getVCallOnPointer()
-    {
-        return std::find_if(this->vcalls.cbegin(), this->vcalls.cend(), [](const std::pair<int32_t, std::pair<MetaData_VCallOnUnionFP, MetaData_VCallOnPointerFP>& v) { return vtag == v.first; }))->second.second;
-    }
+    void* vtable;
 
     template <bool isRoot>
     inline MetaData_GCProcessOperatorFP getProcessFP() const
