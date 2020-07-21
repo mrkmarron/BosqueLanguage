@@ -9,6 +9,10 @@
 #include <cstdint>
 #include <string>
 
+#define BSQ_MEM_ALIGNMENT 8
+#define BSQ_ALIGN_SIZE(ASIZE) (((ASIZE) + 0x7) & 0xFFFFFFFFFFFFFFFC)
+
+
 //Note POD => API
 typedef size_t DATA_KIND_FLAG;
 #define DATA_KIND_CLEAR_FLAG 0x0
@@ -89,13 +93,11 @@ public:
     uint32_t dataflag;
 
     uint32_t datasize; //size of the object in it's raw state (excluding any headers)
-    int32_t sizeentry; //if this is a container then this is the size of each contained element (-1) if not a container
+    int32_t sizeentry; //if this is a container then this is the size of each contained element (0) if not a container
     int32_t sizeadvance; //if this is a container then this is the size (in void* increments) that each entry represents
 
     uint32_t ptrcount; //if this is a simple packed layout (or contents are simple packed layouts) then this is the number of pointers
     RefMask refmask; //if this is a mixed layout (or contents are mixed layouts) then this is the mask to use
-
-    MemSizeFP computeMemorySize;
 
     //Less and Equal operations for the object when it is in boxed form (or null if they are not supported)
     MetaData_RelationalOpFP less;
@@ -121,6 +123,19 @@ public:
     MetaData_UnionUnboxFromValue unionUnboxFromVal;
 
     void* vtable;
+
+    inline size_t getMemorySize(void* obj)
+    {
+        if(this->sizeentry != 0)
+        {
+            return this->datasize;
+        }
+        else
+        {   
+            size_t elemcount = *((size_t*)obj);
+            return this->datasize + BSQ_ALIGN_SIZE(elemcount * this->sizeadvance);
+        }
+    }
 
     template <bool isRoot>
     inline MetaData_GCProcessOperatorFP getProcessFP() const

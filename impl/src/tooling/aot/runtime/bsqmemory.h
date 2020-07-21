@@ -12,7 +12,7 @@
 #include <vector>
 #include <stack>
 #include <queue>
-#include <map>
+#include <set>
 
 #include "bsqmetadata.h"
 
@@ -33,9 +33,6 @@
 #define BSQ_MAX_NURSERY_SIZE 16777216
 #define BSQ_ALLOC_LARGE_BLOCK_SIZE 8192
 
-#define BSQ_MEM_ALIGNMENT 8
-#define BSQ_ALIGN_ALLOC_SIZE(ASIZE) (((ASIZE) + 0x7) & 0xFFFFFFFFFFFFFFFC)
-
 #define BSQ_ALLIGNED_MALLOC(SIZE) _aligned_malloc(SIZE, BSQ_MEM_ALIGNMENT)
 
 #define TYPE_INFO_FORWARD_SENTINAL nullptr
@@ -45,8 +42,8 @@
 #define GET_FORWARD_PTR(M) *((void**)M)
 #define SET_FORWARD_PTR(M, P) *((void**)M) = (void*)P
 
-#define GET_COLLECTION_START_FIXED(M, X) (((uint8_t*)M) + BSQ_ALIGN_ALLOC_SIZE(X))
-#define GET_COLLECTION_START_META(M, META) (((uint8_t*)M) + BSQ_ALIGN_ALLOC_SIZE((META)->datasize))
+#define GET_COLLECTION_START_FIXED(M, X) (((uint8_t*)M) + BSQ_ALIGN_SIZE(X))
+#define GET_COLLECTION_START_META(M, META) (((uint8_t*)M) + BSQ_ALIGN_SIZE((META)->datasize))
 
 #define GC_RC_CLEAR ((uint64_t)0)
 #define GC_RC_MARK_FROM_ROOT ((uint64_t)(1 << 60))
@@ -138,10 +135,8 @@ namespace BSQ
         size_t m_allocsize;
         uint8_t* m_block;
 
-        //
-        //We may want to tie into a nicer free list impl here (and in the old space)
-        //
-        std::map<void*, size_t> m_largeallocs;
+        std::set<void*> m_largeallocs;
+        size_t m_largeallocsize;
 
         GCOperator gc;
 
@@ -183,7 +178,7 @@ namespace BSQ
         }
 
     public:
-        NewSpaceAllocator(Allocator* alloc) : m_block(nullptr), m_largeallocs(), gc(alloc)
+        NewSpaceAllocator(Allocator* alloc) : m_block(nullptr), m_largeallocs(), m_largeallocsize(0), gc(alloc)
         { 
             MEM_STATS_OP(this->totalalloc = 0);
 
@@ -203,14 +198,10 @@ namespace BSQ
         inline uintptr_t getBumpStartAddr() const { return (uintptr_t)this->m_block; }
         inline uintptr_t getBumpEndAddr() const { return (uintptr_t)this->m_currPos; }
 
-        inline size_t clearLargeAlloc(void* v)
+        inline void clearLargeAlloc(void* v)
         {
             auto iter = this->m_largeallocs.find(v);
-            size_t asize = iter->second;
-
             this->m_largeallocs.erase(iter);
-            
-            return asize;
         }
 
         void postGCProcess(size_t rcmem)
@@ -219,6 +210,7 @@ namespace BSQ
                 free(GET_FREE_LIST_BASE(alloc));
             });
             this->m_largeallocs.clear();
+            this->m_largeallocsize = 0;
 
             this->resizeAllocatorAsNeeded(rcmem);
 
@@ -228,12 +220,7 @@ namespace BSQ
 
         size_t currentAllocatedBytes() const
         {
-            size_t balloc = this->m_currPos - this->m_block;
-            std::for_each(this->m_largeallocs.begin(), this->m_largeallocs.end(), [&balloc](const std::pair<void*, size_t>& ainfo) {
-                balloc += ainfo.second + sizeof(RCMeta) + sizeof(MetaData);
-            });
-
-            return balloc;
+            return (this->m_currPos - this->m_block) + this->m_largeallocsize;
         }
 
         //Return uint8_t* of given asize + sizeof(MetaData)
@@ -264,9 +251,10 @@ namespace BSQ
 
                 uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(tsize);
                 GC_MEM_ZERO(rr, tsize);
-
                 *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
-                this->m_largeallocs[rr] = asize;
+
+                this->m_largeallocs.insert(rr);
+                this->m_largeallocsize += tsize;
 
                 return (rr + sizeof(RCMeta));
             }
@@ -305,10 +293,11 @@ namespace BSQ
                 MEM_STATS_OP(this->totalalloc += fsize);
 
                 uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(fsize);
-                GC_MEM_ZERO(rr, tsize);
-
+                GC_MEM_ZERO(rr, fsize);
                 *((RCMeta*)rr) = GC_RC_BIG_ALLOC;
-                this->m_largeallocs[rr] = asize + csize;
+
+                this->m_largeallocs.insert(rr);
+                this->m_largeallocsize += fsize;
 
                 if(contents != nullptr)
                 {
@@ -355,24 +344,26 @@ namespace BSQ
 
         void shrinkBumpAlloc(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
         {
-            size_t osize = tsize + (entrysize * ocount);
+            size_t osize = sizeof(MetaData) + tsize + (entrysize * ocount);
             if(this->m_currPos == mem + osize)
             {
-                size_t nsize = tsize + (entrysize * ncount);
+                size_t nsize = sizeof(MetaData) + tsize + (entrysize * ncount);
                 this->m_currPos -= (osize - nsize);
             }
         }
 
         void shrinkLargeAlloc(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)
         {
+            size_t osize = sizeof(RCMeta) + sizeof(MetaData) + tsize + (entrysize * ocount);
             size_t nsize = sizeof(RCMeta) + sizeof(MetaData) + tsize + (entrysize * ncount);
             MEM_STATS_OP(this->totalalloc += nsize);
 
             uint8_t* rr = (uint8_t*)BSQ_ALLIGNED_MALLOC(nsize);
             GC_MEM_COPY(rr, GET_FREE_LIST_BASE(mem), nsize);
 
-            this->m_largeallocs[rr] = nsize;
             this->clearLargeAlloc(GET_FREE_LIST_BASE(mem));
+            this->m_largeallocsize -= (osize - nsize);
+
             free(GET_FREE_LIST_BASE(mem));
 
             mem = (rr + sizeof(RCMeta) + sizeof(MetaData));
@@ -478,7 +469,7 @@ namespace BSQ
             if(ometa->sizeentry != 0)
             {   
                 size_t elemcount = *((size_t*)obj);
-                osize += BSQ_ALIGN_ALLOC_SIZE(elemcount * ometa->sizeentry);
+                osize += BSQ_ALIGN_SIZE(elemcount * ometa->size);
             }
             MEM_STATS_OP(this->promotedbytes += ometa->datasize + sizeof(MetaData));
 
@@ -782,9 +773,14 @@ namespace BSQ
                     umeta->decObj(umeta, (void**)obj);
                 }
 
-                size_t asize = umeta->computeMemorySize(umeta, obj);
-                this->osalloc.release(obj, asize);
+                size_t asize = umeta->datasize;
+                if(umeta->sizeentry != 0)
+                {   
+                    size_t elemcount = *((size_t*)obj);
+                    asize += BSQ_ALIGN_SIZE(elemcount * umeta->sizeentry);
+                }
 
+                this->osalloc.release(obj, asize);
                 this->releaselist.pop();
             }
         }
@@ -830,7 +826,7 @@ namespace BSQ
         template<typename T>
         inline T* allocateT(MetaData* mdata) 
         {
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t asize = BSQ_ALIGNC_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSize<asize>();
 
             *((MetaData**)alloc) = mdata;
@@ -842,8 +838,8 @@ namespace BSQ
         template <typename T, typename U>
         inline T* allocateTPlus(MetaData* mdata, size_t count, U** contents) 
         {
-            size_t csize = BSQ_ALIGN_ALLOC_SIZE(count * sizeof(U));
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            size_t csize = BSQ_ALIGN_SIZE(count * sizeof(U));
+            constexpr size_t asize = BSQ_ALIGN_SIZE(sizeof(T));
     
             uint8_t* alloc = this->nsalloc.allocateSizePlus<asize>(csize, (uint8_t**)contents);
 
@@ -865,7 +861,7 @@ namespace BSQ
         template <typename T>
         inline T* allocateSafe(MetaData* mdata)
         {
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T));
+            constexpr size_t asize = BSQ_ALIGN_SIZE(sizeof(T));
             uint8_t* alloc = this->nsalloc.allocateSafe<asize>();
 
             *((MetaData**)alloc) = mdata;
@@ -877,7 +873,7 @@ namespace BSQ
         template <typename T, typename U, uint16_t count>
         inline T* allocateSafePlus(MetaData* mdata, U** contents)
         {
-            constexpr size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T)) + BSQ_ALIGN_ALLOC_SIZE(sizeof(U) * count);
+            constexpr size_t asize = BSQ_ALIGN_SIZE(sizeof(T)) + BSQ_ALIGN_SIZE(sizeof(U) * count);
             uint8_t* alloc = this->nsalloc.allocateSafe(asize);
 
             *((MetaData**)alloc) = mdata;
@@ -890,7 +886,7 @@ namespace BSQ
         template <typename T, typename U>
         inline T* allocateSafePlusDynamic(MetaData* mdata, U** contents, size_t count)
         {
-            size_t asize = BSQ_ALIGN_ALLOC_SIZE(sizeof(T)) + BSQ_ALIGN_ALLOC_SIZE(sizeof(U) * count);
+            size_t asize = BSQ_ALIGN_SIZE(sizeof(T)) + BSQ_ALIGN_SIZE(sizeof(U) * count);
             uint8_t* alloc = this->nsalloc.allocateSafeDynamic(asize);
 
             *((MetaData**)alloc) = mdata;
@@ -932,8 +928,14 @@ namespace BSQ
         template <typename T>
         inline T* allocateSafeDynamicCopy(MetaData* mdata, void* val)
         {
-            size_t bytes = mdata->computeMemorySize(mdata, val);
-            uint8_t* alloc = this->allocateSafeDynamic(bytes, mdata);
+            size_t asize = mdata->datasize;
+            if(mdata->sizeentry != 0)
+            {   
+                size_t elemcount = *((size_t*)val);
+                asize += BSQ_ALIGN_SIZE(elemcount * mdata->sizeentry);
+            }
+
+            uint8_t* alloc = this->allocateSafeDynamic(asize, mdata);
             GC_MEM_COPY(alloc, val, bytes);
 
             return (T*)res;
@@ -1170,7 +1172,7 @@ namespace BSQ
         inline static size_t MetaData_ComputeSize_SimpleCollection(const MetaData* meta, void* data)
         {
             size_t count = *((size_t*)data);
-            return sizeof(MetaData) + meta->datasize + BSQ_ALIGN_ALLOC_SIZE(count * meta->sizeentry);
+            return sizeof(MetaData) + meta->datasize + BSQ_ALIGN_SIZE(count * meta->sizeentry);
         }
     };
 }

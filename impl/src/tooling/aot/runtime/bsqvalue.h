@@ -11,6 +11,7 @@
 #include "bsqmemory.h"
 
 #include <set>
+#include <map>
 
 ////
 //Value ops
@@ -429,14 +430,14 @@ struct BSQTuple
 {
     size_t count;
     DATA_KIND_FLAG flag;
-    Value entries[k == 0 ? 1 : k];
+    std::array<Value, k> entries;
 
     template <uint16_t j>
     inline static void convert(const BSQTuple<k>& from, BSQTuple<j>& into) {
         into.count = from.count;
         into.flag = from.flag;
 
-        std::copy(from.entries, from.entries + std::min(j, k), into.entries);
+        std::copy(from.entries.begin(), from.entries.begin() + std::min(j, k), into.entries.begin());
     }
 
     template <uint16_t j>
@@ -463,8 +464,7 @@ struct BSQTuple
     {
         into->count = k;
         into->flag = flag;
-
-        std::copy(values.begin(), std::advance(values.begin(), k), into.entries);
+        into.entries = values;
     }
 
     template <>
@@ -478,8 +478,7 @@ struct BSQTuple
 
         into->count = k;
         into->flag = flag;
-
-        std::copy(values.begin(), std::advance(values.begin(), k), into.entries);
+        into.entries = values;
     }
 
     template <uint16_t idx>
@@ -531,7 +530,6 @@ struct BSQDynamicTuple
 {
     size_t count;
     DATA_KIND_FLAG flag;
-    Value* entries;
 
     template <uint16_t idx>
     inline bool hasIndex() const
@@ -544,7 +542,7 @@ struct BSQDynamicTuple
     {
         if (idx < this->count)
         {
-            return *(&(this->entries) + idx);
+            return *(GET_COLLECTION_START_FIXED(this, sizeof(BSQDynamicTuple)) + idx);
         }
         else
         {
@@ -592,7 +590,7 @@ struct BSQRecord
     size_t count;
     MIRPropertyEnum* properties;
     DATA_KIND_FLAG flag;
-    Value entries[k == 0 ? 1 : k];
+    std::array<Value, k> entries; 
 
     template <uint16_t j>
     inline static void convert(const BSQRecord<k>& from, BSQRecord<j>& into) {
@@ -600,6 +598,7 @@ struct BSQRecord
         into.properties = from.properties;
         into.flag = from.flag;
 
+        xxx;
         std::copy(from.entries, from.entries + std::min(j, k), into.entries);
     }
 
