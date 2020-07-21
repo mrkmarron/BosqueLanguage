@@ -46,7 +46,7 @@ struct BSQList
         *((T*)GET_COLLECTION_START_FIXED(this, sizeof(size_t)) + ipos) = *((T*)GET_COLLECTION_START_FIXED(from, sizeof(size_t)) + fpos);
     }
 
-    inline void store(size_t ipos, T& v)
+    inline void store(size_t ipos, const T& v)
     {
         *((T*)GET_COLLECTION_START_FIXED(this, sizeof(size_t)) + ipos) = v;
     }

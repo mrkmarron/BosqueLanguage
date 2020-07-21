@@ -8,14 +8,14 @@
 
 namespace BSQ
 {
-None NoneStorage::nhome = BSQ_NONE;
-NoneValue NoneStorage::nvhome = BSQ_NONE_VALUE;
+None ConstStorage::nhome = BSQ_NONE;
+NoneValue ConstStorage::nvhome = BSQ_NONE_VALUE;
 
 std::map<MIRRecordPropertySetsEnum, std::vector<MIRPropertyEnum>> BSQPropertySet::knownRecordPropertySets = {
     {MIRRecordPropertySetsEnum::ps__, {}},
     //%%KNOWN_RECORD_PROPERTY_SETS_DECLARE%%
 };
-    
+
 BSQDynamicPropertySetEntry BSQPropertySet::emptyDynamicPropertySetEntry;
 
 BSQDynamicPropertySetEntry* BSQPropertySet::getExtendedProperties(BSQDynamicPropertySetEntry* curr, MIRPropertyEnum ext)

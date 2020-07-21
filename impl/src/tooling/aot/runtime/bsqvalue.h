@@ -176,7 +176,7 @@ struct UnionValue
     }
 };
 
-struct NoneStorage
+struct ConstStorage
 {
     static None nhome;
     static NoneValue nvhome;
@@ -496,7 +496,7 @@ struct BSQTuple
         }
         else
         {
-            return NoneStorage::nvhome;
+            return ConstStorage::nvhome;
         }
     }
 };
@@ -546,7 +546,7 @@ struct BSQDynamicTuple
         }
         else
         {
-            return NoneStorage::nvhome;
+            return ConstStorage::nvhome;
         }
     }
 };
@@ -756,7 +756,7 @@ struct BSQRecord
     inline Value atFixed() const
     {
         auto iter = std::find(this->properties, this->properties + this->count, p);
-        return iter != this->properties + this->count ? *(this->entries + std::distance(this->properties, iter)) : return NoneStorage::nvhome;
+        return iter != this->properties + this->count ? *(this->entries + std::distance(this->properties, iter)) : return ConstStorage::nvhome;
     }
 
     bool checkPropertySet(int n, ...) const

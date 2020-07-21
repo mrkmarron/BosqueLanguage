@@ -946,13 +946,9 @@ namespace BSQ
             this->tempRoots.push_back(&mem);
         }
 
-        template <typename T>
-        T* popRoot()
+        void popRoot()
         {
-            T* res = *this->tempRoots.back();
             this->tempRoots.pop_back();
-
-            return res;
         }
 
         void shrink(uint8_t*& mem, size_t tsize, size_t entrysize, size_t ocount, size_t ncount)

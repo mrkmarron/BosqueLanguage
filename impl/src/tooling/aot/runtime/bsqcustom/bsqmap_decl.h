@@ -48,7 +48,7 @@ struct BSQMap : public BSQObject
         return OP_Val{}(*ipos);
     }
 
-    inline bool tryGetValue(K k, V& res)
+    inline bool tryGetValue(const K& k, V& res)
     {
         EntryT* entries = GET_COLLECTION_START_FIXED(this, sizeof(BSQMap));
         auto ipos = std::lower_bound(entries, entries + this->count, k, [](const T& a, const T& b){ return MEntryCMP{}(a, b); });

@@ -7,12 +7,12 @@ import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimit
 import { CPPTypeEmitter } from "./cpptype_emitter";
 import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRJump, MIRJumpCond, MIRJumpNone, MIRAbort, MIRBasicBlock, MIRPhi, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRResolvedTypeKey, MIRPackSlice, MIRPackExtend, MIRNominalTypeKey, MIRBinLess, MIRConstantRegex } from "../../compiler/mir_ops";
 import { topologicalOrder } from "../../compiler/mir_info";
-import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr, StorageByteAlignment, TRRepr } from "./type_repr";
+import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr, StorageByteAlignment, TRRepr, TypeRepr } from "./type_repr";
 import { compileRegexCppMatch } from "./cpp_regex";
 import { CPPFrame } from "./cpp_frame";
 
 import * as assert from "assert";
-import { CoerceKind, coerce, isDirectReturnValue, getRequiredCoerce, coerseAssignCPPValue, coerceInline } from "./cpp_loadstore";
+import { CoerceKind, coerce, isDirectReturnValue, getRequiredCoerce, coerseAssignCPPValue, coerceInline, coerceNone } from "./cpp_loadstore";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
@@ -2024,16 +2024,19 @@ class CPPBodyEmitter {
         return this.typegen.getMIRType(idecl.enclosingDecl as string);
     }
 
+    getListContentsInfoForType(ltype: MIRType): MIRType {
+        return (this.typegen.assembly.entityDecls.get(ltype.trkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
+    }
+
     getListContentsInfoForListOp(idecl: MIRInvokePrimitiveDecl): MIRType {
         return (this.typegen.assembly.entityDecls.get(idecl.enclosingDecl as string) as MIREntityTypeDecl).terms.get("T") as MIRType;
     }
 
-    getListResultTypeFor(idecl: MIRInvokePrimitiveDecl): [string, string, string, string] {
+    getListResultTypeFor(idecl: MIRInvokePrimitiveDecl): [TypeRepr, TypeRepr] {
         const le = this.typegen.assembly.entityDecls.get(idecl.resultType as string) as MIREntityTypeDecl;
         const ltype = this.typegen.getMIRType(le.tkey);
         const ctype = le.terms.get("T") as MIRType;
-        const uinc = this.typegen.getFunctorsForType(ctype).inc;
-        return [this.typegen.getCPPReprFor(ltype).base, this.typegen.getCPPReprFor(ctype).std, `MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(le.tkey)}`, uinc];
+        return [this.typegen.getCPPReprFor(ltype), this.typegen.getCPPReprFor(ctype)];
     }
 
     getSetContentsInfoForSetOp(idecl: MIRInvokePrimitiveDecl): MIRType {
@@ -2083,26 +2086,42 @@ class CPPBodyEmitter {
         return this.getMEntryCmpTypeForMapType(idecl.enclosingDecl as string);
     }
 
-    createListOpsFor(ltype: MIRType, ctype: MIRType): string {
-        const lrepr = this.typegen.getCPPReprFor(ltype).base;
-        const crepr = this.typegen.getCPPReprFor(ctype);
-        const cops = this.typegen.getFunctorsForType(ctype);
-        return `BSQListOps<${lrepr}, ${crepr.std}, ${cops.inc}, ${cops.dec}, ${cops.display}>`;
-    }
-
-    createMapOpsFor(mtype: MIRType, ktype: MIRType, vtype: MIRType): string {
-        const mrepr = this.typegen.getCPPReprFor(mtype).base;
-        const krepr = this.typegen.getCPPReprFor(ktype);
-        const kops = this.typegen.getFunctorsForType(ktype);
-        const vrepr = this.typegen.getCPPReprFor(vtype);
-        const vops = this.typegen.getFunctorsForType(vtype);
-
-        return `BSQMapOps<${mrepr}, ${krepr.std}, ${kops.dec}, ${kops.display}, ${kops.less}, ${kops.eq}, ${vrepr.std}, ${vops.dec}, ${vops.display}>`;
-    }
-
-    createPCodeInvokeForPred(pc: MIRPCode, arg: string): string {
+    createPCodeInvokeForUnaryPred(pc: MIRPCode, arg: string): string {
         const cargs = pc.cargs.map((ca) => this.typegen.mangleStringForCpp(ca));
         return `${this.typegen.mangleStringForCpp(pc.code)}(${[arg, ...cargs].join(", ")})`;
+    }
+
+    createPCodeInvokeForBinaryPred(pc: MIRPCode, arg1: string, arg2: string): string {
+        const cargs = pc.cargs.map((ca) => this.typegen.mangleStringForCpp(ca));
+        return `${this.typegen.mangleStringForCpp(pc.code)}(${[arg1, arg2, ...cargs].join(", ")})`;
+    }
+
+    createPCodeInvokeForUnary(pc: MIRPCode, arg: string, into: string): string {
+        const cargs = pc.cargs.map((ca) => this.typegen.mangleStringForCpp(ca));
+        const inv = (this.assembly.invokeDecls.get(pc.code) || this.assembly.primitiveInvokeDecls.get(pc.code)) as MIRInvokeDecl;
+
+        const rtype = this.typegen.getMIRType(inv.resultType);
+        const rrepr = this.typegen.getCPPReprFor(rtype);
+        if (isDirectReturnValue(rrepr)) {
+            return `${into} = ${this.typegen.mangleStringForCpp(pc.code)}(${[arg, ...cargs].join(", ")});`;
+        }
+        else {
+            return `${this.typegen.mangleStringForCpp(pc.code)}(${[arg, ...cargs, into].join(", ")});`;
+        }
+    }
+
+    createPCodeInvokeForBinary(pc: MIRPCode, arg1: string, arg2: string, into: string): string {
+        const cargs = pc.cargs.map((ca) => this.typegen.mangleStringForCpp(ca));
+        const inv = (this.assembly.invokeDecls.get(pc.code) || this.assembly.primitiveInvokeDecls.get(pc.code)) as MIRInvokeDecl;
+
+        const rtype = this.typegen.getMIRType(inv.resultType);
+        const rrepr = this.typegen.getCPPReprFor(rtype);
+        if (isDirectReturnValue(rrepr)) {
+            return `${into} = ${this.typegen.mangleStringForCpp(pc.code)}(${[arg1, arg2, ...cargs].join(", ")});`;
+        }
+        else {
+            return `${this.typegen.mangleStringForCpp(pc.code)}(${[arg1, arg2, ...cargs, into].join(", ")});`;
+        }
     }
 
     generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): string {
@@ -2366,64 +2385,63 @@ class CPPBodyEmitter {
                 break;
             }
             case "list_all": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = true;`);
                 bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(!${pci}) { $$return = false; break; } }`);
                 break;
             }
             case "list_any": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = false;`);
                 bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { $$return = true; break; } }`);
                 break;
             }
             case "list_none": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = true;`);
                 bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { $$return = false; break; } }`);
                 break;
             }
             case "list_count": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = 0;`);
                 bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { $$return++; } }`);
                 break;
             }
             case "list_countnot": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = 0;`);
                 bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(!${pci}) { $$return++; } }`);
                 break;
             }
             case "list_indexof": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = ${params[2]};`);
                 bodystr.push(`for(size_t i = ${params[1]}; i < ${params[2]}; ++i) { if(${pci}) { $$return = i; break; } }`);
                 break;
             }
             case "list_indexoflast": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = ${params[2]};`);
                 bodystr.push(`for(int64_t i = ${params[2]}; i > ${params[1]}; --i) { if(${pci}) { $$return = i; break; } }`);
                 break;
             }
             case "list_indexofnot": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = ${params[2]};`);
                 bodystr.push(`for(size_t i = ${params[1]}; i < ${params[2]}; ++i) { if(!${pci}) { $$return = i; break; } }`);
                 break;
             }
             case "list_indexoflastnot": {
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
                 bodystr.push(`auto $$return = ${params[2]};`);
                 bodystr.push(`for(int64_t i = ${params[2]}; i > ${params[1]}; --i) { if(!${pci}) { $$return = i; break; } }`);
                 break;
             }
             case "list_count_keytype": {
-                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
                 const eqf = this.typegen.getFunctorsForType(this.getListContentsInfoForListOp(idecl)).eq;
-                const lambda = `[${params[1]}](${crepr.storagetype} a) { return ${eqf}{}(a, ${params[1]}); }`
-                bodystr.push(`auto $$return = std::count_if(${CPP_EXECUTION_POLICY}, ${params[0]}->begin(), ${params[0]}->end(), ${lambda});`);
+                bodystr.push(`auto $$return = 0;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${eqf}{}(${params[1]}, ${params[0]}->at(i))) { $$return++; } }`);
                 break;
             }
             case "list_indexof_keytype": {
@@ -2469,25 +2487,25 @@ class CPPBodyEmitter {
             case "list_filter": {
                 const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
                 const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
 
-                bodystr.push(`auto tmp = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count, nullptr);`);
-                bodystr.push(`Allocator::GlobalAllocator.pushRoot(tmp);`);
-                bodystr.push(`lcount = ${params[0]}->count;`);
-                bodystr.push(`for(size_t i = 0; i < lcount; ++i) { if(${pci}) { tmp->copyto(tmp->count++, ${params[0]}, i); } }`);
-                bodystr.push(`$$return = Allocator::GlobalAllocator.shrink(Allocator::GlobalAllocator.popRoot<${lrepr.basetype}>(), ${lrepr.alignedSize}, ${crepr.alignedSize}, ${params[0]}->count, tmp->count);`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { $$return->copyto($$return->count++, ${params[0]}, i); } }`);
+                bodystr.push(`Allocator::GlobalAllocator.shrink($$return, ${lrepr.alignedSize}, ${crepr.alignedSize}, ${params[0]}->count, $$return->count);`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_filternot": {
                 const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
                 const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
-                const pci = this.createPCodeInvokeForPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
 
-                bodystr.push(`auto tmp = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count, nullptr);`);
-                bodystr.push(`Allocator::GlobalAllocator.pushRoot(tmp);`);
-                bodystr.push(`lcount = ${params[0]}->count;`);
-                bodystr.push(`for(size_t i = 0; i < lcount; ++i) { if(!${pci}) { tmp->copyto(tmp->count++, ${params[0]}, i); } }`);
-                bodystr.push(`$$return = Allocator::GlobalAllocator.shrink(Allocator::GlobalAllocator.popRoot<${lrepr.basetype}>(), ${lrepr.alignedSize}, ${crepr.alignedSize}, ${params[0]}->count, tmp->count);`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(!${pci}) { $$return->copyto($$return->count++, ${params[0]}, i); } }`);
+                bodystr.push(`Allocator::GlobalAllocator.shrink($$return, ${lrepr.alignedSize}, ${crepr.alignedSize}, ${params[0]}->count, $$return->count);`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_oftype": {
@@ -2506,11 +2524,11 @@ class CPPBodyEmitter {
                     const codecc = this.coerceAccessInline([`${params[0]}->at(i)`, ctype, rlctype]);
                     const codeccv = `${rlrepr.storagetype}& ccv = ${codecc[1][0]};`;
 
-                    bodystr.push(`auto tmp = Allocator::GlobalAllocator.allocateTPlus<${rlrepr.basetype}, ${rlcrepr.storagetype}>(META_DATA_LOAD_DECL(${rlrepr.metadataName}), ${params[0]}->count, nullptr);`);
-                    bodystr.push(`Allocator::GlobalAllocator.pushRoot(tmp);`);
-                    bodystr.push(`lcount = ${params[0]}->count;`);
-                    bodystr.push(`for(size_t i = 0; i < lcount; ++i) { if(${codetc}) { ${[...codecc[0], codeccv].join(" ")} tmp->store(tmp->count++, ccv); } }`);
-                    bodystr.push(`$$return = Allocator::GlobalAllocator.shrink(Allocator::GlobalAllocator.popRoot<${rlrepr.basetype}>(), ${rlrepr.alignedSize}, ${rlcrepr.alignedSize}, ${params[0]}->count, tmp->count);`);
+                    bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rlrepr.basetype}, ${rlcrepr.storagetype}>(META_DATA_LOAD_DECL(${rlrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                    bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                    bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${codetc}) { ${[...codecc[0], codeccv].join(" ")} $$return->store($$return->count++, ccv); } }`);
+                    bodystr.push(`Allocator::GlobalAllocator.shrink($$return, ${rlrepr.alignedSize}, ${rlcrepr.alignedSize}, ${params[0]}->count, $$return->count);`);
+                    bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 }
                 break;
             }
@@ -2522,9 +2540,7 @@ class CPPBodyEmitter {
 
                 const codetc = this.generateTypeCheck(`${params[0]}->at(i)`, ctype, ctype, rlctype);
                 if(codetc === "false") {
-                    const abrt = `BSQ_ABORT("Invalid element to cast", "${filenameClean(this.currentFile)}", ${idecl.sourceLocation.line});`;
-                    const iec = `if(${params[0]}->entries.size() != 0) { ${abrt} }`;
-                    bodystr.push(`${iec} auto $$return = ${this.typegen.getCPPReprFor(ltype).basetype}::empty;`);
+                    bodystr.push(`BSQ_ASSERT(${params[0]}->count == 0, "Invalid element to cast"); auto $$return = ${this.typegen.getCPPReprFor(ltype).basetype}::empty;`);
                 }
                 else {
                     const rlrepr = this.typegen.getCPPReprFor(rltype);
@@ -2532,135 +2548,193 @@ class CPPBodyEmitter {
                     const codecc = this.coerceAccessInline([`${params[0]}->at(i)`, ctype, rlctype]);
                     const codeccv = `${rlrepr.storagetype}& ccv = ${codecc[1][0]};`;
 
-                    bodystr.push(`auto tmp = Allocator::GlobalAllocator.allocateTPlus<${rlrepr.basetype}, ${rlcrepr.storagetype}>(META_DATA_LOAD_DECL(${rlrepr.metadataName}), ${params[0]}->count, nullptr);`);
-                    bodystr.push(`Allocator::GlobalAllocator.pushRoot(tmp);`);
-                    bodystr.push(`lcount = ${params[0]}->count;`);
-                    bodystr.push(`for(size_t i = 0; i < lcount; ++i) { BSQ_ASSERT(${codetc}); ${[...codecc[0], codeccv].join(" ")} tmp->store(tmp->count++, ccv); }`);
-                    bodystr.push(`$$return = Allocator::GlobalAllocator.popRoot<${rlrepr.basetype}>();`);
+                    bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rlrepr.basetype}, ${rlcrepr.storagetype}>(META_DATA_LOAD_DECL(${rlrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                    bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                    bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { BSQ_ASSERT(${codetc}, "Invalid element to cast"); ${[...codecc[0], codeccv].join(" ")} $$return->store($$return->count++, ccv); }`);
+                    bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 }
                 break;
             }
             case "list_slice": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_slice(${params[0]}, ${params[1]}, ${params[2]});`;
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[2]} - ${params[1]}, &contents);`);
+                bodystr.push(`$$return->count = ${params[2]} - ${params[1]};`);
+                bodystr.push(`std::copy(${params[0]}->begin() + ${params[1]}, ${params[0]}->begin() + ${params[2]}, contents);`);
                 break;
             }
             case "list_takewhile": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_takewhile(${params[0]}, ${lambda});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+
+                bodystr.push(`auto wpos = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(!${pci}) { wpos = i; break; } }`);
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), wpos, &contents);`);
+                bodystr.push(`$$return->count = wpos;`);
+                bodystr.push(`std::copy(${params[0]}->begin(), ${params[0]}->begin() + wpos, contents);`);
                 break;
             }
             case "list_discardwhile": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_discardwhile(${params[0]}, ${lambda});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+
+                bodystr.push(`auto wpos = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(!${pci}) { wpos = i; break; } }`);
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count - wpos, &contents);`);
+                bodystr.push(`$$return->count = ${params[0]}->count - wpos;`);
+                bodystr.push(`std::copy(${params[0]}->begin() + wpos, ${params[0]}->end(), contents);`);
                 break;
             }
             case "list_takeuntil": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_takeuntil(${params[0]}, ${lambda});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+
+                bodystr.push(`auto wpos = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { wpos = i; break; } }`);
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), wpos, &contents);`);
+                bodystr.push(`$$return->count = wpos;`);
+                bodystr.push(`std::copy(${params[0]}->begin(), ${params[0]}->begin() + wpos, contents);`);
                 break;
             }
             case "list_discarduntil": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const lambda = this.createLambdaFor(idecl.pcodes.get("p") as MIRPCode);
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_discarduntil(${params[0]}, ${lambda});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+                const pci = this.createPCodeInvokeForUnaryPred(idecl.pcodes.get("p") as MIRPCode, `${params[0]}->at(i)`);
+
+                bodystr.push(`auto wpos = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(${pci}) { wpos = i; break; } }`);
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count - wpos, &contents);`);
+                bodystr.push(`$$return->count = ${params[0]}->count - wpos;`);
+                bodystr.push(`std::copy(${params[0]}->begin() + wpos, ${params[0]}->end(), contents);`);
                 break;
             }
             case "list_unique": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
                 const ctype = this.getListContentsInfoForListOp(idecl);
+                const crepr = this.typegen.getCPPReprFor(ctype);
                 const cmp = this.typegen.getFunctorsForType(ctype).less;
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_unique<${cmp}>(${params[0]});`;
+
+                bodystr.push(`std::set<${crepr.storagetype}, ${cmp}> seen;`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { if(seen.find(${params[0]}->at(i)) == seen.cend()) { seen.insert(${params[0]}->at(i)) ; $$return->copyto($$return->count++, ${params[0]}, i); } }`);
+                bodystr.push(`Allocator::GlobalAllocator.shrink($$return, ${lrepr.alignedSize}, ${crepr.alignedSize}, ${params[0]}->count, $$return->count);`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_reverse": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_reverse(${params[0]});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+
+                bodystr.push(`${crepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[2]} - ${params[1]}, &contents);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`std::reverse_copy(${params[0]}->begin(), ${params[0]}->end(), contents);`);
                 break;
             }
             case "list_map": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag] = this.getListResultTypeFor(idecl);
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                const lambdascope = this.typegen.mangleStringForCpp("$lambda_scope$");
-                const lambda = this.createLambdaFor(idecl.pcodes.get("f") as MIRPCode, lambdascope);
-                bodystr = `BSQRefScope ${lambdascope}(true); auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_map<${utype}, ${ucontents}, ${utag}>(${params[0]}, ${lambda});`;
+                const cc = this.createPCodeInvokeForUnary(idecl.pcodes.get("f") as MIRPCode, `${params[0]}->at(i)`, `$$return->at(i)`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc} }`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_mapindex": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag] = this.getListResultTypeFor(idecl);
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                const lambdascope = this.typegen.mangleStringForCpp("$lambda_scope$");
-                const lambda = this.createLambdaFor(idecl.pcodes.get("f") as MIRPCode, lambdascope);
-                bodystr = `BSQRefScope ${lambdascope}(true); auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_mapindex<${utype}, ${ucontents}, ${utag}>(${params[0]}, ${lambda});`;
+                const cc = this.createPCodeInvokeForBinary(idecl.pcodes.get("f") as MIRPCode, `${params[0]}->at(i)`, "i", `$$return->at(i)`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc} }`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_project": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag, incu] = this.getListResultTypeFor(idecl);
-                const mapt = this.typegen.getCPPReprFor(this.typegen.getMIRType(idecl.params[1].type)).base;
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_project<${utype}, ${ucontents}, ${utag}, ${mapt}, ${incu}>(${params[0]}, ${params[1]});`;
+                const cc = `$$return->store(i, ${params[1]}->getValue(${params[0]}->at(i)));`;
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc} }`);
                 break;
             }
             case "list_tryproject": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag, incu] = this.getListResultTypeFor(idecl);
-                const mapt = this.typegen.getCPPReprFor(this.typegen.getMIRType(idecl.params[1].type)).base;
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                const mirutype = (this.typegen.assembly.entityDecls.get(this.typegen.getMIRType(idecl.resultType).trkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-                const utyperepr = this.typegen.getCPPReprFor(mirutype);
-
-                const mirvvtype = (this.typegen.assembly.entityDecls.get(this.typegen.getMIRType(idecl.params[1].type).trkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
-                const vvtyperepr = this.typegen.getCPPReprFor(mirvvtype);
-
-                //TODO: it would be nice if we had specialized versions of these that didn't dump into our scope manager
-                const codecc = this.typegen.coerce("ccv", mirvvtype, mirutype);
-                const lambdacc = `[&${scopevar}](${this.typegen.getCPPReprFor(ctype).std} ccv) -> ${utyperepr.std} { return ${codecc}; }`;
-                const unone = this.typegen.coerce("BSQ_VALUE_NONE", this.typegen.noneType, mirutype);
-
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_tryproject<${utype}, ${ucontents}, ${vvtyperepr.std}, ${utag}, ${mapt}, ${incu}>(${params[0]}, ${params[1]}, ${unone}, ${lambdacc});`;
+                const cc = `${rcontentsrepr.storagetype} tlv; $$return->store(i, ${params[1]}->tryGetValue(${params[0]}->at(i), tlv) ? tlv : nrv);`;
+                bodystr.push(`${rcontentsrepr.storagetype} nrv; ${coerceNone("nrv", rcontentsrepr)};`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc} }`);
                 break;
             }
             case "list_defaultproject": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag, incu] = this.getListResultTypeFor(idecl);
-                const mapt = this.typegen.getCPPReprFor(this.typegen.getMIRType(idecl.params[1].type)).base;
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_defaultproject<${utype}, ${ucontents}, ${utag}, ${mapt}, ${incu}>(${params[0]}, ${params[1]}, ${params[2]});`;
+                const cc = `${rcontentsrepr.storagetype} tlv; $$return->store(i, ${params[1]}->tryGetValue(${params[0]}->at(i), tlv) ? tlv : ${params[2]});`;
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc} }`);
                 break;
             }
             case "list_zipindex": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
                 const ctype = this.getListContentsInfoForListOp(idecl);
-                const [utype, ucontents, utag] = this.getListResultTypeFor(idecl);
-            
-                //TODO: it would be nice if we had specialized versions of these that didn't dump into our scope manager
-                const codecc = this.typegen.coerce("u", ctype, this.typegen.anyType);
-                const crepr = this.typegen.getCPPReprFor(ctype);
-                const iflag = this.typegen.generateInitialDataKindFlag(ctype); //int component goes along with everything so just ignore it
-                const lambda = `[&${scopevar}](int64_t i, ${crepr.std} u) -> ${ucontents} { return BSQTuple::createFromSingle<${iflag}>({ BSQ_ENCODE_VALUE_TAGGED_INT(i), INC_REF_CHECK(Value, ${codecc}) }); }`;
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_zipindex<${utype}, ${ucontents}, ${utag}>(${params[0]}, ${lambda});`;
+                const iflag = this.typegen.generateInitialDataKindFlag(ctype); //int component goes along with everything so just ignore it
+                const zargs: [string, MIRType, MIRType][] = [[`${params[0]}->at(i)`, ctype, this.typegen.anyType], ["i", this.typegen.intType, this.typegen.anyType]];
+                const [cargs, ops] = this.coerceAccessInline(...zargs);
+
+                const cc = [...ops, `BSQTuple<2>::createFromSingle<${iflag}>($$return->at(i), {${cargs.join(", ")}});`];
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`$$return->count = ${params[0]}->count;`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cc.join(" ")} }`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_join": {
+                const uctype = this.getListContentsInfoForListOp(idecl);
+                const vctype = this.getListContentsInfoForType(this.typegen.getMIRType(idecl.params[1].type));
+                const [rrepr, rcontentsrepr] = this.getListResultTypeFor(idecl);
+
+                const iflag = `${this.typegen.generateInitialDataKindFlag(uctype)} & ${this.typegen.generateInitialDataKindFlag(vctype)}`; 
+                const zargs: [string, MIRType, MIRType][] = [[`${params[0]}->at(i)`, uctype, this.typegen.anyType], [`${params[1]}->at(j)`, uctype, this.typegen.anyType]];
+                const [cargs, ops] = this.coerceAccessInline(...zargs);
+
+                xxxx; //todo the inc of the count as we go is dangerous if GC happens in the middle we will only copy part of the allocation
+
+                const tc = this.createPCodeInvokeForBinaryPred(idecl.pcodes.get("f") as MIRPCode, `${params[0]}->at(i)`, `${params[1]}->at(j)`);
+                const cc = [...ops, `BSQTuple<2>::createFromSingle<${iflag}>($$return->at($$return->count++), {${cargs.join(", ")}});`];
+                bodystr.push(`size_t capcity = std::min(256, ${params[0]}->count, ${params[1]}->count`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), capacity, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) {`);
+                bodystr.push(`for(size_t j = 0; j < ${params[1]}->count; ++j) {`);
+                bodystr.push(`if($$return->count == capcity) { Allocator::GlobalAllocator.grow($$return, capcity); }`);
+                bodystr.push(`if(${tc}) { ${cc.join(" ")} }`);
+                bodystr.push(`}`);
+                bodystr.push(`}`);
+                bodystr.push(`Allocator::GlobalAllocator.shrink($$return, ${rrepr.alignedSize}, ${rcontentsrepr.alignedSize}, capacity, $$return->count);`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
+                break;
+
+
+
                 const ltype = this.getEnclosingListTypeForListOp(idecl);
                 const ctype = this.getListContentsInfoForListOp(idecl);
                 const utype = this.typegen.getMIRType(idecl.params[1].type);

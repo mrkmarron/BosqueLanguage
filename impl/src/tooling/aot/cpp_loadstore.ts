@@ -195,6 +195,22 @@ function getRequiredCoerce(trfrom: TypeRepr, trinto: TypeRepr): {kind: CoerceKin
     return getRequiredCoerceOfPrimitive(trfrom, trinto);
 }
 
+function coerceNone(into: string, trinto: TypeRepr): string
+{
+    if(trinto instanceof NoneRepr) {
+        return `${into} = BSQ_NONE_VALUE`;
+    }
+    else if(trinto instanceof RefRepr) {
+        return `${into} = (${trinto.storagetype})BSQ_NONE_VALUE;`
+    }
+    else if(trinto instanceof UnionRepr) {
+        return `${trinto.basetype}::convertToUnionNone(META_DATA_LOAD_DECL(MetaData_None), ${into});`;
+    }
+    else {
+        return `${into} = BSQ_NONE_VALUE;`;
+    }
+}
+
 function coerceDirect(exp: string, trfrom: TypeRepr, trinto: TypeRepr): string {
     if (trfrom instanceof NoneRepr) {
         if(trinto instanceof RefRepr) {
@@ -513,44 +529,14 @@ function coerceInline(cppframe: CPPFrame, exp: string, trfrom: TypeRepr, trinto:
     return coercePrimitiveDirect(cppframe, exp, trfrom, trinto);
 }
 
-function assignCPPValue(trepr: TypeRepr, dst: string, src: string): string {
-    if(trepr instanceof PrimitiveRepr) {
-        return `${dst} = BSQ_NONE;`;
-    }
-    else if(trepr instanceof PrimitiveRepr) {
-        return `${dst} = ${src};`;
-    }
-    else if(TRRepr instanceof StructRepr) {
-        return `${dst} = ${src};`;
-    }
-    else if(TRRepr instanceof TRRepr) {
-        return `GC_MEM_COPY(&${dst}, &${src}, ${trepr.alignedSize});`;
-    }
-    else if(TRRepr instanceof RefRepr) {
-        return `${dst} = ${src};`;
-    }
-    else if(TRRepr instanceof UnionRepr) {
-        return `GC_MEM_COPY(&${dst}, &${src}, ${trepr.alignedSize});`;
-    }
-    else if(TRRepr instanceof KeyValueRepr) {
-        return `${dst} = ${src};`;
-    }
-    else if(TRRepr instanceof ValueRepr) {
-        return `${dst} = ${src};`;
-    }
-    else {
-        return `${dst} = ${src};`;
-    }
-}
-
 function coerseAssignCPPValue(cppframe: CPPFrame, src: string, dst: string, trfrom: TypeRepr, trinto: TypeRepr): string[] {
     const cop = getRequiredCoerce(trfrom, trinto);
 
     if(cop.kind === CoerceKind.None) {
-        return [assignCPPValue(trinto, dst, src)];
+        return [`dst = BSQ_NONE;`];
     }
     else if(cop.kind === CoerceKind.Direct) {
-        return [assignCPPValue(trinto, dst, coerceDirect(src, trfrom, trinto))];
+        return [`dst = ${coerceDirect(src, trfrom, trinto)};`];
     }
     else if(cop.kind === CoerceKind.Inject) {
         return [coerceInject(dst, src, trfrom, trinto)];
@@ -563,7 +549,7 @@ function coerseAssignCPPValue(cppframe: CPPFrame, src: string, dst: string, trfr
     }
     else {
         let [ee, ops] = coerce(cppframe, src, trfrom, trinto);
-        return [...ops, assignCPPValue(trinto, dst, ee)];
+        return [...ops, `dst = ${ee};`];
     }
 }
 
@@ -573,5 +559,5 @@ function isDirectReturnValue(trepr: TypeRepr) {
 
 export {
     CoerceKind,
-    getRequiredCoerce, coerce, coerceInline, assignCPPValue, coerseAssignCPPValue, isDirectReturnValue
+    getRequiredCoerce, coerce, coerceInline, coerseAssignCPPValue, coerceNone, isDirectReturnValue
 };
