@@ -69,7 +69,6 @@ struct BSQMap : public BSQObject
         EntryT* contents = nullptr;
         Ty* alloc = Allocator::GlobalAllocator.allocateSafePlus<Ty, EntryT, count>(mdata);
 
-        alloc->count = count;
         std::copy(values.begin(), values.end(), contents);
         std::stable_sort(contents, contents + count, MEntryCMP{});
 

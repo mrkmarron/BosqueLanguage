@@ -124,9 +124,14 @@ public:
 
     void* vtable;
 
+    inline bool isFixedMetaData() const
+    {
+        return this->sizeentry == 0;
+    }
+
     inline size_t getMemorySize(void* obj)
     {
-        if(this->sizeentry != 0)
+        if(this->isFixedMetaData())
         {
             return this->datasize;
         }

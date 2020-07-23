@@ -9,6 +9,10 @@
 
 namespace BSQ
 {
+//
+//TODO: do we want to allow for list repr as tree or view structures (like for strings) to provide fast append/slice operations
+//
+
 template <typename T>
 struct BSQList
 {
@@ -20,7 +24,6 @@ struct BSQList
         T* contents = nullptr;
         Ty* alloc = Allocator::GlobalAllocator.allocateSafePlus<Ty, T, count>(mdata);
 
-        alloc->count = count;
         std::copy(values.begin(), values.end(), contents);
 
         return alloc;
@@ -70,7 +73,7 @@ struct BSQList
     }
 
     template <typename Ty, typename ListT>
-    static Ty* list_concat(ListT& l, MetaData* mdata)
+    inline static Ty* list_concat(ListT& l, MetaData* mdata)
     {
         size_t totalct = std::transform_reduce(
             l->begin(), 
@@ -82,8 +85,7 @@ struct BSQList
 
         T* contents = nullptr;
         Ty* res = Allocator::GlobalAllocator.allocateTPlus<Ty, T>(mdata, totalct, &contents);
-        res->count = totalct;
-
+        
         size_t cpos = 0;
         for(size_t i = 0; i < l->entries.size(); ++i)
         {
@@ -97,7 +99,7 @@ struct BSQList
     }
 
     template <std::execution ep>
-    int64_t list_sum_int()
+    inline int64_t list_sum_int()
     {
         int64_t res = std::reduce(ep, this->begin(), this->end(), 0, [](int64_t a, int64_t b) {
             if((a == std::numeric_limits<int64_t>::max()) | (b == std::numeric_limits<int64_t>::max())) 
@@ -127,6 +129,90 @@ struct BSQList
     BSQBigInt* list_sum_mixed()
     {
         assert(false);
+    }
+};
+
+struct ListOps
+{
+    template <typename ListU, typename ListV, typename ListTU, typename LambdaCons, typename LambdaP>
+    inline static void list_join(ListU& lu, ListV& lv, ListTU& res, MetaData* resmeta, LambdaCons cc, LambdaP p)
+    {
+        size_t capacity = res->count;
+        size_t rcount = 0;
+        for(size_t i = 0; i < lu->count; ++i)
+        {
+            for(size_t j = 0; j < lv->count; ++j)
+            {
+                if(rcount == capacity)
+                { 
+                    Allocator::GlobalAllocator.grow(res, resmeta->datasize, resmeta->sizeentry, capacity);
+                }
+
+                if(p(lu->at(i), lv->at(j))) 
+                { 
+                    cc(lu->at(i), lv->at(j), res);
+                }
+            }
+        }
+
+        Allocator::GlobalAllocator.shrink(res, resmeta->datasize, resmeta->sizeentry, capacity, rcount);
+    }
+
+    template <typename ListU, typename ListV, typename ListTU, typename LambdaListCons, typename LambdaCons, typename LambdaP>
+    inline static void* list_joingroup(ListU& lu, ListV& lv, ListTU& res, MetaData* llmeta, LambdaListCons llc, LambdaCons cc, LambdaP p)
+    {
+        for(size_t i = 0; i < lu->count; ++i)
+        {
+            size_t capacity = std::min((size_t)256, lu->count, lv->count);
+            ListV tmpl = llc(capacity);
+            Allocator::GlobalAllocator.pushRoot(tmpl);
+
+            size_t rcount = 0;
+            for(size_t j = 0; j < lv->count; ++j)
+            {
+                if(rcount == capacity)
+                { 
+                    Allocator::GlobalAllocator.grow(tmpl, llmeta->datasize, llmeta->sizeentry, capacity);
+                }
+
+                if(p(lu->at(i), lv->at(j))) 
+                { 
+                    cc(lu->at(i), lv->at(j), tmpl);
+                }
+            }
+
+            Allocator::GlobalAllocator.shrink(tmpl, llmeta->datasize, llmeta->sizeentry, capacity, rcount);
+            Allocator::GlobalAllocator.popRoot();
+            res->store(tmpl, i);
+        }
+    }
+
+    template <typename Ty, typename MType, typename K, typename K_CMP, typename LambdaPF, typename LambdaMEC> 
+    inline static void list_partition(Ty& l, MType& res, LambdaPF pf, LambdaMEC lmec)
+    {
+        std::map<K, size_t, K_CMP> partitionCounts;
+        std::for_each(l->entries.begin(), l->entries.end(), [pf, &partitions](T v) {
+            auto k = pf(v);
+            auto pp = partitions.find(k);
+
+            if(pp != partitions.end())
+            {
+                pp->second.emplace_back(RCIncF{}(v));
+                K_RCDecRef{}(k); //pf did inc so we need to dec
+            }
+            else 
+            {
+                partitions.emplace(k, std::vector<T>{RCIncF{}(v)});
+            }
+        });
+
+        std::vector<MECType> mentries;
+        std::transform(partitions.begin(), partitions.end(), std::back_inserter(mentries), [lmec, l](std::pair<K, std::vector<T>>&& me) -> MECType {
+            auto le = BSQ_NEW_NO_RC(Ty, l->nominalType, std::move(me.second));
+            return lmec(me.first, INC_REF_DIRECT(Ty, le));
+        });
+
+        return BSQ_NEW_NO_RC(MType, ntype, move(mentries));
     }
 };
 }

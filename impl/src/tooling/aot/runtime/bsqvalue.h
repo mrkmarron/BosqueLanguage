@@ -448,11 +448,11 @@ struct BSQTuple
     }
 
     inline static void boxTuple(MetaData* mdata, BSQTuple& from, Value& into) {
-       into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQTuple>(mdata, &from);
+       into = Allocator::GlobalAllocator.allocateSafeStruct<BSQTuple>(mdata, &from);
     }
 
     inline static Value boxTupleDirect(MetaData* mdata, BSQTuple& from) {
-       return Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQTuple>(mdata, &from);
+       return Allocator::GlobalAllocator.allocateSafeStruct<BSQTuple>(mdata, &from);
     }
 
     inline static void unboxTuple(Value from, BSQTuple& into) {
@@ -610,11 +610,11 @@ struct BSQRecord
     }
 
     inline static void boxRecord(MetaData* mdata, BSQRecord& from, Value& into) {
-        into = Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQRecord>(mdata, &from);
+        into = Allocator::GlobalAllocator.allocateSafeStruct<BSQRecord>(mdata, &from);
     }
 
     inline static Value boxRecordDirect(MetaData* mdata, BSQRecord& from) {
-       return Allocator::GlobalAllocator.allocateSafeDynamicCopy<BSQRecord>(mdata, &from);
+       return Allocator::GlobalAllocator.allocateSafeStruct<BSQRecord>(mdata, &from);
     }
 
     inline static void unboxRecord(Value from, BSQRecord& into) {

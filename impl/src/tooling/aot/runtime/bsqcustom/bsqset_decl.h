@@ -41,7 +41,6 @@ struct BSQSet
         T* contents = nullptr;
         Ty* alloc = Allocator::GlobalAllocator.allocateSafePlusDynamic<Ty, T>(mdata, rsize);
 
-        alloc->count = rsize;
         std::copy(rcontents, rcontents + rsize, contents);
         
         return alloc;
@@ -53,7 +52,6 @@ struct BSQSet
         T* contents = nullptr;
         Ty* alloc = Allocator::GlobalAllocator.allocateSafePlus<Ty, T, count>(mdata);
 
-        alloc->count = count;
         std::copy(values.begin(), values.end(), contents);
         std::stable_sort(contents, contents + count, T_CMP{});
         auto end = std::unique(contents, contents + count, T_EQ{});
