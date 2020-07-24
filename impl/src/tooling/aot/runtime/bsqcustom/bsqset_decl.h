@@ -87,5 +87,4 @@ struct BSQSet
         return ss;
     }
 };
-
 }

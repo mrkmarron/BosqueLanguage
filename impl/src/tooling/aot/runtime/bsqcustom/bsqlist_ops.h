@@ -9,60 +9,6 @@
 
 namespace BSQ
 {
-template <typename Ty, typename T>
-class BSQListOps
-{
-public:
-    
-    template <typename MType, typename MEntryType, MIRNominalTypeEnum ntype, typename MEntryCons> 
-    static MType* list_toindexmap(Ty* l, MEntryCons mec)
-    {
-        std::vector<MEntryType> mentries;
-        mentries.reserve(l->entries.size());
-        
-        for(int64_t i = 0; i < l->entries.size(); ++i)
-        {
-            mentries.emplace_back(mec(i, RCIncF{}(l->entries[i])));
-        }
-
-        return BSQ_NEW_NO_RC(MType, ntype, move(mentries));
-    }
-
-    template <typename MType, typename MEntryType, MIRNominalTypeEnum ntype, typename LambdaVF, typename MEntryCons> 
-    static MType* list_transformindexmap(Ty* l, LambdaVF vf, MEntryCons mec)
-    {
-        std::vector<MEntryType> mentries;
-        mentries.reserve(l->entries.size());
-        
-        for(int64_t i = 0; i < l->entries.size(); ++i)
-        {
-            mentries.emplace_back(mec(i, vf(l->entries[i])));
-        }
-
-        return BSQ_NEW_NO_RC(MType, ntype, move(mentries));
-    }
-
-    template <typename MType, typename MEntryType, MIRNominalTypeEnum ntype, typename K, typename K_CMP, typename V, typename LambdaKF, typename LambdaVF, typename MEntryCons> 
-    static MType* list_transformmap(Ty* l, LambdaKF kf, LambdaVF vf, MEntryCons mec)
-    {
-        std::map<K, MEntryType, K_CMP> mentries;
-        
-        std::transform(l->entries.begin(), l->entries.end(), std::inserter(mentries, mentries.begin()), [kf, vf, mec, &mentries](T v) {
-            auto k = kf(v);
-            auto vv = vf(v);
-
-            auto epos = mentries.find(k);
-            BSQ_ASSERT(epos == mentries.end(), "abort -- duplicate keys are not allowed in List<T>::toMap");
-
-            return std::make_pair(k, mec(k, vv));
-        });
-
-        std::vector<MEntryType> rvv;
-        std::transform(mentries.begin(), mentries.end(), std::back_inserter(rvv), [](const std::pair<K, MEntryType>& e) { return e.second; });
-        return BSQ_NEW_NO_RC(MType, ntype, move(rvv));
-    }
-};
-
 class BSQListUtilOps
 {
 public:

@@ -2051,21 +2051,6 @@ class CPPBodyEmitter {
         return (this.typegen.assembly.entityDecls.get(decl) as MIREntityTypeDecl).terms.get("V") as MIRType;
     }
 
-    getMEntryTypeForMapType(decl: MIRResolvedTypeKey): string {
-        const ktd = this.typegen.getCPPReprFor(this.getMapKeyContentsInfoForMapType(decl)).std;
-        const vtd = this.typegen.getCPPReprFor(this.getMapValueContentsInfoForMapType(decl)).std;
-
-        return `MEntry<${ktd}, ${vtd}>`;
-    }
-
-    getMEntryCmpTypeForMapType(decl: MIRResolvedTypeKey): string {
-        const ktd = this.typegen.getCPPReprFor(this.getMapKeyContentsInfoForMapType(decl)).std;
-        const kcmp = this.typegen.getFunctorsForType(this.getMapKeyContentsInfoForMapType(decl)).less;
-        const vtd = this.typegen.getCPPReprFor(this.getMapValueContentsInfoForMapType(decl)).std;
-
-        return `MEntryCMP<${ktd}, ${vtd}, ${kcmp}>`;
-    }
-
     getEnclosingMapTypeForMapOp(idecl: MIRInvokePrimitiveDecl): MIRType {
         return this.typegen.getMIRType(idecl.enclosingDecl as string);
     }
@@ -2078,12 +2063,11 @@ class CPPBodyEmitter {
         return this.getMapValueContentsInfoForMapType(idecl.enclosingDecl as string);
     }
 
-    getMEntryTypeForMapOp(idecl: MIRInvokePrimitiveDecl): string {
-        return this.getMEntryTypeForMapType(idecl.enclosingDecl as string);
-    }
+    getMEntryTypeForMapType(mtypekey: MIRResolvedTypeKey): MIRType {
+        const tailkey = mtypekey.slice(mtypekey.startsWith("NSCore::Map<") ? "NSCore::Map".length : "NSCore::MapEntry".length);
+        const mekey = "NSCore::MapEntry" + tailkey;
 
-    getMEntryCmpTypeForMapOp(idecl: MIRInvokePrimitiveDecl): string {
-        return this.getMEntryCmpTypeForMapType(idecl.enclosingDecl as string);
+        return this.typegen.getMIRType(mekey);
     }
 
     createPCodeInvokeForUnaryPred(pc: MIRPCode, arg: string): string {
@@ -2341,10 +2325,12 @@ class CPPBodyEmitter {
                 break;
             }
             case "list_range": {
-                const rtype = this.typegen.getMIRType(idecl.resultType);
-                const rtyperepr = this.typegen.getCPPReprFor(rtype);
-
-                bodystr = `auto $$return = BSQListUtilOps::list_range<${rtyperepr.base}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(rtype.trkey)}>(${params[0]}, ${params[1]});`;
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
+                
+                bodystr.push(`${crepr.storagetype} contents = nullptr;`);
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[1]} - ${params[0]}, &contents);`);
+                bodystr.push(`for(size_t i = 0; i < (${params[1]} - ${params[0]}); ++i) { contents[i] = (${params[0]} + i); }`);
                 break;
             }
             case "list_size": {
@@ -2717,6 +2703,7 @@ class CPPBodyEmitter {
 
                 bodystr.push(`size_t capacity = std::min((size_t)256, ${params[0]}->count, ${params[1]}->count`);
                 bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), capacity, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
                 bodystr.push(`ListOps::list_join<${this.typegen.getCPPReprFor(ultype).storagetype}, ${this.typegen.getCPPReprFor(vltype).storagetype}, ${rrepr.storagetype}>(${params[0]}, ${params[1]}, $$return, META_DATA_LOAD_DECL(${rrepr.metadataName}), ${tcc}, ${ccc});`)
                 bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
@@ -2741,6 +2728,7 @@ class CPPBodyEmitter {
                 const llcc = `[](size_t capacity) -> ${this.typegen.getCPPReprFor(vltype).storagetype} { return Allocator::GlobalAllocator.allocateTPlus<${this.typegen.getCPPReprFor(vltype).basetype}, ${this.typegen.getCPPReprFor(vctype).storagetype}>(META_DATA_LOAD_DECL(${this.typegen.getCPPReprFor(vltype).metadataName}), capacity, nullptr); }`;
 
                 bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rcontentsrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
                 bodystr.push(`ListOps::list_joingroup<${this.typegen.getCPPReprFor(ultype).storagetype}, ${this.typegen.getCPPReprFor(vltype).storagetype}, ${rrepr.storagetype}>(${params[0]}, ${params[1]}, $$return, META_DATA_LOAD_DECL(${rrepr.metadataName}), ${llcc}, ${tcc}, ${ccc});`)
                 bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
@@ -2753,94 +2741,115 @@ class CPPBodyEmitter {
                 bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), ${params[0]}->count + ${params[1]}->count, &contents);`);
                 bodystr.push(`std::copy(${params[0]}->begin(), ${params[0]}->end(), contents);`);
                 bodystr.push(`std::copy(${params[1]}->begin(), ${params[1]}->end(), contents + ${params[0]}->count);`);
-
                 break;
             }
             case "list_partition": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
+                const lrepr = this.typegen.getCPPReprFor(this.getEnclosingListTypeForListOp(idecl));
+                const crepr = this.typegen.getCPPReprFor(this.getListContentsInfoForListOp(idecl));
             
-                const maptype = this.typegen.getMIRType(idecl.resultType);
-                const mapentrytype = this.getMEntryTypeForMapType(maptype.trkey);
-                const ktype = this.getMapKeyContentsInfoForMapType(maptype.trkey);
+                const klrepr = this.typegen.getCPPReprFor(this.typegen.getMIRType(idecl.params[1].type));
+
+                const rtype = this.typegen.getMIRType(idecl.resultType);
+                const rrepr = this.typegen.getCPPReprFor(rtype);
+                const rentrytype = this.getMEntryTypeForMapType(rtype.trkey);
+                const rentrydecl = this.assembly.entityDecls.get(rentrytype.trkey) as MIREntityTypeDecl;
+                const rentryrepr = this.typegen.getCPPReprFor(rentrytype);
+
+                const ktype = this.getMapKeyContentsInfoForMapType(rtype.trkey);
                 const krepr = this.typegen.getCPPReprFor(ktype);
                 const kops = this.typegen.getFunctorsForType(ktype);
 
-                const lambdascope = this.typegen.mangleStringForCpp("$lambda_scope$");
-                const lambdapf = this.createLambdaFor(idecl.pcodes.get("pf") as MIRPCode, lambdascope);
-                const lambdamec = `[](${this.typegen.getCPPReprFor(ktype).std} kk, ${this.typegen.getCPPReprFor(ltype).std} ll) -> ${mapentrytype} { return ${mapentrytype}{kk, ll}; }`;
+                const kf = rentrydecl.fields.find((f) => f.name === "key") as MIRFieldDecl;
+                const vf = rentrydecl.fields.find((f) => f.name === "value") as MIRFieldDecl;
 
-                bodystr = `BSQRefScope ${lambdascope}(true); auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_partition<${this.typegen.getCPPReprFor(maptype).base}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(maptype.trkey)}, ${mapentrytype}, ${krepr.std}, ${kops.dec}, ${kops.less}>(${params[0]}, ${lambdapf}, ${lambdamec});`
+                const lmec = `[](${klrepr.passingtype} k, ${crepr.passingtype} v, ${rentryrepr.passingtype} e) -> size_t {
+                    e.${this.typegen.mangleStringForCpp(kf.fkey)} = k;
+                    e.${this.typegen.mangleStringForCpp(vf.fkey)} = Allocator::GlobalAllocator.allocateTPlus<${lrepr.basetype}, ${crepr.storagetype}>(META_DATA_LOAD_DECL(${lrepr.metadataName}), 16, nullptr);
+
+                    return 16;
+                }`;
+
+                const vop = `[](${rentryrepr.passingtype} arg) { return arg.${this.typegen.mangleStringForCpp(vf.fkey)}}`
+
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rentryrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), 16, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`ListOps::list_partition<${lrepr.storagetype}, ${crepr.storagetype}, ${klrepr.storagetype}, ${rrepr.storagetype}, ${krepr.storagetype}, ${kops.less}>(${params[0]}, ${params[1]}, $$return, ${lmec}, ${vop});`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
-            case "list_toindexmap": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
+            case "list_toindexmap": {            
+                const rtype = this.typegen.getMIRType(idecl.resultType);
+                const rrepr = this.typegen.getCPPReprFor(rtype);
+                const rentrytype = this.getMEntryTypeForMapType(rtype.trkey);
+                const rentrydecl = this.assembly.entityDecls.get(rentrytype.trkey) as MIREntityTypeDecl;
+                const rentryrepr = this.typegen.getCPPReprFor(rentrytype);
 
-                const maptype = this.typegen.getMIRType(idecl.resultType);
-                const maptyperepr = this.typegen.getCPPReprFor(maptype);
-                const mapentrytype = this.getMEntryTypeForMapType(maptype.trkey);
+                const kfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "key") as MIRFieldDecl).fkey);
+                const vfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "value") as MIRFieldDecl).fkey);
 
-                const lambdamec = `[](int64_t kk, ${this.typegen.getCPPReprFor(ctype).std} vv) -> ${mapentrytype} { return ${mapentrytype}{kk, ${this.typegen.getFunctorsForType(ctype).inc}{}(vv)}; }`;
-
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_toindexmap<${maptyperepr.base}, ${mapentrytype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(maptype.trkey)}>(${params[0]}, ${lambdamec});`;
+                bodystr.push(`${rentryrepr.storagetype}* contents;`)
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rentryrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, contents);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { contents[i].${kfname} = i; contents[i].${vfname} = ${params[0]}->at(i); }`);
                 break;
             }
             case "list_transformindexmap": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
+                const rtype = this.typegen.getMIRType(idecl.resultType);
+                const rrepr = this.typegen.getCPPReprFor(rtype);
+                const rentrytype = this.getMEntryTypeForMapType(rtype.trkey);
+                const rentrydecl = this.assembly.entityDecls.get(rentrytype.trkey) as MIREntityTypeDecl;
+                const rentryrepr = this.typegen.getCPPReprFor(rentrytype);
 
-                const maptype = this.typegen.getMIRType(idecl.resultType);
-                const vftype = this.getMapValueContentsInfoForMapType(idecl.resultType)
-                const maptyperepr = this.typegen.getCPPReprFor(maptype);
-                const mapentrytype = this.getMEntryTypeForMapType(maptype.trkey);
+                const kfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "key") as MIRFieldDecl).fkey);
+                const vfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "value") as MIRFieldDecl).fkey);
 
-                const lambdascope = this.typegen.mangleStringForCpp("$lambda_scope$");
-                const lambdavf = this.createLambdaFor(idecl.pcodes.get("vf") as MIRPCode, lambdascope);
-                const lambdamec = `[](int64_t kk, ${this.typegen.getCPPReprFor(vftype).std} vv) -> ${mapentrytype} { return ${mapentrytype}{kk, vv}; }`;
+                const ccv = this.createPCodeInvokeForUnary(idecl.pcodes.get("vf") as MIRPCode, `${params[0]}->at(i)`, `$$return->at(i).${vfname}`);
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_transformindexmap<${maptyperepr.base}, ${mapentrytype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(maptype.trkey)}>(${params[0]}, ${lambdavf}, ${lambdamec});`;
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rentryrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { $$return->at(i).${kfname} = i; ${ccv}; }`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "list_transformmap": {
-                const ltype = this.getEnclosingListTypeForListOp(idecl);
-                const ctype = this.getListContentsInfoForListOp(idecl);
+                const rtype = this.typegen.getMIRType(idecl.resultType);
+                const rrepr = this.typegen.getCPPReprFor(rtype);
+                const rentrytype = this.getMEntryTypeForMapType(rtype.trkey);
+                const rentrydecl = this.assembly.entityDecls.get(rentrytype.trkey) as MIREntityTypeDecl;
+                const rentryrepr = this.typegen.getCPPReprFor(rentrytype);
 
-                const maptype = this.typegen.getMIRType(idecl.resultType);
-                const kftype = this.getMapKeyContentsInfoForMapType(idecl.resultType)
-                const vftype = this.getMapValueContentsInfoForMapType(idecl.resultType)
-                const maptyperepr = this.typegen.getCPPReprFor(maptype);
-                const mapentrytype = this.getMEntryTypeForMapType(maptype.trkey);
+                const kfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "key") as MIRFieldDecl).fkey);
+                const vfname = this.typegen.mangleStringForCpp((rentrydecl.fields.find((f) => f.name === "value") as MIRFieldDecl).fkey);
 
-                const lambdascope = this.typegen.mangleStringForCpp("$lambda_scope$");
-                const lambdakf = this.createLambdaFor(idecl.pcodes.get("kf") as MIRPCode, lambdascope);
-                const lambdavf = this.createLambdaFor(idecl.pcodes.get("vf") as MIRPCode, lambdascope);
-                const lambdamec = `[](${this.typegen.getCPPReprFor(kftype).std} kk, ${this.typegen.getCPPReprFor(vftype).std} vv) -> ${mapentrytype} { return ${mapentrytype}{kk, vv}; }`;
+                const cck = this.createPCodeInvokeForUnary(idecl.pcodes.get("kf") as MIRPCode, `${params[0]}->at(i)`, `$$return->at(i).${kfname}`);
+                const ccv = this.createPCodeInvokeForUnary(idecl.pcodes.get("vf") as MIRPCode, `${params[0]}->at(i)`, `$$return->at(i).${vfname}`);
 
-                bodystr = `auto $$return = ${this.createListOpsFor(ltype, ctype)}::list_transformmap<${maptyperepr.base}, ${mapentrytype}, MIRNominalTypeEnum::${this.typegen.mangleStringForCpp(maptype.trkey)}, ${this.typegen.getCPPReprFor(kftype).std}, ${this.typegen.getFunctorsForType(kftype).less}, ${this.typegen.getCPPReprFor(vftype).std}>(${params[0]}, ${lambdakf}, ${lambdavf}, ${lambdamec});`;
+                bodystr.push(`auto $$return = Allocator::GlobalAllocator.allocateTPlus<${rrepr.basetype}, ${rentryrepr.storagetype}>(META_DATA_LOAD_DECL(${rrepr.metadataName}), ${params[0]}->count, nullptr);`);
+                bodystr.push(`Allocator::GlobalAllocator.pushRoot($$return);`);
+                bodystr.push(`for(size_t i = 0; i < ${params[0]}->count; ++i) { ${cck}; ${ccv}; }`);
+                bodystr.push(`Allocator::GlobalAllocator.popRoot();`);
                 break;
             }
             case "set_size": {
-                bodystr = `auto $$return = ${params[0]}->entries.size();`;
+                bodystr.push(`auto $$return = ${params[0]}->count;`);
                 break;
             }
             case "set_has_key": {
-                const tcmp = this.typegen.getFunctorsForType(this.getSetContentsInfoForSetOp(idecl)).less;
-                bodystr = `auto $$return = std::binary_search(${params[0]}->entries.begin(), ${params[0]}->entries.end(), ${params[1]}, ${tcmp}{});`;
+                bodystr.push(`auto $$return = ${params[0]}->hasKey(${params[1]});`);
                 break;
             }
             case "map_size": {
-                bodystr = `auto $$return = ${params[0]}->entries.size();`;
+                bodystr.push(`auto $$return = ${params[0]}->count;`);
                 break;
             }
             case "map_has_key": {
-                bodystr = `auto $$return = ${params[0]}->hasKey(${params[1]});`;
+                bodystr.push(`auto $$return = ${params[0]}->hasKey(${params[1]});`);
                 break;
             }
             case "map_at_val": {
-                bodystr = `auto $$return = ${params[0]}->getValue(${params[1]});`;
+                bodystr.push(`auto $$return = ${params[0]}->getValue(${params[1]});`);
                 break;
             }
+            /*
             case "map_key_list": {
                 const mtype = this.getEnclosingMapTypeForMapOp(idecl);
                 const ktype = this.getMapKeyContentsInfoForMapOp(idecl);
@@ -3214,6 +3223,7 @@ class CPPBodyEmitter {
                 bodystr = `${header} ${ctrl} ${rcstatus === "no" ? bodynorc : bodyrc} auto $$return = cacc;`;
                 break;
             }
+            */
             default: {
                 assert(false, `Need to implement -- ${idecl.iname}`);
                 break;

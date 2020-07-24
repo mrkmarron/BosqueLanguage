@@ -11,39 +11,68 @@
 
 namespace BSQ
 {
+template <typename K, typename K_CMP, typename EntryT, typename OP_Key>
+struct MKeyCMP 
+{
+    inline bool operator()(const EntryT& e1, const K& k)
+    {
+        return K_CMP{}(OP_Key{}(e1), k);
+    } 
+};
+
+template <typename K, typename K_EQ, typename EntryT, typename OP_Key>
+struct MKeyEQ 
+{
+    inline bool operator()(const EntryT& e1, const K& k)
+    {
+        return K_EQ{}(OP_Key{}(e1), k);
+    } 
+};
+
+template <typename K, typename K_CMP, typename EntryT, typename OP_Key>
+struct MEntryCMP 
+{
+    inline bool operator()(const EntryT& e1, const EntryT& e2)
+    {
+        return K_CMP{}(OP_Key{}(e1), OP_Key{}(e2));
+    } 
+};
+
+template <typename K, typename K_EQ, typename EntryT, typename OP_Key>
+struct MEntryEQ 
+{
+    inline bool operator()(const EntryT& e1, const EntryT& e2)
+    {
+        return K_EQ{}(OP_Key{}(e1), OP_Key{}(e2));
+    } 
+};
+
 template <typename K, typename V, typename K_CMP, typename K_EQ, typename EntryT, typename OP_Key, typename OP_Val>
 struct BSQMap : public BSQObject 
 {
-    struct MEntryCMP 
-    {
-        inline bool operator()(const EntryT& e1, const EntryT& e2)
-        {
-            return K_CMP{}(OP_Key{}(e1), OP_Key{}(e2));
-        } 
-    };
-
-    struct MEntryEQ 
-    {
-        inline bool operator()(const EntryT& e1, const EntryT& e2)
-        {
-            return K_EQ{}(OP_Key{}(e1), OP_Key{}(e2));
-        } 
-    };
-
     size_t count;
     
+    inline EntryT& at(size_t i)
+    {
+        return *((EntryT*)GET_COLLECTION_START_FIXED(this, sizeof(size_t)) + i);
+    }
+
     inline bool hasKey(const K& k)
     {
         EntryT* entries = GET_COLLECTION_START_FIXED(this, sizeof(BSQMap));
-        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const EntryT& a, const EntryT& b){ return MEntryCMP{}(a, b); });
+        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const EntryT& e, const K& k){ 
+            return MKeyCMP<K, K_CMP, EntryT, OP_Key>{}(e, k); 
+        });
 
-        return ipos != entries + this->count && K_EQ{}(k, OP_Key{}(*ipos));
+        return ipos != entries + this->count && MKeyEQ<K, K_EQ, EntryT, OP_Key>{}(*ipos, k);
     }
 
     inline V& getValue(const K& k)
     {
         EntryT* entries = GET_COLLECTION_START_FIXED(this, sizeof(BSQMap));
-        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const T& a, const T& b){ return MEntryCMP{}(a, b); });
+        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const EntryT& e, const K& k){ 
+            return MKeyCMP<K, K_CMP, EntryT, OP_Key>{}(e, k); 
+        });
 
         return OP_Val{}(*ipos);
     }
@@ -51,9 +80,11 @@ struct BSQMap : public BSQObject
     inline bool tryGetValue(const K& k, V& res)
     {
         EntryT* entries = GET_COLLECTION_START_FIXED(this, sizeof(BSQMap));
-        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const T& a, const T& b){ return MEntryCMP{}(a, b); });
+        auto ipos = std::lower_bound(entries, entries + this->count, k, [](const EntryT& e, const K& k){ 
+            return MKeyCMP<K, K_CMP, EntryT, OP_Key>{}(e, k); 
+        });
 
-        bool found = ipos != entries + this->count && K_EQ{}(k, OP_Key{}(*ipos));
+        bool found = ipos != entries + this->count && MKeyEQ<K, K_EQ, EntryT, OP_Key>{}(*ipos, k);
 
         if(found)
         {
@@ -72,7 +103,7 @@ struct BSQMap : public BSQObject
         std::copy(values.begin(), values.end(), contents);
         std::stable_sort(contents, contents + count, MEntryCMP{});
 
-        auto dup = std::adjacent_find(contents, contents + count, MEntryEQ{});
+        auto dup = std::adjacent_find(contents, contents + count, MEntryEQ<K, K_EQ, EntryT, OP_Key>{});
         BSQ_ASSERT(dup == contents + count, "abort -- duplicate key found in Map initialization");
 
         return alloc;

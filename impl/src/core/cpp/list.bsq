@@ -65,7 +65,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     hidden static s_append(l: List<T>, lp: List<T>): List<T> # list_append
 
-    hidden recursive? static s_partition<K where KeyType>(l: List<T>, pf: recursive? fn(_: T) -> K): Map<K, List<T>> # list_partition
+    hidden static s_partition<K where KeyType>(l: List<T>, plist: List<K>): Map<K, List<T>> # list_partition
     hidden recursive? static s_sort(l: List<T>, cmp: recursive? fn(_: T, _: T) -> Bool): List<T> # list_sort
 
     hidden static s_toIndexMap(l: List<T>): Map<Int, T> # list_toindexmap
@@ -524,7 +524,8 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     }
 
     recursive? method partition<K where KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
-        return List<T>::s_partition<K>[recursive?](this, pf);
+        const plist = this.map<K>[recursive?](pf);
+        return List<T>::s_partition<K>(this, plist);
     }
 
     recursive? method sort(cmp: recursive? fn(_: T, _: T) -> Bool): List<T> {

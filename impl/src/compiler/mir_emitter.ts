@@ -443,6 +443,7 @@ class MIRBodyEmitter {
 }
 
 class MIREmitter {
+    readonly assembly: Assembly;
     readonly masm: MIRAssembly;
     readonly bodyEmitter: MIRBodyEmitter = new MIRBodyEmitter();
 
@@ -459,7 +460,8 @@ class MIREmitter {
     private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
     private readonly allVInvokes: [MIRVirtualMethodKey, MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
 
-    private constructor(masm: MIRAssembly) {
+    private constructor(assembly: Assembly, masm: MIRAssembly) {
+        this.assembly = assembly;
         this.masm = masm;
     }
 
@@ -516,6 +518,18 @@ class MIREmitter {
         const key = MIRKeyGenerator.generateTypeKey(decl, binds);
         if (this.masm.conceptDecls.has(key) || this.masm.entityDecls.has(key) || this.pendingOOProcessing.findIndex((oop) => oop[0] === key) !== -1) {
             return;
+        }
+
+        if (decl.ns === "NSCore" && (decl.name === "Map" || decl.name === "DynamicMap")) {
+            const medecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry") as EntityTypeDecl;
+
+            const mekey = MIRKeyGenerator.generateTypeKey(medecl, binds);
+            if (this.masm.entityDecls.has(mekey) || this.pendingOOProcessing.findIndex((oop) => oop[0] === mekey) !== -1) {
+                return;
+            }
+
+            this.pendingOOProcessing.push([mekey, medecl, binds]);
+            this.entityInstantiationInfo.push([mekey, medecl, binds]);
         }
 
         this.pendingOOProcessing.push([key, decl, binds]);
@@ -695,7 +709,7 @@ class MIREmitter {
         });
 
         const masm = new MIRAssembly(pckge, srcFiles, hash.digest("hex"));
-        const emitter = new MIREmitter(masm);
+        const emitter = new MIREmitter(assembly, masm);
         const checker = new TypeChecker(assembly, true, emitter, buildLevel, validateLiteralStrings);
 
         emitter.registerTypeInstantiation(assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Any") as ConceptTypeDecl, new Map<string, ResolvedType>());

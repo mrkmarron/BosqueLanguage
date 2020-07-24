@@ -187,32 +187,52 @@ struct ListOps
         }
     }
 
-    template <typename Ty, typename MType, typename K, typename K_CMP, typename LambdaPF, typename LambdaMEC> 
-    inline static void list_partition(Ty& l, MType& res, LambdaPF pf, LambdaMEC lmec)
+    template <typename K, typename K_CMP>
+    struct KPTR_CMP 
     {
-        std::map<K, size_t, K_CMP> partitionCounts;
-        std::for_each(l->entries.begin(), l->entries.end(), [pf, &partitions](T v) {
-            auto k = pf(v);
-            auto pp = partitions.find(k);
+        inline bool operator()(const K* k1, const K* k2)
+        {
+            return K_CMP{}(*k1, *k2);
+        } 
+    };
 
-            if(pp != partitions.end())
+    template <typename Ty, typename V, typename KLIST, typename MType, typename K, typename K_CMP, typename LambdaMEC, typename V_OP> 
+    inline static void list_partition(Ty& l, KLIST& kl, MType& res, LambdaMEC lmec, V_OP vop)
+    {
+        std::map<K*, std::pair<size_t, std::pair<size_t, size_t>>, KPTR_CMP<K, K_CMP>> partitionMap;
+
+        size_t mpos = 0;
+        size_t mcapacity = res.count;
+        for(size_t i = 0; i < l->count; ++i)
+        {
+            auto iter = partitionMap.find(&kl->at(i));
+            if(iter == partitions.end())
             {
-                pp->second.emplace_back(RCIncF{}(v));
-                K_RCDecRef{}(k); //pf did inc so we need to dec
+                if(mpos == mcapacity)
+                {
+                    Allocator::GlobalAllocator.grow(res, GET_TYPE_META_DATA(res)->datasize, GET_TYPE_META_DATA(res)->sizeentry, mcapacity);
+                }
+
+                size_t isize = lmec(kl->at(i), l->at(i), res->at(mpos));
+                partitionMap[&kl->at(i)] = std::make_pair(mpos++, std::make_pair(0, isize));
             }
             else 
             {
-                partitions.emplace(k, std::vector<T>{RCIncF{}(v)});
+                std::pair<size_t, size_t>& sizes = res->at(iter->second.second);
+                if(sizes.first == sizes.second)
+                {
+                    Allocator::GlobalAllocator.grow(res->at(iter->second.first), GET_TYPE_META_DATA(l)->datasize, GET_TYPE_META_DATA(l)->sizeentry, sizes.second);
+                }
+
+                vop(res->at(iter->second.first))->copyto(sizes.first++, l, i);
             }
-        });
+        }
 
-        std::vector<MECType> mentries;
-        std::transform(partitions.begin(), partitions.end(), std::back_inserter(mentries), [lmec, l](std::pair<K, std::vector<T>>&& me) -> MECType {
-            auto le = BSQ_NEW_NO_RC(Ty, l->nominalType, std::move(me.second));
-            return lmec(me.first, INC_REF_DIRECT(Ty, le));
-        });
-
-        return BSQ_NEW_NO_RC(MType, ntype, move(mentries));
+        Allocator::GlobalAllocator.shrink(res, GET_TYPE_META_DATA(res)->datasize, GET_TYPE_META_DATA(res)->sizeentry, mcapacity, mpos);
+        for(auto iter = partitionMap.begin(); iter != partitionMap.end(); ++iter)
+        {
+            Allocator::GlobalAllocator.shrink(vop(res->at(iter->second.first)), GET_TYPE_META_DATA(l)->datasize, GET_TYPE_META_DATA(l)->sizeentry, iter->second.second.second, iter->second.second.first);
+        }
     }
 };
 }
