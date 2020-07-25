@@ -87,8 +87,13 @@ class CPPFrame {
     getExpressionForName(name: string): string {
         return (this.registeredNames.get(name) as FrameLocation).access;
     }
+
+    getAllLocations(): FrameLocation[] {
+        return [...this.registeredNames].map((le) => le[1]);
+    }
 }
 
 export {
+    ArgLocation, PrimitiveLocation, PointerLocation, ValueStructLocation, GeneralStructLocation,
     CPPFrame
 };
