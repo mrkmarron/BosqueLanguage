@@ -56,6 +56,10 @@ abstract class TypeRepr {
         this.packedPtrCount = packedPtrCount;
         this.layoutmask = layoutmask;
     }
+
+    constructStringReprOfMask(): string {
+        return this.layoutmask.map((c) => `${c}`).join("");
+    }
 }
 
 class NoneRepr extends TypeRepr {

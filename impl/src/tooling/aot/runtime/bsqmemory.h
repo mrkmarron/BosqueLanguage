@@ -119,7 +119,7 @@ namespace BSQ
         static GCStackEntry frames[8192];
         static uint32_t stackp;
 
-        inline static void pushFrame(void** reffp, uint32_t refslots, void** structfp=nullptr, RefMask mask=nullptr)
+        inline static void pushFrame(void** reffp, uint32_t refslots, void** structfp, RefMask mask)
         {
             if(GCStack::stackp >= 8192)
             {

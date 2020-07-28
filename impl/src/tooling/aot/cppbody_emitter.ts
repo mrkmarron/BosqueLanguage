@@ -9,7 +9,7 @@ import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MI
 import { topologicalOrder } from "../../compiler/mir_info";
 import { StructRepr, RefRepr, ValueRepr, KeyValueRepr, NoneRepr, UnionRepr, StorageByteAlignment, TRRepr, TypeRepr, PrimitiveRepr } from "./type_repr";
 import { compileRegexCppMatch } from "./cpp_regex";
-import { CPPFrame, PrimitiveLocation, PointerLocation, ValueStructLocation } from "./cpp_frame";
+import { CPPFrame, PrimitiveLocation, PointerLocation, ValueStructLocation, GeneralStructLocation } from "./cpp_frame";
 
 import * as assert from "assert";
 import { CoerceKind, coerce, isDirectReturnValue, getRequiredCoerce, coerseAssignCPPValue, coerceInline, coerceNone } from "./cpp_loadstore";
@@ -1978,6 +1978,7 @@ class CPPBodyEmitter {
         if (block.label === "exit") {
             const rrepr = this.typegen.getCPPReprFor(this.currentRType);
             
+            gblock.push(["GCStack::popFrame();"]);
             if (isDirectReturnValue(rrepr)) {
                 gblock.push([`return $$return;`]);
             }
@@ -1993,7 +1994,7 @@ class CPPBodyEmitter {
         let floats: string[] = [];
         let locals: string[] = [];
         let ptrs: string[] = [];
-        let gvals: string[] = [];
+        let gvals: {mask: string, decl: string}[] = [];
 
         for(let i = 0; i < locs.length; ++i) {
             const ll = locs[i];
@@ -2018,8 +2019,8 @@ class CPPBodyEmitter {
             else if(ll instanceof ValueStructLocation) {
                 locals.push(`${ll.trepr.storagetype} ${ll.name};`);
             }
-            else if(ll instanceof ValueStructLocation) {
-                gvals.push(`${ll.trepr.storagetype} ${ll.name};`);
+            else if(ll instanceof GeneralStructLocation) {
+                gvals.push({mask: ll.trepr.constructStringReprOfMask(), decl: `${ll.trepr.storagetype} ${ll.name};`});
             }
             else {
                 assert(false);
@@ -2056,11 +2057,20 @@ class CPPBodyEmitter {
             prelude.push(`    ${ikey}_ptrs $pframe$ = {0};`);
         }
 
+        let mask = "";
         if(gvals.length) {
-            const gframe = `struct ${ikey}_gvals { ${gvals.join(" ")} };`;
+            const gframe = `struct ${ikey}_gvals { ${gvals.map((gve) => gve.decl).join(" ")} };`;
             framedecls.push(gframe);
 
+            mask = gvals.map((gve) => gve.mask).join("");
+
             prelude.push(`    ${ikey}_gvals $gframe$ = {0};`);
+        }
+
+        if(ptrs.length !== 0 || gvals.length !== 0) {
+            const ptrsarg = ptrs.length !== 0 ? `(void**)(&$pframe$)` : "nullptr";
+            const structsarg = gvals.length !== 0 ? `(void**)(&$gframe$)` : "nullptr"
+            prelude.push(`    GCStack::pushFrame(${ptrsarg}, ${ptrs.length}, ${structsarg}, ${mask});`)
         }
 
         return { prelude: prelude.join("\n"), framedecls: framedecls };

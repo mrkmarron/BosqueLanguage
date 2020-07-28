@@ -24,9 +24,9 @@ typedef size_t DATA_KIND_FLAG;
 
 #define DATA_KIND_COMPUTE(KF, COMP) (((KF) == DATA_KIND_UNKNOWN_FLAG) ? (COMP) : (KF)
 
-#define PTR_FIELD_MASK_SCALAR (char)1
-#define PTR_FIELD_MASK_PTR (char)2
-#define PTR_FIELD_MASK_UNION (char)4
+#define PTR_FIELD_MASK_SCALAR '1'
+#define PTR_FIELD_MASK_PTR '2'
+#define PTR_FIELD_MASK_UNION '4'
 #define PTR_FIELD_MASK_END (char)0
 
 #define META_DATA_LOAD_DECL(X) const_cast<MetaData*>(&(X))
