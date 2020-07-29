@@ -28,6 +28,10 @@ concept Some provides Any {
 concept Convertable provides Any {
 }
 
+//<summary>A marker concept that indicates a type has a transform method that will allow conversion generally -- used for implicit converstions where permissible</summary>
+concept Transformable provides Any {
+}
+
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
     abstract static resultParse(str: String): Result<Any, String>;
@@ -119,6 +123,8 @@ struct entity Bool provides Some, Truthy, KeyType, PODType, APIType {
     {
         return (str == "false") ? false : true;
     }
+
+    static typeValue<K=Bool>(): Bool # special_method
 }
 
 //<summary>Primitive integer value.</summary>
@@ -146,6 +152,8 @@ struct entity Int provides KeyType, Parsable, PODType, APIType, Some {
     {
         return Int::s_mod(a, b);
     }
+
+    static typeValue<K=Int>(): Int # special_method
 }
 
 //<summary>Primitive big-integer value.</summary>
@@ -276,12 +284,16 @@ entity String provides KeyType, PODType, APIType, Some {
     static compare(a: String, b: String): Bool # string_compare
 }
 
-//<summary>Primitive StringOf string value.</summary>
-entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType, Convertable {
+//<summary>Primitive safe string value.</summary>
+entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType {
     private static s_unsafe_from(str: String): SafeString<T> # stringof_unsafe_from
 
-    method string(): String # stringof_string
-
+    static from(str: String): StringOf<T>
+        requires release T::accepts(str);
+    {
+        return StringOf<T>::s_unsafe_from(str);
+    }
+  
     static from(str: String): StringOf<T>
         requires release T::accepts(str);
     {
@@ -300,26 +312,30 @@ entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType, Con
         return T::accepts(str) ? ok(StringOf<T>::s_unsafe_from(str)) : err();
     }
 
-    method convert<U where Validator>(): StringOf<U> {
+    method transformable<U where Validator>(): Bool {
+        return U::accepts(this.string());
+    }
+    
+    method transform<U where Validator>(): StringOf<U> {
         return StringOf<U>::from(this.string());
     }
 
-    method tryConvert<U where Validator>(): StringOf<U>? {
+    method tryTransform<U where Validator>(): StringOf<U>? {
         return StringOf<U>::tryFrom(this.string());
     }
 
-    method optionConvert<U where Validator>(): Option<StringOf<U>> {
+    method optionTransform<U where Validator>(): Option<StringOf<U>> {
         return StringOf<U>::optionFrom(this.string());
     }
 
-    method resultConvert<U where Validator>(): Result<StringOf<U>> {
+    method resultTransform<U where Validator>(): Result<StringOf<U>> {
         return StringOf<U>::resultFrom(this.string());
     }
 }
 
 //<summary>Primitive DataString value.</summary>
-entity DataString<T where Parsable> provides APIValue, KeyType, Some, Convertable {
-    private static s_unsafe_from(str: String): StringOf<T> # datastring_unsafe_from
+entity DataString<T where Parsable> provides APIValue, KeyType, Some {
+    private static s_unsafe_from(str: String): DataString<T> # datastring_unsafe_from
 
     method string(): String # datastring_string
 
@@ -330,7 +346,7 @@ entity DataString<T where Parsable> provides APIValue, KeyType, Some, Convertabl
     }
 
     static tryFrom(str: String): DataString<T>? {
-        return T::tryParse(str).isValue() ? DataString<T>::s_unsafe_from(str) : none;
+        return T::tryParse(str).isOk() ? DataString<T>::s_unsafe_from(str) : none;
     }
 
     static optionFrom(str: String): Option<DataString<T>> {
@@ -341,19 +357,23 @@ entity DataString<T where Parsable> provides APIValue, KeyType, Some, Convertabl
         return T::tryParse(str).isOk() ? ok(DataString<T>::s_unsafe_from(str)) : err();
     }
 
-    method convert<U where Parsable>(): DataString<U>  {
+    method transformable<U where Parsable>(): Bool {
+        return U::tryParse(this.string()).isOk();
+    }
+
+    method transform<U where Parsable>(): DataString<U>  {
         return DataString<U>::from(this.string());
     }
 
-    method tryConvert<U where Parsable>(): DataString<U>? {
+    method tryTransform<U where Parsable>(): DataString<U>? {
         return DataString<U>::tryFrom(this.string());
     }
 
-    method optionConvert<U where Parsable>(): Option<DataString<U>> {
+    method optionTransform<U where Parsable>(): Option<DataString<U>> {
         return DataString<U>::tryFrom(this.string());
     }
 
-    method resultConvert<U where Parsable>(): Result<DataString<U>> {
+    method resultTransform<U where Parsable>(): Result<DataString<U>> {
         return DataString<U>::tryFrom(this.string());
     }
 }
@@ -461,14 +481,46 @@ entity RegexMatch provides Object {
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
-concept Tuple provides Some {
+concept Tuple provides Some, Transformable {
+    method transformable<U where grounded Tuple>(): Bool # tuple_convertable
+    method transform<U where grounded Tuple>(): U # tuple_convert
+
+    method tryTransform<U where grounded Tuple>(): U? {
+        return this.convertable<U>() ? this.convert<U>() : none;
+    }
+
+    method optionTransform<U where grounded Tuple>(): Option<U> {
+        return this.convertable<U>() ? this.convert<U>() : empty;
+    }
+
+    method resultTransform<U where grounded Tuple>(): Result<U> {
+        return this.convertable<U>() ? this.convert<U>() : err();
+    }
+
+    static append<T where grounded Tuple, U where grounded Tuple>(t1: T, t2: U): T + U # special_method
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
-concept Record provides Some {
+concept Record provides Some, Transformable {
+    method transformable<U where grounded Record>(): Bool # record_convertable
+    method transform<U where grounded Record>(): U # record_convert
+
+    method tryTransform<U where grounded Record>(): U? {
+        return this.convertable<U>() ? this.convert<U>() : none;
+    }
+
+    method optionTransform<U where grounded Record>(): Option<U> {
+        return this.convertable<U>() ? this.convert<U>() : empty;
+    }
+
+    method resultTransform<U where grounded Record>(): Result<U> {
+        return this.convertable<U>() ? this.convert<U>() : err();
+    }
+
+    static join<T where grounded Record, U where grounded Record>(r1: T, r2: U): T + U # special_method
 }
 
-struct entity MapEntry<K where grounded KeyType, V> provides Some, Convertable, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
+struct entity MapEntry<K where grounded KeyType, V> provides Some, Transformable, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
     field key: K;
     field val: V;
 
@@ -476,15 +528,19 @@ struct entity MapEntry<K where grounded KeyType, V> provides Some, Convertable, 
         return MapEntry<K, V>@{ key=k, val=v };
     }
 
-    method convert<T where grounded KeyType, U>(): MapEntry<T, U> {
-        return MapEntry<T, U>@{ key=this.key.as<T>(), val=this.val.as<U>() };
+    method transformable<T where grounded KeyType, U>(): Bool {
+        return this.key.is<T>() && this.val.is<U>();
+    }
+
+    method transform<T where grounded KeyType, U>(): MapEntry<T, U> {
+        return MapEntry<T, U>@{ key=this.key.as<T>(), value=this.val.as<U>() };
     }
 }
 
 //<summary>Option type</summary>
 struct concept Option<T> provides Some, Convertable, PODType when T grounded PODType, APIType when T grounded APIType {   
-    static createValue(result: T): Option<T> {
-        return OfValue<T>::create(result);
+    static createValue(value: T): Option<T> {
+        return OfValue<T>::create(value);
     }
 
     method isValue(): Bool {
@@ -497,6 +553,10 @@ struct concept Option<T> provides Some, Convertable, PODType when T grounded POD
 
     method value(): T {
         return this.as<OfValue<T>>().value;
+    }
+
+    method convertable<U>(): Bool {
+        return this.isEmpty() || this.value().is<U>();
     }
 
     method convert<U>(): Option<U> {
@@ -514,8 +574,6 @@ struct entity OfValue<T> provides Option<T> {
 
 struct entity Empty provides Option<*> {
 }
-
-function of(value: Any): Any # special_method
 
 //<summary>Result type.</summary>
 struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
@@ -543,6 +601,10 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
         return this.as<Err<E>>().failure;
     }
 
+    method convertable<U, V>(): Bool {
+        return this.isOk() ? this.result().is<U>() : this.failure().is<V>();
+    }
+
     method convert<U, V>(): Result<U, V> {
         return this.isOk() ? Result<U, V>::createOk(this.result().as<U>()) : Result<U, V>::createErr(this.failure().as<V>());
     }
@@ -563,9 +625,6 @@ struct entity Err<E=None> provides Result<*, E> {
         return Err<E>@{ failure = failure };
     }
 }
-
-function ok(value: Any): Any # special_method
-function err(data?: Any): Any # special_method
 
 //<summary>All actual entities/concepts implicitly provide this concept.</summary>
 concept Object provides Some {

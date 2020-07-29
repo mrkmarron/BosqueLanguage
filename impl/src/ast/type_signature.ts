@@ -3,6 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+import { Expression } from "./body";
+
 class TypeSignature {
 }
 
@@ -34,20 +36,35 @@ class NominalTypeSignature extends TypeSignature {
     }
 }
 
+class LiteralTypeSignature extends TypeSignature {
+    readonly oftype: TypeSignature;
+    readonly typevalue: boolean | number | {enumtype: TypeSignature, enumvalue: string} | undefined;
+
+    constructor(oftype: TypeSignature, typevalue: boolean | number | {enumtype: TypeSignature, enumvalue: string} | undefined) {
+        super();
+        this.oftype = oftype;
+        this.typevalue = typevalue;
+    }
+}
+
 class TupleTypeSignature extends TypeSignature {
+    readonly isvalue: boolean;
     readonly entries: [TypeSignature, boolean][];
 
-    constructor(entries: [TypeSignature, boolean][]) {
+    constructor(isvalue: boolean, entries: [TypeSignature, boolean][]) {
         super();
+        this.isvalue = isvalue;
         this.entries = entries;
     }
 }
 
 class RecordTypeSignature extends TypeSignature {
-   readonly entries: [string, TypeSignature, boolean][];
+    readonly isvalue: boolean;
+    readonly entries: [string, TypeSignature, boolean][];
 
-    constructor(entries: [string, TypeSignature, boolean][]) {
+    constructor(isvalue: boolean, entries: [string, TypeSignature, boolean][]) {
         super();
+        this.isvalue = isvalue;
         this.entries = entries;
     }
 }
@@ -66,11 +83,13 @@ class FunctionParameter {
     readonly type: TypeSignature;
     readonly isRef: boolean;
     readonly isOptional: boolean;
+    readonly defaultExp: Expression | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, defaultexp: Expression | undefined, isRef: boolean) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
+        this.defaultExp = defaultexp;
         this.isRef = isRef;
     }
 }
@@ -103,7 +122,16 @@ class ProjectTypeSignature extends TypeSignature {
     }
 }
 
-class IntersectionTypeSignature extends TypeSignature {
+class PlusTypeSignature extends TypeSignature {
+    readonly types: TypeSignature[];
+
+    constructor(types: TypeSignature[]) {
+        super();
+        this.types = types;
+    }
+}
+
+class AndTypeSignature extends TypeSignature {
     readonly types: TypeSignature[];
 
     constructor(types: TypeSignature[]) {
@@ -123,7 +151,7 @@ class UnionTypeSignature extends TypeSignature {
 
 export { 
     TypeSignature, ParseErrorTypeSignature, AutoTypeSignature, 
-    TemplateTypeSignature, NominalTypeSignature, 
+    TemplateTypeSignature, LiteralTypeSignature, NominalTypeSignature, 
     TupleTypeSignature, RecordTypeSignature, EphemeralListTypeSignature,
-    FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, IntersectionTypeSignature, UnionTypeSignature
+    FunctionParameter, FunctionTypeSignature, ProjectTypeSignature, PlusTypeSignature, AndTypeSignature, UnionTypeSignature
 };

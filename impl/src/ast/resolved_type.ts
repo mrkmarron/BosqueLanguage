@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ConceptTypeDecl, EntityTypeDecl } from "./assembly";
+import { Expression } from "./body";
 
 class ResolvedAtomType {
     readonly idStr: string;
@@ -70,6 +71,21 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
     }
 }
 
+class ResolvedLiteralAtomType extends ResolvedAtomType {
+    readonly oftype: ResolvedEntityAtomType;
+    readonly typevalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined;
+
+    constructor(rstr: string, oftype: ResolvedEntityAtomType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined) {
+        super(rstr);
+        this.oftype = oftype;
+        this.typevalue = ofvalue;
+    }
+
+    static create(oftype: ResolvedEntityAtomType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined): ResolvedLiteralAtomType {
+        return new ResolvedLiteralAtomType(``, oftype, ofvalue);
+    }
+}
+
 class ResolvedTupleAtomTypeEntry {
     readonly type: ResolvedType;
     readonly isOptional: boolean;
@@ -81,17 +97,20 @@ class ResolvedTupleAtomTypeEntry {
 }
 
 class ResolvedTupleAtomType extends ResolvedAtomType {
+    readonly isvalue: boolean;
+    readonly isvirtual: boolean;
     readonly types: ResolvedTupleAtomTypeEntry[];
 
-    constructor(rstr: string, types: ResolvedTupleAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, isvirtual: boolean, types: ResolvedTupleAtomTypeEntry[]) {
         super(rstr);
+        this.isvalue = isvalue;
+        this.isvirtual = isvirtual;
         this.types = types;
     }
 
-    static create(entries: ResolvedTupleAtomTypeEntry[]): ResolvedTupleAtomType {
-        let simplifiedEntries = [...entries];
-        let cvalue = simplifiedEntries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.idStr).join(", ");
-        return new ResolvedTupleAtomType("[" + cvalue + "]", simplifiedEntries);
+    static create(isvalue: boolean, entries: ResolvedTupleAtomTypeEntry[]): ResolvedTupleAtomType {
+        let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.idStr).join(", ");
+        return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, entries.some((entry) => entry.isOptional), entries);
     }
 }
 
@@ -108,19 +127,23 @@ class ResolvedRecordAtomTypeEntry {
 }
 
 class ResolvedRecordAtomType extends ResolvedAtomType {
+    readonly isvalue: boolean;
+    readonly isvirtual: boolean;
     readonly entries: ResolvedRecordAtomTypeEntry[];
 
-    constructor(rstr: string, entries: ResolvedRecordAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, isvirtual: boolean, entries: ResolvedRecordAtomTypeEntry[]) {
         super(rstr);
+        this.isvalue = isvalue;
+        this.isvirtual = isvirtual;
         this.entries = entries;
     }
 
-    static create(entries: ResolvedRecordAtomTypeEntry[]): ResolvedRecordAtomType {
+    static create(isvalue: boolean, entries: ResolvedRecordAtomTypeEntry[]): ResolvedRecordAtomType {
         let simplifiedEntries: ResolvedRecordAtomTypeEntry[] = [...entries];
         simplifiedEntries.sort((a, b) => a.name.localeCompare(b.name));
         let cvalue = simplifiedEntries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.idStr).join(", ");
 
-        return new ResolvedRecordAtomType("{" + cvalue + "}", simplifiedEntries);
+        return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, simplifiedEntries.some((entry) => entry.isOptional) , simplifiedEntries);
     }
 }
 
@@ -187,8 +210,50 @@ class ResolvedType {
         }
     }
 
+    static tryGetTupleTypeInfo(t: ResolvedType): ResolvedTupleAtomType | undefined {
+        if (t.options.length !== 1) {
+            return undefined;
+        }
+
+        if (t.options[0] instanceof ResolvedTupleAtomType) {
+            return (t.options[0] as ResolvedTupleAtomType);
+        }
+        else {
+            return undefined;
+        }
+    }
+
+    static tryGetRecordTypeInfo(t: ResolvedType): ResolvedRecordAtomType| undefined {
+        if (t.options.length !== 1) {
+            return undefined;
+        }
+
+        if (t.options[0] instanceof ResolvedRecordAtomType) {
+            return (t.options[0] as ResolvedRecordAtomType);
+        }
+        else {
+            return undefined;
+        }
+    }
+
     isEmptyType(): boolean {
         return this.options.length === 0;
+    }
+
+    isUniqueTupleTargetType(): boolean {
+        if (this.options.length !== 1) {
+            return false;
+        }
+
+        return (this.options[0] instanceof ResolvedTupleAtomType) && !(this.options[0] as ResolvedTupleAtomType).isvirtual;
+    }
+
+    isUniqueRecordTargetType(): boolean {
+        if (this.options.length !== 1) {
+            return false;
+        }
+
+        return (this.options[0] instanceof ResolvedRecordAtomType) && !(this.options[0] as ResolvedRecordAtomType).isvirtual;
     }
 
     isUniqueCallTargetType(): boolean {
@@ -210,6 +275,30 @@ class ResolvedType {
     isAnyType(): boolean {
         return this.options.length === 1 && this.options[0].idStr === "NSCore::Any";
     }
+
+    isGroundedType(): boolean {
+        return this.options.every((opt) => {
+            if(opt instanceof ResolvedConceptAtomType) {
+                return false;
+            }
+            else if(opt instanceof ResolvedEntityAtomType) {
+                return true;
+            }
+            else if(opt instanceof ResolvedLiteralAtomType) {
+                return true;
+            }
+            else if(opt instanceof ResolvedTupleAtomType) {
+                return opt.types.every((entry) => entry.type.isGroundedType());
+            }
+            else if(opt instanceof ResolvedRecordAtomType) {
+                return opt.entries.every((entry) => entry.type.isGroundedType());
+            }
+            else {
+                //ephemeral list should never be in a grounded position
+                return false;
+            }
+        });
+    }
 }
 
 class ResolvedFunctionTypeParam {
@@ -217,11 +306,13 @@ class ResolvedFunctionTypeParam {
     readonly type: ResolvedType | ResolvedFunctionType;
     readonly isRef: boolean;
     readonly isOptional: boolean;
+    readonly defaultExp: Expression | undefined;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, defaultexp: Expression | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
+        this.defaultExp = defaultexp;
         this.isRef = isRef;
     }
 }
@@ -270,6 +361,7 @@ class ResolvedFunctionType {
 export { 
     ResolvedAtomType, 
     ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
+    ResolvedLiteralAtomType,
     ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, 
     ResolvedRecordAtomTypeEntry, ResolvedRecordAtomType, 
     ResolvedEphemeralListType,

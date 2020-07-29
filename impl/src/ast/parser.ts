@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
-import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, IntersectionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
+import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
 import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, ResultExpression, TailTypeExpression, MapEntryConstructorExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
 
@@ -31,20 +31,25 @@ const KeywordStrings = [
     "const",
     "elif",
     "else",
+    "empty",
     "enum",
     "entity",
     "ensures",
+    "err",
     "false",
     "field",
     "fn",
     "function",
     "global",
+    "grounded",
     "identifier",
     "if",
     "invariant",
     "method",
     "namespace",
     "none",
+    "of",
+    "ok",
     "or",
     "private",
     "provides",
@@ -162,10 +167,7 @@ const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
 const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
 
-const SpecialFunctionNames = ["ok", "err"];
-const SpecialInvokeNames = ["update", "merge", "project", "tryProject"];
-
-const UnsafeFieldNames = ["is", "as", "tryAs", "defaultAs", "isNone", "isSome", "update", "merge", "project", "tryProject", "tryParse"]
+const UnsafeFieldNames = ["is", "as", "tryAs", "optionAs", "defaultAs", "isNone", "isSome", "update", "transformable", "transform", "tryTransform", "optionTransform", "resultTransform"]
 
 const TokenStrings = {
     Clear: "[CLEAR]",

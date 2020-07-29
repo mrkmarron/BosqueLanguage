@@ -796,14 +796,21 @@ class Assembly {
     }
 
     getTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {
-        if(oftype.idStr === "NSCore::APIType") {
+        if(oftype.idStr === "NSCore::Record") {
             //
             //NOT IMPLEMENTED YET
             //
             assert(false);
             return ResolvedType.createEmpty();
         }
-        else if(oftype.idStr === "NSCore::Record") {
+        else if(oftype.idStr === "NSCore::KeyType") {
+            //
+            //NOT IMPLEMENTED YET
+            //
+            assert(false);
+            return ResolvedType.createEmpty();
+        }
+        else if(oftype.idStr === "NSCore::APIType") {
             //
             //NOT IMPLEMENTED YET
             //
