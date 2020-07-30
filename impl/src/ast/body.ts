@@ -130,12 +130,14 @@ enum ExpressionTag {
     InvalidExpresion = "[INVALID]",
 
     LiteralNoneExpression = "LiteralNoneExpression",
+    LiteralEmptyExpression = "LiteralEmptyExpression",
     LiteralBoolExpression = "LiteralBoolExpression",
     LiteralIntegerExpression = "LiteralIntegerExpression",
     LiteralBigIntegerExpression = "LiteralBigIntegerExpression",
     LiteralFloatExpression = "LiteralFloatExpression",
     LiteralStringExpression = "LiteralStringExpression",
     LiteralRegexExpression = "LiteralRegexExpression",
+    LiteralParamerterValueExpression = "LiteralParamerterValueExpression",
     LiteralTypedStringExpression = "LiteralTypedStringExpression",
     LiteralTypedStringConstructorExpression = "LiteralTypedStringConstructorExpression",
 
@@ -151,7 +153,7 @@ enum ExpressionTag {
     ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
-    ResultExpression = "ResultExpression",
+    SpecialConstructorExpression = "SpecialConstructorExpression",
     CallNamespaceFunctionExpression = "CallNamespaceFunctionExpression",
     CallStaticFunctionExpression = "CallStaticFunctionExpression",
 
@@ -198,6 +200,12 @@ class InvalidExpression extends Expression {
 class LiteralNoneExpression extends Expression {
     constructor(sinfo: SourceInfo) {
         super(ExpressionTag.LiteralNoneExpression, sinfo);
+    }
+}
+
+class LiteralEmptyExpression extends Expression {
+    constructor(sinfo: SourceInfo) {
+        super(ExpressionTag.LiteralEmptyExpression, sinfo);
     }
 }
 
@@ -252,6 +260,15 @@ class LiteralRegexExpression extends Expression {
     constructor(sinfo: SourceInfo, value: string) {
         super(ExpressionTag.LiteralRegexExpression, sinfo);
         this.value = value;
+    }
+}
+
+class LiteralParamerterValueExpression extends Expression {
+    readonly ltype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, ltype: TypeSignature) {
+        super(ExpressionTag.LiteralParamerterValueExpression, sinfo);
+        this.ltype = ltype;
     }
 }
 
@@ -337,19 +354,23 @@ class ConstructorPrimaryWithFactoryExpression extends Expression {
 }
 
 class ConstructorTupleExpression extends Expression {
+    readonly isvalue: boolean;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, args: Arguments) {
+    constructor(sinfo: SourceInfo, isvalue: boolean, args: Arguments) {
         super(ExpressionTag.ConstructorTupleExpression, sinfo);
+        this.isvalue = isvalue;
         this.args = args;
     }
 }
 
 class ConstructorRecordExpression extends Expression {
+    readonly isvalue: boolean;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, args: Arguments) {
+    constructor(sinfo: SourceInfo, isvalue: boolean, args: Arguments) {
         super(ExpressionTag.ConstructorRecordExpression, sinfo);
+        this.isvalue = isvalue;
         this.args = args;
     }
 }
@@ -387,13 +408,13 @@ class PCodeInvokeExpression extends Expression {
     }
 }
 
-class ResultExpression extends Expression {
+class SpecialConstructorExpression extends Expression {
     readonly rtype: TypeSignature;
     readonly rop: string;
     readonly arg: Expression;
 
     constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: string, arg: Expression) {
-        super(ExpressionTag.ResultExpression, sinfo); 
+        super(ExpressionTag.SpecialConstructorExpression, sinfo); 
         this.rtype = rtype;
         this.rop = rop;
         this.arg = arg;
@@ -1053,9 +1074,9 @@ class BodyImplementation {
 export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
-    LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralBigIntegerExpression, LiteralFloatExpression, LiteralStringExpression, LiteralRegexExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
+    LiteralNoneExpression, LiteralEmptyExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralBigIntegerExpression, LiteralFloatExpression, LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
-    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, ResultExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
+    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, SpecialConstructorExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
     PostfixInvoke, PCodeInvokeExpression,

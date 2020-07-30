@@ -13,7 +13,16 @@ concept Any {
 
     method tryAs<T>(): T? # special_method
     method optionAs<T> Option<T> # special_method
+    method resultAs<T> Result<T> # special_method
     method defaultAs<T>(default: T): T # special_method
+
+    method isConvertable<T>(): Bool # special_method
+    method asConvert<T>(): T # special_method
+
+    method tryAsConvert<T>(): T? # special_method
+    method optionAsConvert<T> Option<T> # special_method
+    method resultAsConvert<T> Result<T> # special_method
+    method defaultAsConvert<T>(default: T): T # special_method
 
     method isNone(): Bool # special_method
     method isSome(): Bool # special_method
@@ -26,10 +35,6 @@ concept Some provides Any {
 
 //<summary>A marker concept that indicates a type has a convert method that will allow conversion to a supertype -- used for method override contravariance</summary>
 concept Convertable provides Any {
-}
-
-//<summary>A marker concept that indicates a type has a transform method that will allow conversion generally -- used for implicit converstions where permissible</summary>
-concept Transformable provides Any {
 }
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
@@ -123,8 +128,6 @@ struct entity Bool provides Some, Truthy, KeyType, PODType, APIType {
     {
         return (str == "false") ? false : true;
     }
-
-    static typeValue<K=Bool>(): Bool # special_method
 }
 
 //<summary>Primitive integer value.</summary>
@@ -152,8 +155,6 @@ struct entity Int provides KeyType, Parsable, PODType, APIType, Some {
     {
         return Int::s_mod(a, b);
     }
-
-    static typeValue<K=Int>(): Int # special_method
 }
 
 //<summary>Primitive big-integer value.</summary>
@@ -502,70 +503,29 @@ entity RegexMatch provides Object {
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
-concept Tuple provides Some, Transformable {
-    method transformable<U where grounded Tuple>(): Bool # tuple_convertable
-    method transform<U where grounded Tuple>(): U # tuple_convert
+concept Tuple provides Some, Convertable {
+    method convertable<U where grounded Tuple>(): Bool # tuple_convertable
+    method convert<U where grounded Tuple>(): U # tuple_convert
 
-    method tryTransform<U where grounded Tuple>(): U? {
-        return this.convertable<U>() ? this.convert<U>() : none;
-    }
-
-    method optionTransform<U where grounded Tuple>(): Option<U> {
-        return this.convertable<U>() ? this.convert<U>() : empty;
-    }
-
-    method resultTransform<U where grounded Tuple>(): Result<U> {
-        return this.convertable<U>() ? this.convert<U>() : err();
-    }
-
-    static append<T where grounded Tuple, U where grounded Tuple>(t1: T, t2: U): T + U # special_method
+    static append(...args: List<Tuple>): Tuple # special_method
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
-concept Record provides Some, Transformable {
-    method transformable<U where grounded Record>(): Bool # record_convertable
-    method transform<U where grounded Record>(): U # record_convert
+concept Record provides Some, Convertable {
+    method convertable<U where grounded Record>(): Bool # record_convertable
+    method convert<U where grounded Record>(): U # record_convert
 
-    method tryTransform<U where grounded Record>(): U? {
-        return this.convertable<U>() ? this.convert<U>() : none;
-    }
-
-    method optionTransform<U where grounded Record>(): Option<U> {
-        return this.convertable<U>() ? this.convert<U>() : empty;
-    }
-
-    method resultTransform<U where grounded Record>(): Result<U> {
-        return this.convertable<U>() ? this.convert<U>() : err();
-    }
-
-    static join<T where grounded Record, U where grounded Record>(r1: T, r2: U): T + U # special_method
-}
-
-struct entity MapEntry<K where grounded KeyType, V> provides Some, Transformable, PODType when K grounded PODType && V grounded PODType, APIType when K grounded APIType && V grounded APIType {
-    field key: K;
-    field val: V;
-
-    static create(k: K, v: V): MapEntry<K, V> {
-        return MapEntry<K, V>@{ key=k, val=v };
-    }
-
-    method transformable<T where grounded KeyType, U>(): Bool {
-        return this.key.is<T>() && this.val.is<U>();
-    }
-
-    method transform<T where grounded KeyType, U>(): MapEntry<T, U> {
-        return MapEntry<T, U>@{ key=this.key.as<T>(), value=this.val.as<U>() };
-    }
+    static join(...args: List<Record>): Record # special_method
 }
 
 //<summary>Option type</summary>
 struct concept Option<T> provides Some, Convertable, PODType when T grounded PODType, APIType when T grounded APIType {   
     static createValue(value: T): Option<T> {
-        return OfValue<T>::create(value);
+        return Of<T>::create(value);
     }
 
     method isValue(): Bool {
-        return this.is<OfValue<T>>();
+        return this.is<Of<T>>();
     }
 
     method isEmpty(): Bool {
@@ -573,23 +533,18 @@ struct concept Option<T> provides Some, Convertable, PODType when T grounded POD
     }
 
     method value(): T {
-        return this.as<OfValue<T>>().value;
+        return this.as<Of<T>>().value;
     }
 
-    method convertable<U>(): Bool {
-        return this.isEmpty() || this.value().is<U>();
-    }
-
-    method convert<U>(): Option<U> {
-        return this.isValue() ? Option<U>::createValue(this.value().as<U>()) : empty;
-    }
+    method convertable<U>(): Bool # option_convertable
+    method convert<U>(): U # option_convert
 }
 
-struct entity OfValue<T> provides Option<T> {
+struct entity Of<T> provides Option<T> {
     field value: T;
 
-    static create(value: T): OfValue<T> {
-        return OfValue<T>@{ data = data };
+    static create(value: T): Of<T> {
+        return Of<T>@{ data = data };
     }
 }
 
@@ -622,13 +577,8 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
         return this.as<Err<E>>().failure;
     }
 
-    method convertable<U, V>(): Bool {
-        return this.isOk() ? this.result().is<U>() : this.failure().is<V>();
-    }
-
-    method convert<U, V>(): Result<U, V> {
-        return this.isOk() ? Result<U, V>::createOk(this.result().as<U>()) : Result<U, V>::createErr(this.failure().as<V>());
-    }
+    method convertable<U>(): Bool # result_convertable
+    method convert<U>(): U # result_convert
 }
 
 struct entity Ok<T, E=None> provides Result<T, E> {

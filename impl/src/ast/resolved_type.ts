@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ConceptTypeDecl, EntityTypeDecl } from "./assembly";
-import { Expression } from "./body";
 
 class ResolvedAtomType {
     readonly idStr: string;
@@ -306,13 +305,11 @@ class ResolvedFunctionTypeParam {
     readonly type: ResolvedType | ResolvedFunctionType;
     readonly isRef: boolean;
     readonly isOptional: boolean;
-    readonly defaultExp: Expression | undefined;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, defaultexp: Expression | undefined) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
-        this.defaultExp = defaultexp;
         this.isRef = isRef;
     }
 }

@@ -4,8 +4,8 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
-import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, ResultExpression, TailTypeExpression, MapEntryConstructorExpression } from "./body";
+import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, TailTypeExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, LiteralEmptyExpression, SpecialConstructorExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
 
 const KeywordStrings = [
@@ -45,6 +45,7 @@ const KeywordStrings = [
     "identifier",
     "if",
     "invariant",
+    "literal",
     "method",
     "namespace",
     "none",
@@ -96,6 +97,7 @@ const SymbolStrings = [
     "::",
     ",",
     ".",
+    ".$",
     "...",
     "=",
     "==",
@@ -109,6 +111,7 @@ const SymbolStrings = [
     "?&",
     "?|",
     "?.",
+    "?.$",
     "<",
     "<=",
     ">",
@@ -167,7 +170,7 @@ const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
 const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
 
-const UnsafeFieldNames = ["is", "as", "tryAs", "optionAs", "defaultAs", "isNone", "isSome", "update", "transformable", "transform", "tryTransform", "optionTransform", "resultTransform"]
+const UnsafeFieldNames = ["is", "as", "tryAs", "optionAs", "resultAs", "defaultAs", "isConvertable", "asConvert", "tryAsConvert", "optionAsConvert", "resultAsConvert", "defaultAsConvert", "isNone", "isSome", "update"]
 
 const TokenStrings = {
     Clear: "[CLEAR]",
@@ -279,9 +282,10 @@ class Lexer {
         return str.length === 1 && /^[A-Z]$/.test(str);
     }
 
-    //TODO: we need to make sure that someone doesn't name a local variable _ -- also want to reserve _X_ for custom operators
+    //TODO: we need to make sure that someone doesn't name a local variable "_"
+    //      operators are going to be <identifier> will need to do follow aware parsing like for the / in regex
     private static isIdentifierName(str: string) {
-        return /^([$]?([a-z]|[a-z][_a-zA-Z0-9]*[a-zA-Z0-9]))|[_]$/.test(str);
+        return /^([$])|([$]?([_a-z][a-zA-Z0-9]*))$/.test(str);
     }
 
     private recordLexToken(epos: number, kind: string) {
@@ -361,8 +365,8 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_stringRe = /"[^"\\\r\n]*(?:\\(?:.|\r?\n)[^"\\\r\n]*)*"/y;
-    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(?:\\(?:.|\r?\n)[^'\\\r\n]*)*'/y;
+    private static readonly _s_stringRe = /"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"/y;
+    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'/y;
     private tryLexString() {
         Lexer._s_stringRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_stringRe.exec(this.m_input);
@@ -381,7 +385,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_regexRe = /\/[^"\\\r\n]*(?:\\(?:.)[^"\\\r\n]*)*\//y;
+    private static readonly _s_regexRe = /\/[^"\\\r\n]*(\\(.)[^"\\\r\n]*)*\//y;
     private tryLexRegex() {
         Lexer._s_regexRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_regexRe.exec(this.m_input);
@@ -776,7 +780,7 @@ class Parser {
             }
 
             if (isref && (isopt || isrest)) {
-                this.raiseError(line, "Cannot use ref/borrow parameters here");
+                this.raiseError(line, "Cannot use ref parameters here");
             }
 
             return [pname, argtype, isopt, isrest, isref];
@@ -909,7 +913,7 @@ class Parser {
     }
 
     private parseProjectType(): TypeSignature {
-        const ltype = this.parseAndCombinatorType();
+        const ltype = this.parseCombineCombinatorType();
         if (!this.testToken("!")) {
             return ltype;
         }
@@ -921,28 +925,44 @@ class Parser {
         }
     }
 
-    private parseAndCombinatorType(): TypeSignature {
+    private parseCombineCombinatorType(): TypeSignature {
         const ltype = this.parseBaseTypeReference();
-        if (!this.testToken("&")) {
+        if (!this.testToken("&") && !this.testToken("+")) {
             return ltype;
         }
         else {
-            this.consumeToken();
-            return Parser.andOfTypeSignatures(ltype, this.parseAndCombinatorType());
+            if(this.testToken("&")) {
+                this.consumeToken();
+                return this.andOfTypeSignatures(ltype, this.parseCombineCombinatorType());
+            }
+            else {
+                this.consumeToken();
+                return this.plusOfTypeSignatures(ltype, this.parseCombineCombinatorType());
+            }
         }
     }
 
     private parseBaseTypeReference(): TypeSignature {
         switch (this.peekToken()) {
+            case "*":
             case TokenStrings.Template:
                 return this.parseTemplateTypeReference();
             case TokenStrings.Namespace:
             case TokenStrings.Type:
                 return this.parseNominalType();
-            case "[":
-                return this.parseTupleType();
-            case "{":
-                return this.parseRecordType();
+            case "@":
+            case "#": { 
+                const isvalue = this.testToken("#");
+                this.consumeToken();
+                if(this.testToken("[")) {
+                    return this.parseTupleType(isvalue);
+                }
+                else {
+                    return this.parseRecordType(isvalue);
+                }
+            }
+            case "type":
+                return this.parseLiteralType();
             case "fn":
             case "recursive?":
             case "recursive":
@@ -998,7 +1018,38 @@ class Parser {
         }
     }
 
-    private parseTupleType(): TypeSignature {
+    private parseLiteralType(): TypeSignature {
+        this.consumeToken();
+        this.ensureAndConsumeToken("(");
+        
+        const ttype = this.parseTypeSignature();
+        
+        this.ensureAndConsumeToken("::");
+
+        let vv: boolean | number | {enumtype: TypeSignature, enumvalue: string} | undefined = undefined;
+        if(this.testToken("true")) {
+            this.consumeToken();
+            vv = true;
+        }
+        else if(this.testToken("false")) {
+            this.consumeToken();
+            vv = false;
+        }
+        else if(this.testToken(TokenStrings.Int)) {
+            vv = Number.parseInt(this.consumeTokenAndGetValue());
+        }
+        else {
+            if(!this.testToken(TokenStrings.Identifier)) {
+                this.raiseError(this.getCurrentLine(), "Literal type must be a Bool, Int, or Enum");
+            }
+
+            vv = { enumtype: ttype, enumvalue: this.consumeTokenAndGetValue() };
+        }
+
+        return new LiteralTypeSignature(ttype, vv);
+    }
+
+    private parseTupleType(isvalue: boolean): TypeSignature {
         const line = this.getCurrentLine();
         let entries: [TypeSignature, boolean][] = [];
 
@@ -1021,7 +1072,7 @@ class Parser {
             }
 
             this.clearRecover();
-            return new TupleTypeSignature(entries);
+            return new TupleTypeSignature(isvalue, entries);
         }
         catch (ex) {
             this.processRecover();
@@ -1029,22 +1080,25 @@ class Parser {
         }
     }
 
-    private parseRecordType(): TypeSignature {
+    private parseRecordType(isvalue: boolean): TypeSignature {
         let entries: [string, TypeSignature, boolean][] = [];
 
         try {
             this.setRecover(this.scanMatchingParens("{", "}"));
+
+            let pnames = new Set<string>();
             entries = this.parseListOf<[string, TypeSignature, boolean]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
 
-                //
-                //TODO: We also need to check this on objects that field and method names are distinct.
-                //      Type checker will also need to make sure that property/field accesses & updates are really to properties or fields.
-                //
                 const name = this.consumeTokenAndGetValue();
                 if(UnsafeFieldNames.includes(name)) {
                     this.raiseError(this.getCurrentLine(), `Property name "${name}" is ambigious with the methods that Record may provide`);
                 }
+
+                if(pnames.has(name)) {
+                    this.raiseError(this.getCurrentLine(), `Duplicate property name "${name}" in record declaration`);
+                }
+                pnames.add(name);
 
                 const isopt = this.testAndConsumeTokenIf("?");
                 this.ensureAndConsumeToken(":");
@@ -1054,7 +1108,7 @@ class Parser {
             })[0];
 
             this.clearRecover();
-            return new RecordTypeSignature(entries);
+            return new RecordTypeSignature(isvalue, entries);
         }
         catch (ex) {
             this.processRecover();
@@ -1137,13 +1191,30 @@ class Parser {
         return new UnionTypeSignature(types);
     }
 
-    private static andOfTypeSignatures(t1: TypeSignature, t2: TypeSignature): TypeSignature {
+    private andOfTypeSignatures(t1: TypeSignature, t2: TypeSignature): TypeSignature {
+        if(t1 instanceof PlusTypeSignature || t2 instanceof PlusTypeSignature) {
+            this.raiseError(this.getCurrentLine(), "Cannot mix & and + type combiners");
+        }
+
         const types = [
-            ...((t1 instanceof IntersectionTypeSignature) ? t1.types : [t1]),
-            ...((t2 instanceof IntersectionTypeSignature) ? t2.types : [t2]),
+            ...((t1 instanceof AndTypeSignature) ? t1.types : [t1]),
+            ...((t2 instanceof AndTypeSignature) ? t2.types : [t2]),
         ];
 
-        return new IntersectionTypeSignature(types);
+        return new AndTypeSignature(types);
+    }
+
+    private plusOfTypeSignatures(t1: TypeSignature, t2: TypeSignature): TypeSignature {
+        if(t1 instanceof AndTypeSignature || t2 instanceof AndTypeSignature) {
+            this.raiseError(this.getCurrentLine(), "Cannot mix & and + type combiners");
+        }
+
+        const types = [
+            ...((t1 instanceof PlusTypeSignature) ? t1.types : [t1]),
+            ...((t2 instanceof PlusTypeSignature) ? t2.types : [t2]),
+        ];
+
+        return new PlusTypeSignature(types);
     }
 
     ////
@@ -1321,6 +1392,10 @@ class Parser {
             this.consumeToken();
             return new LiteralNoneExpression(sinfo);
         }
+        else if (tk === "empty") {
+            this.consumeToken();
+            return new LiteralEmptyExpression(sinfo);
+        }
         else if (tk === "true" || tk === "false") {
             this.consumeToken();
             return new LiteralBoolExpression(sinfo, tk === "true");
@@ -1346,6 +1421,22 @@ class Parser {
 
             this.m_penv.assembly.addLiteralRegex(restr);
             return new LiteralRegexExpression(sinfo, restr);
+        }
+        else if (tk === "of" || tk === "ok" || tk === "err") {
+            this.consumeToken();
+            this.ensureAndConsumeToken("(");
+            const arg = this.parseExpression();
+            this.ensureAndConsumeToken(")");
+
+            return new SpecialConstructorExpression(sinfo, this.m_penv.getCurrentFunctionScope().getReturnType(), tk, arg);
+        }
+        else if (tk === "literal") {
+            this.consumeToken();
+            this.ensureAndConsumeToken("(");
+            const ltype = this.parseTypeSignature();
+            this.ensureAndConsumeToken(")");
+
+            return new LiteralParamerterValueExpression(sinfo, ltype);
         }
         else if (tk === TokenStrings.Identifier) {
             let istr = this.consumeTokenAndGetValue();
@@ -1376,20 +1467,11 @@ class Parser {
                 }
             }
             else {
-                if(SpecialFunctionNames.includes(istr)) {
-                    this.ensureAndConsumeToken("(");
-                    const arg = this.parseExpression();
-                    this.ensureAndConsumeToken(")");
-                    
-                    return new ResultExpression(sinfo, this.m_penv.getCurrentFunctionScope().getReturnType(), istr, arg);
-                }
-                else {
-                    const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                    const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
-                    const args = this.parseArguments("(", ")");
+                const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
+                const args = this.parseArguments("(", ")");
 
-                    return new CallNamespaceFunctionExpression(sinfo, ns, istr, targs, pragmas, args);
-                }
+                return new CallNamespaceFunctionExpression(sinfo, ns, istr, targs, pragmas, args);
             }
         }
         else if (tk === "fn" || this.testFollows("recursive", "fn")) {
@@ -1411,16 +1493,21 @@ class Parser {
                 return new InvalidExpression(sinfo);
             }
         }
-        else if (this.testToken("[")) {
-            const args = this.parseArguments("[", "]");
-            return new ConstructorTupleExpression(sinfo, args);
-        }
-        else if (this.testToken("{")) {
-            const args = this.parseArguments("{", "}");
-            return new ConstructorRecordExpression(sinfo, args);
+        else if (this.testToken("#") || this.testToken("@")) {
+            const isvalue = this.testToken("#");
+            this.consumeToken();
+
+            if (this.testToken("[")) {
+                const args = this.parsePositionalSelfDescribingArguments("[", "]");
+                return new ConstructorTupleExpression(sinfo, isvalue, args);
+            }
+            else {
+                const args = this.parseNamedSelfDescribingArguments("{", "}");
+                return new ConstructorRecordExpression(sinfo, isvalue, args);
+            }
         }
         else if (this.testToken("(|")) {
-            const args = this.parseArguments("(|", "|)");
+            const args = this.parsePositionalSelfDescribingArguments("(|", "|)");
             return new ConstructorEphemeralValueList(sinfo, args);
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Identifier)) {
@@ -1481,6 +1568,20 @@ class Parser {
                 return new InvalidExpression(sinfo);
             }
         }
+    }
+    
+    private parseConstExpression(): Expression {
+        const exp = this.parsePrimaryExpression();
+
+        const isok = ((exp instanceof LiteralNoneExpression) || (exp instanceof LiteralEmptyExpression) || (exp instanceof LiteralBoolExpression) || (exp instanceof LiteralIntegerExpression) 
+            || (exp instanceof LiteralBigIntegerExpression) || (exp instanceof LiteralStringExpression) || (exp instanceof LiteralParamerterValueExpression) 
+            || (exp instanceof AccessNamespaceConstantExpression) || (exp instanceof AccessStaticFieldExpression) || (exp instanceof LiteralTypedStringExpression));
+
+        if(!isok) {
+            this.raiseError(exp.sinfo.line, "Only constant form expression are permitted here");
+        }
+
+        return exp;
     }
 
     private handleSpecialCaseMethods(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string): PostfixOperation {

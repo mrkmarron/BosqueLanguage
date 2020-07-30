@@ -9,6 +9,32 @@ namespace NSCore;
 struct entity Vector<T, K=Int> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     hidden static s_unsafe_get(l: Vector<T, K>, i: Int): T # vector_unsafe_get
 
+     method size(): Int {
+        return literal(K);
+    }
+
+    method empty(): Bool {
+        return literal(K) == 0;
+    }
+
+    method front(): T 
+        requires release literal(K) != 0;
+    {
+        return List<T>::s_unsafe_get(this, 0);
+    }
+
+    method back(): T 
+        requires release literal(K) != 0;
+    {
+        return List<T>::s_unsafe_get(this, literal(K) - 1);
+    }
+
+    method get(i: Int): T 
+        requires release 0 <= i && i < literal(K);
+    {
+        return List<T>::s_unsafe_get(this, i);
+    }
+
     //
     //TODO: fill in here!!!
     //
