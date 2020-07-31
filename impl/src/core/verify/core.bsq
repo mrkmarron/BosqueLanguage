@@ -16,13 +16,13 @@ concept Any {
     method resultAs<T> Result<T> # special_method
     method defaultAs<T>(default: T): T # special_method
 
-    method isConvertable<T>(): Bool # special_method
-    method asConvert<T>(): T # special_method
+    method of<T>(): Bool # special_method
+    method convert<T>(): T # special_method
 
-    method tryAsConvert<T>(): T? # special_method
-    method optionAsConvert<T> Option<T> # special_method
-    method resultAsConvert<T> Result<T> # special_method
-    method defaultAsConvert<T>(default: T): T # special_method
+    method tryConvert<T>(): T? # special_method
+    method optionConvert<T> Option<T> # special_method
+    method resultConvert<T> Result<T> # special_method
+    method defaultConvert<T>(default: T): T # special_method
 
     method isNone(): Bool # special_method
     method isSome(): Bool # special_method
@@ -31,6 +31,8 @@ concept Any {
 //<summary>Special type for representing all non-none values.</summary>
 concept Some provides Any {
     method update(): Some # special_method
+    method insert(): Some # special_method
+    method merge(): Some # special_method
 }
 
 //<summary>A marker concept that indicates a type has a convert method that will allow conversion to a supertype -- used for method override contravariance</summary>
@@ -306,7 +308,7 @@ entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType {
     }
 
     static optionFrom(str: String): Option<StringOf<T>> {
-        return T::accepts(str) ? of(StringOf<T>::s_unsafe_from(str)) : empty;
+        return T::accepts(str) ? opt(StringOf<T>::s_unsafe_from(str)) : empty;
     }
 
     static resultFrom(str: String): Result<StringOf<T>> {
@@ -351,7 +353,7 @@ entity DataString<T where Parsable> provides APIValue, KeyType, Some {
     }
 
     static optionFrom(str: String): Option<DataString<T>> {
-        return T::tryParse(str).isOk() ? of(DataString<T>::s_unsafe_from(str)): empty;
+        return T::tryParse(str).isOk() ? opt(DataString<T>::s_unsafe_from(str)): empty;
     }
 
     static resultFrom(str: String): Result<DataString<T>> {
@@ -483,24 +485,18 @@ entity RegexMatch provides Object {
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
 concept Tuple provides Some, Convertable {
-    method convertable<U where grounded Tuple>(): Bool # tuple_convertable
-    method convert<U where grounded Tuple>(): U # tuple_convert
-
     static append(...args: List<Tuple>): Tuple # special_method
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
 concept Record provides Some, Convertable {
-    method convertable<U where grounded Record>(): Bool # record_convertable
-    method convert<U where grounded Record>(): U # record_convert
-
     static join(...args: List<Record>): Record # special_method
 }
 
 //<summary>Option type</summary>
 struct concept Option<T> provides Some, Convertable, PODType when T grounded PODType, APIType when T grounded APIType {   
     static createValue(value: T): Option<T> {
-        return Of<T>::create(value);
+        return Opt<T>::create(value);
     }
 
     method isValue(): Bool {
@@ -512,18 +508,15 @@ struct concept Option<T> provides Some, Convertable, PODType when T grounded POD
     }
 
     method value(): T {
-        return this.as<Of<T>>().value;
+        return this.as<Opt<T>>().value;
     }
-
-    method convertable<U>(): Bool # option_convertable
-    method convert<U>(): U # option_convert
 }
 
-struct entity Of<T> provides Option<T> {
+struct entity Opt<T> provides Option<T> {
     field value: T;
 
     static create(value: T): Value<T> {
-        return Of<T>@{ value = value };
+        return Opt<T>@{ value = value };
     }
 }
 
@@ -533,7 +526,7 @@ struct entity Empty provides Option<*> {
 //<summary>Result type.</summary>
 struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
     static createOk(result: T): Result<T, E> {
-        return Ok<T, E>::create(result);
+        return Ok<T>::create(result);
     }
 
     static createErr(info: E): Result<T, E> {
@@ -541,7 +534,7 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 
     method isOk(): Bool {
-        return this.is<Ok<T, E>>();
+        return this.is<Ok<T>>();
     }
 
     method isErr(): Bool {
@@ -549,22 +542,19 @@ struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODT
     }
 
     method result(): T {
-        return this.as<Ok<T, E>>().result;
+        return this.as<Ok<T>>().result;
     }
 
     method failure(): E {
         return this.as<Err<E>>().failure;
     }
-
-    method convertable<U>(): Bool # result_convertable
-    method convert<U>(): U # result_convert
 }
 
-struct entity Ok<T, E=None> provides Result<T, E> {
+struct entity Ok<T> provides Result<T, *> {
     field result: T;
 
-    static create(result: T): Ok<T, E> {
-        return Ok<T, E>@{ result = result };
+    static create(result: T): Ok<T> {
+        return Ok<T>@{ result = result };
     }
 }
 

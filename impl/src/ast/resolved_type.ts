@@ -13,6 +13,12 @@ class ResolvedAtomType {
     }
 }
 
+class ResolvedWildcardType extends ResolvedAtomType {
+    constructor() {
+        super("*");
+    }
+}
+
 class ResolvedConceptAtomTypeEntry {
     readonly idStr: string;
     readonly concept: ConceptTypeDecl;
@@ -355,7 +361,8 @@ class ResolvedFunctionType {
     }
 }
 
-export { 
+export {
+    ResolvedWildcardType,
     ResolvedAtomType, 
     ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
     ResolvedLiteralAtomType,

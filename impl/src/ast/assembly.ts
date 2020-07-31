@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType } from "./resolved_type";
-import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, IntersectionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature } from "./type_signature";
+import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature } from "./type_signature";
 import { Expression, BodyImplementation } from "./body";
 import { SourceInfo } from "./parser";
 
@@ -26,12 +26,14 @@ function isBuildLevelEnabled(check: BuildLevel, enabled: BuildLevel): boolean {
 
 class TemplateTermDecl {
     readonly name: string;
+    readonly grounded: boolean;
     readonly constraint: TypeSignature;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
 
-    constructor(name: string, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
+    constructor(name: string, grounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
+        this.grounded = grounded;
         this.constraint = constraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
@@ -506,8 +508,6 @@ class Assembly {
     private resolveTemplateBinds(declterms: TemplateTermDecl[], giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         const fullbinds = new Map<string, ResolvedType>();
 
-        //Later may want to extend this to allow non-literal binds Foo<T, E=Bar<T>> and equality instantiation Foo<E=Int, String>
-
         for (let i = 0; i < declterms.length; ++i) {
             if(giventerms.length <= i) {
                 if(declterms[i].defaultType !== undefined) {
@@ -909,7 +909,7 @@ class Assembly {
         return this.getTypeProjection(fromt, oft);
     }
 
-    private normalizeType_Intersection(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+    private normalizeType_And(t: IntersectionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         if (t.types.some((opt) => this.normalizeTypeOnly(opt, binds).isEmptyType())) {
             return ResolvedType.createEmpty();
         }
@@ -1657,6 +1657,9 @@ class Assembly {
         else if (t instanceof TemplateTypeSignature) {
             return this.normalizeType_Template(t, binds);
         }
+        else if (t instanceof LiteralTypeSignature) {
+            xxxx;
+        }
         else if (t instanceof NominalTypeSignature) {
             return this.normalizeType_Nominal(t, binds);
         }
@@ -1672,8 +1675,11 @@ class Assembly {
         else if(t instanceof ProjectTypeSignature) {
             return this.normalizeType_Projection(t, binds);
         }
-        else if (t instanceof IntersectionTypeSignature) {
-            return this.normalizeType_Intersection(t, binds);
+        else if (t instanceof PlusTypeSignature) {
+            return this.normalizeType_Plus(t, binds);
+        }
+        else if (t instanceof AndTypeSignature) {
+            return this.normalizeType_And(t, binds);
         }
         else {
             return this.normalizeType_Union(t as UnionTypeSignature, binds);

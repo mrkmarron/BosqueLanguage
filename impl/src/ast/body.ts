@@ -95,7 +95,16 @@ class WildcardMatchGuard extends MatchGuard {
     }
 }
 
-class TypeMatchGuard extends MatchGuard {
+class TypeIsMatchGuard extends MatchGuard {
+    readonly oftype: TypeSignature;
+
+    constructor(oftype: TypeSignature, optionalWhen: Expression | undefined) {
+        super(optionalWhen);
+        this.oftype = oftype;
+    }
+}
+
+class TypeConvertMatchGuard extends MatchGuard {
     readonly oftype: TypeSignature;
 
     constructor(oftype: TypeSignature, optionalWhen: Expression | undefined) {
@@ -460,15 +469,9 @@ enum PostfixOpTag {
     PostfixProjectFromIndecies = "PostfixProjectFromIndecies",
     PostfixAccessFromName = "PostfixAccessFromName",
     PostfixProjectFromNames = "PostfixProjectFromNames",
-    PostfixProjectFromType = "PostfixProjectFromType",
 
     PostfixModifyWithIndecies = "PostfixModifyWithIndecies",
     PostfixModifyWithNames = "PostfixModifyWithNames",
-    PostfixStructuredExtend = "PostfixStructuredExtend",
-
-    //    PostfixDifferenceWithIndecies,
-    //    PostfixDifferenceWithNames,
-    //    PostfixDifferenceWithType,
 
     PostfixInvoke = "PostfixInvoke"
 }
@@ -477,11 +480,13 @@ abstract class PostfixOperation {
     readonly sinfo: SourceInfo;
 
     readonly isElvis: boolean;
+    readonly elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined;
     readonly op: PostfixOpTag;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, op: PostfixOpTag) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, op: PostfixOpTag) {
         this.sinfo = sinfo;
         this.isElvis = isElvis;
+        this.elvisRestrict = elvisRestrict;
         this.op = op;
     }
 }
@@ -500,8 +505,8 @@ class PostfixOp extends Expression {
 class PostfixAccessFromIndex extends PostfixOperation {
     readonly index: number;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, index: number) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixAccessFromIndex);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, index: number) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixAccessFromIndex);
         this.index = index;
     }
 }
@@ -510,8 +515,8 @@ class PostfixProjectFromIndecies extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
     readonly indecies: number[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isEphemeralListResult: boolean ,indecies: number[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromIndecies);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, indecies: number[]) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromIndecies);
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
     }
@@ -520,8 +525,8 @@ class PostfixProjectFromIndecies extends PostfixOperation {
 class PostfixAccessFromName extends PostfixOperation {
     readonly name: string;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, name: string) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixAccessFromName);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, name: string) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixAccessFromName);
         this.name = name;
     }
 }
@@ -530,60 +535,50 @@ class PostfixProjectFromNames extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
     readonly names: string[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isEphemeralListResult: boolean, names: string[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromNames);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, names: string[]) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromNames);
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
     }
 }
 
-class PostfixProjectFromType extends PostfixOperation {
-    readonly istry: boolean;
-    readonly ptype: TypeSignature;
-
-    constructor(sinfo: SourceInfo, isElvis: boolean, istry: boolean, ptype: TypeSignature) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromType);
-        this.istry = istry;
-        this.ptype = ptype;
-    }
-}
-
 class PostfixModifyWithIndecies extends PostfixOperation {
+    readonly binder: boolean;
+    readonly opkind: "update" | "insert" | "merge";
     readonly updates: [number, Expression][];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, updates: [number, Expression][]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithIndecies);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: [number, Expression][]) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithIndecies);
+        this.binder = binder;
+        this.opkind = opkind;
         this.updates = updates;
     }
 }
 
 class PostfixModifyWithNames extends PostfixOperation {
+    readonly binder: boolean;
+    readonly opkind: "update" | "insert" | "merge";
     readonly updates: [string, Expression][];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, updates: [string, Expression][]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithNames);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: [string, Expression][]) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithNames);
+        this.binder = binder;
+        this.opkind = opkind;
         this.updates = updates;
     }
 }
 
-class PostfixStructuredExtend extends PostfixOperation {
-    readonly extension: Expression;
-
-    constructor(sinfo: SourceInfo, isElvis: boolean, extension: Expression) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixStructuredExtend);
-        this.extension = extension;
-    }
-}
-
 class PostfixInvoke extends PostfixOperation {
+    readonly binder: boolean;
     readonly specificResolve: TypeSignature | undefined;
     readonly name: string;
     readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixInvoke);
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, binder: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+        super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixInvoke);
+        this.binder = binder;
         this.specificResolve = specificResolve;
         this.name = name;
         this.pragmas = pragmas;
@@ -605,10 +600,10 @@ class PrefixOp extends Expression {
 
 class TailTypeExpression extends Expression {
     readonly exp: Expression;
-    readonly op: string;
+    readonly op: "typeis" | "typeas" | "typeof" | "typeconvert";
     readonly ttype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, exp: Expression, op: string, ttype: TypeSignature) {
+    constructor(sinfo: SourceInfo, exp: Expression, op: "typeis" | "typeas" | "typeof" | "typeconvert", ttype: TypeSignature) {
         super(ExpressionTag.TailTypeExpression, sinfo);
         this.exp = exp;
         this.op = op;
@@ -680,22 +675,26 @@ class MapEntryConstructorExpression extends Expression {
 }
 
 class NonecheckExpression extends Expression {
+    readonly elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined;
     readonly lhs: Expression;
     readonly rhs: Expression;
 
-    constructor(sinfo: SourceInfo, lhs: Expression, rhs: Expression) {
+    constructor(sinfo: SourceInfo, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, lhs: Expression, rhs: Expression) {
         super(ExpressionTag.NonecheckExpression, sinfo);
+        this.elvisRestrict = elvisRestrict;
         this.lhs = lhs;
         this.rhs = rhs;
     }
 }
 
 class CoalesceExpression extends Expression {
+    readonly elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined;
     readonly lhs: Expression;
     readonly rhs: Expression;
 
-    constructor(sinfo: SourceInfo, lhs: Expression, rhs: Expression) {
+    constructor(sinfo: SourceInfo, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, lhs: Expression, rhs: Expression) {
         super(ExpressionTag.CoalesceExpression, sinfo);
+        this.elvisRestrict = elvisRestrict;
         this.lhs = lhs;
         this.rhs = rhs;
     }
@@ -718,13 +717,15 @@ class ExpOrExpression extends Expression {
     readonly exp: Expression;
     readonly action: string;
     readonly result: Expression | undefined;
+    readonly elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined;
     readonly cond: Expression | undefined;
 
-    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression | undefined, cond: Expression | undefined) {
+    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression | undefined, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, cond: Expression | undefined) {
         super(ExpressionTag.ExpOrExpression, sinfo);
         this.exp = exp;
         this.action = action;
         this.result = result;
+        this.elvisRestrict = elvisRestrict;
         this.cond = cond;
     }
 }
@@ -909,19 +910,23 @@ class VariableAssignmentStructuredAssignment extends StructuredAssignment {
 }
 
 class TupleStructuredAssignment extends StructuredAssignment {
+    readonly isvalue: boolean;
     readonly assigns: StructuredAssignment[];
 
-    constructor(assigns: StructuredAssignment[]) {
+    constructor(isvalue: boolean, assigns: StructuredAssignment[]) {
         super();
+        this.isvalue = isvalue;
         this.assigns = assigns;
     }
 }
 
 class RecordStructuredAssignment extends StructuredAssignment {
+    readonly isvalue: boolean;
     readonly assigns: [string, StructuredAssignment][];
 
-    constructor(assigns: [string, StructuredAssignment][]) {
+    constructor(isvalue: boolean, assigns: [string, StructuredAssignment][]) {
         super();
+        this.isvalue = isvalue;
         this.assigns = assigns;
     }
 }
@@ -1078,7 +1083,7 @@ export {
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, SpecialConstructorExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
-    PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixProjectFromType, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixStructuredExtend,
+    PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
     PostfixInvoke, PCodeInvokeExpression,
     TailTypeExpression,
     PrefixOp, 
@@ -1092,6 +1097,6 @@ export {
     TupleStructuredAssignment, RecordStructuredAssignment, NominalStructuredAssignment, ValueListStructuredAssignment,
     ReturnStatement, YieldStatement,
     IfElseStatement, AbortStatement, AssertStatement, CheckStatement, ValidateStatement, DebugStatement, NakedCallStatement,
-    MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
+    MatchGuard, WildcardMatchGuard, TypeIsMatchGuard, TypeConvertMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
     BlockStatement, BodyImplementation
 };
