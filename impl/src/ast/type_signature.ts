@@ -3,6 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+import { Expression } from "./body";
+
 class TypeSignature {
 }
 
@@ -81,12 +83,14 @@ class FunctionParameter {
     readonly type: TypeSignature;
     readonly isRef: boolean;
     readonly isOptional: boolean;
+    readonly optValue: Expression | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, optValue: Expression | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
+        this.optValue = optValue;
     }
 }
 

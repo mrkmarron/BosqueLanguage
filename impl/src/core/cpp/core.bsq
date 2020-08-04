@@ -11,13 +11,10 @@ concept Any {
     method is<T>(): Bool # special_method
     method as<T>(): T # special_method
 
-    method of<T>(): Bool # special_method
-    method convert<T>(): T # special_method
-
-    method tryConvert<T>(): T? # special_method
-    method optionConvert<T> Option<T> # special_method
-    method resultConvert<T> Result<T> # special_method
-    method defaultConvert<T>(default: T): T # special_method
+    method tryAs<T>(): T? # special_method
+    method optionAs<T> Option<T> # special_method
+    method resultAs<T> Result<T> # special_method
+    method defaultAs<T>(default: T): T # special_method
 
     method isNone(): Bool # special_method
     method isSome(): Bool # special_method
@@ -28,10 +25,6 @@ concept Some provides Any {
     method update(): Some # special_method
     method insert(): Some # special_method
     method merge(): Some # special_method
-}
-
-//<summary>A marker concept that indicates a type has a convert method that will allow conversion to a supertype -- used for method override contravariance</summary>
-concept Convertable provides Any {
 }
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
@@ -303,7 +296,7 @@ entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType {
     }
 
     static optionFrom(str: String): Option<StringOf<T>> {
-        return T::accepts(str) ? opt(StringOf<T>::s_unsafe_from(str)) : empty;
+        return T::accepts(str) ? of(StringOf<T>::s_unsafe_from(str)) : empty;
     }
 
     static resultFrom(str: String): Result<StringOf<T>> {
@@ -348,7 +341,7 @@ entity DataString<T where Parsable> provides APIValue, KeyType, Some {
     }
 
     static optionFrom(str: String): Option<DataString<T>> {
-        return T::tryParse(str).isOk() ? opt(DataString<T>::s_unsafe_from(str)): empty;
+        return T::tryParse(str).isOk() ? of(DataString<T>::s_unsafe_from(str)): empty;
     }
 
     static resultFrom(str: String): Result<DataString<T>> {
@@ -479,29 +472,23 @@ entity RegexMatch provides Object {
 }
 
 //<summary>All actual tuples implicitly provide this concept.</summary>
-concept Tuple provides Some, Convertable {
-    method convertable<U where grounded Tuple>(): Bool # tuple_convertable
-    method convert<U where grounded Tuple>(): U # tuple_convert
-
+concept Tuple provides Some {
     static append(...args: List<Tuple>): Tuple # special_method
 }
 
 //<summary>All actual records implicitly provide this concept.</summary>
-concept Record provides Some, Convertable {
-    method convertable<U where grounded Record>(): Bool # record_convertable
-    method convert<U where grounded Record>(): U # record_convert
-
+concept Record provides Some {
     static join(...args: List<Record>): Record # special_method
 }
 
 //<summary>Option type</summary>
-struct concept Option<T> provides Some, Convertable, PODType when T grounded PODType, APIType when T grounded APIType {   
+struct concept Option<T> provides Some, PODType when T grounded PODType, APIType when T grounded APIType {   
     static createValue(value: T): Option<T> {
-        return Opt<T>::create(value);
+        return Of<T>::create(value);
     }
 
     method isValue(): Bool {
-        return this.is<Opt<T>>();
+        return this.is<Of<T>>();
     }
 
     method isEmpty(): Bool {
@@ -509,15 +496,15 @@ struct concept Option<T> provides Some, Convertable, PODType when T grounded POD
     }
 
     method value(): T {
-        return this.as<Opt<T>>().value;
+        return this.as<Of<T>>().value;
     }
 }
 
-struct entity Opt<T> provides Option<T> {
+struct entity Of<T> provides Option<T> {
     field value: T;
 
     static create(value: T): Of<T> {
-        return Opt<T>@{ data = data };
+        return Of<T>@{ data = data };
     }
 }
 
@@ -525,7 +512,7 @@ struct entity Empty provides Option<*> {
 }
 
 //<summary>Result type.</summary>
-struct concept Result<T, E=None> provides Some, Convertable, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
+struct concept Result<T, E=None> provides Some, PODType when T PODType && E PODType, APIType when T APIType && E APIType {   
     static createOk(result: T): Result<T, E> {
         return Ok<T>::create(result);
     }

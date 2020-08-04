@@ -95,16 +95,7 @@ class WildcardMatchGuard extends MatchGuard {
     }
 }
 
-class TypeIsMatchGuard extends MatchGuard {
-    readonly oftype: TypeSignature;
-
-    constructor(oftype: TypeSignature, optionalWhen: Expression | undefined) {
-        super(optionalWhen);
-        this.oftype = oftype;
-    }
-}
-
-class TypeConvertMatchGuard extends MatchGuard {
+class TypeMatchGuard extends MatchGuard {
     readonly oftype: TypeSignature;
 
     constructor(oftype: TypeSignature, optionalWhen: Expression | undefined) {
@@ -513,9 +504,9 @@ class PostfixAccessFromIndex extends PostfixOperation {
 
 class PostfixProjectFromIndecies extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
-    readonly indecies: number[];
+    readonly indecies: {index: number, reqtype?: TypeSignature}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, indecies: number[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, indecies: {index: number, reqtype?: TypeSignature}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromIndecies);
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
@@ -533,9 +524,9 @@ class PostfixAccessFromName extends PostfixOperation {
 
 class PostfixProjectFromNames extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
-    readonly names: string[];
+    readonly names: {name: string, reqtype?: TypeSignature}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, names: string[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "<none>" | "<empty>" | "<err>" | undefined, isEphemeralListResult: boolean, names: {name: string, reqtype?: TypeSignature}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromNames);
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
@@ -600,10 +591,10 @@ class PrefixOp extends Expression {
 
 class TailTypeExpression extends Expression {
     readonly exp: Expression;
-    readonly op: "typeis" | "typeas" | "typeof" | "typeconvert";
+    readonly op: "typeis" | "typeas";
     readonly ttype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, exp: Expression, op: "typeis" | "typeas" | "typeof" | "typeconvert", ttype: TypeSignature) {
+    constructor(sinfo: SourceInfo, exp: Expression, op: "typeis" | "typeas", ttype: TypeSignature) {
         super(ExpressionTag.TailTypeExpression, sinfo);
         this.exp = exp;
         this.op = op;
@@ -1097,6 +1088,6 @@ export {
     TupleStructuredAssignment, RecordStructuredAssignment, NominalStructuredAssignment, ValueListStructuredAssignment,
     ReturnStatement, YieldStatement,
     IfElseStatement, AbortStatement, AssertStatement, CheckStatement, ValidateStatement, DebugStatement, NakedCallStatement,
-    MatchGuard, WildcardMatchGuard, TypeIsMatchGuard, TypeConvertMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
+    MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
     BlockStatement, BodyImplementation
 };

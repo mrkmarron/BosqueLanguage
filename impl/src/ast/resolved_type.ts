@@ -13,7 +13,7 @@ class ResolvedAtomType {
     }
 }
 
-class ResolvedWildcardType extends ResolvedAtomType {
+class ResolvedWildcardAtomType extends ResolvedAtomType {
     constructor() {
         super("*");
     }
@@ -77,17 +77,25 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
 }
 
 class ResolvedLiteralAtomType extends ResolvedAtomType {
-    readonly oftype: ResolvedEntityAtomType;
-    readonly typevalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined;
+    readonly oftype: ResolvedType;
+    readonly typevalue: boolean | number | {enumtype: ResolvedType, enumvalue: string};
 
-    constructor(rstr: string, oftype: ResolvedEntityAtomType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined) {
+    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string}) {
         super(rstr);
         this.oftype = oftype;
         this.typevalue = ofvalue;
     }
 
-    static create(oftype: ResolvedEntityAtomType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string} | undefined): ResolvedLiteralAtomType {
-        return new ResolvedLiteralAtomType(``, oftype, ofvalue);
+    static create(oftype: ResolvedType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string}): ResolvedLiteralAtomType {
+        let rstr = "";
+        if(typeof(ofvalue) === "boolean" || typeof(ofvalue) === "number") {
+            rstr = `${ofvalue}`;
+        }
+        else {
+            rstr = `${ofvalue.enumtype.idStr}::${ofvalue.enumvalue}`
+        }
+        
+        return new ResolvedLiteralAtomType(rstr, oftype, ofvalue);
     }
 }
 
@@ -103,19 +111,17 @@ class ResolvedTupleAtomTypeEntry {
 
 class ResolvedTupleAtomType extends ResolvedAtomType {
     readonly isvalue: boolean;
-    readonly isvirtual: boolean;
     readonly types: ResolvedTupleAtomTypeEntry[];
 
-    constructor(rstr: string, isvalue: boolean, isvirtual: boolean, types: ResolvedTupleAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, types: ResolvedTupleAtomTypeEntry[]) {
         super(rstr);
         this.isvalue = isvalue;
-        this.isvirtual = isvirtual;
         this.types = types;
     }
 
     static create(isvalue: boolean, entries: ResolvedTupleAtomTypeEntry[]): ResolvedTupleAtomType {
         let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.idStr).join(", ");
-        return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, entries.some((entry) => entry.isOptional), entries);
+        return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, entries);
     }
 }
 
@@ -133,13 +139,11 @@ class ResolvedRecordAtomTypeEntry {
 
 class ResolvedRecordAtomType extends ResolvedAtomType {
     readonly isvalue: boolean;
-    readonly isvirtual: boolean;
     readonly entries: ResolvedRecordAtomTypeEntry[];
 
-    constructor(rstr: string, isvalue: boolean, isvirtual: boolean, entries: ResolvedRecordAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, entries: ResolvedRecordAtomTypeEntry[]) {
         super(rstr);
         this.isvalue = isvalue;
-        this.isvirtual = isvirtual;
         this.entries = entries;
     }
 
@@ -148,7 +152,7 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
         simplifiedEntries.sort((a, b) => a.name.localeCompare(b.name));
         let cvalue = simplifiedEntries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.idStr).join(", ");
 
-        return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, simplifiedEntries.some((entry) => entry.isOptional) , simplifiedEntries);
+        return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, simplifiedEntries);
     }
 }
 
@@ -250,7 +254,7 @@ class ResolvedType {
             return false;
         }
 
-        return (this.options[0] instanceof ResolvedTupleAtomType) && !(this.options[0] as ResolvedTupleAtomType).isvirtual;
+        return (this.options[0] instanceof ResolvedTupleAtomType) && (this.options[0] as ResolvedTupleAtomType).types.some((value) => value.isOptional);
     }
 
     isUniqueRecordTargetType(): boolean {
@@ -258,7 +262,7 @@ class ResolvedType {
             return false;
         }
 
-        return (this.options[0] instanceof ResolvedRecordAtomType) && !(this.options[0] as ResolvedRecordAtomType).isvirtual;
+        return (this.options[0] instanceof ResolvedRecordAtomType) && !(this.options[0] as ResolvedRecordAtomType).entries.some((value) => value.isOptional);
     }
 
     isUniqueCallTargetType(): boolean {
@@ -362,8 +366,8 @@ class ResolvedFunctionType {
 }
 
 export {
-    ResolvedWildcardType,
-    ResolvedAtomType, 
+    ResolvedAtomType,
+    ResolvedWildcardAtomType,
     ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
     ResolvedLiteralAtomType,
     ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, 
