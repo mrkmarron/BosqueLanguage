@@ -410,10 +410,10 @@ class PCodeInvokeExpression extends Expression {
 
 class SpecialConstructorExpression extends Expression {
     readonly rtype: TypeSignature;
-    readonly rop: string;
+    readonly rop: "ok" | "opt" | "err";
     readonly arg: Expression;
 
-    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: string, arg: Expression) {
+    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: "ok" | "opt" | "err", arg: Expression) {
         super(ExpressionTag.SpecialConstructorExpression, sinfo); 
         this.rtype = rtype;
         this.rop = rop;

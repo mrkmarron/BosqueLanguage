@@ -446,7 +446,7 @@ class MIREmitter {
     readonly assembly: Assembly;
     readonly masm: MIRAssembly;
     readonly bodyEmitter: MIRBodyEmitter = new MIRBodyEmitter();
-
+    
     private readonly pendingOOProcessing: [MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
 
     private readonly pendingGlobalProcessing: [MIRConstantKey, NamespaceConstDecl][] = [];
@@ -460,7 +460,7 @@ class MIREmitter {
     private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
     private readonly allVInvokes: [MIRVirtualMethodKey, MIRNominalTypeKey, OOPTypeDecl, Map<string, ResolvedType>, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
 
-    private constructor(assembly: Assembly, masm: MIRAssembly) {
+    private constructor(assembly: Assembly, masm: MIRAssembly, templateExpand: boolean) {
         this.assembly = assembly;
         this.masm = masm;
     }

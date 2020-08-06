@@ -51,41 +51,65 @@ class FlowTypeTruthOps {
     }
 }
 
+class ExpressionReturnResult {
+    readonly exptype: ResolvedType;
+    readonly truthval: FlowTypeTruthValue;
+
+    readonly expvar: string | undefined;
+
+    constructor(etype: ResolvedType, tval: FlowTypeTruthValue, expvar: string | undefined) {
+        this.exptype = etype;
+        this.truthval = tval;
+
+        this.expvar = expvar;
+    }
+
+    static join(assembly: Assembly, expvar: string, ...args: ExpressionReturnResult[]): ExpressionReturnResult {
+        assert(args.length !== 0);
+
+        const jtype = assembly.typeUpperBound(args.map((ei) => ei.exptype));
+        const jtv = FlowTypeTruthOps.join(...args.map((ei) => ei.truthval));
+
+        return new ExpressionReturnResult(jtype, jtv, expvar);
+    }
+}
+
 class VarInfo {
     readonly declaredType: ResolvedType;
     readonly isConst: boolean;
     readonly isCaptured: boolean;
     readonly mustDefined: boolean;
-    readonly flowType: ResolvedType;
 
-    constructor(dtype: ResolvedType, isConst: boolean, isCaptured: boolean, mustDefined: boolean, ftype: ResolvedType) {
+    readonly flowType: ResolvedType;
+    readonly truthval: FlowTypeTruthValue; 
+
+    constructor(dtype: ResolvedType, isConst: boolean, isCaptured: boolean, mustDefined: boolean, ftype: ResolvedType, fvalue: FlowTypeTruthValue) {
         this.declaredType = dtype;
         this.flowType = ftype;
         this.isConst = isConst;
         this.isCaptured = isCaptured;
         this.mustDefined = mustDefined;
+        this.truthval = fvalue;
     }
 
-    assign(ftype: ResolvedType): VarInfo {
+    assign(ftype: ResolvedType, fvalue: FlowTypeTruthValue): VarInfo {
         assert(!this.isConst);
-        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype, fvalue);
     }
 
-    infer(ftype: ResolvedType): VarInfo {
-        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype);
+    infer(ftype: ResolvedType, fvalue: FlowTypeTruthValue): VarInfo {
+        return new VarInfo(this.declaredType, this.isConst, this.isCaptured, true, ftype, fvalue);
     }
 
     static join(assembly: Assembly, ...values: VarInfo[]): VarInfo {
         assert(values.length !== 0);
 
-        return new VarInfo(values[0].declaredType, values[0].isConst, values[0].isCaptured, values.every((vi) => vi.mustDefined), assembly.typeUpperBound(values.map((vi) => vi.flowType)));
+        const jdef = values.every((vi) => vi.mustDefined);
+        const jtype = assembly.typeUpperBound(values.map((vi) => vi.flowType));
+        const jval = FlowTypeTruthOps.join(...values.map((vi) => vi.truthval));
+        return new VarInfo(values[0].declaredType, values[0].isConst, values[0].isCaptured, jdef, jtype, jval);
     }
 }
-
-type ExpressionReturnResult = {
-    etype: ResolvedType,
-    value: FlowTypeTruthValue
-};
 
 type StructuredAssignmentPathStep = {
     fromtype: ResolvedType,
@@ -96,6 +120,8 @@ type StructuredAssignmentPathStep = {
 };
 
 class TypeEnvironment {
+    readonly infeasible: boolean;
+
     readonly scope: MIRInvokeKey;
     readonly terms: Map<string, ResolvedType>;
 
@@ -114,10 +140,12 @@ class TypeEnvironment {
 
     readonly frozenVars: Set<string>;
 
-    private constructor(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>,
+    private constructor(infeasible: boolean, scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>,
         args: Map<string, VarInfo> | undefined, locals: Map<string, VarInfo>[] | undefined, result: ResolvedType,
         expressionResult: ExpressionReturnResult | undefined, rflow: ResolvedType | undefined, yflow: ResolvedType | undefined,
         yieldTrgtInfo: [MIRTempRegister, string][], frozenVars: Set<string>) {
+        this.infeasible = infeasible;
+
         this.scope = scope;
         this.terms = terms;
 
@@ -140,85 +168,138 @@ class TypeEnvironment {
     private updateVarInfo(name: string, nv: VarInfo): TypeEnvironment {
         if (this.getLocalVarInfo(name) !== undefined) {
             let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => frame.has(name) ? new Map<string, VarInfo>(frame).set(name, nv) : new Map<string, VarInfo>(frame));
-            return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+            return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
         }
         else {
             const argscopy = new Map<string, VarInfo>(this.args as Map<string, VarInfo>).set(name, nv);
-            return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, argscopy, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+            return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, argscopy, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
         }
     }
 
     static createInitialEnvForCall(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>, args: Map<string, VarInfo>, result: ResolvedType): TypeEnvironment {
-        return new TypeEnvironment(scope, terms, refparams, pcodes, args, [new Map<string, VarInfo>()], result, undefined, undefined, undefined, [], new Set<string>());
+        return new TypeEnvironment(false, scope, terms, refparams, pcodes, args, [new Map<string, VarInfo>()], result, undefined, undefined, undefined, [], new Set<string>());
+    }
+
+    static createInfeasibleFlowEnvironment(assembly: Assembly): TypeEnvironment {
+        return new TypeEnvironment(true, "[INFEASIBLE]", new Map<string, ResolvedType>(), [], new  Map<string, { pcode: PCode, captured: string[] }>(), new  Map<string, VarInfo>(), [new Map<string, VarInfo>()], assembly.getSpecialNoneType(), undefined, undefined, undefined, [], new Set<string>());
+    }
+
+    isInfeasibleFlow(): boolean {
+        return this.infeasible;
     }
 
     hasNormalFlow(): boolean {
-        return this.locals !== undefined;
+        return !this.infeasible && this.locals !== undefined;
     }
 
     getExpressionResult(): ExpressionReturnResult {
-        assert(this.expressionResult !== undefined);
+        assert(this.hasNormalFlow() && this.expressionResult !== undefined);
+
         return this.expressionResult as ExpressionReturnResult;
     }
 
-    setExpressionResult(etype: ResolvedType, value?: FlowTypeTruthValue): TypeEnvironment {
+    setResultExpression(etype: ResolvedType, value?: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
-        let rvalue = value;
-        if (rvalue === undefined) {
-            rvalue = etype.isNoneType() ? FlowTypeTruthValue.False : FlowTypeTruthValue.Unknown;
+
+        const einfo = new ExpressionReturnResult(etype, value || FlowTypeTruthValue.Unknown, undefined);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, einfo, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+    }
+
+    setResultExpressionWVarOpt(etype: ResolvedType, evar: string | undefined, value?: FlowTypeTruthValue): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const rvalue = value || FlowTypeTruthValue.Unknown;
+        const einfo = new ExpressionReturnResult(etype, rvalue, evar);
+        const nte = new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, einfo, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+
+        return evar === undefined ? nte : nte.updateVarInfo(evar, (nte.lookupVar(evar) as VarInfo).assign(etype, rvalue));
+    }
+
+    static convertToBoolFlowsOnResult(assembly: Assembly, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
+        assert(options.every((opt) => !opt.infeasible));
+        assert(options.every((opt) => assembly.subtypeOf(opt.getExpressionResult().exptype, assembly.getSpecialBoolType())));
+
+        const tvals = options.filter((opt) => opt.getExpressionResult().truthval !== FlowTypeTruthValue.False)
+            .map((opt) => opt.setResultExpressionWVarOpt(assembly.getSpecialBoolType(), opt.getExpressionResult().expvar, FlowTypeTruthValue.True));
+
+        const fvals = options.filter((opt) => opt.getExpressionResult().truthval !== FlowTypeTruthValue.True)
+            .map((opt) => opt.setResultExpressionWVarOpt(assembly.getSpecialBoolType(), opt.getExpressionResult().expvar, FlowTypeTruthValue.False));
+
+        return {tenvs: tvals, fenvs: fvals};
+    }
+
+    static convertToTypeNotTypeFlowsOnResult(assembly: Assembly, witht: ResolvedType, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
+        assert(options.every((opt) => !opt.infeasible));
+
+        let tp: TypeEnvironment[] = [];
+        let fp: TypeEnvironment[] = [];
+        
+        for(let i = 0; i < options.length; ++i) {
+            const opt = options[i];
+            const pccs = assembly.splitTypes(opt.getExpressionResult().exptype, witht);
+
+            if(!pccs.tp.isEmptyType()) {
+                tp.push(opt.setResultExpressionWVarOpt(pccs.tp, opt.getExpressionResult().expvar, opt.getExpressionResult().truthval));
+            }
+            if(!pccs.fp.isEmptyType()) {
+                fp.push(opt.setResultExpressionWVarOpt(pccs.fp, opt.getExpressionResult().expvar, opt.getExpressionResult().truthval));
+            }
+        }
+        return {tenvs: tp, fenvs: fp};
+    }
+
+    static splitTypeOptionFlowsOnResult(assembly: Assembly, options: TypeEnvironment[], ...types: ResolvedType[]): TypeEnvironment[][] {
+        assert(options.every((opt) => !opt.infeasible));
+
+        let envs: TypeEnvironment[][] = [];
+
+        for (let i = 0; i < types.length; ++i) {
+            const oftype = types[i];
+            const nenv: TypeEnvironment[] = [];
+
+            for (let j = 0; j < options.length; ++j) {
+                const opt = options[j];
+                const pccs = assembly.splitTypes(opt.getExpressionResult().exptype, oftype);
+
+                if (!pccs.tp.isEmptyType()) {
+                    nenv.push(opt.setResultExpressionWVarOpt(pccs.tp, opt.getExpressionResult().expvar, opt.getExpressionResult().truthval));
+                }
+            }
+
+            envs.push(nenv);
         }
 
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, { etype: etype, value: rvalue }, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
-    }
-
-    static convertToBoolFlowsOnExpressionResult(assembly: Assembly, options: TypeEnvironment[]): [TypeEnvironment[], TypeEnvironment[]] {
-        assert(options.every((opt) => assembly.subtypeOf(opt.getExpressionResult().etype, assembly.typeUpperBound([assembly.getSpecialNoneType(), assembly.getSpecialBoolType()]))));
-
-        const tvals = options.filter((opt) => opt.getExpressionResult().value !== FlowTypeTruthValue.False)
-            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
-
-        const fvals = options.filter((opt) => opt.getExpressionResult().value !== FlowTypeTruthValue.True)
-            .map((opt) => opt.setExpressionResult(assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
-
-        return [tvals, fvals];
-    }
-
-    static convertToNoneSomeFlowsOnExpressionResult(assembly: Assembly, options: TypeEnvironment[]): [TypeEnvironment[], TypeEnvironment[]] {
-        const nvals = options.filter((opt) => !assembly.restrictNone(opt.getExpressionResult().etype).isEmptyType())
-            .map((opt) => opt.setExpressionResult(assembly.restrictNone(opt.getExpressionResult().etype), FlowTypeTruthValue.False));
-
-        const svals = options.filter((opt) => !assembly.restrictSome(opt.getExpressionResult().etype).isEmptyType())
-            .map((opt) => opt.setExpressionResult(assembly.restrictSome(opt.getExpressionResult().etype), opt.getExpressionResult().value));
-
-        return [nvals, svals];
+        return envs;
     }
 
     setAbort(): TypeEnvironment {
         assert(this.hasNormalFlow());
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
     setReturn(assembly: Assembly, rtype: ResolvedType): TypeEnvironment {
         assert(this.hasNormalFlow());
         const rrtype = this.returnResult !== undefined ? assembly.typeUpperBound([this.returnResult, rtype]) : rtype;
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, rrtype, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, rrtype, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
     setYield(assembly: Assembly, ytype: ResolvedType): TypeEnvironment {
         assert(this.hasNormalFlow());
         const rytype = this.yieldResult !== undefined ? assembly.typeUpperBound([this.yieldResult, ytype]) : ytype;
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, this.returnResult, rytype, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, undefined, this.result, this.expressionResult, this.returnResult, rytype, this.yieldTrgtInfo, this.frozenVars);
     }
 
     pushLocalScope(): TypeEnvironment {
         assert(this.hasNormalFlow());
         let localscopy = [...(this.locals as Map<string, VarInfo>[]), new Map<string, VarInfo>()];
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localscopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, localscopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
     popLocalScope(): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
         let localscopy = this.locals !== undefined ? (this.locals as Map<string, VarInfo>[]).slice(0, -1) : undefined;
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localscopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, localscopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
     isInYieldBlock(): boolean {
@@ -226,16 +307,22 @@ class TypeEnvironment {
     }
 
     pushYieldTarget(trgt: MIRTempRegister, block: string): TypeEnvironment {
+        assert(!this.infeasible);
+
         let nyield = [...this.yieldTrgtInfo, [trgt, block]] as [MIRTempRegister, string][];
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, nyield, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, nyield, this.frozenVars);
     }
 
     popYieldTargetInfo(): TypeEnvironment {
+        assert(this.isInYieldBlock());
+
         let nyield = this.yieldTrgtInfo.slice(0, this.yieldTrgtInfo.length - 1);
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, nyield, this.frozenVars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, nyield, this.frozenVars);
     }
 
     getYieldTargetInfo(): [MIRTempRegister, string] {
+        assert(this.isInYieldBlock());
+
         return this.yieldTrgtInfo[this.yieldTrgtInfo.length - 1];
     }
 
@@ -262,20 +349,29 @@ class TypeEnvironment {
         return this.pcodes.get(pc);
     }
 
-    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, ftype: ResolvedType): TypeEnvironment {
+    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, infertype: ResolvedType, tv?: FlowTypeTruthValue): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
         let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
-        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, false, isDefined, ftype));
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+        localcopy[localcopy.length - 1].set(name, new VarInfo(dtype, isConst, false, isDefined, infertype, tv || FlowTypeTruthValue.Unknown));
+
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
-    setVar(name: string, ftype: ResolvedType): TypeEnvironment {
+    setVar(name: string, ftype: ResolvedType, tv?: FlowTypeTruthValue): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
         const oldv = this.lookupVar(name) as VarInfo;
-        const newv = oldv.assign(ftype);
+        
+        let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
+        localcopy[localcopy.length - 1].set(name, oldv.assign(ftype, tv || FlowTypeTruthValue.Unknown));
 
-        return this.updateVarInfo(name, newv);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
     }
 
-    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][]): TypeEnvironment {
+    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType, FlowTypeTruthValue][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType, FlowTypeTruthValue][]): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
         let nenv: TypeEnvironment = this;
 
         for (let i = 0; i < allDeclared.length; ++i) {
@@ -289,13 +385,6 @@ class TypeEnvironment {
         }
 
         return nenv;
-    }
-
-    assumeVar(name: string, ftype: ResolvedType): TypeEnvironment {
-        const oldv = this.lookupVar(name) as VarInfo;
-        const newv = oldv.infer(ftype);
-
-        return this.updateVarInfo(name, newv);
     }
 
     getCurrentFrameNames(): string[] {
@@ -317,16 +406,22 @@ class TypeEnvironment {
     }
 
     freezeVars(): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
         let svars = new Set<string>();
         for (let i = 0; i < (this.locals as Map<string, VarInfo>[]).length; ++i) {
             (this.locals as Map<string, VarInfo>[])[i].forEach((v, k) => svars.add(k));
         }
 
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, svars);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.result, this.expressionResult, this.returnResult, this.yieldResult, this.yieldTrgtInfo, svars);
     }
 
     static join(assembly: Assembly, ...opts: TypeEnvironment[]): TypeEnvironment {
-        assert(opts.length !== 0);
+        opts = opts.filter((env) => env.infeasible);
+
+        if(opts.length === 0) {
+            return TypeEnvironment.createInfeasibleFlowEnvironment(assembly);
+        }
 
         const fopts = opts.filter((opt) => opt.locals !== undefined);
 
@@ -360,15 +455,16 @@ class TypeEnvironment {
 
         let expres: ExpressionReturnResult | undefined = undefined;
         if(expresall.length !== 0) {
-            const retype = assembly.typeUpperBound(expresall.map((opt) => opt.etype));
-            const rflow = FlowTypeTruthOps.join(...expresall.map((opt) => opt.value));
-            expres = { etype: retype, value: rflow };
+            const retype = assembly.typeUpperBound(expresall.map((opt) => opt.exptype));
+            const rflow = FlowTypeTruthOps.join(...expresall.map((opt) => opt.truthval));
+            const evar = expresall.every((ee) => ee.expvar === expresall[0].expvar) ? expresall[0].expvar : undefined;
+            expres = new ExpressionReturnResult(retype, rflow, evar);
         }
 
         const rflow = opts.filter((opt) => opt.returnResult !== undefined).map((opt) => opt.returnResult as ResolvedType);
         const yflow = opts.filter((opt) => opt.yieldResult !== undefined).map((opt) => opt.yieldResult as ResolvedType);
 
-        return new TypeEnvironment(opts[0].scope, opts[0].terms, opts[0].refparams, opts[0].pcodes, args, locals, opts[0].result, expres, rflow.length !== 0 ? assembly.typeUpperBound(rflow) : undefined, yflow.length !== 0 ? assembly.typeUpperBound(yflow) : undefined, opts[0].yieldTrgtInfo, opts[0].frozenVars);
+        return new TypeEnvironment(false, opts[0].scope, opts[0].terms, opts[0].refparams, opts[0].pcodes, args, locals, opts[0].result, expres, rflow.length !== 0 ? assembly.typeUpperBound(rflow) : undefined, yflow.length !== 0 ? assembly.typeUpperBound(yflow) : undefined, opts[0].yieldTrgtInfo, opts[0].frozenVars);
     }
 }
 

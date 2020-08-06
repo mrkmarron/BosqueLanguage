@@ -11,13 +11,27 @@ concept Any {
     method is<T>(): Bool # special_method
     method as<T>(): T # special_method
 
-    method tryAs<T>(): T? # special_method
-    method optionAs<T> Option<T> # special_method
-    method resultAs<T> Result<T> # special_method
-    method defaultAs<T>(default: T): T # special_method
+    method tryAs<T>(): T? {
+        return this.is<T>() ? this : none;
+    }
 
-    method isNone(): Bool # special_method
-    method isSome(): Bool # special_method
+    method optionAs<T> Option<T> {
+        return this.is<T>() ? opt(this) : empty;
+    }
+    method resultAs<T> Result<T> {
+        return this.is<T>() ? ok(this) : err();
+    }
+    method defaultAs<T>(default: T): T {
+        return this.is<T>() ? this : default;
+    }
+
+    method isSome(): Bool {
+        return this.is<Some>();
+    }
+
+    method isNone(): Bool {
+        return this.is<None>();
+    }
 }
 
 //<summary>Special type for representing all non-none values.</summary>
@@ -296,7 +310,7 @@ entity StringOf<T where Validator> provides KeyType, Some, PODType, APIType {
     }
 
     static optionFrom(str: String): Option<StringOf<T>> {
-        return T::accepts(str) ? of(StringOf<T>::s_unsafe_from(str)) : empty;
+        return T::accepts(str) ? opt(StringOf<T>::s_unsafe_from(str)) : empty;
     }
 
     static resultFrom(str: String): Result<StringOf<T>> {
@@ -484,11 +498,11 @@ concept Record provides Some {
 //<summary>Option type</summary>
 struct concept Option<T> provides Some, PODType when T grounded PODType, APIType when T grounded APIType {   
     static createValue(value: T): Option<T> {
-        return Of<T>::create(value);
+        return Opt<T>::create(value);
     }
 
     method isValue(): Bool {
-        return this.is<Of<T>>();
+        return this.is<Opt<T>>();
     }
 
     method isEmpty(): Bool {
@@ -496,15 +510,15 @@ struct concept Option<T> provides Some, PODType when T grounded PODType, APIType
     }
 
     method value(): T {
-        return this.as<Of<T>>().value;
+        return this.as<Opt<T>>().value;
     }
 }
 
-struct entity Of<T> provides Option<T> {
+struct entity Opt<T> provides Option<T> {
     field value: T;
 
     static create(value: T): Value<T> {
-        return Of<T>@{ value = value };
+        return Opt<T>@{ value = value };
     }
 }
 

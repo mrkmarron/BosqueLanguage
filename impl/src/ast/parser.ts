@@ -52,7 +52,7 @@ const KeywordStrings = [
     "namespace",
     "none",
     "ok",
-    "of",
+    "opt",
     "or",
     "private",
     "provides",
@@ -794,6 +794,10 @@ class Parser {
             let exp: Expression | undefined = undefined;
             if(isopt && this.testAndConsumeTokenIf("=")) {
                 exp = this.parseExpression();
+            }
+
+            if(ispcode && isopt) {
+                this.raiseError(line, "Lambda functions cannot have optional arguments")
             }
 
             return [pname, argtype, isopt, isrest, isref, exp];
@@ -2801,17 +2805,17 @@ class Parser {
                     this.consumeToken();
                     const tconstraint = this.parseTypeSignature();
 
-                    return new TemplateTermDecl(templatename, false, tconstraint, false, undefined);
+                    return new TemplateTermDecl(templatename, false, tconstraint, false, undefined, true);
                 }
                 else {
                     const hasconstraint = this.testAndConsumeTokenIf("where");
                     const grounded = this.testAndConsumeTokenIf("grounded");
                     const tconstraint = hasconstraint ? this.parseTypeSignature() : this.m_penv.SpecialAnySignature;
 
-                    let defaulttype = undefined;
                     let isinfer = false;
+                    let defaulttype: TypeSignature | undefined = undefined;
                     if (this.testAndConsumeTokenIf("=")) {
-                        if (this.testToken("?")) {
+                        if (this.testAndConsumeTokenIf("?")) {
                             isinfer = true;
                         }
                         else {
@@ -2819,7 +2823,7 @@ class Parser {
                         }
                     }
 
-                    return new TemplateTermDecl(templatename, grounded, tconstraint, isinfer, defaulttype);
+                    return new TemplateTermDecl(templatename, grounded, tconstraint, isinfer, defaulttype, false);
                 }
             })[0];
         }

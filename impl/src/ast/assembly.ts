@@ -31,13 +31,15 @@ class TemplateTermDecl {
     readonly constraint: TypeSignature;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
+    readonly isLiteral: boolean;
 
-    constructor(name: string, grounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
+    constructor(name: string, grounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined, isliteral: boolean) {
         this.name = name;
         this.grounded = grounded;
         this.constraint = constraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
+        this.isLiteral = isliteral;
     }
 }
 
@@ -679,7 +681,7 @@ class Assembly {
         return { tp: tp, fp: fp };
     }
 
-    private splitTypes(oft: ResolvedType, witht: ResolvedType): { tp: ResolvedType, fp: ResolvedType } {
+    splitTypes(oft: ResolvedType, witht: ResolvedType): { tp: ResolvedType, fp: ResolvedType } {
         if (oft.isEmptyType() || witht.isEmptyType()) {
             return { tp: ResolvedType.createEmpty(), fp: ResolvedType.createEmpty() };
         }
@@ -1585,6 +1587,9 @@ class Assembly {
             if(giventerms.length <= i) {
                 if(declterms[i].defaultType !== undefined) {
                     fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, implicitBinds));
+                }
+                else if (declterms[i].isInfer) {
+                    fullbinds.set(declterms[i].name, this.getSpecialAnyConceptType());
                 }
                 else {
                     return undefined;

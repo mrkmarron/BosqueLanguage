@@ -68,12 +68,14 @@ class TypeChecker {
     private m_file: string;
     private m_errors: [string, number, string][];
 
+    private m_infeasibleFlowErrors: boolean;
+
     private m_emitEnabled: boolean;
     private readonly m_emitter: MIREmitter;
 
-    private readonly AnySplitMethods = ["is", "isSome", "isNone"];
+    private readonly AnySplitMethods = ["is", "as"];
 
-    constructor(assembly: Assembly, emitEnabled: boolean, emitter: MIREmitter, buildlevel: BuildLevel, doLiteralStringValidate: boolean) {
+    constructor(assembly: Assembly, checkInfeasibleFlow: boolean, emitEnabled: boolean, emitter: MIREmitter, buildlevel: BuildLevel, doLiteralStringValidate: boolean) {
         this.m_assembly = assembly;
 
         this.m_buildLevel = buildlevel;
@@ -81,6 +83,8 @@ class TypeChecker {
 
         this.m_file = "[No File]";
         this.m_errors = [];
+
+        this.m_infeasibleFlowErrors = checkInfeasibleFlow;
 
         this.m_emitEnabled = emitEnabled;
         this.m_emitter = emitter;
@@ -115,17 +119,22 @@ class TypeChecker {
 
         const rt = this.m_assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Result") as ConceptTypeDecl;
         const rrt = ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(rt, binds)]));
-        this.m_emitter.registerResolvedTypeReference(rrt);
 
         const okt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
         const rok = ResolvedType.createSingle(ResolvedEntityAtomType.create(okt, binds));
-        this.m_emitter.registerResolvedTypeReference(rok);
-        this.m_emitter.registerTypeInstantiation(okt, binds);
 
         const errt = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
         const rerr = ResolvedType.createSingle(ResolvedEntityAtomType.create(errt, binds));
-        this.m_emitter.registerResolvedTypeReference(rerr);
-        this.m_emitter.registerTypeInstantiation(errt, binds);
+
+        if(this.m_emitEnabled) {
+            this.m_emitter.registerResolvedTypeReference(rrt);
+
+            this.m_emitter.registerResolvedTypeReference(rok);
+            this.m_emitter.registerTypeInstantiation(okt, binds);
+
+            this.m_emitter.registerResolvedTypeReference(rerr);
+            this.m_emitter.registerTypeInstantiation(errt, binds);
+        }
 
         return [rrt, rok, rerr]
     }
@@ -137,7 +146,10 @@ class TypeChecker {
 
             const termconstraint = this.resolveAndEnsureTypeOnly(sinfo, terminfo.constraint, new Map<string, ResolvedType>());
             const boundsok = this.m_assembly.subtypeOf(termtype, termconstraint);
+            const groundedok = !terminfo.grounded || termtype.isGroundedType();
+
             this.raiseErrorIf(sinfo, !boundsok, `Template instantiation does not satisfy specified bounds -- not subtype of ${termconstraint.idStr}`);
+            this.raiseErrorIf(sinfo, !groundedok, `Template instantiation does not satisfy specified bounds -- not a grounded type`);
         }
 
         if (optTypeRestrict !== undefined) {
@@ -168,6 +180,9 @@ class TypeChecker {
             }
             const rtype = this.m_assembly.normalizeTypeGeneral(invoke.params[i].type, invokeBinds);
             this.raiseErrorIf(sinfo, rtype instanceof ResolvedType && rtype.isEmptyType(), "Bad type signature");
+
+            xxxx;
+            //TODO: need to check that optional argument parameter default values are type ok and that we register the initialization functions 
         }
 
         const firstOptIndex = invoke.params.findIndex((param) => param.isOptional);
@@ -240,37 +255,33 @@ class TypeChecker {
         return tj;
     }
 
-    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): [boolean, boolean] {
-        if(lhs.isNoneType() || rhs.isNoneType()) {
-            return [true, false];
+    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): "exact" | "lhsnone" | "rhsnone" | "invalid" {
+        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !lhs.isGroundedType()) {
+            return "invalid";
         }
 
-        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
-            return [false, false];
-        }
-
-        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
-            return [false, false];
+        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !rhs.isGroundedType()) {
+            return "invalid";
         }
 
         if(lhs.options.length === 1 && rhs.options.length === 1 && lhs.idStr === rhs.idStr) {
-            return [true, true];
+            return "exact";
         }
         else {
             if(lhs.options.length === 1 && rhs.options.length === 1) {
-                return [false, false]; //types not same and neither are none
+                return "invalid"; //types not same and neither are none
             }
             else if(lhs.options.length !== 1 && rhs.options.length !== 1) {
-                return [false, false]; //both types are ambig so not ok
+                return "invalid"; //both types are ambig so not ok
             }
             else {
                 if(lhs.options.length !== 1) {
                     const ok = lhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === rhs.idStr);
-                    return [ok, false];
+                    return ok ? "lhsnone" : "invalid";
                 }
                 else {
                     const ok = rhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === lhs.idStr);
-                    return [ok, false];
+                    return ok ? "rhsnone" : "invalid";
                 }
             }
         }
@@ -282,8 +293,8 @@ class TypeChecker {
             || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialStringType()) 
             || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialLogicalTimeType())
             || this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialEnumConceptType())
-            || (lhs.options.length === 1 && this.m_assembly.isSafeStringType(lhs.options[0]))
-            || (lhs.options.length === 1 && this.m_assembly.isStringOfType(lhs.options[0])))) {
+            || (lhs.options.length === 1 && this.m_assembly.isStringOfType(lhs.options[0]))
+            || (lhs.options.length === 1 && this.m_assembly.isDataStringType(lhs.options[0])))) {
             return false;
         }
 
@@ -292,8 +303,8 @@ class TypeChecker {
         || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialStringType()) 
         || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialLogicalTimeType())
         || this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialEnumConceptType())
-        || (rhs.options.length === 1 && this.m_assembly.isSafeStringType(rhs.options[0]))
-        || (rhs.options.length === 1 && this.m_assembly.isStringOfType(rhs.options[0])))) {
+        || (rhs.options.length === 1 && this.m_assembly.isStringOfType(rhs.options[0]))
+        || (rhs.options.length === 1 && this.m_assembly.isDataStringType(rhs.options[0])))) {
             return false;
         }
 
@@ -302,33 +313,18 @@ class TypeChecker {
 
     private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
         const options = rtype.options.map((atom) => {
-            if (atom instanceof ResolvedConceptAtomType) {
-                const catom = ResolvedType.createSingle(atom);
-
-                if (this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
-                    return this.m_assembly.getSpecialPODTypeConceptType();
-                }
-                else if (this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
-                    return this.m_assembly.getSpecialAPITypeConceptType();
+            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples");
+            const tatom = atom as ResolvedTupleAtomType;
+            if (idx < tatom.types.length) {
+                if (!tatom.types[idx].isOptional) {
+                    return tatom.types[idx].type;
                 }
                 else {
-                    return this.m_assembly.getSpecialAnyConceptType();
+                    return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
                 }
             }
             else {
-                this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples and Tuple Concepts");
-                const tatom = atom as ResolvedTupleAtomType;
-                if (idx < tatom.types.length) {
-                    if (!tatom.types[idx].isOptional) {
-                        return tatom.types[idx].type;
-                    }
-                    else {
-                        return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
-                    }
-                }
-                else {
-                    return this.m_assembly.getSpecialNoneType();
-                }
+                return this.m_assembly.getSpecialNoneType();
             }
         });
 
@@ -337,21 +333,7 @@ class TypeChecker {
 
     private getInfoForLoadFromPropertyName(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
         const options = rtype.options.map((atom) => {
-            if (atom instanceof ResolvedConceptAtomType) {
-                const catom = ResolvedType.createSingle(atom);
-                
-                if (this.m_assembly.subtypeOf(this.m_assembly.getSpecialPODTypeConceptType(), catom)) {
-                    return this.m_assembly.getSpecialPODTypeConceptType();
-                }
-                else if (this.m_assembly.subtypeOf(this.m_assembly.getSpecialAPITypeConceptType(), catom)) {
-                    return this.m_assembly.getSpecialAPITypeConceptType();
-                }
-                else {
-                    return this.m_assembly.getSpecialAnyConceptType();
-                }
-            }
-
-            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedRecordAtomType), "Can only load properties from Records and Record Concepts");
+            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedRecordAtomType), "Can only load properties from Records");
             const ratom = atom as ResolvedRecordAtomType;
             const tidx = ratom.entries.findIndex((re) => re.name === pname);
             if (tidx !== -1) {
@@ -368,129 +350,6 @@ class TypeChecker {
         });
 
         return this.m_assembly.typeUpperBound(options);
-    }
-
-    private projectTupleAtom(sinfo: SourceInfo, opt: ResolvedAtomType, ptype: ResolvedTupleAtomType, istry: boolean): ResolvedType {
-        if (opt instanceof ResolvedTupleAtomType) {
-            const tuple = opt as ResolvedTupleAtomType;
-
-            let tentries: ResolvedTupleAtomTypeEntry[] = [];
-            for (let i = 0; i < ptype.types.length; ++i) {
-                if (!ptype.types[i].isOptional) {
-                    if ((i >= tuple.types.length || tuple.types[i].isOptional) || !this.m_assembly.subtypeOf(tuple.types[i].type, ptype.types[i].type)) {
-                        this.raiseErrorIf(sinfo, !istry, "Type mismatch in projection");
-                        return ResolvedType.createEmpty();
-                    }
-
-                    tentries.push(new ResolvedTupleAtomTypeEntry(tuple.types[i].type, false));
-                }
-                else {
-                    if (i < tuple.types.length) {
-                        if (!this.m_assembly.subtypeOf(tuple.types[i].type, ptype.types[i].type)) {
-                            this.raiseErrorIf(sinfo, !istry, "Type mismatch in projection");
-                            return ResolvedType.createEmpty();
-                        }
-
-                        tentries.push(new ResolvedTupleAtomTypeEntry(tuple.types[i].type, tuple.types[i].isOptional));
-                    }
-                }
-            }
-            return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
-        }
-        else if (opt instanceof ResolvedConceptAtomType) {
-            if(!this.m_assembly.subtypeOf(ResolvedType.createSingle(opt), this.m_assembly.getSpecialTupleConceptType())) {
-                this.raiseErrorIf(sinfo, !istry);
-                return ResolvedType.createEmpty();
-            }
-            else {
-                return ResolvedType.createSingle(ptype);
-            }
-        }
-        else {
-            this.raiseErrorIf(sinfo, !istry, "Cannot project over non Tuple or Tuple Concept");
-
-            return this.m_assembly.getSpecialNoneType();
-        }
-    }
-
-    private projectRecordAtom(sinfo: SourceInfo, opt: ResolvedAtomType, ptype: ResolvedRecordAtomType, istry: boolean): ResolvedType {
-        if (opt instanceof ResolvedRecordAtomType) {
-            const record = opt as ResolvedRecordAtomType;
-
-            let rentries: ResolvedRecordAtomTypeEntry[] = [];
-            for (let i = 0; i < ptype.entries.length; ++i) {
-                const riter = record.entries.find((v) => v.name === ptype.entries[i].name);
-                if (!ptype.entries[i].isOptional) {
-                    if ((riter === undefined || riter.isOptional) || !this.m_assembly.subtypeOf((riter as ResolvedRecordAtomTypeEntry).type, ptype.entries[i].type)) {
-                        this.raiseErrorIf(sinfo, !istry, "Type mismatch in projection");
-                        return ResolvedType.createEmpty();
-                    }
-
-                    rentries.push(new ResolvedRecordAtomTypeEntry(ptype.entries[i].name, (riter as ResolvedRecordAtomTypeEntry).type, false));
-                }
-                else {
-                    if (riter !== undefined) {
-                        if (!this.m_assembly.subtypeOf(riter.type, ptype.entries[i].type)) {
-                            this.raiseErrorIf(sinfo, !istry, "Type mismatch in projection");
-                            return ResolvedType.createEmpty();
-                        }
-
-                        rentries.push(new ResolvedRecordAtomTypeEntry(ptype.entries[i].name, riter.type, riter.isOptional));
-                    }
-                }
-            }
-
-            return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
-        }
-        else if (opt instanceof ResolvedConceptAtomType) {
-            if(!this.m_assembly.subtypeOf(ResolvedType.createSingle(opt), this.m_assembly.getSpecialRecordConceptType())) {
-                this.raiseErrorIf(sinfo, !istry);
-                return ResolvedType.createEmpty();
-            }
-            else {
-                return ResolvedType.createSingle(ptype);
-            }
-        }
-        else {
-            this.raiseErrorIf(sinfo, !istry, "Cannot project over non Record or Record Concept");
-
-            return this.m_assembly.getSpecialNoneType();
-        }
-    }
-
-    private projectOOTypeAtom(sinfo: SourceInfo, opt: ResolvedType, ptype: ResolvedEntityAtomType | ResolvedConceptAtomType, istry: boolean): [ResolvedType, OOMemberLookupInfo[]] {
-        let fields = new Set<string>();
-        if (ptype instanceof ResolvedEntityAtomType) {
-            const fmap = this.m_assembly.getAllOOFields(ptype.object, ptype.binds);
-            fmap.forEach((v, k) => fields.add(k));
-        }
-        else {
-            ptype.conceptTypes.forEach((concept) => {
-                const fmap = this.m_assembly.getAllOOFields(concept.concept, concept.binds);
-                fmap.forEach((v, k) => fields.add(k));
-            });
-        }
-
-        let farray: string[] = [];
-        fields.forEach((f) => farray.push(f));
-        farray.sort();
-
-        let rentries: ResolvedRecordAtomTypeEntry[] = [];
-        let fkeys: OOMemberLookupInfo[] = [];
-        for(let i = 0; i < farray.length; ++i) {
-            const f = farray[i];
-            const finfo = this.m_assembly.tryGetOOMemberDeclUnique(opt, "field", f);
-            if(finfo === undefined) {
-                this.raiseErrorIf(sinfo, !istry, "Field name is not defined (or is multiply) defined");
-                return [ResolvedType.createEmpty(), []];
-            }
-
-            const ftype = this.resolveAndEnsureTypeOnly(sinfo, ((finfo as OOMemberLookupInfo).decl as MemberFieldDecl).declaredType, (finfo as OOMemberLookupInfo).binds);
-            rentries.push(new ResolvedRecordAtomTypeEntry(f, ftype, false));
-            fkeys.push(this.m_assembly.tryGetOOMemberDeclOptions(opt, "field", f).root as OOMemberLookupInfo);
-        }
-
-        return [ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries)), fkeys];
     }
 
     private updateTupleIndeciesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [number, ResolvedType][]): ResolvedType {
@@ -2970,6 +2829,17 @@ class TypeChecker {
 
         const rhsreg = this.m_emitter.bodyEmitter.generateTmpRegister();
         const rhs = this.checkExpression(env, exp.rhs, rhsreg);
+
+        xxxx;
+        if(/*lhs is None || rhs is None*/) {
+            //do optimized none checks
+        }
+        else if(/*lhs is Empty || rhs is Empty*/) {
+            //do optimized empty checks
+        }
+        else {
+            //do regular equality
+        }
 
         const [pairwiseok, isstrict] = this.checkValueEq(lhs.getExpressionResult().etype, rhs.getExpressionResult().etype);
         this.raiseErrorIf(exp.sinfo, !pairwiseok, "Types are incompatible for equality compare");
