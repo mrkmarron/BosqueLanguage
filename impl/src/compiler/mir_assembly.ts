@@ -560,6 +560,11 @@ class MIRAssembly {
     readonly conceptDecls: Map<MIRNominalTypeKey, MIRConceptTypeDecl> = new Map<MIRNominalTypeKey, MIRConceptTypeDecl>();
     readonly entityDecls: Map<MIRNominalTypeKey, MIREntityTypeDecl> = new Map<MIRNominalTypeKey, MIREntityTypeDecl>();
 
+    readonly tupleDecls: Map<MIRNominalTypeKey, MIRTupleType> = new Map<MIRNominalTypeKey, MIRTupleType>();
+    readonly recordDecls: Map<MIRNominalTypeKey, MIRRecordType> = new Map<MIRNominalTypeKey, MIRRecordType>();
+
+    readonly ephemeralListDecls: Map<MIRNominalTypeKey, MIREphemeralListType> = new Map<MIRNominalTypeKey, MIREphemeralListType>();
+
     readonly typeMap: Map<MIRResolvedTypeKey, MIRType> = new Map<MIRResolvedTypeKey, MIRType>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();

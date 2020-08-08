@@ -6,6 +6,7 @@
 import { SourceInfo } from "../ast/parser";
 import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
 import assert = require("assert");
+import { BSQRegex } from "../ast/bsqregex";
 
 type MIRConstantKey = string; //ns::[type]::const#binds
 type MIRFieldKey = string; //ns::name::field#binds
@@ -249,20 +250,20 @@ class MIRConstantString extends MIRConstantArgument {
 }
 
 class MIRConstantRegex extends MIRConstantArgument {
-    readonly value: string;
+    readonly value: BSQRegex;
 
-    constructor(value: string) {
-        super(`=regex=${value}`);
+    constructor(value: BSQRegex) {
+        super(`=regex=${value.restr}`);
 
         this.value = value;
     }
 
     stringify(): string {
-        return this.value;
+        return this.value.restr;
     }
 
     jemit(): any {
-        return [this.value, "regex"];
+        return [this.value.jemit(), "regex"];
     }
 }
 

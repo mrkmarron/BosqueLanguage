@@ -15,6 +15,7 @@ import { propagateTmpAssignForBody, removeDeadTempAssignsFromBody } from "./mir_
 import { convertBodyToSSA } from "./mir_ssa";
 import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
+import { BSQRegex } from "../ast/bsqregex";
 
 type PCode = {
     code: InvokeDecl,
@@ -22,6 +23,13 @@ type PCode = {
     captured: Map<string, ResolvedType>,
     ftype: ResolvedFunctionType
 };
+
+enum ResultCheckCategory {
+    NoneChk,
+    EmptyChk,
+    ErrChk,
+    AllChk
+}
 
 class MIRKeyGenerator {
     static computeBindsKeyInfo(binds: Map<string, ResolvedType>): string {
@@ -116,6 +124,22 @@ class MIRBodyEmitter {
         this.m_currentBlock = (this.m_blockMap.get(name) as MIRBasicBlock).ops;
     }
 
+    emitCheckNoError(sinfo: SourceInfo, src: MIRTempRegister, srctype: MIRType, chk: ResultCheckCategory, trgt: MIRTempRegister) {
+        xxxx;
+    }
+
+    emitAssertCheck(sinfo: SourceInfo, msg: string, src: MIRTempRegister) {
+        xxxx;
+    }
+
+    emitExtractResult(sinfo: SourceInfo, src: MIRTempRegister, srctype: MIRType, trgt: MIRTempRegister) {
+        xxxx;
+    }
+
+    emitExtractOption(sinfo: SourceInfo, src: MIRTempRegister, srctype: MIRType, trgt: MIRTempRegister) {
+        xxxx;
+    }
+
     emitLoadConstNone(sinfo: SourceInfo, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNone(), trgt));
     }
@@ -140,7 +164,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantString(sv), trgt));
     }
 
-    emitLoadLiteralRegex(sinfo: SourceInfo, restr: string, trgt: MIRTempRegister) {
+    emitLoadLiteralRegex(sinfo: SourceInfo, restr: BSQRegex, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRegex(restr), trgt));
     }
 
@@ -148,17 +172,15 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRLoadConstSafeString(sinfo, sv, tkey, tskey, trgt));
     }
 
-    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, errtype: MIRResolvedTypeKey | undefined, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey, pfunckey, errtype, trgt));
+    emitLoadConstTypedString(sinfo: SourceInfo, sv: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+        this.m_currentBlock.push(new MIRLoadConstTypedString(sinfo, sv, tkey, tskey trgt));
     }
 
     emitAccessConstant(sinfo: SourceInfo, gkey: MIRConstantKey, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessConstantValue(sinfo, gkey, trgt));
     }
 
-    emitLoadMemberFieldDefaultValue(sinfo: SourceInfo, ckey: MIRFieldKey, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRLoadFieldDefaultValue(sinfo, ckey, trgt));
-    }
+    /*
 
     emitAccessArgVariable(sinfo: SourceInfo, name: string, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessArgVariable(sinfo, new MIRVariable(name), trgt));
@@ -430,6 +452,7 @@ class MIRBodyEmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
+    */
     getBody(file: string, sinfo: SourceInfo, args: Map<string, MIRType>): MIRBody {
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
 
@@ -514,22 +537,35 @@ class MIREmitter {
         return fres;
     }
 
-    registerTypeInstantiation(decl: OOPTypeDecl, binds: Map<string, ResolvedType>) {
+    private registerTypeInstantiation(decl: OOPTypeDecl, binds: Map<string, ResolvedType>) {
         const key = MIRKeyGenerator.generateTypeKey(decl, binds);
         if (this.masm.conceptDecls.has(key) || this.masm.entityDecls.has(key) || this.pendingOOProcessing.findIndex((oop) => oop[0] === key) !== -1) {
             return;
         }
 
-        if (decl.ns === "NSCore" && (decl.name === "Map" || decl.name === "DynamicMap")) {
-            const medecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::MapEntry") as EntityTypeDecl;
-
-            const mekey = MIRKeyGenerator.generateTypeKey(medecl, binds);
-            if (this.masm.entityDecls.has(mekey) || this.pendingOOProcessing.findIndex((oop) => oop[0] === mekey) !== -1) {
-                return;
+        if (decl.ns === "NSCore" && decl.name === "Result") {    
+            const okdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
+            const okkey = MIRKeyGenerator.generateTypeKey(okdecl, binds);
+            if (!this.masm.entityDecls.has(okkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === okkey) === -1) {
+                this.pendingOOProcessing.push([okkey, okdecl, binds]);
+                this.entityInstantiationInfo.push([okkey, okdecl, binds]);
             }
 
-            this.pendingOOProcessing.push([mekey, medecl, binds]);
-            this.entityInstantiationInfo.push([mekey, medecl, binds]);
+            const errdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
+            const errkey = MIRKeyGenerator.generateTypeKey(errdecl, binds);
+            if (!this.masm.entityDecls.has(errkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === errkey) === -1) {
+                this.pendingOOProcessing.push([errkey, errdecl, binds]);
+                this.entityInstantiationInfo.push([errkey, errdecl, binds]);
+            }
+        }
+
+        if (decl.ns === "NSCore" && decl.name === "Option") {
+            const optdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Opt") as EntityTypeDecl;
+            const optkey = MIRKeyGenerator.generateTypeKey(optdecl, binds);
+            if (!this.masm.entityDecls.has(optkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === optkey) === -1) {
+                this.pendingOOProcessing.push([optkey, optdecl, binds]);
+                this.entityInstantiationInfo.push([optkey, optdecl, binds]);
+            }
         }
 
         this.pendingOOProcessing.push([key, decl, binds]);
@@ -562,14 +598,23 @@ class MIREmitter {
             else if (sopt instanceof ResolvedTupleAtomType) {
                 const tatoms = sopt.types.map((entry) => new MIRTupleTypeEntry(this.registerResolvedTypeReference(entry.type), entry.isOptional));
                 rt = MIRTupleType.create(tatoms);
+                if(!this.masm.tupleDecls.has(rt.trkey)) {
+                    this.masm.tupleDecls.set(rt.trkey, rt as MIRTupleType);
+                }
             }
             else if (sopt instanceof ResolvedRecordAtomType) {
                 const tatoms = sopt.entries.map((entry) => new MIRRecordTypeEntry(entry.name, this.registerResolvedTypeReference(entry.type), entry.isOptional));
                 rt = MIRRecordType.create(tatoms);
+                if(!this.masm.recordDecls.has(rt.trkey)) {
+                    this.masm.recordDecls.set(rt.trkey, rt as MIRRecordType);
+                }
             }
             else {
                 const vpatoms = (sopt as ResolvedEphemeralListType).types.map((tt) => this.registerResolvedTypeReference(tt));
                 rt = MIREphemeralListType.create(vpatoms);
+                if(!this.masm.ephemeralListDecls.has(rt.trkey)) {
+                    this.masm.ephemeralListDecls.set(rt.trkey, rt as MIREphemeralListType);
+                }
             }
 
             const ft = MIRType.create([(rt as MIRTypeOption)]);
@@ -874,4 +919,4 @@ class MIREmitter {
     }
 }
 
-export { PCode, MIRKeyGenerator, MIRBodyEmitter, MIREmitter };
+export { PCode, ResultCheckCategory, MIRKeyGenerator, MIRBodyEmitter, MIREmitter };

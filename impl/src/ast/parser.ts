@@ -7,6 +7,7 @@ import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
 import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, TailTypeExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, LiteralEmptyExpression, SpecialConstructorExpression, TypeMatchGuard } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction } from "./assembly";
+import { BSQRegex } from "./bsqregex";
 
 const KeywordStrings = [
     "pragma",
@@ -73,10 +74,7 @@ const KeywordStrings = [
     "var",
     "when",
     "where",
-    "yield",
-    "<none>",
-    "<empty>",
-    "<err>"
+    "yield"
 ].sort((a, b) => { return (a.length !== b.length) ? (b.length - a.length) : a.localeCompare(b); });
 
 const SymbolStrings = [
@@ -116,9 +114,6 @@ const SymbolStrings = [
     "?|",
     "?.",
     "?.$",
-    "<none>",
-    "<empty>",
-    "<err>",
     "<",
     "<=",
     ">",
@@ -146,6 +141,7 @@ const RegexFollows = new Set<string>([
     "when",
     "yield",
     "[",
+    "]",
     "(",
     "{",
     "(|",
@@ -233,6 +229,25 @@ class SourceInfo {
     }
 }
 
+function unescapeLiteralString(str: string): string {
+    let rs = str
+        .replace(/\\0/ug, "\0")
+        .replace(/\\'/ug, "'")
+        .replace(/\\"/ug, "\"")
+        .replace(/\\n/ug, "\n")
+        .replace(/\\r/ug, "\r")
+        .replace(/\\t/ug, "\t");
+
+    let mm = rs.match(/\\u\{([0-9A-Fa-f])+\}/u);
+    while(mm !== null) {
+        const ccode = Number.parseInt(mm[1], 16);
+        const charstr = String.fromCodePoint(ccode);
+        rs = rs.slice(0, mm.index as number) + charstr + rs.slice(mm.index as number + mm[0].length);
+    }
+
+    return rs.replace(/\\\\/ug, "\\");
+}
+
 class Lexer {
     private static findSymbolString(str: string): string | undefined {
         return SymbolStrings.find((value) => str.startsWith(value));
@@ -293,7 +308,7 @@ class Lexer {
     //      operators are going to be <identifier> will need to do follow aware parsing like for the / in regex
     //      this needs unicode support
     private static isIdentifierName(str: string) {
-        return /^([$]?([_a-z][a-zA-Z0-9]*))$/.test(str);
+        return /^([$]?([_\p{L}][_\p{L}\p{Nd}]*))$/u.test(str);
     }
 
     private recordLexToken(epos: number, kind: string) {
@@ -307,7 +322,7 @@ class Lexer {
         this.m_cpos = epos;
     }
 
-    private static readonly _s_whitespaceRe = /\s+/y;
+    private static readonly _s_whitespaceRe = /\p{Z}+/uy;
     private tryLexWS(): boolean {
         Lexer._s_whitespaceRe.lastIndex = this.m_cpos;
         const m = Lexer._s_whitespaceRe.exec(this.m_input);
@@ -326,7 +341,7 @@ class Lexer {
         return true;
     }
 
-    private static readonly _s_commentRe = /(\/\/.*)|(\/\*[\s\S]*?\*\/)/y;
+    private static readonly _s_commentRe = /(\/\/.*)|(\/\*[\p{L}\p{M}\p{N}\p{S}\p{Z}]*?\*\/)/uy;
     private tryLexComment(): boolean {
         Lexer._s_commentRe.lastIndex = this.m_cpos;
         const m = Lexer._s_commentRe.exec(this.m_input);
@@ -373,8 +388,8 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_stringRe = /"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"/y;
-    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'/y;
+    private static readonly _s_stringRe = /"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"/uy;
+    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'/uy;
     private tryLexString() {
         Lexer._s_stringRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_stringRe.exec(this.m_input);
@@ -393,7 +408,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_regexRe = /\/[^"\\\r\n]*(\\(.)[^"\\\r\n]*)*\//y;
+    private static readonly _s_regexRe = /\/[^"\\\r\n]*(\\(.)[^"\\\r\n]*)*\//uy;
     private tryLexRegex() {
         Lexer._s_regexRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_regexRe.exec(this.m_input);
@@ -405,7 +420,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_symbolRe = /\W+/y;
+    private static readonly _s_symbolRe = /[\p{P}\p{S}]+/uy;
     private tryLexSymbol() {
         Lexer._s_symbolRe.lastIndex = this.m_cpos;
         const m = Lexer._s_symbolRe.exec(this.m_input);
@@ -423,8 +438,8 @@ class Lexer {
         }
     }
 
-    private static readonly _s_nameRe = /([$]?\w+)|(recursive\?)/y;
-    private tryLexName() {
+    private static readonly _s_nameRe = /([$]?[_\p{L}][_\p{L}\p{Nd}]+)|(recursive\?)/uy;
+    private tryLexName(): boolean {
         if (this.m_input.startsWith("recursive?", this.m_cpos)) {
             this.recordLexToken(this.m_cpos + "recursive?".length, "recursive?");
             return true;
@@ -1355,11 +1370,15 @@ class Parser {
         }
     }
 
-    private parseElvisRestrict(): "<none>" | "<empty>" | "<err>" | undefined {
-        const pker = this.peekToken();
-        if (pker === "<none>" || pker === "<empty>" || pker === "<err>") {
-            this.consumeToken();
-            return pker;
+    private parseElvisRestrict(): "[none]" | "[empty]" | "[err]" | undefined {
+        if(this.testFollows("[", "none", "]")) {
+            return "[none]";
+        }
+        else if(this.testFollows("[", "empty", "]")) {
+            return "[empty]";
+        }
+        else if(this.testFollows("[", "err", "]")) {
+            return "[err]";
         }
         else {
             return undefined;
@@ -1369,17 +1388,27 @@ class Parser {
     private parseConstructorPrimary(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
 
-       
-        this.ensureAndConsumeToken("@");
+        if(!this.testToken("@") && !this.testToken("#")) {
+            this.raiseError(sinfo.line, "Expected either @ or #");
+        }
+
+        const isvalue = this.testToken("#");
+        this.consumeToken();
+
         const args = this.parseArguments("{", "}");
 
-        return new ConstructorPrimaryExpression(sinfo, otype, args);
+        return new ConstructorPrimaryExpression(sinfo, isvalue, otype, args);
     }
 
     private parseConstructorPrimaryWithFactory(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
 
-        this.ensureAndConsumeToken("@");
+        if(!this.testToken("@") && !this.testToken("#")) {
+            this.raiseError(sinfo.line, "Expected either @ or #");
+        }
+
+        const isvalue = this.testToken("#");
+        this.consumeToken();
         this.ensureToken(TokenStrings.Identifier);
 
         const fname = this.consumeTokenAndGetValue();
@@ -1387,7 +1416,7 @@ class Parser {
         const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
         const args = this.parseArguments("(", ")");
 
-        return new ConstructorPrimaryWithFactoryExpression(sinfo, otype, fname, pragmas, targs, args);
+        return new ConstructorPrimaryWithFactoryExpression(sinfo, isvalue, otype, fname, pragmas, targs, args);
     }
 
     private parsePCodeTerm(): Expression {
@@ -1446,9 +1475,13 @@ class Parser {
         }
         else if (tk === TokenStrings.Regex) {
             const restr = this.consumeTokenAndGetValue(); //keep in escaped format
+            const re = BSQRegex.parse(restr);
+            if(typeof(re) === "string") {
+                this.raiseError(line, re);
+            }
 
-            this.m_penv.assembly.addLiteralRegex(restr);
-            return new LiteralRegexExpression(sinfo, restr);
+            this.m_penv.assembly.addLiteralRegex(re as BSQRegex);
+            return new LiteralRegexExpression(sinfo, re as BSQRegex);
         }
         else if (tk === "opt" || tk === "ok" || tk === "err") {
             this.consumeToken();
@@ -1585,10 +1618,10 @@ class Parser {
                     return new LiteralTypedStringExpression(sinfo, sstr, ttype);
                 }
             }
-            else if (this.testFollows("@", TokenStrings.Identifier)) {
+            else if (this.testFollows("@", TokenStrings.Identifier) || this.testFollows("#", TokenStrings.Identifier)) {
                 return this.parseConstructorPrimaryWithFactory(ttype);
             }
-            else if (this.testFollows("@", "{")) {
+            else if (this.testFollows("@", "{") || this.testFollows("#", "{")) {
                 return this.parseConstructorPrimary(ttype);
             }
             else {
@@ -1598,7 +1631,7 @@ class Parser {
         }
     }
     
-    private handleSpecialCaseMethods(sinfo: SourceInfo, isElvis: boolean, erestrict: "<none>" | "<empty>" | "<err>" | undefined, isbinder: boolean, specificResolve: TypeSignature | undefined, name: string): PostfixOperation {
+    private handleSpecialCaseMethods(sinfo: SourceInfo, isElvis: boolean, erestrict: "[none]" | "[empty]" | "[err]" | undefined, isbinder: boolean, specificResolve: TypeSignature | undefined, name: string): PostfixOperation {
         if (specificResolve !== undefined) {
             this.raiseError(this.getCurrentLine(), "Cannot use specific resolve on special methods");
         }
@@ -2210,8 +2243,9 @@ class Parser {
                     return new ConstValueStructuredAssignment(new LiteralTypedStringExpression(sinfo, sstr, ttype));
                 }
             }
-            else if (this.testFollows("@", "{")) {
-                this.ensureAndConsumeToken("@");
+            else if (this.testFollows("@", "{") || this.testFollows("#", "{")) {
+                const isvalue = this.testToken("#");
+                this.consumeToken();
 
                 const assigns = this.parseListOf<[string, StructuredAssignment]>("{", "}", ",", () => {
                     this.ensureToken(TokenStrings.Identifier);
@@ -2223,7 +2257,7 @@ class Parser {
                     return [name, subg];
                 })[0];
 
-                return new NominalStructuredAssignment(ttype, assigns);
+                return new NominalStructuredAssignment(isvalue, ttype, assigns);
             }
             else {
                 this.raiseError(sinfo.line, "Unknown token sequence in parsing expression");
@@ -2572,8 +2606,9 @@ class Parser {
             //we should find a type (nominal here) and it is a static invoke or a structured assign
             const ttype = this.parseTypeSignature();
 
-            if (this.testFollows("@", "{")) {
-                this.ensureAndConsumeToken("@");
+            if (this.testFollows("@", "{") || this.testFollows("#", "{")) {
+                const isvalue = this.testToken("#");
+                this.consumeToken();
 
                 let decls = new Set<string>();
                 const assigns = this.parseListOf<[string, StructuredAssignment]>("{", "}", ",", () => {
@@ -2586,7 +2621,7 @@ class Parser {
                     return [name, subg];
                 })[0];
 
-                const assign = new NominalStructuredAssignment(ttype, assigns);
+                const assign = new NominalStructuredAssignment(isvalue, ttype, assigns);
                 decls.forEach((dv) => {
                     if (this.m_penv.getCurrentFunctionScope().isVarNameDefined(dv)) {
                         this.raiseError(line, "Variable name is already defined");
@@ -2959,9 +2994,14 @@ class Parser {
 
         if(this.testToken(TokenStrings.Regex)) {
             const vregex = this.consumeTokenAndGetValue();
+            const re = BSQRegex.parse(vregex);
+            if(typeof(re) === "string") {
+                this.raiseError(this.getCurrentLine(), re);
+            }
+
             this.consumeToken();
 
-            const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, vregex));
+            const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], [], "vregex", new NominalTypeSignature("NSCore", "Regex"), new LiteralRegexExpression(sinfo, re as BSQRegex));
             const param = new FunctionParameter("arg", new NominalTypeSignature("NSCore", "String"), false, false, undefined);
             const acceptsbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "validator_accepts");
             const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", "Bool"), [], [], false, new Set<string>(), acceptsbody);
@@ -2971,7 +3011,7 @@ class Parser {
 
             currentDecl.objects.set(tyname, validatortype);
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, currentDecl.objects.get(tyname) as EntityTypeDecl);
-            this.m_penv.assembly.addValidatorRegex(currentDecl.ns + "::" + tyname, vregex);
+            this.m_penv.assembly.addValidatorRegex(currentDecl.ns + "::" + tyname, re as BSQRegex);
         }
         else {
             const btype = this.parseTypeSignature();
@@ -3535,4 +3575,7 @@ class Parser {
     }
 }
 
-export { SourceInfo, ParseError, Parser };
+export { 
+    SourceInfo, ParseError, Parser,
+    unescapeLiteralString
+};

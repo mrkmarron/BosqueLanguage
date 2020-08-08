@@ -10,6 +10,7 @@ import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
 import { type } from "os";
+import { BSQRegex } from "./bsqregex";
 
 type BuildLevel = "debug" | "test" | "release";
 
@@ -502,8 +503,8 @@ class Assembly {
     private m_conceptMap: Map<string, ConceptTypeDecl> = new Map<string, ConceptTypeDecl>();
     private m_objectMap: Map<string, EntityTypeDecl> = new Map<string, EntityTypeDecl>();
 
-    private m_literalRegexs: Set<string> = new Set<string>();
-    private m_validatorRegexs: Map<string, string> = new Map<string, string>();
+    private m_literalRegexs: Set<BSQRegex> = new Set<BSQRegex>();
+    private m_validatorRegexs: Map<string, BSQRegex> = new Map<string, BSQRegex>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
@@ -1259,7 +1260,7 @@ class Assembly {
         return this.m_objectMap.get(name);
     }
 
-    tryGetValidatorForFullyResolvedName(name: string): string | undefined {
+    tryGetValidatorForFullyResolvedName(name: string): BSQRegex | undefined {
         return this.m_validatorRegexs.get(name);
     }
 
@@ -1295,20 +1296,20 @@ class Assembly {
         this.m_objectMap.set(resolvedName, object);
     }
 
-    addValidatorRegex(resolvedName: string, validator: string) {
+    addValidatorRegex(resolvedName: string, validator: BSQRegex) {
         this.m_literalRegexs.add(validator);
         this.m_validatorRegexs.set(resolvedName, validator);
     }
 
-    addLiteralRegex(re: string) {
+    addLiteralRegex(re: BSQRegex) {
         this.m_literalRegexs.add(re);
     }
 
-    getAllLiteralRegexs(): Set<string> {
+    getAllLiteralRegexs(): Set<BSQRegex> {
         return this.m_literalRegexs;
     }
 
-    getAllValidators(): [ResolvedEntityAtomType, string][] {
+    getAllValidators(): [ResolvedEntityAtomType, BSQRegex][] {
         return [...this.m_validatorRegexs].map((vre) => {
             const ve = ResolvedEntityAtomType.create(this.m_objectMap.get(vre[0]) as EntityTypeDecl, new Map<string, ResolvedType>());
             return [ve, vre[1]];
@@ -1726,6 +1727,9 @@ class Assembly {
         let res = false;
 
         if (t1.idStr === t2.idStr) {
+            res = true;
+        }
+        else if(t1.idStr === "NSCore::Empty" && t2.idStr.startsWith("NSCore::Option<")) {
             res = true;
         }
         else if(t1 instanceof ResolvedWildcardAtomType || t2 instanceof ResolvedWildcardAtomType) {
