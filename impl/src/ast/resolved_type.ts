@@ -111,17 +111,21 @@ class ResolvedTupleAtomTypeEntry {
 
 class ResolvedTupleAtomType extends ResolvedAtomType {
     readonly isvalue: boolean;
+    readonly grounded: boolean;
     readonly types: ResolvedTupleAtomTypeEntry[];
 
-    constructor(rstr: string, isvalue: boolean, types: ResolvedTupleAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, grounded: boolean, types: ResolvedTupleAtomTypeEntry[]) {
         super(rstr);
         this.isvalue = isvalue;
+        this.grounded = grounded;
         this.types = types;
     }
 
     static create(isvalue: boolean, entries: ResolvedTupleAtomTypeEntry[]): ResolvedTupleAtomType {
-        let cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.idStr).join(", ");
-        return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, entries);
+        const cvalue = entries.map((entry) => (entry.isOptional ? "?:" : "") + entry.type.idStr).join(", ");
+        const grounded = entries.every((entry) => entry.type.isGroundedType());
+
+        return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, grounded, entries);
     }
 }
 
@@ -139,20 +143,23 @@ class ResolvedRecordAtomTypeEntry {
 
 class ResolvedRecordAtomType extends ResolvedAtomType {
     readonly isvalue: boolean;
+    readonly grounded: boolean;
     readonly entries: ResolvedRecordAtomTypeEntry[];
 
-    constructor(rstr: string, isvalue: boolean, entries: ResolvedRecordAtomTypeEntry[]) {
+    constructor(rstr: string, isvalue: boolean, grounded: boolean, entries: ResolvedRecordAtomTypeEntry[]) {
         super(rstr);
         this.isvalue = isvalue;
+        this.grounded = grounded;
         this.entries = entries;
     }
 
     static create(isvalue: boolean, entries: ResolvedRecordAtomTypeEntry[]): ResolvedRecordAtomType {
         let simplifiedEntries: ResolvedRecordAtomTypeEntry[] = [...entries];
         simplifiedEntries.sort((a, b) => a.name.localeCompare(b.name));
-        let cvalue = simplifiedEntries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.idStr).join(", ");
+        const cvalue = simplifiedEntries.map((entry) => entry.name + (entry.isOptional ? "?:" : ":") + entry.type.idStr).join(", ");
+        const grounded = entries.every((entry) => entry.type.isGroundedType());
 
-        return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, simplifiedEntries);
+        return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, grounded, simplifiedEntries);
     }
 }
 
@@ -285,6 +292,10 @@ class ResolvedType {
         return this.options.length === 1 && this.options[0].idStr === "NSCore::Any";
     }
 
+    isSameType(otype: ResolvedType): boolean {
+        return this.idStr === otype.idStr;
+    }
+
     isGroundedType(): boolean {
         return this.options.every((opt) => {
             if(opt instanceof ResolvedConceptAtomType) {
@@ -297,10 +308,10 @@ class ResolvedType {
                 return true;
             }
             else if(opt instanceof ResolvedTupleAtomType) {
-                return opt.types.every((entry) => entry.type.isGroundedType());
+                return opt.grounded;
             }
             else if(opt instanceof ResolvedRecordAtomType) {
-                return opt.entries.every((entry) => entry.type.isGroundedType());
+                return opt.grounded;
             }
             else {
                 //ephemeral list should never be in a grounded position

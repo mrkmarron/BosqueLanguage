@@ -52,16 +52,16 @@ concept Validator provides Any {
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
-concept KeyType provides Any {
-    static equal<T where grounded KeyType>(a: T, b: T): Bool # special_method
-    static less<T where grounded KeyType>(a: T, b: T): Bool # special_method
+grounded concept KeyType provides Any {
+    static equal<T KeyType>(a: T, b: T): Bool # special_method
+    static less<T KeyType>(a: T, b: T): Bool # special_method
 }
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
-concept PODType provides APIType {
-    static bufferify<T where grounded PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
-    static parseBuffer<T where grounded PODType>(data: Buffer<T>): T # pod_parsebuffer
-    static resultParseBuffer<T where grounded PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
+grounded concept PODType provides APIType {
+    static bufferify<T PODType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # pod_bufferify
+    static parseBuffer<T PODType>(data: Buffer<T>): T # pod_parsebuffer
+    static resultParseBuffer<T PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
 }
 
 //<summary>Type to unify Buffers and APITypes at top level for checking</summary>
@@ -69,10 +69,10 @@ concept APIValue provides Any {
 }
 
 //<summary>Type for indicating that a datatype can be exported as part of a stable API.</summary>
-concept APIType provides APIValue {
-    static bufferify<T where grounded APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
-    static parseBuffer<T where grounded APIType>(data: Buffer<T>): T # api_parsebuffer
-    static resultParseBuffer<T where grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
+grounded concept APIType provides APIValue {
+    static bufferify<T APIType>(data: T, format?: BufferFormat, encoding?: BufferEncoding, compression?: BufferCompression): Buffer<T> # api_bufferify
+    static parseBuffer<T APIType>(data: Buffer<T>): T # api_parsebuffer
+    static resultParseBuffer<T APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
 }
 
 //<summary>Type for representing the none-value.</summary>
@@ -384,7 +384,7 @@ entity DataString<T where Parsable> provides APIValue, KeyType, Some {
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity Buffer<T where grounded PODType | APIType> provides APIValue, Some {
+entity Buffer<T where PODType | APIType> provides APIValue, Some {
     method bytes(): ByteBuffer # buffer_bytes
 }
 
@@ -485,18 +485,18 @@ entity RegexMatch provides Object {
     field length: Int;
 }
 
-//<summary>All actual tuples implicitly provide this concept.</summary>
+//<summary>Static methods for Tuples.</summary>
 concept Tuple provides Some {
     static append(...args: List<Tuple>): Tuple # special_method
 }
 
-//<summary>All actual records implicitly provide this concept.</summary>
+//<summary>Static methods for Records.</summary>
 concept Record provides Some {
     static join(...args: List<Record>): Record # special_method
 }
 
 //<summary>Option type</summary>
-struct concept Option<T> provides Some, PODType when T grounded PODType, APIType when T grounded APIType {   
+struct concept Option<T> provides Some, PODType when T PODType, APIType when T APIType {   
     static createValue(value: T): Option<T> {
         return Opt<T>::create(value);
     }

@@ -9,7 +9,7 @@ import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, S
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionExpression, CallStaticFunctionExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, TailTypeExpression, MapEntryConstructorExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator, MIRBodyEmitter, ResultCheckCategory } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRVariable, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantEmpty, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat64, MIRConstantString, MIRConstantRegex } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
 import * as assert from "assert";
@@ -70,12 +70,11 @@ class TypeChecker {
     private m_file: string;
     private m_errors: [string, number, string][];
 
-    private m_emitEnabled: boolean;
     private readonly m_emitter: MIREmitter;
 
     private readonly AnySplitMethods = ["is", "as"];
 
-    constructor(assembly: Assembly, emitEnabled: boolean, emitter: MIREmitter, buildlevel: BuildLevel, doLiteralStringValidate: boolean) {
+    constructor(assembly: Assembly, emitter: MIREmitter, buildlevel: BuildLevel, doLiteralStringValidate: boolean) {
         this.m_assembly = assembly;
 
         this.m_buildLevel = buildlevel;
@@ -84,12 +83,11 @@ class TypeChecker {
         this.m_file = "[No File]";
         this.m_errors = [];
 
-        this.m_emitEnabled = emitEnabled;
         this.m_emitter = emitter;
     }
 
     private raiseError(sinfo: SourceInfo, msg?: string) {
-        this.m_emitEnabled = false;
+        this.m_emitter.setEmitEnabled(false);
 
         this.m_errors.push([this.m_file, sinfo.line, msg || "Type error"]);
         throw new TypeError(this.m_file, sinfo.line, msg || "Type error");
@@ -109,6 +107,23 @@ class TypeChecker {
         const rtype = this.m_assembly.normalizeTypeOnly(ttype, binds);
         this.raiseErrorIf(sinfo, rtype.isEmptyType(), "Bad type signature");
 
+        if(this.m_emitter.getMonomorphizeEnabled()) {
+            const hasgroundedconcept = rtype.options.some((opt) => {
+                return (opt instanceof ResolvedConceptAtomType) && opt.conceptTypes.some((cpt) => {
+                    const cdecl = this.m_assembly.tryGetConceptTypeForFullyResolvedName(opt.idStr);
+                    return cdecl === undefined ||  OOPTypeDecl.attributeSetContains("grounded", cdecl.attributes);
+                });
+            });
+            this.raiseErrorIf(sinfo, hasgroundedconcept, "Cannot monomorphize with grounded concept present");
+        }
+
+        return rtype;
+    }
+
+    private resolveAndEnsureTypeForTemplateBounds(sinfo: SourceInfo, ttype: TypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+        const rtype = this.m_assembly.normalizeTypeOnly(ttype, binds);
+        this.raiseErrorIf(sinfo, rtype.isEmptyType(), "Bad type signature");
+
         return rtype;
     }
 
@@ -118,9 +133,14 @@ class TypeChecker {
         const errentity = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
 
         return [
-            ResolvedType.createSingle(ResolvedEntityAtomType.create(okentity, new Map<string, ResolvedType>().set("T", binds.get("T") as ResolvedType))), 
+            ResolvedType.createSingle(ResolvedEntityAtomType.create(okentity, new Map<string, ResolvedType>().set("T", binds.get("T") as ResolvedType))),
             ResolvedType.createSingle(ResolvedEntityAtomType.create(errentity, new Map<string, ResolvedType>().set("E", binds.get("E") as ResolvedType)))
         ];
+    }
+
+    private getResultBinds(rtype: ResolvedType): { T: ResolvedType, E: ResolvedType } {
+        const binds = (rtype.options[0] as ResolvedConceptAtomType).conceptTypes[0].binds;
+        return { T: binds.get("T") as ResolvedType, E: binds.get("E") as ResolvedType };
     }
 
     private getOptionSubtype(otype: ResolvedType): ResolvedType {
@@ -131,6 +151,41 @@ class TypeChecker {
 
     }
 
+    private getOptionBind(rtype: ResolvedType): ResolvedType {
+        return (rtype.options[0] as ResolvedConceptAtomType).conceptTypes[0].binds.get("T") as ResolvedType;
+    }
+
+    private emitAssignToTempAndConvertIfNeeded(sinfo: SourceInfo, srctype: ResolvedType, intotype: ResolvedType, src: MIRArgument, trgt: MIRTempRegister) {
+        const mirsrctype = this.m_emitter.registerResolvedTypeReference(srctype);
+        const mirintotype = this.m_emitter.registerResolvedTypeReference(intotype);
+
+        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(srctype, intotype), `Cannot convert type ${srctype.idStr} into ${intotype.idStr}`);
+        
+        if(srctype.idStr === intotype.idStr) {
+            this.m_emitter.emitRegAssign(sinfo, src, trgt);
+        }
+        else {
+            this.m_emitter.emitConvertUp(sinfo, mirsrctype, mirintotype, src, trgt);
+        }
+    }
+
+    private emitConvertIfNeeded(sinfo: SourceInfo, srctype: ResolvedType, intotype: ResolvedType, src: MIRArgument): MIRArgument {
+        const mirsrctype = this.m_emitter.registerResolvedTypeReference(srctype);
+        const mirintotype = this.m_emitter.registerResolvedTypeReference(intotype);
+
+        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(srctype, intotype), `Cannot convert type ${srctype.idStr} into ${intotype.idStr}`);
+        
+        if(srctype.idStr === intotype.idStr) {
+            return src;
+        }
+        else {
+            const trgt = this.m_emitter.generateTmpRegister();
+            this.m_emitter.emitConvertUp(sinfo, mirsrctype, mirintotype, src, trgt);
+
+            return trgt;
+        }
+    }
+
     private checkTemplateTypes(sinfo: SourceInfo, terms: TemplateTermDecl[], binds: Map<string, ResolvedType>, optTypeRestrict?: TypeConditionRestriction) {
         for(let i = 0; i < terms.length; ++i) {
             const terminfo = terms[i];
@@ -138,10 +193,8 @@ class TypeChecker {
 
             const termconstraint = this.resolveAndEnsureTypeOnly(sinfo, terminfo.constraint, new Map<string, ResolvedType>());
             const boundsok = this.m_assembly.subtypeOf(termtype, termconstraint);
-            const groundedok = !terminfo.grounded || termtype.isGroundedType();
 
             this.raiseErrorIf(sinfo, !boundsok, `Template instantiation does not satisfy specified bounds -- not subtype of ${termconstraint.idStr}`);
-            this.raiseErrorIf(sinfo, !groundedok, `Template instantiation does not satisfy specified bounds -- not a grounded type`);
         }
 
         if (optTypeRestrict !== undefined) {
@@ -247,12 +300,12 @@ class TypeChecker {
         return tj;
     }
 
-    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): "exact" | "lhsnone" | "rhsnone" | "invalid" {
-        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !lhs.isGroundedType()) {
+    private checkValueEq(lhs: ResolvedType, rhs: ResolvedType): "exact" | "lhsnone" | "rhsnone" | "lhsempty" | "rhsempty" | "invalid" {
+        if (!this.m_assembly.subtypeOf(lhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
             return "invalid";
         }
 
-        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType()) || !rhs.isGroundedType()) {
+        if (!this.m_assembly.subtypeOf(rhs, this.m_assembly.getSpecialKeyTypeConceptType())) {
             return "invalid";
         }
 
@@ -261,19 +314,33 @@ class TypeChecker {
         }
         else {
             if(lhs.options.length === 1 && rhs.options.length === 1) {
-                return "invalid"; //types not same and neither are none
+                return "invalid"; //types not same and neither are none/empty
             }
             else if(lhs.options.length !== 1 && rhs.options.length !== 1) {
                 return "invalid"; //both types are ambig so not ok
             }
             else {
                 if(lhs.options.length !== 1) {
-                    const ok = lhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === rhs.idStr);
-                    return ok ? "lhsnone" : "invalid";
+                    if (lhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === rhs.idStr)) {
+                        return "lhsnone";
+                    }
+                    else if (lhs.options.every((opt) => opt.idStr === "NSCore::Empty" || opt.idStr === rhs.idStr)) {
+                        return "lhsempty";
+                    }
+                    else {
+                        return "invalid";
+                    }
                 }
                 else {
-                    const ok = rhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === lhs.idStr);
-                    return ok ? "rhsnone" : "invalid";
+                    if (rhs.options.every((opt) => opt.idStr === "NSCore::None" || opt.idStr === lhs.idStr)) {
+                        return "rhsnone";
+                    }
+                    else if (rhs.options.every((opt) => opt.idStr === "NSCore::Empty" || opt.idStr === lhs.idStr)) {
+                        return "rhsempty";
+                    }
+                    else {
+                        return "invalid";
+                    }
                 }
             }
         }
@@ -1359,74 +1426,98 @@ class TypeChecker {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private checkLiteralNoneExpression(env: TypeEnvironment, exp: LiteralNoneExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstNone(exp.sinfo, trgt);
+    private checkLiteralNoneExpression(env: TypeEnvironment, exp: LiteralNoneExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isNoneType()) {
+            this.m_emitter.emitLoadConstNone(exp.sinfo, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialNoneType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialNoneType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialNoneType(), infertype, new MIRConstantNone(), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralEmptyExpression(env: TypeEnvironment, exp: LiteralNoneExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstNone(exp.sinfo, trgt);
+    private checkLiteralEmptyExpression(env: TypeEnvironment, exp: LiteralNoneExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialEmptyType())) {
+            this.m_emitter.emitLoadConstEmpty(exp.sinfo, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialEmptyType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialEmptyType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialEmptyType(), infertype, new MIRConstantEmpty(), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralBoolExpression(env: TypeEnvironment, exp: LiteralBoolExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstBool(exp.sinfo, exp.value, trgt);
+    private checkLiteralBoolExpression(env: TypeEnvironment, exp: LiteralBoolExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialBoolType())) {
+            this.m_emitter.emitLoadConstBool(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialBoolType(), exp.value ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialBoolType(), exp.value ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialBoolType(), infertype, exp.value ? new MIRConstantTrue() : new MIRConstantFalse(), trgt);
+            return [env.setResultExpression(infertype, exp.value ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
+        }
     }
 
-    private checkLiteralIntegerExpression(env: TypeEnvironment, exp: LiteralIntegerExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstInt(exp.sinfo, exp.value, trgt);
+    private checkLiteralIntegerExpression(env: TypeEnvironment, exp: LiteralIntegerExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialIntType())) {
+            this.m_emitter.emitLoadConstInt(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialIntType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialIntType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialIntType(), infertype, new MIRConstantInt(exp.value), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralBigIntegerExpression(env: TypeEnvironment, exp: LiteralBigIntegerExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstBigInt(exp.sinfo, exp.value, trgt);
+    private checkLiteralBigIntegerExpression(env: TypeEnvironment, exp: LiteralBigIntegerExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialBigIntType())) {
+            this.m_emitter.emitLoadConstBigInt(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialBigIntType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialBigIntType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialBigIntType(), infertype, new MIRConstantBigInt(exp.value), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralFloat64Expression(env: TypeEnvironment, exp: LiteralFloatExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstFloat(exp.sinfo, exp.value, trgt);
+    private checkLiteralFloat64Expression(env: TypeEnvironment, exp: LiteralFloatExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialFloat64Type())) {
+            this.m_emitter.emitLoadConstFloat(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialFloat64Type())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialFloat64Type())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialFloat64Type(), infertype, new MIRConstantFloat64(exp.value), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralStringExpression(env: TypeEnvironment, exp: LiteralStringExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, trgt);
+    private checkLiteralStringExpression(env: TypeEnvironment, exp: LiteralStringExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialStringType())) {
+            this.m_emitter.emitLoadConstString(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialStringType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialStringType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialStringType(), infertype, new MIRConstantString(exp.value), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkLiteralRegexExpression(env: TypeEnvironment, exp: LiteralRegexExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadLiteralRegex(exp.sinfo, exp.value, trgt);
+    private checkLiteralRegexExpression(env: TypeEnvironment, exp: LiteralRegexExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialRegexType())) {
+            this.m_emitter.emitLoadLiteralRegex(exp.sinfo, exp.value, trgt);
+            return [env.setResultExpression(this.m_assembly.getSpecialRegexType())];
         }
-
-        return [env.setResultExpression(this.m_assembly.getSpecialRegexType())];
+        else {
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialRegexType(), infertype, new MIRConstantRegex(exp.value), trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkSafeStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
+    private checkStringOfCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
         this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialValidatorConceptType()), "Can only use Validator types as SafeString parameters");
-        this.raiseErrorIf(sinfo, oftype.options.length !== 1 || oftype.options[0].idStr === "NSCore::Validator", "Validator type cannot be union of Validators or generic Validator Concept");
+        this.raiseErrorIf(sinfo, !oftype.isUniqueCallTargetType(), "Validator type cannot be union of Validators or generic Validator Concept");
         
         const aoftype = ResolvedType.tryGetOOTypeInfo(oftype);
         const oodecl = (aoftype as ResolvedEntityAtomType).object;
@@ -1440,7 +1531,7 @@ class TypeChecker {
         return { oftype: [oodecl, oobinds], ofresolved: oftype, stringtype: stype };
     }
 
-    private checkTypedStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType, parsetype: ResolvedType } {
+    private checkDataStringCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType, parsetype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
         this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialParsableConceptType()), "Can only use Parsable types as StringOf parameters");
         this.raiseErrorIf(sinfo, oftype.options.length !== 1, "Parsable type cannot be union of Parsables");
@@ -1465,11 +1556,11 @@ class TypeChecker {
         return { oftype: [oodecl, oobinds], ofresolved: oftype, stringtype: stype, parsetype: ptype };
     }
 
-    private checkCreateTypedString(env: TypeEnvironment, exp: LiteralTypedStringExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkCreateTypedString(env: TypeEnvironment, exp: LiteralTypedStringExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
         const oftype = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.stype, env.terms);
 
         if(this.m_assembly.subtypeOf(oftype, this.m_assembly.getSpecialValidatorConceptType())) {
-            const aoftype = this.checkSafeStringCommon(exp.sinfo, env, exp.stype);
+            const aoftype = this.checkStringOfCommon(exp.sinfo, env, exp.stype);
     
             const sdecl = aoftype.oftype[0].staticFunctions.get("accepts");
             assert(sdecl !== undefined);
@@ -1481,82 +1572,95 @@ class TypeChecker {
             const mtch = new RegExp((vv as BSQRegex).compileToJS()).exec(argstr);
             this.raiseErrorIf(exp.sinfo, mtch === null || mtch[0].length !== argstr.length, "Literal string failed Validator regex");
 
-            if(this.m_emitEnabled) {
-                this.m_emitter.registerResolvedTypeReference(oftype);
-                const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
+            this.m_emitter.registerResolvedTypeReference(oftype);
+            const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-                this.m_emitter.bodyEmitter.emitLoadValidatedTypedString(exp.sinfo, exp.value, MIRKeyGenerator.generateTypeKey(...aoftype.oftype), stype.trkey, trgt);
+            if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialStringType())) {
+                this.m_emitter.emitLoadStringOf(exp.sinfo, exp.value, stype.trkey, trgt);
+                return [env.setResultExpression(aoftype.stringtype)];
             }
-
-            return [env.setResultExpression(aoftype.stringtype)];
+            else {
+                const tmp = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitLoadStringOf(exp.sinfo, exp.value, stype.trkey, tmp);
+                this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, aoftype.stringtype, infertype, tmp, trgt);
+                return [env.setResultExpression(infertype)];
+            }
         }
         else {
-            const aoftype = this.checkTypedStringCommon(exp.sinfo, env, exp.stype);
+            const aoftype = this.checkDataStringCommon(exp.sinfo, env, exp.stype);
             const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
             this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
 
-            if (this.m_emitEnabled) {
-                this.m_emitter.registerResolvedTypeReference(oftype);
-                const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
+            this.m_emitter.registerResolvedTypeReference(oftype);
+            const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-                if (this.m_doLiteralStringValidate) {
-                    this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
-                    this.m_emitter.registerResolvedTypeReference(aoftype.ofresolved);
-                    const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
+            if (this.m_doLiteralStringValidate) {
+                this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
+                this.m_emitter.registerResolvedTypeReference(aoftype.ofresolved);
+                const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
 
-                    const sbinds = this.m_assembly.resolveBindsForCall([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
-                    const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
+                const sbinds = this.m_assembly.resolveBindsForCall([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
+                const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
 
-                    const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
-                    this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);
+                const tmps = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [new MIRConstantString(exp.value)], [presult, presult, -1, []], tmps);
 
-                    const tmps = this.m_emitter.bodyEmitter.generateTmpRegister();
-                    this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, skey, [tmpr], [presult, presult, -1, []], tmps);
-
-                    const tmpokt = this.m_emitter.bodyEmitter.generateTmpRegister();
-                    this.m_emitter.bodyEmitter.emitCheckNoError(exp.sinfo, tmps, presult, ResultCheckCategory.ErrChk, tmpokt);
-                    this.m_emitter.bodyEmitter.emitAssertCheck(exp.sinfo, "String not parsable as given type", tmpokt);
-                }
-                
-                this.m_emitter.bodyEmitter.emitLoadConstTypedString(exp.sinfo, exp.value, stype.trkey, trgt);
+                const tmpokt = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitCheckNoError(exp.sinfo, tmps, presult, ResultCheckCategory.ErrChk, tmpokt);
+                this.m_emitter.emitAssertCheck(exp.sinfo, "String not parsable as given type", tmpokt);
             }
-
-            return [env.setResultExpression(aoftype.stringtype)];
+                
+            if (infertype === undefined || infertype.isSameType(aoftype.stringtype)) {
+                this.m_emitter.emitLoadConstDataString(exp.sinfo, exp.value, stype.trkey, trgt);
+                return [env.setResultExpression(aoftype.stringtype)];
+            }
+            else {
+                const tmp = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitLoadConstDataString(exp.sinfo, exp.value, stype.trkey, tmp);
+                this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, aoftype.stringtype, infertype, tmp, trgt);
+                return [env.setResultExpression(infertype)];
+            }
         }
     }
 
-    private checkTypedStringConstructor(env: TypeEnvironment, exp: LiteralTypedStringConstructorExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        const aoftype = this.checkTypedStringCommon(exp.sinfo, env, exp.stype);
+    private checkDataStringConstructor(env: TypeEnvironment, exp: LiteralTypedStringConstructorExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const aoftype = this.checkDataStringCommon(exp.sinfo, env, exp.stype);
 
         const sdecl = aoftype.oftype[0].staticFunctions.get("tryParse");
         this.raiseErrorIf(exp.sinfo, sdecl === undefined, "Missing static function 'tryParse'");
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
-            this.m_emitter.registerResolvedTypeReference(aoftype.ofresolved);
-            const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
+        this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
+        this.m_emitter.registerResolvedTypeReference(aoftype.ofresolved);
 
-            const sbinds = this.m_assembly.resolveBindsForCall([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
-            const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
+        const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
+        const rok = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(aoftype.parsetype)[0]);
 
-            const tmpr = this.m_emitter.bodyEmitter.generateTmpRegister();
-            this.m_emitter.bodyEmitter.emitLoadConstString(exp.sinfo, exp.value, tmpr);
+        const sbinds = this.m_assembly.resolveBindsForCall([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
+        const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
 
-            const tmps = this.m_emitter.bodyEmitter.generateTmpRegister();
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, skey, [tmpr], [presult, presult, -1, []], tmps);
+        const tmps = this.m_emitter.generateTmpRegister();
+        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [new MIRConstantString(exp.value)], [presult, presult, -1, []], tmps);
 
-            const tmpokt = this.m_emitter.bodyEmitter.generateTmpRegister();
-            this.m_emitter.bodyEmitter.emitCheckNoError(exp.sinfo, tmps, presult, ResultCheckCategory.ErrChk, tmpokt);
-            this.m_emitter.bodyEmitter.emitAssertCheck(exp.sinfo, "String not parsable as given type", tmpokt);
+        const tmpokt = this.m_emitter.generateTmpRegister();
+        this.m_emitter.emitCheckNoError(exp.sinfo, tmps, presult, ResultCheckCategory.ErrChk, tmpokt);
+        this.m_emitter.emitAssertCheck(exp.sinfo, "String not parsable as given type", tmpokt);
 
-            const rok = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(aoftype.parsetype)[0]);
-            this.m_emitter.bodyEmitter.emitExtractResult(exp.sinfo, tmpokt, rok, trgt);
+        const convt = this.m_emitter.generateTmpRegister();
+        this.m_emitter.emitConvertDown(exp.sinfo, presult, rok, tmps, convt);
+
+        if (infertype === undefined || infertype.isSameType(aoftype.ofresolved)) {
+            this.m_emitter.emitExtractResult(exp.sinfo, convt, rok, trgt);
+            return [env.setResultExpression(aoftype.ofresolved)];
         }
-
-        return [env.setResultExpression(aoftype.ofresolved)];
+        else {
+            const tmp = this.m_emitter.generateTmpRegister();
+            this.m_emitter.emitExtractResult(exp.sinfo, convt, rok, tmp);
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, this.getResultBinds(aoftype.parsetype).T, infertype, tmp, trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
-    private checkAccessNamespaceConstant(env: TypeEnvironment, exp: AccessNamespaceConstantExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkAccessNamespaceConstant(env: TypeEnvironment, exp: AccessNamespaceConstantExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
         this.raiseErrorIf(exp.sinfo, !this.m_assembly.hasNamespace(exp.ns), `Namespace '${exp.ns}' is not defined`);
         const nsdecl = this.m_assembly.getNamespace(exp.ns);
 
@@ -1564,13 +1668,20 @@ class TypeChecker {
         const cdecl = nsdecl.consts.get(exp.name) as NamespaceConstDecl;
 
         const rtype = this.resolveAndEnsureTypeOnly(exp.sinfo, cdecl.declaredType, new Map<string, ResolvedType>());
+        const gkey = this.m_emitter.registerPendingGlobalProcessing(cdecl);
 
-        if (this.m_emitEnabled) {
-            const gkey = this.m_emitter.registerPendingGlobalProcessing(cdecl);
-            this.m_emitter.bodyEmitter.emitAccessConstant(exp.sinfo, gkey, trgt);
+        xxxx;
+        
+        if (infertype === undefined || infertype.isSameType(rtype)) {
+            this.m_emitter.emitAccessConstant(exp.sinfo, gkey, trgt);
+            return [env.setResultExpression(rtype)];
         }
-
-        return [env.setResultExpression(rtype)];
+        else {
+            const tmp = this.m_emitter.generateTmpRegister();
+            this.m_emitter.emitAccessConstant(exp.sinfo, gkey, tmp);
+            this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, rtype, infertype, tmp, trgt);
+            return [env.setResultExpression(infertype)];
+        }
     }
 
     private checkAccessStaticField(env: TypeEnvironment, exp: AccessStaticFieldExpression, trgt: MIRTempRegister): TypeEnvironment[] {

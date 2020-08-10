@@ -22,8 +22,8 @@ const KeywordStrings = [
     "entrypoint",
     "recursive?",
     "recursive",
-    "lazy",
     "memoized",
+    "grounded",
 
     "_debug",
     "abort",
@@ -44,7 +44,6 @@ const KeywordStrings = [
     "fn",
     "function",
     "global",
-    "grounded",
     "identifier",
     "if",
     "invariant",
@@ -171,7 +170,7 @@ const RegexFollows = new Set<string>([
 const LeftScanParens = ["[", "(", "{", "(|", "{|"];
 const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
-const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive", "recursive?"];
+const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive?", "recursive", "memoized", "grounded"];
 
 const UnsafeFieldNames = ["is", "as", "tryAs", "optionAs", "resultAs", "defaultAs", "isNone", "isSome", "update", "insert", "merge"]
 
@@ -2840,11 +2839,10 @@ class Parser {
                     this.consumeToken();
                     const tconstraint = this.parseTypeSignature();
 
-                    return new TemplateTermDecl(templatename, false, tconstraint, false, undefined, true);
+                    return new TemplateTermDecl(templatename, tconstraint, false, undefined, true);
                 }
                 else {
                     const hasconstraint = this.testAndConsumeTokenIf("where");
-                    const grounded = this.testAndConsumeTokenIf("grounded");
                     const tconstraint = hasconstraint ? this.parseTypeSignature() : this.m_penv.SpecialAnySignature;
 
                     let isinfer = false;
@@ -2858,7 +2856,7 @@ class Parser {
                         }
                     }
 
-                    return new TemplateTermDecl(templatename, grounded, tconstraint, isinfer, defaulttype, false);
+                    return new TemplateTermDecl(templatename, tconstraint, isinfer, defaulttype, false);
                 }
             })[0];
         }

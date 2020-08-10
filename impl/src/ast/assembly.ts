@@ -28,15 +28,13 @@ function isBuildLevelEnabled(check: BuildLevel, enabled: BuildLevel): boolean {
 
 class TemplateTermDecl {
     readonly name: string;
-    readonly grounded: boolean;
     readonly constraint: TypeSignature;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
     readonly isLiteral: boolean;
 
-    constructor(name: string, grounded: boolean, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined, isliteral: boolean) {
+    constructor(name: string, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined, isliteral: boolean) {
         this.name = name;
-        this.grounded = grounded;
         this.constraint = constraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
@@ -1041,20 +1039,18 @@ class Assembly {
     }
 
     private atomSubtypeOf_TupleConcept(t1: ResolvedTupleAtomType, t2: ResolvedConceptAtomType): boolean {
-        if (this.subtypeOf(this.getSpecialTupleConceptType(), ResolvedType.createSingle(t2))) {
-            return true;
-        }
-
-        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialTupleConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
-        if (this.checkAllTupleEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
-            tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
-        }
-        if (this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
-            if (this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-                tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialSomeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
+        if (t1.grounded) {
+            if (this.checkAllTupleEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
+                tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
-            else {
-                tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+            if (this.checkAllTupleEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+                if (this.checkAllTupleEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+                    tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+                }
+                else {
+                    tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+                }
             }
         }
 
@@ -1066,20 +1062,18 @@ class Assembly {
     }
 
     private atomSubtypeOf_RecordConcept(t1: ResolvedRecordAtomType, t2: ResolvedConceptAtomType): boolean {
-        if (this.subtypeOf(this.getSpecialRecordConceptType(), ResolvedType.createSingle(t2))) {
-            return true;
-        }
-
-        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialRecordConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
-        if (this.checkAllRecordEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
-            tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
-        }
-        if (this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
-            if (this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
-                tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+        let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialSomeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
+        if (t1.grounded) {
+            if (this.checkAllRecordEntriesOfType(t1, this.getSpecialKeyTypeConceptType())) {
+                tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
-            else {
-                tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+            if (this.checkAllRecordEntriesOfType(t1, this.getSpecialAPITypeConceptType())) {
+                if (this.checkAllRecordEntriesOfType(t1, this.getSpecialPODTypeConceptType())) {
+                    tci.push(...(this.getSpecialPODTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+                }
+                else {
+                    tci.push(...(this.getSpecialAPITypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
+                }
             }
         }
 
@@ -1216,9 +1210,6 @@ class Assembly {
     getSpecialTruthyConceptType(): ResolvedType { return this.internSpecialConceptType("Truthy"); }
     getSpecialEnumConceptType(): ResolvedType { return this.internSpecialConceptType("Enum"); }
     getSpecialIdKeyConceptType(): ResolvedType { return this.internSpecialConceptType("IdKey"); }
-
-    getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType("Tuple"); }
-    getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType("Record"); }
     
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType("Object"); }
 
@@ -1239,10 +1230,10 @@ class Assembly {
     ensureNominalRepresentation(t: ResolvedType): ResolvedType {
         const opts = t.options.map((opt) => {
             if (opt instanceof ResolvedTupleAtomType) {
-                return this.getSpecialTupleConceptType();
+                return this.getSpecialSomeConceptType();
             }
             else if (opt instanceof ResolvedRecordAtomType) {
-                return this.getSpecialRecordConceptType();
+                return this.getSpecialSomeConceptType();
             }
             else {
                 return ResolvedType.createSingle(opt);
@@ -1664,10 +1655,7 @@ class Assembly {
 
     normalizeToNominalRepresentation(t: ResolvedAtomType): ResolvedAtomType {
         if (t instanceof ResolvedTupleAtomType) {
-            return this.getSpecialTupleConceptType();
-        }
-        else if (t instanceof ResolvedRecordAtomType) {
-            return this.getSpecialRecordConceptType();
+            return this.getSpecialSomeConceptType();
         }
         else {
             return t;
