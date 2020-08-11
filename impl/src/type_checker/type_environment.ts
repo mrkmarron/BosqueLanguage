@@ -130,7 +130,9 @@ class TypeEnvironment {
 
     readonly args: Map<string, VarInfo> | undefined;
     readonly locals: Map<string, VarInfo>[] | undefined;
-    readonly result: ResolvedType;
+
+    readonly inferResult: ResolvedType | undefined;
+    readonly inferYield: (ResolvedType | undefined)[];
 
     readonly expressionResult: ExpressionReturnResult | undefined;
     readonly returnResult: ResolvedType | undefined;
@@ -141,7 +143,7 @@ class TypeEnvironment {
     readonly frozenVars: Set<string>;
 
     private constructor(infeasible: boolean, scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>,
-        args: Map<string, VarInfo> | undefined, locals: Map<string, VarInfo>[] | undefined, result: ResolvedType,
+        args: Map<string, VarInfo> | undefined, locals: Map<string, VarInfo>[] | undefined, result: ResolvedType | undefined, inferYield: (ResolvedType | undefined)[],
         expressionResult: ExpressionReturnResult | undefined, rflow: ResolvedType | undefined, yflow: ResolvedType | undefined,
         yieldTrgtInfo: [MIRTempRegister, string][], frozenVars: Set<string>) {
         this.infeasible = infeasible;
@@ -154,7 +156,9 @@ class TypeEnvironment {
 
         this.args = args;
         this.locals = locals;
-        this.result = result;
+
+        this.inferResult = result;
+        this.inferYield = inferYield;
 
         this.expressionResult = expressionResult;
         this.returnResult = rflow;

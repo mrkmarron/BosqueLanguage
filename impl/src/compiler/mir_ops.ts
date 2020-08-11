@@ -104,20 +104,40 @@ class MIRTempRegister extends MIRRegisterArgument {
     }
 }
 
-class MIRVariable extends MIRRegisterArgument {
+abstract class MIRVariableArgument extends MIRRegisterArgument {
     readonly lname: string;
 
-    constructor(name: string, forcename?: string) {
+    constructor(name: string, forcename: string | undefined) {
         super(forcename || name);
         this.lname = name;
     }
+}
 
-    jemit(): any {
-        return { tag: "var", lname: this.lname, nameID: this.nameID };
+class MIRParameterVariable extends MIRVariableArgument {
+    constructor(name: string, forcename?: string) {
+        super(name, forcename);
     }
 
-    static jparse(jobj: any): MIRVariable {
-        return new MIRVariable(jobj.lname, jobj.nameID);
+    jemit(): any {
+        return { tag: "paramvar", lname: this.lname, nameID: this.nameID };
+    }
+
+    static jparse(jobj: any): MIRParameterVariable {
+        return new MIRParameterVariable(jobj.lname, jobj.nameID);
+    }
+}
+
+class MIRLocalVariable extends MIRVariableArgument {
+    constructor(name: string, forcename?: string) {
+        super(name, forcename);
+    }
+
+    jemit(): any {
+        return { tag: "localvar", lname: this.lname, nameID: this.nameID };
+    }
+
+    static jparse(jobj: any): MIRLocalVariable {
+        return new MIRLocalVariable(jobj.lname, jobj.nameID);
     }
 }
 
@@ -283,6 +303,26 @@ class MIRConstantRegex extends MIRConstantArgument {
     }
 }
 
+class MIRConstantStringOf extends MIRConstantArgument {
+    readonly value: string;
+    readonly tskey: MIRResolvedTypeKey;
+
+    constructor(value: string, tskey: MIRResolvedTypeKey) {
+        super(`=stringof=${tskey} of ${value}`);
+
+        this.value = value;
+        this.tskey = tskey;
+    }
+
+    stringify(): string {
+        return `${this.tskey} of ${this.value}`;
+    }
+
+    jemit(): any {
+        return [this.value, this.tskey, "stringof"];
+    }
+}
+
 enum MIROpTag {
     MIRLoadConst = "MIRLoadConst",
     MIRLoadConstSafeString = "MIRLoadConstSafeString",
@@ -290,8 +330,6 @@ enum MIROpTag {
 
     MIRAccessConstantValue = "MIRAccessConstantValue",
     MIRLoadFieldDefaultValue = "MIRLoadFieldDefaultValue",
-    MIRAccessArgVariable = "MIRAccessArgVariable",
-    MIRAccessLocalVariable = "MIRAccessLocalVariable",
 
     MIRInvokeInvariantCheckDirect = "MIRInvokeInvariantCheckDirect",
     MIRInvokeInvariantCheckVirtualTarget = "MIRInvokeInvariantCheckVirtualTarget",
@@ -393,10 +431,6 @@ abstract class MIROp {
                 return MIRAccessConstantValue.jparse(jobj);
             case MIROpTag.MIRLoadFieldDefaultValue:
                 return MIRLoadFieldDefaultValue.jparse(jobj);
-            case MIROpTag.MIRAccessArgVariable:
-                return MIRAccessArgVariable.jparse(jobj);
-            case MIROpTag.MIRAccessLocalVariable:
-                return MIRAccessLocalVariable.jparse(jobj);
             case MIROpTag.MIRInvokeInvariantCheckDirect:
                 return MIRInvokeInvariantCheckDirect.jparse(jobj);
             case MIROpTag.MIRInvokeInvariantCheckVirtualTarget:
@@ -552,47 +586,14 @@ class MIRLoadConst extends MIRValueOp {
     }
 }
 
-class MIRLoadConstSafeString extends MIRValueOp {
+class MIRLoadConstDataString extends MIRValueOp {
     readonly ivalue: string;
-    readonly tkey: MIRNominalTypeKey;
     readonly tskey: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadConstSafeString, sinfo, trgt);
-        this.ivalue = ivalue;
-        this.tkey = tkey;
-        this.tskey = tskey;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return []; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.ivalue}#${this.tkey}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), ivalue: this.ivalue, tkey: this.tkey, tskey: this.tskey };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRLoadConstSafeString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRLoadConstTypedString extends MIRValueOp {
-    readonly ivalue: string;
-    readonly tkey: MIRNominalTypeKey;
-    readonly tskey: MIRResolvedTypeKey;
-    readonly pfunckey: MIRInvokeKey | undefined;
-    readonly errtype: MIRResolvedTypeKey | undefined;
-
-    constructor(sinfo: SourceInfo, ivalue: string, tkey: MIRNominalTypeKey, tskey: MIRResolvedTypeKey, pfunckey: MIRInvokeKey | undefined, errtype: MIRResolvedTypeKey | undefined, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, ivalue: string, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
         super(MIROpTag.MIRLoadConstTypedString, sinfo, trgt);
         this.ivalue = ivalue;
-        this.tkey = tkey;
         this.tskey = tskey;
-        this.pfunckey = pfunckey;
-        this.errtype = errtype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return []; }
@@ -602,11 +603,11 @@ class MIRLoadConstTypedString extends MIRValueOp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), ivalue: this.ivalue, tkey: this.tkey, tskey: this.tskey, pfunckey: this.pfunckey, errtype: this.errtype };
+        return { ...this.jbemit(), ivalue: this.ivalue, tskey: this.tskey };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConstTypedString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tkey, jobj.tskey, jobj.pfunckey, jobj.errtype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadConstDataString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tskey, MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -653,52 +654,6 @@ class MIRLoadFieldDefaultValue extends MIRValueOp {
 
     static jparse(jobj: any): MIROp {
         return new MIRLoadFieldDefaultValue(jparsesinfo(jobj.sinfo), jobj.fkey, MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRAccessArgVariable extends MIRValueOp {
-    readonly name: MIRVariable;
-
-    constructor(sinfo: SourceInfo, name: MIRVariable, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRAccessArgVariable, sinfo, trgt);
-        this.name = name;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.name.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), name: this.name.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRAccessArgVariable(jparsesinfo(jobj.sinfo), MIRVariable.jparse(jobj.name), MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRAccessLocalVariable extends MIRValueOp {
-    name: MIRVariable;
-
-    constructor(sinfo: SourceInfo, name: MIRVariable, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRAccessLocalVariable, sinfo, trgt);
-        this.name = name;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.name.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), name: this.name.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRAccessLocalVariable(jparsesinfo(jobj.sinfo), MIRVariable.jparse(jobj.name), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 
@@ -2206,10 +2161,10 @@ class MIRBody {
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat64, MIRConstantString, MIRConstantRegex,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat64, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
-    MIRLoadConst, MIRLoadConstSafeString, MIRLoadConstTypedString,
-    MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRAccessArgVariable, MIRAccessLocalVariable,
+    MIRLoadConst, MIRLoadConstDataString,
+    MIRAccessConstantValue, MIRLoadFieldDefaultValue,
     MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget,
     MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorEphemeralValueList,
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject,

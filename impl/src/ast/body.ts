@@ -287,11 +287,13 @@ class LiteralTypedStringExpression extends Expression {
 class LiteralTypedStringConstructorExpression extends Expression {
     readonly value: string;
     readonly stype: TypeSignature;
+    readonly isvalue: boolean;
 
-    constructor(sinfo: SourceInfo, value: string, stype: TypeSignature) {
+    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, stype: TypeSignature) {
         super(ExpressionTag.LiteralTypedStringConstructorExpression, sinfo);
         this.value = value;
         this.stype = stype;
+        this.isvalue = isvalue;
     }
 }
 

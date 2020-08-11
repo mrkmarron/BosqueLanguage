@@ -1607,10 +1607,12 @@ class Parser {
                     return new CallStaticFunctionExpression(sinfo, ttype, name, targs, pragmas, args);
                 }
             }
-            else if (this.testToken(TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
-                if (this.testAndConsumeTokenIf("@")) {
+            else if (this.testToken(TokenStrings.TypedString) || this.testFollows("#", TokenStrings.TypedString) || this.testFollows("@", TokenStrings.TypedString)) {
+                if (this.testToken("#") || this.testToken("@")) {
+                    const isvalue = this.testToken("#");
+                    this.consumeToken();
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-                    return new LiteralTypedStringConstructorExpression(sinfo, sstr, ttype);
+                    return new LiteralTypedStringConstructorExpression(sinfo, isvalue, sstr, ttype);
                 }
                 else {
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format

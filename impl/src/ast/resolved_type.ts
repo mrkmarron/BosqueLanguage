@@ -264,6 +264,17 @@ class ResolvedType {
         return (this.options[0] instanceof ResolvedTupleAtomType) && (this.options[0] as ResolvedTupleAtomType).types.some((value) => value.isOptional);
     }
 
+    tryGetInferrableTupleConstructorType(isvalue: boolean): ResolvedTupleAtomType | undefined {
+        const tcopts = this.options.filter((opt) => opt instanceof ResolvedTupleAtomType);
+
+        if (tcopts.length !== 1) {
+            return undefined;
+        }
+
+        const tt = tcopts[0] as ResolvedTupleAtomType;
+        return (tt.isvalue === isvalue) ? tt : undefined;
+    }
+
     isUniqueRecordTargetType(): boolean {
         if (this.options.length !== 1) {
             return false;
@@ -272,12 +283,33 @@ class ResolvedType {
         return (this.options[0] instanceof ResolvedRecordAtomType) && !(this.options[0] as ResolvedRecordAtomType).entries.some((value) => value.isOptional);
     }
 
+    tryGetInferrableRecordConstructorType(isvalue: boolean): ResolvedRecordAtomType | undefined {
+        const rcopts = this.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
+
+        if (rcopts.length !== 1) {
+            return undefined;
+        }
+
+        const tr = rcopts[0] as ResolvedRecordAtomType;
+        return (tr.isvalue === isvalue) ? tr : undefined;
+    }
+
     isUniqueCallTargetType(): boolean {
         if (this.options.length !== 1) {
             return false;
         }
 
         return this.options[0] instanceof ResolvedEntityAtomType;
+    }
+
+    tryGetInferrableValueListConstructorType(): ResolvedEphemeralListType | undefined {
+        const vlopts = this.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
+
+        if (vlopts.length !== 1) {
+            return undefined;
+        }
+
+        return (vlopts[0] as ResolvedEphemeralListType);
     }
 
     isNoneType(): boolean {
