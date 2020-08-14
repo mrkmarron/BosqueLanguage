@@ -721,7 +721,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsTupleConstructor(sinfo: SourceInfo, isvalue: boolean, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, itype: ResolvedTupleAtomType | undefined, infertype: ResolvedType | undefined): ResolvedType {
+    private checkArgumentsTupleConstructor(sinfo: SourceInfo, isvalue: boolean, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
         let targs: ResolvedType[] = [];
 
         for (let i = 0; i < args.length; ++i) {
@@ -760,7 +760,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsRecordConstructor(sinfo: SourceInfo, isvalue: boolean, args: [string, ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, itype: ResolvedRecordAtomType | undefined, infertype: ResolvedType | undefined): ResolvedType {
+    private checkArgumentsRecordConstructor(sinfo: SourceInfo, isvalue: boolean, args: [string, ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
         let rargs: [string, ResolvedType][] = [];
 
         const seenNames = new Set<string>();
@@ -804,7 +804,7 @@ class TypeChecker {
         return eargs;
     }
 
-    private checkArgumentsValueListConstructor(sinfo: SourceInfo, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, itype: ResolvedEphemeralListType | undefined, infertype: ResolvedType | undefined): ResolvedType {
+    private checkArgumentsValueListConstructor(sinfo: SourceInfo, args: [ResolvedType, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
         let targs: ResolvedType[] = [];
 
         for (let i = 0; i < args.length; ++i) {
@@ -1878,7 +1878,7 @@ class TypeChecker {
         }
 
         const eargs = this.checkArgumentsEvaluationTuple(env, exp.args, itype);
-        const rtype = this.checkArgumentsTupleConstructor(exp.sinfo, exp.isvalue, eargs, trgt, itype, infertype);
+        const rtype = this.checkArgumentsTupleConstructor(exp.sinfo, exp.isvalue, eargs, trgt, infertype);
 
         return [env.setResultExpression(rtype)];
     }
@@ -1890,7 +1890,7 @@ class TypeChecker {
         }
 
         const eargs = this.checkArgumentsEvaluationRecord(env, exp.args, itype);
-        const rtype = this.checkArgumentsRecordConstructor(exp.sinfo, exp.isvalue, eargs, trgt, itype, infertype);
+        const rtype = this.checkArgumentsRecordConstructor(exp.sinfo, exp.isvalue, eargs, trgt, infertype);
         return [env.setResultExpression(rtype)];
     }
 
@@ -1901,21 +1901,17 @@ class TypeChecker {
         }
 
         const eargs = this.checkArgumentsEvaluationValueList(env, exp.args, itype);
-        const rtype = this.checkArgumentsValueListConstructor(exp.sinfo, eargs, trgt, itype, infertype);
+        const rtype = this.checkArgumentsValueListConstructor(exp.sinfo, eargs, trgt, infertype);
         return [env.setResultExpression(rtype)];
     }
 
     private checkSpecialConstructorExpression(env: TypeEnvironment, exp: SpecialConstructorExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
-        this.raiseErrorIf(exp.sinfo, infertype !== undefined , "Can only use shorthand result constructors in inferable type positions and inferred type must be unique");
-
-        xxxx;
         if(exp.rop === "ok" || exp.rop === "err") {
-            this.raiseErrorIf(exp.sinfo, infertype !== undefined && infertype.options.length === 1 && !(infertype as ResolvedType).idStr.startsWith("NSCore::Result<"), "ok/err shorthand constructors only valid with NSCore::Result typed expressions");
+            this.raiseErrorIf(exp.sinfo, infertype !== undefined && (infertype.options.length !== 1 || !(infertype as ResolvedType).idStr.startsWith("NSCore::Result<")), "ok/err shorthand constructors only valid with NSCore::Result typed expressions");
 
             const [tok, terr] = infertype !== undefined && infertype.options.length === 1 ? this.getResultSubtypes(infertype) : [undefined, undefined];
             const {T, E} = infertype !== undefined && infertype.options.length === 1 ? this.getResultBinds(infertype) : {T: undefined, E: undefined};
             const treg = this.m_emitter.generateTmpRegister();
-            const creg = this.m_emitter.generateTmpRegister();
             if(exp.rop === "ok") {
                 const okenv = this.checkExpression(env, exp.arg, treg, T);
                 const oktdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
@@ -1923,44 +1919,71 @@ class TypeChecker {
                 const okconstype = ResolvedType.createSingle(ResolvedEntityAtomType.create(oktdcl, okbinds));
                 const mirokconstype = this.m_emitter.registerResolvedTypeReference(okconstype);
 
-                const argv = this.emitConvertIfNeeded(exp.sinfo, )
-                this.m_emitter.emitConstructorPrimary(exp.sinfo, mirokconstype.trkey, [treg], creg);
+                const argv = this.emitConvertIfNeeded(exp.sinfo, okenv.getExpressionResult().exptype, T || okenv.getExpressionResult().exptype, treg);
+
+                if(infertype === undefined) {
+                    this.m_emitter.emitConstructorPrimary(exp.sinfo, mirokconstype.trkey, [argv], trgt);
+
+                    return [env.setResultExpression(okconstype)];
+                }
+                else {
+                    const creg = this.m_emitter.generateTmpRegister();
+                    this.m_emitter.emitConstructorPrimary(exp.sinfo, mirokconstype.trkey, [argv], creg);
+                    this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, okconstype, infertype, creg, trgt);
+
+                    return [env.setResultExpression(infertype)];
+                }
             }
             else {
-                const errval = this.checkExpression(env, exp.arg, treg, E);
+                const errenv = this.checkExpression(env, exp.arg, treg, E);
+                const errtdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
+                const errbinds = new Map<string, ResolvedType>().set("E", E || errenv.getExpressionResult().exptype);
+                const errconstype = ResolvedType.createSingle(ResolvedEntityAtomType.create(errtdcl, errbinds));
+                const mirerrconstype = this.m_emitter.registerResolvedTypeReference(errconstype);
+
+                const argv = this.emitConvertIfNeeded(exp.sinfo, errenv.getExpressionResult().exptype, E || errenv.getExpressionResult().exptype, treg);
+                
+                if(infertype === undefined) {
+                    this.m_emitter.emitConstructorPrimary(exp.sinfo, mirerrconstype.trkey, [argv], trgt);
+
+                    return [env.setResultExpression(errconstype)];
+                }
+                else {
+                    const creg = this.m_emitter.generateTmpRegister();
+                    this.m_emitter.emitConstructorPrimary(exp.sinfo, mirerrconstype.trkey, [argv], creg);
+                    this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, errconstype, infertype, creg, trgt);
+
+                    return [env.setResultExpression(infertype)];
+                }
             }
-            this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(rval.getExpressionResult().etype, rbinds.get("T") as ResolvedType));
-            const oktdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
-            const eok = ResolvedType.createSingle(ResolvedEntityAtomType.create(oktdcl, rbinds));
-
-            if(this.m_emitEnabled) {
-                this.m_emitter.registerResolvedTypeReference(eok);
-                this.m_emitter.registerTypeInstantiation(oktdcl, rbinds);
-                const tkey = MIRKeyGenerator.generateTypeKey(oktdcl, rbinds);
-
-                this.m_emitter.bodyEmitter.emitConstructorPrimary(exp.sinfo, tkey, [treg], trgt);
-            }
-
-            return [env.setExpressionResult(eok)];
-        }
-        else if (exp.rop === "err") {
-            this.raiseErrorIf(exp.sinfo, exp.rop !== "err");
-            this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(rval.getExpressionResult().etype, rbinds.get("E") as ResolvedType));
-            const errtdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
-            const eerr = ResolvedType.createSingle(ResolvedEntityAtomType.create(errtdcl, rbinds));
-
-            if(this.m_emitEnabled) {
-                this.m_emitter.registerResolvedTypeReference(eerr);
-                this.m_emitter.registerTypeInstantiation(errtdcl, rbinds);
-                const tkey = MIRKeyGenerator.generateTypeKey(errtdcl, rbinds);
-
-                this.m_emitter.bodyEmitter.emitConstructorPrimary(exp.sinfo, tkey, [treg], trgt);
-            }
-
-            return [env.setExpressionResult(eerr)];
         }
         else {
-            xxxx;
+            this.raiseErrorIf(exp.sinfo, infertype !== undefined && (infertype.options.length !== 1 || !(infertype as ResolvedType).idStr.startsWith("NSCore::Option<")), "opt shorthand constructor only valid with NSCore::Option typed expressions");
+
+            const topt = infertype !== undefined && infertype.options.length === 1 ? this.getOptionSubtype(infertype) : undefined;
+            const T = infertype !== undefined && infertype.options.length === 1 ? this.getOptionBind(infertype) : undefined;
+            const treg = this.m_emitter.generateTmpRegister();
+
+            const optenv = this.checkExpression(env, exp.arg, treg, T);
+            const opttdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Opt") as EntityTypeDecl;
+            const optbinds = new Map<string, ResolvedType>().set("T", T || optenv.getExpressionResult().exptype);
+            const optconstype = ResolvedType.createSingle(ResolvedEntityAtomType.create(opttdcl, optbinds));
+            const miroptconstype = this.m_emitter.registerResolvedTypeReference(optconstype);
+
+            const argv = this.emitConvertIfNeeded(exp.sinfo, optenv.getExpressionResult().exptype, T || optenv.getExpressionResult().exptype, treg);
+
+            if(infertype === undefined) {
+                this.m_emitter.emitConstructorPrimary(exp.sinfo, miroptconstype.trkey, [argv], trgt);
+
+                return [env.setResultExpression(optconstype)];
+            }
+            else {
+                const creg = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitConstructorPrimary(exp.sinfo, miroptconstype.trkey, [argv], creg);
+                this.emitAssignToTempAndConvertIfNeeded(exp.sinfo, optconstype, infertype, creg, trgt);
+
+                return [env.setResultExpression(infertype)];
+            }
         }
     }
 
@@ -2088,51 +2111,124 @@ class TypeChecker {
         return [env.setExpressionResult((pcode as PCode).ftype.resultType)];
     }
 
-    private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
-        const texp = env.getExpressionResult().etype;
+    private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const texp = env.getExpressionResult().exptype;
 
-        this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()), "Base of index expression must be of Tuple type");
+        this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
 
         const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.index);
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitLoadTupleIndex(op.sinfo, this.m_emitter.registerResolvedTypeReference(idxtype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, op.index, trgt);
-        }
+        const mirargtype = this.m_emitter.registerResolvedTypeReference(texp);
+        const mirloadtype = this.m_emitter.registerResolvedTypeReference(idxtype);
 
-        return [env.setExpressionResult(idxtype)];
-    }
+        if(infertype === undefined || infertype.isSameType(idxtype)) {
+            this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, trgt);
 
-    private checkProjectFromIndecies(env: TypeEnvironment, op: PostfixProjectFromIndecies, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
-        const texp = env.getExpressionResult().etype;
-
-        this.raiseErrorIf(op.sinfo, !this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialTupleConceptType()), "Base of index expression must be of Tuple type");
-        this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => idx < 0), "Index cannot be negative");
-
-        if(op.isEphemeralListResult) {
-            const resultOptions = texp.options.map((opt) => {
-                let ttypes = op.indecies.map((idx) => this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(opt), idx));
-                return ResolvedType.createSingle(ResolvedEphemeralListType.create(ttypes));
-            });
-            const restype = this.checkedUnion(op.sinfo, resultOptions);
-
-            if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, op.indecies, trgt);
-            }
-
-            return [env.setExpressionResult(restype)];
+            return [env.setResultExpression(idxtype)];
         }
         else {
-            const resultOptions = texp.options.map((opt) => {
-                let ttypes = op.indecies.map((idx) => new ResolvedTupleAtomTypeEntry(this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(opt), idx), false));
-                return ResolvedType.createSingle(ResolvedTupleAtomType.create(ttypes));
-            });
-            const restype = this.m_assembly.typeUpperBound(resultOptions);
+            const creg = this.m_emitter.generateTmpRegister();
+            this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, creg);
+            this.emitAssignToTempAndConvertIfNeeded(op.sinfo, idxtype, infertype, creg, trgt);
 
-            if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectTupleIndecies(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, op.indecies, trgt);
+            return [env.setResultExpression(infertype)];
+        }
+    }
+
+    private checkProjectFromIndecies(env: TypeEnvironment, op: PostfixProjectFromIndecies, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const texp = env.getExpressionResult().exptype;
+
+        this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
+        this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => idx.index < 0), "Index cannot be negative");
+
+        if(op.isEphemeralListResult) {
+            let itype: ResolvedEphemeralListType | undefined = undefined;
+            if (infertype !== undefined) {
+                itype = infertype.tryGetInferrableValueListConstructorType();
+                this.raiseErrorIf(op.sinfo, itype !== undefined && itype.types.length !== op.indecies.length, "Mismatch between number of indecies loaded and number expected by inferred type");
             }
 
-            return [env.setExpressionResult(restype)];
+            let ctypes: ResolvedType[] = [];
+            for (let i = 0; i < op.indecies.length; ++i) {
+                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
+                let inferidx: ResolvedType | undefined = undefined
+                if (reqtype !== undefined || itype !== undefined) {
+                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[op.indecies[i].index];
+                }
+
+                const ttype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index);
+                this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${i}`);
+                ctypes.push(inferidx || ttype);
+            }
+
+            const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
+            const rephemeral = ResolvedType.createSingle(rephemeralatom);
+            this.raiseErrorIf(op.sinfo, infertype !== undefined && !infertype.isSameType(rephemeral), "Cannot create EphemeralList of needed type");
+
+            const rindecies = op.indecies.map((idv) => idv.index);
+
+            if (texp.isUniqueTupleTargetType()) {
+                const invk = this.m_emitter.registerTupleProjectToEphemeral(texp.getUniqueTupleTargetType(), rindecies, rephemeralatom);
+                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], [rephemeral, rephemeral, -1, []], trgt);
+            }
+            else {
+                const invk = this.m_emitter.registerTupleProjectToEphemeralVirtual(texp, rindecies, rephemeralatom);
+                this.m_emitter.emitInvokeVirtualTarget(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp).trkey, [arg], [rephemeral, rephemeral, -1, []], trgt);
+            }
+
+            return [env.setResultExpression(rephemeral)];
+        }
+        else {
+            let itype: ResolvedTupleAtomType | undefined = undefined;
+            if (infertype !== undefined) {
+                itype = infertype.tryGetInferrableTupleConstructorType(op.isValue);
+            }
+
+            const resultOptions = texp.options.map((opt) => {
+                let ctypes: ResolvedTupleAtomTypeEntry[] = [];
+                for (let i = 0; i < op.indecies.length; ++i) {
+                    const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
+                    let inferidx: ResolvedType | undefined = undefined
+                    if (reqtype !== undefined || itype !== undefined) {
+                        inferidx = reqtype !== undefined ? reqtype : this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
+                    }
+
+                    const ttype = this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(opt), op.indecies[i].index);
+                    this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${i}`);
+                    ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, false));
+                }
+
+                return ResolvedType.createSingle(ResolvedTupleAtomType.create(op.isValue, ctypes));
+            });
+
+            const ubtype = this.m_assembly.typeUpperBound(resultOptions);
+            this.raiseErrorIf(op.sinfo, infertype !== undefined && !this.m_assembly.subtypeOf(ubtype, infertype), "Cannot create Tuple of needed type");
+
+            const rtupletype = ResolvedType.create((infertype || ubtype).options.filter((tt) => tt instanceof ResolvedTupleAtomType));
+
+            const rindecies = op.indecies.map((idv) => {
+                return {
+                    index: idv.index,
+                    reqtype: idv.reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, idv.reqtype as TypeSignature, env.terms) : this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), idv.index)
+                };
+            });
+
+            let ttreg = rtupletype.isSameType(infertype || ubtype) ? trgt : this.m_emitter.generateTmpRegister();
+
+            if (texp.isUniqueTupleTargetType()) {
+                const invk = this.m_emitter.registerTupleProjectToTuple(texp.getUniqueTupleTargetType(), rindecies, rtupletype);
+                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], [rtupletype, rtupletype, -1, []], ttreg);
+            }
+            else {
+                const invk = this.m_emitter.registerTupleProjectToTupleVirtual(texp, rindecies, rtupletype);  
+                this.m_emitter.emitInvokeVirtualTarget(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp).trkey, [arg], [rtupletype, rtupletype, -1, []], ttreg);
+            }
+
+            if(!rtupletype.isSameType(infertype || ubtype)) {
+                this.emitAssignToTempAndConvertIfNeeded(op.sinfo, rtupletype, infertype || ubtype, ttreg, trgt);
+            }
+
+            return [env.setResultExpression(rtupletype)];
         }
     }
 

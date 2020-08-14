@@ -1699,16 +1699,19 @@ class Parser {
 
                     ops.push(new PostfixAccessFromIndex(sinfo, isElvis, erestrict, index));
                 }
-                else if (this.testToken("[")) {
+                else if (this.testFollows("#", "[") || this.testFollows("@", "[")) {
                     if(isBinder) {
                         this.raiseError(sinfo.line, "Binder option is not valid for access");
                     }
 
-                    const indecies = this.parseListOf<{index: number, reqtype?: TypeSignature}>("[", "]", ",", () => {
+                    const isvalue = this.testToken("#");
+                    this.consumeToken();
+
+                    const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("[", "]", ",", () => {
                         this.ensureToken(TokenStrings.Int);
                         const idx = Number.parseInt(this.consumeTokenAndGetValue());
                         if (!this.testAndConsumeTokenIf(":")) {
-                            return { index: idx };
+                            return { index: idx, reqtype: undefined };
                         }
                         else {
                             return { index: idx, reqtype: this.parseTypeSignature() };
@@ -1719,18 +1722,21 @@ class Parser {
                         this.raiseError(sinfo.line, "You must have at least one index when projecting");
                     }
 
-                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, false, indecies));
+                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, isvalue, false, indecies));
                 }
-                else if (this.testToken("{")) {
+                else if (this.testFollows("#", "{") || this.testFollows("@", "{")) {
                     if(isBinder) {
                         this.raiseError(sinfo.line, "Binder option is not valid for access");
                     }
 
-                    const names = this.parseListOf<{ name: string, reqtype?: TypeSignature }>("{", "}", ",", () => {
+                    const isvalue = this.testToken("#");
+                    this.consumeToken();
+
+                    const names = this.parseListOf<{ name: string, reqtype: TypeSignature | undefined }>("{", "}", ",", () => {
                         this.ensureToken(TokenStrings.Identifier);
                         const nn = this.consumeTokenAndGetValue();
                         if (!this.testAndConsumeTokenIf(":")) {
-                            return { name: nn };
+                            return { name: nn, reqtype: undefined };
                         }
                         else {
                             return { name: nn, reqtype: this.parseTypeSignature() };
@@ -1741,7 +1747,7 @@ class Parser {
                         this.raiseError(sinfo.line, "You must have at least one index when projecting");
                     }
 
-                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, erestrict, false, names));
+                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, erestrict, isvalue, false, names));
                 }
                 else if(this.testToken("(|")) {
                     if(isBinder) {
@@ -1749,11 +1755,11 @@ class Parser {
                     }
 
                     if (this.testFollows("(|", TokenStrings.Int)) {
-                        const indecies = this.parseListOf<{index: number, reqtype?: TypeSignature}>("(|", "|)", ",", () => {
+                        const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
                             this.ensureToken(TokenStrings.Int);
                             const idx = Number.parseInt(this.consumeTokenAndGetValue());
                             if (!this.testAndConsumeTokenIf(":")) {
-                                return { index: idx };
+                                return { index: idx, reqtype: undefined};
                             }
                             else {
                                 return { index: idx, reqtype: this.parseTypeSignature() };
@@ -1764,14 +1770,14 @@ class Parser {
                             this.raiseError(sinfo.line, "You must have at least two indecies when projecting out a Ephemeral value pack (otherwise just access the index directly)");
                         }
 
-                        ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, true, indecies));
+                        ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, false, true, indecies));
                     }
                     else {
-                        const names = this.parseListOf<{ name: string, reqtype?: TypeSignature }>("(|", "|)", ",", () => {
+                        const names = this.parseListOf<{ name: string, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
                             this.ensureToken(TokenStrings.Identifier);
                             const nn = this.consumeTokenAndGetValue();
                             if (!this.testAndConsumeTokenIf(":")) {
-                                return { name: nn };
+                                return { name: nn, reqtype: undefined };
                             }
                             else {
                                 return { name: nn, reqtype: this.parseTypeSignature() };
@@ -1782,7 +1788,7 @@ class Parser {
                             this.raiseError(sinfo.line, "You must have at least two names when projecting out a Ephemeral value pack (otherwise just access the property/field directly)");
                         }
 
-                        ops.push(new PostfixProjectFromNames(sinfo, isElvis, erestrict, true, names));
+                        ops.push(new PostfixProjectFromNames(sinfo, isElvis, erestrict, false, true, names));
                     }
                 }
                 else {
@@ -2041,7 +2047,7 @@ class Parser {
             }
 
             const action = this.consumeTokenAndGetValue();
-            let value: undefined | Expression = undefined;
+            let value: undefined | Expression[] = undefined;
             let cond: undefined | Expression = undefined;
 
             if (!this.testToken(";")) {
@@ -2050,7 +2056,7 @@ class Parser {
                     cond = this.parseExpression();
                 }
                 else {
-                    value = this.parseExpression();
+                    value = this.parseEphemeralListOf(() => this.parseExpression());
                     if (this.testToken("when")) {
                         this.consumeToken();
                         cond = this.parseExpression();
@@ -2235,9 +2241,12 @@ class Parser {
                     this.raiseError(sinfo.line, "Literal match is not allowed");
                 }
 
-                if (this.testAndConsumeTokenIf("@")) {
+                if (this.testToken("#") || this.testToken("@")) {
+                    const isvalue = this.testToken("#");
+                    this.consumeToken();
+
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
-                    return new ConstValueStructuredAssignment(new LiteralTypedStringConstructorExpression(sinfo, sstr, ttype));
+                    return new ConstValueStructuredAssignment(new LiteralTypedStringConstructorExpression(sinfo, isvalue, sstr, ttype));
                 }
                 else {
                     const sstr = this.consumeTokenAndGetValue(); //keep in escaped format

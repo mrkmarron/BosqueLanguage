@@ -959,6 +959,10 @@ class Assembly {
         for (let i = 0; i < lidx; ++i) {
             const ttypes = ephemerals.map((tt) => tt.types[i]);
             const ttype = this.typeUpperBound(ttypes);
+            if(ephemerals.some((tt) => !tt.types[i].isSameType(ttype))) {
+                return undefined; //can't have different types
+            }
+
             nte.push(ttype);
         }
 

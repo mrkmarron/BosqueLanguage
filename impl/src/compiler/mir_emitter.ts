@@ -300,6 +300,10 @@ class MIREmitter {
     }
 
     emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
         this.m_currentBlock.push(new MIRConstructorPrimary(sinfo, tkey, args, trgt));
     }
 
@@ -339,15 +343,17 @@ class MIREmitter {
     emitConstructorValueList(sinfo: SourceInfo, resultEphemeralType: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRConstructorEphemeralValueList(sinfo, resultEphemeralType, args, trgt));
     }
+    */
 
-    emitLoadTupleIndex(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, idx: number, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, resultAccessType, arg, argInferType, idx, trgt));
+    emitLoadTupleIndex(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
     }
 
-    emitProjectTupleIndecies(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, indecies: number[], trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRProjectFromIndecies(sinfo, resultProjectType, arg, argInferType, indecies, trgt));
-    }
-
+    /*
     emitLoadProperty(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, pname: string, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, argInferType, pname, trgt));
     }
@@ -776,6 +782,22 @@ class MIREmitter {
 
         this.pendingPCodeProcessing.push([key, idecl, fsig, binds, cinfo]);
         return key;
+    }
+
+    registerTupleProjectToEphemeral(tt: ResolvedTupleAtomType, indecies: number[], epht: ResolvedEphemeralListType): MIRInvokeKey {
+        xxxx;
+    }
+
+    registerTupleProjectToEphemeralVirtual(tt: ResolvedType, indecies: number[], epht: ResolvedEphemeralListType): MIRVirtualMethodKey {
+        xxxx;
+    }
+
+    registerTupleProjectToTuple(tt: ResolvedTupleAtomType, indecies: { index: number, reqtype: ResolvedType | undefined }[], rt: ResolvedType): MIRInvokeKey {
+        xxxx;
+    }
+
+    registerTupleProjectToTupleVirtual(tt: ResolvedType, indecies: { index: number, reqtype: ResolvedType | undefined }[], rt: ResolvedType): MIRVirtualMethodKey {
+        xxxx;
     }
 
     private closeConceptDecl( cpt: MIRConceptTypeDecl) {

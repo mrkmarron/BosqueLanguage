@@ -226,34 +226,12 @@ class ResolvedType {
         }
     }
 
-    static tryGetTupleTypeInfo(t: ResolvedType): ResolvedTupleAtomType | undefined {
-        if (t.options.length !== 1) {
-            return undefined;
-        }
-
-        if (t.options[0] instanceof ResolvedTupleAtomType) {
-            return (t.options[0] as ResolvedTupleAtomType);
-        }
-        else {
-            return undefined;
-        }
-    }
-
-    static tryGetRecordTypeInfo(t: ResolvedType): ResolvedRecordAtomType| undefined {
-        if (t.options.length !== 1) {
-            return undefined;
-        }
-
-        if (t.options[0] instanceof ResolvedRecordAtomType) {
-            return (t.options[0] as ResolvedRecordAtomType);
-        }
-        else {
-            return undefined;
-        }
-    }
-
     isEmptyType(): boolean {
         return this.options.length === 0;
+    }
+
+    isTupleTargetType(): boolean {
+        return this.options.every((opt) => opt instanceof ResolvedTupleAtomType);
     }
 
     isUniqueTupleTargetType(): boolean {
@@ -261,7 +239,11 @@ class ResolvedType {
             return false;
         }
 
-        return (this.options[0] instanceof ResolvedTupleAtomType) && (this.options[0] as ResolvedTupleAtomType).types.some((value) => value.isOptional);
+        return (this.options[0] instanceof ResolvedTupleAtomType) && !(this.options[0] as ResolvedTupleAtomType).types.some((value) => value.isOptional);
+    }
+
+    getUniqueTupleTargetType(): ResolvedTupleAtomType {
+        return (this.options[0] as ResolvedTupleAtomType);
     }
 
     tryGetInferrableTupleConstructorType(isvalue: boolean): ResolvedTupleAtomType | undefined {
@@ -275,12 +257,20 @@ class ResolvedType {
         return (tt.isvalue === isvalue) ? tt : undefined;
     }
 
+    isRecordTargetType(): boolean {
+        return this.options.every((opt) => opt instanceof ResolvedRecordAtomType);
+    }
+
     isUniqueRecordTargetType(): boolean {
         if (this.options.length !== 1) {
             return false;
         }
 
         return (this.options[0] instanceof ResolvedRecordAtomType) && !(this.options[0] as ResolvedRecordAtomType).entries.some((value) => value.isOptional);
+    }
+
+    getUniqueRecordTargetType(): ResolvedRecordAtomType {
+        return (this.options[0] as ResolvedRecordAtomType);
     }
 
     tryGetInferrableRecordConstructorType(isvalue: boolean): ResolvedRecordAtomType | undefined {
@@ -303,7 +293,7 @@ class ResolvedType {
     }
 
     tryGetInferrableValueListConstructorType(): ResolvedEphemeralListType | undefined {
-        const vlopts = this.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
+        const vlopts = this.options.filter((opt) => opt instanceof ResolvedEphemeralListType);
 
         if (vlopts.length !== 1) {
             return undefined;

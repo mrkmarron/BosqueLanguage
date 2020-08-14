@@ -510,11 +510,13 @@ class PostfixAccessFromIndex extends PostfixOperation {
 }
 
 class PostfixProjectFromIndecies extends PostfixOperation {
+    readonly isValue: boolean;
     readonly isEphemeralListResult: boolean;
-    readonly indecies: {index: number, reqtype?: TypeSignature}[];
+    readonly indecies: {index: number, reqtype: TypeSignature | undefined}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isEphemeralListResult: boolean, indecies: {index: number, reqtype?: TypeSignature}[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, indecies: {index: number, reqtype: TypeSignature | undefined}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromIndecies);
+        this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
     }
@@ -530,11 +532,13 @@ class PostfixAccessFromName extends PostfixOperation {
 }
 
 class PostfixProjectFromNames extends PostfixOperation {
+    readonly isValue: boolean;
     readonly isEphemeralListResult: boolean;
-    readonly names: {name: string, reqtype?: TypeSignature}[];
+    readonly names: {name: string, reqtype: TypeSignature | undefined}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isEphemeralListResult: boolean, names: {name: string, reqtype?: TypeSignature}[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, names: {name: string, reqtype: TypeSignature | undefined}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromNames);
+        this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
     }
@@ -543,9 +547,9 @@ class PostfixProjectFromNames extends PostfixOperation {
 class PostfixModifyWithIndecies extends PostfixOperation {
     readonly binder: boolean;
     readonly opkind: "update" | "insert" | "merge";
-    readonly updates: [number, Expression][];
+    readonly updates: { index: number, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: [number, Expression][]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { index: number, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithIndecies);
         this.binder = binder;
         this.opkind = opkind;
@@ -556,9 +560,9 @@ class PostfixModifyWithIndecies extends PostfixOperation {
 class PostfixModifyWithNames extends PostfixOperation {
     readonly binder: boolean;
     readonly opkind: "update" | "insert" | "merge";
-    readonly updates: [string, Expression][];
+    readonly updates: { name: string, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: [string, Expression][]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { name: string, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithNames);
         this.binder = binder;
         this.opkind = opkind;
@@ -714,11 +718,11 @@ class SelectExpression extends Expression {
 class ExpOrExpression extends Expression {
     readonly exp: Expression;
     readonly action: string;
-    readonly result: Expression | undefined;
+    readonly result: Expression[] | undefined;
     readonly elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined;
     readonly cond: Expression | undefined;
 
-    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression | undefined, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, cond: Expression | undefined) {
+    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression[] | undefined, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, cond: Expression | undefined) {
         super(ExpressionTag.ExpOrExpression, sinfo);
         this.exp = exp;
         this.action = action;
