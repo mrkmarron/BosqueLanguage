@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ConceptTypeDecl, EntityTypeDecl } from "./assembly";
+import { ConceptTypeDecl, EntityTypeDecl, OOPTypeDecl } from "./assembly";
 
 class ResolvedAtomType {
     readonly idStr: string;
@@ -321,7 +321,7 @@ class ResolvedType {
     isGroundedType(): boolean {
         return this.options.every((opt) => {
             if(opt instanceof ResolvedConceptAtomType) {
-                return false;
+                return opt.conceptTypes.every((ct) => OOPTypeDecl.attributeSetContains("struct", ct.concept.attributes));
             }
             else if(opt instanceof ResolvedEntityAtomType) {
                 return true;

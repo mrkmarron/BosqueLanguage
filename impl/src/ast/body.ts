@@ -420,7 +420,7 @@ class SpecialConstructorExpression extends Expression {
     readonly rop: "ok" | "opt" | "err";
     readonly arg: Expression;
 
-    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: "ok" | "opt" | "err", arg: Expression) {
+    constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: "ok" | "err", arg: Expression) {
         super(ExpressionTag.SpecialConstructorExpression, sinfo); 
         this.rtype = rtype;
         this.rop = rop;
@@ -502,19 +502,21 @@ class PostfixOp extends Expression {
 
 class PostfixAccessFromIndex extends PostfixOperation {
     readonly index: number;
+    readonly kind: "basic" | "option" | "result";
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, index: number) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, kind: "basic" | "option" | "result", index: number) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixAccessFromIndex);
         this.index = index;
+        this.kind = kind;
     }
 }
 
 class PostfixProjectFromIndecies extends PostfixOperation {
     readonly isValue: boolean;
     readonly isEphemeralListResult: boolean;
-    readonly indecies: {index: number, reqtype: TypeSignature | undefined}[];
+    readonly indecies: {index: number, isopt: boolean, reqtype: TypeSignature | undefined}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, indecies: {index: number, reqtype: TypeSignature | undefined}[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, indecies: {index: number, isopt: boolean, reqtype: TypeSignature | undefined}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromIndecies);
         this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult
@@ -524,9 +526,11 @@ class PostfixProjectFromIndecies extends PostfixOperation {
 
 class PostfixAccessFromName extends PostfixOperation {
     readonly name: string;
+    readonly kind: "basic" | "option" | "result";
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, name: string) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, kind: "basic" | "option" | "result", name: string) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixAccessFromName);
+        this.kind = kind;
         this.name = name;
     }
 }
@@ -534,9 +538,9 @@ class PostfixAccessFromName extends PostfixOperation {
 class PostfixProjectFromNames extends PostfixOperation {
     readonly isValue: boolean;
     readonly isEphemeralListResult: boolean;
-    readonly names: {name: string, reqtype: TypeSignature | undefined}[];
+    readonly names: {name: string, isopt: boolean, reqtype: TypeSignature | undefined}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, names: {name: string, reqtype: TypeSignature | undefined}[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, isValue: boolean, isEphemeralListResult: boolean, names: {name: string, isopt: boolean, reqtype: TypeSignature | undefined}[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixProjectFromNames);
         this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult;
@@ -547,9 +551,9 @@ class PostfixProjectFromNames extends PostfixOperation {
 class PostfixModifyWithIndecies extends PostfixOperation {
     readonly binder: boolean;
     readonly opkind: "update" | "insert" | "merge";
-    readonly updates: { index: number, reqtype: TypeSignature | undefined, value: Expression }[];
+    readonly updates: { index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { index: number, reqtype: TypeSignature | undefined, value: Expression }[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithIndecies);
         this.binder = binder;
         this.opkind = opkind;
@@ -560,9 +564,9 @@ class PostfixModifyWithIndecies extends PostfixOperation {
 class PostfixModifyWithNames extends PostfixOperation {
     readonly binder: boolean;
     readonly opkind: "update" | "insert" | "merge";
-    readonly updates: { name: string, reqtype: TypeSignature | undefined, value: Expression }[];
+    readonly updates: { name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { name: string, reqtype: TypeSignature | undefined, value: Expression }[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, elvisRestrict: "[none]" | "[empty]" | "[err]" | undefined, binder: boolean, opkind: "update" | "insert" | "merge", updates: { name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, elvisRestrict, PostfixOpTag.PostfixModifyWithNames);
         this.binder = binder;
         this.opkind = opkind;

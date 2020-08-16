@@ -419,7 +419,7 @@ class TypeChecker {
     
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
+    private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, missopt: "skip" | "none" | "empty" | "error", idx: number): ResolvedType {
         const options = rtype.options.map((atom) => {
             this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples");
             const tatom = atom as ResolvedTupleAtomType;
@@ -428,15 +428,40 @@ class TypeChecker {
                     return tatom.types[idx].type;
                 }
                 else {
-                    return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
+                    if(missopt === "skip") {
+                        return tatom.types[idx].type;
+                    }
+                    else if(missopt === "none") {
+                        return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
+                    }
+                    else if(missopt === "empty") {
+                        const optentity = this.m_assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Option") as ConceptTypeDecl;
+                        return ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(optentity, new Map<string, ResolvedType>().set("T", tatom.types[idx].type))]));
+                    } 
+                    else {
+                        const resultentity = this.m_assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Result") as EntityTypeDecl;
+                        return ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(resultentity, new Map<string, ResolvedType>().set("T", tatom.types[idx].type).set("E", this.m_assembly.getSpecialNoneType()))]));
+                    }
                 }
             }
             else {
-                return this.m_assembly.getSpecialNoneType();
+                if(missopt === "skip") {
+                    return ResolvedType.createEmpty();
+                }
+                else if(missopt === "none") {
+                    return this.m_assembly.getSpecialNoneType();
+                }
+                else if(missopt === "empty") {
+                    return this.m_assembly.getSpecialEmptyType();
+                } 
+                else {
+                    const errentity = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
+                    return ResolvedType.createSingle(ResolvedEntityAtomType.create(errentity, new Map<string, ResolvedType>().set("E", this.m_assembly.getSpecialNoneType())));
+                }
             }
         });
 
-        return this.m_assembly.typeUpperBound(options);
+        return this.m_assembly.typeUpperBound(options.filter((opt) => !opt.isEmptyType()));
     }
 
     private getInfoForLoadFromPropertyName(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
@@ -1620,7 +1645,7 @@ class TypeChecker {
 
             const stype = this.m_emitter.registerResolvedTypeReference(aoftype.stringtype);
 
-            if (infertype === undefined || infertype.isSameType(this.m_assembly.getSpecialStringType())) {
+            if (infertype === undefined || infertype.isSameType(aoftype.stringtype)) {
                 this.m_emitter.emitLoadLiteralStringOf(exp.sinfo, exp.value, stype.trkey, trgt);
                 return [env.setResultExpression(aoftype.stringtype)];
             }
@@ -1675,6 +1700,7 @@ class TypeChecker {
 
         const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
         const rok = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(aoftype.parsetype)[0]);
+        const ctype = this.getResultBinds(aoftype.parsetype).T;
 
         const sbinds = this.m_assembly.resolveBindsForCall([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
         const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
@@ -1689,9 +1715,9 @@ class TypeChecker {
         const convt = this.m_emitter.generateTmpRegister();
         this.m_emitter.emitConvertDown(exp.sinfo, presult, rok, tmps, convt);
 
-        if (infertype === undefined || infertype.isSameType(aoftype.ofresolved)) {
+        if (infertype === undefined || infertype.isSameType(ctype)) {
             this.m_emitter.emitExtractResult(exp.sinfo, convt, rok, trgt);
-            return [env.setResultExpression(aoftype.ofresolved)];
+            return [env.setResultExpression(ctype)];
         }
         else {
             const tmp = this.m_emitter.generateTmpRegister();
@@ -1909,7 +1935,6 @@ class TypeChecker {
         if(exp.rop === "ok" || exp.rop === "err") {
             this.raiseErrorIf(exp.sinfo, infertype !== undefined && (infertype.options.length !== 1 || !(infertype as ResolvedType).idStr.startsWith("NSCore::Result<")), "ok/err shorthand constructors only valid with NSCore::Result typed expressions");
 
-            const [tok, terr] = infertype !== undefined && infertype.options.length === 1 ? this.getResultSubtypes(infertype) : [undefined, undefined];
             const {T, E} = infertype !== undefined && infertype.options.length === 1 ? this.getResultBinds(infertype) : {T: undefined, E: undefined};
             const treg = this.m_emitter.generateTmpRegister();
             if(exp.rop === "ok") {
@@ -1960,7 +1985,6 @@ class TypeChecker {
         else {
             this.raiseErrorIf(exp.sinfo, infertype !== undefined && (infertype.options.length !== 1 || !(infertype as ResolvedType).idStr.startsWith("NSCore::Option<")), "opt shorthand constructor only valid with NSCore::Option typed expressions");
 
-            const topt = infertype !== undefined && infertype.options.length === 1 ? this.getOptionSubtype(infertype) : undefined;
             const T = infertype !== undefined && infertype.options.length === 1 ? this.getOptionBind(infertype) : undefined;
             const treg = this.m_emitter.generateTmpRegister();
 
@@ -2117,21 +2141,29 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
 
-        const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.index);
         const mirargtype = this.m_emitter.registerResolvedTypeReference(texp);
-        const mirloadtype = this.m_emitter.registerResolvedTypeReference(idxtype);
 
-        if(infertype === undefined || infertype.isSameType(idxtype)) {
-            this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, trgt);
+        if (op.kind === "basic") {
+            const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, "none", op.index);
+            const mirloadtype = this.m_emitter.registerResolvedTypeReference(idxtype);
+            if (infertype === undefined || infertype.isSameType(idxtype)) {
+                this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, trgt);
 
-            return [env.setResultExpression(idxtype)];
+                return [env.setResultExpression(idxtype)];
+            }
+            else {
+                const creg = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, creg);
+                this.emitAssignToTempAndConvertIfNeeded(op.sinfo, idxtype, infertype, creg, trgt);
+
+                return [env.setResultExpression(infertype)];
+            }
+        }
+        else if(op.kind === "option") {
+            xxxx;
         }
         else {
-            const creg = this.m_emitter.generateTmpRegister();
-            this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, creg);
-            this.emitAssignToTempAndConvertIfNeeded(op.sinfo, idxtype, infertype, creg, trgt);
-
-            return [env.setResultExpression(infertype)];
+            xxxx;
         }
     }
 

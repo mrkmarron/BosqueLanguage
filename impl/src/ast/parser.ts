@@ -52,7 +52,6 @@ const KeywordStrings = [
     "namespace",
     "none",
     "ok",
-    "opt",
     "or",
     "private",
     "provides",
@@ -65,8 +64,6 @@ const KeywordStrings = [
     "test",
     "true",
     "type",
-    "typeis",
-    "typeas",
     "typedef",
     "validate",
     "let",
@@ -98,7 +95,6 @@ const SymbolStrings = [
     "::",
     ",",
     ".",
-    ".$",
     "...",
     "=",
     "==",
@@ -112,7 +108,6 @@ const SymbolStrings = [
     "?&",
     "?|",
     "?.",
-    "?.$",
     "<",
     "<=",
     ">",
@@ -172,7 +167,7 @@ const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
 const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive?", "recursive", "memoized", "grounded"];
 
-const UnsafeFieldNames = ["is", "as", "tryAs", "optionAs", "resultAs", "defaultAs", "isNone", "isSome", "update", "insert", "merge"]
+const UnsafeFieldNames = ["is", "as", "tryAs", "isNone", "isSome", "update"]
 
 const TokenStrings = {
     Clear: "[CLEAR]",
@@ -1369,21 +1364,6 @@ class Parser {
         }
     }
 
-    private parseElvisRestrict(): "[none]" | "[empty]" | "[err]" | undefined {
-        if(this.testFollows("[", "none", "]")) {
-            return "[none]";
-        }
-        else if(this.testFollows("[", "empty", "]")) {
-            return "[empty]";
-        }
-        else if(this.testFollows("[", "err", "]")) {
-            return "[err]";
-        }
-        else {
-            return undefined;
-        }
-    }
-
     private parseConstructorPrimary(otype: TypeSignature): Expression {
         const sinfo = this.getCurrentSrcInfo();
 
@@ -1482,7 +1462,7 @@ class Parser {
             this.m_penv.assembly.addLiteralRegex(re as BSQRegex);
             return new LiteralRegexExpression(sinfo, re as BSQRegex);
         }
-        else if (tk === "opt" || tk === "ok" || tk === "err") {
+        else if (tk === "ok" || tk === "err") {
             this.consumeToken();
             this.ensureAndConsumeToken("(");
             const arg = this.parseExpression();
@@ -1638,7 +1618,13 @@ class Parser {
         }
 
         const line = sinfo.line;
-        if (name === "update" || name === "insert" || name === "merge") {
+        if (name === "is") {
+            xxxx;
+        }
+        else if (name === "as") {
+            xxxx;
+        }
+        else if (name === "update") {
             if (this.testFollows("(", TokenStrings.Int)) {
                 const updates = this.parseListOf<[number, Expression]>("(", ")", ",", () => {
                     this.ensureToken(TokenStrings.Int);
@@ -1683,12 +1669,11 @@ class Parser {
             const sinfo = this.getCurrentSrcInfo();
 
             const tk = this.peekToken();
-            if (tk === "." || tk === "?." || tk === ".$" || tk === "?.$") {
-                const isElvis = tk === "?." || tk === "?.$";
-                const isBinder = tk === ".$" || tk === "?.$";
+            if (tk === "." || tk === "?.") {
+                const isElvis = tk === "?.";
 
                 this.consumeToken();
-                const erestrict = this.parseElvisRestrict();
+                const isBinder = this.testAndConsumeTokenIf("$");
                 
                 if (this.testToken(TokenStrings.Int)) {
                     if(isBinder) {
@@ -1697,7 +1682,7 @@ class Parser {
 
                     const index = Number.parseInt(this.consumeTokenAndGetValue());
 
-                    ops.push(new PostfixAccessFromIndex(sinfo, isElvis, erestrict, index));
+                    ops.push(new PostfixAccessFromIndex(sinfo, isElvis, index));
                 }
                 else if (this.testFollows("#", "[") || this.testFollows("@", "[")) {
                     if(isBinder) {
@@ -1722,7 +1707,7 @@ class Parser {
                         this.raiseError(sinfo.line, "You must have at least one index when projecting");
                     }
 
-                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, isvalue, false, indecies));
+                    ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, isvalue, false, indecies));
                 }
                 else if (this.testFollows("#", "{") || this.testFollows("@", "{")) {
                     if(isBinder) {
@@ -1747,7 +1732,7 @@ class Parser {
                         this.raiseError(sinfo.line, "You must have at least one index when projecting");
                     }
 
-                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, erestrict, isvalue, false, names));
+                    ops.push(new PostfixProjectFromNames(sinfo, isElvis, isvalue, false, names));
                 }
                 else if(this.testToken("(|")) {
                     if(isBinder) {
@@ -1770,7 +1755,7 @@ class Parser {
                             this.raiseError(sinfo.line, "You must have at least two indecies when projecting out a Ephemeral value pack (otherwise just access the index directly)");
                         }
 
-                        ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, erestrict, false, true, indecies));
+                        ops.push(new PostfixProjectFromIndecies(sinfo, isElvis, false, true, indecies));
                     }
                     else {
                         const names = this.parseListOf<{ name: string, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
@@ -1801,7 +1786,7 @@ class Parser {
                     this.ensureToken(TokenStrings.Identifier);
                     const name = this.consumeTokenAndGetValue();
     
-                    if (name === "update" || name === "insert" || name === "merge") {
+                    if (name === "as" || name === "is" || name === "update") {
                         ops.push(this.handleSpecialCaseMethods(sinfo, isElvis, erestrict, isBinder, specificResolve, name));
                     }
                     else if (!(this.testToken("<") || this.testToken("[") || this.testToken("("))) {
@@ -1813,7 +1798,7 @@ class Parser {
                             this.raiseError(this.getCurrentLine(), "Encountered named access but given type resolver (only valid on method calls)");
                         }
 
-                        ops.push(new PostfixAccessFromName(sinfo, isElvis, erestrict, name));
+                        ops.push(new PostfixAccessFromName(sinfo, isElvis, erestrict, "basic", name));
                     }
                     else {
                         //ugly ambiguity with < -- the follows should be a NS, Type, or T token
@@ -1837,7 +1822,7 @@ class Parser {
                                     this.raiseError(this.getCurrentLine(), "Encountered named access but given type resolver (only valid on method calls)");
                                 }
         
-                                ops.push(new PostfixAccessFromName(sinfo, isElvis, erestrict, name));
+                                ops.push(new PostfixAccessFromName(sinfo, isElvis, erestrict, "basic", name));
                             }
                         }
                         else {
@@ -2846,29 +2831,29 @@ class Parser {
             terms = this.parseListOf<TemplateTermDecl>("<", ">", ",", () => {
                 this.ensureToken(TokenStrings.Template);
                 const templatename = this.consumeTokenAndGetValue();
-                if(this.testToken("=")) {
-                    this.consumeToken();
-                    const tconstraint = this.parseTypeSignature();
+                const hasconstraint = this.testAndConsumeTokenIf("where");
+                let tconstraint = hasconstraint ? this.parseTypeSignature() : undefined;
 
-                    return new TemplateTermDecl(templatename, tconstraint, false, undefined, true);
-                }
-                else {
-                    const hasconstraint = this.testAndConsumeTokenIf("where");
-                    const tconstraint = hasconstraint ? this.parseTypeSignature() : this.m_penv.SpecialAnySignature;
-
-                    let isinfer = false;
-                    let defaulttype: TypeSignature | undefined = undefined;
-                    if (this.testAndConsumeTokenIf("=")) {
-                        if (this.testAndConsumeTokenIf("?")) {
-                            isinfer = true;
-                        }
-                        else {
+                let isinfer = false;
+                let isliteral = false;
+                let defaulttype: TypeSignature | undefined = undefined;
+                if (this.testAndConsumeTokenIf("=")) {
+                    if (this.testAndConsumeTokenIf("?")) {
+                        isinfer = true;
+                        tconstraint = tconstraint || this.m_penv.SpecialAnySignature;
+                    }
+                    else {
+                        if(tconstraint !== undefined) {
                             defaulttype = this.parseTypeSignature();
                         }
+                        else {
+                            isliteral = true;
+                            tconstraint = this.parseTypeSignature();
+                        }
                     }
-
-                    return new TemplateTermDecl(templatename, tconstraint, isinfer, defaulttype, false);
                 }
+
+                return new TemplateTermDecl(templatename, tconstraint as TypeSignature, isinfer, defaulttype, isliteral);
             })[0];
         }
         return terms;
