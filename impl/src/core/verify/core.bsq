@@ -165,7 +165,6 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
     private static s_float_max_value(): Float64 # float_max_value
     private static s_float_infinity_value(): Float64 # float_infinity_value
     private static s_float_nan_value(): Float64 # float_nan_value
-    private static s_compare(a: Float64, b: Float64): Int # float64_compare
 
     const min_value: Float64 = Float64::s_float_min_value();
     const max_value: Float64 = Float64::s_float_max_value();
@@ -182,14 +181,8 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
     method isInfinite(): Bool # float64_isinfinity
     method isNan(): Bool # float64_isnan
 
-    static compare(a: Float64, b: Float64): Int
-        requires release !(a.isNan() || b.isNan());
-    {
-        return Float64::s_compare(a, b);
-    }
-
     method abs(): Float64 {
-        return Float64::compare(this, 0) < 0 ? -this : this;
+        return this < 0 ? -this : this;
     }
 
     method ceiling(): Float64 # float64_ceiling
@@ -219,11 +212,11 @@ struct entity Float64 provides Parsable, PODType, APIType, Some {
     method tan(): Float64 # float64_tan
 
     static min(v1: Float64, v2: Float64): Float64 {
-        return Float64::compare(v1, v2) < 0 ? v1 : v2;
+        return v1 < v2 ? v1 : v2;
     }
 
     static max(v1: Float64, v2: Float64): Float64 {
-        return Float64::compare(v1, v2) < 0 ? v2 : v1;
+        return v1 > v2 ? v1 : v2;
     }
 }
 

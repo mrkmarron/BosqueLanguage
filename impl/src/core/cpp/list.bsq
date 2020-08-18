@@ -68,9 +68,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     private recursive? static {when T KeyType} s_min(l: List<T>): T # list_min
     private recursive? static {when T KeyType} s_max(l: List<T>): T # list_max
-    private recursive? static {when T Int | BigInt} s_sum(l: List<T>): T # list_sum
-
-    //TODO: sum with float -- move from Float64
+    private recursive? static {when T Int || T BigInt} s_sum(l: List<T>): T # list_sum
 
     private recursive? static s_filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
     private recursive? static s_filternot(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filternot
@@ -94,10 +92,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private static {when T KeyType} s_tryProjectWMap<U>(l: List<T>, m: Map<T, U>): List<U?> # list_tryproject
     private static {when T KeyType} s_defaultProjectWMap<U>(l: List<T>, m: Map<T, U>, d: U): List<U> # list_defaultproject
 
-    private static  s_zipindex(l: List<T>): List<[Int, T]> # list_zipindex
+    private static  s_zipindex(l: List<T>): List<#[Int, T]> # list_zipindex
 
-    private recursive? static s_join<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> # list_join
-    private recursive? static s_joingroup<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> # list_joingroup
+    private recursive? static s_join<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> # list_join
+    private recursive? static s_joingroup<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, List<U>]> # list_joingroup
 
     private static s_append(l: List<T>, lp: List<T>): List<T> # list_append
 
@@ -253,11 +251,23 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_size(this) != 0 ? List<T>::s_max(this) : none;
     }
 
-    //
-    //TODO: should do argMin/argMax variations on these as well
-    //
+    recursive? method argMin<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T {
+        //TODO: fill in
+    }
 
-    method {when T Int | BigInt} sum(): T {
+    recursive? method tryArgMin<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T? {
+        //TODO: fill in
+    }
+
+    recursive? method argMax<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T {
+        //TODO: fill in
+    }
+
+    recursive? method tryArgMax<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T? {
+        //TODO: fill in
+    }
+
+    method {when T Int || T BigInt} sum(): T {
         return List<T>::s_sum(this);
     }
 
@@ -492,27 +502,27 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_mapindex<U>[recursive?](this, f);
     }
 
-    method {when T KeyType} projectWithMap<U>(m: Map<T, U>): List<U> {
+    method {when T KeyType} projectWithMap<U=?>(m: Map<T, U>): List<U> {
         return List<T>::s_projectWMap<U>(this, m); 
     }
 
-    method {when T KeyType} tryProjectWithMap<U>(m: Map<T, U>): List<U?> {
+    method {when T KeyType} tryProjectWithMap<U=?>(m: Map<T, U>): List<U?> {
         return List<T>::s_tryProjectWMap<U>(this, m);
     }
 
-    method {when T KeyType} defaultProjectWithMap<U>(default: U, m: Map<T, U>): List<U> {
+    method {when T KeyType} defaultProjectWithMap<U=?>(default: U, m: Map<T, U>): List<U> {
         return List<T>::s_defaultProjectWMap<U>(this, m, default);
     }
 
-    method zipIndex(): List<[Int, T]> {
+    method zipIndex(): List<#[Int, T]> {
         return List<T>::s_zipindex(this);
     }
 
-    recursive? method join<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, U]> {
+    recursive? method join<U=?>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> {
         return List<T>::s_join<U>[recursive?](this, ol, p);
     }
 
-    recursive? method joinGroup<U>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<[T, List<U>]> {
+    recursive? method joinGroup<U=?>(ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, List<U>]> {
         return List<T>::s_joingroup<U>[recursive?](this, ol, p);
     }
 
@@ -524,7 +534,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_append(l, this);
     }
 
-    recursive? method partition<K where KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
+    recursive? method partition<K=? where KeyType>(pf: recursive? fn(_: T) -> K): Map<K, List<T>> {
         const plist = this.map<K>[recursive?](pf);
         return List<T>::s_partition<K>(this, plist);
     }
@@ -537,31 +547,55 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_toIndexMap(this);
     }
 
-    recursive? method transformToIndexMap<V>(vf: recursive? fn(_: T) -> V): Map<Int, V> {
+    recursive? method transformToIndexMap<V=?>(vf: recursive? fn(_: T) -> V): Map<Int, V> {
         return List<T>::s_transformIndexMap<V>[recursive?](this, vf);
     }
 
-    recursive? method transformToMap<K where KeyType, V>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
+    recursive? method transformToMap<K=? where KeyType, V=?>(kf: recursive? fn(_: T) -> K, vf: recursive? fn(_: T) -> V): Map<K, V> {
         return List<T>::s_transformMap<K, V>[recursive?](this, kf, vf);
     }
 
-    hidden static s_zip<T, U>(l1: List<T>, l2: List<U>): List<[T, U]> # list_zip
-    hidden static s_unzip<T, U>(l: List<[T, U]>): List<T>, List<U> # list_unzip
-    hidden static s_range(start: Int, end: Int): List<Int> # list_range
+    private static s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
+    private static s_unzip<T, U>(l: List<#[T, U]>): List<T>, List<U> # list_unzip
+    private static s_range(start: Int, end: Int): List<Int> # list_range
 
-    static zip<T, U>(l1: List<T>, l2: List<U>): List<[T, U]>
+    static zip<T=?, U=?>(l1: List<T>, l2: List<U>): List<#[T, U]>
         requires release List<T>::s_size(l1) == List<U>::s_size(l2);
     {
         return ListOf::s_zip<T, U>(l1, l2);
     }
 
-    static unzip<T, U>(l: List<[T, U]>): List<T>, List<U> {
+    static unzip<T=?, U=?>(l: List<#[T, U]>): List<T>, List<U> {
         return ListOf::s_unzip<T, U>(l);
     }
 
-    static range(start: Int, end: Int): List<Int>
+    static {when T Int} range(start: Int, end: Int): List<Int>
         requires release start <= end;
     {
         return ListOf::s_range(start, end);
+    }
+
+    method {when T Float64} sigmaSum(): List<Float64> {
+        //TODO: fill in
+    }
+
+    method {when T Float64} product(): List<Float64> {
+        //TODO: fill in
+    }
+
+    method {when T Float64} floatMax(): List<Float64> {
+        //TODO: fill in
+    }
+
+    method {when T Float64} floatMin(): List<Float64> {
+        //TODO: fill in
+    }
+
+    recursive? method floatArgMax(vf: recursive? fn(_: T) -> Float64): T {
+        //TODO: fill in
+    }
+
+    recursive? method floatArgMin(vf: recursive? fn(_: T) -> Float64): T {
+        //TODO: fill in
     }
 }

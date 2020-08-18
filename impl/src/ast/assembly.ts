@@ -31,14 +31,12 @@ class TemplateTermDecl {
     readonly constraint: TypeSignature;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
-    readonly isLiteral: boolean;
 
-    constructor(name: string, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined, isliteral: boolean) {
+    constructor(name: string, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
         this.constraint = constraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
-        this.isLiteral = isliteral;
     }
 }
 
