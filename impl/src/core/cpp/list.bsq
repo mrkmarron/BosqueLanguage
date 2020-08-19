@@ -47,7 +47,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private static s_concat(l: List<List<T>>): List<T> # list_concat
     private static s_fill(k: Int, val: T): List<T> # list_fill
 
-    private static {when T KeyType} s_toset(l: List<T>): Set<T> # list_toset
+    private static {when T grounded KeyType} s_toset(l: List<T>): Set<T> # list_toset
 
     private recursive? static s_all(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_all
     private recursive? static s_none(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_none
@@ -62,13 +62,20 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private recursive? static s_indexofnot(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexofnot
     private recursive? static s_indexoflastnot(l: List<T>, s: Int, e: Int, p: recursive? fn(_: T) -> Bool): Int # list_indexoflastnot
 
-    private recursive? static {when T KeyType} s_count_keytype(l: List<T>, v: T): Int # list_count_keytype
-    private recursive? static {when T KeyType} s_indexof_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexof_keytype
-    private recursive? static {when T KeyType} s_indexoflast_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexoflast_keytype
+    private recursive? static {when T grounded KeyType} s_count_keytype(l: List<T>, v: T): Int # list_count_keytype
+    private recursive? static {when T grounded KeyType} s_indexof_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexof_keytype
+    private recursive? static {when T grounded KeyType} s_indexoflast_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexoflast_keytype
 
-    private recursive? static {when T KeyType} s_min(l: List<T>): T # list_min
-    private recursive? static {when T KeyType} s_max(l: List<T>): T # list_max
-    private recursive? static {when T Int || T BigInt} s_sum(l: List<T>): T # list_sum
+    private recursive? static {when T grounded KeyType} s_min(l: List<T>): T # list_min
+    private recursive? static {when T <(T, T)} s_minof(l: List<T>): T # list_minof
+    private recursive? static {when T grounded KeyType} s_max(l: List<T>): T # list_max
+    private recursive? static {when T <(T, T)} s_maxof(l: List<T>): T # list_maxof
+
+    private recursive? static s_argmin<V where <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmin
+    private recursive? static s_argmax<V where <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmax
+
+    private recursive? static {when T +(T, T)} s_sum(l: List<T>): T # list_sum
+    private recursive? static {when T *(T, T)} s_product(l: List<T>): T # list_product
 
     private recursive? static s_filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
     private recursive? static s_filternot(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filternot
@@ -175,7 +182,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return i < List<T>::s_size(this) ? List<T>::s_unsafe_get(this, i) : default;
     }
 
-    method {when T KeyType} toSet(): Set<T> {
+    method {when T grounded KeyType} toSet(): Set<T> {
         return List<T>::s_toset(this);
     }
 
@@ -223,15 +230,15 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_countnot[recursive?](this, p);
     }
 
-    method {when T KeyType} contains(v: T): Bool {
+    method {when T grounded KeyType} contains(v: T): Bool {
         return List<T>::s_indexof_keytype(this, 0, List<T>::s_size(this), v) != List<T>::s_size(this);
     }
 
-    method {when T KeyType} count(v: T): Int {
+    method {when T grounded KeyType} count(v: T): Int {
         return List<T>::s_count_keytype(this, v);
     }
 
-    method {when T KeyType} min(): T 
+    method {when T grounded KeyType} min(): T 
         requires release List<T>::s_size(this) != 0;
     {
         return List<T>::s_min(this);
@@ -239,6 +246,16 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     method {when T KeyType} tryMin(): T? {
         return List<T>::s_size(this) != 0 ? List<T>::s_min(this) : none;
+    }
+
+    method {when T <(T, T)} minOf(): T 
+        requires release List<T>::s_size(this) != 0;
+    {
+        return List<T>::s_min_ordtype(this);
+    }
+
+    method {when T <(T, T)} tryMinOf(): T? {
+        return List<T>::s_size(this) != 0 ? List<T>::s_min_ordtype(this) : none;
     }
 
     method {when T KeyType} max(): T 
@@ -251,24 +268,42 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_size(this) != 0 ? List<T>::s_max(this) : none;
     }
 
-    recursive? method argMin<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T {
-        //TODO: fill in
+     method {when T <(T, T)} maxOf(): T 
+        requires release List<T>::s_size(this) != 0;
+    {
+        return List<T>::s_max(this);
     }
 
-    recursive? method tryArgMin<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T? {
-        //TODO: fill in
+    method {when T <(T, T)} tryMaxOf(): T? {
+        return List<T>::s_size(this) != 0 ? List<T>::s_max(this) : none;
     }
 
-    recursive? method argMax<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T {
-        //TODO: fill in
+    recursive? method argMin<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T
+        requires release List<T>::s_size(this) != 0;
+    {
+        return List<T>::s_argmin[recursive?](this, vf);
     }
 
-    recursive? method tryArgMax<K=? where KeyType>(vf: recursive? fn(_: T) -> K): T? {
-        //TODO: fill in
+    recursive? method tryArgMin<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
+        return List<T>::s_size(this) != 0 ? List<T>::s_argmin[recursive?](this, vf) : none;
     }
 
-    method {when T Int || T BigInt} sum(): T {
-        return List<T>::s_sum(this);
+    recursive? method argMax<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T 
+        requires release List<T>::s_size(this) != 0;
+    {
+        return List<T>::s_argmax[recursive?](this, vf);
+    }
+
+    recursive? method tryArgMax<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
+        return List<T>::s_size(this) != 0 ? List<T>::s_argmin[recursive?](this, vf) : none;
+    }
+
+    method {when T +(T, T)} sum(): T {
+        return List<Int>::s_sum(this);
+    }
+    
+    method {when T *(T, T)} product(): T {
+        return List<Int>::s_product(this);
     }
 
     recursive? method find(p: recursive? fn(_: T) -> Bool): T {
@@ -573,29 +608,5 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         requires release start <= end;
     {
         return ListOf::s_range(start, end);
-    }
-
-    method {when T Float64} sigmaSum(): List<Float64> {
-        //TODO: fill in
-    }
-
-    method {when T Float64} product(): List<Float64> {
-        //TODO: fill in
-    }
-
-    method {when T Float64} floatMax(): List<Float64> {
-        //TODO: fill in
-    }
-
-    method {when T Float64} floatMin(): List<Float64> {
-        //TODO: fill in
-    }
-
-    recursive? method floatArgMax(vf: recursive? fn(_: T) -> Float64): T {
-        //TODO: fill in
-    }
-
-    recursive? method floatArgMin(vf: recursive? fn(_: T) -> Float64): T {
-        //TODO: fill in
     }
 }

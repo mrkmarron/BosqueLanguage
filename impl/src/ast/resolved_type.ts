@@ -341,6 +341,33 @@ class ResolvedType {
             }
         });
     }
+
+    isUniqueType(): boolean {
+        if(this.options.length !== 1) {
+            return false;
+        }
+
+        const opt = this.options[0];
+        if (opt instanceof ResolvedConceptAtomType) {
+            return false;
+        }
+        else if (opt instanceof ResolvedEntityAtomType) {
+            return true;
+        }
+        else if (opt instanceof ResolvedLiteralAtomType) {
+            return true;
+        }
+        else if (opt instanceof ResolvedTupleAtomType) {
+            return opt.grounded && opt.types.every((entry) => !entry.isOptional);
+        }
+        else if (opt instanceof ResolvedRecordAtomType) {
+            return opt.grounded && opt.entries.every((entry) => !entry.isOptional);
+        }
+        else {
+            //ephemeral list should never be in a grounded position
+            return false;
+        }
+    }
 }
 
 class ResolvedFunctionTypeParam {

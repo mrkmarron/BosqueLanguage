@@ -23,7 +23,9 @@ const KeywordStrings = [
     "recursive?",
     "recursive",
     "memoized",
-    "grounded",
+    "prefix",
+    "infix",
+    "dynamic",
 
     "_debug",
     "abort",
@@ -44,14 +46,17 @@ const KeywordStrings = [
     "fn",
     "function",
     "global",
+    "grounded",
     "identifier",
     "if",
     "invariant",
+    "let",
     "literal",
     "method",
     "namespace",
     "none",
     "ok",
+    "operator",
     "or",
     "private",
     "provides",
@@ -65,8 +70,8 @@ const KeywordStrings = [
     "true",
     "type",
     "typedef",
+    "unique",
     "validate",
-    "let",
     "var",
     "when",
     "where",
@@ -165,7 +170,7 @@ const RegexFollows = new Set<string>([
 const LeftScanParens = ["[", "(", "{", "(|", "{|"];
 const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
-const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive?", "recursive", "memoized", "grounded"];
+const AttributeStrings = ["struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive?", "recursive", "memoized", "grounded", "prefix", "infix", "dynamic"];
 
 const UnsafeFieldNames = ["is", "as", "tryAs", "isNone", "isSome", "update"]
 
@@ -179,12 +184,16 @@ const TokenStrings = {
     String: "[LITERAL_STRING]",
     Regex: "[LITERAL_REGEX]",
     TypedString: "[LITERAL_TYPED_STRING]",
+    TypedInt: "[LITERAL_TYPED_INT]",
+    TypedBigInt: "[LITERAL_TYPED_BIGINT]",
+    TypedFloat: "[LITERAL_TYPED_FLOAT]",
 
     //Names
     Namespace: "[NAMESPACE]",
     Type: "[TYPE]",
     Template: "[TEMPLATE]",
     Identifier: "[IDENTIFIER]",
+    Operator: "[OPERATOR]",
 
     EndOfStream: "[EOS]"
 };
@@ -299,8 +308,6 @@ class Lexer {
     }
 
     //TODO: we need to make sure that someone doesn't name a local variable "_"
-    //      operators are going to be <identifier> will need to do follow aware parsing like for the / in regex
-    //      this needs unicode support
     private static isIdentifierName(str: string) {
         return /^([$]?([_\p{L}][_\p{L}\p{Nd}]*))$/u.test(str);
     }
@@ -423,11 +430,13 @@ class Lexer {
         }
 
         const sym = Lexer.findSymbolString(m[0]);
-        if (sym === undefined) {
-            return false;
+        if (sym !== undefined) {
+            this.recordLexToken(this.m_cpos + sym.length, sym);
+            return true;
         }
         else {
-            this.recordLexToken(this.m_cpos + sym.length, sym);
+            const oper = m[0];
+            this.recordLexTokenWData(this.m_cpos + oper.length, TokenStrings.Operator, oper);
             return true;
         }
     }
@@ -926,7 +935,7 @@ class Parser {
     }
 
     private parsePostfixTypeReference(): TypeSignature {
-        let roottype = this.parseProjectType();
+        let roottype = this.parseCombineCombinatorType();
         while (this.testToken("?")) {
             roottype = this.parseNoneableType(roottype);
         }
@@ -938,21 +947,8 @@ class Parser {
         return Parser.orOfTypeSignatures(basetype, this.m_penv.SpecialNoneSignature);
     }
 
-    private parseProjectType(): TypeSignature {
-        const ltype = this.parseCombineCombinatorType();
-        if (!this.testToken("!")) {
-            return ltype;
-        }
-        else {
-            this.consumeToken();
-            const ptype = this.parseNominalType();
-            
-            return new ProjectTypeSignature(ltype, ptype);
-        }
-    }
-
     private parseCombineCombinatorType(): TypeSignature {
-        const ltype = this.parseBaseTypeReference();
+        const ltype = this.parseProjectType();
         if (!this.testToken("&") && !this.testToken("+")) {
             return ltype;
         }
@@ -968,9 +964,21 @@ class Parser {
         }
     }
 
+    private parseProjectType(): TypeSignature {
+        const ltype = this.parseBaseTypeReference();
+        if (!this.testToken("!")) {
+            return ltype;
+        }
+        else {
+            this.consumeToken();
+            const ptype = this.parseNominalType();
+            
+            return new ProjectTypeSignature(ltype, ptype);
+        }
+    }
+
     private parseBaseTypeReference(): TypeSignature {
         switch (this.peekToken()) {
-            case "*":
             case TokenStrings.Template:
                 return this.parseTemplateTypeReference();
             case TokenStrings.Namespace:
@@ -1022,6 +1030,8 @@ class Parser {
         if (ns === undefined) {
             this.raiseError(line, "Could not resolve namespace");
         }
+
+        xxxx;
 
         if (!this.testToken("<")) {
             return new NominalTypeSignature(ns as string, tname);
@@ -2884,7 +2894,6 @@ class Parser {
 
     private parseTermRestrictionList(): TemplateTypeRestriction[] {
         const trl = this.parseSingleTermRestriction();
-        xxxx; //allow list of ands / list of ors
         if (this.testAndConsumeTokenIf("&&")) {
             const ands = this.parseTermRestrictionList();
             return [trl, ...ands];
