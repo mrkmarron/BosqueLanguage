@@ -25,13 +25,13 @@ class TemplateTypeSignature extends TypeSignature {
 
 class NominalTypeSignature extends TypeSignature {
     readonly nameSpace: string;
-    readonly baseName: string;
+    readonly tnames: string[];
     readonly terms: TypeSignature[];
 
-    constructor(ns: string, base: string, terms?: TypeSignature[]) {
+    constructor(ns: string, tnames: string[], terms?: TypeSignature[]) {
         super();
         this.nameSpace = ns;
-        this.baseName = base;
+        this.tnames = tnames;
         this.terms = terms || [];
     }
 }
@@ -83,14 +83,16 @@ class FunctionParameter {
     readonly type: TypeSignature;
     readonly isRef: boolean;
     readonly isOptional: boolean;
-    readonly optValue: Expression | undefined;
+    readonly isLiteral: boolean;
+    readonly exp: Expression | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, optValue: Expression | undefined) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, isLiteral: boolean, exp: Expression | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
-        this.optValue = optValue;
+        this.isLiteral = isLiteral;
+        this.exp = exp;
     }
 }
 

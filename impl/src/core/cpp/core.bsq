@@ -111,8 +111,8 @@ struct entity Bool provides Some, KeyType, PODType, APIType, NotOpProvider {
 struct entity Int provides Some, KeyType, Parsable, PODType, APIType {
     private static s_mod(a: Int, b: Int): Int # int_mod
 
-    const min_value: Int = -9007199254740991;
-    const max_value: Int = 9007199254740991;
+    const min_value: Int = -9223372036854775808;
+    const max_value: Int = 9223372036854775807;
 
     override static parse(str: String): Result<Int, String> # int_tryparse
     static stringify(i: Int): String # int_tostring
@@ -136,13 +136,31 @@ struct entity Int provides Some, KeyType, Parsable, PODType, APIType {
     }
 }
 
+//<summary>Primitive natural number value.</summary>
+struct entity Nat provides Some, KeyType, Parsable, PODType, APIType {
+    const max_value: Nat = 18446744073709551615;
+
+    override static parse(str: String): Result<Nat, String> # nat_tryparse
+    static stringify(i: Nat): String # nat_tostring
+
+    static max(v1: Nat, v2: Nat): Nat {
+        return v1 > v2 ? v1 : v2;
+    }
+
+    static min(v1: Nat, v2: Nat): Nat {
+        return v1 < v2 ? v1 : v2;
+    }
+
+    static mod(a: Nat, b: Int): Nat # nat_mod
+}
+
 //<summary>Primitive big-integer value.</summary>
 struct entity BigInt provides Some, KeyType, Parsable, PODType, APIType {
     override static parse(str: String): Result<BigInt, String> # bigint_tryparse
     static stringify(i: BigInt): String # bigint_tostring
 
-    const min_safeInt: BigInt = BigInt::fromInt(-9007199254740991);
-    const max_safeInt: BigInt = BigInt::fromInt(9007199254740991);
+    const min_safeInt: BigInt = -9223372036854775808I;
+    const max_safeInt: BigInt = 9223372036854775807I;
 
     method isSafeInt(): Bool {
         return BigInt::min_safeInt <= this && this <= BigInt::max_safeInt;
@@ -152,12 +170,43 @@ struct entity BigInt provides Some, KeyType, Parsable, PODType, APIType {
     method toInt(): Int # bigint_toint 
 }
 
+
+//<summary>Primitive big-integer value.</summary>
+struct entity BigNat provides Some, KeyType, Parsable, PODType, APIType {
+    override static parse(str: String): Result<BigNat, String> # bignat_tryparse
+    static stringify(i: BigInt): String # bignat_tostring
+
+    const max_safeNat: BigInt = 18446744073709551615N;
+
+    method isSafeNat(): Bool {
+        return this <= BigNat::max_safeInt;
+    }
+
+    static fromNat(n: Nat): BigInt # bignat_fromnat
+    method toNat(): Nat # bignat_tonat
+}
+
+//<summary>Primitive big-integer value.</summary>
+struct entity Rational provides Some, KeyType, Parsable, PODType, APIType {
+    override static parse(str: String): Result<Rational, String> # rational_tryparse
+    static stringify(i: Rational): String # rational_tostring
+
+    method isIntegral(): Bool # rational_isint
+    method isSafeIntegral(): Bool # rational_issafeint
+
+    static fromInt(n: Int): Rational # rational_fromint
+    method toInt(): Int # rational_toint
+
+    static fromBigInt(bi: BigInt): Rational # rational_fromnat
+    method toBigInt(): BigInt # rational_tonat
+}
+
 //<summary>Primitive float 64 value.</summary>
 struct entity Float64 provides Some, Parsable, PODType, APIType {
-    private static s_float_min_value(): Float64 # float_min_value
-    private static s_float_max_value(): Float64 # float_max_value
-    private static s_float_infinity_value(): Float64 # float_infinity_value
-    private static s_float_nan_value(): Float64 # float_nan_value
+    private static s_float_min_value(): Float64 # float64_min_value
+    private static s_float_max_value(): Float64 # float64_max_value
+    private static s_float_infinity_value(): Float64 # float64_infinity_value
+    private static s_float_nan_value(): Float64 # float64_nan_value
 
     const min_value: Float64 = Float64::s_float_min_value();
     const max_value: Float64 = Float64::s_float_max_value();
@@ -165,8 +214,8 @@ struct entity Float64 provides Some, Parsable, PODType, APIType {
     const infinity: Float64 = Float64::s_float_infinity_value();
     const nan: Float64 = Float64::s_float_nan_value();
     
-    const pi: Float64 = 3.1415926535897931f;
-    const e: Float64 = 2.7182818284590451f;
+    const pi: Float64 = 3.1415926535897931;
+    const e: Float64 = 2.7182818284590451;
 
     override static parse(str: String): Result<Float64, String> # float64_tryparse
     static stringify(f: Float64): String # float64_tostring
@@ -209,6 +258,95 @@ struct entity Float64 provides Some, Parsable, PODType, APIType {
     }
 
     static max(v1: Float64, v2: Float64): Float64 {
+        return v1 > v2 ? v1 : v2;
+    }
+}
+
+//<summary>Primitive float decimal value.</summary>
+struct entity Decimal provides Some, Parsable, PODType, APIType {
+    private static s_decimal_min_value(): Float64 # decimal_min_value
+    private static s_decimal_max_value(): Float64 # decimal_max_value
+
+    const min_value: Decimal = Decimal::s_decimal_min_value();
+    const max_value: Decimal = Decimal::s_decimal_max_value();
+
+    override static parse(str: String): Result<Decimal, String> # decimal_tryparse
+    static stringify(d: Decimal): String # decimal_tostring
+
+    method abs(): Decimal {
+        return this < 0 ? -this : this;
+    }
+
+    method ceiling(): Decimal # decimal_ceiling
+    method floor(): Decimal # decimal_floor
+    method round(x?: Nat): Decimal # decimal_round
+
+    static min(v1: Decimal, v2: Decimal): Decimal {
+        return v1 < v2 ? v1 : v2;
+    }
+
+    static max(v1: Decimal, v2: Decimal): Decimal {
+        return v1 > v2 ? v1 : v2;
+    }
+}
+
+//<summary>Primitive float 128 value.</summary>
+struct entity Float128 provides Some, Parsable, PODType, APIType {
+    private static s_float_min_value(): Float128 # float128_min_value
+    private static s_float_max_value(): Float128 # float128_max_value
+    private static s_float_infinity_value(): Float128 # float128_infinity_value
+    private static s_float_nan_value(): Float128 # float128_nan_value
+
+    const min_value: Float128 = Float128::s_float_min_value();
+    const max_value: Float128 = Float128::s_float_max_value();
+
+    const infinity: Float128 = Float128::s_float_infinity_value();
+    const nan: Float128 = Float128::s_float_nan_value();
+    
+    const pi: Float128 = 3.1415926535897931F;
+    const e: Float128 = 2.7182818284590451F;
+
+    override static parse(str: String): Result<Float128, String> # float128_tryparse
+    static stringify(f: Float128): String # float128_tostring
+
+    method isInfinite(): Bool # float128_isinfinity
+    method isNan(): Bool # float128_isnan
+
+    method abs(): Float128 {
+        return this < 0 ? -this : this;
+    }
+
+    method ceiling(): Float128 # float128_ceiling
+    method floor(): Float128 # float128_floor
+
+    static pow(x: Float128, y: Float128): Float128 # float128_pow
+    static pow2(v: Float128): Float128 # float128_pow2
+    static pow10(v: Float128): Float128 # float128_pow10
+    static exp(v: Float128): Float128 # float128_exp
+
+    static root(x: Float128, y: Float128): Float128 # float128_root
+
+    method square(): Float128 {
+        return this * this;
+    }
+
+    method sqrt(): Float128 {
+        return Float128::root(this, 2.0F);
+    }
+    
+    static log2(v: Float128): Float128 # float128_log2
+    static log10(v: Float128): Float128 # float128_log10
+    static log(x: Float128, y: Float128): Float128 # float128_log
+
+    method sin(): Float128 # float128_sin
+    method cos(): Float128 # float128_cos
+    method tan(): Float128 # float128_tan
+
+    static min(v1: Float128, v2: Float128): Float128 {
+        return v1 < v2 ? v1 : v2;
+    }
+
+    static max(v1: Float128, v2: Float128): Float128 {
         return v1 > v2 ? v1 : v2;
     }
 }
@@ -491,7 +629,8 @@ concept Expandoable<T> provides Object {
     method expand<U>(): List<U> # special_method
 }
 
-//Magic happens for Int, BigInt, Float64
+//Magic happens for all number types
+abstract prefix operator +(a: Any): Any 1;
 abstract prefix operator -(a: Any): Any 1;
 
 abstract infix operator *(a: Any, b, Any): Any 2;
@@ -499,7 +638,7 @@ abstract infix operator /(a: Any, b, Any): Any 2;
 abstract infix operator +(a: Any, b, Any): Any 3;
 abstract infix "+-" operator -(a: Any, b, Any): Any 3;
 
-//Magic happens for None, KeyTypes, and Float64
+//Magic happens for None, KeyTypes, and number types
 abstract infix operator ==(a: Any, b: Any): Bool 4;
 abstract infix operator !=(a: Any, b: Any): Bool 4;
 abstract infix operator <(a: Any, b: Any): Bool 4;
