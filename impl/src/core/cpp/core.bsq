@@ -27,11 +27,11 @@ concept Any {
 //<summary>Special type for representing all non-none values.</summary>
 concept Some provides Any {
     method update(): Some # special_method
+    method coerce(): Some # special_method
 }
 
 //<summary>Special type for indicating this type supports typed string use.</summary>
 concept Parsable provides Any {
-    abstract static parse(str: String): Result<Any, String>;
 }
 
 //<summary>Special type that all Validator (regex etc.) types provide.</summary>
@@ -61,19 +61,8 @@ concept APIType provides APIValue {
     static parseBuffer<T grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
 }
 
-//<summary>Type for Int values that can be parsed as literal values.</summary>
-concept IntConverter provides Any {
-    abstract static convertInt(x: Int): Result<Any, String>;
-}
-
-//<summary>Type for BigInt values that can be parsed as literal values.</summary>
-concept BigIntConverter provides Any {
-    abstract static convertBigInt(x: BigInt): Result<Any, String>;
-}
-
-//<summary>Type for Float64 values that can be parsed as literal values.</summary>
-concept Float64Converter provides Any {
-    abstract static convertFloat64(x: Float64): Result<Any, String>;
+//<summary>Type for Numeric values that can be parsed as literal values.</summary>
+concept NumericUnit provides Any {
 }
 
 //<summary>Type for representing the none-value.</summary>
@@ -629,6 +618,7 @@ concept Expandoable<T> provides Object {
     method expand<U>(): List<U> # special_method
 }
 
+/*
 //Magic happens for all number types
 abstract prefix operator +(a: Any): Any 1;
 abstract prefix operator -(a: Any): Any 1;
@@ -636,7 +626,7 @@ abstract prefix operator -(a: Any): Any 1;
 abstract infix operator *(a: Any, b, Any): Any 2;
 abstract infix operator /(a: Any, b, Any): Any 2;
 abstract infix operator +(a: Any, b, Any): Any 3;
-abstract infix "+-" operator -(a: Any, b, Any): Any 3;
+abstract infix operator -(a: Any, b, Any): Any 3;
 
 //Magic happens for None, KeyTypes, and number types
 abstract infix operator ==(a: Any, b: Any): Bool 4;
@@ -645,7 +635,6 @@ abstract infix operator <(a: Any, b: Any): Bool 4;
 abstract infix operator >(a: Any, b: Any): Bool 4;
 abstract infix operator <=(a: Any, b: Any): Bool 4;
 abstract infix operator >=(a: Any, b: Any): Bool 4;
-
-
+*/
 
 

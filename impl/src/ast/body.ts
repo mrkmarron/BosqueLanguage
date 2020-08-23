@@ -163,8 +163,8 @@ enum ExpressionTag {
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
     SpecialConstructorExpression = "SpecialConstructorExpression",
-    CallNamespaceFunctionExpression = "CallNamespaceFunctionExpression",
-    CallStaticFunctionExpression = "CallStaticFunctionExpression",
+    CallNamespaceFunctionOrOperatorExpression = "CallNamespaceFunctionOrOperatorExpression",
+    CallStaticFunctionOrOperatorExpression = "CallStaticFunctionOrOperatorExpression",
 
     PostfixOpExpression = "PostfixOpExpression",
 
@@ -331,41 +331,17 @@ class LiteralTypedStringExpression extends Expression {
     }
 }
 
-class LiteralTypedIntConstructorExpression extends Expression {
+class LiteralTypedNumericConstructorExpression extends Expression {
     readonly value: string;
-    readonly stype: TypeSignature;
+    readonly ntype: TypeSignature;
+    readonly vtype: TypeSignature;
     readonly isvalue: boolean;
 
-    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, stype: TypeSignature) {
+    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, ntype: TypeSignature, vtype: TypeSignature) {
         super(ExpressionTag.LiteralTypedIntConstructorExpression, sinfo);
         this.value = value;
-        this.stype = stype;
-        this.isvalue = isvalue;
-    }
-}
-
-class LiteralTypedBigIntConstructorExpression extends Expression {
-    readonly value: string;
-    readonly stype: TypeSignature;
-    readonly isvalue: boolean;
-
-    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, stype: TypeSignature) {
-        super(ExpressionTag.LiteralTypedBigIntConstructorExpression, sinfo);
-        this.value = value;
-        this.stype = stype;
-        this.isvalue = isvalue;
-    }
-}
-
-class LiteralTypedFloatConstructorExpression extends Expression {
-    readonly value: string;
-    readonly stype: TypeSignature;
-    readonly isvalue: boolean;
-
-    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, stype: TypeSignature) {
-        super(ExpressionTag.LiteralTypedFloatConstructorExpression, sinfo);
-        this.value = value;
-        this.stype = stype;
+        this.ntype = ntype;
+        this.vtype = vtype;
         this.isvalue = isvalue;
     }
 }
@@ -514,7 +490,7 @@ class SpecialConstructorExpression extends Expression {
     }
 }
 
-class CallNamespaceFunctionExpression extends Expression {
+class CallNamespaceFunctionOrOperatorExpression extends Expression {
     readonly ns: string;
     readonly name: string;
     readonly pragmas: PragmaArguments;
@@ -522,7 +498,7 @@ class CallNamespaceFunctionExpression extends Expression {
     readonly args: Arguments;
 
     constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
-        super(ExpressionTag.CallNamespaceFunctionExpression, sinfo);
+        super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ns = ns;
         this.name = name;
         this.pragmas = pragmas;
@@ -531,7 +507,7 @@ class CallNamespaceFunctionExpression extends Expression {
     }
 }
 
-class CallStaticFunctionExpression extends Expression {
+class CallStaticFunctionOrOperatorExpression extends Expression {
     readonly ttype: TypeSignature;
     readonly name: string;
     readonly pragmas: PragmaArguments;
@@ -539,7 +515,7 @@ class CallStaticFunctionExpression extends Expression {
     readonly args: Arguments;
 
     constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
-        super(ExpressionTag.CallStaticFunctionExpression, sinfo);
+        super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ttype = ttype;
         this.name = name;
         this.pragmas = pragmas;
@@ -559,6 +535,7 @@ enum PostfixOpTag {
 
     PostfixIs = "PostfixIs",
     PostfixAs = "PostfixAs",
+    PostfixCoerce = "PostfixCoerce",
     PostfixInvoke = "PostfixInvoke"
 }
 
@@ -669,6 +646,16 @@ class PostfixAs extends PostfixOperation {
         this.astype = astype;
     }
 }
+
+class PostfixCoerce extends PostfixOperation {
+    readonly terms: TemplateArguments;
+
+    constructor(sinfo: SourceInfo, isElvis: boolean, terms: TemplateArguments) {
+        super(sinfo, isElvis, PostfixOpTag.PostfixCoerce);
+        this.terms = terms;
+    }
+}
+
 
 class PostfixInvoke extends PostfixOperation {
     readonly binder: Set<string> | undefined;
@@ -1132,9 +1119,9 @@ class DebugStatement extends Statement {
 }
 
 class NakedCallStatement extends Statement {
-    readonly call: CallNamespaceFunctionExpression | CallStaticFunctionExpression;
+    readonly call: CallNamespaceFunctionOrOperatorExpression | CallStaticFunctionOrOperatorExpression;
 
-    constructor(sinfo: SourceInfo, call: CallNamespaceFunctionExpression | CallStaticFunctionExpression) {
+    constructor(sinfo: SourceInfo, call: CallNamespaceFunctionOrOperatorExpression | CallStaticFunctionOrOperatorExpression) {
         super(StatementTag.NakedCallStatement, sinfo);
         this.call = call;
     }
@@ -1167,12 +1154,14 @@ export {
     LiteralNoneExpression, LiteralBoolExpression, 
     LiteralIntegerExpression, LiteralNaturalExpression, LiteralFloatExpression, LiteralDecimalExpression, LiteralQuadFloatExpression, LiteralBigIntegerExpression, LiteralBigNaturalExpression, LiteralRationalExpression, 
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 
-    LiteralTypedStringConstructorExpression,
+    LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
-    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, ConstructorPCodeExpression, SpecialConstructorExpression, CallNamespaceFunctionExpression, CallStaticFunctionExpression,
+    ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
+    ConstructorPCodeExpression, SpecialConstructorExpression, 
+    CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
-    PostfixIs, PostfixAs, PostfixInvoke, PCodeInvokeExpression,
+    PostfixIs, PostfixAs, PostfixCoerce, PostfixInvoke, PCodeInvokeExpression,
     PrefixOp, 
     BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     MapEntryConstructorExpression,

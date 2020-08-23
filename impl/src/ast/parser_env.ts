@@ -93,7 +93,16 @@ class ParserEnvironment {
     readonly SpecialAnySignature: TypeSignature;
     readonly SpecialNoneSignature: TypeSignature;
     readonly SpecialBoolSignature: TypeSignature;
+    
     readonly SpecialIntSignature: TypeSignature;
+    readonly SpecialNatSignature: TypeSignature;
+    readonly SpecialFloatSignature: TypeSignature;
+    readonly SpecialDecimalSignature: TypeSignature;
+    readonly SpecialQuadFloatSignature: TypeSignature;
+    readonly SpecialBigIntSignature: TypeSignature;
+    readonly SpecialBigNatSignature: TypeSignature;
+    readonly SpecialRationalSignature: TypeSignature;
+
     readonly SpecialAutoSignature: TypeSignature;
 
     constructor(assembly: Assembly) {
@@ -106,8 +115,17 @@ class ParserEnvironment {
 
         this.SpecialAnySignature = new NominalTypeSignature("NSCore", ["Any"], []);
         this.SpecialNoneSignature = new NominalTypeSignature("NSCore", ["None"], []);
-        this.SpecialBoolSignature = new NominalTypeSignature("NSCore", ["None"], []);
-        this.SpecialIntSignature = new NominalTypeSignature("NSCore", ["None"], []);
+        this.SpecialBoolSignature = new NominalTypeSignature("NSCore", ["Bool"], []);
+
+        this.SpecialIntSignature = new NominalTypeSignature("NSCore", ["Int"], []);
+        this.SpecialNatSignature = new NominalTypeSignature("NSCore", ["Nat"], []);
+        this.SpecialFloatSignature = new NominalTypeSignature("NSCore", ["Float64"], []);
+        this.SpecialDecimalSignature = new NominalTypeSignature("NSCore", ["Decimal"], []);
+        this.SpecialQuadFloatSignature = new NominalTypeSignature("NSCore", ["Float128"], []);
+        this.SpecialBigIntSignature = new NominalTypeSignature("NSCore", ["BigInt"], []);
+        this.SpecialBigNatSignature = new NominalTypeSignature("NSCore", ["BigNat"], []);
+        this.SpecialRationalSignature = new NominalTypeSignature("NSCore", ["Rational"], []);
+
         this.SpecialAutoSignature = new AutoTypeSignature();
     }
 
@@ -140,6 +158,10 @@ class ParserEnvironment {
         return this.m_currentNamespace as string;
     }
 
+    isVarDefinedInAnyScope(name: string): boolean {
+        return this.m_functionScopes.some((sc) => sc.isVarNameDefined(name));
+    }
+
     tryResolveNamespace(ns: string | undefined, typename: string): string | undefined {
         if (ns !== undefined) {
             return ns;
@@ -159,6 +181,34 @@ class ParserEnvironment {
                 return fromns !== undefined ? fromns.fromNamespace : undefined;
             }
         }
+    }
+
+    tryResolveAsPrefixUnaryOperator(opname: string, level: number): string | undefined {
+        const nsdecl = this.assembly.getNamespace(this.m_currentNamespace as string);
+        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.prefixUnaryOperators.get(opname) !== undefined) {
+            return (nsdecl.prefixUnaryOperators.get(opname) as PrefixUnaryOperator).level === level ? this.m_currentNamespace as string : undefined;
+        }
+
+        const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
+        if(fromns !== undefined && fromns.prefixUnaryOperators.get(opname) !== undefined) {
+            return (fromns.prefixUnaryOperators.get(opname) as PrefixUnaryOperator).level === level ? fromns.fromNamespace : undefined;
+        }
+
+        return undefined;
+    }
+
+    tryResolveAsInfixBinaryOperator(opname: string, level: number): string | undefined {
+        const nsdecl = this.assembly.getNamespace(this.m_currentNamespace as string);
+        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.infixBinaryOperators.get(opname) !== undefined) {
+            return (nsdecl.infixBinaryOperators.get(opname) as InfixBinaryOperator).level === level ? this.m_currentNamespace as string : undefined;
+        }
+
+        const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
+        if(fromns !== undefined && fromns.infixBinaryOperators.get(opname) !== undefined) {
+            return (fromns.infixBinaryOperators.get(opname) as InfixBinaryOperator).level === level ? fromns.fromNamespace : undefined;
+        }
+
+        return undefined;
     }
 }
 
