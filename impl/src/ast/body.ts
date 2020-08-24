@@ -608,23 +608,19 @@ class PostfixProjectFromNames extends PostfixOperation {
 }
 
 class PostfixModifyWithIndecies extends PostfixOperation {
-    readonly binder: Set<string> | undefined;
     readonly updates: { index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, binder: Set<string> | undefined, updates: { index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, updates: { index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithIndecies);
-        this.binder = binder;
         this.updates = updates;
     }
 }
 
 class PostfixModifyWithNames extends PostfixOperation {
-    readonly binder: Set<string> | undefined;
     readonly updates: { name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, binder: Set<string> | undefined, updates: { name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, updates: { name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }[]) {
         super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithNames);
-        this.binder = binder;
         this.updates = updates;
     }
 }
@@ -658,16 +654,14 @@ class PostfixCoerce extends PostfixOperation {
 
 
 class PostfixInvoke extends PostfixOperation {
-    readonly binder: Set<string> | undefined;
     readonly specificResolve: TypeSignature | undefined;
     readonly name: string;
     readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, binder: Set<string> | undefined, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
         super(sinfo, isElvis, PostfixOpTag.PostfixInvoke);
-        this.binder = binder;
         this.specificResolve = specificResolve;
         this.name = name;
         this.pragmas = pragmas;

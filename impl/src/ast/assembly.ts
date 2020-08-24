@@ -213,6 +213,35 @@ class StaticFunctionDecl implements OOMemberDecl {
     }
 }
 
+class StaticOperatorDecl implements OOMemberDecl {
+    readonly sourceLocation: SourceInfo;
+    readonly srcFile: string;
+
+    readonly isPrefix: boolean;
+    readonly isInfix: boolean;
+    readonly isDynamic: boolean;
+    readonly attributes: string[];
+    readonly name: string;
+
+    readonly invoke: InvokeDecl;
+
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, invoke: InvokeDecl) {
+        this.sourceLocation = sinfo;
+        this.srcFile = srcFile;
+        this.isPrefix = attributes.includes("prefix");
+        this.isInfix = attributes.includes("infix");
+        this.isDynamic = attributes.includes("dynamic");
+        this.attributes = attributes;
+        this.name = name;
+
+        this.invoke = invoke;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
 class MemberFieldDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
@@ -261,12 +290,28 @@ class MemberMethodDecl implements OOMemberDecl {
     }
 }
 
+enum SpecialTypeCategory {
+    None,
+    ValidatorTypeDecl,
+    EnumTypeDecl,
+    IdentifierTypeDecl,
+    VectorTypeDecl,
+    ListTypeDecl,
+    StackTypeDecl,
+    QueueTypeDecl,
+    SetTypeDecl,
+    DynamicSetTypeDecl,
+    MapTypeDecl,
+    DynamicMapTypeDecl
+}
+
 class OOPTypeDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
     readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
+    readonly specialDecl: SpecialTypeCategory;
     readonly ns: string;
     readonly name: string;
 
@@ -278,17 +323,22 @@ class OOPTypeDecl {
 
     readonly staticMembers: Map<string, StaticMemberDecl>;
     readonly staticFunctions: Map<string, StaticFunctionDecl>;
+    readonly staticOperators = new Map<string, StaticOperatorDecl>();
     readonly memberFields: Map<string, MemberFieldDecl>;
     readonly memberMethods: Map<string, MemberMethodDecl>;
 
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    readonly nestedEntityDecls: Map<string, EntityTypeDecl>;
+
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecl: SpecialTypeCategory, ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
+        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl>,
+        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        nestedEntityDecls: Map<string, EntityTypeDecl>) {
         this.sourceLocation = sourceLocation;
         this.srcFile = srcFile;
         this.pragmas = pragmas;
         this.attributes = attributes;
+        this.specialDecl = specialDecl;
         this.ns = ns;
         this.name = name;
         this.terms = terms;
@@ -296,56 +346,34 @@ class OOPTypeDecl {
         this.invariants = invariants;
         this.staticMembers = staticMembers;
         this.staticFunctions = staticFunctions;
+        this.staticOperators = staticOperators;
         this.memberFields = memberFields;
         this.memberMethods = memberMethods;
+        this.nestedEntityDecls = nestedEntityDecls;
     }
 
     isTypeAnExpandoableCollection(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "List" || this.name === "Set" || this.name === "DynamicSet" || this.name === "Map" || this.name === "DynamicMap";
+        return this.isTypeAListEntity() || this.isTypeASetEntity() || this.isTypeAMapEntity();
     }
 
     isTypeAListEntity(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "List" || this.name === "Vector";
+        return this.specialDecl === SpecialTypeCategory.VectorTypeDecl || this.specialDecl === SpecialTypeCategory.ListTypeDecl;
     }
 
     isTypeAQueueEntity(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "Queue";
+        return this.specialDecl === SpecialTypeCategory.QueueTypeDecl;
     }
 
     isTypeAStackEntity(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "Stack";
+        return this.specialDecl === SpecialTypeCategory.StackTypeDecl;
     }
 
     isTypeASetEntity(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "Set" || this.name === "DynamicSet";
+        return this.specialDecl === SpecialTypeCategory.SetTypeDecl || this.specialDecl === SpecialTypeCategory.DynamicSetTypeDecl;
     }
 
     isTypeAMapEntity(): boolean {
-        if (this.ns !== "NSCore") {
-            return false;
-        }
-
-        return this.name === "Map" || this.name === "DynamicMap";
+        return this.specialDecl === SpecialTypeCategory.MapTypeDecl || this.specialDecl === SpecialTypeCategory.DynamicMapTypeDecl;
     }
 
     static attributeSetContains(attr: string, attrSet: string[]): boolean {
@@ -354,20 +382,22 @@ class OOPTypeDecl {
 }
 
 class ConceptTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecl: SpecialTypeCategory, ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
-        super(sourceLocation, srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl>,
+        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        nestedEntityDecls: Map<string, EntityTypeDecl>) {
+        super(sourceLocation, srcFile, pragmas, attributes, specialDecl, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
 }
 
 class EntityTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecl: SpecialTypeCategory, ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
-        super(sourceLocation, srcFile, pragmas, attributes, ns, name, terms, provides, invariants, staticMembers, staticFunctions, memberFields, memberMethods);
+        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl>,
+        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        nestedEntityDecls: Map<string, EntityTypeDecl>) {
+        super(sourceLocation, srcFile, pragmas, attributes, specialDecl, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
 }
 
@@ -419,6 +449,34 @@ class NamespaceFunctionDecl {
     }
 }
 
+class NamespaceOperatorDecl {
+    readonly sourceLocation: SourceInfo;
+    readonly srcFile: string;
+    readonly isPrefix: boolean;
+    readonly isInfix: boolean;
+    readonly isDynamic: boolean;
+    readonly attributes: string[];
+
+    readonly ns: string;
+    readonly name: string;
+
+    readonly invoke: InvokeDecl;
+
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, invoke: InvokeDecl) {
+        this.sourceLocation = sinfo;
+        this.srcFile = srcFile;
+
+        this.isPrefix = attributes.includes("prefix");
+        this.isInfix = attributes.includes("infix");
+        this.isDynamic = attributes.includes("dynamic");
+        this.attributes = attributes;
+        this.ns = ns;
+        this.name = name;
+
+        this.invoke = invoke;
+    }
+}
+
 class NamespaceTypedef {
     readonly ns: string;
     readonly name: string;
@@ -452,6 +510,7 @@ class NamespaceDeclaration {
     typeDefs: Map<string, NamespaceTypedef>;
     consts: Map<string, NamespaceConstDecl>;
     functions: Map<string, NamespaceFunctionDecl>;
+    operators: Map<string, NamespaceOperatorDecl>;
     concepts: Map<string, ConceptTypeDecl>;
     objects: Map<string, EntityTypeDecl>;
 
@@ -463,6 +522,7 @@ class NamespaceDeclaration {
         this.typeDefs = new Map<string, NamespaceTypedef>();
         this.consts = new Map<string, NamespaceConstDecl>();
         this.functions = new Map<string, NamespaceFunctionDecl>();
+        this.operators = new Map<string, NamespaceOperatorDecl>();
         this.concepts = new Map<string, ConceptTypeDecl>();
         this.objects = new Map<string, EntityTypeDecl>();
     }
@@ -1869,7 +1929,7 @@ class Assembly {
 export {
     BuildLevel, isBuildLevelEnabled,
     TemplateTermDecl, TemplateTypeRestriction, TypeConditionRestriction, PreConditionDecl, PostConditionDecl, InvokeDecl,
-    OOMemberDecl, InvariantDecl, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
-    NamespaceConstDecl, NamespaceFunctionDecl, NamespaceTypedef, NamespaceUsing, NamespaceDeclaration,
+    SpecialTypeCategory, OOMemberDecl, InvariantDecl, StaticMemberDecl, StaticFunctionDecl, StaticOperatorDecl, MemberFieldDecl, MemberMethodDecl, OOPTypeDecl, ConceptTypeDecl, EntityTypeDecl,
+    NamespaceConstDecl, NamespaceFunctionDecl, NamespaceOperatorDecl, NamespaceTypedef, NamespaceUsing, NamespaceDeclaration,
     OOMemberLookupInfo, Assembly
 };

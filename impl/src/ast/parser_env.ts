@@ -9,7 +9,6 @@ import { NominalTypeSignature, TypeSignature, AutoTypeSignature } from "./type_s
 class FunctionScope {
     private readonly m_rtype: TypeSignature;
     private m_captured: Set<string>;
-    private m_scoped: Set<string> | undefined;
     private readonly m_ispcode: boolean;
     private readonly m_args: Set<string>;
     private m_locals: Set<string>[];
@@ -17,7 +16,6 @@ class FunctionScope {
     constructor(args: Set<string>, rtype: TypeSignature, ispcode: boolean) {
         this.m_rtype = rtype;
         this.m_captured = new Set<string>();
-        this.m_scoped = undefined;
         this.m_ispcode = ispcode;
         this.m_args = args;
         this.m_locals = [];
@@ -29,21 +27,6 @@ class FunctionScope {
 
     popLocalScope() {
         this.m_locals.pop();
-    }
-
-    isScoped(): boolean {
-        return this.m_scoped !== undefined;
-    }
-
-    pushScopedCall() {
-        this.m_scoped = new Set<string>();
-    }
-
-    popScopedCall(): Set<string> {
-        const rv = this.m_scoped as Set<string>;
-        this.m_scoped = undefined;
-
-        return rv;
     }
 
     isPCodeEnv(): boolean {
@@ -63,13 +46,8 @@ class FunctionScope {
     }
 
     useLocalVar(name: string) {
-        if (!this.isVarNameDefined(name)) {
-            if(name.startsWith("$") && this.m_scoped !== undefined) {
-                this.m_scoped.add(name);
-            }
-            else {
-                this.m_captured.add(name);
-            }
+        if (!this.isVarNameDefined(name) && !name.startsWith("$")) {
+            this.m_captured.add(name);
         }
     }
 
@@ -139,10 +117,6 @@ class ParserEnvironment {
 
     popFunctionScope(): FunctionScope {
         return this.m_functionScopes.pop() as FunctionScope;
-    }
-
-    checkHasNestedScopes(): boolean {
-        return this.m_functionScopes.some((fs) => fs.isScoped());
     }
 
     setNamespaceAndFile(ns: string, file: string) {
