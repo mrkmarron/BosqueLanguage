@@ -5,12 +5,14 @@
 
 import { ConceptTypeDecl, EntityTypeDecl, OOPTypeDecl } from "./assembly";
 
-class ResolvedAtomType {
+abstract class ResolvedAtomType {
     readonly idStr: string;
 
     constructor(rstr: string) {
         this.idStr = rstr;
     }
+
+    abstract hasTemplateType(): boolean;
 }
 
 class ResolvedTemplateUnifyType extends ResolvedAtomType {
@@ -20,6 +22,10 @@ class ResolvedTemplateUnifyType extends ResolvedAtomType {
 
     static create(name: string): ResolvedTemplateUnifyType {
         return new ResolvedTemplateUnifyType(name);
+    }
+
+    hasTemplateType(): boolean {
+        return true;
     }
 }
 
@@ -40,6 +46,10 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
         }
 
         return new ResolvedEntityAtomType(name, object, binds);
+    }
+
+    hasTemplateType(): boolean {
+        return false;
     }
 }
 
@@ -63,6 +73,10 @@ class ResolvedLiteralAtomType extends ResolvedAtomType {
         }
         
         return new ResolvedLiteralAtomType(rstr, oftype, ofvalue);
+    }
+
+    hasTemplateType(): boolean {
+        return false;
     }
 }
 
@@ -101,6 +115,10 @@ class ResolvedConceptAtomType extends ResolvedAtomType {
 
         return new ResolvedConceptAtomType(rstr, sortedConcepts);
     }
+
+    hasTemplateType(): boolean {
+        return false;
+    }
 }
 
 class ResolvedTupleAtomTypeEntry {
@@ -130,6 +148,10 @@ class ResolvedTupleAtomType extends ResolvedAtomType {
         const grounded = entries.every((entry) => entry.type.isGroundedType());
 
         return new ResolvedTupleAtomType((isvalue ? "#[" : "@[") + cvalue + "]", isvalue, grounded, entries);
+    }
+
+    hasTemplateType(): boolean {
+        return this.types.some((entry) => entry.type.hasTemplateType());
     }
 }
 
@@ -165,6 +187,10 @@ class ResolvedRecordAtomType extends ResolvedAtomType {
 
         return new ResolvedRecordAtomType((isvalue ? "#{" : "@{") + cvalue + "}", isvalue, grounded, simplifiedEntries);
     }
+
+    hasTemplateType(): boolean {
+        return this.entries.some((entry) => entry.type.hasTemplateType());
+    }
 }
 
 class ResolvedEphemeralListType extends ResolvedAtomType {
@@ -179,6 +205,10 @@ class ResolvedEphemeralListType extends ResolvedAtomType {
         const simplifiedEntries = [...entries];
         const cvalue = simplifiedEntries.map((entry) => entry.idStr).join(", ");
         return new ResolvedEphemeralListType("(|" + cvalue + "|)", simplifiedEntries);
+    }
+
+    hasTemplateType(): boolean {
+        return this.types.some((type) => type.hasTemplateType());
     }
 }
 
@@ -234,8 +264,8 @@ class ResolvedType {
         return this.options.length === 0;
     }
 
-    hasTemplateUnifyTypes(): boolean {
-        return this.options.some((opt) => opt instanceof ResolvedTemplateUnifyType);
+    hasTemplateType(): boolean {
+        return this.options.some((opt) => opt.hasTemplateType());
     }
 
     isTupleTargetType(): boolean {

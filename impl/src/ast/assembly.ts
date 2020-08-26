@@ -581,21 +581,16 @@ class Assembly {
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
 
-    private resolveTemplateBinds(declterms: TemplateTermDecl[], giventerms: TypeSignature[], binds: Map<string, ResolvedType>, allowinfer: boolean): [Map<string, ResolvedType> | undefined, Set<string>] {
+    private resolveTemplateBinds(declterms: TemplateTermDecl[], giventerms: TypeSignature[], binds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         let fullbinds = new Map<string, ResolvedType>();
-        let inferbinds = new Set<string>();
 
         for (let i = 0; i < declterms.length; ++i) {
             if (giventerms.length <= i) {
                 if (declterms[i].defaultType !== undefined) {
                     fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, new Map<string, ResolvedType>()));
                 }
-                else if (allowinfer && declterms[i].isInfer) {
-                    xxxx;
-                    inferbinds.add(declterms[i].name);
-                }
                 else {
-                    return [undefined, inferbinds];
+                    return undefined;
                 }
             }
             else {
@@ -603,7 +598,7 @@ class Assembly {
             }
         }
 
-        return [fullbinds, inferbinds];
+        return fullbinds;
     }
 
     private checkTuplesMustDisjoint(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): boolean {
@@ -894,16 +889,11 @@ class Assembly {
         }
     }
 
-    private normalizeType_Template(t: TemplateTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
-        if(allowtemplate) {
-            return ResolvedType.createSingle(new ResolvedTemplateUnifyType(t.name));
-        }
-        else {
-            return binds.has(t.name) ? binds.get(t.name) as ResolvedType : ResolvedType.createEmpty();
-        }
+    private normalizeType_Template(t: TemplateTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+        return binds.has(t.name) ? binds.get(t.name) as ResolvedType : ResolvedType.createEmpty();
     }
 
-    private normalizeType_Nominal(t: NominalTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType | ResolvedFunctionType {
+    private normalizeType_Nominal(t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedType | ResolvedFunctionType {
         const [aliasResolvedType, aliasResolvedBinds] = this.lookupTypeDef(t, binds);
         if (aliasResolvedType === undefined) {
             return ResolvedType.createEmpty();
@@ -936,7 +926,7 @@ class Assembly {
         }
     }
 
-    private normalizeType_Literal(l: LiteralTypeSignature, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Literal(l: LiteralTypeSignature): ResolvedType {
         const ltype = this.normalizeTypeOnly(l.oftype, new Map<string, ResolvedType>());
 
         //should be Bool, Int, or Enum
@@ -953,7 +943,7 @@ class Assembly {
         }
     }
 
-    private normalizeType_Tuple(t: TupleTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Tuple(t: TupleTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         const entries = t.entries.map((entry) => new ResolvedTupleAtomTypeEntry(this.normalizeTypeOnly(entry[0], binds), entry[1]));
         if (entries.some((e) => e.type.isEmptyType())) {
             return ResolvedType.createEmpty();
@@ -970,7 +960,7 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedTupleAtomType.create(t.isvalue, entries));
     }
 
-    private normalizeType_Record(t: RecordTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Record(t: RecordTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         let seenNames = new Set<string>();
         let entries: ResolvedRecordAtomTypeEntry[] = [];
         for (let i = 0; i < t.entries.length; ++i) {
@@ -987,7 +977,7 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedRecordAtomType.create(t.isvalue, entries));
     }
 
-    private normalizeType_EphemeralList(t: EphemeralListTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_EphemeralList(t: EphemeralListTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         const entries = t.entries.map((entry) => this.normalizeTypeOnly(entry, binds));
         if (entries.some((e) => e.isEmptyType())) {
             return ResolvedType.createEmpty();
@@ -996,7 +986,7 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedEphemeralListType.create(entries));
     }
 
-    private normalizeType_Projection(t: ProjectTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Projection(t: ProjectTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         const fromt = this.normalizeTypeOnly(t.fromtype, binds);
         const oft = this.normalizeTypeOnly(t.oftype, binds);
 
@@ -1007,7 +997,7 @@ class Assembly {
         return this.getDerivedTypeProjection(fromt, oft);
     }
 
-    private normalizeType_Plus(t: PlusTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Plus(t: PlusTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         const ccs = t.types.map((tt) => this.normalizeTypeOnly(tt, binds));
         assert(ccs.length !== 0);
 
@@ -1069,7 +1059,7 @@ class Assembly {
         }
     }
 
-    private normalizeType_And(t: AndTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_And(t: AndTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         if (t.types.some((opt) => this.normalizeTypeOnly(opt, binds).isEmptyType())) {
             return ResolvedType.createEmpty();
         }
@@ -1112,7 +1102,7 @@ class Assembly {
         return ResolvedType.createSingle(ResolvedConceptAtomType.create(simplifiedTypes));
     }
 
-    private normalizeType_Union(t: UnionTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedType {
+    private normalizeType_Union(t: UnionTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
         if (t.types.some((opt) => this.normalizeTypeOnly(opt, binds).isEmptyType())) {
             return ResolvedType.createEmpty();
         }
@@ -1121,7 +1111,7 @@ class Assembly {
         return this.normalizeUnionList(utypes);
     }
 
-    private normalizeEphemerals(ephemerals: ResolvedEphemeralListType[], allowtemplate: boolean): ResolvedEphemeralListType | undefined {
+    private normalizeEphemerals(ephemerals: ResolvedEphemeralListType[]): ResolvedEphemeralListType | undefined {
         const lidx = Math.max(...ephemerals.map((tt) => tt.types.length));
         const uidx = Math.min(...ephemerals.map((tt) => tt.types.length));
         if(lidx !== uidx) {
@@ -1142,7 +1132,7 @@ class Assembly {
         return ResolvedEphemeralListType.create(nte);
     }
 
-    private normalizeUnionList(types: ResolvedType[], allowtemplate: boolean): ResolvedType {
+    private normalizeUnionList(types: ResolvedType[]): ResolvedType {
         //flatten any union types
         const ntypes: ResolvedAtomType[][] = types.map((opt) => opt.options);
         let flattened: ResolvedAtomType[] = ([] as ResolvedAtomType[]).concat(...ntypes);
@@ -1206,7 +1196,7 @@ class Assembly {
         return ResolvedType.create(simplifiedTypes);
     }
 
-    private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>, allowtemplate: boolean): ResolvedFunctionType | undefined {
+    private normalizeType_Function(t: FunctionTypeSignature, binds: Map<string, ResolvedType>): ResolvedFunctionType | undefined {
         const params = t.params.map((param) => {
             let ttl = this.normalizeTypeGeneral(param.type, binds);
             let llpv: string | undefined = undefined;
@@ -1326,6 +1316,77 @@ class Assembly {
         }
 
         return true;
+    }
+
+    private unifyResolvedEntityAtomType(witht: ResolvedEntityAtomType, atom: ResolvedEntityAtomType, umap: Map<string, ResolvedType | undefined>) {
+        if(witht.object.ns !== atom.object.ns || witht.object.name !== atom.object.name) {
+            return;
+        }
+
+        if(witht.binds.size !== atom.binds.size) {
+            return;
+        }
+
+        witht.binds.forEach((v, k) => {
+            this.typeUnify(v, atom.binds.get(k) as ResolvedType, umap);
+        });
+    }
+
+    private unifyResolvedConceptAtomType(witht: ResolvedConceptAtomType, atom: ResolvedConceptAtomType, umap: Map<string, ResolvedType | undefined>) {
+        if(witht.conceptTypes.length !== atom.conceptTypes.length) {
+            return;
+        }
+
+        for(let i = 0; i < witht.conceptTypes.length; ++i) {
+            const withcc = witht.conceptTypes[i];
+            const atomcc = atom.conceptTypes[i];
+
+            if(withcc.concept.ns !== atomcc.concept.ns || withcc.concept.name !== atomcc.concept.name) {
+                return;
+            }
+    
+            if(withcc.binds.size !== atomcc.binds.size) {
+                return;
+            }
+    
+            withcc.binds.forEach((v, k) => {
+                this.typeUnify(v, atomcc.binds.get(k) as ResolvedType, umap);
+            });
+        }
+    }
+
+    private unifyResolvedTupleAtomType(witht: ResolvedTupleAtomType, atom: ResolvedTupleAtomType, umap: Map<string, ResolvedType | undefined>) {
+        if(witht.isvalue !== atom.isvalue || witht.types.length !== atom.types.length) {
+            return;
+        }
+
+        for(let i = 0; i < witht.types.length; ++i) {
+            const withe = witht.types[i];
+            const atome = atom.types[i];
+
+            if(withe.isOptional !== atome.isOptional) {
+                return;
+            }
+
+            this.typeUnify(withe.type, atome.type, umap);
+        }
+    }
+
+    private unifyResolvedRecordAtomType(witht: ResolvedRecordAtomType, atom: ResolvedRecordAtomType, umap: Map<string, ResolvedType | undefined>) {
+        if(witht.isvalue !== atom.isvalue || witht.entries.length !== atom.entries.length) {
+            return;
+        }
+
+        for(let i = 0; i < witht.entries.length; ++i) {
+            const withe = witht.entries[i];
+            const atome = atom.entries[i];
+
+            if(withe.name !== atome.name || withe.isOptional !== atome.isOptional) {
+                return;
+            }
+
+            this.typeUnify(withe.type, atome.type, umap);
+        }
     }
 
     private internSpecialConceptType(names: [string], terms?: TypeSignature[], binds?: Map<string, ResolvedType>): ResolvedType {
@@ -1484,8 +1545,8 @@ class Assembly {
 
         //compute the bindings to use when resolving the RHS of the typedef alias
         const typealias = nsd.typeDefs.get(lname) as NamespaceTypedef;
-        const [updatedbinds, inferbinds] = this.resolveTemplateBinds(typealias.terms, t.terms, binds);
-        if(updatedbinds === undefined || inferbinds.size !== 0) {
+        const updatedbinds = this.resolveTemplateBinds(typealias.terms, t.terms, binds);
+        if(updatedbinds === undefined) {
             return [undefined, new Map<string, ResolvedType>()];
         }
 
@@ -1498,8 +1559,8 @@ class Assembly {
     }
 
     createConceptTypeAtom(concept: ConceptTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedConceptAtomType | undefined {
-        const [fullbinds, inferbinds] = this.resolveTemplateBinds(concept.terms, t.terms, binds);
-        if(fullbinds === undefined || inferbinds.size !== 0) {
+        const fullbinds = this.resolveTemplateBinds(concept.terms, t.terms, binds);
+        if(fullbinds === undefined) {
             return undefined;
         }
 
@@ -1507,8 +1568,8 @@ class Assembly {
     }
 
     createObjectTypeAtom(object: EntityTypeDecl, t: NominalTypeSignature, binds: Map<string, ResolvedType>): ResolvedEntityAtomType | undefined {
-        const [fullbinds, inferbinds] = this.resolveTemplateBinds(object.terms, t.terms, binds);
-        if(fullbinds === undefined || inferbinds.size !== 0) {
+        const fullbinds = this.resolveTemplateBinds(object.terms, t.terms, binds);
+        if(fullbinds === undefined) {
             return undefined;
         }
 
@@ -1614,7 +1675,7 @@ class Assembly {
         return undefined;
     }
 
-    private tryGetMemberConstDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
+    tryGetMemberConstDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
         if(!ooptype.staticMembers.has(name)) {
             return undefined;
         }
@@ -1622,7 +1683,7 @@ class Assembly {
         return new OOMemberLookupInfo<StaticMemberDecl>(ooptype, ooptype.staticMembers.get(name) as StaticMemberDecl, binds);
     }
 
-    private tryGetMemberFunctionDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
+    tryGetMemberFunctionDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
         if(!ooptype.staticFunctions.has(name)) {
             return undefined;
         }
@@ -1630,7 +1691,7 @@ class Assembly {
         return new OOMemberLookupInfo<StaticFunctionDecl>(ooptype, ooptype.staticFunctions.get(name) as StaticFunctionDecl, binds);
     }
 
-    private tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
+    tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
         if(!ooptype.staticOperators.has(name)) {
             return undefined;
         }
@@ -1685,7 +1746,7 @@ class Assembly {
         return undefined;
     }
 
-    private tryGetNestedEntityDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<EntityTypeDecl> | undefined {
+    tryGetNestedEntityDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<EntityTypeDecl> | undefined {
         if(!ooptype.nestedEntityDecls.has(name)) {
             return undefined;
         }
@@ -1723,7 +1784,7 @@ class Assembly {
         }
     }
 
-    private tryGetFieldUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
+    tryGetFieldUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
@@ -1745,7 +1806,46 @@ class Assembly {
         }
     }
 
-    private tryGetMethodUniqueRootDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+    //Given a unique entity type resolve the actual method target to invoke -- should exist or it is an error 
+    tryGetMethodUniqueFromUniqueEntityType(tt: ResolvedEntityAtomType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+        return this.tryGetMemberMethodDecl(tt.object, tt.binds, fname, true) || this.tryGetMemberMethodDeclParent(tt.object, tt.binds, fname, true);
+    }
+
+    //Given a type find, if possible, the single static method that every possibility resolves to -- if not then this needs to be a virtual call
+    tryGetMethodUniqueConcreteDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+        const ntype = this.ensureNominalRepresentation(tt);
+        const ttopts = ntype.options.map((ttopt) => {
+            if(ttopt instanceof ResolvedEntityAtomType) {
+                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, true);
+            }
+            else {
+                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
+                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
+                });
+                return this.ensureSingleDecl_Helper<MemberMethodDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl>[]);
+            }
+        });
+
+        if(ttopts.some((topt) => topt === undefined)) {
+            return undefined;
+        }
+        else {
+            const sdecl = this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
+            if(sdecl === undefined) {
+                return undefined;
+            }
+
+            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.attributes)) {
+                return undefined;
+            }
+            else {
+                return sdecl;
+            }
+        }
+    }
+
+    //Given a type find the single virtual method root decl that every possible resoltions derives from -- should exist or it is an error
+    tryGetMethodUniqueRootDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
@@ -1767,7 +1867,7 @@ class Assembly {
         }
     }
 
-    resolveBindsForCall(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>, allowinfer: boolean): Map<string, ResolvedType> | undefined {
+    resolveBindsForCallComplete(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         let fullbinds = new Map<string, ResolvedType>();
         implicitBinds.forEach((v, k) => {
             fullbinds.set(k, v);
@@ -1777,10 +1877,6 @@ class Assembly {
             if(giventerms.length <= i) {
                 if(declterms[i].defaultType !== undefined) {
                     fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, implicitBinds));
-                }
-                else if (allowinfer && declterms[i].isInfer) {
-                    xxxx;
-                    fullbinds.set(declterms[i].name, this.getSpecialAnyConceptType());
                 }
                 else {
                     return undefined;
@@ -1792,6 +1888,34 @@ class Assembly {
         }
 
         return fullbinds;
+    }
+
+    resolveBindsForCallWithInfer(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>, allowinfer: boolean): [Map<string, ResolvedType> | undefined, string[]] {
+        let fullbinds = new Map<string, ResolvedType>();
+        let inferbinds: string[] = [];
+        implicitBinds.forEach((v, k) => {
+            fullbinds.set(k, v);
+        });
+
+        for (let i = 0; i < declterms.length; ++i) {
+            if(giventerms.length <= i) {
+                if(declterms[i].defaultType !== undefined) {
+                    fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, implicitBinds));
+                }
+                else if (allowinfer && declterms[i].isInfer) {
+                    inferbinds.push(declterms[i].name);
+                    fullbinds.set(declterms[i].name, ResolvedType.createSingle(ResolvedTemplateUnifyType.create(declterms[i].name)));
+                }
+                else {
+                    return [undefined, inferbinds];
+                }
+            }
+            else {
+                fullbinds.set(declterms[i].name, this.normalizeTypeOnly(giventerms[i], callBinds));
+            }
+        }
+
+        return [fullbinds, inferbinds];
     }
 
     normalizeTypeOnly(t: TypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -1824,7 +1948,7 @@ class Assembly {
             return this.normalizeType_Template(t, binds);
         }
         else if (t instanceof LiteralTypeSignature) {
-            return this.normalizeType_Literal(t, binds);
+            return this.normalizeType_Literal(t);
         }
         else if (t instanceof NominalTypeSignature) {
             return this.normalizeType_Nominal(t, binds);
@@ -1861,23 +1985,6 @@ class Assembly {
         }
     }
 
-    computeUnifiedFunctionType(funcs: ResolvedFunctionType[], rootSig: ResolvedFunctionType): ResolvedFunctionType | undefined {
-        if (funcs.length === 0) {
-            return undefined;
-        }
-
-        if (funcs.length === 1) {
-            return funcs[0];
-        }
-        else {
-            if (funcs.some((ft) => !this.functionSubtypeOf(ft, rootSig))) {
-                return undefined;
-            }
-
-            return rootSig;
-        }
-    }
-
     restrictNone(from: ResolvedType): { tp: ResolvedType, fp: ResolvedType } {
         return this.splitTypes(from, this.getSpecialNoneType());
     }
@@ -1891,7 +1998,7 @@ class Assembly {
     }
 
     typeUpperBound(types: ResolvedType[]): ResolvedType {
-        if(type.length === 0) {
+        if(types.length === 0) {
             return ResolvedType.createEmpty();
         }
         else {
@@ -1914,12 +2021,6 @@ class Assembly {
         let res = false;
 
         if (t1.idStr === t2.idStr) {
-            res = true;
-        }
-        else if(t1.idStr === "NSCore::Empty" && t2.idStr.startsWith("NSCore::Option<")) {
-            res = true;
-        }
-        else if(t1 instanceof ResolvedWildcardAtomType || t2 instanceof ResolvedWildcardAtomType) {
             res = true;
         }
         else if (t1 instanceof ResolvedConceptAtomType && t2 instanceof ResolvedConceptAtomType) {
@@ -1973,6 +2074,64 @@ class Assembly {
         return res;
     }
  
+    atomUnify(t1: ResolvedAtomType, t2: ResolvedAtomType, umap: Map<string, ResolvedType | undefined>) {
+        if(t1 instanceof ResolvedTemplateUnifyType) {
+            if(umap.has(t1.idStr)) {
+                if(umap.get(t1.idStr) === undefined || (umap.get(t1.idStr) as ResolvedType).idStr === t2.idStr) {
+                    //leave it
+                }
+                else {
+                    umap.set(t1.idStr, undefined);
+                }
+            }
+            else {
+                umap.set(t1.idStr, ResolvedType.createSingle(t2));
+            }
+        }
+        else if(t1 instanceof ResolvedEntityAtomType && t2 instanceof ResolvedEntityAtomType) {
+            this.unifyResolvedEntityAtomType(t1, t2, umap);
+        }
+        else if(t1 instanceof ResolvedConceptAtomType && t2 instanceof ResolvedConceptAtomType) {
+            this.unifyResolvedConceptAtomType(t1, t2, umap);
+        }
+        else if(t1 instanceof ResolvedTupleAtomType && t2 instanceof ResolvedTupleAtomType) {
+            this.unifyResolvedTupleAtomType(t1, t2, umap);
+        }
+        else if(t1 instanceof ResolvedRecordAtomType && t2 instanceof ResolvedRecordAtomType) {
+            this.unifyResolvedRecordAtomType(t1, t2, umap);
+        }
+        else {
+            //nothing -- types might mismatch but we don't care as typecheck will catch this later
+        }
+    }
+
+    typeUnify(t1: ResolvedType, t2: ResolvedType, umap: Map<string, ResolvedType | undefined>) {
+        //TODO: we may want to try and strip matching types in any options -- T | None ~~ Int | None should unify T -> Int
+
+        if (t1.options.length === 1 && t1.options[0] instanceof ResolvedTemplateUnifyType) {
+            if (umap.has(t1.idStr)) {
+                if (umap.get(t1.idStr) === undefined || (umap.get(t1.idStr) as ResolvedType).idStr === t2.idStr) {
+                    //leave it
+                }
+                else {
+                    umap.set(t1.idStr, undefined);
+                }
+            }
+            else {
+                if (t2.options.length !== 1) {
+                    //if multiple options unify with the | 
+                    umap.set(t1.idStr, t2); 
+                }
+                else {
+                    //otherwise expand and try unifying with the individual type
+                    this.atomUnify(t1.options[0], t2.options[0], umap);
+                }
+            }
+        }
+
+        //otherwise we do nothing and will fail subtype check later 
+    }
+
     resolveProvides(tt: OOPTypeDecl, binds: Map<string, ResolvedType>): TypeSignature[] {
         let oktypes: TypeSignature[] = [];
         
@@ -2048,6 +2207,7 @@ class Assembly {
         return true;
     }
 
+    //Only used for pcode checking
     functionSubtypeOf(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
         let memores = this.m_subtypeRelationMemo.get(t1.idStr);
         if (memores === undefined) {

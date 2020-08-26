@@ -3843,26 +3843,60 @@ class Parser {
     private parseNamespaceOperator(currentDecl: NamespaceDeclaration) {
         const sinfo = this.getCurrentSrcInfo();
 
-        //[attr] operator NAME(params): type [requires...] [ensures...] { ... }
+        //[attr] operator [NS ::] NAME(params): type [requires...] [ensures...] { ... }
         const pragmas = this.parseDeclPragmas();
         const attributes = this.parseAttributes();
 
         this.ensureAndConsumeToken("operator");
-        this.ensureToken(TokenStrings.Identifier);
-        const fname = this.consumeTokenAndGetValue();
+        if (this.testToken("+") || this.testToken("-") || this.testToken("*") || this.testToken("/") ||
+            this.testToken("==") || this.testToken("!=") || this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")) {
+            const fname = this.consumeTokenAndGetValue();
 
-        let recursive: "yes" | "no" | "cond" = "no";
-        if (Parser.attributeSetContains("recursive", attributes) || Parser.attributeSetContains("recursive?", attributes)) {
-            recursive = Parser.attributeSetContains("recursive", attributes) ? "yes" : "cond";
+            let recursive: "yes" | "no" | "cond" = "no";
+            if (Parser.attributeSetContains("recursive", attributes) || Parser.attributeSetContains("recursive?", attributes)) {
+                recursive = Parser.attributeSetContains("recursive", attributes) ? "yes" : "cond";
+            }
+
+            const ns = this.m_penv.assembly.getNamespace("NSMain");
+            const sig = this.parseInvokableCommon(InvokableKind.StaticOperator, false, attributes, recursive, pragmas, [], undefined);
+
+            if (!currentDecl.operators.has(fname)) {
+                currentDecl.operators.set(fname, []);
+            }
+            (ns.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), attributes, "NSMain", fname, sig));
         }
+        else {
+            this.ensureToken(TokenStrings.Identifier);
+            const fname = this.consumeTokenAndGetValue();
 
-        const ikind = attributes.includes("dynamic") ? InvokableKind.DynamicOperator : InvokableKind.StaticOperator;
-        const sig = this.parseInvokableCommon(ikind, false, attributes, recursive, pragmas, [], undefined);
+            let recursive: "yes" | "no" | "cond" = "no";
+            if (Parser.attributeSetContains("recursive", attributes) || Parser.attributeSetContains("recursive?", attributes)) {
+                recursive = Parser.attributeSetContains("recursive", attributes) ? "yes" : "cond";
+            }
 
-        if(!currentDecl.operators.has(fname)) {
-            currentDecl.operators.set(fname, []);
+            let ns = currentDecl;
+            if(this.testToken(TokenStrings.Namespace)) {
+                const nns = this.consumeTokenAndGetValue();
+                this.ensureAndConsumeToken("::");
+
+                ns = this.m_penv.assembly.getNamespace(nns);
+            }
+
+            const isabstract = OOPTypeDecl.attributeSetContains("abstract", attributes);
+            const ikind = attributes.includes("dynamic") ? InvokableKind.DynamicOperator : InvokableKind.StaticOperator;
+            const sig = this.parseInvokableCommon(ikind, isabstract, attributes, recursive, pragmas, [], undefined);
+
+            let level = -1;
+            if(isabstract) {
+                level = Number.parseInt(this.consumeTokenAndGetValue());
+                this.ensureAndConsumeToken(";");
+            }
+
+            if (!ns.operators.has(fname)) {
+                ns.operators.set(fname, []);
+            }
+            (ns.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), attributes, ns.ns, fname, sig, level));
         }
-        (currentDecl.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), attributes, currentDecl.ns, fname, sig));
     }
 
     private parseEndOfStream() {
@@ -3902,7 +3936,7 @@ class Parser {
                     break;
                 }
 
-                if (this.testToken("function")  || this.testToken("operator") || this.testToken("const")) {
+                if (this.testToken("function")  || this.testToken("const")) {
                     this.consumeToken();
                     this.ensureToken(TokenStrings.Identifier);
                     const fname = this.consumeTokenAndGetValue();
@@ -3911,6 +3945,23 @@ class Parser {
                     }
 
                     nsdecl.declaredNames.add(ns + "::" + fname);
+                }
+                else if (this.testToken("operator")) {
+                    this.consumeToken();
+                    this.ensureToken(TokenStrings.Identifier);
+                    const fname = this.consumeTokenAndGetValue();
+
+                    if (!this.testToken("+") && !this.testToken("-") && !this.testToken("*") && !this.testToken("/") &&
+                        !this.testToken("==") && !this.testToken("!=") && !this.testToken("<") && !this.testToken(">") && !this.testToken("<=") && !this.testToken(">=")) {
+                        let nns = ns;
+                        if (this.testToken(TokenStrings.Namespace)) {
+                            nns = this.consumeTokenAndGetValue();
+                        }
+
+                        if (nns === ns) {
+                            nsdecl.declaredNames.add(ns + "::" + fname);
+                        }
+                    }
                 }
                 else if (this.testToken("typedef") || this.testToken("enum") || this.testToken("identifier")) {
                     this.consumeToken();
