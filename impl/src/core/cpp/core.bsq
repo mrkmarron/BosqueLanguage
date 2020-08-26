@@ -30,15 +30,6 @@ concept Some provides Any {
     method coerce(): Some # special_method
 }
 
-//<summary>Special type for indicating this type supports typed string use.</summary>
-concept Parsable provides Any {
-}
-
-//<summary>Special type that all Validator (regex etc.) types provide.</summary>
-concept Validator provides Any {
-    abstract function accepts(str: String): Bool; 
-}
-
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
 concept KeyType provides Any {
     function equal<T grounded KeyType>(a: T, b: T): Bool # special_method
@@ -61,13 +52,9 @@ concept APIType provides APIValue {
     function parseBuffer<T grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
 }
 
-//<summary>Type for Numeric values that can be parsed as literal values.</summary>
-concept NumericUnit provides Any {
-}
-
 //<summary>Type for representing the none-value.</summary>
-struct entity None provides KeyType, PODType, APIType {
-    override function parse(str: String): Result<None, String> {
+parsable struct entity None provides KeyType, PODType, APIType {
+    function parse(str: String): Result<None, String> {
         if(str == "none") {
             return ok(none);
         }
@@ -78,8 +65,8 @@ struct entity None provides KeyType, PODType, APIType {
 }
 
 //<summary>Primitive boolean value.</summary>
-struct entity Bool provides Some, KeyType, PODType, APIType, NotOpProvider {
-    override function parse(str: String): Result<Bool, String> {
+parsable struct entity Bool provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<Bool, String> {
         if(str == "false") {
             return ok(false);
         }
@@ -97,13 +84,13 @@ struct entity Bool provides Some, KeyType, PODType, APIType, NotOpProvider {
 }
 
 //<summary>Primitive integer value.</summary>
-struct entity Int provides Some, KeyType, Parsable, PODType, APIType {
+parsable struct entity Int provides Some, KeyType, PODType, APIType {
     private function s_mod(a: Int, b: Int): Int # int_mod
 
     const min_value: Int = -9223372036854775808;
     const max_value: Int = 9223372036854775807;
 
-    override function parse(str: String): Result<Int, String> # int_tryparse
+    function parse(str: String): Result<Int, String> # int_tryparse
     function stringify(i: Int): String # int_tostring
 
     method abs(): Int {
@@ -126,10 +113,10 @@ struct entity Int provides Some, KeyType, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive natural number value.</summary>
-struct entity Nat provides Some, KeyType, Parsable, PODType, APIType {
+parsable struct entity Nat provides Some, KeyType, PODType, APIType {
     const max_value: Nat = 18446744073709551615;
 
-    override function parse(str: String): Result<Nat, String> # nat_tryparse
+    function parse(str: String): Result<Nat, String> # nat_tryparse
     function stringify(i: Nat): String # nat_tostring
 
     function max(v1: Nat, v2: Nat): Nat {
@@ -144,8 +131,8 @@ struct entity Nat provides Some, KeyType, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive big-integer value.</summary>
-struct entity BigInt provides Some, KeyType, Parsable, PODType, APIType {
-    override function parse(str: String): Result<BigInt, String> # bigint_tryparse
+parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<BigInt, String> # bigint_tryparse
     function stringify(i: BigInt): String # bigint_tostring
 
     const min_safeInt: BigInt = -9223372036854775808I;
@@ -161,8 +148,8 @@ struct entity BigInt provides Some, KeyType, Parsable, PODType, APIType {
 
 
 //<summary>Primitive big-integer value.</summary>
-struct entity BigNat provides Some, KeyType, Parsable, PODType, APIType {
-    override function parse(str: String): Result<BigNat, String> # bignat_tryparse
+parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<BigNat, String> # bignat_tryparse
     function stringify(i: BigInt): String # bignat_tostring
 
     const max_safeNat: BigInt = 18446744073709551615N;
@@ -176,8 +163,8 @@ struct entity BigNat provides Some, KeyType, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive big-integer value.</summary>
-struct entity Rational provides Some, KeyType, Parsable, PODType, APIType {
-    override function parse(str: String): Result<Rational, String> # rational_tryparse
+parsable struct entity Rational provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<Rational, String> # rational_tryparse
     function stringify(i: Rational): String # rational_tostring
 
     method isIntegral(): Bool # rational_isint
@@ -191,7 +178,7 @@ struct entity Rational provides Some, KeyType, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive float 64 value.</summary>
-struct entity Float64 provides Some, Parsable, PODType, APIType {
+parsable struct entity Float64 provides Some, PODType, APIType {
     private function s_float_min_value(): Float64 # float64_min_value
     private function s_float_max_value(): Float64 # float64_max_value
     private function s_float_infinity_value(): Float64 # float64_infinity_value
@@ -206,7 +193,7 @@ struct entity Float64 provides Some, Parsable, PODType, APIType {
     const pi: Float64 = 3.1415926535897931;
     const e: Float64 = 2.7182818284590451;
 
-    override function parse(str: String): Result<Float64, String> # float64_tryparse
+    function parse(str: String): Result<Float64, String> # float64_tryparse
     function stringify(f: Float64): String # float64_tostring
 
     method isInfinite(): Bool # float64_isinfinity
@@ -252,14 +239,14 @@ struct entity Float64 provides Some, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive float decimal value.</summary>
-struct entity Decimal provides Some, Parsable, PODType, APIType {
+parsable struct entity Decimal provides Some, PODType, APIType {
     private function s_decimal_min_value(): Float64 # decimal_min_value
     private function s_decimal_max_value(): Float64 # decimal_max_value
 
     const min_value: Decimal = Decimal::s_decimal_min_value();
     const max_value: Decimal = Decimal::s_decimal_max_value();
 
-    override function parse(str: String): Result<Decimal, String> # decimal_tryparse
+    function parse(str: String): Result<Decimal, String> # decimal_tryparse
     function stringify(d: Decimal): String # decimal_tostring
 
     method abs(): Decimal {
@@ -280,7 +267,7 @@ struct entity Decimal provides Some, Parsable, PODType, APIType {
 }
 
 //<summary>Primitive float 128 value.</summary>
-struct entity Float128 provides Some, Parsable, PODType, APIType {
+parsable struct entity Float128 provides Some, PODType, APIType {
     private function s_float_min_value(): Float128 # float128_min_value
     private function s_float_max_value(): Float128 # float128_max_value
     private function s_float_infinity_value(): Float128 # float128_infinity_value
@@ -295,7 +282,7 @@ struct entity Float128 provides Some, Parsable, PODType, APIType {
     const pi: Float128 = 3.1415926535897931F;
     const e: Float128 = 2.7182818284590451F;
 
-    override function parse(str: String): Result<Float128, String> # float128_tryparse
+    function parse(str: String): Result<Float128, String> # float128_tryparse
     function stringify(f: Float128): String # float128_tostring
 
     method isInfinite(): Bool # float128_isinfinity
@@ -401,7 +388,7 @@ entity String provides Some, KeyType, PODType, APIType {
 }
 
 //<summary>Primitive safe string value.</summary>
-entity StringOf<T where unique Validator> provides Some, KeyType, PODType, APIType {
+entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
     private function s_unsafe_from(str: String): SafeString<T> # stringof_unsafe_from
 
     function from(str: String): StringOf<T>
@@ -420,21 +407,21 @@ entity StringOf<T where unique Validator> provides Some, KeyType, PODType, APITy
         return T::accepts(str) ? StringOf<T>::s_unsafe_from(str) : none;
     }
 
-    method convertable<U where Validator>(): Bool {
+    method convertable<U where validator>(): Bool {
         return U::accepts(this.string());
     }
     
-    method convert<U where Validator>(): StringOf<U> {
+    method convert<U where validator>(): StringOf<U> {
         return StringOf<U>::from(this.string());
     }
 
-    method tryConvert<U where Validator>(): StringOf<U> {
+    method tryConvert<U where validator>(): StringOf<U> {
         return StringOf<U>::tryFrom(this.string());
     }
 }
 
 //<summary>Primitive DataString value.</summary>
-entity DataString<T where unique Parsable> provides Some, APIValue, KeyType {
+entity DataString<T where parsable> provides Some, APIValue, KeyType {
     private function s_unsafe_from(str: String): DataString<T> # datastring_unsafe_from
 
     method string(): String # datastring_string
@@ -449,15 +436,15 @@ entity DataString<T where unique Parsable> provides Some, APIValue, KeyType {
         return T::tryParse(str).isOk() ? DataString<T>::s_unsafe_from(str) : none;
     }
 
-    method convertable<U where Parsable>(): Bool {
+    method convertable<U where parsable>(): Bool {
         return U::tryParse(this.string()).isOk();
     }
 
-    method convert<U where Parsable>(): DataString<U>  {
+    method convert<U where parsable>(): DataString<U>  {
         return DataString<U>::from(this.string());
     }
 
-    method tryConvert<U where Parsable>(): DataString<U>? {
+    method tryConvert<U where parsable>(): DataString<U>? {
         return DataString<U>::tryFrom(this.string());
     }
 }
@@ -468,7 +455,7 @@ entity Buffer<T where grounded PODType | APIType> provides Some, APIValue {
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity BufferOf<T where unique Parsable> provides Some, APIValue {
+entity DataBuffer<T where parsable> provides Some, APIValue {
     method bytes(): ByteBuffer # bufferof_bytes
 }
 
@@ -494,28 +481,28 @@ entity ByteBuffer provides Some, APIValue {
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
-struct entity ISOTime provides Some, Parsable, PODType, APIType {
-    override function parse(str: String): Result<ISOTime, String> # time_tryparse
+parsable struct entity ISOTime provides Some, PODType, APIType {
+    function parse(str: String): Result<ISOTime, String> # time_tryparse
 }
 
 //<summary>Primitive UUID value.</summary>
-struct entity UUID provides Some, KeyType, Parsable, PODType, APIType {
-    override function parse(str: String): Result<UUID, String> # uuid_tryparse
+parsable struct entity UUID provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<UUID, String> # uuid_tryparse
 }
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
-struct entity LogicalTime provides Some, KeyType, Parsable, PODType, APIType {
-    override function parse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
+parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
+    function parse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
 
     function zero(): LogicalTime # logicaltime_zero
     function tick(t: LogicalTime): LogicalTime # logicaltime_tick
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
-entity CryptoHash provides Some, KeyType, Parsable, PODType, APIType {
+parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
     function compute<T>(value: T): CryptoHash # cryptohash_compute
 
-    override function parse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
+    function parse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
 }
 
 //<summary>Primitive regex value.</summary>

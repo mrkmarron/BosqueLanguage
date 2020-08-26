@@ -34,13 +34,17 @@ class NominalTypeSignature extends TypeSignature {
         this.tnames = tnames;
         this.terms = terms || [];
     }
+
+    computeResolvedName(): string {
+        return this.tnames.join("::");
+    }
 }
 
 class LiteralTypeSignature extends TypeSignature {
     readonly oftype: TypeSignature;
-    readonly typevalue: boolean | number | {enumtype: TypeSignature, enumvalue: string} | undefined;
+    readonly typevalue: boolean | number | string | undefined;
 
-    constructor(oftype: TypeSignature, typevalue: boolean | number | {enumtype: TypeSignature, enumvalue: string} | undefined) {
+    constructor(oftype: TypeSignature, typevalue: boolean | number | string | undefined) {
         super();
         this.oftype = oftype;
         this.typevalue = typevalue;

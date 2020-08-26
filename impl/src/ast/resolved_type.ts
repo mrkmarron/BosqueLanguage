@@ -13,9 +13,56 @@ class ResolvedAtomType {
     }
 }
 
-class ResolvedWildcardAtomType extends ResolvedAtomType {
-    constructor() {
-        super("*");
+class ResolvedTemplateUnifyType extends ResolvedAtomType {
+    constructor(rstr: string) {
+        super(rstr);
+    }
+
+    static create(name: string): ResolvedTemplateUnifyType {
+        return new ResolvedTemplateUnifyType(name);
+    }
+}
+
+class ResolvedEntityAtomType extends ResolvedAtomType {
+    readonly object: EntityTypeDecl;
+    readonly binds: Map<string, ResolvedType>;
+
+    constructor(rstr: string, object: EntityTypeDecl, binds: Map<string, ResolvedType>) {
+        super(rstr);
+        this.object = object;
+        this.binds = binds;
+    }
+
+    static create(object: EntityTypeDecl, binds: Map<string, ResolvedType>): ResolvedEntityAtomType {
+        let name = object.ns + "::" + object.name;
+        if (object.terms.length !== 0) {
+            name += "<" + object.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + ">";
+        }
+
+        return new ResolvedEntityAtomType(name, object, binds);
+    }
+}
+
+class ResolvedLiteralAtomType extends ResolvedAtomType {
+    readonly oftype: ResolvedType;
+    readonly typevalue: boolean | number | string;
+
+    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | number | string) {
+        super(rstr);
+        this.oftype = oftype;
+        this.typevalue = ofvalue;
+    }
+
+    static create(oftype: ResolvedType, ofvalue: boolean | number | string): ResolvedLiteralAtomType {
+        let rstr = "";
+        if(typeof(ofvalue) === "boolean" || typeof(ofvalue) === "number") {
+            rstr = `${ofvalue}`;
+        }
+        else {
+            rstr = `${oftype.idStr}::${ofvalue}`;
+        }
+        
+        return new ResolvedLiteralAtomType(rstr, oftype, ofvalue);
     }
 }
 
@@ -53,49 +100,6 @@ class ResolvedConceptAtomType extends ResolvedAtomType {
         const rstr = sortedConcepts.map((cpt) => cpt.idStr).join("&");
 
         return new ResolvedConceptAtomType(rstr, sortedConcepts);
-    }
-}
-
-class ResolvedEntityAtomType extends ResolvedAtomType {
-    readonly object: EntityTypeDecl;
-    readonly binds: Map<string, ResolvedType>;
-
-    constructor(rstr: string, object: EntityTypeDecl, binds: Map<string, ResolvedType>) {
-        super(rstr);
-        this.object = object;
-        this.binds = binds;
-    }
-
-    static create(object: EntityTypeDecl, binds: Map<string, ResolvedType>): ResolvedEntityAtomType {
-        let name = object.ns + "::" + object.name;
-        if (object.terms.length !== 0) {
-            name += "<" + object.terms.map((arg) => (binds.get(arg.name) as ResolvedType).idStr).join(", ") + ">";
-        }
-
-        return new ResolvedEntityAtomType(name, object, binds);
-    }
-}
-
-class ResolvedLiteralAtomType extends ResolvedAtomType {
-    readonly oftype: ResolvedType;
-    readonly typevalue: boolean | number | {enumtype: ResolvedType, enumvalue: string};
-
-    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string}) {
-        super(rstr);
-        this.oftype = oftype;
-        this.typevalue = ofvalue;
-    }
-
-    static create(oftype: ResolvedType, ofvalue: boolean | number | {enumtype: ResolvedType, enumvalue: string}): ResolvedLiteralAtomType {
-        let rstr = "";
-        if(typeof(ofvalue) === "boolean" || typeof(ofvalue) === "number") {
-            rstr = `${ofvalue}`;
-        }
-        else {
-            rstr = `${ofvalue.enumtype.idStr}::${ofvalue.enumvalue}`
-        }
-        
-        return new ResolvedLiteralAtomType(rstr, oftype, ofvalue);
     }
 }
 
@@ -228,6 +232,10 @@ class ResolvedType {
 
     isEmptyType(): boolean {
         return this.options.length === 0;
+    }
+
+    hasTemplateUnifyTypes(): boolean {
+        return this.options.some((opt) => opt instanceof ResolvedTemplateUnifyType);
     }
 
     isTupleTargetType(): boolean {
@@ -364,7 +372,7 @@ class ResolvedType {
             return opt.grounded && opt.entries.every((entry) => !entry.isOptional);
         }
         else {
-            //ephemeral list should never be in a grounded position
+            //ephemeral list should never be in a unique position
             return false;
         }
     }
@@ -375,12 +383,16 @@ class ResolvedFunctionTypeParam {
     readonly type: ResolvedType | ResolvedFunctionType;
     readonly isRef: boolean;
     readonly isOptional: boolean;
+    readonly isLiteral: boolean;
+    readonly literalExp: string | undefined;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isLiteral: boolean, literalExp: string | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
+        this.isLiteral = isLiteral;
+        this.literalExp = literalExp;
     }
 }
 
@@ -406,7 +418,7 @@ class ResolvedFunctionType {
     }
 
     static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionType {
-        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr);
+        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr + (param.isLiteral ? ("==" + param.literalExp) : ""));
         let cvalue = cvalues.join(", ");
 
         let recstr = "";
@@ -427,7 +439,7 @@ class ResolvedFunctionType {
 
 export {
     ResolvedAtomType,
-    ResolvedWildcardAtomType,
+    ResolvedTemplateUnifyType,
     ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, 
     ResolvedLiteralAtomType,
     ResolvedTupleAtomTypeEntry, ResolvedTupleAtomType, 

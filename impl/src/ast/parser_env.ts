@@ -3,12 +3,13 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { Assembly } from "./assembly";
+import { Assembly, NamespaceOperatorDecl } from "./assembly";
 import { NominalTypeSignature, TypeSignature, AutoTypeSignature } from "./type_signature";
 
 class FunctionScope {
     private readonly m_rtype: TypeSignature;
     private m_captured: Set<string>;
+    private m_inImplicitValueBind: boolean;
     private readonly m_ispcode: boolean;
     private readonly m_args: Set<string>;
     private m_locals: Set<string>[];
@@ -16,6 +17,7 @@ class FunctionScope {
     constructor(args: Set<string>, rtype: TypeSignature, ispcode: boolean) {
         this.m_rtype = rtype;
         this.m_captured = new Set<string>();
+        this.m_inImplicitValueBind = false;
         this.m_ispcode = ispcode;
         this.m_args = args;
         this.m_locals = [];
@@ -33,6 +35,10 @@ class FunctionScope {
         return this.m_ispcode;
     }
 
+    setImplicitValueState(vs: boolean) {
+        this.m_inImplicitValueBind = vs;
+    }
+
     isVarNameDefined(name: string): boolean {
         if (this.m_locals.some((frame) => frame.has(name))) {
             return true;
@@ -46,8 +52,17 @@ class FunctionScope {
     }
 
     useLocalVar(name: string) {
-        if (!this.isVarNameDefined(name) && !name.startsWith("$")) {
+        if (this.isVarNameDefined(name) || !this.isPCodeEnv()) {
+            return;
+        }
+
+        if(name !== "$value") {
             this.m_captured.add(name);
+        }
+        else {
+            if(!this.m_inImplicitValueBind) {
+                this.m_captured.add(name);
+            }
         }
     }
 
@@ -159,30 +174,24 @@ class ParserEnvironment {
 
     tryResolveAsPrefixUnaryOperator(opname: string, level: number): string | undefined {
         const nsdecl = this.assembly.getNamespace(this.m_currentNamespace as string);
-        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.prefixUnaryOperators.get(opname) !== undefined) {
-            return (nsdecl.prefixUnaryOperators.get(opname) as PrefixUnaryOperator).level === level ? this.m_currentNamespace as string : undefined;
+        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.operators.get(opname) !== undefined) {
+            const opdecls = nsdecl.operators.get(opname) as NamespaceOperatorDecl[];
+            return opdecls.some((opdecl) => (opdecl.isPrefix && opdecl.level === level)) ? this.m_currentNamespace as string : undefined;
         }
 
         const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
-        if(fromns !== undefined && fromns.prefixUnaryOperators.get(opname) !== undefined) {
-            return (fromns.prefixUnaryOperators.get(opname) as PrefixUnaryOperator).level === level ? fromns.fromNamespace : undefined;
-        }
-
-        return undefined;
+        return fromns !== undefined ? fromns.fromNamespace : undefined;
     }
 
     tryResolveAsInfixBinaryOperator(opname: string, level: number): string | undefined {
         const nsdecl = this.assembly.getNamespace(this.m_currentNamespace as string);
-        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.infixBinaryOperators.get(opname) !== undefined) {
-            return (nsdecl.infixBinaryOperators.get(opname) as InfixBinaryOperator).level === level ? this.m_currentNamespace as string : undefined;
+        if (nsdecl.declaredNames.has(this.m_currentNamespace + "::" + opname) && nsdecl.operators.get(opname) !== undefined) {
+            const opdecls = nsdecl.operators.get(opname) as NamespaceOperatorDecl[];
+            return opdecls.some((opdecl) => (opdecl.isInfix && opdecl.level === level)) ? this.m_currentNamespace as string : undefined;
         }
 
         const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
-        if(fromns !== undefined && fromns.infixBinaryOperators.get(opname) !== undefined) {
-            return (fromns.infixBinaryOperators.get(opname) as InfixBinaryOperator).level === level ? fromns.fromNamespace : undefined;
-        }
-
-        return undefined;
+        return fromns !== undefined ? fromns.fromNamespace : undefined;
     }
 }
 
