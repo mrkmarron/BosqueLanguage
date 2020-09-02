@@ -418,15 +418,15 @@ class ResolvedFunctionTypeParam {
     readonly isRef: boolean;
     readonly isOptional: boolean;
     readonly isLiteral: boolean;
-    readonly literalExp: string | undefined;
+    readonly exp: string | undefined;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isLiteral: boolean, literalExp: string | undefined) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isLiteral: boolean, exp: string | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
         this.isRef = isRef;
         this.isLiteral = isLiteral;
-        this.literalExp = literalExp;
+        this.exp = exp;
     }
 }
 

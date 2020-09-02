@@ -502,14 +502,46 @@ enum BufferCompression {
 entity ByteBuffer provides Some, APIValue {
 }
 
+//<summary>Unit declarations for seconds and milliseconds</summary>
+unit ISOSecond = Int;
+unit ISOMilliSecond = Int;
+
+inline infix operator +(a: ISOSecond, b, ISOSecond): ISOSecond # default_add
+inline infix operator -(a: ISOSecond, b, ISOSecond): ISOSecond # default_sub
+inline infix operator ==(a: ISOSecond, b: ISOSecond): Bool # default_eq
+inline infix operator !=(a: ISOSecond, b: ISOSecond): Bool # default_neq
+inline infix operator <(a: ISOSecond, b: ISOSecond): Bool # default_lt
+inline infix operator >(a: ISOSecond, b: ISOSecond): Bool # default_gt
+inline infix operator <=(a: ISOSecond, b: ISOSecond): Bool # default_lteq
+inline infix operator >=(a: ISOSecond, b: ISOSecond): Bool # default_gteq
+
+inline infix operator +(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond # default_add
+inline infix operator -(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond # default_sub
+inline infix operator ==(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_eq
+inline infix operator !=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_neq
+inline infix operator <(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_lt
+inline infix operator >(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_gt
+inline infix operator <=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_lteq
+inline infix operator >=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_gteq
+
 //<summary>Primitive ISO standard date time value.</summary>
 parsable struct entity ISOTime provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<ISOTime, String> # time_tryparse
+
+    function fromAbsoluteMilliSeconds(millis: ISOMilliSecond) # time_frommillis
+    method toAbsoluteMilliSeconds(): ISOMilliSecond # time_tomillis
+
+    function secondsToMilliSeconds(seconds: ISOSecond): ISOMilliSecond {
+        ISOMilliSecond::create(seconds.value() * 1000);
+    }
+
+    function milliSecondsToSeconds(millis: ISOMilliSecond): ISOSecond {
+        ISOMilliSecond::create(millis.value() / 1000);
+    }
 }
-//TODO: make these milliseconds
-inline infix operator +(a: Nat, b, ISOTime): ISOTime # default_add
-inline infix operator +(a: ISOTime, b, Nat): ISOTime # default_add
-inline infix operator -(a: ISOTime, b, ISOTime): Nat # default_sub
+inline infix operator +(a: ISOMilliSecond, b, ISOTime): ISOTime # default_add
+inline infix operator +(a: ISOTime, b, ISOMilliSecond): ISOTime # default_add
+inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSecond # default_sub
 inline infix operator ==(a: ISOTime, b: ISOTime): Bool # default_eq
 inline infix operator !=(a: ISOTime, b: ISOTime): Bool # default_neq
 inline infix operator <(a: ISOTime, b: ISOTime): Bool # default_lt
@@ -532,9 +564,9 @@ parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
 
     const zero: LogicalTime = LogicalTime::s_zero_value();
 }
-inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # default_add
-inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # default_add
-inline infix operator -(a: LogicalTime, b, LogicalTime): Nat # default_sub
+inline infix operator +(a: Int, b, LogicalTime): LogicalTime # default_add
+inline infix operator +(a: LogicalTime, b, Int): LogicalTime # default_add
+inline infix operator -(a: LogicalTime, b, LogicalTime): Int # default_sub
 inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool # default_eq
 inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool # default_neq
 inline infix operator <(a: LogicalTime, b: LogicalTime): Bool # default_lt

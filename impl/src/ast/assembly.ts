@@ -1216,7 +1216,7 @@ class Assembly {
                     llpv = `${ttl.idStr}::${access.name}`;
                 }
                 else {
-                    ttl = ResolvedType.createEmpty();
+                    // all good
                 }
             }
 
@@ -1965,7 +1965,7 @@ class Assembly {
         return fullbinds;
     }
 
-    resolveBindsForCallWithInfer(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>, allowinfer: boolean): [Map<string, ResolvedType> | undefined, string[]] {
+    resolveBindsForCallWithInfer(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>): [Map<string, ResolvedType> | undefined, string[]] {
         let fullbinds = new Map<string, ResolvedType>();
         let inferbinds: string[] = [];
         implicitBinds.forEach((v, k) => {
@@ -1977,7 +1977,7 @@ class Assembly {
                 if(declterms[i].defaultType !== undefined) {
                     fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, implicitBinds));
                 }
-                else if (allowinfer && declterms[i].isInfer) {
+                else if (declterms[i].isInfer) {
                     inferbinds.push(declterms[i].name);
                     fullbinds.set(declterms[i].name, ResolvedType.createSingle(ResolvedTemplateUnifyType.create(declterms[i].name)));
                 }

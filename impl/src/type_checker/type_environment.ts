@@ -180,8 +180,8 @@ class TypeEnvironment {
         }
     }
 
-    static createInitialEnvForCall(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>, args: Map<string, VarInfo>, result: ResolvedType): TypeEnvironment {
-        return new TypeEnvironment(false, scope, terms, refparams, pcodes, args, [new Map<string, VarInfo>()], result, [], undefined, undefined, undefined, [], new Set<string>());
+    static createInitialEnvForCall(scope: MIRInvokeKey, terms: Map<string, ResolvedType>, refparams: string[], pcodes: Map<string, { pcode: PCode, captured: string[] }>, args: Map<string, VarInfo>, inferResult: ResolvedType | undefined): TypeEnvironment {
+        return new TypeEnvironment(false, scope, terms, refparams, pcodes, args, [new Map<string, VarInfo>()], inferResult, [], undefined, undefined, undefined, [], new Set<string>());
     }
 
     static createInfeasibleFlowEnvironment(assembly: Assembly): TypeEnvironment {

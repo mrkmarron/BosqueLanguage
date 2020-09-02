@@ -178,10 +178,15 @@ class TypeChecker {
             const terminfo = terms[i];
             const termtype = binds.get(terminfo.name) as ResolvedType;
 
-            const termconstraint = this.resolveAndEnsureTypeOnly(sinfo, terminfo.constraint, new Map<string, ResolvedType>());
+            const termconstraint = this.resolveAndEnsureTypeOnly(sinfo, terminfo.tconstraint, new Map<string, ResolvedType>());
             const boundsok = this.m_assembly.subtypeOf(termtype, termconstraint);
-
             this.raiseErrorIf(sinfo, !boundsok, `Template instantiation does not satisfy specified bounds -- not subtype of ${termconstraint.idStr}`);
+
+            let opok = true;
+            if(terminfo.opconstraint !== undefined) {
+                xxxx;
+            }
+            this.raiseErrorIf(sinfo, !opok, "Template instantiation deos not satisfy the operator requirements");
 
             if (terminfo.specialRestrictions.size !== 0) {
                 terminfo.specialRestrictions.forEach((srv) => {
@@ -226,7 +231,7 @@ class TypeChecker {
                 const consinfo = optTypeRestrict.constraints[i];
                 const constype = this.resolveAndEnsureTypeOnly(sinfo, consinfo.t, binds)
 
-                const constrainttype = this.resolveAndEnsureTypeOnly(sinfo, consinfo.constraint, binds);
+                const constrainttype = this.resolveAndEnsureTypeOnly(sinfo, consinfo.tconstraint, binds);
                 const boundsok = this.m_assembly.subtypeOf(constype, constrainttype);
                 this.raiseErrorIf(sinfo, !boundsok, `Template instantiation does not satisfy specified restriction -- not subtype of ${constrainttype.idStr}`);
             }
@@ -345,11 +350,6 @@ class TypeChecker {
             return "datastring";
         }
 
-        if((lhs.isUniqueCallTargetType() && (lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.WallTimeTypeDecl) || lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.LogicalTimeTypeDecl)))
-            && (rhs.isUniqueCallTargetType() && (rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.WallTimeTypeDecl) || rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.LogicalTimeTypeDecl)))) {
-            return "time";
-        }
-
         return "operator";
     }
     
@@ -361,16 +361,10 @@ class TypeChecker {
         if((lhs.isUniqueCallTargetType() && lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl)) && (rhs.isUniqueCallTargetType() && rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl))) {
             return "datastring";
         }
-
-        if((lhs.isUniqueCallTargetType() && (lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.WallTimeTypeDecl) || lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.LogicalTimeTypeDecl)))
-            && (rhs.isUniqueCallTargetType() && (rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.WallTimeTypeDecl) || rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.LogicalTimeTypeDecl)))) {
-            return "time";
-        }
         
         return "operator";
     }
 
-    
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, missopt: "skip" | "none" | "empty" | "error", idx: number): ResolvedType {
@@ -526,6 +520,17 @@ class TypeChecker {
         return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
     }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private getTypeForParameter(p: ResolvedFunctionTypeParam): ResolvedType {
+        if (!p.isOptional) {
+            return p.type as ResolvedType;
+        }
+        else {
+            return p.exp === undefined ? this.m_assembly.typeUpperBound([p.type as ResolvedType, this.m_assembly.getSpecialNoneType()]) : (p.type as ResolvedType)
+        }
+    }
+
     private checkTypeOkForTupleExpando(sinfo: SourceInfo, rtype: ResolvedType): [number, number] {
         const tslist = rtype.options.map((opt) => {
             this.raiseErrorIf(sinfo, !(opt instanceof ResolvedTupleAtomType), "Can only expando into positional arguments with Tuple");
@@ -562,14 +567,110 @@ class TypeChecker {
         return [reqNames, allNames];
     }
 
-    private checkPCodeExpression(env: TypeEnvironment, exp: ConstructorPCodeExpression, expectedFunction: ResolvedFunctionType): PCode {
+    private checkPCodeExpressionInfer(env: TypeEnvironment, exp: ConstructorPCodeExpression, cbinds: Map<string, ResolvedType>, expectedFunction: ResolvedFunctionType | undefined): ResolvedType {
         this.raiseErrorIf(exp.sinfo, exp.isAuto && expectedFunction === undefined, "Could not infer auto function type");
 
-        const ltypetry = exp.isAuto ? expectedFunction : this.m_assembly.normalizeTypeFunction(exp.invoke.generateSig(), env.terms);
+        const ltypetry = exp.isAuto ? expectedFunction : this.m_assembly.normalizeTypeFunction(exp.invoke.generateSig(), cbinds);
         this.raiseErrorIf(exp.sinfo, ltypetry === undefined, "Invalid lambda type");
 
-        this.raiseErrorIf(exp.sinfo, exp.invoke.params.length !== expectedFunction.params.length, "Mismatch in expected parameter count and provided function parameter count");
-        this.raiseErrorIf(exp.sinfo, !this.m_assembly.functionSubtypeOf(ltypetry as ResolvedFunctionType, expectedFunction), "Mismatch in expected and provided function signature");
+        this.raiseErrorIf(exp.sinfo, exp.invoke.params.length !== (ltypetry as ResolvedFunctionType).params.length, "Mismatch in expected parameter count and provided function parameter count");
+
+        const fsig = ltypetry as ResolvedFunctionType;
+        let refNames: string[] = [];
+        let cargs = new Map<string, VarInfo>();
+
+        for(let i = 0; i < exp.invoke.params.length; ++i) {
+            const p = fsig.params[i];
+            const ptype = this.getTypeForParameter(p);
+            cargs.set(exp.invoke.params[i].name, new VarInfo(ptype, !p.isRef, false, true, ptype, FlowTypeTruthValue.Unknown));
+
+            if (p.isRef) {
+                refNames.push(p.name);
+            }
+        }
+        if (fsig.optRestParamType !== undefined) {
+            cargs.set(exp.invoke.optRestName as string, new VarInfo(fsig.optRestParamType, true, false, true, fsig.optRestParamType, FlowTypeTruthValue.Unknown));
+        }
+
+        exp.invoke.captureSet.forEach((v) => {
+            if(v === "%this_captured" && env.lookupVar(v) === null) {
+                const vinfo = env.lookupVar("this") as VarInfo;
+                cargs.set(v, vinfo);
+            }
+            else {
+                const vinfo = env.lookupVar(v) as VarInfo;
+                this.raiseErrorIf(exp.sinfo, vinfo.declaredType instanceof ResolvedFunctionType, "Cannot capture function typed argument");
+                cargs.set(v, vinfo);
+            }
+        });
+
+        const ikey = MIRKeyGenerator.generatePCodeKey(exp.invoke);
+        const pcenv = TypeEnvironment.createInitialEnvForCall(ikey, new Map<string, ResolvedType>(cbinds), refNames, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, undefined);
+
+        if (exp.invoke.body instanceof Expression) {
+            const dummyreg = this.m_emitter.generateTmpRegister();
+            const evalue = this.checkExpression(pcenv, exp.invoke.body, dummyreg, undefined);
+            return evalue.getExpressionResult().exptype;
+        }
+        else {
+            const renv = this.checkBlock(pcenv, (exp.invoke.body as BodyImplementation).body as BlockStatement);
+
+            this.raiseErrorIf(exp.sinfo, renv.hasNormalFlow(), "Not all flow paths return a value!");
+            return renv.returnResult as ResolvedType;
+        }
+    }
+
+    private checkArgumentsEvaluationWSigInfer(sinfo: SourceInfo, env: TypeEnvironment, ptypes: TypeSignature[], args: Arguments, hasself: boolean, ibinds: Map<string, ResolvedType>, infer: string[]): Map<string, ResolvedType> {
+        let resbinds = new Map<string, ResolvedType | undefined>();
+
+        //
+        //TODO: assumes a simple signature and call layout -- no optional, no rest, no named, no spread, no ref
+        //      if we want to support some/all of this we will need to split the checking like we do for the real thing
+        //
+
+        const pidx = hasself ? 1 : 0;
+        
+        for (let i = 0; i < args.argList.length; ++i) {
+            const arg = args.argList[i];
+            const ptype = this.m_assembly.normalizeTypeGeneral(ptypes[pidx + i], ibinds);
+            
+            if (arg.value instanceof ConstructorPCodeExpression) {
+                this.raiseErrorIf(arg.value.sinfo, !(ptype instanceof ResolvedFunctionType), "Must have function type for function arg");
+                
+                const pcrtype = this.checkPCodeExpressionInfer(env, arg.value, ibinds, ptype as ResolvedFunctionType | undefined);
+                this.m_assembly.typeUnify((ptype as ResolvedFunctionType).resultType, pcrtype, resbinds);
+            }
+            else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
+                this.raiseErrorIf(arg.value.sinfo, !(ptype instanceof ResolvedFunctionType), "Must have function type for function arg");
+
+                const pcode =  (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
+                this.m_assembly.typeUnify((ptype as ResolvedFunctionType).resultType, pcode.ftype.resultType, resbinds);
+            }
+            else {
+                this.raiseErrorIf(arg.value.sinfo, !(ptype instanceof ResolvedType), "Must have non-function type for non-function arg");
+                const dummyreg = this.m_emitter.generateTmpRegister();
+
+                const etype = this.checkExpression(env, arg.value, dummyreg, undefined).getExpressionResult().exptype;
+                this.m_assembly.typeUnify((ptype as ResolvedType), etype, resbinds);
+            }
+        }
+
+        this.raiseErrorIf(sinfo, infer.some((ii) => !resbinds.has(ii)), "Could not compute bind for all needed variables");
+        this.raiseErrorIf(sinfo, [...resbinds].some((bb) => bb[1] === undefined), "Binds were ambig for inference");
+
+        let fbinds = new Map<string, ResolvedType>();
+        resbinds.forEach((v, k) => fbinds.set(k, v as ResolvedType));
+        return fbinds;
+    }
+
+    private checkPCodeExpression(env: TypeEnvironment, exp: ConstructorPCodeExpression, cbinds: Map<string, ResolvedType>, expectedFunction: ResolvedFunctionType | undefined): PCode {
+        this.raiseErrorIf(exp.sinfo, exp.isAuto && expectedFunction === undefined, "Could not infer auto function type");
+
+        const ltypetry = exp.isAuto ? expectedFunction : this.m_assembly.normalizeTypeFunction(exp.invoke.generateSig(), cbinds);
+        this.raiseErrorIf(exp.sinfo, ltypetry === undefined, "Invalid lambda type");
+
+        this.raiseErrorIf(exp.sinfo, exp.invoke.params.length !== (ltypetry as ResolvedFunctionType).params.length, "Mismatch in expected parameter count and provided function parameter count");
+        this.raiseErrorIf(exp.sinfo, expectedFunction !== undefined && !this.m_assembly.functionSubtypeOf(ltypetry as ResolvedFunctionType, expectedFunction), "Mismatch in expected and provided function signature");
 
         let capturedMap: Map<string, ResolvedType> = new Map<string, ResolvedType>();
 
@@ -578,7 +679,7 @@ class TypeChecker {
         captures.sort();
 
         captures.forEach((v) => {
-            if(v === "$$this_captured" && env.lookupVar(v) === null) {
+            if(v === "%this_captured" && env.lookupVar(v) === null) {
                 const vinfo = env.lookupVar("this") as VarInfo;
 
                 capturedMap.set(v, vinfo.flowType);
@@ -591,35 +692,42 @@ class TypeChecker {
             }
         });
 
-        this.m_emitter.registerPCode(exp.invoke, ltypetry as ResolvedFunctionType, env.terms, [...capturedMap].sort((a, b) => a[0].localeCompare(b[0])));
+        this.m_emitter.registerPCode(exp.invoke, ltypetry as ResolvedFunctionType, cbinds, [...capturedMap].sort((a, b) => a[0].localeCompare(b[0])));
 
         return {code: exp.invoke, scope: env.scope, captured: capturedMap, ftype: ltypetry as ResolvedFunctionType};
     }
 
-    private checkArgumentsEvaluationWSig(env: TypeEnvironment, sig: ResolvedFunctionType, args: Arguments, optSelfValue: [ResolvedType, MIRTempRegister] | undefined, refallowed: boolean): ExpandedArgument[] {
+    private checkArgumentsEvaluationWSig(env: TypeEnvironment, sig: ResolvedFunctionType, sigbinds: Map<string, ResolvedType>, args: Arguments, optSelfValue: [ResolvedType, MIRTempRegister] | undefined, refallowed: boolean): ExpandedArgument[] {
         let eargs: ExpandedArgument[] = [];
 
         if (optSelfValue !== undefined) {
             eargs.push({ name: "this", argtype: optSelfValue[0], ref: undefined, expando: false, pcode: undefined, treg: optSelfValue[1] });
         }
 
-        const skipthisidx = optSelfValue !== undefined ? 1 : 0;
+        const ridx = optSelfValue !== undefined ? 1 : 0;
         const noExpando = args.argList.every((arg) => !(arg instanceof PositionalArgument) || !arg.isSpread);
         const firstNameIdx = sig.params.findIndex((p) => args.argList.some((arg) => arg instanceof NamedArgument && arg.name !== "_" && arg.name === p.name));
 
+        //
+        //TODO: we only end up doing type inference for calls that are simple (no expandos and only before first positional arg)
+        //      we may want to fix this by augmenting our template type inference to do more!!!
+        //
+
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
+            const sigidx = ridx + i;
+
+            const treg = this.m_emitter.generateTmpRegister();
 
             this.raiseErrorIf(arg.value.sinfo, arg.isRef && !refallowed, "Cannot use ref params in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg.isRef && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
 
             if (arg.value instanceof ConstructorPCodeExpression) {
-                const oftype = (noExpando && (firstNameIdx === -1 || i < firstNameIdx) && i < sig.params.length && !sig.params[i].isOptional) ? sig.params[i + skipthisidx].type : undefined;
-                this.raiseErrorIf(arg.value.sinfo, oftype === undefined || !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
+                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? sig.params[sigidx].type : undefined;
+                this.raiseErrorIf(arg.value.sinfo, oftype !== undefined && !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
                 this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
 
-                const pcode = this.checkPCodeExpression(env, arg.value, oftype as ResolvedFunctionType);
+                const pcode = this.checkPCodeExpression(env, arg.value, sigbinds, oftype as ResolvedFunctionType);
 
                 if (arg instanceof NamedArgument) {
                     eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
@@ -631,7 +739,8 @@ class TypeChecker {
                 }
             }
             else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
-                const oftype = (noExpando && (firstNameIdx === -1 || i < firstNameIdx) && i < sig.params.length && !sig.params[i].isOptional) ? sig.params[i + skipthisidx].type : this.m_assembly.getSpecialAnyConceptType();
+                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? sig.params[sigidx].type : undefined;
+
                 this.raiseErrorIf(arg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
                 this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
 
@@ -647,13 +756,15 @@ class TypeChecker {
                 }
             }
             else {
+                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? this.getTypeForParameter(sig.params[sigidx]) : undefined;
+
                 if (arg.isRef) {
                     this.raiseErrorIf(arg.value.sinfo, !(arg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
                     const rvname = (arg.value as AccessVariableExpression).name;
                     this.raiseErrorIf(arg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
-                    this.checkExpression(env, arg.value, treg);
+                    this.checkExpression(env, arg.value, treg, oftype);
                     const earg = (env.lookupVar(rvname) as VarInfo);
 
                     if (arg instanceof NamedArgument) {
@@ -665,12 +776,12 @@ class TypeChecker {
                 }
                 else {
                     if (arg instanceof NamedArgument) {
-                        const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-                        eargs.push({ name: arg.name, argtype: earg.etype, ref: undefined, expando: false, pcode: undefined, treg: treg });
+                        const earg = this.checkExpression(env, arg.value, treg, oftype).getExpressionResult();
+                        eargs.push({ name: arg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg });
                     }
                     else {
-                        const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
-                        eargs.push({ name: undefined, argtype: earg.etype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
+                        const earg = this.checkExpression(env, arg.value, treg, oftype).getExpressionResult();
+                        eargs.push({ name: undefined, argtype: earg.exptype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
                     }
                 }
             }
@@ -1812,6 +1923,8 @@ class TypeChecker {
 
         const fdecl = oodecl.staticFunctions.get(exp.factoryName);
         this.raiseErrorIf(exp.sinfo, fdecl === undefined || !OOPTypeDecl.attributeSetContains("factory", fdecl.attributes), `Function is not a factory function for type '${ctype.idStr}'`);
+
+        xxxx = this.m_assembly.resolveBindsForCallWithInfer((fdecl as StaticFunctionDecl).invoke.terms, exp.terms.targs, oobinds, env.terms);
 
         const binds = this.m_assembly.resolveBindsForCall((fdecl as StaticFunctionDecl).invoke.terms, exp.terms.targs, oobinds, env.terms);
         this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
@@ -5557,7 +5670,6 @@ class TypeChecker {
         const pragmas = this.processPragmas(pci.sourceLocation, pci.pragmas);
 
         let cargs = new Map<string, VarInfo>();
-        let fargs = new Map<string, { pcode: PCode, captured: string[] }>();
         let argTypes: Map<string, MIRType> = new Map<string, MIRType>();
         let refNames: string[] = [];
         let params: MIRFunctionParameter[] = [];
@@ -5595,7 +5707,7 @@ class TypeChecker {
         let resolvedResult = fsig.resultType;
         const resultType = this.generateExpandedReturnSig(sinfo, resolvedResult, fsig.params, binds);
 
-        const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, refNames, fargs, cargs, fsig.resultType);
+        const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, refNames, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, fsig.resultType);
         const mirbody = this.checkBody(env, pci.body as BodyImplementation, argTypes, resolvedResult, undefined, undefined);
         return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", pragmas, sinfo, pci.srcFile, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
