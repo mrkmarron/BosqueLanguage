@@ -67,15 +67,15 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private recursive? static {when T grounded KeyType} s_indexoflast_keytype(l: List<T>, s: Int, e: Int, v: T): Int # list_indexoflast_keytype
 
     private recursive? static {when T grounded KeyType} s_min(l: List<T>): T # list_min
-    private recursive? static {when T <(T, T)} s_minof(l: List<T>): T # list_minof
+    private recursive? static {when T operator <(T, T)} s_minof(l: List<T>): T # list_minof
     private recursive? static {when T grounded KeyType} s_max(l: List<T>): T # list_max
-    private recursive? static {when T <(T, T)} s_maxof(l: List<T>): T # list_maxof
+    private recursive? static {when T operator <(T, T)} s_maxof(l: List<T>): T # list_maxof
 
-    private recursive? static s_argmin<V where <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmin
-    private recursive? static s_argmax<V where <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmax
+    private recursive? static s_argmin<V where operator <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmin
+    private recursive? static s_argmax<V where operator <(V, V)>(l: List<T>, (vf: recursive? fn(_: T) -> V): T # list_argmax
 
-    private recursive? static {when T +(T, T)} s_sum(l: List<T>): T # list_sum
-    private recursive? static {when T *(T, T)} s_product(l: List<T>): T # list_product
+    private recursive? static {when T operator +(T, T)} s_sum(l: List<T>): T # list_sum
+    private recursive? static {when T operator *(T, T)} s_product(l: List<T>): T # list_product
 
     private recursive? static s_filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
     private recursive? static s_filternot(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filternot
@@ -248,13 +248,13 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_size(this) != 0 ? List<T>::s_min(this) : none;
     }
 
-    method {when T <(T, T)} minOf(): T 
+    method {when T operator <(T, T)} minOf(): T 
         requires release List<T>::s_size(this) != 0;
     {
         return List<T>::s_min_ordtype(this);
     }
 
-    method {when T <(T, T)} tryMinOf(): T? {
+    method {when T operator <(T, T)} tryMinOf(): T? {
         return List<T>::s_size(this) != 0 ? List<T>::s_min_ordtype(this) : none;
     }
 
@@ -268,41 +268,41 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_size(this) != 0 ? List<T>::s_max(this) : none;
     }
 
-     method {when T <(T, T)} maxOf(): T 
+     method {when T operator <(T, T)} maxOf(): T 
         requires release List<T>::s_size(this) != 0;
     {
         return List<T>::s_max(this);
     }
 
-    method {when T <(T, T)} tryMaxOf(): T? {
+    method {when T operator <(T, T)} tryMaxOf(): T? {
         return List<T>::s_size(this) != 0 ? List<T>::s_max(this) : none;
     }
 
-    recursive? method argMin<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T
+    recursive? method argMin<V=? where operator <(V, V)>(vf: recursive? fn(_: T) -> V): T
         requires release List<T>::s_size(this) != 0;
     {
         return List<T>::s_argmin[recursive?](this, vf);
     }
 
-    recursive? method tryArgMin<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
+    recursive? method tryArgMin<V=? where operator <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
         return List<T>::s_size(this) != 0 ? List<T>::s_argmin[recursive?](this, vf) : none;
     }
 
-    recursive? method argMax<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T 
+    recursive? method argMax<V=? where operator <(V, V)>(vf: recursive? fn(_: T) -> V): T 
         requires release List<T>::s_size(this) != 0;
     {
         return List<T>::s_argmax[recursive?](this, vf);
     }
 
-    recursive? method tryArgMax<V=? where <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
+    recursive? method tryArgMax<V=? where operator <(V, V)>(vf: recursive? fn(_: T) -> V): T? {
         return List<T>::s_size(this) != 0 ? List<T>::s_argmin[recursive?](this, vf) : none;
     }
 
-    method {when T +(T, T)} sum(): T {
+    method {when T operator +(T, T)} sum(): T {
         return List<Int>::s_sum(this);
     }
     
-    method {when T *(T, T)} product(): T {
+    method {when T operator *(T, T)} product(): T {
         return List<Int>::s_product(this);
     }
 

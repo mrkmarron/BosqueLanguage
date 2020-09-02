@@ -245,11 +245,11 @@ class MIRConstantBigInt extends MIRConstantArgument {
     }
 }
 
-class MIRConstantFloat64 extends MIRConstantArgument {
+class MIRConstantFloat extends MIRConstantArgument {
     readonly value: string;
 
     constructor(value: string) {
-        super(`=float64=${value}`);
+        super(`=float=${value}`);
 
         this.value = value;
     }
@@ -2161,7 +2161,7 @@ class MIRBody {
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat64, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue,

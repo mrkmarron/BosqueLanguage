@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ConceptTypeDecl, EntityTypeDecl, OOPTypeDecl } from "./assembly";
+import { ConceptTypeDecl, EntityTypeDecl, SpecialTypeCategory } from "./assembly";
 
 abstract class ResolvedAtomType {
     readonly idStr: string;
@@ -330,6 +330,10 @@ class ResolvedType {
         return this.options[0] instanceof ResolvedEntityAtomType;
     }
 
+    getUniqueCallTargetType(): ResolvedEntityAtomType {
+        return this.options[0] as ResolvedEntityAtomType;
+    }
+
     tryGetInferrableValueListConstructorType(): ResolvedEphemeralListType | undefined {
         const vlopts = this.options.filter((opt) => opt instanceof ResolvedEphemeralListType);
 
@@ -359,7 +363,7 @@ class ResolvedType {
     isGroundedType(): boolean {
         return this.options.every((opt) => {
             if(opt instanceof ResolvedConceptAtomType) {
-                return opt.conceptTypes.every((ct) => OOPTypeDecl.attributeSetContains("struct", ct.concept.attributes));
+                return opt.conceptTypes.length === 1 && opt.conceptTypes[0].concept.specialDecls.has(SpecialTypeCategory.ResultDecl);
             }
             else if(opt instanceof ResolvedEntityAtomType) {
                 return true;

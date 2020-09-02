@@ -257,15 +257,6 @@ class LiteralDecimalExpression extends Expression {
     }
 }
 
-class LiteralQuadFloatExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralQuadFloatExpression, sinfo);
-        this.value = value;
-    }
-}
-
 class LiteralBigIntegerExpression extends Expression {
     readonly value: string;
 
@@ -1146,7 +1137,7 @@ export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
-    LiteralIntegerExpression, LiteralNaturalExpression, LiteralFloatExpression, LiteralDecimalExpression, LiteralQuadFloatExpression, LiteralBigIntegerExpression, LiteralBigNaturalExpression, LiteralRationalExpression, 
+    LiteralIntegerExpression, LiteralNaturalExpression, LiteralFloatExpression, LiteralDecimalExpression, LiteralBigIntegerExpression, LiteralBigNaturalExpression, LiteralRationalExpression, 
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 
     LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,

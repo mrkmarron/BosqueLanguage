@@ -82,6 +82,8 @@ parsable struct entity Bool provides Some, KeyType, PODType, APIType {
         return b ? "true" : "false";
     }
 }
+inline infix operator ==(a: Bool, b: Bool): Bool # default_eq
+inline infix operator !=(a: Bool, b: Bool): Bool # default_neq
 
 //<summary>Primitive integer value.</summary>
 parsable struct entity Int provides Some, KeyType, PODType, APIType {
@@ -111,10 +113,22 @@ parsable struct entity Int provides Some, KeyType, PODType, APIType {
         return Int::s_mod(a, b);
     }
 }
+inline prefix operator +(a: Int): Int # default_pos
+inline prefix operator -(a: Int): Int # default_neg
+inline infix operator *(a: Int, b, Int): Int # default_mult
+inline infix operator /(a: Int, b, Int): Int # default_div
+inline infix operator +(a: Int, b, Int): Int # default_add
+inline infix operator -(a: Int, b, Int): Int # default_sub
+inline infix operator ==(a: Int, b: Int): Bool # default_eq
+inline infix operator !=(a: Int, b: Int): Bool # default_neq
+inline infix operator <(a: Int, b: Int): Bool # default_lt
+inline infix operator >(a: Int, b: Int): Bool # default_gt
+inline infix operator <=(a: Int, b: Int): Bool # default_lteq
+inline infix operator >=(a: Int, b: Int): Bool # default_gteq
 
 //<summary>Primitive natural number value.</summary>
 parsable struct entity Nat provides Some, KeyType, PODType, APIType {
-    const max_value: Nat = 18446744073709551615;
+    const max_value: Nat = 18446744073709551615n;
 
     function parse(str: String): Result<Nat, String> # nat_tryparse
     function stringify(i: Nat): String # nat_tostring
@@ -129,6 +143,17 @@ parsable struct entity Nat provides Some, KeyType, PODType, APIType {
 
     function mod(a: Nat, b: Int): Nat # nat_mod
 }
+inline prefix operator +(a: Nat): Nat # default_pos
+inline infix operator *(a: Nat, b, Nat): Nat # default_mult
+inline infix operator /(a: Nat, b, Nat): Nat # default_div
+inline infix operator +(a: Nat, b, Nat): Nat # default_add
+inline infix operator -(a: Nat, b, Nat): Nat # default_sub
+inline infix operator ==(a: Nat, b: Nat): Bool # default_eq
+inline infix operator !=(a: Nat, b: Nat): Bool # default_neq
+inline infix operator <(a: Nat, b: Nat): Bool # default_lt
+inline infix operator >(a: Nat, b: Nat): Bool # default_gt
+inline infix operator <=(a: Nat, b: Nat): Bool # default_lteq
+inline infix operator >=(a: Nat, b: Nat): Bool # default_gteq
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
@@ -145,7 +170,18 @@ parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
     function fromInt(i: Int): BigInt # bigint_fromint
     method toInt(): Int # bigint_toint 
 }
-
+inline prefix operator +(a: BigInt): BigInt # default_pos
+inline prefix operator -(a: BigInt): BigInt # default_neg
+inline infix operator *(a: BigInt, b, BigInt): BigInt # default_mult
+inline infix operator /(a: BigInt, b, BigInt): BigInt # default_div
+inline infix operator +(a: BigInt, b, BigInt): BigInt # default_add
+inline infix operator -(a: BigInt, b, BigInt): BigInt # default_sub
+inline infix operator ==(a: BigInt, b: BigInt): Bool # default_eq
+inline infix operator !=(a: BigInt, b: BigInt): Bool # default_neq
+inline infix operator <(a: BigInt, b: BigInt): Bool # default_lt
+inline infix operator >(a: BigInt, b: BigInt): Bool # default_gt
+inline infix operator <=(a: BigInt, b: BigInt): Bool # default_lteq
+inline infix operator >=(a: BigInt, b: BigInt): Bool # default_gteq
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
@@ -161,6 +197,17 @@ parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
     function fromNat(n: Nat): BigInt # bignat_fromnat
     method toNat(): Nat # bignat_tonat
 }
+inline prefix operator +(a: BigNat): BigNat # default_pos
+inline infix operator *(a: BigNat, b, BigNat): BigNat # default_mult
+inline infix operator /(a: BigNat, b, BigNat): BigNat # default_div
+inline infix operator +(a: BigNat, b, BigNat): BigNat # default_add
+inline infix operator -(a: BigNat, b, BigNat): BigNat # default_sub
+inline infix operator ==(a: BigNat, b: BigNat): Bool # default_eq
+inline infix operator !=(a: BigNat, b: BigNat): Bool # default_neq
+inline infix operator <(a: BigNat, b: BigNat): Bool # default_lt
+inline infix operator >(a: BigNat, b: BigNat): Bool # default_gt
+inline infix operator <=(a: BigNat, b: BigNat): Bool # default_lteq
+inline infix operator >=(a: BigNat, b: BigNat): Bool # default_gteq
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity Rational provides Some, KeyType, PODType, APIType {
@@ -176,72 +223,92 @@ parsable struct entity Rational provides Some, KeyType, PODType, APIType {
     function fromBigInt(bi: BigInt): Rational # rational_fromnat
     method toBigInt(): BigInt # rational_tonat
 }
+inline prefix operator +(a: Rational): Rational # default_pos
+inline prefix operator -(a: Rational): Rational # default_neg
+inline infix operator *(a: Rational, b, Rational): Rational # default_mult
+inline infix operator /(a: Rational, b, Rational): Rational # default_div
+inline infix operator +(a: Rational, b, Rational): Rational # default_add
+inline infix operator -(a: Rational, b, Rational): Rational # default_sub
+inline infix operator ==(a: Rational, b: Rational): Bool # default_eq
+inline infix operator !=(a: Rational, b: Rational): Bool # default_neq
+inline infix operator <(a: Rational, b: Rational): Bool # default_lt
+inline infix operator >(a: Rational, b: Rational): Bool # default_gt
+inline infix operator <=(a: Rational, b: Rational): Bool # default_lteq
+inline infix operator >=(a: Rational, b: Rational): Bool # default_gteq
 
-//<summary>Primitive float 64 value.</summary>
-parsable struct entity Float64 provides Some, PODType, APIType {
-    private function s_float_min_value(): Float64 # float64_min_value
-    private function s_float_max_value(): Float64 # float64_max_value
-    private function s_float_infinity_value(): Float64 # float64_infinity_value
-    private function s_float_nan_value(): Float64 # float64_nan_value
+//<summary>Primitive float value -- compiler flags control bitness -- defaults to 64bit.</summary>
+parsable struct entity Float provides Some, PODType, APIType {
+    private function s_float_min_value(): Float # float_min_value
+    private function s_float_max_value(): Float # float_max_value
+    private function s_float_infinity_value(): Float # float_infinity_value
+    private function s_float_nan_value(): Float # float_nan_value
 
-    const min_value: Float64 = Float64::s_float_min_value();
-    const max_value: Float64 = Float64::s_float_max_value();
+    const min_value: Float = Float::s_float_min_value();
+    const max_value: Float = Float::s_float_max_value();
 
-    const infinity: Float64 = Float64::s_float_infinity_value();
-    const nan: Float64 = Float64::s_float_nan_value();
+    const infinity: Float = Float::s_float_infinity_value();
+    const nan: Float = Float::s_float_nan_value();
     
-    const pi: Float64 = 3.1415926535897931;
-    const e: Float64 = 2.7182818284590451;
+    const pi: Float = 3.1415926535897931;
+    const e: Float = 2.7182818284590451;
 
-    function parse(str: String): Result<Float64, String> # float64_tryparse
-    function stringify(f: Float64): String # float64_tostring
+    function parse(str: String): Result<Float, String> # float_tryparse
+    function stringify(f: Float): String # float_tostring
 
-    method isInfinite(): Bool # float64_isinfinity
-    method isNan(): Bool # float64_isnan
+    method isInfinite(): Bool # float_isinfinity
+    method isNan(): Bool # float_isnan
 
-    method abs(): Float64 {
+    method abs(): Float {
         return this < 0 ? -this : this;
     }
 
-    method ceiling(): Float64 # float64_ceiling
-    method floor(): Float64 # float64_floor
+    method ceiling(): Float # float_ceiling
+    method floor(): Float # float_floor
 
-    function pow(x: Float64, y: Float64): Float64 # float64_pow
-    function pow2(v: Float64): Float64 # float64_pow2
-    function pow10(v: Float64): Float64 # float64_pow10
-    function exp(v: Float64): Float64 # float64_exp
+    function pow(x: Float, y: Float): Float # float_pow
+    function pow2(v: Float): Float # float_pow2
+    function pow10(v: Float): Float # float_pow10
+    function exp(v: Float): Float # float_exp
 
-    function root(x: Float64, y: Float64): Float64 # float64_root
+    function root(x: Float, y: Float): Float # float_root
 
-    method square(): Float64 {
+    method square(): Float {
         return this * this;
     }
 
-    method sqrt(): Float64 {
-        return Float64::root(this, 2.0f);
+    method sqrt(): Float {
+        return Float::root(this, 2.0f);
     }
     
-    function log2(v: Float64): Float64 # float64_log2
-    function log10(v: Float64): Float64 # float64_log10
-    function log(x: Float64, y: Float64): Float64 # float64_log
+    function log2(v: Float): Float # float_log2
+    function log10(v: Float): Float # float_log10
+    function log(x: Float, y: Float): Float # float_log
 
-    method sin(): Float64 # float64_sin
-    method cos(): Float64 # float64_cos
-    method tan(): Float64 # float64_tan
+    method sin(): Float # float_sin
+    method cos(): Float # float_cos
+    method tan(): Float # float_tan
 
-    function min(v1: Float64, v2: Float64): Float64 {
+    function min(v1: Float, v2: Float): Float {
         return v1 < v2 ? v1 : v2;
     }
 
-    function max(v1: Float64, v2: Float64): Float64 {
+    function max(v1: Float, v2: Float): Float {
         return v1 > v2 ? v1 : v2;
     }
 }
+inline prefix operator +(a: Float): Float # default_pos
+inline prefix operator -(a: Float): Float # default_neg
+inline infix operator *(a: Float, b, Float): Float # default_mult
+inline infix operator /(a: Float, b, Float): Float # default_div
+inline infix operator +(a: Float, b, Float): Float # default_add
+inline infix operator -(a: Float, b, Float): Float # default_sub
+inline infix operator <(a: Float, b: Float): Bool # default_lt
+inline infix operator >(a: Float, b: Float): Bool # default_gt
 
 //<summary>Primitive float decimal value.</summary>
 parsable struct entity Decimal provides Some, PODType, APIType {
-    private function s_decimal_min_value(): Float64 # decimal_min_value
-    private function s_decimal_max_value(): Float64 # decimal_max_value
+    private function s_decimal_min_value(): Decimal # decimal_min_value
+    private function s_decimal_max_value(): Decimal # decimal_max_value
 
     const min_value: Decimal = Decimal::s_decimal_min_value();
     const max_value: Decimal = Decimal::s_decimal_max_value();
@@ -265,67 +332,14 @@ parsable struct entity Decimal provides Some, PODType, APIType {
         return v1 > v2 ? v1 : v2;
     }
 }
-
-//<summary>Primitive float 128 value.</summary>
-parsable struct entity Float128 provides Some, PODType, APIType {
-    private function s_float_min_value(): Float128 # float128_min_value
-    private function s_float_max_value(): Float128 # float128_max_value
-    private function s_float_infinity_value(): Float128 # float128_infinity_value
-    private function s_float_nan_value(): Float128 # float128_nan_value
-
-    const min_value: Float128 = Float128::s_float_min_value();
-    const max_value: Float128 = Float128::s_float_max_value();
-
-    const infinity: Float128 = Float128::s_float_infinity_value();
-    const nan: Float128 = Float128::s_float_nan_value();
-    
-    const pi: Float128 = 3.1415926535897931F;
-    const e: Float128 = 2.7182818284590451F;
-
-    function parse(str: String): Result<Float128, String> # float128_tryparse
-    function stringify(f: Float128): String # float128_tostring
-
-    method isInfinite(): Bool # float128_isinfinity
-    method isNan(): Bool # float128_isnan
-
-    method abs(): Float128 {
-        return this < 0 ? -this : this;
-    }
-
-    method ceiling(): Float128 # float128_ceiling
-    method floor(): Float128 # float128_floor
-
-    function pow(x: Float128, y: Float128): Float128 # float128_pow
-    function pow2(v: Float128): Float128 # float128_pow2
-    function pow10(v: Float128): Float128 # float128_pow10
-    function exp(v: Float128): Float128 # float128_exp
-
-    function root(x: Float128, y: Float128): Float128 # float128_root
-
-    method square(): Float128 {
-        return this * this;
-    }
-
-    method sqrt(): Float128 {
-        return Float128::root(this, 2.0F);
-    }
-    
-    function log2(v: Float128): Float128 # float128_log2
-    function log10(v: Float128): Float128 # float128_log10
-    function log(x: Float128, y: Float128): Float128 # float128_log
-
-    method sin(): Float128 # float128_sin
-    method cos(): Float128 # float128_cos
-    method tan(): Float128 # float128_tan
-
-    function min(v1: Float128, v2: Float128): Float128 {
-        return v1 < v2 ? v1 : v2;
-    }
-
-    function max(v1: Float128, v2: Float128): Float128 {
-        return v1 > v2 ? v1 : v2;
-    }
-}
+inline prefix operator +(a: Decimal): Decimal # default_pos
+inline prefix operator -(a: Decimal): Decimal # default_neg
+inline infix operator *(a: Decimal, b, Decimal): Decimal # default_mult
+inline infix operator /(a: Decimal, b, Decimal): Decimal # default_div
+inline infix operator +(a: Decimal, b, Decimal): Decimal # default_add
+inline infix operator -(a: Decimal, b, Decimal): Decimal # default_sub
+inline infix operator <(a: Decimal, b: Decimal): Bool # default_lt
+inline infix operator >(a: Decimal, b: Decimal): Bool # default_gt
 
 //<summary>Primitive string value.</summary>
 entity String provides Some, KeyType, PODType, APIType {
@@ -386,6 +400,12 @@ entity String provides Some, KeyType, PODType, APIType {
 
     function compare(a: String, b: String): Bool # string_compare
 }
+inline infix operator ==(a: Rational, b: Rational): Bool # default_eq
+inline infix operator !=(a: Rational, b: Rational): Bool # default_neq
+inline infix operator <(a: Rational, b: Rational): Bool # default_lt
+inline infix operator >(a: Rational, b: Rational): Bool # default_gt
+inline infix operator <=(a: Rational, b: Rational): Bool # default_lteq
+inline infix operator >=(a: Rational, b: Rational): Bool # default_gteq
 
 //<summary>Primitive safe string value.</summary>
 entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
@@ -419,9 +439,10 @@ entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
         return StringOf<U>::tryFrom(this.string());
     }
 }
+//special case for == and < operations
 
 //<summary>Primitive DataString value.</summary>
-entity DataString<T where parsable> provides Some, APIValue, KeyType {
+entity DataString<T where parsable> provides Some, KeyType, APIValue {
     private function s_unsafe_from(str: String): DataString<T> # datastring_unsafe_from
 
     method string(): String # datastring_string
@@ -448,6 +469,7 @@ entity DataString<T where parsable> provides Some, APIValue, KeyType {
         return DataString<U>::tryFrom(this.string());
     }
 }
+//special case for == and < operations
 
 //<summary>An efficient buffer encoding for data.</summary>
 entity Buffer<T where grounded PODType | APIType> provides Some, APIValue {
@@ -481,22 +503,44 @@ entity ByteBuffer provides Some, APIValue {
 }
 
 //<summary>Primitive ISO standard date time value.</summary>
-parsable struct entity ISOTime provides Some, PODType, APIType {
+parsable struct entity ISOTime provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<ISOTime, String> # time_tryparse
 }
+//TODO: make these milliseconds
+inline infix operator +(a: Nat, b, ISOTime): ISOTime # default_add
+inline infix operator +(a: ISOTime, b, Nat): ISOTime # default_add
+inline infix operator -(a: ISOTime, b, ISOTime): Nat # default_sub
+inline infix operator ==(a: ISOTime, b: ISOTime): Bool # default_eq
+inline infix operator !=(a: ISOTime, b: ISOTime): Bool # default_neq
+inline infix operator <(a: ISOTime, b: ISOTime): Bool # default_lt
+inline infix operator >(a: ISOTime, b: ISOTime): Bool # default_gt
+inline infix operator <=(a: ISOTime, b: ISOTime): Bool # default_lteq
+inline infix operator >=(a: ISOTime, b: ISOTime): Bool # default_gteq
 
 //<summary>Primitive UUID value.</summary>
 parsable struct entity UUID provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<UUID, String> # uuid_tryparse
 }
+inline infix operator ==(a: UUID, b: UUID): Bool # default_eq
+inline infix operator !=(a: UUID, b: UUID): Bool # default_neq
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
 parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
+    private function s_zero_value(): LogicalTime # logicaltime_zero
+
     function parse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
 
-    function zero(): LogicalTime # logicaltime_zero
-    function tick(t: LogicalTime): LogicalTime # logicaltime_tick
+    const zero: LogicalTime = LogicalTime::s_zero_value();
 }
+inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # default_add
+inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # default_add
+inline infix operator -(a: LogicalTime, b, LogicalTime): Nat # default_sub
+inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool # default_eq
+inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool # default_neq
+inline infix operator <(a: LogicalTime, b: LogicalTime): Bool # default_lt
+inline infix operator >(a: LogicalTime, b: LogicalTime): Bool # default_gt
+inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool # default_lteq
+inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool # default_gteq
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
@@ -504,6 +548,8 @@ parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
 
     function parse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
 }
+inline infix operator ==(a: CryptoHash, b: CryptoHash): Bool # default_eq
+inline infix operator !=(a: CryptoHash, b: CryptoHash): Bool # default_neq
 
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {

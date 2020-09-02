@@ -36,14 +36,16 @@ enum TemplateTermSpecialRestriction {
 class TemplateTermDecl {
     readonly name: string;
     readonly specialRestrictions: Set<TemplateTermSpecialRestriction>;
-    readonly constraint: TypeSignature;
+    readonly tconstraint: TypeSignature;
+    readonly opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
 
-    constructor(name: string, specialRestrictions: Set<TemplateTermSpecialRestriction>, constraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
+    constructor(name: string, specialRestrictions: Set<TemplateTermSpecialRestriction>, tconstraint: TypeSignature, opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
         this.specialRestrictions = specialRestrictions;
-        this.constraint = constraint;
+        this.tconstraint = tconstraint;
+        this.opconstraint = opconstraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
     }
@@ -51,11 +53,13 @@ class TemplateTermDecl {
 
 class TemplateTypeRestriction {
     readonly t: TypeSignature;
-    readonly constraint: TypeSignature;
+    readonly tconstraint: TypeSignature;
+    readonly opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined;
 
-    constructor(t: TypeSignature, constraint: TypeSignature) {
+    constructor(t: TypeSignature, tconstraint: TypeSignature, opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined) {
         this.t = t;
-        this.constraint = constraint;
+        this.tconstraint = tconstraint;
+        this.opconstraint = opconstraint;
     }
 }
 
@@ -302,10 +306,10 @@ class MemberMethodDecl implements OOMemberDecl {
 enum SpecialTypeCategory {
     None,
     ParsableTypeDecl,
-    UnitTypeDecl,
     ValidatorTypeDecl,
     EnumTypeDecl,
     IdentifierTypeDecl,
+    UnitTypeDecl,
     StringOfDecl,
     DataStringDecl,
     BufferDecl,
@@ -1422,9 +1426,8 @@ class Assembly {
     getSpecialBigIntType(): ResolvedType { return this.internSpecialObjectType(["BigInt"]); }
     getSpecialBigNatType(): ResolvedType { return this.internSpecialObjectType(["BigNat"]); }
     getSpecialRationalType(): ResolvedType { return this.internSpecialObjectType(["Rational"]); }
-    getSpecialFloat64Type(): ResolvedType { return this.internSpecialObjectType(["Float64"]); }
+    getSpecialFloatType(): ResolvedType { return this.internSpecialObjectType(["Float"]); }
     getSpecialDecimalType(): ResolvedType { return this.internSpecialObjectType(["Decimal"]); }
-    getSpecialFloat128Type(): ResolvedType { return this.internSpecialObjectType(["Float128"]); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType(["String"]); }
     getSpecialBufferFormatType(): ResolvedType { return this.internSpecialObjectType(["BufferFormat"]); }
     getSpecialBufferEncodingType(): ResolvedType { return this.internSpecialObjectType(["BufferEncoding"]); }
@@ -1440,6 +1443,7 @@ class Assembly {
     getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType(["Any"]); }
     getSpecialSomeConceptType(): ResolvedType { return this.internSpecialConceptType(["Some"]); }
     getSpecialKeyTypeConceptType(): ResolvedType { return this.internSpecialConceptType(["KeyType"]); }
+    getSpecialOrderableType(): ResolvedType { return this.internSpecialConceptType(["Orderable"]); }
     getSpecialPODTypeConceptType(): ResolvedType { return this.internSpecialConceptType(["PODType"]); }
     getSpecialAPIValueConceptType(): ResolvedType { return this.internSpecialConceptType(["APIValue"]); }
     getSpecialAPITypeConceptType(): ResolvedType { return this.internSpecialConceptType(["APIType"]); }
@@ -1675,7 +1679,7 @@ class Assembly {
         return undefined;
     }
 
-    tryGetMemberConstDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
+    private tryGetMemberConstDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
         if(!ooptype.staticMembers.has(name)) {
             return undefined;
         }
@@ -1683,12 +1687,38 @@ class Assembly {
         return new OOMemberLookupInfo<StaticMemberDecl>(ooptype, ooptype.staticMembers.get(name) as StaticMemberDecl, binds);
     }
 
-    tryGetMemberFunctionDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
+    private tryGetMemberConstDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
+        const rprovides = this.resolveProvides(ooptype, binds);
+        for (let i = 0; i < rprovides.length; ++i) {
+            const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
+            const res = this.tryGetMemberConstDecl(tt.concept, tt.binds, name) || this.tryGetMemberConstDeclParent(tt.concept, tt.binds, name);
+            if (res !== undefined) {
+                return res;
+            }
+        }
+
+        return undefined;
+    }
+
+    private tryGetMemberFunctionDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
         if(!ooptype.staticFunctions.has(name)) {
             return undefined;
         }
 
         return new OOMemberLookupInfo<StaticFunctionDecl>(ooptype, ooptype.staticFunctions.get(name) as StaticFunctionDecl, binds);
+    }
+
+    private tryGetMemberFunctionDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
+        const rprovides = this.resolveProvides(ooptype, binds);
+        for (let i = 0; i < rprovides.length; ++i) {
+            const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
+            const res = this.tryGetMemberFunctionDecl(tt.concept, tt.binds, name,) || this.tryGetMemberFunctionDeclParent(tt.concept, tt.binds, name);
+            if (res !== undefined) {
+                return res;
+            }
+        }
+
+        return undefined;
     }
 
     tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
@@ -1783,6 +1813,51 @@ class Assembly {
             return allSame ? opt1 : undefined;
         }
     }
+
+    tryGetConstMemberUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
+        const ntype = this.ensureNominalRepresentation(tt);
+        const ttopts = ntype.options.map((ttopt) => {
+            if(ttopt instanceof ResolvedEntityAtomType) {
+                return this.tryGetMemberConstDecl(ttopt.object, ttopt.binds, fname) || this.tryGetMemberConstDeclParent(ttopt.object, ttopt.binds, fname);
+            }
+            else {
+                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
+                    return this.tryGetMemberConstDecl(ccopt.concept, ccopt.binds, fname) || this.tryGetMemberConstDeclParent(ccopt.concept, ccopt.binds, fname);
+                });
+                return this.ensureSingleDecl_Helper<StaticMemberDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<StaticMemberDecl>[]);
+            }
+        });
+
+        if(ttopts.some((topt) => topt === undefined)) {
+            return undefined;
+        }
+        else {
+            return this.ensureSingleDecl_Helper<StaticMemberDecl>(ttopts as OOMemberLookupInfo<StaticMemberDecl>[]);
+        }
+    }
+
+    tryGetFunctionUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
+        const ntype = this.ensureNominalRepresentation(tt);
+        const ttopts = ntype.options.map((ttopt) => {
+            if(ttopt instanceof ResolvedEntityAtomType) {
+                return this.tryGetMemberFunctionDecl(ttopt.object, ttopt.binds, fname) || this.tryGetMemberFunctionDeclParent(ttopt.object, ttopt.binds, fname);
+            }
+            else {
+                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
+                    return this.tryGetMemberFunctionDecl(ccopt.concept, ccopt.binds, fname) || this.tryGetMemberFunctionDeclParent(ccopt.concept, ccopt.binds, fname);
+                });
+                return this.ensureSingleDecl_Helper<StaticFunctionDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<StaticFunctionDecl>[]);
+            }
+        });
+
+        if(ttopts.some((topt) => topt === undefined)) {
+            return undefined;
+        }
+        else {
+            return this.ensureSingleDecl_Helper<StaticFunctionDecl>(ttopts as OOMemberLookupInfo<StaticFunctionDecl>[]);
+        }
+    }
+
 
     tryGetFieldUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
@@ -2145,7 +2220,7 @@ class Assembly {
             else {
                 const allok = pcond.constraints.every((consinfo) => {
                     const constype = this.normalizeTypeOnly(consinfo.t, binds)
-                    return this.subtypeOf(constype, this.normalizeTypeOnly(consinfo.constraint, binds));
+                    return this.subtypeOf(constype, this.normalizeTypeOnly(consinfo.tconstraint, binds));
                 });
 
                 if(allok) {
