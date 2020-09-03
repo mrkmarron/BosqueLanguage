@@ -620,7 +620,7 @@ class TypeChecker {
         }
     }
 
-    private checkArgumentsEvaluationWSigInfer(sinfo: SourceInfo, env: TypeEnvironment, ptypes: TypeSignature[], args: Arguments, hasself: boolean, ibinds: Map<string, ResolvedType>, infer: string[]): Map<string, ResolvedType> {
+    private checkArgumentsEvaluationWSigInfer(sinfo: SourceInfo, env: TypeEnvironment, ptypes: FunctionParameter[], args: Arguments, hasself: boolean, ibinds: Map<string, ResolvedType>, infer: string[]): Map<string, ResolvedType> {
         let resbinds = new Map<string, ResolvedType | undefined>();
 
         //
@@ -632,7 +632,7 @@ class TypeChecker {
         
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            const ptype = this.m_assembly.normalizeTypeGeneral(ptypes[pidx + i], ibinds);
+            const ptype = this.m_assembly.normalizeTypeGeneral(ptypes[pidx + i].type, ibinds);
             
             if (arg.value instanceof ConstructorPCodeExpression) {
                 this.raiseErrorIf(arg.value.sinfo, !(ptype instanceof ResolvedFunctionType), "Must have function type for function arg");
@@ -715,13 +715,13 @@ class TypeChecker {
 
         const ridx = optSelfValue !== undefined ? 1 : 0;
         const noExpando = args.argList.every((arg) => !(arg instanceof PositionalArgument) || !arg.isSpread);
-        const firstNameIdx = sig.params.findIndex((p) => args.argList.some((arg) => arg instanceof NamedArgument && arg.name !== "_" && arg.name === p.name));
-
+        
         //
-        //TODO: we only end up doing type inference for calls that are simple (no expandos and only before first positional arg)
+        //TODO: we only end up doing type inference for calls that are simple (no expandos)
         //      we may want to fix this by augmenting our template type inference to do more!!!
         //
 
+        xxxx;
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
             const sigidx = ridx + i;
@@ -799,6 +799,40 @@ class TypeChecker {
         return eargs;
     }
 
+    private inferAndCheckArguments(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, invk: InvokeDecl, giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>, optSelfValue: [ResolvedType, string | undefined, MIRTempRegister] | undefined, refallowed: boolean): [ResolvedFunctionType, Map<string, ResolvedType>, ExpandedArgument[]] {
+        const oldenable = this.m_emitter.getEmitEnabled();
+        this.m_emitter.setEmitEnabled(false);
+        let rrbinds = new Map<string, ResolvedType>();
+
+        try {
+            const [ibinds, iterms] = this.m_assembly.resolveBindsForCallWithInfer(invk.terms, giventerms, implicitBinds, callBinds);
+            this.raiseErrorIf(sinfo, ibinds === undefined, "Template instantiation failure");
+
+            //Do checking and infer any template params that we need
+            rrbinds = ibinds as Map<string, ResolvedType>;
+            if (iterms.length !== 0) {
+                const fbinds = this.checkArgumentsEvaluationWSigInfer(sinfo, env, invk.params, args, optSelfValue !== undefined, rrbinds, iterms);
+
+                const binds = this.m_assembly.resolveBindsForCallComplete(invk.terms, giventerms, implicitBinds, callBinds, fbinds);
+                this.raiseErrorIf(sinfo, binds === undefined, "Call bindings could not be resolved");
+
+                rrbinds = binds as Map<string, ResolvedType>;
+            }
+        }
+        finally {
+            this.m_emitter.setEmitEnabled(oldenable);
+        }
+
+        this.checkTemplateTypes(sinfo, invk.terms, rrbinds);
+
+        const fsig = this.m_assembly.normalizeTypeFunction(invk.generateSig(), rrbinds);
+        this.raiseErrorIf(sinfo, fsig === undefined, "Invalid function signature");
+
+        const eargs = this.checkArgumentsEvaluationWSig(sinfo, env, fsig as ResolvedFunctionType, rrbinds, args, optSelfValue, refallowed);
+
+        return [fsig as ResolvedFunctionType, rrbinds, eargs];
+    }
+
     private checkArgumentsEvaluationTuple(env: TypeEnvironment, args: Arguments, itype: ResolvedTupleAtomType | undefined): [ResolvedType, MIRTempRegister][] {
         let eargs: [ResolvedType, MIRTempRegister][] = [];
 
@@ -810,11 +844,15 @@ class TypeChecker {
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in tuple constructor");
             this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Expando parameters are not allowed in Tuple constructor");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
+            const treg = this.m_emitter.generateTmpRegister();
+            let etype: ResolvedType | undefined = undefined;
+            if(itype !== undefined && i < itype.types.length) {
+                etype = itype.types[i].type;
+            }
+            const earg = this.checkExpression(env, arg.value, treg, etype).getExpressionResult();
 
-            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
-            eargs.push([earg.etype, treg]);
+            this.raiseErrorIf(arg.value.sinfo, earg.exptype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
+            eargs.push([earg.exptype, treg]);
         }
 
         return eargs;
@@ -827,16 +865,17 @@ class TypeChecker {
             targs.push(args[i][0] as ResolvedType);
         }
 
-        const tupleatom = ResolvedTupleAtomType.create(targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
+        const tupleatom = ResolvedTupleAtomType.create(isvalue, targs.map((targ) => new ResolvedTupleAtomTypeEntry(targ, false)));
         const rtuple = ResolvedType.createSingle(tupleatom);
 
-        if (this.m_emitEnabled) {
-            const regs = args.map((e) => e[1]);
-            const tupkey = this.m_emitter.registerResolvedTypeReference(rtuple);
-            this.m_emitter.bodyEmitter.emitConstructorTuple(sinfo, tupkey.trkey, regs, trgt);
-        }
+        const [restype, iipack] = this.genInferInfo(sinfo, rtuple, infertype, trgt);
 
-        return rtuple;
+        const regs = args.map((e) => e[1]);
+        const tupkey = this.m_emitter.registerResolvedTypeReference(rtuple);
+        this.m_emitter.emitConstructorTuple(sinfo, tupkey.trkey, regs, iipack[0]);
+
+        this.emitConvertIfNeeded(sinfo, rtuple, infertype, iipack);
+        return restype;
     }
 
     private checkArgumentsEvaluationRecord(env: TypeEnvironment, args: Arguments, itype: ResolvedRecordAtomType | undefined): [string, ResolvedType, MIRTempRegister][] {
@@ -849,11 +888,15 @@ class TypeChecker {
 
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof NamedArgument), "Only named arguments allowed in record constructor");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
+            const treg = this.m_emitter.generateTmpRegister();
+            let etype: ResolvedType | undefined = undefined;
+            if(itype !== undefined && itype.entries.findIndex((entry) => entry.name === (arg as NamedArgument).name) !== -1) {
+                etype = (itype.entries.find((entry) => entry.name === (arg as NamedArgument).name) as ResolvedRecordAtomTypeEntry).type;
+            }
+            const earg = this.checkExpression(env, arg.value, treg, etype).getExpressionResult();
 
-            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
-            eargs.push([(arg as NamedArgument).name, earg.etype, treg]);
+            this.raiseErrorIf(arg.value.sinfo, earg.exptype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
+            eargs.push([(arg as NamedArgument).name, earg.exptype, treg]);
         }
 
         return eargs;
@@ -870,16 +913,18 @@ class TypeChecker {
         }
 
         const rentries = rargs.map((targ) => new ResolvedRecordAtomTypeEntry(targ[0], targ[1], false));
-        const recordatom = ResolvedRecordAtomType.create(rentries);
+        const recordatom = ResolvedRecordAtomType.create(isvalue, rentries);
         const rrecord = ResolvedType.createSingle(recordatom);
 
-        if (this.m_emitEnabled) {
-            const regs = args.map<[string, MIRTempRegister]>((e) => [e[0] as string, e[2]]).sort((a, b) => a[0].localeCompare(b[0]));
-            const regkey = this.m_emitter.registerResolvedTypeReference(rrecord);
-            this.m_emitter.bodyEmitter.emitConstructorRecord(sinfo, regkey.trkey, regs, trgt);
-        }
+        const [restype, iipack] = this.genInferInfo(sinfo, rrecord, infertype, trgt);
 
-       return rrecord;
+        const regs = args.map<[string, MIRTempRegister]>((e) => [e[0] as string, e[2]]).sort((a, b) => a[0].localeCompare(b[0]));
+        const regkey = this.m_emitter.registerResolvedTypeReference(rrecord);
+        this.m_emitter.emitConstructorRecord(sinfo, regkey.trkey, regs, iipack[0]);
+
+        this.emitConvertIfNeeded(sinfo, rrecord, infertype, iipack);
+
+        return rrecord;
     }
 
     private checkArgumentsEvaluationValueList(env: TypeEnvironment, args: Arguments, itype: ResolvedEphemeralListType | undefined): [ResolvedType, MIRTempRegister][] {
@@ -893,11 +938,15 @@ class TypeChecker {
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in tuple constructor");
             this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Expando parameters are not allowed in Tuple constructor");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult();
+            const treg = this.m_emitter.generateTmpRegister();
+            let etype: ResolvedType | undefined = undefined;
+            if(itype !== undefined && i < itype.types.length) {
+                etype = itype.types[i];
+            }
+            const earg = this.checkExpression(env, arg.value, treg, etype).getExpressionResult();
 
-            this.raiseErrorIf(arg.value.sinfo, earg.etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
-            eargs.push([earg.etype, treg]);
+            this.raiseErrorIf(arg.value.sinfo, earg.exptype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store an Epehmeral list");
+            eargs.push([earg.exptype, treg]);
         }
 
         return eargs;
@@ -913,11 +962,13 @@ class TypeChecker {
         const vlatom = ResolvedEphemeralListType.create(targs);
         const rvl = ResolvedType.createSingle(vlatom);
 
-        if (this.m_emitEnabled) {
-            const regs = args.map((e) => e[1]);
-            const vlkey = this.m_emitter.registerResolvedTypeReference(rvl);
-            this.m_emitter.bodyEmitter.emitConstructorValueList(sinfo, vlkey.trkey, regs, trgt);
-        }
+        const [restype, iipack] = this.genInferInfo(sinfo, rvl, infertype, trgt);
+
+        const regs = args.map((e) => e[1]);
+        const vlkey = this.m_emitter.registerResolvedTypeReference(rvl);
+        this.m_emitter.emitConstructorValueList(sinfo, vlkey.trkey, regs, iipack[0]);
+
+        this.emitConvertIfNeeded(sinfo, rvl, infertype, iipack);
 
         return rvl;
     }
@@ -929,7 +980,7 @@ class TypeChecker {
         return ep as ResolvedType;
     }
 
-    private checkArgumentsEvaluationCollection(env: TypeEnvironment, args: Arguments): [ResolvedType, boolean, MIRTempRegister][] {
+    private checkArgumentsEvaluationCollection(env: TypeEnvironment, args: Arguments, contentstype: ResolvedType): [ResolvedType, boolean, MIRTempRegister][] {
         let eargs: [ResolvedType, boolean, MIRTempRegister][] = [];
 
         for (let i = 0; i < args.argList.length; ++i) {
@@ -938,10 +989,15 @@ class TypeChecker {
             this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg instanceof NamedArgument, "Cannot use named arguments in constructor");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult().etype;
-
-            eargs.push([earg, (arg as PositionalArgument).isSpread, treg]);
+            const treg = this.m_emitter.generateTmpRegister();
+            if ((arg as PositionalArgument).isSpread) {
+                const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult().exptype;
+                eargs.push([earg, true, treg]);
+            }
+            else {
+                const earg = this.checkExpression(env, arg.value, treg, contentstype).getExpressionResult().exptype;
+                eargs.push([earg, false, treg]);
+            }
         }
 
         return eargs;
@@ -960,155 +1016,87 @@ class TypeChecker {
         const texpando = this.getExpandoType(sinfo, opt as ResolvedEntityAtomType);
         const texpandoT = (texpando.options[0] as ResolvedConceptAtomType).conceptTypes[0].binds.get("T") as ResolvedType;
 
-        return this.m_assembly.subtypeOf(texpandoT, oftexpandoT);
+        return texpandoT.isSameType(oftexpandoT);
     }
 
-    private checkArgumentsSequenceConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
+    private checkArgumentsCollectionConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined, generatekeylistT: string | undefined): ResolvedType {
         for (let i = 0; i < args.length; ++i) {
             const arg = args[i];
 
             if (!arg[1]) {
-                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
+                this.raiseErrorIf(sinfo, !arg[0].isSameType(entrytype));
             }
             else {
                 this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
             }
         }
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(oftype));
-            this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
-            const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
+        const resulttype = ResolvedType.createSingle(oftype);
+        const [restype, iipack] = this.genInferInfo(sinfo, resulttype, infertype, trgt);
 
-            if (args.length === 0) {
-                this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
+        if (generatekeylistT !== undefined && this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
+            const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
+            const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get(generatekeylistT) as ResolvedType);
+            const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
+            this.m_emitter.registerResolvedTypeReference(kltype);
+        }
+
+        this.m_emitter.registerResolvedTypeReference(resulttype);
+        this.m_emitter.registerResolvedTypeReference(entrytype);
+        const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
+        if (args.length === 0) {
+            this.m_emitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, iipack[0]);
+        }
+        else {
+            if (args.every((v) => !v[1])) {
+                this.m_emitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), iipack[0]);
             }
-            else {
-                if (args.every((v) => !v[1])) {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                }
-                else if (args.every((v) => v[1])) {
-                    if(args.length === 1 && args[0][0].idStr === oftype.idStr) {
-                        //special case where we expand a (say) List<Int> into a List<Int>
-                        this.m_emitter.bodyEmitter.emitRegAssign(sinfo, args[0][2], trgt);
-                    }
-                    else {
-                        this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                    }
+            else if (args.every((v) => v[1])) {
+                if(args.length === 1 && args[0][0].isSameType(resulttype)) {
+                    //special case where we expand a (say) List<Int> into a List<Int>
+                    this.m_emitter.emitTempRegisterAssign(sinfo, args[0][2], iipack[0]);
                 }
                 else {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
+                    this.m_emitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), iipack[0]);
                 }
+            }
+            else {
+                this.m_emitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), iipack[0]);
             }
         }
 
-        return ResolvedType.createSingle(oftype);
+        this.emitConvertIfNeeded(sinfo, resulttype, infertype, iipack);
+
+        return resulttype;
     }
 
-    private checkArgumentsSetConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, ctype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
-        for (let i = 0; i < args.length; ++i) {
-            const arg = args[i];
+    private checkArgumentsEvaluationEntityWithPositional(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, fieldinfo: [string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]]): ExpandedArgument[] {
+        this.raiseErrorIf(sinfo, args.argList.some((arg) => arg instanceof NamedArgument || (arg as PositionalArgument).isSpread), "All arguments must be positional (and not spread) for entity constructor");
 
-            if (!arg[1]) {
-                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ctype));
+        let eargs: ExpandedArgument[] = [];
+
+        for (let i = 0; i < args.argList.length; ++i) {
+            const arg = args.argList[i];
+            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
+
+            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
+            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult().etype;
+
+            if (arg instanceof NamedArgument) {
+                eargs.push({ name: arg.name, argtype: earg, ref: undefined, expando: false, treg: treg, pcode: undefined });
             }
             else {
-                this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
+                eargs.push({ name: undefined, argtype: earg, ref: undefined, expando: (arg as PositionalArgument).isSpread, treg: treg, pcode: undefined });
             }
         }
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(oftype));
-            this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
-            const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
-
-            if (this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
-                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
-                const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get("T") as ResolvedType);
-                const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
-                this.m_emitter.registerResolvedTypeReference(kltype);
-                this.m_emitter.registerTypeInstantiation(klobj, klbinds);
-            }
-
-            if (args.length === 0) {
-                this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
-            }
-            else {
-                if (args.every((v) => !v[1])) {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                }
-                else if (args.every((v) => v[1])) {
-                    if(args.length === 1 && args[0][0].idStr === oftype.idStr) {
-                        //special case where we expand a (say) Set<Int> into a Set<Int>
-                        this.m_emitter.bodyEmitter.emitRegAssign(sinfo, args[0][2], trgt);
-                    }
-                    else {
-                        this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                    }
-                }
-                else {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
-                }
-            }
-        }
-
-        return ResolvedType.createSingle(oftype);
+        return eargs;
     }
 
-    private checkArgumentsMapConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedType, args: [ResolvedType, boolean, MIRTempRegister][], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
-        for (let i = 0; i < args.length; ++i) {
-            const arg = args[i];
+    private checkArgumentsEvaluationEntityWithNames(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, fieldinfo: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>): ExpandedArgument[] {
+        this.raiseErrorIf(sinfo, args.argList.some((arg) => arg instanceof PositionalArgument && !arg.isSpread), "All arguments must be named (or spread or record) for entity constructor");
 
-            if (!arg[1]) {
-                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg[0], ResolvedType.createSingle(entrytype)));
-            }
-            else {
-                this.raiseErrorIf(sinfo, !this.checkExpandoType(sinfo, oftype, arg[0]), "Container contents not of matching expando type");
-            }
-        }
-
-        if (this.m_emitEnabled) {
-            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(entrytype));
-            this.m_emitter.registerTypeInstantiation(entrytype.object, entrytype.binds);
-
-            this.m_emitter.registerResolvedTypeReference(ResolvedType.createSingle(oftype));
-            this.m_emitter.registerTypeInstantiation(oftype.object, oftype.binds);
-            const tkey = MIRKeyGenerator.generateTypeKey(oftype.object, oftype.binds);
-
-            if (this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
-                const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
-                const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get("K") as ResolvedType);
-                const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
-                this.m_emitter.registerResolvedTypeReference(kltype);
-                this.m_emitter.registerTypeInstantiation(klobj, klbinds);
-            }
-
-            if (args.length === 0) {
-                this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionEmpty(sinfo, tkey, trgt);
-            }
-            else {
-                if (args.every((v) => !v[1])) {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                }
-                else if (args.every((v) => v[1])) {
-                    if(args.length === 1 && args[0][0].idStr === oftype.idStr) {
-                        //special case where we expand a (say) Map<Int, Int> into a Map<Int, Int>
-                        this.m_emitter.bodyEmitter.emitRegAssign(sinfo, args[0][2], trgt);
-                    }
-                    else {
-                        this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
-                    }
-                }
-                else {
-                    this.m_emitter.bodyEmitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
-                }
-            }
-        }
-
-        return ResolvedType.createSingle(oftype);
-    }
-
-    private checkArgumentsEvaluationEntity(env: TypeEnvironment, args: Arguments): ExpandedArgument[] {
         let eargs: ExpandedArgument[] = [];
 
         for (let i = 0; i < args.argList.length; ++i) {

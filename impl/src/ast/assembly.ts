@@ -1944,7 +1944,7 @@ class Assembly {
         }
     }
 
-    resolveBindsForCallComplete(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
+    resolveBindsForCallComplete(declterms: TemplateTermDecl[], giventerms: TypeSignature[], implicitBinds: Map<string, ResolvedType>, callBinds: Map<string, ResolvedType>, inferBinds: Map<string, ResolvedType>): Map<string, ResolvedType> | undefined {
         let fullbinds = new Map<string, ResolvedType>();
         implicitBinds.forEach((v, k) => {
             fullbinds.set(k, v);
@@ -1954,6 +1954,14 @@ class Assembly {
             if(giventerms.length <= i) {
                 if(declterms[i].defaultType !== undefined) {
                     fullbinds.set(declterms[i].name, this.normalizeTypeOnly(declterms[i].defaultType as TypeSignature, implicitBinds));
+                }
+                else if (declterms[i].isInfer) {
+                    if(!inferBinds.has(declterms[i].name)) {
+                        return undefined;
+                    }
+                    else {
+                        fullbinds.set(declterms[i].name, inferBinds.get(declterms[i].name) as ResolvedType);
+                    }
                 }
                 else {
                     return undefined;
