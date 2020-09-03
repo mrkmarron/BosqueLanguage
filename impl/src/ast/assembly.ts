@@ -288,12 +288,14 @@ class MemberMethodDecl implements OOMemberDecl {
     readonly attributes: string[];
     readonly name: string;
 
+    readonly refRcvr: boolean;
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, invoke: InvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, refrcvr: boolean, invoke: InvokeDecl) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
         this.attributes = attributes;
+        this.refRcvr = refrcvr;
         this.name = name;
         this.invoke = invoke;
     }

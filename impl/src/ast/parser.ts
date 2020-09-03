@@ -3510,7 +3510,8 @@ class Parser {
     private parseMemberMethod(thisType: TypeSignature, memberMethods: Map<string, MemberMethodDecl>, allMemberNames: Set<string>, attributes: string[], pragmas: [TypeSignature, string][]) {
         const sinfo = this.getCurrentSrcInfo();
 
-        //[attr] method NAME<T where C...>(params): type [requires...] [ensures...] { ... }
+        //[attr] [ref] method NAME<T where C...>(params): type [requires...] [ensures...] { ... }
+        const refrcvr = this.testAndConsumeTokenIf("ref");
         this.ensureAndConsumeToken("method");
         const termRestrictions = this.parseTermRestriction(true);
 
@@ -3528,7 +3529,7 @@ class Parser {
         }
         allMemberNames.add(mname);
 
-        memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), attributes, mname, sig));
+        memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), attributes, mname, refrcvr, sig));
     }
 
     private parseInvariantsInto(invs: InvariantDecl[]) {

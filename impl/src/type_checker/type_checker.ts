@@ -697,11 +697,20 @@ class TypeChecker {
         return {code: exp.invoke, scope: env.scope, captured: capturedMap, ftype: ltypetry as ResolvedFunctionType};
     }
 
-    private checkArgumentsEvaluationWSig(env: TypeEnvironment, sig: ResolvedFunctionType, sigbinds: Map<string, ResolvedType>, args: Arguments, optSelfValue: [ResolvedType, MIRTempRegister] | undefined, refallowed: boolean): ExpandedArgument[] {
+    private checkArgumentsEvaluationWSig(sinfo: SourceInfo, env: TypeEnvironment, sig: ResolvedFunctionType, sigbinds: Map<string, ResolvedType>, args: Arguments, optSelfValue: [ResolvedType, string | undefined, MIRTempRegister] | undefined, refallowed: boolean): ExpandedArgument[] {
         let eargs: ExpandedArgument[] = [];
 
         if (optSelfValue !== undefined) {
-            eargs.push({ name: "this", argtype: optSelfValue[0], ref: undefined, expando: false, pcode: undefined, treg: optSelfValue[1] });
+            if(optSelfValue[1] === undefined) {
+                eargs.push({ name: "this", argtype: optSelfValue[0], ref: undefined, expando: false, pcode: undefined, treg: optSelfValue[2] });
+            }
+            else {
+                const rvname = optSelfValue[1];
+                this.raiseErrorIf(sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
+
+                const earg = (env.lookupVar(rvname) as VarInfo);
+                eargs.push({ name: "this", argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: optSelfValue[2] });
+            }
         }
 
         const ridx = optSelfValue !== undefined ? 1 : 0;
