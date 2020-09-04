@@ -191,6 +191,14 @@ class MIREmitter {
         xxxx;
     }
 
+    emitBlankValue(sinfo: SourceInfo, srctype: MIRType, trgt: MIRRegisterArgument) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
+    }
+
     emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, chk: ResultCheckCategory, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -327,6 +335,70 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRAccessConstantValue(sinfo, gkey, trgt));
     }
 
+    emitHasFlagLocation(count: number): string {
+        if(!this.emitEnabled || count === 0) {
+            return "[IGNORE]";
+        }
+
+        xxxx;
+    }
+
+    emitSetHasFlagConstant(hasflag: string, position: number, has: boolean) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
+    }
+
+    emitTupleHasProperty(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, hasflag: string, position: number) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        xxxx;
+    }
+
+    emitRecordHasProperty(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, hasflag: string, position: number) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        xxxx;
+    }
+
+    emitReadHasFlag(sinfo: SourceInfo, hasflag: string) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        xxxx;
+    }
+
+    emitLoadTupleIndex(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister, hasflag?: string, position?: number) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
+    }
+
+    emitLoadProperty(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister, hasflag?: string, position?: number) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, argInferType, pname, trgt));
+    }
+
+    emitLoadField(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, fname: MIRFieldKey, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRAccessFromField(sinfo, resultAccessType, arg, argInferType, fname, trgt));
+    }
+
     emitConstructorPrimary(sinfo: SourceInfo, tkey: MIRNominalTypeKey, args: MIRArgument[], trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -426,22 +498,6 @@ class MIREmitter {
 
     emitInvokeInvariantCheckVirtualTarget(sinfo: SourceInfo, inferrcvr: MIRResolvedTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
         this.m_currentBlock.push(new MIRInvokeInvariantCheckVirtualTarget(sinfo, inferrcvr, rcvr, trgt));
-    }
-
-    emitLoadTupleIndex(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-        
-        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
-    }
-
-    emitLoadProperty(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, pname: string, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, argInferType, pname, trgt));
-    }
-
-    emitLoadField(sinfo: SourceInfo, resultAccessType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, fname: MIRFieldKey, trgt: MIRTempRegister) {
-        this.m_currentBlock.push(new MIRAccessFromField(sinfo, resultAccessType, arg, argInferType, fname, trgt));
     }
 
     emitProjectProperties(sinfo: SourceInfo, resultProjectType: MIRResolvedTypeKey, arg: MIRArgument, argInferType: MIRResolvedTypeKey, properties: string[], trgt: MIRTempRegister) {

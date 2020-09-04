@@ -163,6 +163,8 @@ enum ExpressionTag {
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
     SpecialConstructorExpression = "SpecialConstructorExpression",
+    TupleAppendExpression = "TupleAppendExpression",
+    RecordJoinExpression = "RecordJoinExpression",
     CallNamespaceFunctionOrOperatorExpression = "CallNamespaceFunctionOrOperatorExpression",
     CallStaticFunctionOrOperatorExpression = "CallStaticFunctionOrOperatorExpression",
 
@@ -481,6 +483,24 @@ class SpecialConstructorExpression extends Expression {
     }
 }
 
+class TupleAppendExpression  extends Expression {
+    readonly args: Arguments;
+
+    constructor(sinfo: SourceInfo, args: Arguments) {
+        super(ExpressionTag.TupleAppendExpression, sinfo);
+        this.args = args;
+    }
+}
+
+class RecordJoinExpression extends Expression {
+    readonly args: Arguments;
+
+    constructor(sinfo: SourceInfo, args: Arguments) {
+        super(ExpressionTag.RecordJoinExpression, sinfo);
+        this.args = args;
+    }
+}
+
 class CallNamespaceFunctionOrOperatorExpression extends Expression {
     readonly ns: string;
     readonly name: string;
@@ -642,7 +662,6 @@ class PostfixCoerce extends PostfixOperation {
         this.terms = terms;
     }
 }
-
 
 class PostfixInvoke extends PostfixOperation {
     readonly specificResolve: TypeSignature | undefined;
@@ -1142,7 +1161,7 @@ export {
     LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
-    ConstructorPCodeExpression, SpecialConstructorExpression, 
+    ConstructorPCodeExpression, SpecialConstructorExpression, TupleAppendExpression, RecordJoinExpression,
     CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,

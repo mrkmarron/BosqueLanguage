@@ -1450,8 +1450,6 @@ class Assembly {
     getSpecialAPIValueConceptType(): ResolvedType { return this.internSpecialConceptType(["APIValue"]); }
     getSpecialAPITypeConceptType(): ResolvedType { return this.internSpecialConceptType(["APIType"]); }
 
-    getSpecialTupleConceptType(): ResolvedType { return this.internSpecialConceptType(["Tuple"]); }
-    getSpecialRecordConceptType(): ResolvedType { return this.internSpecialConceptType(["Record"]); }
     getSpecialObjectConceptType(): ResolvedType { return this.internSpecialConceptType(["Object"]); }
 
     isExpandoableType(ty: ResolvedAtomType): boolean { return ty.idStr.startsWith("NSCore::Expandoable<"); }

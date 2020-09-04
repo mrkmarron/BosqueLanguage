@@ -367,7 +367,7 @@ class TypeChecker {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, missopt: "skip" | "none" | "empty" | "error", idx: number): ResolvedType {
+    private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
         const options = rtype.options.map((atom) => {
             this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples");
             const tatom = atom as ResolvedTupleAtomType;
@@ -376,36 +376,11 @@ class TypeChecker {
                     return tatom.types[idx].type;
                 }
                 else {
-                    if(missopt === "skip") {
-                        return tatom.types[idx].type;
-                    }
-                    else if(missopt === "none") {
-                        return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
-                    }
-                    else if(missopt === "empty") {
-                        const optentity = this.m_assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Option") as ConceptTypeDecl;
-                        return ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(optentity, new Map<string, ResolvedType>().set("T", tatom.types[idx].type))]));
-                    } 
-                    else {
-                        const resultentity = this.m_assembly.tryGetConceptTypeForFullyResolvedName("NSCore::Result") as EntityTypeDecl;
-                        return ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(resultentity, new Map<string, ResolvedType>().set("T", tatom.types[idx].type).set("E", this.m_assembly.getSpecialNoneType()))]));
-                    }
+                    return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
                 }
             }
             else {
-                if(missopt === "skip") {
-                    return ResolvedType.createEmpty();
-                }
-                else if(missopt === "none") {
-                    return this.m_assembly.getSpecialNoneType();
-                }
-                else if(missopt === "empty") {
-                    return this.m_assembly.getSpecialEmptyType();
-                } 
-                else {
-                    const errentity = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
-                    return ResolvedType.createSingle(ResolvedEntityAtomType.create(errentity, new Map<string, ResolvedType>().set("E", this.m_assembly.getSpecialNoneType())));
-                }
+                return this.m_assembly.getSpecialNoneType();
             }
         });
 
@@ -716,81 +691,178 @@ class TypeChecker {
         const ridx = optSelfValue !== undefined ? 1 : 0;
         const noExpando = args.argList.every((arg) => !(arg instanceof PositionalArgument) || !arg.isSpread);
         
+        this.raiseErrorIf(sinfo, !refallowed && ((optSelfValue !== undefined && optSelfValue[1] !== undefined) || args.argList.some((arg) => arg.isRef)), "Cannot use ref params in this call position");
+
         //
         //TODO: we only end up doing type inference for calls that are simple (no expandos)
         //      we may want to fix this by augmenting our template type inference to do more!!!
         //
 
-        xxxx;
-        for (let i = 0; i < args.argList.length; ++i) {
-            const arg = args.argList[i];
-            const sigidx = ridx + i;
+        if (noExpando) {
+            let fillednames = new Set<string>();
 
-            const treg = this.m_emitter.generateTmpRegister();
+            for (let i = 0; i < args.argList.length; ++i) {
+                this.raiseErrorIf(args.argList[i].value.sinfo, args.argList[i].isRef && !refallowed, "Cannot use ref params in this call position");
 
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef && !refallowed, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
+                if (args.argList[i] instanceof PositionalArgument) {
+                    continue;
+                }
+                const narg = args.argList[i] as NamedArgument;
+                fillednames.add(narg.name);
 
-            if (arg.value instanceof ConstructorPCodeExpression) {
-                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? sig.params[sigidx].type : undefined;
-                this.raiseErrorIf(arg.value.sinfo, oftype !== undefined && !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                const paramIdx = sig.params.findIndex((p) => p.name === narg.name);
+                this.raiseErrorIf(narg.value.sinfo, paramIdx === -1 || eargs[paramIdx] !== undefined, "Named argument does not match parameter or is multiply defined");
+                const param = sig.params[paramIdx];
 
-                const pcode = this.checkPCodeExpression(env, arg.value, sigbinds, oftype as ResolvedFunctionType);
+                const treg = this.m_emitter.generateTmpRegister();
+                if (narg.value instanceof ConstructorPCodeExpression) {
+                    this.raiseErrorIf(narg.value.sinfo, !(param.type instanceof ResolvedFunctionType), "Must have function type for function arg");
+                    this.raiseErrorIf(narg.value.sinfo, narg.isRef, "Cannot use ref params on function argument");
 
-                if (arg instanceof NamedArgument) {
-                    eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                    const pcode = this.checkPCodeExpression(env, narg.value, sigbinds, param.type as ResolvedFunctionType);
+                    eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                }
+                else if (narg.value instanceof AccessVariableExpression && env.pcodes.has(narg.value.name)) {
+                    this.raiseErrorIf(narg.value.sinfo, !(param.type instanceof ResolvedFunctionType), "Must have function type for function arg");
+                    this.raiseErrorIf(narg.value.sinfo, narg.isRef, "Cannot use ref params on function argument");
+
+                    const pcode = (env.pcodes.get(narg.value.name) as { pcode: PCode, captured: string[] }).pcode;
+                    eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else {
-                    this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
+                    if (narg.isRef) {
+                        this.raiseErrorIf(narg.value.sinfo, !(narg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
-                    eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
-                }
-            }
-            else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
-                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? sig.params[sigidx].type : undefined;
+                        const rvname = (narg.value as AccessVariableExpression).name;
+                        this.raiseErrorIf(narg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
-                this.raiseErrorIf(arg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                        this.checkExpression(env, narg.value, treg, param.type as ResolvedType);
+                        const earg = (env.lookupVar(rvname) as VarInfo);
 
-                const pcode =  (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
-
-                if (arg instanceof NamedArgument) {
-                    eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
-                }
-                else {
-                    this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
-
-                    eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
-                }
-            }
-            else {
-                const oftype = (noExpando && (firstNameIdx === -1 || sigidx < firstNameIdx) && sigidx < sig.params.length) ? this.getTypeForParameter(sig.params[sigidx]) : undefined;
-
-                if (arg.isRef) {
-                    this.raiseErrorIf(arg.value.sinfo, !(arg.value instanceof AccessVariableExpression), "Can only ref on variable names");
-
-                    const rvname = (arg.value as AccessVariableExpression).name;
-                    this.raiseErrorIf(arg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
-
-                    this.checkExpression(env, arg.value, treg, oftype);
-                    const earg = (env.lookupVar(rvname) as VarInfo);
-
-                    if (arg instanceof NamedArgument) {
-                        eargs.push({ name: arg.name, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg });
+                        eargs[i] = { name: narg.name, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg };
                     }
                     else {
-                        eargs.push({ name: undefined, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg });
+                        const earg = this.checkExpression(env, narg.value, treg, param.type as ResolvedType).getExpressionResult();
+                        eargs[i] = { name: narg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg };
+                    }
+                }
+            }
+
+            let sigidx = ridx;
+            for (let i = 0; i < args.argList.length; ++i) {
+                if (args.argList[i] instanceof NamedArgument) {
+                    continue;
+                }
+                const parg = args.argList[i] as PositionalArgument;
+
+                while(sigidx < sig.params.length && fillednames.has(sig.params[sigidx].name)) {
+                    sigidx++;
+                }
+
+                const oftypett = (sigidx < sig.params.length) ? sig.params[sigidx].type : sig.optRestParamType;
+                this.raiseErrorIf(sinfo, oftypett === undefined, "Too many parameters for call");
+                const oftype = oftypett as ResolvedFunctionType | ResolvedType;
+
+                const treg = this.m_emitter.generateTmpRegister();
+                if (parg.value instanceof ConstructorPCodeExpression) {
+                    this.raiseErrorIf(parg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
+                    this.raiseErrorIf(parg.value.sinfo, parg.isRef, "Cannot use ref params on function argument");
+
+                    const pcode = this.checkPCodeExpression(env, parg.value, sigbinds, oftype as ResolvedFunctionType);
+                    eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                }
+                else if (parg.value instanceof AccessVariableExpression && env.pcodes.has(parg.value.name)) {
+                    this.raiseErrorIf(parg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
+                    this.raiseErrorIf(parg.value.sinfo, parg.isRef, "Cannot use ref params on function argument");
+
+                    const pcode = (env.pcodes.get(parg.value.name) as { pcode: PCode, captured: string[] }).pcode;
+                    eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                }
+                else {
+                    if (parg.isRef) {
+                        this.raiseErrorIf(parg.value.sinfo, !(parg.value instanceof AccessVariableExpression), "Can only ref on variable names");
+
+                        const rvname = (parg.value as AccessVariableExpression).name;
+                        this.raiseErrorIf(parg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
+
+                        this.checkExpression(env, parg.value, treg, oftype as ResolvedType);
+                        const earg = (env.lookupVar(rvname) as VarInfo);
+
+                        eargs[i] = { name: undefined, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg };
+                    }
+                    else {
+                        const earg = this.checkExpression(env, parg.value, treg, oftype as ResolvedType).getExpressionResult();
+                        eargs[i] = { name: undefined, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg };
+                    }
+                }
+
+                ++sigidx;
+            }
+        }
+        else {
+            for (let i = 0; i < args.argList.length; ++i) {
+                const arg = args.argList[i];
+                const sigidx = ridx + i;
+
+                const treg = this.m_emitter.generateTmpRegister();
+
+                this.raiseErrorIf(arg.value.sinfo, arg.isRef && !refallowed, "Cannot use ref params in this call position");
+                this.raiseErrorIf(arg.value.sinfo, arg.isRef && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
+
+                if (arg.value instanceof ConstructorPCodeExpression) {
+                    this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+
+                    const pcode = this.checkPCodeExpression(env, arg.value, sigbinds, undefined);
+
+                    if (arg instanceof NamedArgument) {
+                        eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                    }
+                    else {
+                        this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
+
+                        eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                    }
+                }
+                else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
+                    this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+
+                    const pcode = (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
+
+                    if (arg instanceof NamedArgument) {
+                        eargs.push({ name: arg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
+                    }
+                    else {
+                        this.raiseErrorIf(arg.value.sinfo, (arg as PositionalArgument).isSpread, "Cannot have spread on pcode argument");
+
+                        eargs.push({ name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg });
                     }
                 }
                 else {
-                    if (arg instanceof NamedArgument) {
-                        const earg = this.checkExpression(env, arg.value, treg, oftype).getExpressionResult();
-                        eargs.push({ name: arg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg });
+                    if (arg.isRef) {
+                        this.raiseErrorIf(arg.value.sinfo, !(arg.value instanceof AccessVariableExpression), "Can only ref on variable names");
+
+                        const rvname = (arg.value as AccessVariableExpression).name;
+                        this.raiseErrorIf(arg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
+
+                        this.checkExpression(env, arg.value, treg, undefined);
+                        const earg = (env.lookupVar(rvname) as VarInfo);
+
+                        if (arg instanceof NamedArgument) {
+                            eargs.push({ name: arg.name, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg });
+                        }
+                        else {
+                            eargs.push({ name: undefined, argtype: earg.declaredType, ref: rvname, expando: false, pcode: undefined, treg: treg });
+                        }
                     }
                     else {
-                        const earg = this.checkExpression(env, arg.value, treg, oftype).getExpressionResult();
-                        eargs.push({ name: undefined, argtype: earg.exptype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
+                        if (arg instanceof NamedArgument) {
+                            const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult();
+                            eargs.push({ name: arg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg });
+                        }
+                        else {
+                            const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult();
+                            eargs.push({ name: undefined, argtype: earg.exptype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
+                        }
                     }
                 }
             }
@@ -1070,48 +1142,68 @@ class TypeChecker {
         return resulttype;
     }
 
-    private checkArgumentsEvaluationEntityWithPositional(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, fieldinfo: [string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]]): ExpandedArgument[] {
-        this.raiseErrorIf(sinfo, args.argList.some((arg) => arg instanceof NamedArgument || (arg as PositionalArgument).isSpread), "All arguments must be positional (and not spread) for entity constructor");
-
+    private checkArgumentsEvaluationEntity(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, fieldinfo: [string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]][]): ExpandedArgument[] {
         let eargs: ExpandedArgument[] = [];
 
-        for (let i = 0; i < args.argList.length; ++i) {
-            const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
+        const noExpando = args.argList.every((arg) => !(arg instanceof PositionalArgument) || !arg.isSpread);
+        if (noExpando) {
+            let fillednames = new Set<string>();
+            for (let i = 0; i < args.argList.length; ++i) {
+                this.raiseErrorIf(args.argList[i].value.sinfo, args.argList[i].isRef, "Cannot use ref params in this call position");
 
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult().etype;
+                if (args.argList[i] instanceof PositionalArgument) {
+                    continue;
+                }
+                const narg = args.argList[i] as NamedArgument;
+                fillednames.add(narg.name);
 
-            if (arg instanceof NamedArgument) {
-                eargs.push({ name: arg.name, argtype: earg, ref: undefined, expando: false, treg: treg, pcode: undefined });
+                const fieldIdx = fieldinfo.findIndex((p) => p[0] === narg.name);
+                this.raiseErrorIf(narg.value.sinfo, fieldIdx === -1 || eargs[fieldIdx] !== undefined, "Named argument does not match any field name or is multiply defined");
+                const field = fieldinfo[fieldIdx];
+                const ftype = this.resolveAndEnsureTypeOnly(sinfo, field[1][1].declaredType, field[1][2]);
+
+                const treg = this.m_emitter.generateTmpRegister();
+                const earg = this.checkExpression(env, narg.value, treg, ftype).getExpressionResult();
+                eargs[i] = { name: narg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg };
             }
-            else {
-                eargs.push({ name: undefined, argtype: earg, ref: undefined, expando: (arg as PositionalArgument).isSpread, treg: treg, pcode: undefined });
+
+            let fidx = 0;
+            for (let i = 0; i < args.argList.length; ++i) {
+                if (args.argList[i] instanceof NamedArgument) {
+                    continue;
+                }
+                const parg = args.argList[i] as PositionalArgument;
+
+                while (fidx < fieldinfo.length && fillednames.has(fieldinfo[i][0])) {
+                    fidx++;
+                }
+
+                const field = fieldinfo[fidx];
+                const ftype = this.resolveAndEnsureTypeOnly(sinfo, field[1][1].declaredType, field[1][2]);
+
+                const treg = this.m_emitter.generateTmpRegister();
+
+                const earg = this.checkExpression(env, parg.value, treg, ftype).getExpressionResult();
+                eargs[i] = { name: undefined, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg };
+
+                ++fidx;
             }
         }
+        else {
+            for (let i = 0; i < args.argList.length; ++i) {
+                const arg = args.argList[i];
+                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
 
-        return eargs;
-    }
+                const treg = this.m_emitter.generateTmpRegister();
 
-    private checkArgumentsEvaluationEntityWithNames(sinfo: SourceInfo, env: TypeEnvironment, args: Arguments, fieldinfo: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>): ExpandedArgument[] {
-        this.raiseErrorIf(sinfo, args.argList.some((arg) => arg instanceof PositionalArgument && !arg.isSpread), "All arguments must be named (or spread or record) for entity constructor");
-
-        let eargs: ExpandedArgument[] = [];
-
-        for (let i = 0; i < args.argList.length; ++i) {
-            const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
-
-            const treg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const earg = this.checkExpression(env, arg.value, treg).getExpressionResult().etype;
-
-            if (arg instanceof NamedArgument) {
-                eargs.push({ name: arg.name, argtype: earg, ref: undefined, expando: false, treg: treg, pcode: undefined });
-            }
-            else {
-                eargs.push({ name: undefined, argtype: earg, ref: undefined, expando: (arg as PositionalArgument).isSpread, treg: treg, pcode: undefined });
+                if (arg instanceof NamedArgument) {
+                    const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult();
+                    eargs.push({ name: arg.name, argtype: earg.exptype, ref: undefined, expando: false, pcode: undefined, treg: treg });
+                }
+                else {
+                    const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult();
+                    eargs.push({ name: undefined, argtype: earg.exptype, ref: undefined, expando: (arg as PositionalArgument).isSpread, pcode: undefined, treg: treg });
+                }
             }
         }
 
@@ -1120,10 +1212,15 @@ class TypeChecker {
 
     private checkArgumentsEntityConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, args: ExpandedArgument[], trgt: MIRTempRegister, infertype: ResolvedType | undefined): ResolvedType {
         const fieldInfo = this.m_assembly.getAllOOFields(oftype.object, oftype.binds);
+        const flatfinfo = [...fieldInfo];
         let fields: string[] = [];
         fieldInfo.forEach((v, k) => {
             fields.push(k);
         });
+
+        const optcount = flatfinfo.filter((fi) => fi[1][1].value !== undefined).length;
+        const optfirst = flatfinfo.findIndex((fi) => fi[1][1].value !== undefined);
+        const fflag = this.m_emitter.emitHasFlagLocation(optcount);
 
         let filledLocations: { vtype: ResolvedType, mustDef: boolean, trgt: MIRArgument }[] = [];
 
@@ -1138,8 +1235,11 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${arg.name}"`);
 
                 filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, trgt: arg.treg };
+                if(flatfinfo[fidx][1][1].value !== undefined) {
+                    this.m_emitter.emitSetHasFlagConstant(fflag, fidx - optfirst, true);
+                }
             }
-            else if (arg.expando && this.m_assembly.subtypeOf(arg.argtype as ResolvedType, this.m_assembly.getSpecialRecordConceptType())) {
+            else if (arg.expando && (arg.argtype as ResolvedType).isRecordTargetType()) {
                 const expandInfo = this.checkTypeOkForRecordExpando(sinfo, arg.argtype as ResolvedType);
 
                 expandInfo[1].forEach((pname) => {
@@ -1149,14 +1249,13 @@ class TypeChecker {
 
                     this.raiseErrorIf(sinfo, (fieldInfo.get(pname) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>])[1].value !== undefined && !expandInfo[0].has(pname), `Constructor requires "${pname}" but it is provided as an optional argument`);
 
-                    const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const etreg = this.m_emitter.generateTmpRegister();
                     const lvtype =  this.getInfoForLoadFromPropertyName(sinfo, arg.argtype as ResolvedType, pname);
-                    if (this.m_emitEnabled) {
-                        const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
-                        this.m_emitter.bodyEmitter.emitLoadProperty(sinfo, ptype.trkey, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType).trkey, pname, etreg);
-                    }
-
+                    const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
+                    this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType).trkey, pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype.trkey, trgt);
+                    
                     filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[0].has(pname), trgt: etreg };
+                    optmask[fidx] = expandInfo[0].has(pname) ? "X" : "?";
                 });
             }
             else {
@@ -1165,7 +1264,7 @@ class TypeChecker {
         }
 
         //now fill in positional parameters
-        let apos = args.findIndex((ae) => ae.name === undefined && !(ae.expando && this.m_assembly.subtypeOf(ae.argtype as ResolvedType, this.m_assembly.getSpecialRecordConceptType())));
+        let apos = args.findIndex((ae) => ae.name === undefined && !(ae.expando && (ae.argtype as ResolvedType).isRecordTargetType()));
         if (apos === -1) {
             apos = args.length;
         }
@@ -1181,24 +1280,27 @@ class TypeChecker {
             const arg = args[apos];
             if (!arg.expando) {
                 filledLocations[ii] = { vtype: arg.argtype as ResolvedType, mustDef: true, trgt: arg.treg };
+                if(flatfinfo[ii][1][1].value !== undefined) {
+                    this.m_emitter.emitSetHasFlagConstant(fflag, ii - optfirst, true);
+                }
+                
                 ++ii;
             }
             else {
-                this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(arg.argtype as ResolvedType, this.m_assembly.getSpecialTupleConceptType()), "Only Tuple types can be expanded as positional arguments");
+                this.raiseErrorIf(sinfo, !(arg.argtype as ResolvedType).isTupleTargetType(), "Only Tuple types can be expanded as positional arguments");
                 const expandInfo = this.checkTypeOkForTupleExpando(sinfo, arg.argtype as ResolvedType);
 
                 for (let ectr = 0; ectr < expandInfo[1]; ++ectr) {
                     this.raiseErrorIf(sinfo, ii >= fields.length, "Too many arguments as part of tuple expando");
                     this.raiseErrorIf(sinfo, (fieldInfo.get(fields[ii]) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>])[1].value !== undefined && ectr >= expandInfo[0], `Constructor requires "${fields[ii]}" but it is provided as an optional argument as part of tuple expando`);
 
-                    const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
+                    const etreg = this.m_emitter.generateTmpRegister();
                     const lvtype = this.getInfoForLoadFromIndex(sinfo, arg.argtype as ResolvedType, ectr);
-                    if (this.m_emitEnabled) {
-                        const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
-                        this.m_emitter.bodyEmitter.emitLoadTupleIndex(sinfo, itype.trkey, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType).trkey, ectr, etreg);
-                    }
-
+                    const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
+                    this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType).trkey, ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype.trkey, trgt);
+                    
                     filledLocations[ii] = { vtype: lvtype, mustDef: ectr < expandInfo[0], trgt: etreg };
+                    optmask[ii] = ectr < expandInfo[0] ? "X" : "?";
 
                     while (filledLocations[ii] !== undefined) {
                         ii++;
@@ -1207,7 +1309,7 @@ class TypeChecker {
             }
 
             apos++;
-            while (apos < args.length && (args[apos].name !== undefined || (args[apos].expando && this.m_assembly.subtypeOf(args[apos].argtype as ResolvedType, this.m_assembly.getSpecialRecordConceptType())))) {
+            while (apos < args.length && (args[apos].name !== undefined || (args[apos].expando && (args[apos].argtype as ResolvedType).isRecordTargetType()))) {
                 apos++;
             }
         }
@@ -1220,10 +1322,8 @@ class TypeChecker {
             if (filledLocations[i] === undefined) {
                 this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[i]}" is required and must be assigned a value in constructor`);
 
-                const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                if (this.m_emitEnabled) {
-                    this.m_emitter.bodyEmitter.emitLoadMemberFieldDefaultValue(sinfo, MIRKeyGenerator.generateFieldKey(field[0], field[2], field[1].name), etreg);
-                }
+                const etreg = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitLoadMemberFieldDefaultValue(sinfo, MIRKeyGenerator.generateFieldKey(field[0], field[2], field[1].name), etreg);
 
                 filledLocations[i] = { vtype: fieldtype, mustDef: true, trgt: etreg };
             }
