@@ -12,7 +12,6 @@ type MIRConstantKey = string; //ns::[type]::const#binds
 type MIRFieldKey = string; //ns::name::field#binds
 type MIRInvokeKey = string; //ns::[type]::func#binds%code
 
-type MIRNominalTypeKey = string; //ns::name#binds
 type MIRResolvedTypeKey = string; //idstr
 type MIRVirtualMethodKey = string; //method#binds
 
@@ -245,11 +244,73 @@ class MIRConstantBigInt extends MIRConstantArgument {
     }
 }
 
+class MIRConstantBigNat extends MIRConstantArgument {
+    readonly value: string;
+
+    constructor(value: string) {
+        super(`=bignat=${value}`);
+
+        this.value = value;
+    }
+
+    digits(): string {
+        return this.value.slice(0, this.value.length - 1);
+    }
+
+    stringify(): string {
+        return this.value;
+    }
+
+    jemit(): any {
+        return this.value;
+    }
+}
+
+class MIRConstantRational extends MIRConstantArgument {
+    readonly value: string;
+
+    constructor(value: string) {
+        super(`=rational=${value}`);
+
+        this.value = value;
+    }
+
+    stringify(): string {
+        return this.value;
+    }
+
+    jemit(): any {
+        return this.value;
+    }
+}
+
 class MIRConstantFloat extends MIRConstantArgument {
     readonly value: string;
 
     constructor(value: string) {
         super(`=float=${value}`);
+
+        this.value = value;
+    }
+
+    digits(): string {
+        return this.value.slice(0, this.value.length - 1);
+    }
+    
+    stringify(): string {
+        return this.value;
+    }
+
+    jemit(): any {
+        return this.value;
+    }
+}
+
+class MIRConstantDecmial extends MIRConstantArgument {
+    readonly value: string;
+
+    constructor(value: string) {
+        super(`=decimal=${value}`);
 
         this.value = value;
     }
@@ -2160,8 +2221,8 @@ class MIRBody {
 }
 
 export {
-    MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRNominalTypeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue,

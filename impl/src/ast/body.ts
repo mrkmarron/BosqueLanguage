@@ -547,6 +547,8 @@ enum PostfixOpTag {
     PostfixIs = "PostfixIs",
     PostfixAs = "PostfixAs",
     PostfixCoerce = "PostfixCoerce",
+    PostfixHasIndex = "PostfixHasIndex",
+    PostfixHasProperty = "PostfixHasProperty",
     PostfixInvoke = "PostfixInvoke"
 }
 
@@ -660,6 +662,24 @@ class PostfixCoerce extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, terms: TemplateArguments) {
         super(sinfo, isElvis, PostfixOpTag.PostfixCoerce);
         this.terms = terms;
+    }
+}
+
+class PostfixHasIndex extends PostfixOperation {
+    readonly idx: number;
+
+    constructor(sinfo: SourceInfo, isElvis: boolean, idx: number) {
+        super(sinfo, isElvis, PostfixOpTag.PostfixHasIndex);
+        this.idx = idx;
+    }
+}
+
+class PostfixHasProperty extends PostfixOperation {
+    readonly pname: string;
+
+    constructor(sinfo: SourceInfo, isElvis: boolean, pname: string) {
+        super(sinfo, isElvis, PostfixOpTag.PostfixHasProperty);
+        this.pname = pname;
     }
 }
 
@@ -1165,7 +1185,7 @@ export {
     CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
-    PostfixIs, PostfixAs, PostfixCoerce, PostfixInvoke, PCodeInvokeExpression,
+    PostfixIs, PostfixAs, PostfixCoerce, PostfixHasIndex, PostfixHasProperty, PostfixInvoke, PCodeInvokeExpression,
     PrefixOp, 
     BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
     MapEntryConstructorExpression,
