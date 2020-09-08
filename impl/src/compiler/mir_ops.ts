@@ -1453,7 +1453,7 @@ class MIRInvokeFixedFunction extends MIRValueOp {
     readonly mkey: MIRInvokeKey;
     args: MIRArgument[]; //this is args[0] for methods
 
-    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, trgt: MIRTempRegister) {
         super(MIROpTag.MIRInvokeFixedFunction, sinfo, trgt);
         this.resultType = resultType;
         this.mkey = mkey;
@@ -1730,12 +1730,12 @@ class MIRIsTypeOf extends MIRValueOp {
     }
 }
 
-class MIRRegAssign extends MIRFlowOp {
+class MIRTempRegisterAssign extends MIRFlowOp {
     src: MIRArgument;
     trgt: MIRTempRegister;
 
     constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRRegAssign, sinfo);
+        super(MIROpTag.MIRTempRegisterAssign, sinfo);
         this.src = src;
         this.trgt = trgt;
     }
@@ -1782,12 +1782,38 @@ class MIRTruthyConvert extends MIRFlowOp {
     }
 }
 
-class MIRVarStore extends MIRFlowOp {
+class MIRParameterVarStore extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRVariable) {
-        super(MIROpTag.MIRVarStore, sinfo);
+    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRParameterVariable) {
+        super(MIROpTag.MIRParameterVarStore, sinfo);
+        this.src = src;
+        this.name = name;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.name]; }
+
+    stringify(): string {
+        return `${this.name.stringify()} = ${this.src.stringify()}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRVariable.jparse(jobj.name));
+    }
+}
+
+class MIRLocalVarStore extends MIRFlowOp {
+    src: MIRArgument;
+    name: MIRVariable;
+
+    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRLocalVariable) {
+        super(MIROpTag.MIRLocalVarStore, sinfo);
         this.src = src;
         this.name = name;
     }
@@ -2233,7 +2259,7 @@ export {
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction,
     MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinLess, MIRBinCmp,
     MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf,
-    MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRPackSlice, MIRPackExtend, MIRReturnAssign,
+    MIRTempRegisterAssign, MIRTruthyConvert, MIRParameterVarStore, MIRLocalVarStore, MIRPackSlice, MIRPackExtend, MIRReturnAssign,
     MIRAbort, MIRDebug,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRPhi,

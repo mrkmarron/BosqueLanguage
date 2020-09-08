@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRArgument, MIRLoadConstDataString, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRRegAssign, MIRVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRConstructorEphemeralValueList, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend, MIRConstantBigInt, MIRConstantFloat, MIRBinLess, MIRConstantRegex, MIRConstantEmpty, MIRConstantStringOf, MIRConstantDecmial, MIRConstantBigNat, MIRConstantRational } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRArgument, MIRLoadConstDataString, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRPrefixOp, MIRBinOp, MIRBinCmp, MIRBinEq, MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRConstructorEphemeralValueList, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend, MIRConstantBigInt, MIRConstantFloat, MIRBinLess, MIRConstantRegex, MIRConstantEmpty, MIRConstantStringOf, MIRConstantDecmial, MIRConstantBigNat, MIRConstantRational, MIRVariableArgument, MIRParameterVariable } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl, BuildLevel } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedEphemeralListType } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType } from "./mir_assembly";
@@ -327,7 +327,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRAccessConstantValue(sinfo, gkey, trgt));
     }
 
-    emitHasFlagLocation(count: number): string {
+    emitHasFlagLocation(name: string, count: number): string {
         if(!this.emitEnabled || count === 0) {
             return "[IGNORE]";
         }
@@ -399,17 +399,19 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRInvokeInvariantCheckDirect(sinfo, ikey, tkey, rcvr, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, retinfo: [MIRType, MIRType, number, [string, MIRType][]], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [string, MIRType][]], trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
+        const retinfo = Array.isArray(rretinfo) ? rretinfo : [rretinfo, rretinfo, -1, []] as [MIRType, MIRType, number, [string, MIRType][]];
+
         if (retinfo[3].length === 0) {
-            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[0].trkey, ikey, args, trgt));
+            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[0].trkey, ikey, args, optstatusmask, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[1].trkey, ikey, args, rr));
+            this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[1].trkey, ikey, args, optstatusmask, rr));
 
             if (retinfo[2] === -1) {
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[0].trkey, retinfo[1].trkey, 0, trgt));
@@ -422,7 +424,7 @@ class MIREmitter {
             for (let i = 0; i < retinfo[3].length; ++i) {
                 const tr = this.generateTmpRegister();
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[3][i][1].trkey, retinfo[1].trkey, refbase + i, tr));
-                this.m_currentBlock.push(new MIRVarStore(sinfo, tr, new MIRVariable(retinfo[3][i][0])));
+                this.m_currentBlock.push(new MIRParameterVarStore(sinfo, tr, new MIRParameterVariable(retinfo[3][i][0])));
             }
         }
     }
