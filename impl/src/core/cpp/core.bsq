@@ -27,7 +27,6 @@ concept Any {
 //<summary>Special type for representing all non-none values.</summary>
 concept Some provides Any {
     method update(): Some # special_method
-    method coerce(): Some # special_method
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>

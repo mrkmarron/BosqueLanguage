@@ -163,8 +163,6 @@ enum ExpressionTag {
 
     PCodeInvokeExpression = "PCodeInvokeExpression",
     SpecialConstructorExpression = "SpecialConstructorExpression",
-    TupleAppendExpression = "TupleAppendExpression",
-    RecordJoinExpression = "RecordJoinExpression",
     CallNamespaceFunctionOrOperatorExpression = "CallNamespaceFunctionOrOperatorExpression",
     CallStaticFunctionOrOperatorExpression = "CallStaticFunctionOrOperatorExpression",
 
@@ -480,24 +478,6 @@ class SpecialConstructorExpression extends Expression {
         this.rtype = rtype;
         this.rop = rop;
         this.arg = arg;
-    }
-}
-
-class TupleAppendExpression  extends Expression {
-    readonly args: Arguments;
-
-    constructor(sinfo: SourceInfo, args: Arguments) {
-        super(ExpressionTag.TupleAppendExpression, sinfo);
-        this.args = args;
-    }
-}
-
-class RecordJoinExpression extends Expression {
-    readonly args: Arguments;
-
-    constructor(sinfo: SourceInfo, args: Arguments) {
-        super(ExpressionTag.RecordJoinExpression, sinfo);
-        this.args = args;
     }
 }
 
@@ -1171,7 +1151,7 @@ export {
     LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
-    ConstructorPCodeExpression, SpecialConstructorExpression, TupleAppendExpression, RecordJoinExpression,
+    ConstructorPCodeExpression, SpecialConstructorExpression,
     CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,

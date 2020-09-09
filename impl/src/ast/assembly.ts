@@ -1722,12 +1722,25 @@ class Assembly {
         return undefined;
     }
 
-    tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
+    private tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
         if(!ooptype.staticOperators.has(name)) {
             return undefined;
         }
 
         return new OOMemberLookupInfo<StaticOperatorDecl[]>(ooptype, ooptype.staticOperators.get(name) as StaticOperatorDecl[], binds);
+    }
+
+    private tryGetMemberOperatorDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
+        const rprovides = this.resolveProvides(ooptype, binds);
+        for (let i = 0; i < rprovides.length; ++i) {
+            const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
+            const res = this.tryGetMemberOperatorDecl(tt.concept, tt.binds, name,) || this.tryGetMemberOperatorDeclParent(tt.concept, tt.binds, name);
+            if (res !== undefined) {
+                return res;
+            }
+        }
+
+        return undefined;
     }
 
     private tryGetMemberFieldDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
@@ -1859,6 +1872,27 @@ class Assembly {
         }
     }
 
+    tryGetOperatorUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
+        const ntype = this.ensureNominalRepresentation(tt);
+        const ttopts = ntype.options.map((ttopt) => {
+            if(ttopt instanceof ResolvedEntityAtomType) {
+                return this.tryGetMemberOperatorDecl(ttopt.object, ttopt.binds, fname) || this.tryGetMemberOperatorDeclParent(ttopt.object, ttopt.binds, fname);
+            }
+            else {
+                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
+                    return this.tryGetMemberOperatorDecl(ccopt.concept, ccopt.binds, fname) || this.tryGetMemberOperatorDeclParent(ccopt.concept, ccopt.binds, fname);
+                });
+                return this.ensureSingleDecl_Helper<StaticOperatorDecl[]>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<StaticOperatorDecl[]>[]);
+            }
+        });
+
+        if(ttopts.some((topt) => topt === undefined)) {
+            return undefined;
+        }
+        else {
+            return this.ensureSingleDecl_Helper<StaticOperatorDecl[]>(ttopts as OOMemberLookupInfo<StaticOperatorDecl[]>[]);
+        }
+    }
 
     tryGetFieldUniqueDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);

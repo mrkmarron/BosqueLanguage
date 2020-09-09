@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, TupleAppendExpression, RecordJoinExpression, PostfixHasIndex, PostfixHasProperty } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
@@ -1777,17 +1777,11 @@ class Parser {
                     return new AccessStaticFieldExpression(sinfo, ttype, name);
                 }
                 else {
-                    if (ttype instanceof MIRNominalType &&
-                        ((ttype.trkey === "NSCore::Tuple" && name === "append") || (ttype.trkey === "NSCore::Record" && name === "join"))) {
-                        return this.handleSpecialCaseStaticCall(sinfo, ttype, name);
-                    }
-                    else {
-                        const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
-                        const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
-                        const args = this.parseArguments("(", ")");
+                    const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
+                    const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
+                    const args = this.parseArguments("(", ")");
 
-                        return new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, pragmas, args);
-                    }
+                    return new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, pragmas, args);
                 }
             }
             else if (this.testFollows("@", TokenStrings.Identifier) || this.testFollows("#", TokenStrings.Identifier)) {
@@ -1887,22 +1881,6 @@ class Parser {
         else {
             this.raiseError(line, "unknown special operation");
             return (undefined as unknown) as PostfixOperation;
-        }
-    }
-
-    private handleSpecialCaseStaticCall(sinfo: SourceInfo, ttype: TypeSignature, name: string): TupleAppendExpression | RecordJoinExpression {
-        const line = sinfo.line;
-        if (name === "append") {
-            const args = this.parseArguments("(", ")");
-            return new TupleAppendExpression(sinfo, args);
-        }
-        else if (name === "join") {
-            const args = this.parseArguments("(", ")");
-            return new RecordJoinExpression(sinfo, args);
-        }
-        else {
-            this.raiseError(line, "unknown special operation");
-            return (undefined as unknown) as TupleAppendExpression;
         }
     }
 
