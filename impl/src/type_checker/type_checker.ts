@@ -7,7 +7,7 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression, PragmaArguments } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator, MIRBodyEmitter, ResultCheckCategory } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRNominalTypeKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantEmpty, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantBigInt, MIRConstantFloat, MIRConstantString, MIRConstantRegex, MIRLocalVariable, MIRParameterVariable, MIRVariableArgument } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
@@ -1678,7 +1678,7 @@ class TypeChecker {
         return { args: margs, types: mtypes, fflag: fflag, refs: refs, pcodes: pcodes, cinfo: cinfo };
     }
 
-    private checkArgumentsWOperator(sinfo: SourceInfo, env: TypeEnvironment, opnames: string[], args: ExpandedArgument[]): { args: MIRArgument[], types: ResolvedType[], fflag: string, refs: string[], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
+    private checkArgumentsWOperator(sinfo: SourceInfo, env: TypeEnvironment, opnames: string[], args: ExpandedArgument[]): { args: MIRArgument[], types: ResolvedType[], refs: string[], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
         let filledLocations: FilledLocation[] = [];
 
         //figure out named parameter mapping first
@@ -1762,89 +1762,30 @@ class TypeChecker {
             apos++;
         }
 
-        if (ii < opnames.length) {
-            this.raiseErrorIf(sinfo, !sig.params[ii].isOptional, `Insufficient number of parameters -- missing value for ${opnames[ii]}`);
-        }
-        else {
-            this.raiseErrorIf(sinfo, apos !== args.length && sig.optRestParamType === undefined, "Too many arguments for call");
-        }
-
-        //go through names and fill out info for any that should use the default value -- raise error if any are missing
+        this.raiseErrorIf(sinfo, ii < opnames.length, `Insufficient number of parameters -- missing value for ${opnames[ii]}`);
+        this.raiseErrorIf(sinfo, apos !== args.length, "Too many arguments for operator");
+        
         //check ref, pcode, and regular arg types -- plus build up emit data
         let margs: MIRArgument[] = [];
         let mtypes: ResolvedType[] = [];
         let pcodes: PCode[] = [];
         let refs: string[] = [];
-        for (let j = 0; j < sig.params.length; ++j) {
-            const paramtype = sig.params[j].type;
+        for (let j = 0; j < opnames.length; ++j) {
+            this.raiseErrorIf(sinfo, filledLocations[j] === undefined, `Parameter ${opnames[j]} was not provided`);
 
-            if (filledLocations[j] === undefined) {
-                this.raiseErrorIf(sinfo, !sig.params[j].isOptional, `Parameter ${sig.params[j].name} is required and must be assigned a value in constructor`);
-
-                const etreg = this.m_emitter.generateTmpRegister();
-                this.m_emitter.emitBlankValue(sinfo, this.m_emitter.registerResolvedTypeReference(paramtype as ResolvedType), etreg);
-
-                filledLocations[j] = { vtype: paramtype, mustDef: true, ref: undefined, pcode: undefined, trgt: etreg };
-            }
-
-            if (sig.params[j].type instanceof ResolvedFunctionType) {
-                this.raiseErrorIf(sinfo, filledLocations[j].pcode === undefined, `Parameter ${sig.params[j].name} expected a function`);
-                this.raiseErrorIf(sinfo, !this.m_assembly.functionSubtypeOf(filledLocations[j].vtype as ResolvedFunctionType, paramtype as ResolvedFunctionType), `Parameter ${sig.params[j].name} expected function of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
-
+            if (filledLocations[j].vtype instanceof ResolvedFunctionType) {
                 pcodes.push(filledLocations[j].pcode as PCode);
             }
             else {
-                this.raiseErrorIf(sinfo, filledLocations[j].pcode !== undefined, `Parameter ${sig.params[j].name} cannot take a function`);
+                this.raiseErrorIf(sinfo, filledLocations[j].pcode !== undefined, `Parameter ${opnames[j]} cannot take a function`);
 
-                if (sig.params[j].isRef) {
-                    this.raiseErrorIf(sinfo, filledLocations[j].ref === undefined, `Parameter ${sig.params[j].name} expected reference parameter`);
-                    this.raiseErrorIf(sinfo, (filledLocations[j].vtype as ResolvedType).idStr !== (paramtype as ResolvedType).idStr, `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
-
+                if (filledLocations[j].ref !== undefined) {
                     refs.push(filledLocations[j].ref as string);
                 }
-                else {
-                    this.raiseErrorIf(sinfo, filledLocations[j].ref !== undefined, `Parameter ${sig.params[j].name} reference parameter is not alloed in this position`);
-                    this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(filledLocations[j].vtype as ResolvedType, paramtype as ResolvedType), `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
-                }
 
-                const narg = this.emitInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType);
-                margs.push(narg);
-                mtypes.push(sig.params[j].type as ResolvedType);
+                margs.push(filledLocations[j].trgt);
+                mtypes.push(filledLocations[j].vtype as ResolvedType);
             }
-        }
-
-        //if this has a rest parameter check it
-        if (sig.optRestParamType !== undefined) {
-            const objtype = ResolvedType.tryGetOOTypeInfo(sig.optRestParamType);
-            this.raiseErrorIf(sinfo, objtype === undefined || !(objtype instanceof ResolvedEntityAtomType), "Invalid rest type");
-
-            const oodecl = (objtype as ResolvedEntityAtomType).object;
-            const oobinds = (objtype as ResolvedEntityAtomType).binds;
-            const oftype = ResolvedEntityAtomType.create(oodecl, oobinds);
-
-            const rargs = args.slice(apos).filter((arg) => arg.name === undefined);
-            const cargs = rargs.map((ca) => [ca.argtype, ca.expando, ca.treg] as [ResolvedType, boolean, MIRTempRegister]);
-
-            const etype = oodecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl) 
-                ? ResolvedType.createSingle(ResolvedTupleAtomType.create(true, [new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]))
-                : oobinds.get("T") as ResolvedType;
-
-            let genkl: string | undefined = undefined;
-            if(oodecl.specialDecls.has(SpecialTypeCategory.SetTypeDecl)) {
-                genkl = "T";
-            } 
-            else if (oodecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl)) {
-                genkl = "K";
-            }
-            else {
-                //nothing
-            }
-
-            const rtreg = this.m_emitter.generateTmpRegister();
-            this.checkArgumentsCollectionConstructor(sinfo, oftype, etype, cargs, rtreg, sig.optRestParamType, genkl);
-
-            margs.push(rtreg);
-            mtypes.push(ResolvedType.createSingle(oftype));
         }
 
         //take all the pcodes and pass the "captured" variables in as arguments in alpha order
@@ -1878,7 +1819,7 @@ class TypeChecker {
             }
         }
 
-        return { args: margs, types: mtypes, fflag: fflag, refs: refs, pcodes: pcodes, cinfo: cinfo };
+        return { args: margs, types: mtypes, refs: refs, pcodes: pcodes, cinfo: cinfo };
     }
 
     private generateExpandedReturnSig(sinfo: SourceInfo, declaredType: ResolvedType, params: FunctionParameter[], binds: Map<string, ResolvedType>): MIRType {
@@ -2422,11 +2363,78 @@ class TypeChecker {
         }
     }
 
+    private checkNamespaceOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, opdecl: NamespaceOperatorDecl, args: MIRArgument[], argtypes: ResolvedType[], refs: string[], pcodes: PCode[], cinfo: [string, ResolvedType][], pragmas: PragmaArguments, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const fsig = this.m_assembly.normalizeTypeFunction(opdecl.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
+        const [restype, iipack] = this.genInferInfo(sinfo, fsig.resultType, infertype, trgt);
+
+        this.checkRecursion(sinfo, fsig, pcodes, pragmas.recursive);
+
+        //if it is a static operator or it has a unique dynamic resolution based on the types
+        if (!OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
+            let cargs: MIRArgument[] = [];
+            for (let i = 0; i < fsig.params.length; ++i) {
+                if(fsig.params[i] instanceof ResolvedFunctionType) {
+                    continue;
+                }
+
+                const argidx = cargs.length;
+                if(opdecl.invoke.params[i].isRef) {
+                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(opdecl.invoke.params[i].type as ResolvedType));
+                }
+                cargs.push(this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], opdecl.invoke.params[i].type as ResolvedType));
+            }
+
+            const opkey = this.m_emitter.registerOperatorCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
+            const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
+            this.m_emitter.emitInvokeFixedFunction(sinfo, opkey, cargs, "[IGNORE]", refinfo, iipack[0]);
+        }
+        else {
+            let cargs: MIRArgument[] = [];
+            for (let i = 0; i < fsig.params.length; ++i) {
+                if(fsig.params[i] instanceof ResolvedFunctionType) {
+                    continue;
+                }
+
+                const argidx = cargs.length;
+                if(opdecl.invoke.params[i].isRef) {
+                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(opdecl.invoke.params[i].type as ResolvedType));
+                }
+            }
+
+            const opkey = this.m_emitter.registerOperatorCallVCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
+            const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
+            this.m_emitter.emitInvokeVirtualFunction(sinfo, opkey, cargs, "[IGNORE]", refinfo, iipack[0]);
+        }
+
+        this.emitConvertIfNeeded(sinfo, fsig.resultType, infertype, iipack);
+        return [env.setResultExpression(restype)];
+    }
+
     private checkCallNamespaceFunctionOrOperatorExpression(env: TypeEnvironment, exp: CallNamespaceFunctionOrOperatorExpression, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
         this.raiseErrorIf(exp.sinfo, !this.m_assembly.hasNamespace(exp.ns), `Namespace '${exp.ns}' is not defined`);
         const nsdecl = this.m_assembly.getNamespace(exp.ns);
 
-        if (nsdecl.functions.has(exp.name)) {
+        if (nsdecl.operators.has(exp.name)) {
+            const opsintro = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+            const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+            this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
+
+            const pnames = opdecls[0].invoke.params.map((p) => p.name);
+
+            //No terms to be bound on operator call
+
+            const eargs = this.checkArgumentsEvaluationWOperator(exp.sinfo, env, env.terms, exp.args, refok);
+            const rargs = this.checkArgumentsWOperator(exp.sinfo, env, pnames, eargs);
+
+           const isigs = opdecls.map((opd) => this.m_assembly.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
+            const opidx = this.m_assembly.tryGetUniqueStaticOperatorResolve(rargs.types, isigs);
+
+            this.raiseErrorIf(exp.sinfo, opidx !== -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
+            const opdecl = opidx !== -1 ? opdecls[opidx] : opsintro as NamespaceOperatorDecl;
+            
+            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.pragmas, trgt, refok, infertype);
+        } 
+        else {
             this.raiseErrorIf(exp.sinfo, !nsdecl.functions.has(exp.name), `Function named '${exp.name}' is not defined`);
             const fdecl = nsdecl.functions.get(exp.name) as NamespaceFunctionDecl;
 
@@ -2443,40 +2451,6 @@ class TypeChecker {
             this.emitConvertIfNeeded(exp.sinfo, fsig.resultType, infertype, iipack);
     
             return [env.setResultExpression(restype)];
-        }
-        else {
-            this.raiseErrorIf(exp.sinfo, !nsdecl.operators.has(exp.name), `Operator named '${exp.name}' is not defined`);
-            const opdecl = nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[];
-
-            //No terms to be bound on operator call
-
-
-            //
-            //TODO: if we want to do template inference this is a key point -- see the assertion in check args to figure out how to pre-check the body and get a result type
-            //
-            this.raiseErrorIf(exp.sinfo, fdecl.invoke.terms.length !== exp.terms.targs.length, "Missing template arguments that cannot be inferred");
-
-            const binds = this.m_assembly.resolveBindsForCall(fdecl.invoke.terms, exp.terms.targs, new Map<string, ResolvedType>(), env.terms);
-            this.raiseErrorIf(exp.sinfo, binds === undefined, "Call bindings could not be resolved");
-
-            this.checkTemplateTypes(exp.sinfo, fdecl.invoke.terms, binds as Map<string, ResolvedType>, fdecl.invoke.termRestrictions);
-
-            const fsig = this.m_assembly.normalizeTypeFunction(fdecl.invoke.generateSig(), binds as Map<string, ResolvedType>);
-            this.raiseErrorIf(exp.sinfo, fsig === undefined, "Invalid function signature");
-
-            const eargs = this.checkArgumentsEvaluationWSig(env, fsig as ResolvedFunctionType, exp.args, undefined, refok);
-            const margs = this.checkArgumentsSignature(exp.sinfo, env, fsig as ResolvedFunctionType, eargs);
-
-            this.checkRecursion(exp.sinfo, fsig as ResolvedFunctionType, margs.pcodes, exp.pragmas.recursive);
-
-            if (this.m_emitEnabled) {
-                const ckey = this.m_emitter.registerFunctionCall(exp.ns, exp.name, fdecl, binds as Map<string, ResolvedType>, margs.pcodes, margs.cinfo);
-
-                const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, margs.refs);
-                this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, ckey, margs.args, refinfo, trgt);
-            }
-
-            return [env.setExpressionResult(this.resolveAndEnsureTypeOnly(exp.sinfo, fdecl.invoke.resultType, binds as Map<string, ResolvedType>))];
         }
     }
 

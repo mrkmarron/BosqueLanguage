@@ -10,6 +10,7 @@ import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
 import { BSQRegex } from "./bsqregex";
+import { SIGABRT } from "constants";
 
 type BuildLevel = "debug" | "test" | "release";
 
@@ -1939,6 +1940,63 @@ class Assembly {
         }
         else {
             return this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
+        }
+    }
+
+    tryGetUniqueStaticOperatorResolve(args: ResolvedType[], opsig: ResolvedFunctionType[]): number {
+        const ppairs = opsig.map((sig, idx) => { return {sig: sig, idx: idx}; }).filter((spp) => {
+            let j = 0;
+            for(let i = 0; i < args.length; ++i) {
+                while(spp.sig.params[j].type instanceof ResolvedFunctionType) {
+                    j++;
+                }
+
+                if(!this.subtypeOf(args[i], spp.sig.params[j].type as ResolvedType)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        const rrsigs: {sig: ResolvedFunctionType, idx: number}[] = [];
+        for(let i = 0; i < ppairs.length; ++i) {
+            const isig = ppairs[i].sig;
+            let nomorespecific = false;
+
+            for(let j = 0; j < ppairs.length; ++j) {
+                if(i == j) {
+                    continue;
+                }
+
+                const jsig = ppairs[j].sig;
+                let morespecific = true;
+                for(let k = 0; k < isig.params.length; ++ k) {
+                    if(isig.params[k] instanceof ResolvedFunctionType) {
+                        continue;
+                    }
+
+                    if(!this.subtypeOf(jsig.params[k].type as ResolvedType, isig.params[k].type as ResolvedType)) {
+                        morespecific = false;
+                        break;
+                    } 
+                }
+
+                if(morespecific) {
+                    nomorespecific = true;
+                    break;
+                }
+            }
+
+            if(nomorespecific) {
+                rrsigs.push(ppairs[i]);
+            }
+        }
+
+        if(rrsigs.length !== 1) {
+            return -1;
+        }
+        else {
+            return rrsigs[0].idx;
         }
     }
 
