@@ -49,32 +49,20 @@ class MIRKeyGenerator {
         return "[" + pcodes.map((pc) => `${pc.code.srcFile}%${pc.code.sourceLocation.line}%${pc.code.sourceLocation.column}`).join(",") + "]";
     }
 
-    private static generateTypeKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>): MIRResolvedTypeKey {
-        return `${t.ns}::${t.name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}`;
+    static generateTypeKey(t: ResolvedType): MIRResolvedTypeKey {
+        return t.idStr;
     }
 
-    static generateGlobalKey(ns: string, name: string): MIRConstantKey {
-        return `${ns}::${name}`;
+    static generateFieldKey(t: ResolvedType, name: string): MIRFieldKey {
+        return `${MIRKeyGenerator.generateTypeKey(t)}.${name}`;
     }
 
-    static generateConstKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): MIRConstantKey {
-        return `${MIRKeyGenerator.generateTypeKey(t, binds)}::${name}`;
+    static generateFunctionKey(prefix: string, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
+        return `${prefix}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
     }
 
-    static generateFieldKey(t: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): MIRFieldKey {
-        return `${MIRKeyGenerator.generateTypeKey(t, binds)}.${name}`;
-    }
-
-    static generateFunctionKey(ns: string, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
-        return `${ns}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
-    }
-
-    static generateStaticKey(t: OOPTypeDecl, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
-    }
-
-    static generateMethodKey(t: OOPTypeDecl, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
-        return `${t.ns}::${t.name}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
+    static generateMethodKey(t: ResolvedType, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
+        return `${this.generateTypeKey(t)}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
     }
 
     static generateVirtualMethodKey(vname: string, binds: Map<string, ResolvedType>): MIRVirtualMethodKey {
@@ -317,14 +305,6 @@ class MIREmitter {
         }
 
         this.m_currentBlock.push(new MIRLoadConstDataString(sinfo, sv, tskey, trgt));
-    }
-
-    emitAccessConstant(sinfo: SourceInfo, gkey: MIRConstantKey, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRAccessConstantValue(sinfo, gkey, trgt));
     }
 
     emitHasFlagLocation(name: string, count: number): string {
@@ -852,7 +832,7 @@ class MIREmitter {
     }
 
     registerPendingGlobalProcessing(decl: NamespaceConstDecl): MIRConstantKey {
-        const key = MIRKeyGenerator.generateGlobalKey(decl.ns, decl.name);
+        const key = MIRKeyGenerator.generateFunctionKey(`${global}@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingGlobalProcessing.findIndex((gp) => gp[0] === key) !== -1) {
             return key;
         }
@@ -862,7 +842,7 @@ class MIREmitter {
     }
 
     registerPendingConstProcessing(containingType: OOPTypeDecl, decl: StaticMemberDecl, binds: Map<string, ResolvedType>): MIRConstantKey {
-        const key = MIRKeyGenerator.generateConstKey(containingType, binds, decl.name);
+        const key = MIRKeyGenerator.generateFunctionKey(`${global}@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
             return key;
         }

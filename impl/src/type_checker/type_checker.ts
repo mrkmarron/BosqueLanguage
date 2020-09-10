@@ -821,7 +821,6 @@ class TypeChecker {
         else {
             for (let i = 0; i < args.argList.length; ++i) {
                 const arg = args.argList[i];
-                const sigidx = ridx + i;
 
                 const treg = this.m_emitter.generateTmpRegister();
 
@@ -1442,7 +1441,7 @@ class TypeChecker {
         const rtype = this.m_emitter.registerResolvedTypeReference(constype);
         const [restype, iipack] = this.genInferInfo(sinfo, constype, infertype, trgt);
 
-        const ikey = MIRKeyGenerator.generateStaticKey(oftype.object, "@@constructor", oftype.binds, []);
+        const ikey = MIRKeyGenerator.generateFunctionKey(MIRKeyGenerator.generateTypeKey(constype), "@@constructor", new Map<string, ResolvedType>(), []);
         this.m_emitter.emitInvokeFixedFunction(sinfo, ikey, cargs, fflag, rtype, iipack[0]);
 
         this.emitConvertIfNeeded(sinfo, constype, infertype, iipack);
@@ -2112,7 +2111,6 @@ class TypeChecker {
 
         const presult = this.m_emitter.registerResolvedTypeReference(aoftype.parsetype);
         const rok = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(aoftype.parsetype)[0]);
-        const ctype = this.getResultBinds(aoftype.parsetype).T;
 
         const sbinds = this.m_assembly.resolveBindsForCallComplete([], [], (aoftype.stringtype.options[0] as ResolvedEntityAtomType).binds, new Map<string, ResolvedType>(), new Map<string, ResolvedType>()) as Map<string, ResolvedType>;
         const skey = this.m_emitter.registerStaticCall(aoftype.oftype[0], aoftype.oftype[1], sdecl as StaticFunctionDecl, "tryParse", sbinds, [], []);
@@ -2145,7 +2143,7 @@ class TypeChecker {
         const gkey = this.m_emitter.registerPendingGlobalProcessing(cdecl);
 
         const [restype, iipack] = this.genInferInfo(exp.sinfo, rtype, infertype, trgt);
-        this.m_emitter.emitAccessConstant(exp.sinfo, gkey, iipack[0]);
+        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, gkey, [], undefined, this.m_emitter.registerResolvedTypeReference(rtype), iipack[0]);
         this.emitConvertIfNeeded(exp.sinfo, rtype, infertype, iipack);
 
         return [env.setResultExpression(restype)];
@@ -2163,7 +2161,7 @@ class TypeChecker {
         const skey = this.m_emitter.registerPendingConstProcessing(cdecl.contiainingType, cdecl.decl, cdecl.binds);
 
         const [restype, iipack] = this.genInferInfo(exp.sinfo, rtype, infertype, trgt);
-        this.m_emitter.emitAccessConstant(exp.sinfo, skey, iipack[0]);
+        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [], undefined, this.m_emitter.registerResolvedTypeReference(rtype), iipack[0]);
         this.emitConvertIfNeeded(exp.sinfo, rtype, infertype, iipack);
 
         return [env.setResultExpression(restype)];
@@ -2177,7 +2175,6 @@ class TypeChecker {
 
         if (infertype === undefined || this.m_assembly.subtypeOf(vinfo.flowType, infertype)) {
             const totype = infertype || vinfo.flowType;
-            const tmp = this.m_emitter.generateTmpRegister();
 
             if (env.getLocalVarInfo(exp.name) !== undefined) {
                 this.emitAssignToTempAndConvertIfNeeded_KnownSafe(exp.sinfo, vinfo.declaredType, totype, new MIRLocalVariable(exp.name), trgt);
@@ -2374,7 +2371,8 @@ class TypeChecker {
         this.checkRecursion(sinfo, fsig, pcodes, pragmas.recursive);
 
         //if it is a static operator or it has a unique dynamic resolution based on the types
-        if (!opdecl.isDynamic || (!OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes) && opdecl.invoke.params.every((p) => !p.isLiteral))) {
+        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
+            const opkey = this.m_emitter.registerNamespaceOperatorCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
             let cargs: MIRArgument[] = [];
             for (let i = 0; i < fsig.params.length; ++i) {
                 if(fsig.params[i] instanceof ResolvedFunctionType) {
@@ -2382,13 +2380,25 @@ class TypeChecker {
                 }
 
                 const argidx = cargs.length;
-                if(opdecl.invoke.params[i].isRef) {
-                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(opdecl.invoke.params[i].type as ResolvedType));
+                if(fsig.params[i].isRef) {
+                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(fsig.params[i].type as ResolvedType));
                 }
-                cargs.push(this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], opdecl.invoke.params[i].type as ResolvedType));
+                cargs.push(this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], fsig.params[i].type as ResolvedType));
+
+                if(fsig.params[i].isLiteral) {
+                    const mirargtype = this.m_emitter.registerResolvedTypeReference(argtypes[argidx]);
+
+                    const lcreg = this.m_emitter.generateTmpRegister();
+                    const lccall = MIRKeyGenerator.generateFunctionKey(opkey, `@@literalkey${i}`, new Map<string, ResolvedType>(), []);
+                    this.m_emitter.emitInvokeFixedFunction(sinfo, lccall, [], undefined, mirargtype, lcreg);
+
+                    //Should have same error if we fail to find suitable dynamic dispatch -- this is just a nice optimization
+                    const ichkreg = this.m_emitter.generateTmpRegister();
+                    this.m_emitter.emitBinKeyEq(sinfo, mirargtype, cargs[argidx], mirargtype, lcreg, ichkreg);
+                    this.m_emitter.emitAssertCheck(sinfo, "Failed to match literal tag on dynamic operator invoke", ichkreg);
+                }
             }
 
-            const opkey = this.m_emitter.registerNamespaceOperatorCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
             this.m_emitter.emitInvokeFixedFunction(sinfo, opkey, cargs, "[IGNORE]", refinfo, iipack[0]);
         }
@@ -2406,6 +2416,66 @@ class TypeChecker {
             }
 
             const opkey = this.m_emitter.registerVirtualNamespaceOperatorCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
+            const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
+            this.m_emitter.emitInvokeVirtualOperator(sinfo, opkey, cargs,  refinfo, iipack[0]);
+        }
+
+        this.emitConvertIfNeeded(sinfo, fsig.resultType, infertype, iipack);
+        return [env.setResultExpression(restype)];
+    }
+
+    private checkStaticOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, oodecl: OOPTypeDecl, oobinds: Map<string, ResolvedType>, opdecl: StaticOperatorDecl, args: MIRArgument[], argtypes: ResolvedType[], refs: MIRVariableArgument[], pcodes: PCode[], cinfo: [string, ResolvedType][], pragmas: PragmaArguments, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const fsig = this.m_assembly.normalizeTypeFunction(opdecl.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType;
+        const [restype, iipack] = this.genInferInfo(sinfo, fsig.resultType, infertype, trgt);
+
+        this.checkRecursion(sinfo, fsig, pcodes, pragmas.recursive);
+
+        //if it is a static operator or it has a unique dynamic resolution based on the types
+        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
+            const opkey = this.m_emitter.registerStaticOperatorCall(oodecl, opdecl.name, opdecl, oobinds, pcodes, cinfo);
+            let cargs: MIRArgument[] = [];
+            for (let i = 0; i < fsig.params.length; ++i) {
+                if(fsig.params[i] instanceof ResolvedFunctionType) {
+                    continue;
+                }
+
+                const argidx = cargs.length;
+                if(fsig.params[i].isRef) {
+                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(fsig.params[i].type as ResolvedType));
+                }
+                cargs.push(this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], fsig.params[i].type as ResolvedType));
+
+                if(fsig.params[i].isLiteral) {
+                    const mirargtype = this.m_emitter.registerResolvedTypeReference(argtypes[argidx]);
+
+                    const lcreg = this.m_emitter.generateTmpRegister();
+                    const lccall = MIRKeyGenerator.generateFunctionKey(opkey, `@@literalkey${i}`, new Map<string, ResolvedType>(), []);
+                    this.m_emitter.emitInvokeFixedFunction(sinfo, lccall, [], undefined, mirargtype, lcreg);
+
+                    //Should have same error if we fail to find suitable dynamic dispatch -- this is just a nice optimization
+                    const ichkreg = this.m_emitter.generateTmpRegister();
+                    this.m_emitter.emitBinKeyEq(sinfo, mirargtype, cargs[argidx], mirargtype, lcreg, ichkreg);
+                    this.m_emitter.emitAssertCheck(sinfo, "Failed to match literal tag on dynamic operator invoke", ichkreg);
+                }
+            }
+
+            const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
+            this.m_emitter.emitInvokeFixedFunction(sinfo, opkey, cargs, "[IGNORE]", refinfo, iipack[0]);
+        }
+        else {
+            let cargs: MIRArgument[] = [];
+            for (let i = 0; i < fsig.params.length; ++i) {
+                if(fsig.params[i] instanceof ResolvedFunctionType) {
+                    continue;
+                }
+
+                const argidx = cargs.length;
+                if(opdecl.invoke.params[i].isRef) {
+                    this.raiseErrorIf(sinfo, !argtypes[argidx].isSameType(opdecl.invoke.params[i].type as ResolvedType));
+                }
+            }
+
+            const opkey = this.m_emitter.registerVirtualStaticOperatorCall(oodecl, opdecl.name, opdecl, oobinds, pcodes, cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
             this.m_emitter.emitInvokeVirtualOperator(sinfo, opkey, cargs,  refinfo, iipack[0]);
         }
@@ -2526,6 +2596,7 @@ class TypeChecker {
             let eargs: [ResolvedType, MIRTempRegister][] = [];
             let ttypes: ResolvedRecordAtomTypeEntry[] = [];
             let isvalue: boolean[] = [];
+            let names = new Set<string>();
 
             for (let i = 0; i < exp.args.argList.length; ++i) {
                 const arg = exp.args.argList[i];
@@ -2540,26 +2611,69 @@ class TypeChecker {
 
                 this.raiseErrorIf(exp.sinfo, earg.isRecordTargetType(), "Can only join arguments of (known) Record types");
                 eargs.push([earg, treg]);
-                xxxx;
-                ttypes = [...ttypes, ...earg.get().types.map((tt) => new ResolvedTupleAtomTypeEntry(tt.type, false))];
-                isvalue.push(earg.getUniqueTupleTargetType().isvalue);
+                
+                const allnamegroups = earg.options.map((opt) => (opt as ResolvedRecordAtomType).entries.map((entry) => entry.name));
+                const allnames = [...new Set<string>(([] as string[]).concat(...allnamegroups))].sort();
+
+                const allvals = earg.options.every((opt) => (opt as ResolvedRecordAtomType).isvalue);
+                const allrefs = earg.options.every((opt) => !(opt as ResolvedRecordAtomType).isvalue);
+
+                this.raiseErrorIf(exp.sinfo, allnames.some((pname) => names.has(pname)), "Cannot have (possibly) duplicate properties in join");
+                this.raiseErrorIf(exp.sinfo, !allvals && !allrefs, "Cannot have mix of value and reference records");
+
+                const ecc = allnames.map((pname) => {
+                    names.add(pname);
+
+                    const isopt = earg.options.some((opt) => {
+                        const entry = (opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname);
+                        return entry === undefined || entry.isOptional;
+                    });
+
+                    const rtypes = earg.options
+                        .filter((opt) => (opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname) !== undefined)
+                        .map((opt) => ((opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname) as ResolvedRecordAtomTypeEntry).type);
+
+                    return new ResolvedRecordAtomTypeEntry(pname, this.m_assembly.typeUpperBound(rtypes), isopt);
+                });
+
+                ttypes.push(...ecc);
+                isvalue.push(allvals);
             }
 
             const vcons = isvalue.every((vv) => vv);
             this.raiseErrorIf(exp.sinfo, isvalue.some((vv) => vv !== vcons), "Mix of value and reference tuple types is not allowed");
 
-            const rtupletype = ResolvedType.createSingle(ResolvedTupleAtomType.create(vcons, ttypes));
-            const [restype, iipack] = this.genInferInfo(exp.sinfo, rtupletype, infertype, trgt);
+            const rrecordtype = ResolvedType.createSingle(ResolvedRecordAtomType.create(vcons, ttypes));
+            const [restype, iipack] = this.genInferInfo(exp.sinfo, rrecordtype, infertype, trgt);
 
-            this.m_emitter.emitStructuredAppendTuple(exp.sinfo, this.m_emitter.registerResolvedTypeReference(rtupletype), eargs, ttypes.map((entry) => this.m_emitter.registerResolvedTypeReference(entry.type)), iipack[0]);
+            this.m_emitter.emitStructuredJoinRecord(exp.sinfo, this.m_emitter.registerResolvedTypeReference(rrecordtype), eargs.map((arg) => arg[1]), eargs.map((arg) => this.m_emitter.registerResolvedTypeReference(arg[0])), iipack[0]);
 
-            this.emitConvertIfNeeded(exp.sinfo, rtupletype, infertype, iipack);
+            this.emitConvertIfNeeded(exp.sinfo, rrecordtype, infertype, iipack);
             return [env.setResultExpression(restype)];
         }
         else {
             if (opdecltry !== undefined) {
-                const opdecl = opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>;
-                xxxx;
+                const oodecl = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).contiainingType;
+                const oobinds = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).binds;
+
+                const opsintro = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+                const opdecls = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+                this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
+
+                const pnames = opdecls[0].invoke.params.map((p) => p.name);
+
+                //No terms to be bound on operator call
+
+                const eargs = this.checkArgumentsEvaluationWOperator(exp.sinfo, env, env.terms, exp.args, refok);
+                const rargs = this.checkArgumentsWOperator(exp.sinfo, env, pnames, eargs);
+
+                const isigs = opdecls.map((opd) => this.m_assembly.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
+                const opidx = this.m_assembly.tryGetUniqueStaticOperatorResolve(rargs.types, isigs);
+
+                this.raiseErrorIf(exp.sinfo, opidx !== -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
+                const opdecl = opidx !== -1 ? opdecls[opidx] : opsintro as StaticOperatorDecl;
+            
+                return this.checkStaticOperatorInvoke(exp.sinfo, env, oodecl, oobinds, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.pragmas, trgt, refok, infertype); 
             }
             else {
                 const fdecl = fdecltry as OOMemberLookupInfo<StaticFunctionDecl>;
@@ -2581,27 +2695,28 @@ class TypeChecker {
         }
     }
 
-    private checkPCodeInvokeExpression(env: TypeEnvironment, exp: PCodeInvokeExpression, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
+    private checkPCodeInvokeExpression(env: TypeEnvironment, exp: PCodeInvokeExpression, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
         const pco = env.lookupPCode(exp.pcode);
         this.raiseErrorIf(exp.sinfo, pco === undefined, "Code name not defined");
         const pcode = (pco as { pcode: PCode, captured: string[] }).pcode;
         const captured = (pco as { pcode: PCode, captured: string[] }).captured;
 
         const cargs = [...exp.args.argList, ...captured.map((cv) => new PositionalArgument(false, false, new AccessVariableExpression(exp.sinfo, cv)))];
-        const eargs = this.checkArgumentsEvaluationWSig(env, pcode.ftype, new Arguments(cargs), undefined, refok);
+        const eargs = this.checkArgumentsEvaluationWSig(exp.sinfo, env, pcode.ftype, new Map<string, ResolvedType>(), new Arguments(cargs), undefined, refok);
 
         //A little strange since we don't expand captured args on the signature yet and don't expand/rest/etc -- slice them off for the checking
-        const margs = this.checkArgumentsSignature(exp.sinfo, env, pcode.ftype, eargs.slice(0, exp.args.argList.length));
+        const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs.slice(0, exp.args.argList.length));
         const cargsext = eargs.slice(exp.args.argList.length).map((ea) => ea.treg);
 
         this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.pragmas.recursive);
 
-        if (this.m_emitEnabled) {
-            const refinfo = this.generateRefInfoForCallEmit((pcode as PCode).ftype, margs.refs);
-            this.m_emitter.bodyEmitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), [...margs.args, ...cargsext], refinfo, trgt);
-        }
+        const [restype, iipack] = this.genInferInfo(exp.sinfo, pcode.ftype.resultType, infertype, trgt);
 
-        return [env.setExpressionResult((pcode as PCode).ftype.resultType)];
+        const refinfo = this.generateRefInfoForCallEmit((pcode as PCode).ftype, margs.refs);
+        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), [...margs.args, ...cargsext], undefined, refinfo, iipack[0]);        
+        this.emitConvertIfNeeded(exp.sinfo, pcode.ftype.resultType, infertype, iipack);
+
+        return [env.setResultExpression(restype)];
     }
 
     private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
@@ -2610,30 +2725,13 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
 
-        const mirargtype = this.m_emitter.registerResolvedTypeReference(texp);
+        const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.index);
 
-        if (op.kind === "basic") {
-            const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, "none", op.index);
-            const mirloadtype = this.m_emitter.registerResolvedTypeReference(idxtype);
-            if (infertype === undefined || infertype.isSameType(idxtype)) {
-                this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, trgt);
+        const [restype, iipack] = this.genInferInfo(op.sinfo, idxtype, infertype, trgt);
+        this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp), op.index, !texp.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(idxtype), iipack[0]);
+        this.emitConvertIfNeeded(op.sinfo, idxtype, infertype, iipack);
 
-                return [env.setResultExpression(idxtype)];
-            }
-            else {
-                const creg = this.m_emitter.generateTmpRegister();
-                this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, mirargtype.trkey, op.index, !texp.isUniqueTupleTargetType(), mirloadtype.trkey, creg);
-                this.emitAssignToTempAndConvertIfNeeded(op.sinfo, idxtype, infertype, creg, trgt);
-
-                return [env.setResultExpression(infertype)];
-            }
-        }
-        else if(op.kind === "option") {
-            xxxx;
-        }
-        else {
-            xxxx;
-        }
+        return [env.setResultExpression(restype)];
     }
 
     private checkProjectFromIndecies(env: TypeEnvironment, op: PostfixProjectFromIndecies, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {

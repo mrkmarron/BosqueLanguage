@@ -10,7 +10,6 @@ import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
 import { BSQRegex } from "./bsqregex";
-import { SIGABRT } from "constants";
 
 type BuildLevel = "debug" | "test" | "release";
 
@@ -1036,22 +1035,38 @@ class Assembly {
             const fte = ([] as ResolvedTupleAtomTypeEntry[]).concat(...tte);
             return ResolvedType.createSingle(ResolvedTupleAtomType.create(allvals, fte));
         }
-        else if(ccs.every((tt) => tt.isUniqueRecordTargetType())) {
+        else if(ccs.every((tt) => tt.isRecordTargetType())) {
             let tte: ResolvedRecordAtomTypeEntry[][] = [];
             let names = new Set<string>();
             let allvals = true;
             let allrefs = true;
             for(let i = 0; i < ccs.length; ++i) {
-                const rte = ccs[i].options[0] as ResolvedRecordAtomType;
-                if(rte.entries.some((entry) => names.has(entry.name))) {
+                const allnamegroups = ccs[i].options.map((opt) => (opt as ResolvedRecordAtomType).entries.map((entry) => entry.name));
+                const allnames = [...new Set<string>(([] as string[]).concat(...allnamegroups))].sort();
+
+                if (allnames.some((pname) => names.has(pname))) {
                     return ResolvedType.createEmpty();
                 }
 
-                tte.push(rte.entries);
-                rte.entries.forEach((entry) => names.add(entry.name));
+                allvals = allvals && ccs[i].options.every((opt) => (opt as ResolvedRecordAtomType).isvalue);
+                allrefs = allrefs && ccs[i].options.every((opt) => !(opt as ResolvedRecordAtomType).isvalue);
+                    
+                const ecc = allnames.map((pname) => {
+                    names.add(pname);
+                    
+                    const isopt = ccs[i].options.some((opt) => {
+                        const entry = (opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname);
+                        return entry === undefined || entry.isOptional;
+                    });
 
-                allvals = allvals && rte.isvalue;
-                allrefs = allrefs && !rte.isvalue;
+                    const ttypes = ccs[i].options
+                        .filter((opt) => (opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname) !== undefined)
+                        .map((opt) => ((opt as ResolvedRecordAtomType).entries.find((ee) => ee.name === pname) as ResolvedRecordAtomTypeEntry).type);
+
+                    return new ResolvedRecordAtomTypeEntry(pname, this.typeUpperBound(ttypes), isopt);
+                });
+
+                tte.push(ecc);
             }
 
             if(!allvals && !allrefs) {
