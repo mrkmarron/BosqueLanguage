@@ -112,6 +112,15 @@ class TypeChecker {
         return rtype;
     }
 
+    private resolveOOTypeFromDecls(oodecl: OOPTypeDecl, oobinds: Map<string, ResolvedType>): ResolvedType {
+        if(oodecl instanceof EntityTypeDecl) {
+            return ResolvedType.createSingle(ResolvedEntityAtomType.create(oodecl, oobinds));
+        }
+        else {
+            return ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(oodecl as ConceptTypeDecl, oobinds)]));
+        }
+    }
+
     private isConstructorTypeOfValue(ctype: ResolvedType): boolean {
         const ootd = this.m_assembly.tryGetObjectTypeForFullyResolvedName(ctype.options[0].idStr);
         if (ootd === undefined) {
@@ -382,137 +391,64 @@ class TypeChecker {
         return "operator";
     }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    private getInfoForHasIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): "yes" | "no" | "maybe" {
+        this.raiseErrorIf(sinfo, rtype.options.some((atom) => !(atom instanceof ResolvedTupleAtomType)), "Can only load indecies from Tuples");
 
-    private getInfoForLoadFromIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
-        const options = rtype.options.map((atom) => {
-            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedTupleAtomType), "Can only load indecies from Tuples");
+        const yhas = rtype.options.every((atom) => {
             const tatom = atom as ResolvedTupleAtomType;
-            if (idx < tatom.types.length) {
-                if (!tatom.types[idx].isOptional) {
-                    return tatom.types[idx].type;
-                }
-                else {
-                    return this.m_assembly.typeUpperBound([tatom.types[idx].type, this.m_assembly.getSpecialNoneType()]);
-                }
-            }
-            else {
-                return this.m_assembly.getSpecialNoneType();
-            }
+            return (idx < tatom.types.length) && !tatom.types[idx].isOptional;
         });
 
-        return this.m_assembly.typeUpperBound(options.filter((opt) => !opt.isEmptyType()));
-    }
-
-    private getInfoForLoadFromPropertyName(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
-        const options = rtype.options.map((atom) => {
-            this.raiseErrorIf(sinfo, !(atom instanceof ResolvedRecordAtomType), "Can only load properties from Records");
-            const ratom = atom as ResolvedRecordAtomType;
-            const tidx = ratom.entries.findIndex((re) => re.name === pname);
-            if (tidx !== -1) {
-                if (!ratom.entries[tidx].isOptional) {
-                    return ratom.entries[tidx].type;
-                }
-                else {
-                    return this.m_assembly.typeUpperBound([ratom.entries[tidx].type, this.m_assembly.getSpecialNoneType()]);
-                }
-            }
-            else {
-                return this.m_assembly.getSpecialNoneType();
-            }
+        const yno = rtype.options.every((atom) => {
+            const tatom = atom as ResolvedTupleAtomType;
+            return (idx >= tatom.types.length);
         });
 
-        return this.m_assembly.typeUpperBound(options);
-    }
-
-    private updateTupleIndeciesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [number, ResolvedType][]): ResolvedType {
-        this.raiseErrorIf(sinfo, !(t instanceof ResolvedTupleAtomType), "Cannot only update indecies on Tuples");
-        const tuple = t as ResolvedTupleAtomType;
-
-        let tentries: ResolvedTupleAtomTypeEntry[] = [];
-        for (let i = 0; i < updates.length; ++i) {
-            const update = updates[i];
-            this.raiseErrorIf(sinfo, update[0] < 0, "Update index is out of tuple bounds");
-
-            if (update[0] > tentries.length) {
-                const extendCount = (update[0] - tentries.length) + 1;
-                for (let j = 0; j < extendCount; ++j) {
-                    if (tentries.length + j < tuple.types.length) {
-                        if (!tuple.types[i].isOptional) {
-                            tentries.push(new ResolvedTupleAtomTypeEntry(tuple.types[j].type, false));
-                        }
-                        else {
-                            tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.typeUpperBound([tuple.types[j].type, this.m_assembly.getSpecialNoneType()]), false));
-                        }
-                    }
-                    else {
-                        tentries.push(new ResolvedTupleAtomTypeEntry(this.m_assembly.getSpecialNoneType(), false));
-                    }
-                }
-            }
-            tentries[update[0]] = new ResolvedTupleAtomTypeEntry(update[1], false);
+        if(yhas) {
+            return "yes";
         }
-
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
-    }
-
-    private updateNamedPropertiesAtom(sinfo: SourceInfo, t: ResolvedAtomType, updates: [string, ResolvedType][]): ResolvedType {
-        this.raiseErrorIf(sinfo, !(t instanceof ResolvedRecordAtomType), "Cannot update on 'Record' type");
-        const record = t as ResolvedRecordAtomType;
-
-        let rentries: ResolvedRecordAtomTypeEntry[] = [...record.entries];
-        for (let i = 0; i < updates.length; ++i) {
-            const update = updates[i];
-            const idx = rentries.findIndex((e) => e.name === update[0]);
-            rentries[idx !== -1 ? idx : rentries.length] = new ResolvedRecordAtomTypeEntry(update[0], update[1], false);
-        }
-
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
-    }
-
-    private appendIntoTupleAtom(sinfo: SourceInfo, t: ResolvedTupleAtomType, merge: ResolvedAtomType): ResolvedType {
-        this.raiseErrorIf(sinfo, !(t instanceof ResolvedTupleAtomType), "Cannot append on 'Tuple' type");
-        const tuple = merge as ResolvedTupleAtomType;
-
-        let tentries: ResolvedTupleAtomTypeEntry[] = [];
-        if (t.types.some((entry) => entry.isOptional)) {
-            this.raiseError(sinfo, "Appending to tuple with optional entries creates ambigious result tuple");
+        else if(yno) {
+            return "no";
         }
         else {
-            //just copy everything along
-            tentries = [...t.types, ...tuple.types];
+            return "maybe";
         }
-
-        return ResolvedType.createSingle(ResolvedTupleAtomType.create(tentries));
     }
 
-    private mergeIntoRecordAtom(sinfo: SourceInfo, t: ResolvedRecordAtomType, merge: ResolvedAtomType): ResolvedType {
-        this.raiseErrorIf(sinfo, !(t instanceof ResolvedRecordAtomType), "Cannot merge with 'Record' type");
-        const record = merge as ResolvedRecordAtomType;
-
-        let rentries: ResolvedRecordAtomTypeEntry[] = [...t.entries];
-        for (let i = 0; i < record.entries.length; ++i) {
-            const update = record.entries[i];
-            const fidx = rentries.findIndex((e) => e.name === update.name);
-            const idx = fidx !== -1 ? fidx : rentries.length;
-
-            if (!update.isOptional) {
-                rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, update.type, false);
-            }
-            else {
-                if (idx === rentries.length) {
-                    rentries[idx] = update;
-                }
-                else {
-                    rentries[idx] = new ResolvedRecordAtomTypeEntry(update.name, this.m_assembly.typeUpperBound([update.type, rentries[idx].type]), true);
-                }
-            }
-        }
-
-        return ResolvedType.createSingle(ResolvedRecordAtomType.create(rentries));
+    private getInfoForLoadFromSafeIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType | undefined {
+        this.raiseErrorIf(sinfo, this.getInfoForHasIndex(sinfo, rtype, idx) !== "yes");
+        return this.m_assembly.typeUpperBound(rtype.options.map((atom) => (atom as ResolvedTupleAtomType).types[idx].type));
     }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    private getInfoForHasProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): "yes" | "no" | "maybe" {
+        this.raiseErrorIf(sinfo, rtype.options.some((atom) => !(atom instanceof ResolvedRecordAtomType)), "Can only load properties from Records");
+
+        const yhas = rtype.options.every((atom) => {
+            const tatom = atom as ResolvedRecordAtomType;
+            const eidx = tatom.entries.findIndex((entry) => entry.name === pname);
+            return (eidx !== -1) && !tatom.entries[eidx].isOptional;
+        });
+
+        const yno = rtype.options.every((atom) => {
+            const tatom = atom as ResolvedRecordAtomType;
+            const eidx = tatom.entries.findIndex((entry) => entry.name === pname);
+            return (eidx === -1);
+        });
+
+        if(yhas) {
+            return "yes";
+        }
+        else if(yno) {
+            return "no";
+        }
+        else {
+            return "maybe";
+        }
+    }
+
+    private getInfoForLoadFromSafeProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType | undefined {
+        return this.m_assembly.typeUpperBound(rtype.options.map((atom) => ((atom as ResolvedRecordAtomType).entries.find((re) => re.name === pname) as ResolvedRecordAtomTypeEntry).type));
+    }
 
     private getTypeForParameter(p: ResolvedFunctionTypeParam): ResolvedType {
         if (!p.isOptional) {
@@ -1136,7 +1072,7 @@ class TypeChecker {
 
         this.emitConvertIfNeeded(sinfo, rvl, infertype, iipack);
 
-        return rvl;
+        return restype;
     }
 
     private getExpandoType(sinfo: SourceInfo, eatom: ResolvedEntityAtomType): ResolvedType {
@@ -1433,6 +1369,7 @@ class TypeChecker {
 
                 filledLocations[i] = { vtype: fieldtype, mustDef: true, trgt: etreg };
             }
+            xxxx;
 
             cargs.push(this.emitInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype));
         }
@@ -1554,6 +1491,7 @@ class TypeChecker {
         }
 
         while (filledLocations[ii] !== undefined) {
+            xxxx;
             this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional parameter "${sig.params[ii].name}"`);
             ii++;
         }
@@ -1586,6 +1524,7 @@ class TypeChecker {
 
                 filledLocations[j] = { vtype: paramtype, mustDef: true, ref: undefined, pcode: undefined, trgt: etreg };
             }
+            xxxx;
 
             if (sig.params[j].type instanceof ResolvedFunctionType) {
                 this.raiseErrorIf(sinfo, filledLocations[j].pcode === undefined, `Parameter ${sig.params[j].name} expected a function`);
@@ -2329,7 +2268,7 @@ class TypeChecker {
         if (exp.rop === "ok") {
             const okenv = this.checkExpression(env, exp.arg, treg, T);
             const oktdcl = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Result::Ok") as EntityTypeDecl;
-            const okbinds = new Map<string, ResolvedType>().set("T", T || okenv.getExpressionResult().exptype).set("E", E || this.m_assembly.getSpecialNoneType());
+            const okbinds = new Map<string, ResolvedType>().set("T", T || okenv.getExpressionResult().exptype).set("E", E || this.m_assembly.getSpecialAnyConceptType());
             const okconstype = ResolvedType.createSingle(ResolvedEntityAtomType.create(oktdcl, okbinds));
             const mirokconstype = this.m_emitter.registerResolvedTypeReference(okconstype);
 
@@ -2740,6 +2679,74 @@ class TypeChecker {
         this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => idx.index < 0), "Index cannot be negative");
 
+        let ctypes: ResolvedType[] = [];
+        for (let i = 0; i < op.indecies.length; ++i) {
+            ctypes.push(this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index));
+        }
+        const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
+        const rephemeral = ResolvedType.createSingle(rephemeralatom);
+
+        const rindecies = op.indecies.map((idv) => idv.index);
+
+        const prjtemp = this.m_emitter.generateTmpRegister();
+        if(texp.isUniqueTupleTargetType()) {
+            const invk = this.m_emitter.registerTupleProjectToEphemeral(texp.getUniqueTupleTargetType(), rindecies, rephemeralatom);
+            this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
+        }
+        else {
+            const invk = this.m_emitter.registerTupleProjectToEphemeralVirtual(texp, rindecies, rephemeralatom);
+            this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
+        }
+
+        if (op.isEphemeralListResult) {
+            let itype: ResolvedEphemeralListType | undefined = undefined;
+            if (infertype !== undefined) {
+                itype = infertype.tryGetInferrableValueListConstructorType();
+                this.raiseErrorIf(op.sinfo, itype !== undefined && itype.types.length !== op.indecies.length, "Mismatch between number of indecies loaded and number expected by inferred type");
+            }
+
+            let eargs: [ResolvedType, MIRTempRegister][] = [];
+            for (let i = 0; i < op.indecies.length; ++i) {
+                let treg = this.m_emitter.generateTmpRegister();
+                let ttype = ResolvedType.createEmpty();
+                if (op.indecies[i].exp !== undefined) {
+                    //push binds and evaluate expression -- make sure binder flag is set too
+                    xxxx;
+                    ttype = ;
+                }
+                else {
+                    this.m_emitter.emitLoadFromEpehmeralList(op.sinfo, prjtemp, this.m_emitter.registerResolvedTypeReference(rephemeral), i, this.m_emitter.registerResolvedTypeReference(ctypes[i]), treg);
+                    ttype = ctypes[i];
+                }
+
+                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
+                let inferidx: ResolvedType | undefined = undefined
+                if (reqtype !== undefined || itype !== undefined) {
+                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[i];
+                }
+
+                if(inferidx === undefined) {
+                    eargs.push([ttype, treg]);
+                }
+                else {
+                    //convert result into infer type if needed
+                    eargs.push([inferidx, this.emitInlineConvertIfNeeded(op.sinfo, treg, ttype, inferidx) as MIRTempRegister]);
+                }
+            }
+
+            if (op.isEphemeralListResult) {
+                const rtype = this.checkArgumentsValueListConstructor(op.sinfo, eargs, trgt, infertype);
+                return xxxx;
+            }
+            else {
+                const rtype = this.checkArgumentsTupleConstructor(op.sinfo, op.isValue, eargs, trgt, infertype);
+                return xxxx;
+            }
+        }
+        else {
+            xxxx;
+        }
+
         if(op.isEphemeralListResult) {
             let itype: ResolvedEphemeralListType | undefined = undefined;
             if (infertype !== undefined) {
@@ -2752,30 +2759,31 @@ class TypeChecker {
                 const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
                 let inferidx: ResolvedType | undefined = undefined
                 if (reqtype !== undefined || itype !== undefined) {
-                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[op.indecies[i].index];
+                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[i];
                 }
 
                 const ttype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index);
-                this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${i}`);
+                this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${op.indecies[i]}`);
                 ctypes.push(inferidx || ttype);
             }
 
             const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
             const rephemeral = ResolvedType.createSingle(rephemeralatom);
-            this.raiseErrorIf(op.sinfo, infertype !== undefined && !infertype.isSameType(rephemeral), "Cannot create EphemeralList of needed type");
 
             const rindecies = op.indecies.map((idv) => idv.index);
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rephemeral, infertype, trgt);
 
             if (texp.isUniqueTupleTargetType()) {
                 const invk = this.m_emitter.registerTupleProjectToEphemeral(texp.getUniqueTupleTargetType(), rindecies, rephemeralatom);
-                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], [rephemeral, rephemeral, -1, []], trgt);
+                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
             }
             else {
                 const invk = this.m_emitter.registerTupleProjectToEphemeralVirtual(texp, rindecies, rephemeralatom);
-                this.m_emitter.emitInvokeVirtualTarget(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp).trkey, [arg], [rephemeral, rephemeral, -1, []], trgt);
+                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
             }
 
-            return [env.setResultExpression(rephemeral)];
+            this.emitConvertIfNeeded(op.sinfo, rephemeral, infertype, iipack);
+            return [env.setResultExpression(restype)];
         }
         else {
             let itype: ResolvedTupleAtomType | undefined = undefined;
@@ -2783,145 +2791,275 @@ class TypeChecker {
                 itype = infertype.tryGetInferrableTupleConstructorType(op.isValue);
             }
 
-            const resultOptions = texp.options.map((opt) => {
-                let ctypes: ResolvedTupleAtomTypeEntry[] = [];
-                for (let i = 0; i < op.indecies.length; ++i) {
-                    const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
-                    let inferidx: ResolvedType | undefined = undefined
-                    if (reqtype !== undefined || itype !== undefined) {
-                        inferidx = reqtype !== undefined ? reqtype : this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
+            let opidx = op.indecies.findIndex((ee) => ee.isopt);
+            if(opidx !== -1) {
+                this.raiseErrorIf(op.sinfo, op.indecies.slice(opidx).some((ee) => !ee.isopt), "Cannot have non-optional indecies after optional");
+            }
+
+            let ctypes: ResolvedTupleAtomTypeEntry[] = [];
+            for (let i = 0; i < op.indecies.length; ++i) {
+                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
+
+                if (!op.indecies[i].isopt) {
+                    let inferidx = reqtype !== undefined ? reqtype : undefined;
+                    if(inferidx === undefined && itype !== undefined) {
+                        const [tt, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
+                        if(status === "never") {
+                            inferidx = this.m_assembly.getSpecialNoneType();
+                        }
+                        else if (status === "opt") {
+                            inferidx = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
+                        }
+                        else {
+                            inferidx = tt;
+                        }
                     }
 
-                    const ttype = this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(opt), op.indecies[i].index);
+                    const ttype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index);
                     this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${i}`);
                     ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, false));
                 }
+                else {
+                    let inferidx = reqtype !== undefined ? reqtype : undefined;
+                    if(inferidx === undefined && itype !== undefined) {
+                        const [tt, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
+                        if(status === "never") {
+                            inferidx = this.m_assembly.getSpecialNoneType();
+                        }
+                        else if (status === "opt" && !op.indecies[i].isopt) {
+                            inferidx = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
+                        }
+                        else {
+                            inferidx = tt;
+                        }
+                    }
 
-                return ResolvedType.createSingle(ResolvedTupleAtomType.create(op.isValue, ctypes));
-            });
+                    const [ttype, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, texp, op.indecies[i].index);
+                    if(status === "never") {
+                        break;
+                    }
+                    else {
+                        this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype as ResolvedType, inferidx), `Type incompatibility in projecting index ${i}`);
 
-            const ubtype = this.m_assembly.typeUpperBound(resultOptions);
-            this.raiseErrorIf(op.sinfo, infertype !== undefined && !this.m_assembly.subtypeOf(ubtype, infertype), "Cannot create Tuple of needed type");
+                        ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, status === "opt"));
+                    }
+                }
+            }
 
-            const rtupletype = ResolvedType.create((infertype || ubtype).options.filter((tt) => tt instanceof ResolvedTupleAtomType));
-
-            const rindecies = op.indecies.map((idv) => {
+            const rtupletype = ResolvedType.createSingle(ResolvedTupleAtomType.create(op.isValue, ctypes));
+            const rindecies = op.indecies.map((opidx, ii) => {
                 return {
-                    index: idv.index,
-                    reqtype: idv.reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, idv.reqtype as TypeSignature, env.terms) : this.getInfoForLoadFromIndex(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), idv.index)
-                };
+                    index: opidx.index,
+                    isopt: opidx.isopt,
+                    reqtype: ctypes[ii].type
+                }
             });
 
-            let ttreg = rtupletype.isSameType(infertype || ubtype) ? trgt : this.m_emitter.generateTmpRegister();
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rtupletype, infertype, trgt);
 
             if (texp.isUniqueTupleTargetType()) {
                 const invk = this.m_emitter.registerTupleProjectToTuple(texp.getUniqueTupleTargetType(), rindecies, rtupletype);
-                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], [rtupletype, rtupletype, -1, []], ttreg);
+                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
             }
             else {
                 const invk = this.m_emitter.registerTupleProjectToTupleVirtual(texp, rindecies, rtupletype);  
-                this.m_emitter.emitInvokeVirtualTarget(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp).trkey, [arg], [rtupletype, rtupletype, -1, []], ttreg);
+                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
             }
 
-            if(!rtupletype.isSameType(infertype || ubtype)) {
-                this.emitAssignToTempAndConvertIfNeeded(op.sinfo, rtupletype, infertype || ubtype, ttreg, trgt);
-            }
-
-            return [env.setResultExpression(rtupletype)];
+            this.emitConvertIfNeeded(op.sinfo, rtupletype, infertype, iipack);
+            return [env.setResultExpression(restype)];
         }
     }
 
-    private checkAccessFromName(env: TypeEnvironment, op: PostfixAccessFromName, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
-        const texp = env.getExpressionResult().etype;
+    private checkAccessFromName(env: TypeEnvironment, op: PostfixAccessFromName, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const texp = env.getExpressionResult().exptype;
 
-        if (this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
+        if (texp.isRecordTargetType()) {
             const rtype = this.getInfoForLoadFromPropertyName(op.sinfo, texp, op.name);
 
-            if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitLoadProperty(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, op.name, trgt);
-            }
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rtype, infertype, trgt);
+            
+            this.m_emitter.emitLoadProperty(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp), op.name, !texp.isUniqueRecordTargetType(), this.m_emitter.registerResolvedTypeReference(texp), iipack[0]);
 
-            return [env.setExpressionResult(rtype)];
+            this.emitConvertIfNeeded(op.sinfo, rtype, infertype, iipack);
+            return [env.setResultExpression(restype)];
         }
         else {
-            const finfo = this.m_assembly.tryGetOOMemberDeclOptions(texp, "field", op.name);
-            this.raiseErrorIf(op.sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
+            const tryfinfo = this.m_assembly.tryGetFieldUniqueDeclFromType(texp, op.name);
+            this.raiseErrorIf(op.sinfo, tryfinfo === undefined, "Field name is not defined (or is multiply) defined");
 
-            const topts = (finfo.decls as OOMemberLookupInfo[]).map((info) => this.resolveAndEnsureTypeOnly(op.sinfo, (info.decl as MemberFieldDecl).declaredType, info.binds));
-            const rtype = this.m_assembly.typeUpperBound(topts);
+            const finfo = tryfinfo as OOMemberLookupInfo<MemberFieldDecl>;
+            const ftype = this.resolveAndEnsureTypeOnly(op.sinfo, finfo.decl.declaredType, finfo.binds);
 
-            if (this.m_emitEnabled) {
-                const fdeclinfo = finfo.root as OOMemberLookupInfo;
-                const fkey = MIRKeyGenerator.generateFieldKey(fdeclinfo.contiainingType, fdeclinfo.binds, op.name);
-                this.m_emitter.bodyEmitter.emitLoadField(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, fkey, trgt);
-            }
-
-            return [env.setExpressionResult(rtype)];
+            const [restype, iipack] = this.genInferInfo(op.sinfo, ftype, infertype, trgt);
+            
+            const fkey = MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(finfo.contiainingType, finfo.binds), op.name);
+            this.m_emitter.emitLoadField(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp), fkey, texp.isUniqueCallTargetType(), this.m_emitter.registerResolvedTypeReference(texp), iipack[0]);
+            
+            this.emitConvertIfNeeded(op.sinfo, ftype, infertype, iipack);
+            return [env.setResultExpression(restype)];
         }
     }
 
-    private checkProjectFromNames(env: TypeEnvironment, op: PostfixProjectFromNames, arg: MIRTempRegister, trgt: MIRTempRegister): TypeEnvironment[] {
-        const texp = env.getExpressionResult().etype;
+    private checkProjectFromNames(env: TypeEnvironment, op: PostfixProjectFromNames, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const texp = env.getExpressionResult().exptype;
 
-        if (this.m_assembly.subtypeOf(texp, this.m_assembly.getSpecialRecordConceptType())) {
-            const resultOptions = texp.options.map((opt) => {
-                let ttypes = op.names.map((name) => new ResolvedRecordAtomTypeEntry(name, this.getInfoForLoadFromPropertyName(op.sinfo, ResolvedType.createSingle(opt), name), false));
-
-                return ResolvedType.createSingle(ResolvedRecordAtomType.create(ttypes));
-            });
-            const restype = this.m_assembly.typeUpperBound(resultOptions);
-
-            if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.emitProjectProperties(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, op.names, trgt);
+        if (op.isEphemeralListResult) {
+            let itype: ResolvedEphemeralListType | undefined = undefined;
+            if (infertype !== undefined) {
+                itype = infertype.tryGetInferrableValueListConstructorType();
+                this.raiseErrorIf(op.sinfo, itype !== undefined && itype.types.length !== op.names.length, "Mismatch between number of properties loaded and number expected by inferred type");
             }
 
-            return [env.setExpressionResult(restype)];
-        }
-        else {
-            const fieldkeys = op.names.map((f) => {
-                const finfo = this.m_assembly.tryGetOOMemberDeclOptions(texp, "field", f);
-                this.raiseErrorIf(op.sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
-
-                const fdeclinfo = finfo.root as OOMemberLookupInfo;
-                return MIRKeyGenerator.generateFieldKey(fdeclinfo.contiainingType, fdeclinfo.binds, f);
-            });
-
-            if(op.isEphemeralListResult) {
-                const resultOptions = texp.options.map((atom) => {
-                    const oentries = op.names.map((f) => {
-                        const finfo = this.m_assembly.tryGetOOMemberDeclUnique(ResolvedType.createSingle(atom), "field", f) as OOMemberLookupInfo;
-                        const ftype = this.resolveAndEnsureTypeOnly(op.sinfo, (finfo.decl as MemberFieldDecl).declaredType, finfo.binds);
-                        return ftype;
-                    });
-
-                    return ResolvedType.createSingle(ResolvedEphemeralListType.create(oentries));
-                });
-                const restype = this.checkedUnion(op.sinfo, resultOptions);
-
-                if (this.m_emitEnabled) {
-                    this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, fieldkeys, trgt);
+            let ctypes: ResolvedType[] = [];
+            for (let i = 0; i < op.names.length; ++i) {
+                const reqtype = op.names[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.names[i].reqtype as TypeSignature, env.terms) : undefined;
+                let infername: ResolvedType | undefined = undefined
+                if (reqtype !== undefined || itype !== undefined) {
+                    infername = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[i];
                 }
 
-                return [env.setExpressionResult(restype)];
+                let ttype = ResolvedType.createEmpty();
+                if (texp.isRecordTargetType()) {
+                    ttype = this.getInfoForLoadFromPropertyName(op.sinfo, texp, op.names[i].name);
+                }
+                else {
+                    const tryfinfo = this.m_assembly.tryGetFieldUniqueDeclFromType(texp, op.names[i].name);
+                    this.raiseErrorIf(op.sinfo, tryfinfo === undefined, "Field name is not defined (or is multiply) defined");
+
+                    const finfo = tryfinfo as OOMemberLookupInfo<MemberFieldDecl>;
+                    ttype = this.resolveAndEnsureTypeOnly(op.sinfo, finfo.decl.declaredType, finfo.binds);
+                }
+
+                this.raiseErrorIf(op.sinfo, infername === undefined || !this.m_assembly.subtypeOf(ttype, infername), `Type incompatibility in projecting name ${op.names[i]}`);
+                ctypes.push(infername || ttype);
+            }
+
+            const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
+            const rephemeral = ResolvedType.createSingle(rephemeralatom);
+
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rephemeral, infertype, trgt);
+
+            if (texp.isRecordTargetType()) {
+                const rnames = op.names.map((idv) => idv.name);
+
+                if (texp.isUniqueRecordTargetType()) {
+                    const invk = this.m_emitter.registerRecordProjectToEphemeral(texp.getUniqueRecordTargetType(), rnames, rephemeralatom);
+                    this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
+                }
+                else {
+                    const invk = this.m_emitter.registerRecordProjectToEphemeralVirtual(texp, rnames, rephemeralatom);
+                    this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
+                }
             }
             else {
-                const resultOptions = texp.options.map((atom) => {
-                    const oentries = op.names.map((f) => {
-                        const finfo = this.m_assembly.tryGetOOMemberDeclUnique(ResolvedType.createSingle(atom), "field", f) as OOMemberLookupInfo;
-                        const ftype = this.resolveAndEnsureTypeOnly(op.sinfo, (finfo.decl as MemberFieldDecl).declaredType, finfo.binds);
-                        return new ResolvedRecordAtomTypeEntry(f, ftype, false);
-                    });
-
-                    return ResolvedType.createSingle(ResolvedRecordAtomType.create(oentries));
+                const rfields = op.names.map((idv) => {
+                    const flookup = this.m_assembly.tryGetFieldUniqueDeclFromType(texp, idv.name) as OOMemberLookupInfo<MemberFieldDecl>;
+                    return MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(flookup.contiainingType, flookup.binds), idv.name);
                 });
-                const restype = this.m_assembly.typeUpperBound(resultOptions);
 
-                if (this.m_emitEnabled) {
-                    this.m_emitter.bodyEmitter.emitProjectFields(op.sinfo, this.m_emitter.registerResolvedTypeReference(restype).trkey, arg, this.m_emitter.registerResolvedTypeReference(texp).trkey, fieldkeys, trgt);
+                if (texp.isUniqueCallTargetType()) {
+                    const invk = this.m_emitter.registerEntityProjectToEphemeral(texp.getUniqueCallTargetType(), rfields, rephemeralatom);
+                    this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
                 }
-
-                return [env.setExpressionResult(restype)];
+                else {
+                    const invk = this.m_emitter.registerOOTypeProjectToEphemeralVirtual(texp, rfields, rephemeralatom);
+                    this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
+                }
             }
+
+            this.emitConvertIfNeeded(op.sinfo, rephemeral, infertype, iipack);
+            return [env.setResultExpression(restype)];
+        }
+        else {
+            let itype: ResolvedRecordAtomType | undefined = undefined;
+            if (infertype !== undefined) {
+                itype = infertype.tryGetInferrableRecordConstructorType(op.isValue);
+            }
+
+            let ctypes: ResolvedRecordAtomTypeEntry[] = [];
+            for (let i = 0; i < op.names.length; ++i) {
+                const reqtype = op.names[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.names[i].reqtype as TypeSignature, env.terms) : undefined;
+
+                if (!op.names[i].isopt) {
+                    let infername = reqtype !== undefined ? reqtype : undefined;
+                    if(infername === undefined && itype !== undefined) {
+                        const [tt, status] = this.getInfoForLoadFromPropertyNameWOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedRecordAtomType), op.names[i].name);
+                        if(status === "never") {
+                            infername = this.m_assembly.getSpecialNoneType();
+                        }
+                        else if (status === "opt") {
+                            infername = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
+                        }
+                        else {
+                            infername = tt;
+                        }
+                    }
+
+                    let ttype = ResolvedType.createEmpty();
+                    if (texp.isRecordTargetType()) {
+                        ttype = this.getInfoForLoadFromPropertyName(op.sinfo, texp, op.names[i].name);
+                    }
+                    else {
+                        const tryfinfo = this.m_assembly.tryGetFieldUniqueDeclFromType(texp, op.names[i].name);
+                        this.raiseErrorIf(op.sinfo, tryfinfo === undefined, "Field name is not defined (or is multiply) defined");
+
+                        const finfo = tryfinfo as OOMemberLookupInfo<MemberFieldDecl>;
+                        ttype = this.resolveAndEnsureTypeOnly(op.sinfo, finfo.decl.declaredType, finfo.binds);
+                    }
+
+                    this.raiseErrorIf(op.sinfo, infername === undefined || !this.m_assembly.subtypeOf(ttype, infername), `Type incompatibility in projecting name ${op.names[i].name}`);
+                    ctypes.push(new ResolvedRecordAtomTypeEntry(op.names[i].name, infername || ttype, false));
+                }
+                else {
+                    let inferidx = reqtype !== undefined ? reqtype : undefined;
+                    if(inferidx === undefined && itype !== undefined) {
+                        const [tt, status] = this.getInfoForLoadFromPropertyNameWOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
+                        if(status === "never") {
+                            inferidx = this.m_assembly.getSpecialNoneType();
+                        }
+                        else if (status === "opt" && !op.indecies[i].isopt) {
+                            inferidx = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
+                        }
+                        else {
+                            inferidx = tt;
+                        }
+                    }
+
+                    const [ttype, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, texp, op.indecies[i].index);
+                    if(status === "never") {
+                        break;
+                    }
+                    else {
+                        this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype as ResolvedType, inferidx), `Type incompatibility in projecting index ${i}`);
+
+                        ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, status === "opt"));
+                    }
+                }
+            }
+
+            const rtupletype = ResolvedType.createSingle(ResolvedTupleAtomType.create(op.isValue, ctypes));
+            const rindecies = op.indecies.map((opidx, ii) => {
+                return {
+                    index: opidx.index,
+                    isopt: opidx.isopt,
+                    reqtype: ctypes[ii].type
+                }
+            });
+
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rtupletype, infertype, trgt);
+
+            if (texp.isUniqueTupleTargetType()) {
+                const invk = this.m_emitter.registerTupleProjectToTuple(texp.getUniqueTupleTargetType(), rindecies, rtupletype);
+                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
+            }
+            else {
+                const invk = this.m_emitter.registerTupleProjectToTupleVirtual(texp, rindecies, rtupletype);
+                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
+            }
+
+            this.emitConvertIfNeeded(op.sinfo, rtupletype, infertype, iipack);
+            return [env.setResultExpression(restype)];
         }
     }
 

@@ -259,6 +259,10 @@ function unescapeLiteralString(str: string): string {
 
 class Lexer {
     private static findSymbolString(str: string): string | undefined {
+        if(str.startsWith("$") && !/^([$][_\p{L}])/.test(str)) {
+            return "$";
+        }
+
         return SymbolStrings.find((value) => str.startsWith(value));
     }
 
@@ -476,7 +480,6 @@ class Lexer {
             this.recordLexToken(this.m_cpos + sym.length, sym);
             return true;
         }
-
 
         Lexer._s_operatorRe.lastIndex = this.m_cpos;
         const mo = Lexer._s_operatorRe.exec(this.m_input);
@@ -1825,39 +1828,30 @@ class Parser {
             return new PostfixIs(sinfo, isElvis, astype);
         }
         else if (name === "update") {
+            const isBinder = this.testAndConsumeTokenIf("$")
             if (this.testFollows("(", TokenStrings.Int)) {
-                const updates = this.parseListOf<{ index: number, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }>("(", ")", ",", () => {
+                const updates = this.parseListOf<{ index: number, value: Expression }>("(", ")", ",", () => {
                     this.ensureToken(TokenStrings.Int);
                     const idx = Number.parseInt(this.consumeTokenAndGetValue());
-                    const isopt = this.testAndConsumeTokenIf("?");
-                    let reqtype: TypeSignature | undefined = undefined;
-                    if (this.testAndConsumeTokenIf(":")) {
-                        reqtype = this.parseTypeSignature(false);
-                    }
                     this.ensureAndConsumeToken("=");
                     const value = this.parseExpression();
 
-                    return { index: idx, isopt: isopt, reqtype: reqtype, value: value };
+                    return { index: idx, value: value };
                 })[0].sort((a, b) => a.index - b.index);
 
-                return new PostfixModifyWithIndecies(sinfo, isElvis, updates);
+                return new PostfixModifyWithIndecies(sinfo, isElvis, isBinder, updates);
             }
             else if (this.testFollows("(", TokenStrings.Identifier)) {
-                const updates = this.parseListOf<{ name: string, isopt: boolean, reqtype: TypeSignature | undefined, value: Expression }>("(", ")", ",", () => {
+                const updates = this.parseListOf<{ name: string, value: Expression }>("(", ")", ",", () => {
                     this.ensureToken(TokenStrings.Identifier);
                     const uname = this.consumeTokenAndGetValue();
-                    const isopt = this.testAndConsumeTokenIf("?");
-                    let reqtype: TypeSignature | undefined = undefined;
-                    if (this.testAndConsumeTokenIf(":")) {
-                        reqtype = this.parseTypeSignature(false);
-                    }
                     this.ensureAndConsumeToken("=");
                     const value = this.parseExpression();
 
-                    return { name: uname, isopt: isopt, reqtype: reqtype, value: value };
+                    return { name: uname, value: value };
                 })[0].sort((a, b) => a.name.localeCompare(b.name));
 
-                return new PostfixModifyWithNames(sinfo, isElvis, updates);
+                return new PostfixModifyWithNames(sinfo, isElvis, isBinder, updates);
             }
             else {
                 this.raiseError(line, "Expected list of property/field or tuple updates");
@@ -1905,16 +1899,15 @@ class Parser {
                     const isvalue = this.testToken("#");
                     this.consumeToken();
 
-                    const indecies = this.parseListOf<{ index: number, isopt: boolean, reqtype: TypeSignature | undefined }>("[", "]", ",", () => {
+                    const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("[", "]", ",", () => {
                         this.ensureToken(TokenStrings.Int);
                         const idx = Number.parseInt(this.consumeTokenAndGetValue());
-                        const isopt = this.testAndConsumeTokenIf("?");
 
                         if (!this.testAndConsumeTokenIf(":")) {
-                            return { index: idx, isopt: isopt, reqtype: undefined };
+                            return { index: idx, reqtype: undefined };
                         }
                         else {
-                            return { index: idx, isopt: isopt, reqtype: this.parseTypeSignature(false) };
+                            return { index: idx, reqtype: this.parseTypeSignature(false) };
                         }
                     })[0];
 
@@ -1928,39 +1921,35 @@ class Parser {
                     const isvalue = this.testToken("#");
                     this.consumeToken();
 
-                    const names = this.parseListOf<{ name: string, isopt: boolean, reqtype: TypeSignature | undefined }>("{", "}", ",", () => {
+                    const names = this.parseListOf<{ name: string, reqtype: TypeSignature | undefined }>("{", "}", ",", () => {
                         this.ensureToken(TokenStrings.Identifier);
                         const nn = this.consumeTokenAndGetValue();
-                        const isopt = this.testAndConsumeTokenIf("?");
 
                         if (!this.testAndConsumeTokenIf(":")) {
-                            return { name: nn, isopt: isopt, reqtype: undefined };
+                            return { name: nn, reqtype: undefined };
                         }
                         else {
-                            return { name: nn, isopt: isopt, reqtype: this.parseTypeSignature(false) };
+                            return { name: nn, reqtype: this.parseTypeSignature(false) };
                         }
                     })[0];
 
                     if(names.length === 0) {
-                        this.raiseError(sinfo.line, "You must have at least one index when projecting");
+                        this.raiseError(sinfo.line, "You must have at least one name when projecting");
                     }
 
                     ops.push(new PostfixProjectFromNames(sinfo, isElvis, isvalue, false, names));
                 }
                 else if(this.testToken("(|")) {
                     if (this.testFollows("(|", TokenStrings.Int)) {
-                        const indecies = this.parseListOf<{ index: number, isopt: boolean, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
+                        const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
                             this.ensureToken(TokenStrings.Int);
                             const idx = Number.parseInt(this.consumeTokenAndGetValue());
-                            if(this.testAndConsumeTokenIf("?")) {
-                                this.raiseError(sinfo.line, "Cannot have optional part in Ephemeral List projection");
-                            }
-
+                            
                             if (!this.testAndConsumeTokenIf(":")) {
-                                return { index: idx, isopt: false, reqtype: undefined};
+                                return { index: idx, reqtype: undefined};
                             }
                             else {
-                                return { index: idx, isopt: false, reqtype: this.parseTypeSignature(false) };
+                                return { index: idx, reqtype: this.parseTypeSignature(false) };
                             }
                         })[0];
 
@@ -2037,6 +2026,10 @@ class Parser {
                         }
                         else {
                             const pragmas = this.testToken("[") ? this.parsePragmaArguments() : new PragmaArguments("no", []);
+
+                            //
+                            //TODO add binder support here later -- x.f<Int>${g, h}($g + 1, $h - 5)
+                            //
                             const args = this.parseArguments("(", ")");
 
                             ops.push(new PostfixInvoke(sinfo, isElvis, specificResolve, name, new TemplateArguments([]), pragmas, args));
