@@ -41,6 +41,7 @@ type ExpandedArgument = {
 type FilledLocation = {
     vtype: ResolvedType | ResolvedFunctionType,
     mustDef: boolean,
+    fflagchk: boolean,
     ref: MIRVariableArgument | undefined,
     pcode: PCode | undefined,
     trgt: MIRArgument
@@ -180,6 +181,22 @@ class TypeChecker {
 
         const rr = this.m_emitter.generateTmpRegister();
         this.m_emitter.emitConvertUp(sinfo, mirsrctype, mirintotype, src, rr);
+
+        return rr;
+    }
+
+    private emitCheckedInlineConvertIfNeeded(sinfo: SourceInfo, src: MIRArgument, srctype: ResolvedType, trgttype: ResolvedType, fflag: string, index: number): MIRArgument {
+        if(srctype.isSameType(trgttype)) {
+            return src;
+        }
+
+        this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(srctype, trgttype), `Cannot convert type ${srctype.idStr} into ${trgttype.idStr}`);
+
+        const mirsrctype = this.m_emitter.registerResolvedTypeReference(srctype);
+        const mirintotype = this.m_emitter.registerResolvedTypeReference(trgttype);
+
+        const rr = this.m_emitter.generateTmpRegister();
+        this.m_emitter.emitCheckedConvertUp(sinfo, mirsrctype, mirintotype, src, rr, fflag, index);
 
         return rr;
     }
@@ -415,8 +432,8 @@ class TypeChecker {
         }
     }
 
-    private getInfoForLoadFromSafeIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType | undefined {
-        this.raiseErrorIf(sinfo, this.getInfoForHasIndex(sinfo, rtype, idx) !== "yes");
+    private getInfoForLoadFromSafeIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): ResolvedType {
+        this.raiseErrorIf(sinfo, this.getInfoForHasIndex(sinfo, rtype, idx) === "no");
         return this.m_assembly.typeUpperBound(rtype.options.map((atom) => (atom as ResolvedTupleAtomType).types[idx].type));
     }
 
@@ -446,7 +463,8 @@ class TypeChecker {
         }
     }
 
-    private getInfoForLoadFromSafeProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType | undefined {
+    private getInfoForLoadFromSafeProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
+        this.raiseErrorIf(sinfo, this.getInfoForHasProperty(sinfo, rtype, pname) === "no");
         return this.m_assembly.typeUpperBound(rtype.options.map((atom) => ((atom as ResolvedRecordAtomType).entries.find((re) => re.name === pname) as ResolvedRecordAtomTypeEntry).type));
     }
 
@@ -1026,7 +1044,7 @@ class TypeChecker {
 
         this.emitConvertIfNeeded(sinfo, rrecord, infertype, iipack);
 
-        return rrecord;
+        return restype;
     }
 
     private checkArgumentsEvaluationValueList(env: TypeEnvironment, args: Arguments, itype: ResolvedEphemeralListType | undefined): [ResolvedType, MIRTempRegister][] {
@@ -1168,7 +1186,7 @@ class TypeChecker {
 
         this.emitConvertIfNeeded(sinfo, resulttype, infertype, iipack);
 
-        return resulttype;
+        return restype;
     }
 
     private checkArgumentsEvaluationEntity(sinfo: SourceInfo, env: TypeEnvironment, oftype: ResolvedEntityAtomType, args: Arguments): ExpandedArgument[] {
@@ -1252,7 +1270,7 @@ class TypeChecker {
         const optfirst = flatfinfo.findIndex((fi) => fi[1][1].value !== undefined);
         const fflag = this.m_emitter.emitHasFlagLocation(oftype.object.name, optcount);
 
-        let filledLocations: { vtype: ResolvedType, mustDef: boolean, trgt: MIRArgument }[] = [];
+        let filledLocations: { vtype: ResolvedType, mustDef: boolean, fflagchk: boolean, trgt: MIRArgument }[] = [];
 
         //figure out named parameter mapping first
         for (let i = 0; i < args.length; ++i) {
@@ -1264,7 +1282,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, fidx === -1, `Entity ${oftype.idStr} does not have field named "${arg.name}"`);
                 this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${arg.name}"`);
 
-                filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, trgt: arg.treg };
+                filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg };
                 if(flatfinfo[fidx][1][1].value !== undefined) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, fidx - optfirst, true);
                 }
@@ -1280,17 +1298,20 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, (fieldInfo.get(pname) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>])[1].value !== undefined && !expandInfo[0].has(pname), `Constructor requires "${pname}" but it is provided as an optional argument`);
 
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype =  this.getInfoForLoadFromPropertyName(sinfo, arg.argtype as ResolvedType, pname);
+                    const lvtype =  this.getInfoForLoadFromSafeProperty(sinfo, arg.argtype as ResolvedType, pname);
                     const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
 
-                    if (flatfinfo[fidx][1][1].value === undefined) {
+                    if(expandInfo[0].has(pname)) {
                         this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg);
+                        filledLocations[fidx] = { vtype: lvtype, mustDef: true, fflagchk: false, trgt: etreg };
                     }
                     else {
-                        this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
-                    }
+                        const field = flatfinfo[fidx][1];
+                        this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[fidx]}" is required and must be assigned a value in constructor`);
 
-                    filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[0].has(pname), trgt: etreg };
+                        this.m_emitter.emitCheckedLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
+                        filledLocations[fidx] = { vtype: lvtype, mustDef: false, fflagchk: true, trgt: etreg };
+                    }
                 });
             }
             else {
@@ -1314,7 +1335,7 @@ class TypeChecker {
 
             const arg = args[apos];
             if (!arg.expando) {
-                filledLocations[ii] = { vtype: arg.argtype as ResolvedType, mustDef: true, trgt: arg.treg };
+                filledLocations[ii] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg };
                 if(flatfinfo[ii][1][1].value !== undefined) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, ii - optfirst, true);
                 }
@@ -1330,19 +1351,23 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, (fieldInfo.get(fields[ii]) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>])[1].value !== undefined && ectr >= expandInfo[0], `Constructor requires "${fields[ii]}" but it is provided as an optional argument as part of tuple expando`);
 
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype = this.getInfoForLoadFromIndex(sinfo, arg.argtype as ResolvedType, ectr);
+                    const lvtype = this.getInfoForLoadFromSafeIndex(sinfo, arg.argtype as ResolvedType, ectr);
                     const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
                    
-                    if (flatfinfo[ii][1][1].value === undefined) {
+                    if(ectr < expandInfo[0]) {
                         this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg);
+                        filledLocations[ii] = { vtype: lvtype, mustDef: true, fflagchk: false, trgt: etreg };
                     }
                     else {
-                        this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
+                        const field = flatfinfo[ii][1];
+                        this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[ii]}" is required and must be assigned a value in constructor`);
+
+                        this.m_emitter.emitCheckedLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
+                        filledLocations[ii] = { vtype: lvtype, mustDef: false, fflagchk: true, trgt: etreg };
                     }
 
-                    filledLocations[ii] = { vtype: lvtype, mustDef: ectr < expandInfo[0], trgt: etreg };
-
                     while (filledLocations[ii] !== undefined) {
+                        this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional field "${fields[ii]}"`);
                         ii++;
                     }
                 }
@@ -1354,24 +1379,18 @@ class TypeChecker {
             }
         }
 
-        //go through names and fill out info for any that should use the default value -- raise error if any are missing
+        //go through arguments and type coearce as needed
         let cargs: MIRArgument[] = [];
         for (let i = 0; i < fields.length; ++i) {
             const field = (fieldInfo.get(fields[i]) as [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]);
             const fieldtype = this.resolveAndEnsureTypeOnly(sinfo, field[1].declaredType, field[2]);
 
-            if (filledLocations[i] === undefined) {
-                this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[i]}" is required and must be assigned a value in constructor`);
-
-                const etreg = this.m_emitter.generateTmpRegister();
-                const ftype = this.resolveAndEnsureTypeOnly(sinfo, field[1].declaredType, field[2]);
-                this.m_emitter.emitBlankValue(sinfo, this.m_emitter.registerResolvedTypeReference(ftype), etreg);
-
-                filledLocations[i] = { vtype: fieldtype, mustDef: true, trgt: etreg };
+            if(filledLocations[i].fflagchk) {
+                cargs.push(this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype, fflag, i - optfirst));
             }
-            xxxx;
-
-            cargs.push(this.emitInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype));
+            else {
+                cargs.push(this.emitInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype));
+            }
         }
 
         const constype = ResolvedType.createSingle(oftype);
@@ -1400,7 +1419,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, fidx === -1, `Call does not have parameter named "${arg.name}"`);
                 this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name ${arg.name}`);
 
-                filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
+                filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
                 if(sig.params[fidx].isOptional) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, fidx - optfirst, true);
                 }
@@ -1415,18 +1434,22 @@ class TypeChecker {
 
                     this.raiseErrorIf(sinfo, !sig.params[fidx].isOptional && !expandInfo[0].has(pname), `Call requires "${pname}" but it is provided as an optional argument`);
 
+
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype =  this.getInfoForLoadFromPropertyName(sinfo, arg.argtype as ResolvedType, pname);
+                    const lvtype =  this.getInfoForLoadFromSafeProperty(sinfo, arg.argtype as ResolvedType, pname);
                     const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
 
-                    if (!sig.params[fidx].isOptional) {
+                    if(expandInfo[0].has(pname)) {
                         this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg);
+                        filledLocations[fidx] = { vtype: lvtype, mustDef: true, fflagchk: false, ref: undefined, pcode: undefined, trgt: etreg };
                     }
                     else {
-                        this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
-                    }
+                        const param = sig.params[fidx];
+                        this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
 
-                    filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[0].has(pname), ref: undefined, pcode: undefined, trgt: etreg };
+                        this.m_emitter.emitCheckedLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
+                        filledLocations[fidx] = { vtype: lvtype, mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
+                    }
                 });
             }
             else {
@@ -1450,7 +1473,7 @@ class TypeChecker {
 
             const arg = args[apos];
             if (!arg.expando) {
-                filledLocations[ii] = { vtype: arg.argtype, mustDef: true, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
+                filledLocations[ii] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
                 if(sig.params[ii].isOptional) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, ii - optfirst, true);
                 }
@@ -1466,19 +1489,23 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !sig.params[ii].isOptional && ectr >= expandInfo[0], `Call requires "${sig.params[ii].name}" but it is provided as an optional argument as part of tuple expando`);
 
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype = this.getInfoForLoadFromIndex(sinfo, arg.argtype as ResolvedType, ectr);
+                    const lvtype = this.getInfoForLoadFromSafeIndex(sinfo, arg.argtype as ResolvedType, ectr);
                     const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
                    
-                    if (!sig.params[ii].isOptional) {
+                    if(ectr < expandInfo[0]) {
                         this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg);
+                        filledLocations[ii] = { vtype: lvtype, mustDef: true, fflagchk: false, ref: undefined, pcode: undefined, trgt: etreg };
                     }
                     else {
-                        this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
+                        const param = sig.params[ii];
+                        this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
+
+                        this.m_emitter.emitCheckedLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
+                        filledLocations[ii] = { vtype: lvtype, mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
                     }
 
-                    filledLocations[ii] = { vtype: lvtype, mustDef: ectr < expandInfo[0], ref: undefined, pcode: undefined, trgt: etreg };
-
                     while (filledLocations[ii] !== undefined) {
+                        this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional parameter "${sig.params[ii].name}"`);
                         ii++;
                     }
                 }
@@ -1488,12 +1515,6 @@ class TypeChecker {
             while (apos < args.length && (args[apos].name !== undefined || (args[apos].expando && (args[apos].argtype as ResolvedType).isRecordTargetType()))) {
                 apos++;
             }
-        }
-
-        while (filledLocations[ii] !== undefined) {
-            xxxx;
-            this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional parameter "${sig.params[ii].name}"`);
-            ii++;
         }
 
         while (apos < args.length && (args[apos].name !== undefined || (args[apos].expando && (args[apos].argtype as ResolvedType).isRecordTargetType()))) {
@@ -1519,12 +1540,11 @@ class TypeChecker {
             if (filledLocations[j] === undefined) {
                 this.raiseErrorIf(sinfo, !sig.params[j].isOptional, `Parameter ${sig.params[j].name} is required and must be assigned a value in constructor`);
 
-                const etreg = this.m_emitter.generateTmpRegister();
-                this.m_emitter.emitBlankValue(sinfo, this.m_emitter.registerResolvedTypeReference(paramtype as ResolvedType), etreg);
+                this.m_emitter.emitSetHasFlagConstant(fflag, j - optfirst, false);
 
-                filledLocations[j] = { vtype: paramtype, mustDef: true, ref: undefined, pcode: undefined, trgt: etreg };
+                const etreg = this.m_emitter.generateTmpRegister();
+                filledLocations[j] = { vtype: paramtype, mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
             }
-            xxxx;
 
             if (sig.params[j].type instanceof ResolvedFunctionType) {
                 this.raiseErrorIf(sinfo, filledLocations[j].pcode === undefined, `Parameter ${sig.params[j].name} expected a function`);
@@ -1546,7 +1566,15 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(filledLocations[j].vtype as ResolvedType, paramtype as ResolvedType), `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
                 }
 
-                const narg = this.emitInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType);
+
+                let narg = filledLocations[j].trgt;
+                if(filledLocations[j].fflagchk) {
+                    narg = this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType, fflag, j - optfirst);
+                }
+                else {
+                    narg = this.emitInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType);
+                }
+
                 margs.push(narg);
                 mtypes.push(sig.params[j].type as ResolvedType);
             }
@@ -1631,7 +1659,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, fidx === -1, `Operator does not have parameter named "${arg.name}"`);
                 this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name ${arg.name}`);
 
-                filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
+                filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
             }
             else if (arg.expando && (arg.argtype as ResolvedType).isRecordTargetType()) {
                 const expandInfo = this.checkTypeOkForRecordExpando(sinfo, arg.argtype as ResolvedType);
@@ -1643,11 +1671,11 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${pname}"`);
 
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype =  this.getInfoForLoadFromPropertyName(sinfo, arg.argtype as ResolvedType, pname);
+                    const lvtype =  this.getInfoForLoadFromSafeProperty(sinfo, arg.argtype as ResolvedType, pname);
                     const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
 
                     this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg);
-                    filledLocations[fidx] = { vtype: lvtype, mustDef: expandInfo[0].has(pname), ref: undefined, pcode: undefined, trgt: etreg };
+                    filledLocations[fidx] = { vtype: lvtype, mustDef: true, fflagchk: false, ref: undefined, pcode: undefined, trgt: etreg };
                 });
             }
             else {
@@ -1670,7 +1698,7 @@ class TypeChecker {
 
             const arg = args[apos];
             if (!arg.expando) {
-                filledLocations[ii] = { vtype: arg.argtype, mustDef: true, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
+                filledLocations[ii] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
                 ++ii;
             }
             else {
@@ -1682,11 +1710,11 @@ class TypeChecker {
                     this.raiseErrorIf(sinfo, ii >= opnames.length, "Too many arguments as part of tuple expando and/or cannot split tuple expando (between arguments and rest)");
                     
                     const etreg = this.m_emitter.generateTmpRegister();
-                    const lvtype = this.getInfoForLoadFromIndex(sinfo, arg.argtype as ResolvedType, ectr);
+                    const lvtype = this.getInfoForLoadFromSafeIndex(sinfo, arg.argtype as ResolvedType, ectr);
                     const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
                    
                     this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg);
-                    filledLocations[ii] = { vtype: lvtype, mustDef: ectr < expandInfo[0], ref: undefined, pcode: undefined, trgt: etreg };
+                    filledLocations[ii] = { vtype: lvtype, mustDef: true, fflagchk: false, ref: undefined, pcode: undefined, trgt: etreg };
 
                     while (filledLocations[ii] !== undefined) {
                         ii++;
@@ -2663,8 +2691,9 @@ class TypeChecker {
 
         this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.index < 0, "Index cannot be negative");
+        this.raiseErrorIf(op.sinfo, this.getInfoForHasIndex(op.sinfo, texp, op.index) !== "yes", "Index may not be defined for tuple");
 
-        const idxtype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.index);
+        const idxtype = this.getInfoForLoadFromSafeIndex(op.sinfo, texp, op.index);
 
         const [restype, iipack] = this.genInferInfo(op.sinfo, idxtype, infertype, trgt);
         this.m_emitter.emitLoadTupleIndex(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp), op.index, !texp.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(idxtype), iipack[0]);
@@ -2678,18 +2707,41 @@ class TypeChecker {
 
         this.raiseErrorIf(op.sinfo, !texp.isTupleTargetType(), "Base of index expression must be of Tuple type");
         this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => idx.index < 0), "Index cannot be negative");
+        this.raiseErrorIf(op.sinfo, op.indecies.some((idx) => this.getInfoForHasIndex(op.sinfo, texp, idx.index) !== "yes"), "Index may not be defined for all tuples");
 
-        let ctypes: ResolvedType[] = [];
-        for (let i = 0; i < op.indecies.length; ++i) {
-            ctypes.push(this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index));
+        let itype: ResolvedType[] | undefined = undefined;
+        if (infertype !== undefined) {
+            if (op.isEphemeralListResult) {
+                const eitype = infertype.tryGetInferrableValueListConstructorType();
+                itype = eitype !== undefined ? eitype.types : undefined;
+            }
+            else {
+                const eitype = infertype.tryGetInferrableTupleConstructorType(op.isValue);
+                itype = eitype !== undefined ? eitype.types.map((entry) => entry.type) : undefined;
+            }
+
+            this.raiseErrorIf(op.sinfo, itype !== undefined && itype.length !== op.indecies.length, "Mismatch between number of indecies loaded and number expected by inferred type");
         }
-        const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
+
+        let etypes: ResolvedType[] = [];
+        for (let i = 0; i < op.indecies.length; ++i) {
+            const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
+            let inferidx: ResolvedType | undefined = undefined
+            if (reqtype !== undefined || itype !== undefined) {
+                inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedType[])[i];
+            }
+
+            const ttype = this.getInfoForLoadFromSafeIndex(op.sinfo, texp, op.indecies[i].index);
+            etypes.push(inferidx || ttype);
+        }
+
+        const rephemeralatom = ResolvedEphemeralListType.create(etypes);
         const rephemeral = ResolvedType.createSingle(rephemeralatom);
 
         const rindecies = op.indecies.map((idv) => idv.index);
 
         const prjtemp = this.m_emitter.generateTmpRegister();
-        if(texp.isUniqueTupleTargetType()) {
+        if (texp.isUniqueTupleTargetType()) {
             const invk = this.m_emitter.registerTupleProjectToEphemeral(texp.getUniqueTupleTargetType(), rindecies, rephemeralatom);
             this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
         }
@@ -2699,174 +2751,23 @@ class TypeChecker {
         }
 
         if (op.isEphemeralListResult) {
-            let itype: ResolvedEphemeralListType | undefined = undefined;
-            if (infertype !== undefined) {
-                itype = infertype.tryGetInferrableValueListConstructorType();
-                this.raiseErrorIf(op.sinfo, itype !== undefined && itype.types.length !== op.indecies.length, "Mismatch between number of indecies loaded and number expected by inferred type");
-            }
-
-            let eargs: [ResolvedType, MIRTempRegister][] = [];
-            for (let i = 0; i < op.indecies.length; ++i) {
-                let treg = this.m_emitter.generateTmpRegister();
-                let ttype = ResolvedType.createEmpty();
-                if (op.indecies[i].exp !== undefined) {
-                    //push binds and evaluate expression -- make sure binder flag is set too
-                    xxxx;
-                    ttype = ;
-                }
-                else {
-                    this.m_emitter.emitLoadFromEpehmeralList(op.sinfo, prjtemp, this.m_emitter.registerResolvedTypeReference(rephemeral), i, this.m_emitter.registerResolvedTypeReference(ctypes[i]), treg);
-                    ttype = ctypes[i];
-                }
-
-                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
-                let inferidx: ResolvedType | undefined = undefined
-                if (reqtype !== undefined || itype !== undefined) {
-                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[i];
-                }
-
-                if(inferidx === undefined) {
-                    eargs.push([ttype, treg]);
-                }
-                else {
-                    //convert result into infer type if needed
-                    eargs.push([inferidx, this.emitInlineConvertIfNeeded(op.sinfo, treg, ttype, inferidx) as MIRTempRegister]);
-                }
-            }
-
-            if (op.isEphemeralListResult) {
-                const rtype = this.checkArgumentsValueListConstructor(op.sinfo, eargs, trgt, infertype);
-                return xxxx;
-            }
-            else {
-                const rtype = this.checkArgumentsTupleConstructor(op.sinfo, op.isValue, eargs, trgt, infertype);
-                return xxxx;
-            }
-        }
-        else {
-            xxxx;
-        }
-
-        if(op.isEphemeralListResult) {
-            let itype: ResolvedEphemeralListType | undefined = undefined;
-            if (infertype !== undefined) {
-                itype = infertype.tryGetInferrableValueListConstructorType();
-                this.raiseErrorIf(op.sinfo, itype !== undefined && itype.types.length !== op.indecies.length, "Mismatch between number of indecies loaded and number expected by inferred type");
-            }
-
-            let ctypes: ResolvedType[] = [];
-            for (let i = 0; i < op.indecies.length; ++i) {
-                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
-                let inferidx: ResolvedType | undefined = undefined
-                if (reqtype !== undefined || itype !== undefined) {
-                    inferidx = reqtype !== undefined ? reqtype : (itype as ResolvedEphemeralListType).types[i];
-                }
-
-                const ttype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index);
-                this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${op.indecies[i]}`);
-                ctypes.push(inferidx || ttype);
-            }
-
-            const rephemeralatom = ResolvedEphemeralListType.create(ctypes);
-            const rephemeral = ResolvedType.createSingle(rephemeralatom);
-
-            const rindecies = op.indecies.map((idv) => idv.index);
             const [restype, iipack] = this.genInferInfo(op.sinfo, rephemeral, infertype, trgt);
 
-            if (texp.isUniqueTupleTargetType()) {
-                const invk = this.m_emitter.registerTupleProjectToEphemeral(texp.getUniqueTupleTargetType(), rindecies, rephemeralatom);
-                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
-            }
-            else {
-                const invk = this.m_emitter.registerTupleProjectToEphemeralVirtual(texp, rindecies, rephemeralatom);
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
-            }
+            this.m_emitter.emitTempRegisterAssign(op.sinfo, prjtemp, iipack[0]);
 
             this.emitConvertIfNeeded(op.sinfo, rephemeral, infertype, iipack);
             return [env.setResultExpression(restype)];
         }
         else {
-            let itype: ResolvedTupleAtomType | undefined = undefined;
-            if (infertype !== undefined) {
-                itype = infertype.tryGetInferrableTupleConstructorType(op.isValue);
-            }
+            const tupleatom = ResolvedTupleAtomType.create(op.isValue, etypes.map((tt) => new ResolvedTupleAtomTypeEntry(tt, false)));
+            const rtuple = ResolvedType.createSingle(tupleatom);
+    
+            const [restype, iipack] = this.genInferInfo(op.sinfo, rtuple, infertype, trgt);
 
-            let opidx = op.indecies.findIndex((ee) => ee.isopt);
-            if(opidx !== -1) {
-                this.raiseErrorIf(op.sinfo, op.indecies.slice(opidx).some((ee) => !ee.isopt), "Cannot have non-optional indecies after optional");
-            }
-
-            let ctypes: ResolvedTupleAtomTypeEntry[] = [];
-            for (let i = 0; i < op.indecies.length; ++i) {
-                const reqtype = op.indecies[i].reqtype !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.indecies[i].reqtype as TypeSignature, env.terms) : undefined;
-
-                if (!op.indecies[i].isopt) {
-                    let inferidx = reqtype !== undefined ? reqtype : undefined;
-                    if(inferidx === undefined && itype !== undefined) {
-                        const [tt, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
-                        if(status === "never") {
-                            inferidx = this.m_assembly.getSpecialNoneType();
-                        }
-                        else if (status === "opt") {
-                            inferidx = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
-                        }
-                        else {
-                            inferidx = tt;
-                        }
-                    }
-
-                    const ttype = this.getInfoForLoadFromIndex(op.sinfo, texp, op.indecies[i].index);
-                    this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype, inferidx), `Type incompatibility in projecting index ${i}`);
-                    ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, false));
-                }
-                else {
-                    let inferidx = reqtype !== undefined ? reqtype : undefined;
-                    if(inferidx === undefined && itype !== undefined) {
-                        const [tt, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, ResolvedType.createSingle(itype as ResolvedTupleAtomType), op.indecies[i].index);
-                        if(status === "never") {
-                            inferidx = this.m_assembly.getSpecialNoneType();
-                        }
-                        else if (status === "opt" && !op.indecies[i].isopt) {
-                            inferidx = this.m_assembly.typeUpperBound([tt, this.m_assembly.getSpecialNoneType()]);
-                        }
-                        else {
-                            inferidx = tt;
-                        }
-                    }
-
-                    const [ttype, status] = this.getInfoForLoadFromIndexWithOpt(op.sinfo, texp, op.indecies[i].index);
-                    if(status === "never") {
-                        break;
-                    }
-                    else {
-                        this.raiseErrorIf(op.sinfo, inferidx === undefined || !this.m_assembly.subtypeOf(ttype as ResolvedType, inferidx), `Type incompatibility in projecting index ${i}`);
-
-                        ctypes.push(new ResolvedTupleAtomTypeEntry(inferidx || ttype, status === "opt"));
-                    }
-                }
-            }
-
-            const rtupletype = ResolvedType.createSingle(ResolvedTupleAtomType.create(op.isValue, ctypes));
-            const rindecies = op.indecies.map((opidx, ii) => {
-                return {
-                    index: opidx.index,
-                    isopt: opidx.isopt,
-                    reqtype: ctypes[ii].type
-                }
-            });
-
-            const [restype, iipack] = this.genInferInfo(op.sinfo, rtupletype, infertype, trgt);
-
-            if (texp.isUniqueTupleTargetType()) {
-                const invk = this.m_emitter.registerTupleProjectToTuple(texp.getUniqueTupleTargetType(), rindecies, rtupletype);
-                this.m_emitter.emitInvokeFixedFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
-            }
-            else {
-                const invk = this.m_emitter.registerTupleProjectToTupleVirtual(texp, rindecies, rtupletype);  
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, [arg], undefined, this.m_emitter.registerResolvedTypeReference(rtupletype), iipack[0]);
-            }
-
-            this.emitConvertIfNeeded(op.sinfo, rtupletype, infertype, iipack);
+            const tupkey = this.m_emitter.registerResolvedTypeReference(rtuple);
+            this.m_emitter.emitConstructorTupleFromEphemeralList(op.sinfo, tupkey, prjtemp, this.m_emitter.registerResolvedTypeReference(rephemeral), iipack[0]);
+    
+            this.emitConvertIfNeeded(op.sinfo, rtuple, infertype, iipack);
             return [env.setResultExpression(restype)];
         }
     }
@@ -2875,7 +2776,10 @@ class TypeChecker {
         const texp = env.getExpressionResult().exptype;
 
         if (texp.isRecordTargetType()) {
-            const rtype = this.getInfoForLoadFromPropertyName(op.sinfo, texp, op.name);
+            this.raiseErrorIf(op.sinfo, !texp.isRecordTargetType(), "Base of property access expression must be of Record type");
+            this.raiseErrorIf(op.sinfo, this.getInfoForHasProperty(op.sinfo, texp, op.name) !== "yes", "Property may not be defined for record");
+
+            const rtype = this.getInfoForLoadFromSafeProperty(op.sinfo, texp, op.name);
 
             const [restype, iipack] = this.genInferInfo(op.sinfo, rtype, infertype, trgt);
             
@@ -2903,6 +2807,8 @@ class TypeChecker {
 
     private checkProjectFromNames(env: TypeEnvironment, op: PostfixProjectFromNames, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
         const texp = env.getExpressionResult().exptype;
+
+        xxxx;
 
         if (op.isEphemeralListResult) {
             let itype: ResolvedEphemeralListType | undefined = undefined;
