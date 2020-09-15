@@ -252,6 +252,46 @@ class TypeEnvironment {
         return {tenvs: tp, fenvs: fp};
     }
 
+    static convertToHasIndexNotHasIndexFlowsOnResult(assembly: Assembly, idx: number, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
+        assert(options.every((opt) => !opt.infeasible));
+
+        let tp: TypeEnvironment[] = [];
+        let fp: TypeEnvironment[] = [];
+        
+        for(let i = 0; i < options.length; ++i) {
+            const opt = options[i];
+            const pccs = assembly.splitIndex(opt.getExpressionResult().exptype, idx);
+
+            if(!pccs.tp.isEmptyType()) {
+                tp.push(opt.setResultExpressionWVarOpt(pccs.tp, opt.getExpressionResult().expvar));
+            }
+            if(!pccs.fp.isEmptyType()) {
+                fp.push(opt.setResultExpressionWVarOpt(pccs.fp, opt.getExpressionResult().expvar));
+            }
+        }
+        return {tenvs: tp, fenvs: fp};
+    }
+
+    static convertToHasIndexNotHasPropertyFlowsOnResult(assembly: Assembly, pname: string, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
+        assert(options.every((opt) => !opt.infeasible));
+
+        let tp: TypeEnvironment[] = [];
+        let fp: TypeEnvironment[] = [];
+        
+        for(let i = 0; i < options.length; ++i) {
+            const opt = options[i];
+            const pccs = assembly.splitProperty(opt.getExpressionResult().exptype, pname);
+
+            if(!pccs.tp.isEmptyType()) {
+                tp.push(opt.setResultExpressionWVarOpt(pccs.tp, opt.getExpressionResult().expvar));
+            }
+            if(!pccs.fp.isEmptyType()) {
+                fp.push(opt.setResultExpressionWVarOpt(pccs.fp, opt.getExpressionResult().expvar));
+            }
+        }
+        return {tenvs: tp, fenvs: fp};
+    }
+
     static splitTypeOptionFlowsOnResult(assembly: Assembly, options: TypeEnvironment[], ...types: ResolvedType[]): TypeEnvironment[][] {
         assert(options.every((opt) => !opt.infeasible));
 

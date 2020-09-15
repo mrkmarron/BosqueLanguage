@@ -12,16 +12,11 @@ concept Any {
     method as<T>(): T # special_method
 
     method tryAs<T>(): T? {
-        return this.is<T>() ? this : none;
+        return this.is<T>() ? this.as<T>() : none;
     }
 
-    method isSome(): Bool {
-        return this.is<Some>();
-    }
-
-    method isNone(): Bool {
-        return this.is<None>();
-    }
+    method isSome(): Bool # special_method
+    method isNone(): Bool # special_method
 }
 
 //<summary>Special type for representing all non-none values.</summary>

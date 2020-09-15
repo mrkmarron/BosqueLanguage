@@ -272,6 +272,26 @@ class ResolvedType {
         return this.options.every((opt) => opt instanceof ResolvedTupleAtomType);
     }
 
+    getTupleTargetTypeIndexRange(): { req: number, opt: number } {
+        if(this.options.length === 0) {
+            return { req: 0, opt: 0 }; 
+        }
+
+        let req: number[] = [];
+        let opt = -1;
+
+        for (let i = 0; i < this.options.length; ++i) {
+            const rta = (this.options[i] as ResolvedTupleAtomType);
+
+            const opti = rta.types.findIndex((tt) => tt.isOptional);
+            req.push(opti !== -1 ? opti : rta.types.length)
+
+            opt = Math.max(opt, rta.types.length);
+        }
+
+        return { req: Math.min(...req), opt: opt };
+    }
+
     isUniqueTupleTargetType(): boolean {
         if (this.options.length !== 1) {
             return false;
@@ -297,6 +317,22 @@ class ResolvedType {
 
     isRecordTargetType(): boolean {
         return this.options.every((opt) => opt instanceof ResolvedRecordAtomType);
+    }
+
+    getRecordTargetTypePropertySets(): {req: Set<string>, opt: Set<string>} {
+        let allopts = new Set<string>();
+        this.options.forEach((opt) => {
+            (opt as ResolvedRecordAtomType).entries.forEach((entry) => allopts.add(entry.name));
+        });
+
+        let req = new Set<string>();
+        allopts.forEach((oname) => {
+            if(this.options.every((opt) => (opt as ResolvedRecordAtomType).entries.findIndex((entry) => entry.name === oname) !== -1)) {
+                req.add(oname);
+            }
+        });
+
+        return { req: req, opt: allopts };
     }
 
     isUniqueRecordTargetType(): boolean {
@@ -452,7 +488,7 @@ class ResolvedFunctionType {
     }
 
     static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionType {
-        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr + (param.isLiteral ? ("==" + param.literalExp) : ""));
+        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr + (param.isLiteral ? ("==" + param.exp) : ""));
         let cvalue = cvalues.join(", ");
 
         let recstr = "";

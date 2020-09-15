@@ -84,6 +84,7 @@ class ParserEnvironment {
     readonly assembly: Assembly;
 
     readonly SpecialAnySignature: TypeSignature;
+    readonly SpecialSomeSignature: TypeSignature;
     readonly SpecialNoneSignature: TypeSignature;
     readonly SpecialBoolSignature: TypeSignature;
     
@@ -107,6 +108,7 @@ class ParserEnvironment {
         this.m_functionScopes = [];
 
         this.SpecialAnySignature = new NominalTypeSignature("NSCore", ["Any"], []);
+        this.SpecialSomeSignature = new NominalTypeSignature("NSCore", ["Some"], []);
         this.SpecialNoneSignature = new NominalTypeSignature("NSCore", ["None"], []);
         this.SpecialBoolSignature = new NominalTypeSignature("NSCore", ["Bool"], []);
 

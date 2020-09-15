@@ -868,6 +868,84 @@ class Assembly {
         return {tp: this.typeUpperBound(tp), fp: this.typeUpperBound(fp)};
     }
 
+    splitIndex(oft: ResolvedType, idx: number): { tp: ResolvedType, fp: ResolvedType } {
+        if (oft.isEmptyType()) {
+            return { tp: ResolvedType.createEmpty(), fp: ResolvedType.createEmpty() };
+        }
+
+        let tpp: ResolvedTupleAtomType[] = [];
+        let fpp: ResolvedTupleAtomType[] = [];
+        for(let i = 0; i < oft.options.length; ++i) {
+            const opt = oft.options[i] as ResolvedTupleAtomType;
+
+            if(idx < opt.types.length && !opt.types[idx].isOptional) {
+                tpp.push(opt);
+            }
+            else if (opt.types.length <= idx) {
+                fpp.push(opt);
+            }
+            else {
+                let ttypes: ResolvedTupleAtomTypeEntry[] = [];
+                let ftypes: ResolvedTupleAtomTypeEntry[] = [];
+                for(let j = 0; j < opt.types.length; ++i) {
+                    if(j < idx) {
+                        ttypes.push(new ResolvedTupleAtomTypeEntry(opt.types[j].type, false));
+                        ftypes.push(opt.types[j]);
+                    }
+                    else if (j === idx) {
+                        ttypes.push(new ResolvedTupleAtomTypeEntry(opt.types[j].type, false));
+                    }
+                    else {
+                        ttypes.push(opt.types[j]);
+                    }
+                }
+
+                tpp.push(ResolvedTupleAtomType.create(opt.isvalue, ttypes));
+                fpp.push(ResolvedTupleAtomType.create(opt.isvalue, ftypes));
+            }
+        }
+
+        return {tp: ResolvedType.create(tpp), fp: ResolvedType.create(fpp)};
+    }
+
+    splitProperty(oft: ResolvedType, pname: string): { tp: ResolvedType, fp: ResolvedType } {
+        if (oft.isEmptyType()) {
+            return { tp: ResolvedType.createEmpty(), fp: ResolvedType.createEmpty() };
+        }
+
+        let tpp: ResolvedRecordAtomType[] = [];
+        let fpp: ResolvedRecordAtomType[] = [];
+        for(let i = 0; i < oft.options.length; ++i) {
+            const opt = oft.options[i] as ResolvedRecordAtomType;
+
+            const entry = opt.entries.find((ee) => ee.name === pname);
+            if(entry !== undefined && !entry.isOptional) {
+                tpp.push(opt);
+            }
+            else if (entry === undefined) {
+                fpp.push(opt);
+            }
+            else {
+                let ttypes: ResolvedRecordAtomTypeEntry[] = [];
+                let ftypes: ResolvedRecordAtomTypeEntry[] = [];
+                for(let j = 0; j < opt.entries.length; ++i) {
+                    if (opt.entries[j].name === pname) {
+                        ttypes.push(new ResolvedRecordAtomTypeEntry(pname, opt.entries[j].type, false));
+                    }
+                    else {
+                        ttypes.push(opt.entries[j]);
+                        ftypes.push(opt.entries[j])
+                    }
+                }
+
+                tpp.push(ResolvedRecordAtomType.create(opt.isvalue, ttypes));
+                fpp.push(ResolvedRecordAtomType.create(opt.isvalue, ftypes));
+            }
+        }
+
+        return {tp: ResolvedType.create(tpp), fp: ResolvedType.create(fpp)};
+    }
+
     getDerivedTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {
         if(oftype.idStr === "NSCore::Record") {
             //
@@ -1929,11 +2007,6 @@ class Assembly {
         else {
             return this.ensureSingleDecl_Helper<MemberFieldDecl>(ttopts as OOMemberLookupInfo<MemberFieldDecl>[]);
         }
-    }
-
-    //Given a unique entity type resolve the actual method target to invoke -- should exist or it is an error 
-    tryGetMethodUniqueFromUniqueEntityType(tt: ResolvedEntityAtomType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
-        return this.tryGetMemberMethodDecl(tt.object, tt.binds, fname, true) || this.tryGetMemberMethodDeclParent(tt.object, tt.binds, fname, true);
     }
 
     //Given a type find, if possible, the single static method that every possibility resolves to -- if not then this needs to be a virtual call
