@@ -181,6 +181,12 @@ class ParserEnvironment {
             return opdecls.some((opdecl) => (opdecl.isPrefix && opdecl.level === level)) ? this.m_currentNamespace as string : undefined;
         }
 
+        const nsmaindecl = this.assembly.getNamespace("NSMain");
+        if (nsmaindecl.declaredNames.has("NSMain::" + opname) && nsmaindecl.operators.get(opname) !== undefined) {
+            const opdecls = nsmaindecl.operators.get(opname) as NamespaceOperatorDecl[];
+            return opdecls.some((opdecl) => (opdecl.isPrefix && opdecl.level === level)) ? "NSMain" : undefined;
+        }
+
         const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
         return fromns !== undefined ? fromns.fromNamespace : undefined;
     }
@@ -192,6 +198,12 @@ class ParserEnvironment {
             return opdecls.some((opdecl) => (opdecl.isInfix && opdecl.level === level)) ? this.m_currentNamespace as string : undefined;
         }
 
+        const nsmaindecl = this.assembly.getNamespace("NSMain");
+        if (nsmaindecl.declaredNames.has("NSMain::" + opname) && nsmaindecl.operators.get(opname) !== undefined) {
+            const opdecls = nsmaindecl.operators.get(opname) as NamespaceOperatorDecl[];
+            return opdecls.some((opdecl) => (opdecl.isPrefix && opdecl.level === level)) ? "NSMain" : undefined;
+        }
+        
         const fromns = nsdecl.usings.find((nsuse) => nsuse.names.indexOf(opname) !== -1);
         return fromns !== undefined ? fromns.fromNamespace : undefined;
     }

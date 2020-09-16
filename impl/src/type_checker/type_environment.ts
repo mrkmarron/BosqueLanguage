@@ -219,6 +219,14 @@ class TypeEnvironment {
         return evar === undefined ? nte : nte.updateVarInfo(evar, (nte.lookupVar(evar) as VarInfo).assign(etype, rvalue));
     }
 
+    setResultExpressionWVarOptNoInfer(etype: ResolvedType, evar: string | undefined, value?: FlowTypeTruthValue): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const rvalue = value || FlowTypeTruthValue.Unknown;
+        const einfo = new ExpressionReturnResult(etype, rvalue, evar);
+        return new TypeEnvironment(this.infeasible, this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.yieldTrgtInfo, this.frozenVars);
+    }
+
     static convertToBoolFlowsOnResult(assembly: Assembly, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
         assert(options.every((opt) => !opt.infeasible));
         assert(options.every((opt) => assembly.subtypeOf(opt.getExpressionResult().exptype, assembly.getSpecialBoolType())));
@@ -290,30 +298,6 @@ class TypeEnvironment {
             }
         }
         return {tenvs: tp, fenvs: fp};
-    }
-
-    static splitTypeOptionFlowsOnResult(assembly: Assembly, options: TypeEnvironment[], ...types: ResolvedType[]): TypeEnvironment[][] {
-        assert(options.every((opt) => !opt.infeasible));
-
-        let envs: TypeEnvironment[][] = [];
-
-        for (let i = 0; i < types.length; ++i) {
-            const oftype = types[i];
-            const nenv: TypeEnvironment[] = [];
-
-            for (let j = 0; j < options.length; ++j) {
-                const opt = options[j];
-                const pccs = assembly.splitTypes(opt.getExpressionResult().exptype, oftype);
-
-                if (!pccs.tp.isEmptyType()) {
-                    nenv.push(opt.setResultExpressionWVarOpt(pccs.tp, opt.getExpressionResult().expvar, opt.getExpressionResult().truthval));
-                }
-            }
-
-            envs.push(nenv);
-        }
-
-        return envs;
     }
 
     setAbort(): TypeEnvironment {

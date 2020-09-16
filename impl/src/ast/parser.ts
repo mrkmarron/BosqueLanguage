@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixOp, BinOpExpression, BinEqExpression, BinCmpExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, PostfixTryAs } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, PostfixTryAs, BinEqExpression, BinCmpExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
@@ -2078,20 +2078,19 @@ class Parser {
     private parsePrefixExpression(): Expression {
         const sinfo = this.getCurrentSrcInfo();
 
-        if (this.testToken("+") || this.testToken("-") || this.testToken("!")) {
+        if (this.testToken("!")) {
             const op = this.consumeTokenAndGetValue();
-            return new PrefixOp(sinfo, op, this.parsePrefixExpression());
+            return new PrefixNotOp(sinfo, op, this.parsePrefixExpression());
         }
-        else if(this.testToken(TokenStrings.Operator)) {
+        else if(this.testToken("+") || this.testToken("-") || this.testToken(TokenStrings.Operator)) {
             const ons = this.m_penv.tryResolveAsPrefixUnaryOperator(this.peekTokenData(), 1);
-            if(ons !== undefined) {
-                const op = this.consumeTokenAndGetValue();
-                const arg = new PositionalArgument(false, false, this.parsePrefixExpression());
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([arg]));
+            if(ons === undefined) {
+                this.raiseError(sinfo.line, "Could not resolve operator");
             }
-            else {
-                return this.parseStatementExpression();
-            }
+
+            const op = this.consumeTokenAndGetValue();
+            const arg = new PositionalArgument(false, false, this.parsePrefixExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([arg]));
         }
         else {
             return this.parseStatementExpression();
@@ -2102,21 +2101,16 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parsePrefixExpression();
 
-        if (this.testToken("*") || this.testToken("/")) {
-            const op = this.consumeTokenAndGetValue();
-            return new BinOpExpression(sinfo, exp, op, this.parseMultiplicativeExpression());
-        }
-        else if(this.testToken(TokenStrings.Operator)) {
+        if(this.testToken("*") || this.testToken("/") || this.testToken(TokenStrings.Operator)) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 2);
-            if(ons !== undefined) {
-                const op = this.consumeTokenAndGetValue();
-                const lhs = new PositionalArgument(false, false, exp);
-                const rhs = new PositionalArgument(false, false, this.parseMultiplicativeExpression());
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
+            if(ons === undefined) {
+                this.raiseError(sinfo.line, "Could not resolve operator");
             }
-            else {
-                return exp;
-            }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(false, false, exp);
+            const rhs = new PositionalArgument(false, false, this.parseMultiplicativeExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
         }
         else {
             return exp;
@@ -2127,21 +2121,16 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseMultiplicativeExpression();
 
-        if (this.testToken("+") || this.testToken("-")) {
-            const op = this.consumeTokenAndGetValue();
-            return new BinOpExpression(sinfo, exp, op, this.parseAdditiveExpression());
-        }
-        else if(this.testToken(TokenStrings.Operator)) {
+        if(this.testToken("+") || this.testToken("-") || this.testToken(TokenStrings.Operator)) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 3);
-            if(ons !== undefined) {
-                const op = this.consumeTokenAndGetValue();
-                const lhs = new PositionalArgument(false, false, exp);
-                const rhs = new PositionalArgument(false, false, this.parseAdditiveExpression());
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
+            if (ons === undefined) {
+                this.raiseError(sinfo.line, "Could not resolve operator");
             }
-            else {
-                return exp;
-            }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(false, false, exp);
+            const rhs = new PositionalArgument(false, false, this.parseAdditiveExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
         }
         else {
             return exp;
@@ -2162,15 +2151,14 @@ class Parser {
         }
         else if(this.testToken(TokenStrings.Operator)) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 4);
-            if(ons !== undefined) {
-                const op = this.consumeTokenAndGetValue();
-                const lhs = new PositionalArgument(false, false, exp);
-                const rhs = new PositionalArgument(false, false, this.parseRelationalExpression());
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
+            if (ons === undefined) {
+                this.raiseError(sinfo.line, "Could not resolve operator");
             }
-            else {
-                return exp;
-            }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(false, false, exp);
+            const rhs = new PositionalArgument(false, false, this.parseRelationalExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), new PragmaArguments("no", []), new Arguments([lhs, rhs]));
         }
         else {
             return exp;

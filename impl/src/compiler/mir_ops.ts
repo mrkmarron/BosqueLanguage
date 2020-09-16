@@ -425,7 +425,7 @@ enum MIROpTag {
     MIRInvokeFixedFunction = "MIRInvokeFixedFunction",
     MIRInvokeVirtualTarget = "MIRInvokeVirtualTarget",
 
-    MIRPrefixOp = "MIRPrefixOp",
+    MIRPrefixNotOp = "MIRPrefixNotOp",
 
     MIRBinOp = "MIRBinOp",
     MIRBinEq = "MIRBinEq",

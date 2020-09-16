@@ -168,10 +168,8 @@ enum ExpressionTag {
 
     PostfixOpExpression = "PostfixOpExpression",
 
-    PrefixOpExpression = "PrefixOpExpression",
-    TailTypeExpression = "TailTypeExpression",
+    PrefixNotOpExpression = "PrefixNotOpExpression",
     
-    BinOpExpression = "BinOpExpression",
     BinCmpExpression = "BinCmpExpression",
     BinEqExpression = "BinEqExpression",
     BinLogicExpression = "BinLogicExpression",
@@ -674,27 +672,14 @@ class PostfixInvoke extends PostfixOperation {
     }
 }
 
-class PrefixOp extends Expression {
+class PrefixNotOp extends Expression {
     readonly op: string; //+, -, !
     readonly exp: Expression;
 
     constructor(sinfo: SourceInfo, op: string, exp: Expression) {
-        super(ExpressionTag.PrefixOpExpression, sinfo);
+        super(ExpressionTag.PrefixNotOpExpression, sinfo);
         this.op = op;
         this.exp = exp;
-    }
-}
-
-class BinOpExpression extends Expression {
-    readonly lhs: Expression;
-    readonly op: string; //+, -, *, /, %
-    readonly rhs: Expression;
-
-    constructor(sinfo: SourceInfo, lhs: Expression, op: string, rhs: Expression) {
-        super(ExpressionTag.BinOpExpression, sinfo);
-        this.lhs = lhs;
-        this.op = op;
-        this.rhs = rhs;
     }
 }
 
@@ -1160,8 +1145,8 @@ export {
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
     PostfixIs, PostfixAs, PostfixHasIndex, PostfixHasProperty, PostfixInvoke, PCodeInvokeExpression,
-    PrefixOp, 
-    BinOpExpression, BinCmpExpression, BinEqExpression, BinLogicExpression,
+    PrefixNotOp, 
+    BinCmpExpression, BinEqExpression, BinLogicExpression,
     MapEntryConstructorExpression,
     NonecheckExpression, CoalesceExpression, SelectExpression, ExpOrExpression,
     BlockStatementExpression, IfExpression, MatchExpression,

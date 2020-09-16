@@ -92,20 +92,6 @@ parsable struct entity Int provides Some, KeyType, PODType, APIType {
     method abs(): Int {
         return this < 0 ? -this : this;
     }
-
-    function max(v1: Int, v2: Int): Int {
-        return v1 > v2 ? v1 : v2;
-    }
-
-    function min(v1: Int, v2: Int): Int {
-        return v1 < v2 ? v1 : v2;
-    }
-
-    function mod(a: Int, b: Int): Int
-        requires release a >= 0 && b > 0;
-    {
-        return Int::s_mod(a, b);
-    }
 }
 inline prefix operator +(a: Int): Int # default_pos
 inline prefix operator -(a: Int): Int # default_neg
@@ -126,16 +112,6 @@ parsable struct entity Nat provides Some, KeyType, PODType, APIType {
 
     function parse(str: String): Result<Nat, String> # nat_tryparse
     function stringify(i: Nat): String # nat_tostring
-
-    function max(v1: Nat, v2: Nat): Nat {
-        return v1 > v2 ? v1 : v2;
-    }
-
-    function min(v1: Nat, v2: Nat): Nat {
-        return v1 < v2 ? v1 : v2;
-    }
-
-    function mod(a: Nat, b: Int): Nat # nat_mod
 }
 inline prefix operator +(a: Nat): Nat # default_pos
 inline infix operator *(a: Nat, b, Nat): Nat # default_mult
@@ -251,44 +227,6 @@ parsable struct entity Float provides Some, PODType, APIType {
 
     method isInfinite(): Bool # float_isinfinity
     method isNan(): Bool # float_isnan
-
-    method abs(): Float {
-        return this < 0 ? -this : this;
-    }
-
-    method ceiling(): Float # float_ceiling
-    method floor(): Float # float_floor
-
-    function pow(x: Float, y: Float): Float # float_pow
-    function pow2(v: Float): Float # float_pow2
-    function pow10(v: Float): Float # float_pow10
-    function exp(v: Float): Float # float_exp
-
-    function root(x: Float, y: Float): Float # float_root
-
-    method square(): Float {
-        return this * this;
-    }
-
-    method sqrt(): Float {
-        return Float::root(this, 2.0f);
-    }
-    
-    function log2(v: Float): Float # float_log2
-    function log10(v: Float): Float # float_log10
-    function log(x: Float, y: Float): Float # float_log
-
-    method sin(): Float # float_sin
-    method cos(): Float # float_cos
-    method tan(): Float # float_tan
-
-    function min(v1: Float, v2: Float): Float {
-        return v1 < v2 ? v1 : v2;
-    }
-
-    function max(v1: Float, v2: Float): Float {
-        return v1 > v2 ? v1 : v2;
-    }
 }
 inline prefix operator +(a: Float): Float # default_pos
 inline prefix operator -(a: Float): Float # default_neg
@@ -312,18 +250,6 @@ parsable struct entity Decimal provides Some, PODType, APIType {
 
     method abs(): Decimal {
         return this < 0 ? -this : this;
-    }
-
-    method ceiling(): Decimal # decimal_ceiling
-    method floor(): Decimal # decimal_floor
-    method round(x?: Nat): Decimal # decimal_round
-
-    function min(v1: Decimal, v2: Decimal): Decimal {
-        return v1 < v2 ? v1 : v2;
-    }
-
-    function max(v1: Decimal, v2: Decimal): Decimal {
-        return v1 > v2 ? v1 : v2;
     }
 }
 inline prefix operator +(a: Decimal): Decimal # default_pos
@@ -404,6 +330,8 @@ inline infix operator >=(a: Rational, b: Rational): Bool # default_gteq
 //<summary>Primitive safe string value.</summary>
 entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
     private function s_unsafe_from(str: String): SafeString<T> # stringof_unsafe_from
+
+    method string(): String # datastring_string
 
     function from(str: String): StringOf<T>
         requires release T::accepts(str);

@@ -305,14 +305,13 @@ class ResolvedType {
     }
 
     tryGetInferrableTupleConstructorType(isvalue: boolean): ResolvedTupleAtomType | undefined {
-        const tcopts = this.options.filter((opt) => opt instanceof ResolvedTupleAtomType);
+        const tcopts = this.options.filter((opt) => opt instanceof ResolvedTupleAtomType && opt.isvalue === isvalue);
 
         if (tcopts.length !== 1) {
             return undefined;
         }
 
-        const tt = tcopts[0] as ResolvedTupleAtomType;
-        return (tt.isvalue === isvalue) ? tt : undefined;
+        return tcopts[0] as ResolvedTupleAtomType;
     }
 
     isRecordTargetType(): boolean {
@@ -348,14 +347,13 @@ class ResolvedType {
     }
 
     tryGetInferrableRecordConstructorType(isvalue: boolean): ResolvedRecordAtomType | undefined {
-        const rcopts = this.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
+        const rcopts = this.options.filter((opt) => opt instanceof ResolvedRecordAtomType && opt.isvalue === isvalue);
 
         if (rcopts.length !== 1) {
             return undefined;
         }
 
-        const tr = rcopts[0] as ResolvedRecordAtomType;
-        return (tr.isvalue === isvalue) ? tr : undefined;
+        return rcopts[0] as ResolvedRecordAtomType;
     }
 
     isUniqueCallTargetType(): boolean {
