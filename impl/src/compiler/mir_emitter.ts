@@ -24,11 +24,6 @@ type PCode = {
     ftype: ResolvedFunctionType
 };
 
-enum ResultCheckCategory {
-    NoneChk,
-    ErrChk
-}
-
 class MIRKeyGenerator {
     static computeBindsKeyInfo(binds: Map<string, ResolvedType>): string {
         if (binds.size === 0) {
@@ -94,9 +89,13 @@ class MIREmitter {
     private emitEnabled: boolean;
     
     private m_blockMap: Map<string, MIRBasicBlock> = new Map<string, MIRBasicBlock>();
+    private m_currentBlockName = "UNDEFINED";
     private m_currentBlock: MIROp[] = [];
 
     private m_tmpIDCtr = 0;
+
+    private yieldPatchInfo: [string, MIRTempRegister, ResolvedType][][] = [];
+    private returnPatchInfo: [string, MIRTempRegister, ResolvedType][] = [];
 
     private constructor(assembly: Assembly, masm: MIRAssembly, emitEnabled: boolean) {
         this.assembly = assembly;
@@ -121,7 +120,11 @@ class MIREmitter {
         this.m_blockMap.set("returnassign", new MIRBasicBlock("returnassign", []));
         this.m_blockMap.set("exit", new MIRBasicBlock("exit", []));
 
+        this.m_currentBlockName = "entry";
         this.m_currentBlock = (this.m_blockMap.get("entry") as MIRBasicBlock).ops;
+
+        this.yieldPatchInfo = [];
+        this.returnPatchInfo = [];
     }
 
     generateTmpRegister(): MIRTempRegister {
@@ -147,11 +150,16 @@ class MIREmitter {
         return name;
     }
 
+    getActiveBlockName(): string {
+        return this.m_currentBlockName;
+    }
+
     setActiveBlock(name: string) {
         if(!this.emitEnabled) {
             return;
         }
 
+        this.m_currentBlockName = name;
         this.m_currentBlock = (this.m_blockMap.get(name) as MIRBasicBlock).ops;
     }
 
@@ -203,7 +211,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, chk: ResultCheckCategory, trgt: MIRTempRegister) {
+    emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
@@ -711,8 +719,37 @@ class MIREmitter {
     }
 
     emitReturnAssign(sinfo: SourceInfo, src: MIRArgument) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
         this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
     }
+
+    processEnterYield() {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.yieldPatchInfo.push([]);
+    }
+
+    getActiveYieldSet(): [string, MIRTempRegister, ResolvedType][] {
+        return this.emitEnabled ? this.yieldPatchInfo[this.yieldPatchInfo.length - 1] : [];
+    }
+
+    processExitYield() {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.yieldPatchInfo.pop();
+    }
+
+    getActiveReturnSet(): [string, MIRTempRegister, ResolvedType][] {
+        return this.emitEnabled ? this.returnPatchInfo : [];
+    }
+
 
     localLifetimeStart(sinfo: SourceInfo, name: string, vtype: MIRType) {
         if(!this.emitEnabled) {
@@ -721,7 +758,6 @@ class MIREmitter {
 
         this.m_currentBlock.push(new MIRVarLifetimeStart(sinfo, name, vtype.trkey));
     }
-
 
     localLifetimeEnd(sinfo: SourceInfo, name: string) {
         if(!this.emitEnabled) {
@@ -1243,4 +1279,4 @@ class MIREmitter {
     }
 }
 
-export { PCode, ResultCheckCategory, MIRKeyGenerator, MIRBodyEmitter, MIREmitter };
+export { PCode, MIRKeyGenerator, MIREmitter };

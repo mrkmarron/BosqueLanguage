@@ -394,6 +394,42 @@ class ResolvedType {
         return this.idStr === otype.idStr;
     }
 
+    isResultConceptType(): boolean {
+        if(this.options.length !== 1 || !(this.options[0] instanceof ResolvedConceptAtomType)) {
+            return false;
+        }
+
+        const ccpt = this.options[0] as ResolvedConceptAtomType;
+        return ccpt.conceptTypes.length === 1 && ccpt.conceptTypes[0].concept.specialDecls.has(SpecialTypeCategory.ResultDecl);
+    }
+
+    isResultEntityType(): boolean {
+        if(this.options.length !== 1 || !(this.options[0] instanceof ResolvedConceptAtomType)) {
+            return false;
+        }
+
+        const ccpt = this.options[0] as ResolvedConceptAtomType;
+        return ccpt.conceptTypes.every((cpt) => cpt.concept.specialDecls.has(SpecialTypeCategory.ResultOkDecl) || cpt.concept.specialDecls.has(SpecialTypeCategory.ResultErrDecl));
+    }
+
+    isResultGeneralType(): boolean {
+        return this.isResultConceptType() || this.isResultEntityType();
+    }
+
+    isNotResultGeneralType(): boolean {
+        return this.options.every((opt) => {
+            if(opt instanceof ResolvedConceptAtomType) {
+                return opt.conceptTypes.every((cpt) => !cpt.concept.specialDecls.has(SpecialTypeCategory.ResultDecl));
+            }
+            else if(opt instanceof ResolvedEntityAtomType) {
+                return !opt.object.specialDecls.has(SpecialTypeCategory.ResultOkDecl) && !opt.object.specialDecls.has(SpecialTypeCategory.ResultErrDecl);
+            }
+            else {
+                return true;
+            }
+        });
+    }
+
     isGroundedType(): boolean {
         return this.options.every((opt) => {
             if(opt instanceof ResolvedConceptAtomType) {
