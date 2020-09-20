@@ -136,7 +136,6 @@ enum ExpressionTag {
     LiteralNaturalExpression = "LiteralNaturalExpression",
     LiteralFloatExpression = "LiteralFloatExpression",
     LiteralDecimalExpression = "LiteralDecimalExpression",
-    LiteralQuadFloatExpression = "LiteralQuadFloatExpression",
     LiteralBigIntegerExpression = "LiteralBigIntegerExpression",
     LiteralBigNaturalExpression = "LiteralBigNaturalExpression",
     LiteralRationalExpression = "LiteralRationalExpression",
@@ -145,9 +144,7 @@ enum ExpressionTag {
     LiteralParamerterValueExpression = "LiteralParamerterValueExpression",
     LiteralTypedStringExpression = "LiteralTypedStringExpression",
 
-    LiteralTypedIntConstructorExpression = "LiteralTypedIntConstructorExpression",
-    LiteralTypedBigIntConstructorExpression = "LiteralTypedBigIntConstructorExpression",
-    LiteralTypedFloatConstructorExpression = "LiteralTypedFloatConstructorExpression",
+    LiteralTypedNumericConstructorExpression = "LiteralTypedNumericConstructorExpression",
     LiteralTypedStringConstructorExpression = "LiteralTypedStringConstructorExpression",
 
     AccessNamespaceConstantExpression = "AccessNamespaceConstantExpression",
@@ -324,14 +321,12 @@ class LiteralTypedNumericConstructorExpression extends Expression {
     readonly value: string;
     readonly ntype: TypeSignature;
     readonly vtype: TypeSignature;
-    readonly isvalue: boolean;
 
-    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, ntype: TypeSignature, vtype: TypeSignature) {
-        super(ExpressionTag.LiteralTypedIntConstructorExpression, sinfo);
+    constructor(sinfo: SourceInfo, value: string, ntype: TypeSignature, vtype: TypeSignature) {
+        super(ExpressionTag.LiteralTypedNumericConstructorExpression, sinfo);
         this.value = value;
         this.ntype = ntype;
         this.vtype = vtype;
-        this.isvalue = isvalue;
     }
 }
 

@@ -1018,7 +1018,7 @@ class Assembly {
             return ResolvedType.createEmpty();
         }
 
-        if (typeof (l.typevalue) === "boolean" || typeof (l.typevalue) === "number") {
+        if (typeof (l.typevalue) === "boolean") {
             return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, l.typevalue));
         }
         else {

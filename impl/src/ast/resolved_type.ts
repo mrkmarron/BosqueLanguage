@@ -55,24 +55,16 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
 
 class ResolvedLiteralAtomType extends ResolvedAtomType {
     readonly oftype: ResolvedType;
-    readonly typevalue: boolean | number | string;
+    readonly typevalue: boolean | string;
 
-    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | number | string) {
+    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | string) {
         super(rstr);
         this.oftype = oftype;
         this.typevalue = ofvalue;
     }
 
-    static create(oftype: ResolvedType, ofvalue: boolean | number | string): ResolvedLiteralAtomType {
-        let rstr = "";
-        if(typeof(ofvalue) === "boolean" || typeof(ofvalue) === "number") {
-            rstr = `${ofvalue}`;
-        }
-        else {
-            rstr = `${oftype.idStr}::${ofvalue}`;
-        }
-        
-        return new ResolvedLiteralAtomType(rstr, oftype, ofvalue);
+    static create(oftype: ResolvedType, ofvalue: boolean | string): ResolvedLiteralAtomType {
+        return new ResolvedLiteralAtomType(`${oftype.idStr}::${ofvalue}`, oftype, ofvalue);
     }
 
     hasTemplateType(): boolean {

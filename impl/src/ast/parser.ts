@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, PostfixTryAs, BinEqExpression, BinCmpExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralDecimalExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
@@ -1158,7 +1158,11 @@ class Parser {
         }
         else if (this.testToken(TokenStrings.Int)) {
             ttype = this.m_penv.SpecialIntSignature;
-            vv = Number.parseInt(this.consumeTokenAndGetValue());
+            vv = this.consumeTokenAndGetValue();
+        }
+        else if (this.testToken(TokenStrings.Int)) {
+            ttype = this.m_penv.SpecialNatSignature;
+            vv = this.consumeTokenAndGetValue();
         }
         else {
             ttype = this.parseTypeSignature(false);
@@ -1548,17 +1552,15 @@ class Parser {
         }
     }
 
-    private tryParseFollowConsType(): [boolean, boolean, TypeSignature] {
+    private tryParseFollowConsType(): [boolean, TypeSignature] {
         if(!this.testToken("#") && !this.testToken("@")) {
-            return [false, false, this.m_penv.SpecialNoneSignature]; 
+            return [true, this.m_penv.SpecialNoneSignature]; 
         }
         else {
-            const isvalue = this.testToken("#");
-            this.consumeToken();
-
+            this.ensureAndConsumeToken("#");
             const ttype = this.parseFollowType();
 
-            return [true, isvalue, ttype];
+            return [false, ttype];
         }
     }
 
@@ -1577,45 +1579,45 @@ class Parser {
         }
         else if (tk === TokenStrings.Int) {
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialIntSignature, ttype);
+            return islit ? new LiteralIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialIntSignature, ttype);
         }
         else if (tk === TokenStrings.Nat) {
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialNatSignature, ttype);
+            return islit ? new LiteralNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialNatSignature, ttype);
         }
         else if (tk === TokenStrings.Float) {
             const fstr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralFloatExpression(sinfo, fstr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, fstr, this.m_penv.SpecialFloatSignature, ttype);
+            return islit ? new LiteralFloatExpression(sinfo, fstr) : new LiteralTypedNumericConstructorExpression(sinfo, fstr, this.m_penv.SpecialFloatSignature, ttype);
         }
         else if (tk === TokenStrings.Decimal) {
             const fstr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralDecimalExpression(sinfo, fstr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, fstr, this.m_penv.SpecialDecimalSignature, ttype);
+            return islit ? new LiteralDecimalExpression(sinfo, fstr) : new LiteralTypedNumericConstructorExpression(sinfo, fstr, this.m_penv.SpecialDecimalSignature, ttype);
         }
         else if (tk === TokenStrings.BigInt) {
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralBigIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialBigIntSignature, ttype);
+            return islit ? new LiteralBigIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialBigIntSignature, ttype);
         }
         else if (tk === TokenStrings.BigNat) {
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralBigNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialBigNatSignature, ttype);
+            return islit ? new LiteralBigNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialBigNatSignature, ttype);
         }
         else if (tk === TokenStrings.Rational) {
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return islit ? new LiteralRationalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialRationalSignature, ttype);
+            return islit ? new LiteralRationalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialRationalSignature, ttype);
         }
         else if (tk === TokenStrings.String) {
             const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
@@ -2440,9 +2442,9 @@ class Parser {
                 this.consumeToken();
             }
             const istr = (isneg ? "-" : "") + this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return new ConstValueStructuredAssignment(islit ? new LiteralIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialIntSignature, ttype));
+            return new ConstValueStructuredAssignment(islit ? new LiteralIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialIntSignature, ttype));
         }
         else if (this.testToken(TokenStrings.Nat) || this.testFollows("+", TokenStrings.Nat)) {
             if(!literalok) {
@@ -2451,9 +2453,9 @@ class Parser {
 
             this.testAndConsumeTokenIf("+");
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return new ConstValueStructuredAssignment(islit ? new LiteralNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialNatSignature, ttype));
+            return new ConstValueStructuredAssignment(islit ? new LiteralNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialNatSignature, ttype));
         }
         else if (this.testToken(TokenStrings.BigInt) || this.testFollows("+", TokenStrings.BigInt) || this.testFollows("-", TokenStrings.BigInt)) {
             if(!literalok) {
@@ -2465,9 +2467,9 @@ class Parser {
                 this.consumeToken();
             }
             const istr = (isneg ? "-" : "") + this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return new ConstValueStructuredAssignment(islit ? new LiteralBigIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialBigIntSignature, ttype));
+            return new ConstValueStructuredAssignment(islit ? new LiteralBigIntegerExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialBigIntSignature, ttype));
         }
         else if (this.testToken(TokenStrings.BigNat) || this.testFollows("+", TokenStrings.BigNat)) {
             if(!literalok) {
@@ -2476,9 +2478,9 @@ class Parser {
 
             this.testAndConsumeTokenIf("+");
             const istr = this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return new ConstValueStructuredAssignment(islit ? new LiteralBigNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialBigNatSignature, ttype));
+            return new ConstValueStructuredAssignment(islit ? new LiteralBigNaturalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialBigNatSignature, ttype));
         }
         else if (this.testToken(TokenStrings.Rational) || this.testFollows("+", TokenStrings.Rational) || this.testFollows("-", TokenStrings.Rational)) {
             if(!literalok) {
@@ -2490,9 +2492,9 @@ class Parser {
                 this.consumeToken();
             }
             const istr = (isneg ? "-" : "") + this.consumeTokenAndGetValue();
-            const [islit, isvalue, ttype] = this.tryParseFollowConsType();
+            const [islit, ttype] = this.tryParseFollowConsType();
 
-            return new ConstValueStructuredAssignment(islit ? new LiteralRationalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, isvalue, istr, this.m_penv.SpecialRationalSignature, ttype));
+            return new ConstValueStructuredAssignment(islit ? new LiteralRationalExpression(sinfo, istr) : new LiteralTypedNumericConstructorExpression(sinfo, istr, this.m_penv.SpecialRationalSignature, ttype));
         }
         else if (this.testToken(TokenStrings.String)) {
             if(!literalok) {
@@ -3906,7 +3908,6 @@ class Parser {
         const value = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "value", valuedecl);
 
         let provides = [[new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]] as [TypeSignature, TypeConditionRestriction | undefined][];
-        provides.push([new NominalTypeSignature("NSCore", ["APIType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["APIType"]), undefined)])]);
 
         const invariants: InvariantDecl[] = [];
         const staticMembers = new Map<string, StaticMemberDecl>();

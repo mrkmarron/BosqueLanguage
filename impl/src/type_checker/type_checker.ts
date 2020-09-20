@@ -3,13 +3,13 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry } from "../ast/resolved_type";
+import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry, ResolvedLiteralAtomType, ResolvedAtomType } from "../ast/resolved_type";
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
 import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, InvokeArgument, BinCmpExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, InvokeArgument, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRVariableArgument, MIRLocalVariable, MIRRegisterArgument } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRVariableArgument, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
 import * as assert from "assert";
@@ -2011,6 +2011,39 @@ class TypeChecker {
         return [env.setResultExpression(restype)];
     }
 
+    private checkLiteralParameterValeExpression(env: TypeEnvironment, exp: LiteralParamerterValueExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const vv = (env.terms.get(exp.ltype.name) as ResolvedType).options[0] as ResolvedLiteralAtomType;
+
+        const [restype, iipack] = this.genInferInfo(exp.sinfo, vv.oftype, infertype, trgt);
+
+        if(typeof(vv.typevalue) === "boolean") {
+            this.m_emitter.emitLoadConstBool(exp.sinfo, vv.typevalue, iipack[0]);
+        }
+        else {
+            if(!/^([_\p{L}])/.test(vv.typevalue)) {
+                if(!vv.typevalue.endsWith("n")) {
+                    this.m_emitter.emitLoadConstInt(exp.sinfo, vv.typevalue, iipack[0]);
+                }
+                else {
+                    this.m_emitter.emitLoadConstNat(exp.sinfo, vv.typevalue, iipack[0]);
+                }
+            }
+            else {
+                const cdecltry = this.m_assembly.tryGetConstMemberUniqueDeclFromType(vv.oftype, vv.typevalue);
+                this.raiseErrorIf(exp.sinfo, cdecltry === undefined, `Enum value not defined (or not uniquely defined) for type '${vv.oftype.idStr}'`);
+
+                const cdecl = cdecltry as OOMemberLookupInfo<StaticMemberDecl>;
+                const rtype = this.resolveAndEnsureTypeOnly(exp.sinfo, cdecl.decl.declaredType, cdecl.binds);
+
+                const skey = this.m_emitter.registerPendingConstProcessing(cdecl.contiainingType, cdecl.decl, cdecl.binds);
+                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [], undefined, this.m_emitter.registerResolvedTypeReference(rtype), iipack[0]);
+            }
+        }
+
+        this.emitConvertIfNeeded(exp.sinfo, vv.oftype, infertype, iipack);
+        return [env.setResultExpression(restype)];
+    }
+
     private checkStringOfCommon(sinfo: SourceInfo, env: TypeEnvironment, ttype: TypeSignature): { oftype: [OOPTypeDecl, Map<string, ResolvedType>], ofresolved: ResolvedType, stringtype: ResolvedType } {
         const oftype = this.resolveAndEnsureTypeOnly(sinfo, ttype, env.terms);
         this.raiseErrorIf(sinfo, !oftype.isUniqueCallTargetType() || !oftype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.ValidatorTypeDecl), "Validator type must be a unique type");
@@ -2131,6 +2164,57 @@ class TypeChecker {
         const [restype, iipack] = this.genInferInfo(exp.sinfo, aoftype.stringtype, infertype, trgt);
         this.m_emitter.emitExtractResult(exp.sinfo, convt, rok, iipack[0]);
         this.emitConvertIfNeeded(exp.sinfo, this.getResultBinds(aoftype.parsetype).T, infertype, iipack);
+
+        return [env.setResultExpression(restype)];
+    }
+
+    private checkTypedTypedNumericConstructor(env: TypeEnvironment, exp: LiteralTypedNumericConstructorExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        const tntt = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.vtype, env.terms);
+        const oftype = (tntt.options[0] as ResolvedEntityAtomType).object;
+        const ofbinds = (tntt.options[0] as ResolvedEntityAtomType).binds;
+
+        const validatef = oftype.staticFunctions.get("validate");
+        const consf = oftype.staticFunctions.get("create");
+        this.raiseErrorIf(exp.sinfo, consf === undefined, "Missing static function 'create'");
+
+        let nval: MIRArgument = new MIRConstantNone();
+        const ntype = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.ntype, new Map<string, ResolvedType>());
+        if(ntype.isSameType(this.m_assembly.getSpecialIntType())) {
+            nval = new MIRConstantInt(exp.value);
+        }
+        else if(ntype.isSameType(this.m_assembly.getSpecialNatType())) {
+            nval = new MIRConstantNat(exp.value);
+        }
+        else if(ntype.isSameType(this.m_assembly.getSpecialBigIntType())) {
+            nval = new MIRConstantBigInt(exp.value);
+        }
+        else if(ntype.isSameType(this.m_assembly.getSpecialBigNatType())) {
+            nval = new MIRConstantBigNat(exp.value);
+        }
+        else if(ntype.isSameType(this.m_assembly.getSpecialRationalType())) {
+            nval = new MIRConstantRational(exp.value);
+        }
+        else if(ntype.isSameType(this.m_assembly.getSpecialFloatType())) {
+            nval = new MIRConstantFloat(exp.value);
+        }
+        else {
+            nval = new MIRConstantDecmial(exp.value);
+        }
+
+        if(validatef !== undefined) {
+            const skey = this.m_emitter.registerStaticCall(oftype, ofbinds, validatef, "validate", new Map<string, ResolvedType>(), [], []);
+
+            const tmps = this.m_emitter.generateTmpRegister();
+            this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), tmps);
+            this.m_emitter.emitAssertCheck(exp.sinfo, "Number does not satisfy requirements for type", tmps);    
+        }
+
+        const [restype, iipack] = this.genInferInfo(exp.sinfo, tntt, infertype, trgt);
+
+        const skey = this.m_emitter.registerStaticCall(oftype, ofbinds, consf as StaticFunctionDecl, "create", new Map<string, ResolvedType>(), [], []);
+        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(tntt), iipack[0]);
+
+        this.emitConvertIfNeeded(exp.sinfo, tntt, infertype, iipack);
 
         return [env.setResultExpression(restype)];
     }
@@ -3161,8 +3245,8 @@ class TypeChecker {
 
             const renvs = TypeEnvironment.convertToHasIndexNotHasIndexFlowsOnResult(this.m_assembly, op.idx, [env]);
             return [
-                ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, FlowTypeTruthValue.True))),
-                ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, FlowTypeTruthValue.False))),
+                ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.True))),
+                ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.False))),
             ];
         }
     }
@@ -3192,8 +3276,8 @@ class TypeChecker {
 
             const renvs = TypeEnvironment.convertToHasIndexNotHasPropertyFlowsOnResult(this.m_assembly, op.pname, [env]);
             return [
-                ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.True))),
-                ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.False))),
+                ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.True))),
+                ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.False))),
             ];
         }
     }
@@ -4013,7 +4097,9 @@ class TypeChecker {
             results.push(aenv);
             rblocks.push([this.m_emitter.getActiveBlockName(), ttreg, aenv.getExpressionResult().exptype]);
         }
-        
+
+        this.raiseErrorIf(exp.sinfo, results.some((eev) => eev.hasNormalFlow()), "No feasible path in this conditional expression");
+
         const etype = this.m_assembly.typeUpperBound(results.map((eev) => eev.getExpressionResult().exptype));
         const [restype, iipack] = this.genInferInfo(exp.sinfo, etype, infertype, trgt);
 
@@ -4030,7 +4116,7 @@ class TypeChecker {
 
         this.m_emitter.setActiveBlock(doneblck);
         
-        return results.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, eev.getExpressionResult().truthval));
+        return results.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, eev.getExpressionResult().truthval));
     }
 
     private checkMatchExpression(env: TypeEnvironment, exp: MatchExpression, refok: boolean, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
@@ -4038,50 +4124,81 @@ class TypeChecker {
         const venv = this.checkExpression(env, exp.sval, vreg, undefined, { refok: refok, orok: false });
 
         const doneblck = this.m_emitter.createNewBlock("Lswitchexp_done");
+        const matchvar = `@match@${exp.sinfo.pos}`;
+        let cenv = venv.pushLocalScope().addVar(matchvar, true, venv.getExpressionResult().exptype, true, venv.getExpressionResult().exptype, venv.getExpressionResult().truthval);
 
-        let cenv = venv;
-        let vtype = venv.getExpressionResult().exptype;
+        let hasfalseflow = true;
         let results: TypeEnvironment[] = [];
-        for (let i = 0; i < exp.flow.length; ++i) {
-            const nextlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchexp_${i}next`);
-            const actionlabel = this.m_emitter.bodyEmitter.createNewBlock(`Lswitchexp_${i}action`);
+        let rblocks: [string, MIRTempRegister, ResolvedType][] = [];
+        for (let i = 0; i < exp.flow.length && !hasfalseflow; ++i) {
+            const nextlabel = this.m_emitter.createNewBlock(`Lswitchexp_${i}next`);
+            const actionlabel = this.m_emitter.createNewBlock(`Lswitchexp_${i}action`);
 
-            const test = this.checkMatchGuard(exp.sinfo, i, vreg, vtype, cenv, exp.flow[i].check, nextlabel, actionlabel, svname, i === exp.flow.length - 1);
+            const test = this.checkMatchGuard(exp.sinfo, i, cenv, matchvar, exp.flow[i].check, nextlabel, actionlabel);
 
-            vtype = test.nexttype;
-            const [trueflow, falseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, test.envinfo);
-            this.raiseErrorIf(exp.sinfo, trueflow.length === 0 || (falseflow.length === 0 && i !== exp.flow.length - 1) , "Expression is always true/false expression test is redundant");
+            if(test.tenvs.length === 0) {
+                this.m_emitter.setActiveBlock(actionlabel);
+                this.m_emitter.emitDeadBlock(exp.sinfo);
 
-            if (this.m_emitEnabled) {
-                this.m_emitter.bodyEmitter.setActiveBlock(actionlabel);
+                this.m_emitter.setActiveBlock(nextlabel);
+                cenv = TypeEnvironment.join(this.m_assembly, ...test.fenvs);
             }
+            else if(test.fenvs.length === 0) {
+                //go though action block and skip rest of generation
+                this.m_emitter.setActiveBlock(actionlabel);
 
-            const truestate = this.checkExpression(TypeEnvironment.join(this.m_assembly, ...trueflow), exp.flow[i].action, trgt);
-            if (this.m_emitEnabled) {
-                if (truestate.hasNormalFlow()) {
-                    this.m_emitter.bodyEmitter.emitDirectJump(exp.sinfo, doneblck);
-                }
+                const ttreg = this.m_emitter.generateTmpRegister();
+                const truestate = this.checkExpression(TypeEnvironment.join(this.m_assembly, ...test.tenvs), exp.flow[i].action, ttreg, infertype);
 
-                this.m_emitter.bodyEmitter.setActiveBlock(nextlabel);
+                results.push(truestate);
+                rblocks.push([this.m_emitter.getActiveBlockName(), ttreg, truestate.getExpressionResult().exptype]);
+
+                this.m_emitter.setActiveBlock(nextlabel);
+                this.m_emitter.emitDeadBlock(exp.sinfo);
+
+                hasfalseflow = false;
             }
+            else {
+                this.m_emitter.setActiveBlock(actionlabel);
 
-            results.push(truestate);
-            cenv = falseflow.length !== 0 ? TypeEnvironment.join(this.m_assembly, ...falseflow) : cenv;
+                const ttreg = this.m_emitter.generateTmpRegister();
+                const truestate = this.checkExpression(TypeEnvironment.join(this.m_assembly, ...test.tenvs), exp.flow[i].action, ttreg, infertype);
+
+                results.push(truestate);
+                rblocks.push([this.m_emitter.getActiveBlockName(), ttreg, truestate.getExpressionResult().exptype]);
+
+                this.m_emitter.setActiveBlock(nextlabel);
+                cenv = TypeEnvironment.join(this.m_assembly, ...test.fenvs);
+            }
         }
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitAbort(exp.sinfo, "exhaustive");
+        if (hasfalseflow) {
+            this.m_emitter.emitAbort(exp.sinfo, "exhaustive");
         }
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.setActiveBlock(doneblck);
+        this.raiseErrorIf(exp.sinfo, results.some((eev) => eev.hasNormalFlow()), "No feasible path in this conditional expression");
+
+        const etype = this.m_assembly.typeUpperBound(results.map((eev) => eev.getExpressionResult().exptype));
+        const [restype, iipack] = this.genInferInfo(exp.sinfo, etype, infertype, trgt);
+
+        for (let i = 0; i < rblocks.length; ++i) {
+            const rcb = rblocks[i];
+            this.m_emitter.setActiveBlock(rcb[0]);
+
+            const convreg = this.emitInlineConvertIfNeeded(exp.sinfo, rcb[1], rcb[2], etype);
+            this.m_emitter.emitTempRegisterAssign(exp.sinfo, convreg, iipack[0]);
+            this.emitConvertIfNeeded(exp.sinfo, etype, infertype, iipack);
+
+            this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
         }
 
-        return results;
+        this.m_emitter.setActiveBlock(doneblck);
+        
+        return results.map((eev) => eev.popLocalScope().setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, eev.getExpressionResult().truthval));
     }
 
     private checkExpression(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, infertype: ResolvedType | undefined, extraok?: { refok: boolean, orok: boolean }): TypeEnvironment {
-        const res = this.checkExpressionMultiFlow(env, exp, trgt, extraok);
+        const res = this.checkExpressionMultiFlow(env, exp, trgt, infertype, extraok);
         this.raiseErrorIf(exp.sinfo, res.length === 0, "No feasible flow for expression");
 
         return TypeEnvironment.join(this.m_assembly, ...res);
@@ -4089,56 +4206,82 @@ class TypeChecker {
 
     private checkExpressionMultiFlow(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, infertype: ResolvedType | undefined, extraok?: { refok: boolean, orok: boolean }): TypeEnvironment[] {
         switch (exp.tag) {
+/*
+    BinCmpExpression = "BinCmpExpression",
+    BinEqExpression = "BinEqExpression",
+    BinLogicExpression = "BinLogicExpression",
+
+    MapEntryConstructorExpression = "MapEntryConstructorExpression",
+
+    NonecheckExpression = "NonecheckExpression",
+    CoalesceExpression = "CoalesceExpression",
+    SelectExpression = "SelectExpression",
+
+    ExpOrExpression = "ExpOrExpression",
+
+    BlockStatementExpression = "BlockStatementExpression",
+    IfExpression = "IfExpression",
+    MatchExpression = "MatchExpression",
+*/
             case ExpressionTag.LiteralNoneExpression:
-                return this.checkLiteralNoneExpression(env, exp as LiteralNoneExpression, trgt);
+                return this.checkLiteralNoneExpression(env, exp as LiteralNoneExpression, trgt, infertype);
             case ExpressionTag.LiteralBoolExpression:
-                return this.checkLiteralBoolExpression(env, exp as LiteralBoolExpression, trgt);
+                return this.checkLiteralBoolExpression(env, exp as LiteralBoolExpression, trgt, infertype);
             case ExpressionTag.LiteralIntegerExpression:
-                return this.checkLiteralIntegerExpression(env, exp as LiteralIntegerExpression, trgt);
-            case ExpressionTag.LiteralBigIntegerExpression:
-                return this.checkLiteralBigIntegerExpression(env, exp as LiteralBigIntegerExpression, trgt);
+                return this.checkLiteralIntegerExpression(env, exp as LiteralIntegerExpression, trgt, infertype);
+            case ExpressionTag.LiteralNaturalExpression:
+                return this.checkLiteralNatExpression(env, exp as LiteralNaturalExpression, trgt, infertype);
             case ExpressionTag.LiteralFloatExpression:
-                return this.checkLiteralFloat64Expression(env, exp as LiteralFloatExpression, trgt);
-            case ExpressionTag.LiteralRegexExpression:
-                return this.checkLiteralRegexExpression(env, exp as LiteralRegexExpression, trgt);
+                return this.checkLiteralFloatExpression(env, exp as LiteralFloatExpression, trgt, infertype);
+            case ExpressionTag.LiteralDecimalExpression:
+                return this.checkLiteralDecimalExpression(env, exp as LiteralDecimalExpression, trgt, infertype);
+            case ExpressionTag.LiteralBigIntegerExpression:
+                return this.checkLiteralBigIntExpression(env, exp as LiteralBigIntegerExpression, trgt, infertype);
+            case ExpressionTag.LiteralBigNaturalExpression:
+                return this.checkLiteralBigNatExpression(env, exp as LiteralBigNaturalExpression, trgt, infertype);
+            case ExpressionTag.LiteralRationalExpression:
+                return this.checkLiteralRationalExpression(env, exp as LiteralRationalExpression, trgt, infertype);
             case ExpressionTag.LiteralStringExpression:
-                return this.checkLiteralStringExpression(env, exp as LiteralStringExpression, trgt);
+                return this.checkLiteralStringExpression(env, exp as LiteralStringExpression, trgt, infertype);
+            case ExpressionTag.LiteralRegexExpression:
+                return this.checkLiteralRegexExpression(env, exp as LiteralRegexExpression, trgt, infertype);
+            case ExpressionTag.LiteralParamerterValueExpression:
+                return this.checkLiteralParameterValeExpression(env, exp as LiteralParamerterValueExpression, trgt, infertype);
             case ExpressionTag.LiteralTypedStringExpression:
-                return this.checkCreateTypedString(env, exp as LiteralTypedStringExpression, trgt);
+                return this.checkCreateTypedString(env, exp as LiteralTypedStringExpression, trgt, infertype);
+            case ExpressionTag.LiteralTypedNumericConstructorExpression:
+                return this.checkTypedTypedNumericConstructor(env, exp as LiteralTypedNumericConstructorExpression, trgt, infertype);
             case ExpressionTag.LiteralTypedStringConstructorExpression:
-                return this.checkTypedStringConstructor(env, exp as LiteralTypedStringConstructorExpression, trgt);
+                return this.checkDataStringConstructor(env, exp as LiteralTypedStringConstructorExpression, trgt, infertype);
             case ExpressionTag.AccessNamespaceConstantExpression:
-                return this.checkAccessNamespaceConstant(env, exp as AccessNamespaceConstantExpression, trgt);
+                return this.checkAccessNamespaceConstant(env, exp as AccessNamespaceConstantExpression, trgt, infertype);
             case ExpressionTag.AccessStaticFieldExpression:
-                return this.checkAccessStaticField(env, exp as AccessStaticFieldExpression, trgt);
+                return this.checkAccessStaticField(env, exp as AccessStaticFieldExpression, trgt, infertype);
             case ExpressionTag.AccessVariableExpression:
-                return this.checkAccessVariable(env, exp as AccessVariableExpression, trgt);
+                return this.checkAccessVariable(env, exp as AccessVariableExpression, trgt, infertype);
             case ExpressionTag.ConstructorPrimaryExpression:
-                return this.checkConstructorPrimary(env, exp as ConstructorPrimaryExpression, trgt);
+                return this.checkConstructorPrimary(env, exp as ConstructorPrimaryExpression, trgt, infertype);
             case ExpressionTag.ConstructorPrimaryWithFactoryExpression:
-                return this.checkConstructorPrimaryWithFactory(env, exp as ConstructorPrimaryWithFactoryExpression, trgt);
+                return this.checkConstructorPrimaryWithFactory(env, exp as ConstructorPrimaryWithFactoryExpression, trgt, infertype);
             case ExpressionTag.ConstructorTupleExpression:
-                return this.checkTupleConstructor(env, exp as ConstructorTupleExpression, trgt);
+                return this.checkTupleConstructor(env, exp as ConstructorTupleExpression, trgt, infertype);
             case ExpressionTag.ConstructorRecordExpression:
-                return this.checkRecordConstructor(env, exp as ConstructorRecordExpression, trgt);
+                return this.checkRecordConstructor(env, exp as ConstructorRecordExpression, trgt, infertype);
             case ExpressionTag.ConstructorEphemeralValueList:
-                return this.checkConstructorEphemeralValueList(env, exp as ConstructorEphemeralValueList, trgt);
-            case ExpressionTag.ResultExpression:
-                return this.checkResultExpression(env, exp as ResultExpression, trgt);
-            case ExpressionTag.CallNamespaceFunctionExpression:
-                return this.checkCallNamespaceFunctionExpression(env, exp as CallNamespaceFunctionExpression, trgt, (extraok && extraok.refok) || false);
-            case ExpressionTag.CallStaticFunctionExpression:
-                return this.checkCallStaticFunctionExpression(env, exp as CallStaticFunctionExpression, trgt, (extraok && extraok.refok) || false);
+                return this.checkConstructorEphemeralValueList(env, exp as ConstructorEphemeralValueList, trgt, infertype);
             case ExpressionTag.PCodeInvokeExpression:
-                return this.checkPCodeInvokeExpression(env, exp as PCodeInvokeExpression, trgt, (extraok && extraok.refok) || false);
+                return this.checkPCodeInvokeExpression(env, exp as PCodeInvokeExpression, trgt, (extraok && extraok.refok) || false, infertype);
+            case ExpressionTag.SpecialConstructorExpression:
+                return this.checkSpecialConstructorExpression(env, exp as SpecialConstructorExpression, trgt, infertype);
+            case ExpressionTag.CallNamespaceFunctionOrOperatorExpression:
+                return this.checkCallNamespaceFunctionOrOperatorExpression(env, exp as CallNamespaceFunctionOrOperatorExpression, trgt, (extraok && extraok.refok) || false, infertype);
+            case ExpressionTag.CallStaticFunctionOrOperatorExpression:
+                return this.checkCallStaticFunctionOrOperatorExpression(env, exp as CallStaticFunctionOrOperatorExpression, trgt, (extraok && extraok.refok) || false, infertype);
             case ExpressionTag.PostfixOpExpression:
-                return this.checkPostfixExpression(env, exp as PostfixOp, trgt, (extraok && extraok.refok) || false);
-            case ExpressionTag.PrefixOpExpression:
-                return this.checkPrefixOp(env, exp as PrefixOp, trgt);
-            case ExpressionTag.TailTypeExpression:
-                return this.checkTailTypeExpression(env, exp as TailTypeExpression, trgt);
-            case ExpressionTag.BinOpExpression:
-                return this.checkBinOp(env, exp as BinOpExpression, trgt);
+                return this.checkPostfixExpression(env, exp as PostfixOp, trgt, (extraok && extraok.refok) || false, infertype);
+            case ExpressionTag.PrefixNotOpExpression:
+                return this.checkPrefixNotOp(env, exp as PrefixNotOp, trgt, (extraok && extraok.refok) || false, infertype);
+
             case ExpressionTag.BinEqExpression:
                 return this.checkBinEq(env, exp as BinEqExpression, trgt);
             case ExpressionTag.BinCmpExpression:
@@ -4725,13 +4868,13 @@ class TypeChecker {
         }
     }
 
-    private checkMatchGuard(sinfo: SourceInfo, midx: number, env: TypeEnvironment, guard: MatchGuard, nextlabel: string, actionlabel: string): { tenvs: TypeEnvironment[], fenvs: TypeEnvironment[] } {
+    private checkMatchGuard(sinfo: SourceInfo, midx: number, env: TypeEnvironment, matchvar: string, guard: MatchGuard, nextlabel: string, actionlabel: string): { tenvs: TypeEnvironment[], fenvs: TypeEnvironment[] } {
         let opts: { tenvs: TypeEnvironment[], fenvs: TypeEnvironment[] } = { tenvs: [], fenvs: [] };
         let mreg = this.m_emitter.generateTmpRegister();
 
-        const vspecial = new MIRLocalVariable("@match@");
-        const vspecialinfo = env.getLocalVarInfo("@match@") as VarInfo;
-        env = env.setResultExpressionWVarOptNoInfer(vspecialinfo.flowType, "@match@");
+        const vspecial = new MIRLocalVariable(matchvar);
+        const vspecialinfo = env.getLocalVarInfo(matchvar) as VarInfo;
+        env = env.setResultExpressionWVarOptNoInfer(vspecialinfo.flowType, matchvar);
 
         let lifetimes: string[] = [];
         if (guard instanceof WildcardMatchGuard) {
@@ -4755,6 +4898,8 @@ class TypeChecker {
             let allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][] = [];
             let allChecks: [StructuredAssignmentPathStep[], Expression | ResolvedType][] = [];
             const oftype = this.checkStructuredMatch(sinfo, env, [], sguard.match, {representation: vspecialinfo.declaredType, infered: vspecialinfo.flowType}, allDeclared, allAssigned, allChecks)[0];
+
+            xxxx; //fix this up so we are checking/assigning everything per layer/expansion step 
 
             const tcreg = this.m_emitter.generateTmpRegister();
             this.m_emitter.emitTypeOf(sinfo, tcreg, this.m_emitter.registerResolvedTypeReference(oftype), vspecial, this.m_emitter.registerResolvedTypeReference(vspecialinfo.declaredType));
