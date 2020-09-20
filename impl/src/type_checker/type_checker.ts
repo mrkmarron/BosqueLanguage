@@ -3115,8 +3115,8 @@ class TypeChecker {
         
         const renvs = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, oftype, [env]);
         return [
-            ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.True))), 
-            ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.False))),
+            ...(renvs.tenvs.map((eev) => eev.setResultExpression(restype, FlowTypeTruthValue.True))), 
+            ...(renvs.fenvs.map((eev) => eev.setResultExpression(restype, FlowTypeTruthValue.False)))
         ];
     }
 
@@ -3404,8 +3404,8 @@ class TypeChecker {
             const eevs = (action === "lhsnone") ? rhs : lhs;
             const renvs = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, this.m_assembly.getSpecialNoneType(), [eevs]);
             return [
-                ...(renvs.tenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.True))),
-                ...(renvs.fenvs.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, FlowTypeTruthValue.False))),
+                ...(renvs.tenvs.map((eev) => eev.setResultExpression(restype, FlowTypeTruthValue.True))),
+                ...(renvs.fenvs.map((eev) => eev.setResultExpression(restype, FlowTypeTruthValue.False)))
             ];
         }
         else {
@@ -3956,7 +3956,7 @@ class TypeChecker {
         }
     }
 
-    private checkIfExpression(env: TypeEnvironment, exp: IfExpression, refok: boolean, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkIfExpression(env: TypeEnvironment, exp: IfExpression, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
         const doneblck = this.m_emitter.createNewBlock("Lifexp_done");
 
         let cenv = env;
@@ -3966,7 +3966,7 @@ class TypeChecker {
 
         for (let i = 0; i < exp.flow.conds.length && hasfalseflow; ++i) {
             const testreg = this.m_emitter.generateTmpRegister();
-            const test = this.checkExpressionMultiFlow(cenv, exp.flow.conds[i].cond, testreg, infertype, { refok: refok, orok: false });
+            const test = this.checkExpressionMultiFlow(cenv, exp.flow.conds[i].cond, testreg, infertype);
             this.raiseErrorIf(exp.sinfo, !test.every((eev) => eev.getExpressionResult().exptype.isSameType(this.m_assembly.getSpecialBoolType())), "If test expression must return a Bool");
 
             const cflow = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, test);
@@ -4033,9 +4033,9 @@ class TypeChecker {
         return results.map((eev) => eev.setResultExpressionWVarOpt(restype, eev.getExpressionResult().expvar, eev.getExpressionResult().truthval));
     }
 
-    private checkMatchExpression(env: TypeEnvironment, exp: MatchExpression, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkMatchExpression(env: TypeEnvironment, exp: MatchExpression, refok: boolean, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
         const vreg = this.m_emitter.generateTmpRegister();
-        const venv = this.checkExpression(env, exp.sval, vreg, undefined, );
+        const venv = this.checkExpression(env, exp.sval, vreg, undefined, { refok: refok, orok: false });
 
         const doneblck = this.m_emitter.createNewBlock("Lswitchexp_done");
 
@@ -4725,13 +4725,15 @@ class TypeChecker {
         }
     }
 
-    private checkMatchGuard(sinfo: SourceInfo, midx: number, env: TypeEnvironment, guard: MatchGuard, nextlabel: string, actionlabel: string): TypeEnvironment[] {
+    private checkMatchGuard(sinfo: SourceInfo, midx: number, env: TypeEnvironment, guard: MatchGuard, nextlabel: string, actionlabel: string): { tenvs: TypeEnvironment[], fenvs: TypeEnvironment[] } {
         let opts: { tenvs: TypeEnvironment[], fenvs: TypeEnvironment[] } = { tenvs: [], fenvs: [] };
         let mreg = this.m_emitter.generateTmpRegister();
 
         const vspecial = new MIRLocalVariable("@match@");
         const vspecialinfo = env.getLocalVarInfo("@match@") as VarInfo;
+        env = env.setResultExpressionWVarOptNoInfer(vspecialinfo.flowType, "@match@");
 
+        let lifetimes: string[] = [];
         if (guard instanceof WildcardMatchGuard) {
             this.m_emitter.emitLoadConstBool(sinfo, true, mreg);
             opts = { tenvs: [env.setResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)], fenvs: [] };
@@ -4740,7 +4742,11 @@ class TypeChecker {
             const tmatch = this.resolveAndEnsureTypeOnly(sinfo, guard.oftype, env.terms);
             this.m_emitter.emitTypeOf(sinfo, mreg, this.m_emitter.registerResolvedTypeReference(tmatch), vspecial, this.m_emitter.registerResolvedTypeReference(vspecialinfo.declaredType));
 
-            opts = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, tmatch, [env]);
+            const fflows = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, tmatch, [env]);
+            opts = {
+                tenvs: fflows.tenvs.map((eev) => eev.setResultExpressionWVarOpt(this.m_assembly.getSpecialBoolType(), undefined, FlowTypeTruthValue.True)),
+                fenvs: fflows.fenvs.map((eev) => eev.setResultExpressionWVarOpt(this.m_assembly.getSpecialBoolType(), undefined, FlowTypeTruthValue.False))
+            };
         }
         else {
             const sguard = guard as StructureMatchGuard;
@@ -4775,11 +4781,10 @@ class TypeChecker {
                         this.generateTypeofOps(sinfo, vspecialinfo.declaredType, vspecial, allChecks[i][0], allChecks[i][1] as ResolvedType, mreg);
                     }
 
-                    this.m_emitter.emitBoolJump(sinfo, mreg, nexttestlabel, filllabel);
+                    this.m_emitter.emitBoolJump(sinfo, mreg, nexttestlabel, nextlabel);
                     this.m_emitter.setActiveBlock(nexttestlabel);
                 }
 
-                xxxx; //shouldn't we jump conditional on mreg to bail if this didn't work before filling????
                 this.m_emitter.emitDirectJump(sinfo, filllabel);
             }
 
@@ -4789,6 +4794,7 @@ class TypeChecker {
 
                 const mirvtype = this.m_emitter.registerResolvedTypeReference(declv[2]);
                 this.m_emitter.localLifetimeStart(sinfo, declv[1], mirvtype);
+                lifetimes.push(declv[1]);
 
                 const treg = this.generateAssignOps(sinfo, vspecial, declv[3]);
                 this.m_emitter.emitLocalVarStore(sinfo, treg, declv[1], mirvtype);
@@ -4798,68 +4804,70 @@ class TypeChecker {
                 const assignv = allAssigned[i];
 
                 const treg = this.generateAssignOps(sinfo, vspecial, assignv[1]);
+                const assigntype = (env.lookupVar(assignv[0]) as VarInfo).declaredType;
+                const convarg = this.emitInlineConvertIfNeeded(sinfo, treg, assignv[2], assigntype);
+
                 if(env.getLocalVarInfo(assignv[0]) === undefined) {
-                    xxxx; //convert type if needed
-                    this.m_emitter.emitArgVarStore(sinfo, treg, assignv[0]);
+                    this.m_emitter.emitArgVarStore(sinfo, convarg as MIRTempRegister, assignv[0], this.m_emitter.registerResolvedTypeReference(assigntype));
                 }
                 else {
-                    xxxx; //convert type if needed
-                    this.m_emitter.emitLocalVarStore(sinfo, treg, assignv[0]);
+                    this.m_emitter.emitLocalVarStore(sinfo, convarg as MIRTempRegister, assignv[0], this.m_emitter.registerResolvedTypeReference(assigntype));
                 }
             }
 
-            if (svname === undefined) {
-                opts = [
-                    env.setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False),
-                    env.multiVarUpdate(allDeclared, allAssigned).setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)
-                ];
-            }
-            else {
-                this.raiseErrorIf(sinfo, this.m_assembly.restrictT(sexp, oftype).isEmptyType(), "Value is never of type");
-
-                const tval = env
-                        .assumeVar(svname, this.m_assembly.restrictT(sexp, oftype))
-                        .multiVarUpdate(allDeclared, allAssigned)
-                        .setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True);
-
-                const ntval = env.setExpressionResult(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False);
-
-                opts = [tval, ntval];
+            const fflows = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, oftype, [env]);
+            opts = {
+                tenvs: fflows.tenvs.map((eev) => eev.multiVarUpdate(allDeclared, allAssigned).setResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)),
+                fenvs: fflows.fenvs.map((eev) => eev.setResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False))
             }
         }
-
-        xxxx;
-        //need lifetime end for bids too (if they end up false)
 
         if (guard.optionalWhen === undefined) {
-            this.m_emitter.emitBoolJump(sinfo, mreg, actionlabel, nextlabel);
+            if(lifetimes.length === 0) {
+                this.m_emitter.emitBoolJump(sinfo, mreg, actionlabel, nextlabel);
+            }
+            else {
+                const endlifeblock = this.m_emitter.createNewBlock(`match${midx}_endlife`);
+                this.m_emitter.emitBoolJump(sinfo, mreg, actionlabel, endlifeblock);
 
-            return { envinfo: opts, nexttype: nexttype };
+                this.m_emitter.setActiveBlock(endlifeblock);
+                for(let i = 0; i < lifetimes.length; ++i) {
+                    this.m_emitter.localLifetimeEnd(sinfo, lifetimes[i]);
+                }
+
+                this.m_emitter.emitDirectJump(sinfo, nextlabel);
+            }
+
+            return opts;
         }
         else {
-            const [gtrueflow, gfalseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, opts);
+            const whenblck = this.m_emitter.createNewBlock(`match${midx}_when`);
+            this.m_emitter.emitBoolJump(sinfo, mreg, whenblck, nextlabel);
 
-            if (this.m_emitEnabled) {
-                const whenblck = this.m_emitter.bodyEmitter.createNewBlock(`match${midx}_when`);
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, mreg, true, whenblck, nextlabel);
+            this.m_emitter.setActiveBlock(whenblck);
 
-                this.m_emitter.bodyEmitter.setActiveBlock(whenblck);
+            let wreg = this.m_emitter.generateTmpRegister();
+            const wopts = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...opts.tenvs), guard.optionalWhen, wreg, this.m_assembly.getSpecialBoolType());
+            this.raiseErrorIf(sinfo, wopts.some((opt) => !opt.getExpressionResult().exptype.isSameType(this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
+
+            if (lifetimes.length === 0) {
+                this.m_emitter.emitBoolJump(sinfo, wreg, actionlabel, nextlabel);
+            }
+            else {
+                const endlifeblock = this.m_emitter.createNewBlock(`match${midx}_whenendlife`);
+                this.m_emitter.emitBoolJump(sinfo, mreg, actionlabel, endlifeblock);
+
+                this.m_emitter.setActiveBlock(endlifeblock);
+                for (let i = 0; i < lifetimes.length; ++i) {
+                    this.m_emitter.localLifetimeEnd(sinfo, lifetimes[i]);
+                }
+
+                this.m_emitter.emitDirectJump(sinfo, nextlabel);
             }
 
-            let wreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const wopts = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...gtrueflow), guard.optionalWhen, wreg);
+            const wflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, wopts);
 
-            const okType = this.m_assembly.typeUpperBound([this.m_assembly.getSpecialNoneType(), this.m_assembly.getSpecialBoolType()]);
-            this.raiseErrorIf(sinfo, wopts.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().etype, okType)), "Type of logic op must be Bool | None");
-
-            if (this.m_emitEnabled) {
-                const isstrict = wopts.every((opt) => this.m_assembly.subtypeOf(opt.getExpressionResult().etype, this.m_assembly.getSpecialBoolType()));
-                this.m_emitter.bodyEmitter.emitBoolJump(sinfo, wreg, isstrict, actionlabel, nextlabel);
-            }
-
-            const [wtrueflow, wfalseflow] = TypeEnvironment.convertToBoolFlowsOnExpressionResult(this.m_assembly, wopts);
-
-            return { envinfo: [...wtrueflow, ...gfalseflow, ...wfalseflow], nexttype: nexttype };
+            return { tenvs: wflows.tenvs, fenvs: [...opts.fenvs, ...wflows.fenvs] };
         }
     }
 

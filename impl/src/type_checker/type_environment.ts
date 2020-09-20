@@ -7,7 +7,7 @@ import assert = require("assert");
 
 import { Assembly } from "../ast/assembly";
 import { ResolvedType } from "../ast/resolved_type";
-import { MIRTempRegister, MIRInvokeKey } from "../compiler/mir_ops";
+import { MIRInvokeKey } from "../compiler/mir_ops";
 import { PCode } from "../compiler/mir_emitter";
 
 enum FlowTypeTruthValue {
@@ -355,7 +355,7 @@ class TypeEnvironment {
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, this.frozenVars);
     }
 
-    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType, FlowTypeTruthValue][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType, FlowTypeTruthValue][]): TypeEnvironment {
+    multiVarUpdate(allDeclared: [boolean, string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][]): TypeEnvironment {
         assert(this.hasNormalFlow());
 
         let nenv: TypeEnvironment = this;
