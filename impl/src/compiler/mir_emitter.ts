@@ -448,6 +448,8 @@ class MIREmitter {
             return;
         }
         
+        //CAREFUL: this is going to assume that the types of the elist values and storage locations match (so no conversion is needed)
+
         this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, arg, resultType, argInferType, idx, trgt));
     }
 

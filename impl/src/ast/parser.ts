@@ -3859,7 +3859,8 @@ class Parser {
         const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [param], undefined, undefined, simpleITypeResult, [], [], false, new Set<string>(), body);
         const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "create", createdecl);
 
-        let provides = [[new NominalTypeSignature("NSCore", ["KeyType"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
+        let provides = [[new NominalTypeSignature("NSCore", ["Some"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][]
+        provides.push([new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]);
         provides.push([new NominalTypeSignature("NSCore", ["APIType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["APIType"]), undefined)])]);
 
         const invariants: InvariantDecl[] = [];
@@ -3907,7 +3908,9 @@ class Parser {
         const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], [], undefined, [vparam], undefined, undefined, idval, [], [], false, new Set<string>(), vbody);
         const value = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "value", valuedecl);
 
-        let provides = [[new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]] as [TypeSignature, TypeConditionRestriction | undefined][];
+        let provides = [[new NominalTypeSignature("NSCore", ["Some"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][]
+        provides.push([new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]);
+        provides.push([new NominalTypeSignature("NSCore", ["APIType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["APIType"]), undefined)])]);
 
         const invariants: InvariantDecl[] = [];
         const staticMembers = new Map<string, StaticMemberDecl>();

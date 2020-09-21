@@ -3813,9 +3813,9 @@ class TypeChecker {
         }
     }
 
-    private checkSelect(env: TypeEnvironment, exp: SelectExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+    private checkSelect(env: TypeEnvironment, exp: SelectExpression, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
         const testreg = this.m_emitter.generateTmpRegister();
-        const test = this.checkExpressionMultiFlow(env, exp.test, testreg, this.m_assembly.getSpecialBoolType());
+        const test = this.checkExpressionMultiFlow(env, exp.test, testreg, this.m_assembly.getSpecialBoolType(), { refok: refok, orok: false });
 
         const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, test);
         
@@ -4040,7 +4040,7 @@ class TypeChecker {
         }
     }
 
-    private checkIfExpression(env: TypeEnvironment, exp: IfExpression, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkIfExpression(env: TypeEnvironment, exp: IfExpression, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined,): TypeEnvironment[] {
         const doneblck = this.m_emitter.createNewBlock("Lifexp_done");
 
         let cenv = env;
@@ -4050,7 +4050,7 @@ class TypeChecker {
 
         for (let i = 0; i < exp.flow.conds.length && hasfalseflow; ++i) {
             const testreg = this.m_emitter.generateTmpRegister();
-            const test = this.checkExpressionMultiFlow(cenv, exp.flow.conds[i].cond, testreg, infertype);
+            const test = this.checkExpressionMultiFlow(cenv, exp.flow.conds[i].cond, testreg, infertype, i === 0 ? { refok: refok, orok: false } : undefined);
             this.raiseErrorIf(exp.sinfo, !test.every((eev) => eev.getExpressionResult().exptype.isSameType(this.m_assembly.getSpecialBoolType())), "If test expression must return a Bool");
 
             const cflow = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, test);
@@ -4119,7 +4119,7 @@ class TypeChecker {
         return results.map((eev) => eev.setResultExpressionWVarOptNoInfer(restype, eev.getExpressionResult().expvar, eev.getExpressionResult().truthval));
     }
 
-    private checkMatchExpression(env: TypeEnvironment, exp: MatchExpression, refok: boolean, infertype: ResolvedType | undefined, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkMatchExpression(env: TypeEnvironment, exp: MatchExpression, trgt: MIRTempRegister, refok: boolean, infertype: ResolvedType | undefined): TypeEnvironment[] {
         const vreg = this.m_emitter.generateTmpRegister();
         const venv = this.checkExpression(env, exp.sval, vreg, undefined, { refok: refok, orok: false });
 
@@ -4206,23 +4206,6 @@ class TypeChecker {
 
     private checkExpressionMultiFlow(env: TypeEnvironment, exp: Expression, trgt: MIRTempRegister, infertype: ResolvedType | undefined, extraok?: { refok: boolean, orok: boolean }): TypeEnvironment[] {
         switch (exp.tag) {
-/*
-    BinCmpExpression = "BinCmpExpression",
-    BinEqExpression = "BinEqExpression",
-    BinLogicExpression = "BinLogicExpression",
-
-    MapEntryConstructorExpression = "MapEntryConstructorExpression",
-
-    NonecheckExpression = "NonecheckExpression",
-    CoalesceExpression = "CoalesceExpression",
-    SelectExpression = "SelectExpression",
-
-    ExpOrExpression = "ExpOrExpression",
-
-    BlockStatementExpression = "BlockStatementExpression",
-    IfExpression = "IfExpression",
-    MatchExpression = "MatchExpression",
-*/
             case ExpressionTag.LiteralNoneExpression:
                 return this.checkLiteralNoneExpression(env, exp as LiteralNoneExpression, trgt, infertype);
             case ExpressionTag.LiteralBoolExpression:
@@ -4281,30 +4264,29 @@ class TypeChecker {
                 return this.checkPostfixExpression(env, exp as PostfixOp, trgt, (extraok && extraok.refok) || false, infertype);
             case ExpressionTag.PrefixNotOpExpression:
                 return this.checkPrefixNotOp(env, exp as PrefixNotOp, trgt, (extraok && extraok.refok) || false, infertype);
-
             case ExpressionTag.BinEqExpression:
-                return this.checkBinEq(env, exp as BinEqExpression, trgt);
+                return this.checkBinEq(env, exp as BinEqExpression, trgt, infertype);
             case ExpressionTag.BinCmpExpression:
-                return this.checkBinCmp(env, exp as BinCmpExpression, trgt);
+                return this.checkBinCmp(env, exp as BinCmpExpression, trgt, infertype);
             case ExpressionTag.BinLogicExpression:
-                return this.checkBinLogic(env, exp as BinLogicExpression, trgt);
+                return this.checkBinLogic(env, exp as BinLogicExpression, trgt, infertype);
             case ExpressionTag.MapEntryConstructorExpression:
-                return this.checkMapEntryConstructorExpression(env, exp as MapEntryConstructorExpression, trgt);
+                return this.checkMapEntryConstructorExpression(env, exp as MapEntryConstructorExpression, trgt, infertype);
             case ExpressionTag.NonecheckExpression:
-                return this.checkNonecheck(env, exp as NonecheckExpression, trgt);
+                return this.checkNonecheck(env, exp as NonecheckExpression, trgt, infertype);
             case ExpressionTag.CoalesceExpression:
-                return this.checkCoalesce(env, exp as CoalesceExpression, trgt);
+                return this.checkCoalesce(env, exp as CoalesceExpression, trgt, infertype);
             case ExpressionTag.SelectExpression:
-                return this.checkSelect(env, exp as SelectExpression, trgt);
+                return this.checkSelect(env, exp as SelectExpression, trgt, (extraok && extraok.refok) || false, infertype);
             case ExpressionTag.ExpOrExpression:
-                return this.checkOrExpression(env, exp as ExpOrExpression, trgt, extraok || { refok: false, orok: false });
+                return this.checkOrExpression(env, exp as ExpOrExpression, trgt, infertype, extraok || { refok: false, orok: false });
             case ExpressionTag.BlockStatementExpression:
-                return this.checkBlockExpression(env, exp as BlockStatementExpression, trgt);
+                return this.checkBlockExpression(env, exp as BlockStatementExpression, infertype, trgt);
             case ExpressionTag.IfExpression:
-                return this.checkIfExpression(env, exp as IfExpression, trgt);
+                return this.checkIfExpression(env, exp as IfExpression, trgt, (extraok && extraok.refok) || false, infertype);
             default:
                 this.raiseErrorIf(exp.sinfo, exp.tag !== ExpressionTag.MatchExpression, "Unknown expression");
-                return this.checkMatchExpression(env, exp as MatchExpression, trgt);
+                return this.checkMatchExpression(env, exp as MatchExpression, trgt, (extraok && extraok.refok) || false, infertype);
         }
     }
 
@@ -4317,27 +4299,28 @@ class TypeChecker {
         const vtype = (decltype instanceof AutoTypeSignature) ? (venv as { etype: ResolvedType, etreg: MIRTempRegister }).etype : this.resolveAndEnsureTypeOnly(sinfo, decltype, env.terms);
         this.raiseErrorIf(sinfo, venv !== undefined && !this.m_assembly.subtypeOf(venv.etype, vtype), "Expression is not of declared type");
 
-        if (this.m_emitEnabled) {
-            const mirvtype = this.m_emitter.registerResolvedTypeReference(vtype);
-            this.m_emitter.bodyEmitter.localLifetimeStart(sinfo, vname, mirvtype.trkey);
+        const mirvtype = this.m_emitter.registerResolvedTypeReference(vtype);
+        this.m_emitter.localLifetimeStart(sinfo, vname, mirvtype);
 
-            if (venv !== undefined) {
-                this.m_emitter.bodyEmitter.emitVarStore(sinfo, venv.etreg, vname);
-            }
+        if (venv !== undefined) {
+            const convreg = this.emitInlineConvertIfNeeded(sinfo, venv.etreg, venv.etype, vtype) as MIRTempRegister;
+            this.m_emitter.emitLocalVarStore(sinfo, convreg, vname, mirvtype);
         }
 
         return env.addVar(vname, isConst, vtype, venv !== undefined, venv !== undefined ? venv.etype : vtype);
     }
 
     private checkVariableDeclarationStatement(env: TypeEnvironment, stmt: VariableDeclarationStatement): TypeEnvironment {
-        const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const venv = stmt.exp !== undefined ? this.checkExpression(env, stmt.exp, etreg, { refok: true, orok: true }) : undefined;
+        const infertype = stmt.vtype instanceof AutoTypeSignature ? undefined : this.resolveAndEnsureTypeOnly(stmt.sinfo, stmt.vtype, env.terms);
+
+        const etreg = this.m_emitter.generateTmpRegister();
+        const venv = stmt.exp !== undefined ? this.checkExpression(env, stmt.exp, etreg, infertype, { refok: true, orok: true }) : undefined;
 
         if(venv !== undefined) {
-            this.raiseErrorIf(stmt.sinfo, venv.getExpressionResult().etype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store Ephemeral value lists in variables");
+            this.raiseErrorIf(stmt.sinfo, venv.getExpressionResult().exptype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store Ephemeral value lists in variables");
         }
 
-        const vv = venv !== undefined ? { etype: venv.getExpressionResult().etype, etreg: etreg } : undefined;
+        const vv = venv !== undefined ? { etype: venv.getExpressionResult().exptype, etreg: etreg } : undefined;
         return this.checkDeclareSingleVariable(stmt.sinfo, env, stmt.name, stmt.isConst, stmt.vtype, vv);
     }
 
@@ -4350,31 +4333,58 @@ class TypeChecker {
         }
         else {
             if (stmt.exp.length === 1) {
-                const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                const ve = this.checkExpression(env, stmt.exp[0], etreg, { refok: true, orok: true }).getExpressionResult().etype;
+                let infertypes = stmt.vars.map((vds) => vds.vtype instanceof AutoTypeSignature ? undefined : this.resolveAndEnsureTypeOnly(stmt.sinfo, vds.vtype, env.terms));
+                let infertype = infertypes.includes(undefined) ? undefined : ResolvedType.createSingle(ResolvedEphemeralListType.create(infertypes as ResolvedType[]));
+
+                const etreg = this.m_emitter.generateTmpRegister();
+                const ve = this.checkExpression(env, stmt.exp[0], etreg, infertype, { refok: true, orok: true }).getExpressionResult().exptype;
 
                 this.raiseErrorIf(stmt.sinfo, ve.options.length !== 1 || !(ve.options[0] instanceof ResolvedEphemeralListType), "Expected Ephemeral List for multi assign");
 
                 const elt = ve.options[0] as ResolvedEphemeralListType;
                 this.raiseErrorIf(stmt.sinfo, stmt.vars.length !== elt.types.length, "Missing initializers for variables");
 
-                for (let i = 0; i < stmt.vars.length; ++i) {
-                    const tlreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                    if (this.m_emitEnabled) {
-                        const eltkey = this.m_emitter.registerResolvedTypeReference(ve).trkey;
-                        const rtype = this.m_emitter.registerResolvedTypeReference(elt.types[i]).trkey;
-                        this.m_emitter.bodyEmitter.emitLoadFromEpehmeralList(stmt.sinfo, etreg, rtype, eltkey, i, tlreg);
+                //check if all the assignments are conversion free -- if so we can do a multi-load
+                const convertfree = stmt.vars.every((v, i) => {
+                    const decltype = this.resolveAndEnsureTypeOnly(stmt.sinfo, v.vtype, env.terms);
+                    const exptype = elt.types[i];
+
+                    return decltype.isSameType(exptype);
+                });
+
+                if(convertfree) {
+                    this.raiseErrorIf(stmt.sinfo, stmt.vars.some((vv) => env.isVarNameDefined(vv.name), "Cannot shadow previous definition"));
+
+                    let trgts: { pos: number, into: MIRRegisterArgument, oftype: MIRType }[] = [];
+                    for (let i = 0; i < stmt.vars.length; ++i) {
+                        const decltype = this.resolveAndEnsureTypeOnly(stmt.sinfo, stmt.vars[i].vtype, env.terms);
+                        const mirvtype = this.m_emitter.registerResolvedTypeReference(decltype);
+                        this.m_emitter.localLifetimeStart(stmt.sinfo, stmt.vars[i].name, mirvtype);
+
+                        trgts.push({ pos: i, into: new MIRLocalVariable(stmt.vars[i].name), oftype: mirvtype });
                     }
 
-                    cenv = this.checkDeclareSingleVariable(stmt.sinfo, cenv, stmt.vars[i].name, stmt.isConst, stmt.vars[i].vtype, { etype: elt.types[i], etreg: tlreg });
+                    this.m_emitter.emitMultiLoadFromEpehmeralList(stmt.sinfo, etreg, this.m_emitter.registerResolvedTypeReference(ve), trgts);
+
+                    cenv = cenv.multiVarUpdate(stmt.vars.map((vv) => [stmt.isConst, vv.name, this.resolveAndEnsureTypeOnly(stmt.sinfo, vv.vtype, env.terms), [], this.resolveAndEnsureTypeOnly(stmt.sinfo, vv.vtype, env.terms)]), []);
+                }
+                else {
+                    for (let i = 0; i < stmt.vars.length; ++i) {
+                        const tlreg = this.m_emitter.generateTmpRegister();
+                        this.m_emitter.emitLoadFromEpehmeralList(stmt.sinfo, etreg, this.m_emitter.registerResolvedTypeReference(elt.types[i]), i, this.m_emitter.registerResolvedTypeReference(ve), tlreg);
+
+                        cenv = this.checkDeclareSingleVariable(stmt.sinfo, cenv, stmt.vars[i].name, stmt.isConst, stmt.vars[i].vtype, { etype: elt.types[i], etreg: tlreg });
+                    }
                 }
             }
             else {
                 this.raiseErrorIf(stmt.sinfo, stmt.vars.length !== stmt.exp.length, "Missing initializers for variables");
 
                 for (let i = 0; i < stmt.vars.length; ++i) {
-                    const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                    const venv = this.checkExpression(env, stmt.exp[i], etreg).getExpressionResult().etype;
+                    const infertype = stmt.vars[i].vtype instanceof AutoTypeSignature ? undefined : this.resolveAndEnsureTypeOnly(stmt.sinfo, stmt.vars[i].vtype, env.terms);
+
+                    const etreg = this.m_emitter.generateTmpRegister();
+                    const venv = this.checkExpression(env, stmt.exp[i], etreg, infertype).getExpressionResult().exptype;
 
                     cenv = this.checkDeclareSingleVariable(stmt.sinfo, cenv, stmt.vars[i].name, stmt.isConst, stmt.vars[i].vtype, { etype: venv, etreg: etreg });
                 }
@@ -4386,54 +4396,94 @@ class TypeChecker {
 
     private checkAssignSingleVariable(sinfo: SourceInfo, env: TypeEnvironment, vname: string, etype: ResolvedType, etreg: MIRTempRegister): TypeEnvironment {
         const vinfo = env.lookupVar(vname);
-        this.raiseErrorIf(sinfo, vinfo === undefined, "Variable was not previously defined");
+        this.raiseErrorIf(sinfo, vinfo === null, "Variable was not previously defined");
         this.raiseErrorIf(sinfo, (vinfo as VarInfo).isConst, "Variable defined as const");
 
         this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(etype, (vinfo as VarInfo).declaredType), "Assign value is not subtype of declared variable type");
 
-        if (this.m_emitEnabled) {
-            this.m_emitter.bodyEmitter.emitVarStore(sinfo, etreg, vname);
-        }
+        const convreg = this.emitInlineConvertIfNeeded(sinfo, etreg, etype, (vinfo as VarInfo).declaredType) as MIRTempRegister;
+        this.m_emitter.emitLocalVarStore(sinfo, convreg, vname, this.m_emitter.registerResolvedTypeReference((vinfo as VarInfo).declaredType));
 
         return env.setVar(vname, etype);
     }
 
     private checkVariableAssignmentStatement(env: TypeEnvironment, stmt: VariableAssignmentStatement): TypeEnvironment {
-        const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-        const venv = this.checkExpression(env, stmt.exp, etreg, { refok: true, orok: true });
+        const vinfo = env.lookupVar(stmt.name);
+        this.raiseErrorIf(stmt.sinfo, vinfo === undefined, "Variable was not previously defined");
+
+        const infertype = (vinfo as VarInfo).declaredType instanceof AutoTypeSignature ? undefined : (vinfo as VarInfo).declaredType;
+
+        const etreg = this.m_emitter.generateTmpRegister();
+        const venv = this.checkExpression(env, stmt.exp, etreg, infertype, { refok: true, orok: true });
        
-        return this.checkAssignSingleVariable(stmt.sinfo, env, stmt.name, venv.getExpressionResult().etype, etreg);
+        if(venv !== undefined) {
+            this.raiseErrorIf(stmt.sinfo, venv.getExpressionResult().exptype.options.some((opt) => opt instanceof ResolvedEphemeralListType), "Cannot store Ephemeral value lists in variables");
+        }
+
+        return this.checkAssignSingleVariable(stmt.sinfo, env, stmt.name, venv.getExpressionResult().exptype, etreg);
     }
 
     private checkVariablePackAssignmentStatement(env: TypeEnvironment, stmt: VariablePackAssignmentStatement): TypeEnvironment {
         let cenv = env;
 
         if (stmt.exp.length === 1) {
-            const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-            const ve = this.checkExpression(env, stmt.exp[0], etreg, { refok: true, orok: true }).getExpressionResult().etype;
+            let infertypes = stmt.names.map((vn) => env.lookupVar(vn));
+            this.raiseErrorIf(stmt.sinfo, infertypes.includes(null), "Variable was not previously defined");
+            let infertype = ResolvedType.createSingle(ResolvedEphemeralListType.create(infertypes.map((vi) => (vi as VarInfo).declaredType)));
+
+            const etreg = this.m_emitter.generateTmpRegister();
+            const ve = this.checkExpression(env, stmt.exp[0], etreg, infertype, { refok: true, orok: true }).getExpressionResult().exptype;
 
             this.raiseErrorIf(stmt.sinfo, ve.options.length !== 1 || !(ve.options[0] instanceof ResolvedEphemeralListType), "Expected Ephemeral List for multi assign");
 
             const elt = ve.options[0] as ResolvedEphemeralListType;
             this.raiseErrorIf(stmt.sinfo, stmt.names.length !== elt.types.length, "Missing initializers for variables");
 
-            for (let i = 0; i < stmt.names.length; ++i) {
-                const tlreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                if (this.m_emitEnabled) {
-                    const eltkey = this.m_emitter.registerResolvedTypeReference(ve).trkey;
-                    const rtype = this.m_emitter.registerResolvedTypeReference(elt.types[i]).trkey;
-                    this.m_emitter.bodyEmitter.emitLoadFromEpehmeralList(stmt.sinfo, etreg, rtype, eltkey, i, tlreg);
+            //check if all the assignments are conversion free -- if so we can do a multi-load
+            const convertfree = stmt.names.every((v, i) => {
+                const decltype = (env.lookupVar(v) as VarInfo).declaredType;
+                const exptype = elt.types[i];
+
+                return decltype.isSameType(exptype);
+            });
+
+            if (convertfree) {
+                this.raiseErrorIf(stmt.sinfo, stmt.names.some((vv) => !env.isVarNameDefined(vv), "Variable was not previously defined"));
+                this.raiseErrorIf(stmt.sinfo, stmt.names.some((vv) => (env.lookupVar(vv) as VarInfo).isConst, "Variable is const"));
+
+                let trgts: { pos: number, into: MIRRegisterArgument, oftype: MIRType }[] = [];
+                for (let i = 0; i < stmt.names.length; ++i) {
+                    const decltype = (env.lookupVar(stmt.names[i]) as VarInfo).declaredType;
+                    const mirvtype = this.m_emitter.registerResolvedTypeReference(decltype);
+
+                    const vstore = env.getLocalVarInfo(stmt.names[i]) === undefined ? new MIRParameterVariable(stmt.names[i]) : new MIRLocalVariable(stmt.names[i]);
+                    trgts.push({ pos: i, into: vstore, oftype: mirvtype });
                 }
 
-                cenv = this.checkAssignSingleVariable(stmt.sinfo, cenv, stmt.names[i], elt.types[i], tlreg);
+                this.m_emitter.emitMultiLoadFromEpehmeralList(stmt.sinfo, etreg, this.m_emitter.registerResolvedTypeReference(ve), trgts);
+
+                cenv = cenv.multiVarUpdate([], stmt.names.map((vv) => [vv, [], (env.lookupVar(vv) as VarInfo).declaredType]));
+            }
+            else {
+                for (let i = 0; i < stmt.names.length; ++i) {
+                    const tlreg = this.m_emitter.generateTmpRegister();
+                    this.m_emitter.emitLoadFromEpehmeralList(stmt.sinfo, etreg, this.m_emitter.registerResolvedTypeReference(elt.types[i]), i, this.m_emitter.registerResolvedTypeReference(ve), tlreg);
+
+                    cenv = this.checkAssignSingleVariable(stmt.sinfo, cenv, stmt.names[i], elt.types[i], etreg);
+                }
             }
         }
         else {
             this.raiseErrorIf(stmt.sinfo, stmt.names.length !== stmt.exp.length, "Missing initializers for variables");
 
             for (let i = 0; i < stmt.names.length; ++i) {
-                const etreg = this.m_emitter.bodyEmitter.generateTmpRegister();
-                const venv = this.checkExpression(env, stmt.exp[i], etreg).getExpressionResult().etype;
+                const vinfo = env.lookupVar(stmt.names[i]);
+                this.raiseErrorIf(stmt.sinfo, vinfo === null, "Variable was not previously defined");
+
+                const infertype = (vinfo as VarInfo).declaredType;
+
+                const etreg = this.m_emitter.generateTmpRegister();
+                const venv = this.checkExpression(env, stmt.exp[i], etreg, infertype).getExpressionResult().exptype;
 
                 cenv = this.checkAssignSingleVariable(stmt.sinfo, cenv, stmt.names[i], venv, etreg);
             }
