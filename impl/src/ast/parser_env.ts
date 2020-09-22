@@ -9,22 +9,20 @@ import { NominalTypeSignature, TypeSignature, AutoTypeSignature } from "./type_s
 class FunctionScope {
     private readonly m_rtype: TypeSignature;
     private m_captured: Set<string>;
-    private m_inImplicitValueBind: boolean;
     private readonly m_ispcode: boolean;
     private readonly m_args: Set<string>;
-    private m_locals: Set<string>[];
+    private m_locals: { name: string, scopedname: string, isbinder: boolean }[][];
 
     constructor(args: Set<string>, rtype: TypeSignature, ispcode: boolean) {
         this.m_rtype = rtype;
         this.m_captured = new Set<string>();
-        this.m_inImplicitValueBind = false;
         this.m_ispcode = ispcode;
         this.m_args = args;
         this.m_locals = [];
     }
 
     pushLocalScope() {
-        this.m_locals.push(new Set<string>());
+        this.m_locals.push([]);
     }
 
     popLocalScope() {
@@ -35,35 +33,23 @@ class FunctionScope {
         return this.m_ispcode;
     }
 
-    setImplicitValueState(vs: boolean) {
-        this.m_inImplicitValueBind = vs;
-    }
-
     isVarNameDefined(name: string): boolean {
-        if (this.m_locals.some((frame) => frame.has(name))) {
-            return true;
-        }
-
-        return this.m_args.has(name) || this.m_captured.has(name);
+        return this.m_args.has(name) || this.m_locals.some((frame) => frame.some((fr) => fr.name === name));
     }
 
-    defineLocalVar(name: string) {
-        this.m_locals[this.m_locals.length - 1].add(name);
-    }
-
-    useLocalVar(name: string) {
-        if (this.isVarNameDefined(name) || !this.isPCodeEnv()) {
-            return;
-        }
-
-        if(name !== "$value") {
-            this.m_captured.add(name);
-        }
-        else {
-            if(!this.m_inImplicitValueBind) {
-                this.m_captured.add(name);
+    getScopedVarName(name: string): string {
+        for (let i = this.m_locals.length - 1; i >= 0; --i) {
+            const vinfo = this.m_locals[i].find((fr) => fr.name === name);
+            if (vinfo !== undefined) {
+                return vinfo.scopedname;
             }
         }
+
+        return name;
+    }
+
+    defineLocalVar(name: string, scopedname: string, isbinder: boolean) {
+        this.m_locals[this.m_locals.length - 1].push({ name: name, scopedname: scopedname, isbinder: isbinder });
     }
 
     getCaptureVars(): Set<string> {
@@ -151,6 +137,28 @@ class ParserEnvironment {
 
     isVarDefinedInAnyScope(name: string): boolean {
         return this.m_functionScopes.some((sc) => sc.isVarNameDefined(name));
+    }
+
+    useLocalVar(name: string): string {
+        const cscope = this.getCurrentFunctionScope();
+        if (cscope.isPCodeEnv() && name === "this") {
+            return "%this_captured";
+        }
+
+        if(name.startsWith("$")) {
+            for(let i = this.m_functionScopes.length - 1; i >= 0; --i) {
+                if(this.m_functionScopes[i].isVarNameDefined(name)) {
+                    name = this.m_functionScopes[i].getScopedVarName(name);
+                    break;
+                }
+            }
+        }
+
+        if (!cscope.isVarNameDefined(name) && cscope.isPCodeEnv()) {
+            cscope.getCaptureVars().add(name);
+        }
+        
+        return name;
     }
 
     tryResolveNamespace(ns: string | undefined, typename: string): string | undefined {

@@ -463,7 +463,7 @@ class PCodeInvokeExpression extends Expression {
 
 class SpecialConstructorExpression extends Expression {
     readonly rtype: TypeSignature;
-    readonly rop: "ok" | "opt" | "err";
+    readonly rop: "ok" | "err";
     readonly arg: Expression;
 
     constructor(sinfo: SourceInfo, rtype: TypeSignature, rop: "ok" | "err", arg: Expression) {
@@ -528,11 +528,13 @@ abstract class PostfixOperation {
     readonly sinfo: SourceInfo;
 
     readonly isElvis: boolean;
+    readonly customCheck: Expression | undefined;
     readonly op: PostfixOpTag;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, op: PostfixOpTag) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, op: PostfixOpTag) {
         this.sinfo = sinfo;
         this.isElvis = isElvis;
+        this.customCheck = customCheck;
         this.op = op;
     }
 }
@@ -551,8 +553,8 @@ class PostfixOp extends Expression {
 class PostfixAccessFromIndex extends PostfixOperation {
     readonly index: number;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, index: number) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixAccessFromIndex);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, index: number) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromIndex);
         this.index = index;
     }
 }
@@ -562,8 +564,8 @@ class PostfixProjectFromIndecies extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
     readonly indecies: {index: number, reqtype: TypeSignature | undefined}[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isValue: boolean, isEphemeralListResult: boolean, indecies: {index: number, reqtype: TypeSignature | undefined }[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromIndecies);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isValue: boolean, isEphemeralListResult: boolean, indecies: {index: number, reqtype: TypeSignature | undefined }[]) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixProjectFromIndecies);
         this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
@@ -573,8 +575,8 @@ class PostfixProjectFromIndecies extends PostfixOperation {
 class PostfixAccessFromName extends PostfixOperation {
     readonly name: string;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, name: string) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixAccessFromName);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, name: string) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromName);
         this.name = name;
     }
 }
@@ -584,8 +586,8 @@ class PostfixProjectFromNames extends PostfixOperation {
     readonly isEphemeralListResult: boolean;
     readonly names: { name: string, reqtype: TypeSignature | undefined }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isValue: boolean, isEphemeralListResult: boolean, names: { name: string, reqtype: TypeSignature | undefined }[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixProjectFromNames);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isValue: boolean, isEphemeralListResult: boolean, names: { name: string, reqtype: TypeSignature | undefined }[]) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixProjectFromNames);
         this.isValue = isValue;
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
@@ -596,8 +598,8 @@ class PostfixModifyWithIndecies extends PostfixOperation {
     readonly isBinder: boolean;
     readonly updates: { index: number, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isBinder: boolean, updates: { index: number, value: Expression }[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithIndecies);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isBinder: boolean, updates: { index: number, value: Expression }[]) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixModifyWithIndecies);
         this.isBinder = isBinder;
         this.updates = updates;
     }
@@ -607,8 +609,8 @@ class PostfixModifyWithNames extends PostfixOperation {
     readonly isBinder: boolean;
     readonly updates: { name: string, value: Expression }[];
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, isBinder: boolean, updates: { name: string, value: Expression }[]) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixModifyWithNames);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isBinder: boolean, updates: { name: string, value: Expression }[]) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixModifyWithNames);
         this.isBinder = isBinder;
         this.updates = updates;
     }
@@ -617,8 +619,8 @@ class PostfixModifyWithNames extends PostfixOperation {
 class PostfixIs extends PostfixOperation {
     readonly istype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, istype: TypeSignature) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixIs);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, istype: TypeSignature) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixIs);
         this.istype = istype;
     }
 }
@@ -626,8 +628,8 @@ class PostfixIs extends PostfixOperation {
 class PostfixAs extends PostfixOperation {
     readonly astype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, astype: TypeSignature) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixAs);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, astype: TypeSignature) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAs);
         this.astype = astype;
     }
 }
@@ -635,8 +637,8 @@ class PostfixAs extends PostfixOperation {
 class PostfixHasIndex extends PostfixOperation {
     readonly idx: number;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, idx: number) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixHasIndex);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, idx: number) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasIndex);
         this.idx = idx;
     }
 }
@@ -644,21 +646,23 @@ class PostfixHasIndex extends PostfixOperation {
 class PostfixHasProperty extends PostfixOperation {
     readonly pname: string;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, pname: string) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixHasProperty);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, pname: string) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasProperty);
         this.pname = pname;
     }
 }
 
 class PostfixInvoke extends PostfixOperation {
+    readonly isBinder: boolean;
     readonly specificResolve: TypeSignature | undefined;
     readonly name: string;
     readonly pragmas: PragmaArguments;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
-        super(sinfo, isElvis, PostfixOpTag.PostfixInvoke);
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isBinder: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+        super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixInvoke);
+        this.isBinder = isBinder;
         this.specificResolve = specificResolve;
         this.name = name;
         this.pragmas = pragmas;
@@ -934,14 +938,12 @@ class ConstValueStructuredAssignment extends StructuredAssignment {
 class VariableDeclarationStructuredAssignment extends StructuredAssignment {
     readonly isOptional: boolean;
     readonly vname: string;
-    readonly isConst: boolean;
     readonly vtype: TypeSignature;
 
-    constructor(isOptional: boolean, vname: string, isConst: boolean, vtype: TypeSignature) {
+    constructor(isOptional: boolean, vname: string, vtype: TypeSignature) {
         super();
         this.isOptional = isOptional;
         this.vname = vname;
-        this.isConst = isConst;
         this.vtype = vtype;
     }
 }
