@@ -59,7 +59,6 @@ const KeywordStrings = [
     "none",
     "ok",
     "operator",
-    "or",
     "private",
     "provides",
     "ref",
@@ -112,8 +111,6 @@ const SymbolStrings = [
     "||",
     "+",
     "?",
-    "?&",
-    "?|",
     "<",
     "<=",
     ">",
@@ -132,7 +129,6 @@ const RegexFollows = new Set<string>([
     "else",
     "ensures",
     "invariant",
-    "or",
     "release",
     "return",
     "requires",
@@ -155,10 +151,9 @@ const RegexFollows = new Set<string>([
     "=>",
     "==>",
     ";",
+    "?",
     "||",
     "+",
-    "?&",
-    "?|",
     "<",
     "<=",
     ">",
@@ -634,9 +629,9 @@ class Parser {
         throw new ParseError(line, msg);
     }
 
-    private scanMatchingParens(lp: string, rp: string): number {
+    private scanMatchingParens(lp: string, rp: string, sindex?: number): number {
         let pscount = 1;
-        for (let pos = this.m_cpos + 1; pos < this.m_epos; ++pos) {
+        for (let pos = this.m_cpos + (sindex || 0) + 1; pos < this.m_epos; ++pos) {
             const tok = this.m_tokens[pos];
             if (tok.kind === lp) {
                 pscount++;
@@ -704,14 +699,22 @@ class Parser {
         return true;
     }
 
-    testFollowsFrom(pos: number, ...kinds: string[]): boolean {
-        for (let i = 0; i < kinds.length; ++i) {
-            if (pos + i === this.m_epos || this.m_tokens[pos + i].kind !== kinds[i]) {
-                return false;
-            }
+    private testElvisFollows(ftoken: string): boolean {
+        if(this.testFollows("?", ftoken)) {
+            return true;
         }
 
-        return true;
+        if(!this.testFollows("?", "(")) {
+            return false;
+        }
+        else {
+            const eepos = this.scanMatchingParens("(", ")", 1);
+            if(eepos === this.m_epos) {
+                return false;
+            }
+
+            return this.m_tokens[eepos].kind === ftoken;
+        }
     }
 
     private consumeToken() {
@@ -956,6 +959,25 @@ class Parser {
         else {
             return InvokeDecl.createStandardInvokeDecl(sinfo, srcFile, attributes, isrecursive, pragmas, terms, termRestrictions, fparams, restName, restType, resultInfo, preconds, postconds, body);
         }
+    }
+
+    parseElvisCheck(sinfo: SourceInfo): Expression | undefined {
+        let customCheck: Expression | undefined = undefined;
+        if (this.testToken("(")) {
+            this.consumeToken();
+            try {
+                this.m_penv.getCurrentFunctionScope().pushLocalScope();
+                this.m_penv.getCurrentFunctionScope().defineLocalVar("$chkval", `$chkval_#${sinfo.pos}`, true);
+
+                customCheck = this.parseExpression();
+            }
+            finally {
+                this.m_penv.getCurrentFunctionScope().popLocalScope();
+            }
+            this.ensureAndConsumeToken(")");
+        }
+
+        return customCheck;
     }
 
     ////
@@ -1863,27 +1885,9 @@ class Parser {
         while (true) {
             const sinfo = this.getCurrentSrcInfo();
 
-            if (this.testFollows(".") || this.testFollows("?", ".") || this.testFollows("?", "(")) {
+            if (this.testFollows(".") || this.testElvisFollows(".")) {
                 const isElvis = this.testAndConsumeTokenIf("?");
-
-                let customCheck: Expression | undefined = undefined;
-                if(this.testToken("(")) {
-                    if(!isElvis) {
-                        this.raiseError(sinfo.line, "Cannot have custom elvis predicate if not using an elvis '?' accessor");
-                    }
-
-                    this.consumeToken();
-                    try {
-                        this.m_penv.getCurrentFunctionScope().pushLocalScope();
-                        this.m_penv.getCurrentFunctionScope().defineLocalVar("$elvis", `$elvis_#${sinfo.pos}`, true);
-
-                        customCheck = this.parseExpression();
-                    }
-                    finally {
-                        this.m_penv.getCurrentFunctionScope().popLocalScope();
-                    }
-                    this.ensureAndConsumeToken(")");
-                }
+                const customCheck = isElvis ? this.parseElvisCheck(sinfo) : undefined;
 
                 this.ensureAndConsumeToken(".");
                 const isBinder = this.testAndConsumeTokenIf("$");
@@ -2247,11 +2251,14 @@ class Parser {
     }
 
     private parseNonecheckExpression(): Expression {
-        const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseRelationalExpression();
 
-        if (this.testAndConsumeTokenIf("?&")) {
-            return new NonecheckExpression(sinfo, exp, this.parseNonecheckExpression());
+        if (this.testElvisFollows("&")) {
+            const sinfo = this.getCurrentSrcInfo();
+            this.consumeToken();
+            const customCheck = this.parseElvisCheck(sinfo);
+            this.consumeToken();
+            return new NonecheckExpression(sinfo, exp, customCheck, this.parseNonecheckExpression());
         }
         else {
             return exp;
@@ -2259,11 +2266,14 @@ class Parser {
     }
 
     private parseCoalesceExpression(): Expression {
-        const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseNonecheckExpression();
 
-        if (this.testAndConsumeTokenIf("?|")) {
-            return new CoalesceExpression(sinfo, exp, this.parseCoalesceExpression());
+        if (this.testElvisFollows("|")) {
+            const sinfo = this.getCurrentSrcInfo();
+            this.consumeToken();
+            const customCheck = this.parseElvisCheck(sinfo);
+            this.consumeToken();
+            return new CoalesceExpression(sinfo, exp, customCheck, this.parseCoalesceExpression());
         }
         else {
             return exp;
@@ -2335,41 +2345,43 @@ class Parser {
     }
 
     private parseExpOrExpression(): Expression {
-        const sinfo = this.getCurrentSrcInfo();
         const texp = this.parseSelectExpression();
 
-        if (this.testAndConsumeTokenIf("or")) {
-            if (!this.testToken("return") && !this.testToken("yield")) {
-                this.raiseError(this.getCurrentLine(), "Expected 'return' or 'yield");
-            }
+        if (this.testFollows("?", "none", "?") || this.testFollows("?", "err", "?") || this.testElvisFollows("?")) {
+            const ffsinfo = this.getCurrentSrcInfo();
+            this.consumeToken();
 
-            const action = this.consumeTokenAndGetValue();
-            let value: undefined | Expression[] = undefined;
-            let cond: undefined | Expression = undefined;
-
-            if (!this.testToken(";")) {
+            try {
                 this.m_penv.getCurrentFunctionScope().pushLocalScope();
-                this.m_penv.getCurrentFunctionScope().defineLocalVar("$value", `$value_#${sinfo.pos}`, true);
+                this.m_penv.getCurrentFunctionScope().defineLocalVar("$value", `$value_#${ffsinfo.pos}`, true);
 
-                try {
-                    if (this.testToken("when")) {
-                        this.consumeToken();
-                        cond = this.parseExpression();
-                    }
-                    else {
-                        value = this.parseEphemeralListOf(() => this.parseExpression());
-                        if (this.testToken("when")) {
-                            this.consumeToken();
-                            cond = this.parseExpression();
-                        }
-                    }
+                let cond: Expression | "none" | "err" = "none";
+                let action: "return" | "yield" = "return";
+                if (this.testAndConsumeTokenIf("none")) {
+                    cond = "none";
                 }
-                finally {
-                    this.m_penv.popFunctionScope();
+                else if (this.testAndConsumeTokenIf("err")) {
+                    cond = "err";
                 }
+                else {
+                    cond = this.parseElvisCheck(ffsinfo) as Expression;
+                }
+                this.consumeToken();
+
+                if (this.testToken("return") || this.testToken("yield")) {
+                    action = this.consumeTokenAndGetValue() as "return" | "yield";
+                }
+
+                let value: Expression[] | undefined = undefined;
+                if (!this.testToken(";")) {
+                    value = this.parseEphemeralListOf(() => this.parseExpression());
+                }
+
+                return new ExpOrExpression(ffsinfo, texp, action, value, cond);
             }
-
-            return new ExpOrExpression(sinfo, texp, action, value, cond);
+            finally {
+                this.m_penv.popFunctionScope();
+            }
         }
         else {
             return texp;
@@ -2912,10 +2924,9 @@ class Parser {
         else if (tk === "validate") {
             this.consumeToken();
 
-            const exp = this.parseExpression();
+            const exp = this.parseSelectExpression();
             let err = new LiteralNoneExpression(sinfo);
-            if (this.testAndConsumeTokenIf("or")) {
-                this.ensureAndConsumeToken("return");
+            if (this.testFollows("else")) {
                 err = this.parseExpression();
             }
 
@@ -3326,15 +3337,11 @@ class Parser {
                     level = this.parseBuildInfo(level);
                 }
 
-                const exp = this.parseSelectExpression(); //don't want to get the ExpOrExpression
+                const exp = this.parseSelectExpression();
 
-                let err: Expression | undefined = undefined;
-                if (isvalidate) {
-                    err = new LiteralNoneExpression(sinfo);
-                    if (this.testAndConsumeTokenIf("or")) {
-                        this.ensureAndConsumeToken("return");
-                        err = this.parseExpression();
-                    }
+                let err = new LiteralNoneExpression(sinfo);
+                if (this.testFollows("else")) {
+                    err = this.parseExpression();
                 }
 
                 preconds.push(new PreConditionDecl(sinfo, isvalidate, level, exp, err));
@@ -3894,7 +3901,6 @@ class Parser {
 
         this.ensureAndConsumeToken("=");
         const idval = this.parseTypeSignature(false);
-        this.ensureAndConsumeToken(";");
 
         const param = new FunctionParameter("value", idval, false, false, false, undefined);
         const body = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "idkey_create");
@@ -3911,6 +3917,27 @@ class Parser {
         const staticOperators = new Map<string, StaticOperatorDecl[]>();
         const memberFields = new Map<string, MemberFieldDecl>();
         const memberMethods = new Map<string, MemberMethodDecl>();
+
+        if(this.testAndConsumeTokenIf("&")) {
+            this.setRecover(this.scanCodeParens());
+            this.ensureAndConsumeToken("{");
+
+            const thisType = new NominalTypeSignature(currentDecl.ns, [iname], []);
+
+            const nestedEntities = new Map<string, EntityTypeDecl>();
+            this.parseOOPMembersCommon(thisType, currentDecl, [iname], [], nestedEntities, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods);
+
+            this.ensureAndConsumeToken("}");
+
+            if (currentDecl.checkDeclNameClash(currentDecl.ns, iname)) {
+                this.raiseError(line, "Collision between concept and other names");
+            }
+
+            this.clearRecover();
+        }
+        else {
+            this.ensureAndConsumeToken(";");
+        }
 
         currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, [SpecialTypeCategory.IdentifierTypeDecl], currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, new Map<string, EntityTypeDecl>()));
         this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
@@ -3938,7 +3965,6 @@ class Parser {
 
         this.ensureAndConsumeToken("=");
         const idval = this.parseTypeSignature(false);
-        this.ensureAndConsumeToken(";");
 
         const cparam = new FunctionParameter("value", idval, false, false, false, undefined);
         const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "unit_create");
@@ -3961,9 +3987,26 @@ class Parser {
         const memberFields = new Map<string, MemberFieldDecl>();
         const memberMethods = new Map<string, MemberMethodDecl>();
 
-        //
-        //TODO: maybe we want to auto generate operator definitions here
-        //
+        if(this.testAndConsumeTokenIf("&")) {
+            this.setRecover(this.scanCodeParens());
+            this.ensureAndConsumeToken("{");
+
+            const thisType = new NominalTypeSignature(currentDecl.ns, [iname], []);
+
+            const nestedEntities = new Map<string, EntityTypeDecl>();
+            this.parseOOPMembersCommon(thisType, currentDecl, [iname], [], nestedEntities, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods);
+
+            this.ensureAndConsumeToken("}");
+
+            if (currentDecl.checkDeclNameClash(currentDecl.ns, iname)) {
+                this.raiseError(line, "Collision between concept and other names");
+            }
+
+            this.clearRecover();
+        }
+        else {
+            this.ensureAndConsumeToken(";");
+        }
 
         currentDecl.objects.set(iname, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, [SpecialTypeCategory.UnitTypeDecl], currentDecl.ns, iname, [], provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, new Map<string, EntityTypeDecl>()));
         this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + iname, currentDecl.objects.get(iname) as EntityTypeDecl);
@@ -4138,7 +4181,7 @@ class Parser {
                         }
                     }
                 }
-                else if (this.testToken("typedef") || this.testToken("enum") || this.testToken("identifier") || this.testToken("unit")) {
+                else if (this.testToken("typedef") || this.testToken("enum")) {
                     this.consumeToken();
                     this.ensureToken(TokenStrings.Type);
                     const tname = this.consumeTokenAndGetValue();
@@ -4147,6 +4190,21 @@ class Parser {
                     }
 
                     nsdecl.declaredNames.add(ns + "::" + tname);
+                }
+                else if (this.testToken("identifier") || this.testToken("unit")) {
+                    this.consumeToken();
+                    this.ensureToken(TokenStrings.Type);
+                    const tname = this.consumeTokenAndGetValue();
+                    if (nsdecl.declaredNames.has(tname)) {
+                        this.raiseError(this.getCurrentLine(), "Duplicate definition of name");
+                    }
+
+                    nsdecl.declaredNames.add(ns + "::" + tname);
+
+                    if (this.testToken("&")) {
+                        this.ensureToken("{"); //we should be at the opening left paren 
+                        this.m_cpos = this.scanCodeParens(); //scan to the closing paren
+                    }
                 }
                 else if (this.testToken("concept") || this.testToken("entity")) {
                     this.consumeToken();

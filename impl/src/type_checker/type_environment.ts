@@ -9,6 +9,7 @@ import { Assembly } from "../ast/assembly";
 import { ResolvedType } from "../ast/resolved_type";
 import { MIRInvokeKey } from "../compiler/mir_ops";
 import { PCode } from "../compiler/mir_emitter";
+import { Expression } from "../ast/body";
 
 enum FlowTypeTruthValue {
     True = "True",
@@ -117,6 +118,15 @@ type StructuredAssignmentPathStep = {
     step: "tuple" | "record" | "elist" | "nominal";
     ival: number;
     nval: string;
+    safe: boolean;
+};
+
+type StructuredAssignmentCheck = {
+    action: "eqchk" | "typechk" | "tstructchk" | "rstructchk",
+    oftype: ResolvedType | undefined,
+    eqvalue: Expression | undefined,
+    idxstructure: {idx: number, isopt: boolean }[],
+    namestructure: {name: string, isopt: boolean }[]
 };
 
 class TypeEnvironment {
@@ -452,6 +462,6 @@ class TypeEnvironment {
 
 export {
     FlowTypeTruthValue, FlowTypeTruthOps,
-    VarInfo, ExpressionReturnResult, StructuredAssignmentPathStep,
+    VarInfo, ExpressionReturnResult, StructuredAssignmentPathStep, StructuredAssignmentCheck,
     TypeEnvironment
 };

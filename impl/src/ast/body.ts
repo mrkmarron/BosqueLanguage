@@ -734,22 +734,26 @@ class MapEntryConstructorExpression extends Expression {
 
 class NonecheckExpression extends Expression {
     readonly lhs: Expression;
+    readonly customCheck: Expression | undefined;
     readonly rhs: Expression;
 
-    constructor(sinfo: SourceInfo, lhs: Expression, rhs: Expression) {
+    constructor(sinfo: SourceInfo, lhs: Expression, customCheck: Expression | undefined, rhs: Expression) {
         super(ExpressionTag.NonecheckExpression, sinfo);
         this.lhs = lhs;
+        this.customCheck = customCheck;
         this.rhs = rhs;
     }
 }
 
 class CoalesceExpression extends Expression {
     readonly lhs: Expression;
+    readonly customCheck: Expression | undefined;
     readonly rhs: Expression;
 
-    constructor(sinfo: SourceInfo, lhs: Expression, rhs: Expression) {
+    constructor(sinfo: SourceInfo, lhs: Expression, customCheck: Expression | undefined, rhs: Expression) {
         super(ExpressionTag.CoalesceExpression, sinfo);
         this.lhs = lhs;
+        this.customCheck = customCheck;
         this.rhs = rhs;
     }
 }
@@ -769,11 +773,11 @@ class SelectExpression extends Expression {
 
 class ExpOrExpression extends Expression {
     readonly exp: Expression;
-    readonly action: string;
+    readonly action: "return" | "yield";
     readonly result: Expression[] | undefined;
-    readonly cond: Expression | undefined;
+    readonly cond: Expression | "none" | "err";
 
-    constructor(sinfo: SourceInfo, exp: Expression, action: string, result: Expression[] | undefined, cond: Expression | undefined) {
+    constructor(sinfo: SourceInfo, exp: Expression, action: "return" | "yield", result: Expression[] | undefined, cond: Expression | "none" | "err") {
         super(ExpressionTag.ExpOrExpression, sinfo);
         this.exp = exp;
         this.action = action;
