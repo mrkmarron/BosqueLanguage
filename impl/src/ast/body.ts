@@ -940,25 +940,21 @@ class ConstValueStructuredAssignment extends StructuredAssignment {
 }
 
 class VariableDeclarationStructuredAssignment extends StructuredAssignment {
-    readonly isOptional: boolean;
     readonly vname: string;
     readonly vtype: TypeSignature;
 
-    constructor(isOptional: boolean, vname: string, vtype: TypeSignature) {
+    constructor(vname: string, vtype: TypeSignature) {
         super();
-        this.isOptional = isOptional;
         this.vname = vname;
         this.vtype = vtype;
     }
 }
 
 class VariableAssignmentStructuredAssignment extends StructuredAssignment {
-    readonly isOptional: boolean;
     readonly vname: string;
 
-    constructor(isOptional: boolean, vname: string) {
+    constructor(vname: string) {
         super();
-        this.isOptional = isOptional;
         this.vname = vname;
     }
 }

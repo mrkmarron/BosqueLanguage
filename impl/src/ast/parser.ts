@@ -2480,7 +2480,7 @@ class Parser {
     ////
     //Statement parsing
 
-    parseStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, trequired: boolean, literalok: boolean, decls: Set<string>): StructuredAssignment {
+    parseStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, decls: Set<string>): StructuredAssignment {
         if (this.testToken("#") || this.testToken("@")) {
             const isvalue = this.testToken("#");
             this.consumeToken();
@@ -2696,8 +2696,6 @@ class Parser {
                 return new IgnoreTermStructuredAssignment(isopt, itype);
             }
             else {
-                const isopt = this.testAndConsumeTokenIf("?");
-
                 let itype = this.m_penv.SpecialAutoSignature;
                 if (trequired && vars !== undefined) {
                     this.ensureAndConsumeToken(":");
@@ -2715,7 +2713,7 @@ class Parser {
                     }
                     decls.add(name);
 
-                    return new VariableDeclarationStructuredAssignment(isopt, name, itype);
+                    return new VariableDeclarationStructuredAssignment(name, itype);
                 }
                 else {
                     if (!this.m_penv.getCurrentFunctionScope().isVarNameDefined(name)) {
@@ -2726,7 +2724,7 @@ class Parser {
                         this.raiseError(sinfo.line, "Cannot redeclare type of variable on assignment");
                     }
 
-                    return new VariableAssignmentStructuredAssignment(isopt, name);
+                    return new VariableAssignmentStructuredAssignment(name);
                 }
             }
         }

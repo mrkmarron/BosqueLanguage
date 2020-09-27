@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry, ResolvedLiteralAtomType, ResolvedAtomType } from "../ast/resolved_type";
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
-import { TypeEnvironment, ExpressionReturnResult, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck } from "./type_environment";
+import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature, TupleTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, InvokeArgument, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
@@ -14,6 +14,7 @@ import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
 import * as assert from "assert";
 import { BSQRegex } from "../ast/bsqregex";
+import { option } from "commander";
 
 class TypeError extends Error {
     readonly file: string;
@@ -75,7 +76,7 @@ function createTupleStructureCheck(idxstructure: { idx: number, isopt: boolean }
 }
 
 function createRecordStructureCheck(namestructure: { name: string, isopt: boolean }[]): StructuredAssignmentCheck {
-    return { action: "rstructchk", oftype: undefined, eqvalue: undefined, idxstructure: [], namestructure: { name: string, isopt: boolean }[] };
+    return { action: "rstructchk", oftype: undefined, eqvalue: undefined, idxstructure: [], namestructure: namestructure };
 }
 
 class TypeChecker {
@@ -459,29 +460,6 @@ class TypeChecker {
         return this.m_assembly.typeUpperBound(rtype.options.map((atom) => (atom as ResolvedTupleAtomType).types[idx].type));
     }
 
-    private getInfoForLoadFromUnSafeIndex(rtype: ResolvedType, idx: number): ResolvedType {
-        let topts = rtype.options.map((atom) => {
-            const tatom = atom as ResolvedTupleAtomType;
-            if(idx < tatom.types.length) {
-                return tatom.types[idx].type;
-            }
-            else {
-                return this.m_assembly.getSpecialNoneType();
-            }
-        });
-
-        const addnone = rtype.options.some((atom) => {
-            const tatom = atom as ResolvedTupleAtomType;
-            return tatom.types.length <= idx || tatom.types[idx].isOptional;
-        });
-
-        if(addnone) {
-            topts.push(this.m_assembly.getSpecialNoneType());
-        }
-
-        return this.m_assembly.typeUpperBound(topts);
-    }
-
     private getInfoForHasProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): "yes" | "no" | "maybe" {
         this.raiseErrorIf(sinfo, rtype.options.some((atom) => !(atom instanceof ResolvedRecordAtomType)), "Can only load properties from Records");
 
@@ -511,31 +489,6 @@ class TypeChecker {
     private getInfoForLoadFromSafeProperty(sinfo: SourceInfo, rtype: ResolvedType, pname: string): ResolvedType {
         this.raiseErrorIf(sinfo, this.getInfoForHasProperty(sinfo, rtype, pname) === "no");
         return this.m_assembly.typeUpperBound(rtype.options.map((atom) => ((atom as ResolvedRecordAtomType).entries.find((re) => re.name === pname) as ResolvedRecordAtomTypeEntry).type));
-    }
-
-    private getInfoForLoadFromUnSafeProperty(rtype: ResolvedType, pname: string): ResolvedType {
-        let topts = rtype.options.map((atom) => {
-            const ratom = atom as ResolvedRecordAtomType;
-            const entry = ratom.entries.find((ee) => ee.name === pname);
-            if(entry !== undefined) {
-                return entry.type;
-            }
-            else {
-                return this.m_assembly.getSpecialNoneType();
-            }
-        });
-
-        const addnone = rtype.options.some((atom) => {
-            const ratom = atom as ResolvedRecordAtomType;
-            const entry = ratom.entries.find((ee) => ee.name === pname);
-            return entry === undefined || entry.isOptional;
-        });
-
-        if(addnone) {
-            topts.push(this.m_assembly.getSpecialNoneType());
-        }
-
-        return this.m_assembly.typeUpperBound(topts);
     }
 
     private getTypeForParameter(p: ResolvedFunctionTypeParam): ResolvedType {
@@ -4622,20 +4575,24 @@ class TypeChecker {
         return cenv;
     }
 
-    private checkStructuredMatch(sinfo: SourceInfo, env: TypeEnvironment, etype: ResolvedType, 
+    private checkStructuredMatch(sinfo: SourceInfo, env: TypeEnvironment, etype: ResolvedType,
         cpath: StructuredAssignmentPathStep[], assign: StructuredAssignment,
         allDeclared: [string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType][], 
         allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][], 
-        allChecks: [StructuredAssignmentPathStep[], StructuredAssignmentCheck][]): ["match" | "fail" | "maybe", bool] {
+        allChecks: [StructuredAssignmentPathStep[], StructuredAssignmentCheck][]): [boolean, boolean] {
 
         if (assign instanceof IgnoreTermStructuredAssignment) {
             const itype = this.resolveAndEnsureTypeOnly(sinfo, assign.termType, env.terms);
-            const mr = this.m_assembly.subtypeOf(etype, itype) ? "match" : "maybe";
-
-            if(mr !== "match") {
+            
+            const optt = this.m_assembly.splitTypes(etype, itype);
+            if(optt.tp.isEmptyType()) {
+                return [false, false];
+            }
+            if(!optt.fp.isEmptyType()) {
                 allChecks.push([[...cpath], createOfTypeCheck(itype)]);
             }
-            return [mr, assign.isOptional];
+
+            return [true, assign.isOptional];
         }
         else if (assign instanceof ConstValueStructuredAssignment) {
             const oldenable = this.m_emitter.getEmitEnabled();
@@ -4645,9 +4602,14 @@ class TypeChecker {
             
             this.m_emitter.setEmitEnabled(oldenable);
 
+            this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(ctype, this.m_assembly.getSpecialKeyTypeConceptType()) || !ctype.isGroundedType(), "Invalid type for constant match");
+
+            if(!this.m_assembly.subtypeOf(etype, this.m_assembly.getSpecialKeyTypeConceptType()) || !etype.isGroundedType()) {
+                return [false, false];
+            }
             allChecks.push([[...cpath], createTerminalEqCheck(assign.constValue, ctype)]);
 
-            return ["maybe", false];
+            return [true, false];
         }
         else if (assign instanceof VariableDeclarationStructuredAssignment) {
             this.raiseErrorIf(sinfo, allDeclared.find((decl) => decl[0] === assign.vname) !== undefined || allAssigned.find((asgn) => asgn[0] === assign.vname) !== undefined, "Duplicate variables used in structured assign");
@@ -4655,12 +4617,15 @@ class TypeChecker {
             const vtype = (assign.vtype instanceof AutoTypeSignature) ? etype : this.resolveAndEnsureTypeOnly(sinfo, assign.vtype, env.terms);
             allDeclared.push([assign.vname, vtype, [...cpath], etype]);
 
-            const mr = this.m_assembly.subtypeOf(etype, vtype) ? "match" : "maybe";
-            if(mr !== "match") {
+            const optt = this.m_assembly.splitTypes(etype, vtype);
+            if(optt.tp.isEmptyType()) {
+                return [false, false];
+            }
+            if(!optt.fp.isEmptyType()) {
                 allChecks.push([[...cpath], createOfTypeCheck(vtype)]);
             }
 
-            return [mr, assign.isOptional];
+            return [true, false];
         }
         else if (assign instanceof VariableAssignmentStructuredAssignment) {
             this.raiseErrorIf(sinfo, allDeclared.find((decl) => decl[0] === assign.vname) !== undefined || allAssigned.find((asgn) => asgn[0] === assign.vname) !== undefined, "Duplicate variables used in structured assign");
@@ -4671,113 +4636,55 @@ class TypeChecker {
 
             allAssigned.push([assign.vname, [...cpath], etype]);
             
-            const mr = this.m_assembly.subtypeOf(etype, (vinfo as VarInfo).declaredType) ? "match" : "maybe";
-            if(mr !== "match") {
+            const optt = this.m_assembly.splitTypes(etype, (vinfo as VarInfo).declaredType);
+            if(optt.tp.isEmptyType()) {
+                return [false, false];
+            }
+            if(!optt.fp.isEmptyType()) {
                 allChecks.push([[...cpath], createOfTypeCheck((vinfo as VarInfo).declaredType)]);
             }
 
-            return [mr, assign.isOptional];
+            return [true, false];
+        }
+        else if (assign instanceof ValueListStructuredAssignment) {
+            if (etype.options.length !== 1 || !(etype.options[0] instanceof ResolvedEphemeralListType)) {
+                return [false, false];
+            }
+
+            const eltype = etype.options[0] as ResolvedEphemeralListType;
+            if (eltype.types.length !== assign.assigns.length) {
+                return [false, false];
+            }
+
+            let chksok = true;
+            for (let i = 0; i < assign.assigns.length; ++i) {
+                const step = createEphemeralStructuredAssignmentPathStep(etype, eltype.types[i], i);
+                const [ok, ] = this.checkStructuredMatch(sinfo, env, eltype.types[i], [...cpath, step], assign.assigns[i], allDeclared, allAssigned, allChecks);
+
+                chksok = chksok && ok;
+            }
+
+            return [chksok, false];
         }
         else if (assign instanceof NominalStructuredAssignment) {
             const ntype = this.resolveAndEnsureTypeOnly(sinfo, assign.atype, env.terms);
-            this.raiseErrorIf(sinfo, ntype.options.length !== 1 || !(ntype.options[0] instanceof ResolvedEntityAtomType || ntype.options[0] instanceof ResolvedConceptAtomType));
-            
-            const fieldkeys = assign.assigns.map((asn) => {
-                const finfo = this.m_assembly.tryGetOOMemberDeclOptions(ntype, "field", asn[0]);
-                this.raiseErrorIf(sinfo, finfo.root === undefined, "Field name is not defined (or is multiply) defined");
-
-                const fdeclinfo = finfo.root as OOMemberLookupInfo;
-                const ffdecl = (fdeclinfo.decl as MemberFieldDecl);
-                const ftype = this.resolveAndEnsureTypeOnly(sinfo, ffdecl.declaredType, fdeclinfo.binds);
-                return { key: MIRKeyGenerator.generateFieldKey(fdeclinfo.contiainingType, fdeclinfo.binds, asn[0]), ftype: ftype };
-            });
-
-            for (let i = 0; i < assign.assigns.length; ++i) {
-                const ttype = fieldkeys[i].ftype;
-                const step = createNominalStructuredAssignmentPathStep(expt, ttype, fieldkeys[i].key);
-
-                let childchecks: [StructuredAssignmentPathStep[], Expression | ResolvedType][] = [];
-                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, step], assign.assigns[i], ttype, allDeclared, allAssigned, childchecks);
-
-                allChecks.push([[...cpath], einfo[0]])
-                allChecks.push(...childchecks);
+            if (ntype.options.length === 1 && ntype.options[0] instanceof ResolvedEntityAtomType) {
+                const isstruct = OOPTypeDecl.attributeSetContains("struct", (ntype.options[0] as ResolvedEntityAtomType).object.attributes);
+                this.raiseErrorIf(sinfo, isstruct !== assign.isvalue, "Mismatch in value type of Entity and match");
+            }
+            else {
+                this.raiseErrorIf(sinfo, ntype.options.length !== 1 || !(ntype.options[0] instanceof ResolvedConceptAtomType));
+                const anystructcpt = (ntype.options[0] as ResolvedConceptAtomType).conceptTypes.some((cpt) => OOPTypeDecl.attributeSetContains("struct", cpt.concept.attributes));
+                this.raiseErrorIf(sinfo, anystructcpt !== assign.isvalue, "Mismatch in value type of Concept and match");
             }
 
-            return [ntype, false];
-        }
-
-
-
-        
-        else if (assign instanceof ValueListStructuredAssignment) {
-            const eltype = expt.options[0] as ResolvedEphemeralListType;
-            this.raiseErrorIf(sinfo, eltype.types.length !== assign.assigns.length, "Mismatch values in ephemeral list and assignment");
-            this.raiseErrorIf(sinfo, expt.options.length !== 1 || !(expt.options[0] instanceof ResolvedEphemeralListType), "Assign value is not subtype of declared variable type");
-            
-            for (let i = 0; i < assign.assigns.length; ++i) {
-                const step = createEphemeralStructuredAssignmentPathStep(expt, eltype.types[i], i);
-                this.checkStructuredMatch(sinfo, env, [...cpath, step], assign.assigns[i], eltype.types[i], allDeclared, allAssigned, allChecks);
+            const optt = this.m_assembly.splitTypes(etype, ntype);
+            if(optt.tp.isEmptyType()) {
+                return [false, false];
             }
-
-            return [expt, false];
-        }
-        else if (assign instanceof TupleStructuredAssignment) {
-            const tupopts = expt.options.filter((opt) => opt instanceof ResolvedTupleAtomType);
-            this.raiseErrorIf(sinfo, tupopts.length === 0, "Check will always fail");
-
-            const tuptype = ResolvedType.create(tupopts);
-            const tupcheck: ResolvedTupleAtomTypeEntry[] = [];
-            for (let i = 0; i < assign.assigns.length; ++i) {
-                const ttype = this.getInfoForLoadFromIndex(sinfo, tuptype, i);
-                const step = createTupleStructuredAssignmentPathStep(expt, ttype, i);
-                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, step], assign.assigns[i], ttype, allDeclared, allAssigned, allChecks);
-                tupcheck.push(new ResolvedTupleAtomTypeEntry(...einfo));
+            if(!optt.fp.isEmptyType()) {
+                allChecks.push([[...cpath], createOfTypeCheck(ntype)]);
             }
-
-            return [ResolvedType.createSingle(ResolvedTupleAtomType.create(tupcheck)), false];
-        }
-        else {
-            this.raiseErrorIf(sinfo, !(assign instanceof RecordStructuredAssignment), "Unknown structured assignment type");
-
-            const recopts = expt.options.filter((opt) => opt instanceof ResolvedRecordAtomType);
-            this.raiseErrorIf(sinfo, recopts.length === 0, "Check will always fail");
-
-            const rassign = assign as RecordStructuredAssignment;
-            const rectype = ResolvedType.create(recopts);
-            const reccheck: ResolvedRecordAtomTypeEntry[] = [];
-            for (let i = 0; i < rassign.assigns.length; ++i) {
-                const pname = rassign.assigns[i][0];
-                const ttype = this.getInfoForLoadFromPropertyName(sinfo, rectype, pname);
-                const step = createRecordStructuredAssignmentPathStep(expt, ttype, pname);
-                const einfo = this.checkStructuredMatch(sinfo, env, [...cpath, step], rassign.assigns[i][1], ttype, allDeclared, allAssigned, allChecks);
-                reccheck.push(new ResolvedRecordAtomTypeEntry(pname, ...einfo));
-            }
-
-            return [ResolvedType.createSingle(ResolvedRecordAtomType.create(reccheck)), false];
-        }
-    }
-
-    private checkStructuredAssign(sinfo: SourceInfo, env: TypeEnvironment, isopt: boolean, cpath: StructuredAssignmentPathStep[], assign: StructuredAssignment, expt: ResolvedType, allDeclared: [string, ResolvedType, StructuredAssignmentPathStep[], ResolvedType][], allAssigned: [string, StructuredAssignmentPathStep[], ResolvedType][]) {
-        
-        
-        else if (assign instanceof ValueListStructuredAssignment) {
-            this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
-            this.raiseErrorIf(sinfo, expt.options.length !== 1 || !(expt.options[0] instanceof ResolvedEphemeralListType), "Assign value is not subtype of declared variable type");
-            
-            const eltype = expt.options[0] as ResolvedEphemeralListType;
-            this.raiseErrorIf(sinfo, eltype.types.length !== assign.assigns.length, "More values in ephemeral list than assignment");
-
-            for (let i = 0; i < assign.assigns.length; ++i) {
-                const step = createEphemeralStructuredAssignmentPathStep(expt, expt, eltype.types[i], i);
-                this.checkStructuredAssign(sinfo, env, false, [...cpath, step], assign.assigns[i], eltype.types[i], allDeclared, allAssigned);
-            }
-        }
-        else if (assign instanceof NominalStructuredAssignment) {
-            this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
-
-            const ntype = this.resolveAndEnsureTypeOnly(sinfo, assign.atype, env.terms);
-            this.raiseErrorIf(sinfo, ntype.options.length !== 1 || !(ntype.options[0] instanceof ResolvedEntityAtomType || ntype.options[0] instanceof ResolvedConceptAtomType));
-            this.raiseErrorIf(sinfo, !this.m_assembly.subtypeOf(expt, ntype), "Assign value is not subtype of declared variable type");
 
             const fieldkeys = assign.assigns.map((asn) => {
                 const tryfinfo = this.m_assembly.tryGetFieldUniqueDeclFromType(ntype, asn[0]);
@@ -4801,74 +4708,124 @@ class TypeChecker {
                     fmap.forEach((v, k) => fields.add(k));
                 });
             }
-            this.raiseErrorIf(sinfo, fields.size > assign.assigns.length, "More fields in type that assignment");
+            this.raiseErrorIf(sinfo, fields.size !== assign.assigns.length, "Mismatch in field counts and assignment");
 
+            let chkok = true;
             for (let i = 0; i < assign.assigns.length; ++i) {
                 const ttype = fieldkeys[i].ftype;
-                const step = createNominalStructuredAssignmentPathStep(expt, expt, ttype, fieldkeys[i].key);
-                this.checkStructuredAssign(sinfo, env, false, [...cpath, step], assign.assigns[i], ttype, allDeclared, allAssigned);
+                const step = createNominalStructuredAssignmentPathStep(etype, ttype, fieldkeys[i].key);
+                const [ok, ] = this.checkStructuredMatch(sinfo, env, ttype, [...cpath, step], assign.assigns[i], allDeclared, allAssigned, allChecks);
+
+                chkok = chkok && ok;
             }
+
+            return [chkok, false];
         }
         else if (assign instanceof TupleStructuredAssignment) {
-            this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
-            this.raiseErrorIf(sinfo, !expt.isTupleTargetType(), "Expected Tuple for structured Tuple assignment");
+            const tupopts = etype.options.filter((opt) => opt instanceof ResolvedTupleAtomType && opt.isvalue === assign.isvalue) as ResolvedTupleAtomType[];
+            if(tupopts.length === 0, "Check will always fail") {
+                return [false, false];
+            }
 
-            this.raiseErrorIf(sinfo, expt.options.some((atom) => {
-                return (atom as ResolvedTupleAtomType).isvalue !== assign.isvalue || (atom as ResolvedTupleAtomType).types.length > assign.assigns.length;
-            }), "More values in record that assignment");
+            const tlen = tupopts.reduce((acc, v) => Math.max(acc, v.types.length), 0);
+            if(tlen !== assign.assigns.length) {
+                return [false, false];
+            }
 
+            const ttype = ResolvedType.create(tupopts);
+            let schecks: { idx: number, isopt: boolean }[] = [];
+            let chkok = true;
             for (let i = 0; i < assign.assigns.length; ++i) {
-                const hasidx = this.getInfoForHasIndex(sinfo, expt, i);
+                const asgn = assign.assigns[i];
+                const tuphasidx = this.getInfoForHasIndex(sinfo, ttype, i);
 
-                if(hasidx === "no") {
-                    const step = createNoneStructuredAssignmentPathStep(this.m_assembly.getSpecialNoneType());
-                    this.checkStructuredAssign(sinfo, env, true, [step], assign.assigns[i], this.m_assembly.getSpecialNoneType(), allDeclared, allAssigned);
+                let ok = true;
+                if(tuphasidx === "no") {
+                    if(!(asgn instanceof IgnoreTermStructuredAssignment) || !asgn.isOptional) {
+                        return [false, false];
+                    }
                 }
-                else if(hasidx === "yes") {
-                    const ttype = this.getInfoForLoadFromSafeIndex(sinfo, expt, i);
-                    const step = createTupleStructuredAssignmentPathStep(expt, expt, ttype, i, true);
-                    this.checkStructuredAssign(sinfo, env, false, [...cpath, step], assign.assigns[i], ttype, allDeclared, allAssigned);
+                else if (tuphasidx === "maybe") {
+                    const idxtype = this.getInfoForLoadFromSafeIndex(sinfo, ttype, i);
+                    const step = createTupleStructuredAssignmentPathStep(ttype, idxtype, i, false);
+
+                    schecks.push({ idx: i, isopt: true });
+                    let optok = true;
+                    [ok, optok] = this.checkStructuredMatch(sinfo, env, idxtype, [...cpath, step], assign.assigns[i], allDeclared, allAssigned, allChecks);
+
+                    if(!optok) {
+                        return [false, false];
+                    }
                 }
                 else {
-                    const ttype = this.getInfoForLoadFromUnSafeIndex(expt, i);
-                    const step = createTupleStructuredAssignmentPathStep(expt, expt, ttype, i, false);
-                    this.checkStructuredAssign(sinfo, env, true, [...cpath, step], assign.assigns[i], ttype, allDeclared, allAssigned);
+                    const idxtype = this.getInfoForLoadFromSafeIndex(sinfo, ttype, i);
+                    const step = createTupleStructuredAssignmentPathStep(ttype, idxtype, i, true);
+
+                    [ok, ] = this.checkStructuredMatch(sinfo, env, idxtype, [...cpath, step], assign.assigns[i], allDeclared, allAssigned, allChecks);
                 }
+
+                chkok = chkok && ok;
             }
+
+            if(schecks.length !== 0) {
+                allChecks.push([[...cpath], createTupleStructureCheck(schecks)]);
+            }
+
+            return [chkok, false];
         }
         else {
-            this.raiseErrorIf(sinfo, !(assign instanceof RecordStructuredAssignment), "Unknown structured assignment type");
-            this.raiseErrorIf(sinfo, isopt, "Missing value for required entry");
-            this.raiseErrorIf(sinfo, !expt.isRecordTargetType(), "Expected Recrod for structured Record assignment");
-            
             const rassign = assign as RecordStructuredAssignment;
+            const recopts = etype.options.filter((opt) => opt instanceof ResolvedRecordAtomType && opt.isvalue === rassign.isvalue) as ResolvedRecordAtomType[];
+            if(recopts.length === 0, "Check will always fail") {
+                return [false, false];
+            }
 
-            this.raiseErrorIf(sinfo, expt.options.some((atom) => {
-                return (atom as ResolvedRecordAtomType).isvalue !== rassign.isvalue || (atom as ResolvedRecordAtomType).entries.some((re) => {
-                    const entry = rassign.assigns.find((e) => e[0] === re.name);
-                    return entry === undefined;
-                });
-            }), "More values in record that assignment");
+            let allnames = new Set<string>();
+            recopts.forEach((opt) => opt.entries.forEach((entry) => allnames.add(entry.name)));
+            if(allnames.size !== rassign.assigns.length) {
+                return [false, false];
+            }
 
+            const ttype = ResolvedType.create(recopts);
+            let schecks: { name: string, isopt: boolean }[] = [];
+            let chkok = true;
             for (let i = 0; i < rassign.assigns.length; ++i) {
-                const pname = rassign.assigns[i][0];
-                const hasidx = this.getInfoForHasProperty(sinfo, expt, pname);
+                const asgn = rassign.assigns[i];
+                const rechasprop = this.getInfoForHasProperty(sinfo, ttype, asgn[0]);
 
-                if(hasidx === "no") {
-                    const step = createNoneStructuredAssignmentPathStep(this.m_assembly.getSpecialNoneType());
-                    this.checkStructuredAssign(sinfo, env, true, [step], rassign.assigns[i], this.m_assembly.getSpecialNoneType(), allDeclared, allAssigned);
+                let ok = true;
+                if(rechasprop === "no") {
+                    if(!(asgn instanceof IgnoreTermStructuredAssignment) || !asgn.isOptional) {
+                        return [false, false];
+                    }
                 }
-                else if(hasidx === "yes") {
-                    const ttype = this.getInfoForLoadFromSafeProperty(sinfo, expt, pname);
-                    const step = createRecordStructuredAssignmentPathStep(expt, expt, ttype, pname, true);
-                    this.checkStructuredAssign(sinfo, env, false, [...cpath, step], rassign.assigns[i], ttype, allDeclared, allAssigned);
+                else if (rechasprop === "maybe") {
+                    const ptype = this.getInfoForLoadFromSafeProperty(sinfo, ttype, asgn[0]);
+                    const step = createRecordStructuredAssignmentPathStep(ttype, ptype, asgn[0], false);
+
+                    schecks.push({ name: asgn[0], isopt: true });
+                    let optok = true;
+                    [ok, optok] = this.checkStructuredMatch(sinfo, env, ptype, [...cpath, step], rassign.assigns[i], allDeclared, allAssigned, allChecks);
+
+                    if(!optok) {
+                        return [false, false];
+                    }
                 }
                 else {
-                    const ttype = this.getInfoForLoadFromUnSafeProperty(expt, pname);
-                    const step = createRecordStructuredAssignmentPathStep(expt, expt, ttype, pname, false);
-                    this.checkStructuredAssign(sinfo, env, true, [...cpath, step], rassign.assigns[i], ttype, allDeclared, allAssigned);
+                    const ptype = this.getInfoForLoadFromSafeProperty(sinfo, ttype, asgn[0]);
+                    const step = createRecordStructuredAssignmentPathStep(ttype, ptype, asgn[0], true);
+
+                    [ok, ] = this.checkStructuredMatch(sinfo, env, ptype, [...cpath, step], rassign.assigns[i], allDeclared, allAssigned, allChecks);
                 }
+
+                chkok = chkok && ok;
             }
+
+            if(schecks.length !== 0) {
+                allChecks.push([[...cpath], createRecordStructureCheck(schecks)]);
+            }
+
+            return [chkok, false];
         }
     }
 
