@@ -680,6 +680,14 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRBinCmp(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
     }
 
+    emitMultiTestOp(sinfo: SourceInfo, alltrue: MIRTempRegister[], allfalse: MIRTempRegister[], trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
+    }
+
     emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srctype: MIRType) {
         if(!this.emitEnabled) {
             return;

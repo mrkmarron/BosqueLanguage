@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { Expression } from "./body";
+import { AccessNamespaceConstantExpression, AccessStaticFieldExpression, Expression, LiteralBoolExpression, LiteralIntegerExpression, LiteralNaturalExpression } from "./body";
 
 class TypeSignature {
 }
@@ -41,12 +41,10 @@ class NominalTypeSignature extends TypeSignature {
 }
 
 class LiteralTypeSignature extends TypeSignature {
-    readonly oftype: TypeSignature;
-    readonly typevalue: boolean | number | string | undefined;
+    readonly typevalue: LiteralBoolExpression | LiteralIntegerExpression | LiteralNaturalExpression | AccessNamespaceConstantExpression | AccessStaticFieldExpression;
 
-    constructor(oftype: TypeSignature, typevalue: boolean | number | string | undefined) {
+    constructor(typevalue: LiteralBoolExpression | LiteralIntegerExpression | LiteralNaturalExpression | AccessNamespaceConstantExpression | AccessStaticFieldExpression) {
         super();
-        this.oftype = oftype;
         this.typevalue = typevalue;
     }
 }

@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegerExpression, AccessStaticFieldExpression } from "./body";
+import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegerExpression, AccessStaticFieldExpression, LiteralNaturalExpression, AccessNamespaceConstantExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -1010,21 +1010,79 @@ class Assembly {
         }
     }
 
-    private normalizeType_Literal(l: LiteralTypeSignature): ResolvedType {
-        const ltype = this.normalizeTypeOnly(l.oftype, new Map<string, ResolvedType>());
+    private normalizeType_Literal(l: LiteralTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
+        let ltype = this.getSpecialNoneType();
+        let tval: boolean | string = "[UNDEF]";
 
-        //should be Bool, Int, or Enum
-        if (ltype.isEmptyType() || !ltype.isUniqueCallTargetType()) {
-            return ResolvedType.createEmpty();
+        if (l.typevalue instanceof LiteralBoolExpression) {
+            ltype = this.getSpecialBoolType();
+            tval = l.typevalue.value;
+        } 
+        else if (l.typevalue instanceof LiteralIntegerExpression) {
+            ltype = this.getSpecialIntType();
+            tval = l.typevalue.value;
         }
-
-        if (typeof (l.typevalue) === "boolean") {
-            return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, l.typevalue));
+        else if (l.typevalue instanceof LiteralNaturalExpression) {
+            ltype = this.getSpecialNatType();
+            tval = l.typevalue.value;
         }
         else {
-            const lenum = l.typevalue as string ;
-            return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, lenum));
+            let lexp: Expression = l.typevalue;
+            while (lexp instanceof AccessNamespaceConstantExpression || lexp instanceof AccessStaticFieldExpression) {
+                if (lexp instanceof AccessNamespaceConstantExpression) {
+                    if (!this.hasNamespace(lexp.ns)) {
+                        return ResolvedType.createEmpty()
+                    }
+                    const nsdecl = this.getNamespace(lexp.ns);
+
+                    if (!nsdecl.consts.has(lexp.name)) {
+                        return ResolvedType.createEmpty();
+                    }
+
+                    const cdecl = nsdecl.consts.get(lexp.name) as NamespaceConstDecl;
+                    ltype = this.normalizeTypeOnly(cdecl.declaredType, new Map<string, ResolvedType>());
+                    lexp = cdecl.value;
+                }
+                else {
+                    const oftype = this.normalizeTypeOnly(lexp.stype, binds);
+                    if(oftype.isUniqueCallTargetType() && oftype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.EnumTypeDecl)) {
+                        break;
+                    }
+
+                    const cdecltry = this.tryGetConstMemberUniqueDeclFromType(oftype, lexp.name);
+                    if(cdecltry === undefined || cdecltry.decl.value === undefined) {
+                        return ResolvedType.createEmpty();
+                    }
+            
+                    const cdecl = cdecltry as OOMemberLookupInfo<StaticMemberDecl>;
+                    ltype = this.normalizeTypeOnly(cdecl.decl.declaredType, cdecl.binds);
+                    lexp = cdecl.decl.value as Expression;
+                }
+            }
+
+            //should be Bool, Int, or Enum
+            if (!ltype.isUniqueCallTargetType()) {
+                return ResolvedType.createEmpty();
+            }
+
+            if (lexp instanceof LiteralBoolExpression) {
+                tval = lexp.value;
+            }
+            else if (lexp instanceof LiteralIntegerExpression) { 
+                tval = lexp.value;
+            }
+            else if (lexp instanceof LiteralNaturalExpression) { 
+                tval = lexp.value;
+            }
+            else if (lexp instanceof AccessStaticFieldExpression) { 
+                tval = lexp.name;
+            }
+            else {
+                return ResolvedType.createEmpty();
+            }
         }
+
+        return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, tval));
     }
 
     private normalizeType_Tuple(t: TupleTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -1301,19 +1359,7 @@ class Assembly {
             let ttl = this.normalizeTypeGeneral(param.type, binds);
             let llpv: string | undefined = undefined;
             if(param.exp !== undefined) {
-                if(param.exp instanceof LiteralBoolExpression) {
-                    llpv = `${(param.exp as LiteralBoolExpression).value}`;
-                }
-                else if (param.exp instanceof LiteralIntegerExpression) {
-                    llpv = `${(param.exp as LiteralIntegerExpression).value}`;
-                }
-                else if (param.exp instanceof AccessStaticFieldExpression) {
-                    const access = param.exp as AccessStaticFieldExpression;
-                    llpv = `${ttl.idStr}::${access.name}`;
-                }
-                else {
-                    // all good
-                }
+                llpv = "[LITERAL EXP]"
             }
 
             return new ResolvedFunctionTypeParam(param.name, ttl, param.isOptional, param.isRef, param.isLiteral, llpv) 
@@ -1322,6 +1368,10 @@ class Assembly {
         const rtype = this.normalizeTypeOnly(t.resultType, binds);
 
         if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || rtype.isEmptyType()) {
+            return undefined;
+        }
+
+        if (t.params.some((p) => p.exp !== undefined && !p.exp.isConstantExpression())) {
             return undefined;
         }
 
@@ -2211,7 +2261,7 @@ class Assembly {
             return this.normalizeType_Template(t, binds);
         }
         else if (t instanceof LiteralTypeSignature) {
-            return this.normalizeType_Literal(t);
+            return this.normalizeType_Literal(t, binds);
         }
         else if (t instanceof NominalTypeSignature) {
             return this.normalizeType_Nominal(t, binds);

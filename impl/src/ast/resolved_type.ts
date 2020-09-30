@@ -462,10 +462,10 @@ class ResolvedType {
             return true;
         }
         else if (opt instanceof ResolvedTupleAtomType) {
-            return opt.grounded && opt.types.every((entry) => !entry.isOptional);
+            return opt.grounded && !opt.types[0].isOptional;
         }
         else if (opt instanceof ResolvedRecordAtomType) {
-            return opt.grounded && opt.entries.every((entry) => !entry.isOptional);
+            return opt.grounded && !opt.entries[0].isOptional;
         }
         else {
             //ephemeral list should never be in a unique position

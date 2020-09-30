@@ -118,15 +118,15 @@ type StructuredAssignmentPathStep = {
     step: "tuple" | "record" | "elist" | "nominal";
     ival: number;
     nval: string;
-    safe: boolean;
 };
 
 type StructuredAssignmentCheck = {
     action: "eqchk" | "typechk" | "tstructchk" | "rstructchk",
+    srctype: ResolvedType,
     oftype: ResolvedType | undefined,
     eqvalue: Expression | undefined,
-    idxstructure: {idx: number, isopt: boolean }[],
-    namestructure: {name: string, isopt: boolean }[]
+    idxstructure: {idx: number, restype: ResolvedType, chk: "yes" | "opt" | "no" }[],
+    namestructure: {name: string, restype: ResolvedType, chk: "yes" | "opt" | "no" }[]
 };
 
 class TypeEnvironment {

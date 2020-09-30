@@ -42,6 +42,10 @@ class Arguments {
     constructor(args: InvokeArgument[]) {
         this.argList = args;
     }
+
+    isConstantArgList(): boolean {
+        return this.argList.every((arg) => arg.value.isConstantExpression());
+    }
 }
 
 class TemplateArguments {
@@ -192,6 +196,10 @@ abstract class Expression {
     constructor(tag: ExpressionTag, sinfo: SourceInfo) {
         this.tag = tag;
         this.sinfo = sinfo;
+    }
+
+    isConstantExpression(): boolean {
+        return true;
     }
 }
 
@@ -372,6 +380,10 @@ class AccessVariableExpression extends Expression {
         super(ExpressionTag.AccessVariableExpression, sinfo);
         this.name = name;
     }
+
+    isConstantExpression(): boolean {
+        return false;
+    }
 }
 
 class ConstructorPrimaryExpression extends Expression {
@@ -384,6 +396,10 @@ class ConstructorPrimaryExpression extends Expression {
         this.isvalue = isvalue;
         this.ctype = ctype;
         this.args = args;
+    }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
     }
 }
 
@@ -404,6 +420,10 @@ class ConstructorPrimaryWithFactoryExpression extends Expression {
         this.terms = terms;
         this.args = args;
     }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
+    }
 }
 
 class ConstructorTupleExpression extends Expression {
@@ -414,6 +434,10 @@ class ConstructorTupleExpression extends Expression {
         super(ExpressionTag.ConstructorTupleExpression, sinfo);
         this.isvalue = isvalue;
         this.args = args;
+    }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
     }
 }
 
@@ -426,6 +450,10 @@ class ConstructorRecordExpression extends Expression {
         this.isvalue = isvalue;
         this.args = args;
     }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
+    }
 }
 
 class ConstructorEphemeralValueList extends Expression {
@@ -434,6 +462,10 @@ class ConstructorEphemeralValueList extends Expression {
     constructor(sinfo: SourceInfo, args: Arguments) {
         super(ExpressionTag.ConstructorEphemeralValueList, sinfo);
         this.args = args;
+    }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
     }
 }
 
@@ -445,6 +477,10 @@ class ConstructorPCodeExpression extends Expression {
         super(ExpressionTag.ConstructorPCodeExpression, sinfo);
         this.isAuto = isAuto;
         this.invoke = invoke;
+    }
+
+    isConstantExpression(): boolean {
+        return this.invoke.captureSet.size === 0;
     }
 }
 
@@ -459,6 +495,10 @@ class PCodeInvokeExpression extends Expression {
         this.pragmas = pragmas;
         this.args = args;
     }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
+    }
 }
 
 class SpecialConstructorExpression extends Expression {
@@ -471,6 +511,10 @@ class SpecialConstructorExpression extends Expression {
         this.rtype = rtype;
         this.rop = rop;
         this.arg = arg;
+    }
+
+    isConstantExpression(): boolean {
+        return this.arg.isConstantExpression();
     }
 }
 
@@ -489,6 +533,10 @@ class CallNamespaceFunctionOrOperatorExpression extends Expression {
         this.terms = terms;
         this.args = args;
     }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
+    }
 }
 
 class CallStaticFunctionOrOperatorExpression extends Expression {
@@ -505,6 +553,10 @@ class CallStaticFunctionOrOperatorExpression extends Expression {
         this.pragmas = pragmas;
         this.terms = terms;
         this.args = args;
+    }
+
+    isConstantExpression(): boolean {
+        return this.args.isConstantArgList();
     }
 }
 
@@ -537,6 +589,8 @@ abstract class PostfixOperation {
         this.customCheck = customCheck;
         this.op = op;
     }
+
+    abstract isConstantPostfixOperation(): boolean;
 }
 
 class PostfixOp extends Expression {
@@ -548,6 +602,10 @@ class PostfixOp extends Expression {
         this.rootExp = root;
         this.ops = ops;
     }
+
+    isConstantExpression(): boolean {
+        return this.rootExp.isConstantExpression() && this.ops.every((op) => (op.customCheck === undefined || op.customCheck.isConstantExpression()) && op.isConstantPostfixOperation());
+    }
 }
 
 class PostfixAccessFromIndex extends PostfixOperation {
@@ -556,6 +614,10 @@ class PostfixAccessFromIndex extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, index: number) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromIndex);
         this.index = index;
+    }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
     }
 }
 
@@ -570,6 +632,10 @@ class PostfixProjectFromIndecies extends PostfixOperation {
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
+    }
 }
 
 class PostfixAccessFromName extends PostfixOperation {
@@ -578,6 +644,10 @@ class PostfixAccessFromName extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, name: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromName);
         this.name = name;
+    }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
     }
 }
 
@@ -592,6 +662,10 @@ class PostfixProjectFromNames extends PostfixOperation {
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
+    }
 }
 
 class PostfixModifyWithIndecies extends PostfixOperation {
@@ -602,6 +676,10 @@ class PostfixModifyWithIndecies extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixModifyWithIndecies);
         this.isBinder = isBinder;
         this.updates = updates;
+    }
+
+    isConstantPostfixOperation(): boolean {
+        return this.updates.every((update) => update.value.isConstantExpression());
     }
 }
 
@@ -614,6 +692,10 @@ class PostfixModifyWithNames extends PostfixOperation {
         this.isBinder = isBinder;
         this.updates = updates;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return this.updates.every((update) => update.value.isConstantExpression());
+    }
 }
 
 class PostfixIs extends PostfixOperation {
@@ -622,6 +704,10 @@ class PostfixIs extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, istype: TypeSignature) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixIs);
         this.istype = istype;
+    }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
     }
 }
 
@@ -632,6 +718,10 @@ class PostfixAs extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAs);
         this.astype = astype;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
+    }
 }
 
 class PostfixHasIndex extends PostfixOperation {
@@ -641,6 +731,10 @@ class PostfixHasIndex extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasIndex);
         this.idx = idx;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
+    }
 }
 
 class PostfixHasProperty extends PostfixOperation {
@@ -649,6 +743,10 @@ class PostfixHasProperty extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, pname: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasProperty);
         this.pname = pname;
+    }
+
+    isConstantPostfixOperation(): boolean {
+        return true;
     }
 }
 
@@ -669,6 +767,10 @@ class PostfixInvoke extends PostfixOperation {
         this.terms = terms;
         this.args = args;
     }
+
+    isConstantPostfixOperation(): boolean {
+        return this.args.isConstantArgList();
+    }
 }
 
 class PrefixNotOp extends Expression {
@@ -679,6 +781,10 @@ class PrefixNotOp extends Expression {
         super(ExpressionTag.PrefixNotOpExpression, sinfo);
         this.op = op;
         this.exp = exp;
+    }
+
+    isConstantExpression(): boolean {
+        return this.exp.isConstantExpression();
     }
 }
 
@@ -693,6 +799,10 @@ class BinEqExpression extends Expression {
         this.op = op;
         this.rhs = rhs;
     }
+
+    isConstantExpression(): boolean {
+        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
+    }
 }
 
 class BinCmpExpression extends Expression {
@@ -705,6 +815,10 @@ class BinCmpExpression extends Expression {
         this.lhs = lhs;
         this.op = op;
         this.rhs = rhs;
+    }
+
+    isConstantExpression(): boolean {
+        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
     }
 }
 
@@ -719,6 +833,10 @@ class BinLogicExpression extends Expression {
         this.op = op;
         this.rhs = rhs;
     }
+
+    isConstantExpression(): boolean {
+        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
+    }
 }
 
 class MapEntryConstructorExpression extends Expression {
@@ -729,6 +847,10 @@ class MapEntryConstructorExpression extends Expression {
         super(ExpressionTag.MapEntryConstructorExpression, sinfo);
         this.kexp = kexp;
         this.vexp = vexp;
+    }
+
+    isConstantExpression(): boolean {
+        return this.kexp.isConstantExpression() && this.vexp.isConstantExpression();
     }
 }
 
@@ -743,6 +865,10 @@ class NonecheckExpression extends Expression {
         this.customCheck = customCheck;
         this.rhs = rhs;
     }
+
+    isConstantExpression(): boolean {
+        return this.lhs.isConstantExpression() && (this.customCheck === undefined || this.customCheck.isConstantExpression()) && this.rhs.isConstantExpression();
+    }
 }
 
 class CoalesceExpression extends Expression {
@@ -756,6 +882,10 @@ class CoalesceExpression extends Expression {
         this.customCheck = customCheck;
         this.rhs = rhs;
     }
+
+    isConstantExpression(): boolean {
+        return this.lhs.isConstantExpression() && (this.customCheck === undefined || this.customCheck.isConstantExpression()) && this.rhs.isConstantExpression();
+    }
 }
 
 class SelectExpression extends Expression {
@@ -768,6 +898,10 @@ class SelectExpression extends Expression {
         this.test = test;
         this.option1 = option1;
         this.option2 = option2;
+    }
+
+    isConstantExpression(): boolean {
+        return this.test.isConstantExpression() && this.option1.isConstantExpression() && this.option2.isConstantExpression();
     }
 }
 
@@ -784,6 +918,10 @@ class ExpOrExpression extends Expression {
         this.result = result;
         this.cond = cond;
     }
+
+    isConstantExpression(): boolean {
+        return false;
+    }
 }
 
 class BlockStatementExpression extends Expression {
@@ -793,6 +931,10 @@ class BlockStatementExpression extends Expression {
         super(ExpressionTag.BlockStatementExpression, sinfo);
         this.ops = ops;
     }
+
+    isConstantExpression(): boolean {
+        return false;
+    }
 }
 
 class IfExpression extends Expression {
@@ -801,6 +943,18 @@ class IfExpression extends Expression {
     constructor(sinfo: SourceInfo, flow: IfElse<Expression>) {
         super(ExpressionTag.IfExpression, sinfo);
         this.flow = flow;
+    }
+
+    isConstantExpression(): boolean {
+        if(this.flow.conds.some((cc) => !cc.cond.isConstantExpression() || !cc.action.isConstantExpression())) {
+            return false;
+        }
+
+        if(this.flow.elseAction !== undefined && !this.flow.elseAction.isConstantExpression()) {
+            return false;
+        }
+
+        return true;
     }
 }
 
@@ -812,6 +966,31 @@ class MatchExpression extends Expression {
         super(ExpressionTag.MatchExpression, sinfo);
         this.sval = sval;
         this.flow = flow;
+    }
+
+    isConstantExpression(): boolean {
+        if(!this.sval.isConstantExpression()) {
+            return false;
+        } 
+        
+        const nonconstmatch = this.flow.some((match) => {
+            if(match instanceof StructureMatchGuard && !match.match.isConstantStructuredAssignment()) {
+                return true;
+            }
+
+            if(match.check.optionalWhen !== undefined && !(match.check.optionalWhen as Expression).isConstantExpression()) {
+                return true;
+            }
+
+            //TODO: we want to make constant check aware of constant binds as well -- so if the binds in the match are const
+            //      we should pass them along for const awareness in the action -- same for statements 
+            return !match.action.isConstantExpression();
+        });
+        if(nonconstmatch) {
+            return false;
+        }
+
+        return true;
     }
 }
 
@@ -917,6 +1096,9 @@ class VariablePackAssignmentStatement extends Statement {
 }
 
 class StructuredAssignment {
+    isConstantStructuredAssignment(): boolean {
+        return true;
+    }
 }
 
 class IgnoreTermStructuredAssignment extends StructuredAssignment {
@@ -931,11 +1113,15 @@ class IgnoreTermStructuredAssignment extends StructuredAssignment {
 }
 
 class ConstValueStructuredAssignment extends StructuredAssignment {
-    readonly constValue: Expression; //this should always be a constant evaluateable expression (literal, const, statics only)
+    readonly constValue: Expression; //this should always be a constant evaluateable expression (but we need to check during type checking)
 
     constructor(constValue: Expression) {
         super();
         this.constValue = constValue;
+    }
+
+    isConstantStructuredAssignment(): boolean {
+        return this.constValue.isConstantExpression();
     }
 }
 
@@ -968,6 +1154,10 @@ class TupleStructuredAssignment extends StructuredAssignment {
         this.isvalue = isvalue;
         this.assigns = assigns;
     }
+
+    isConstantStructuredAssignment(): boolean {
+        return this.assigns.every((assign) => assign.isConstantStructuredAssignment());
+    }
 }
 
 class RecordStructuredAssignment extends StructuredAssignment {
@@ -978,6 +1168,10 @@ class RecordStructuredAssignment extends StructuredAssignment {
         super();
         this.isvalue = isvalue;
         this.assigns = assigns;
+    }
+
+    isConstantStructuredAssignment(): boolean {
+        return this.assigns.every((assign) => assign[1].isConstantStructuredAssignment());
     }
 }
 
@@ -992,6 +1186,10 @@ class NominalStructuredAssignment extends StructuredAssignment {
         this.atype = atype;
         this.assigns = assigns;
     }
+
+    isConstantStructuredAssignment(): boolean {
+        return this.assigns.every((assign) => assign[1].isConstantStructuredAssignment());
+    }
 }
 
 class ValueListStructuredAssignment extends StructuredAssignment {
@@ -1000,6 +1198,10 @@ class ValueListStructuredAssignment extends StructuredAssignment {
     constructor(assigns: StructuredAssignment[]) {
         super();
         this.assigns = assigns;
+    }
+
+    isConstantStructuredAssignment(): boolean {
+        return this.assigns.every((assign) => assign.isConstantStructuredAssignment());
     }
 }
 
