@@ -11,8 +11,18 @@ concept Any {
     method is<T>(): Bool # special_method
     method as<T>(): T # special_method
 
-    method tryAs<T>(): T? {
-        return this.is<T>() ? this.as<T>() : none;
+    method asOrNone<T>(): T? {
+        return this->is<T>() ? this->as<T>() : none;
+    }
+
+    method asTry<T>(ref? v: T): Bool {
+        if(!this->is<T>()) {
+            return false;
+        }
+        else {
+            v = this->as<T>();
+            return true;
+        }
     }
 
     method isSome(): Bool # special_method
@@ -21,7 +31,6 @@ concept Any {
 
 //<summary>Special type for representing all non-none values.</summary>
 concept Some provides Any {
-    method update(): Some # special_method
 }
 
 //<summary>Special type for indicating a value can be used as a key in a collection.</summary>
@@ -370,17 +379,17 @@ entity DataString<T where parsable> provides Some, KeyType, APIValue {
     method string(): String # datastring_string
 
     function from(str: String): DataString<T> 
-        requires release T::tryParse(str).isOk();
+        requires release T::parse(str).isOk();
     {
         return DataString<T>::s_unsafe_from(str);
     }
 
     function tryFrom(str: String): DataString<T>? {
-        return T::tryParse(str).isOk() ? DataString<T>::s_unsafe_from(str) : none;
+        return T::parse(str).isOk() ? DataString<T>::s_unsafe_from(str) : none;
     }
 
     method convertable<U where parsable>(): Bool {
-        return U::tryParse(this.string()).isOk();
+        return U::parse(this.string()).isOk();
     }
 
     method convert<U where parsable>(): DataString<U>  {
@@ -604,24 +613,3 @@ concept Object provides Some {
 concept Expandoable<T> provides Object {
     method expand<U>(): List<U> # special_method
 }
-
-/*
-//Magic happens for all number types
-abstract prefix operator +(a: Any): Any 1;
-abstract prefix operator -(a: Any): Any 1;
-
-abstract infix operator *(a: Any, b, Any): Any 2;
-abstract infix operator /(a: Any, b, Any): Any 2;
-abstract infix operator +(a: Any, b, Any): Any 3;
-abstract infix operator -(a: Any, b, Any): Any 3;
-
-//Magic happens for None, KeyTypes, and number types
-abstract infix operator ==(a: Any, b: Any): Bool 4;
-abstract infix operator !=(a: Any, b: Any): Bool 4;
-abstract infix operator <(a: Any, b: Any): Bool 4;
-abstract infix operator >(a: Any, b: Any): Bool 4;
-abstract infix operator <=(a: Any, b: Any): Bool 4;
-abstract infix operator >=(a: Any, b: Any): Bool 4;
-*/
-
-

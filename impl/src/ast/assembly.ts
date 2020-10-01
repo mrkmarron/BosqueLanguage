@@ -1014,6 +1014,7 @@ class Assembly {
         let ltype = this.getSpecialNoneType();
         let tval: boolean | string = "[UNDEF]";
 
+        xxxx;
         if (l.typevalue instanceof LiteralBoolExpression) {
             ltype = this.getSpecialBoolType();
             tval = l.typevalue.value;

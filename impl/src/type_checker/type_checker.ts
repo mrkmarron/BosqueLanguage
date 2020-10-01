@@ -393,19 +393,15 @@ class TypeChecker {
         
         const lhsnone = lhs.options.some((opt) => opt.idStr == "NSCore::None");
         const simplelhsopts = lhs.options.filter((opt) => opt.idStr == "NSCore::None");
-        const simplelhs = simplelhsopts.length !== 0 ? ResolvedType.create(simplelhsopts) : lhs;
 
         const rhsnone = rhs.options.some((opt) => opt.idStr == "NSCore::None");
         const simplerhsopts = rhs.options.filter((opt) => opt.idStr == "NSCore::None");
-        const simplerhs = simplerhsopts.length !== 0 ? ResolvedType.create(simplerhsopts) : rhs;
 
         const lnotnonechk = lhsnone && !rhsnone;
-        const rnotnonechk = !lhsnone && rhsnone;
+        const simplelhs = simplelhsopts.length !== 0 && lnotnonechk ? ResolvedType.create(simplelhsopts) : lhs;
 
-        if ((simplelhs.isUniqueType() && this.m_assembly.subtypeOf(simplelhs, this.m_assembly.getSpecialKeyTypeConceptType())) 
-            && (simplerhs.isUniqueType() && this.m_assembly.subtypeOf(simplerhs, this.m_assembly.getSpecialKeyTypeConceptType()))) {
-            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "keytype", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
-        }
+        const rnotnonechk = !lhsnone && rhsnone;
+        const simplerhs = simplerhsopts.length !== 0 && rnotnonechk ? ResolvedType.create(simplerhsopts) : rhs;
 
         if((simplelhs.isUniqueCallTargetType() && simplelhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl)) 
             && (simplerhs.isUniqueCallTargetType() && simplerhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl))) {
@@ -417,7 +413,15 @@ class TypeChecker {
             return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "datastring", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
         }
 
-        xxxx;
+        if ((simplelhs.isUniqueTupleTargetType() && this.m_assembly.subtypeOf(simplelhs, this.m_assembly.getSpecialKeyTypeConceptType())) 
+            && (simplerhs.isUniqueTupleTargetType() && this.m_assembly.subtypeOf(simplerhs, this.m_assembly.getSpecialKeyTypeConceptType()))) {
+            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "keytuple", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
+        }
+
+        if ((simplelhs.isUniqueRecordTargetType() && this.m_assembly.subtypeOf(simplelhs, this.m_assembly.getSpecialKeyTypeConceptType())) 
+            && (simplerhs.isUniqueRecordTargetType() && this.m_assembly.subtypeOf(simplerhs, this.m_assembly.getSpecialKeyTypeConceptType()))) {
+            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "keyrecord", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
+        }
         
         return { chk: "operator", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
     }
@@ -2684,15 +2688,13 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(tlhs, ktype), "Invalid argument");
             this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(trhs, ktype), "Invalid argument");
 
-            let mirlhs = this.m_emitter.registerResolvedTypeReference(tlhs);
-            let mirrhs = this.m_emitter.registerResolvedTypeReference(trhs);
 
             const [restype, iipack] = this.genInferInfo(exp.sinfo, this.m_assembly.getSpecialBoolType(), infertype, trgt);
             if(exp.name === "equal") {
-                this.m_emitter.emitBinKeyEq(exp.sinfo, mirlhs, lhsreg, mirrhs, rhsreg, iipack[0]);
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(ktype), this.emitInlineConvertIfNeeded(exp.sinfo, lhsreg, tlhs, ktype), this.emitInlineConvertIfNeeded(exp.sinfo, rhsreg, trhs, ktype), iipack[0]);
             }
             else {
-                this.m_emitter.emitBinKeyLess(exp.sinfo, mirlhs, lhsreg, mirrhs, rhsreg, iipack[0]);
+                this.m_emitter.emitBinKeyLess(exp.sinfo, this.m_emitter.registerResolvedTypeReference(ktype), this.emitInlineConvertIfNeeded(exp.sinfo, lhsreg, tlhs, ktype), this.emitInlineConvertIfNeeded(exp.sinfo, rhsreg, trhs, ktype), iipack[0]);
             }
 
             this.emitConvertIfNeeded(exp.sinfo, this.m_assembly.getSpecialBoolType(), infertype, iipack);

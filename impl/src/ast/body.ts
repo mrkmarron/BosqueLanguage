@@ -10,19 +10,19 @@ import { BSQRegex } from "./bsqregex";
 
 class InvokeArgument {
     readonly value: Expression;
-    readonly isRef: boolean;
+    readonly ref: "ref" | "ref!" | "ref?" | undefined;
 
-    constructor(value: Expression, isRef: boolean) {
+    constructor(value: Expression, ref: "ref" | "ref!" | "ref?" | undefined) {
         this.value = value;
-        this.isRef = isRef;
+        this.ref = ref;
     }
 }
 
 class NamedArgument extends InvokeArgument {
     readonly name: string;
 
-    constructor(isRef: boolean, name: string, value: Expression) {
-        super(value, isRef);
+    constructor(ref: "ref" | "ref!" | "ref?" | undefined, name: string, value: Expression) {
+        super(value, ref);
         this.name = name;
     }
 }
@@ -30,8 +30,8 @@ class NamedArgument extends InvokeArgument {
 class PositionalArgument extends InvokeArgument {
     readonly isSpread: boolean;
 
-    constructor(isRef: boolean, isSpread: boolean, value: Expression) {
-        super(value, isRef);
+    constructor(ref: "ref" | "ref!" | "ref?" | undefined, isSpread: boolean, value: Expression) {
+        super(value, ref);
         this.isSpread = isSpread;
     }
 }
@@ -41,10 +41,6 @@ class Arguments {
 
     constructor(args: InvokeArgument[]) {
         this.argList = args;
-    }
-
-    isConstantArgList(): boolean {
-        return this.argList.every((arg) => arg.value.isConstantExpression());
     }
 }
 
@@ -136,13 +132,9 @@ enum ExpressionTag {
 
     LiteralNoneExpression = "LiteralNoneExpression",
     LiteralBoolExpression = "LiteralBoolExpression",
-    LiteralIntegerExpression = "LiteralIntegerExpression",
-    LiteralNaturalExpression = "LiteralNaturalExpression",
-    LiteralFloatExpression = "LiteralFloatExpression",
-    LiteralDecimalExpression = "LiteralDecimalExpression",
-    LiteralBigIntegerExpression = "LiteralBigIntegerExpression",
-    LiteralBigNaturalExpression = "LiteralBigNaturalExpression",
+    LiteralIntegralExpression = "LiteralIntegralExpression",
     LiteralRationalExpression = "LiteralRationalExpression",
+    LiteralFloatPointExpression = "LiteralFloatExpression",
     LiteralStringExpression = "LiteralStringExpression",
     LiteralRegexExpression = "LiteralRegexExpression",
     LiteralParamerterValueExpression = "LiteralParamerterValueExpression",
@@ -166,6 +158,8 @@ enum ExpressionTag {
     SpecialConstructorExpression = "SpecialConstructorExpression",
     CallNamespaceFunctionOrOperatorExpression = "CallNamespaceFunctionOrOperatorExpression",
     CallStaticFunctionOrOperatorExpression = "CallStaticFunctionOrOperatorExpression",
+
+    OfTypeConvertExpression = "OfTypeConvertExpression",
 
     PostfixOpExpression = "PostfixOpExpression",
 
@@ -197,9 +191,14 @@ abstract class Expression {
         this.tag = tag;
         this.sinfo = sinfo;
     }
+}
 
-    isConstantExpression(): boolean {
-        return true;
+//This just holds an expression but not a subtype of Expression so we can distinguish as types
+class LiteralExpressionValue {
+    readonly exp: Expression;
+
+    constructor(exp: Expression) {
+        this.exp = exp;
     }
 }
 
@@ -224,66 +223,36 @@ class LiteralBoolExpression extends Expression {
     }
 }
 
-class LiteralIntegerExpression extends Expression {
+class LiteralIntegralExpression extends Expression {
     readonly value: string;
+    readonly itype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralIntegerExpression, sinfo);
+    constructor(sinfo: SourceInfo, value: string, itype: TypeSignature) {
+        super(ExpressionTag.LiteralIntegralExpression, sinfo);
         this.value = value;
-    }
-}
-
-class LiteralNaturalExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralBigNaturalExpression, sinfo);
-        this.value = value;
-    }
-}
-
-class LiteralFloatExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralFloatExpression, sinfo);
-        this.value = value;
-    }
-}
-
-class LiteralDecimalExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralDecimalExpression, sinfo);
-        this.value = value;
-    }
-}
-
-class LiteralBigIntegerExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralBigIntegerExpression, sinfo);
-        this.value = value;
-    }
-}
-
-class LiteralBigNaturalExpression extends Expression {
-    readonly value: string;
-
-    constructor(sinfo: SourceInfo, value: string) {
-        super(ExpressionTag.LiteralDecimalExpression, sinfo);
-        this.value = value;
+        this.itype = itype;
     }
 }
 
 class LiteralRationalExpression extends Expression {
     readonly value: string;
+    readonly rtype: TypeSignature;
 
-    constructor(sinfo: SourceInfo, value: string) {
+    constructor(sinfo: SourceInfo, value: string, rtype: TypeSignature) {
         super(ExpressionTag.LiteralRationalExpression, sinfo);
         this.value = value;
+        this.rtype = rtype;
+    }
+}
+
+class LiteralFloatPointExpression extends Expression {
+    readonly value: string;
+    readonly fptype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, value: string, fptype: TypeSignature) {
+        super(ExpressionTag.LiteralFloatPointExpression, sinfo);
+        this.value = value;
+        this.fptype = fptype;
     }
 }
 
@@ -341,13 +310,11 @@ class LiteralTypedNumericConstructorExpression extends Expression {
 class LiteralTypedStringConstructorExpression extends Expression {
     readonly value: string;
     readonly stype: TypeSignature;
-    readonly isvalue: boolean;
-
-    constructor(sinfo: SourceInfo, isvalue: boolean, value: string, stype: TypeSignature) {
+    
+    constructor(sinfo: SourceInfo, value: string, stype: TypeSignature) {
         super(ExpressionTag.LiteralTypedStringConstructorExpression, sinfo);
         this.value = value;
         this.stype = stype;
-        this.isvalue = isvalue;
     }
 }
 
@@ -380,10 +347,6 @@ class AccessVariableExpression extends Expression {
         super(ExpressionTag.AccessVariableExpression, sinfo);
         this.name = name;
     }
-
-    isConstantExpression(): boolean {
-        return false;
-    }
 }
 
 class ConstructorPrimaryExpression extends Expression {
@@ -396,10 +359,6 @@ class ConstructorPrimaryExpression extends Expression {
         this.isvalue = isvalue;
         this.ctype = ctype;
         this.args = args;
-    }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
     }
 }
 
@@ -420,10 +379,6 @@ class ConstructorPrimaryWithFactoryExpression extends Expression {
         this.terms = terms;
         this.args = args;
     }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
-    }
 }
 
 class ConstructorTupleExpression extends Expression {
@@ -434,10 +389,6 @@ class ConstructorTupleExpression extends Expression {
         super(ExpressionTag.ConstructorTupleExpression, sinfo);
         this.isvalue = isvalue;
         this.args = args;
-    }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
     }
 }
 
@@ -450,10 +401,6 @@ class ConstructorRecordExpression extends Expression {
         this.isvalue = isvalue;
         this.args = args;
     }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
-    }
 }
 
 class ConstructorEphemeralValueList extends Expression {
@@ -462,10 +409,6 @@ class ConstructorEphemeralValueList extends Expression {
     constructor(sinfo: SourceInfo, args: Arguments) {
         super(ExpressionTag.ConstructorEphemeralValueList, sinfo);
         this.args = args;
-    }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
     }
 }
 
@@ -477,10 +420,6 @@ class ConstructorPCodeExpression extends Expression {
         super(ExpressionTag.ConstructorPCodeExpression, sinfo);
         this.isAuto = isAuto;
         this.invoke = invoke;
-    }
-
-    isConstantExpression(): boolean {
-        return this.invoke.captureSet.size === 0;
     }
 }
 
@@ -495,10 +434,6 @@ class PCodeInvokeExpression extends Expression {
         this.pragmas = pragmas;
         this.args = args;
     }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
-    }
 }
 
 class SpecialConstructorExpression extends Expression {
@@ -511,10 +446,6 @@ class SpecialConstructorExpression extends Expression {
         this.rtype = rtype;
         this.rop = rop;
         this.arg = arg;
-    }
-
-    isConstantExpression(): boolean {
-        return this.arg.isConstantExpression();
     }
 }
 
@@ -533,10 +464,6 @@ class CallNamespaceFunctionOrOperatorExpression extends Expression {
         this.terms = terms;
         this.args = args;
     }
-
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
-    }
 }
 
 class CallStaticFunctionOrOperatorExpression extends Expression {
@@ -554,9 +481,16 @@ class CallStaticFunctionOrOperatorExpression extends Expression {
         this.terms = terms;
         this.args = args;
     }
+}
 
-    isConstantExpression(): boolean {
-        return this.args.isConstantArgList();
+class OfTypeConvertExpression extends Expression {
+    readonly arg: Expression;
+    readonly oftype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, arg: Expression, oftype: TypeSignature) {
+        super(ExpressionTag.OfTypeConvertExpression, sinfo);
+        this.arg = arg;
+        this.oftype = oftype;
     }
 }
 
@@ -589,8 +523,6 @@ abstract class PostfixOperation {
         this.customCheck = customCheck;
         this.op = op;
     }
-
-    abstract isConstantPostfixOperation(): boolean;
 }
 
 class PostfixOp extends Expression {
@@ -602,10 +534,6 @@ class PostfixOp extends Expression {
         this.rootExp = root;
         this.ops = ops;
     }
-
-    isConstantExpression(): boolean {
-        return this.rootExp.isConstantExpression() && this.ops.every((op) => (op.customCheck === undefined || op.customCheck.isConstantExpression()) && op.isConstantPostfixOperation());
-    }
 }
 
 class PostfixAccessFromIndex extends PostfixOperation {
@@ -614,10 +542,6 @@ class PostfixAccessFromIndex extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, index: number) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromIndex);
         this.index = index;
-    }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
     }
 }
 
@@ -632,10 +556,6 @@ class PostfixProjectFromIndecies extends PostfixOperation {
         this.isEphemeralListResult = isEphemeralListResult
         this.indecies = indecies;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
-    }
 }
 
 class PostfixAccessFromName extends PostfixOperation {
@@ -644,10 +564,6 @@ class PostfixAccessFromName extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, name: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAccessFromName);
         this.name = name;
-    }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
     }
 }
 
@@ -662,10 +578,6 @@ class PostfixProjectFromNames extends PostfixOperation {
         this.isEphemeralListResult = isEphemeralListResult;
         this.names = names;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
-    }
 }
 
 class PostfixModifyWithIndecies extends PostfixOperation {
@@ -676,10 +588,6 @@ class PostfixModifyWithIndecies extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixModifyWithIndecies);
         this.isBinder = isBinder;
         this.updates = updates;
-    }
-
-    isConstantPostfixOperation(): boolean {
-        return this.updates.every((update) => update.value.isConstantExpression());
     }
 }
 
@@ -692,10 +600,6 @@ class PostfixModifyWithNames extends PostfixOperation {
         this.isBinder = isBinder;
         this.updates = updates;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return this.updates.every((update) => update.value.isConstantExpression());
-    }
 }
 
 class PostfixIs extends PostfixOperation {
@@ -704,10 +608,6 @@ class PostfixIs extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, istype: TypeSignature) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixIs);
         this.istype = istype;
-    }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
     }
 }
 
@@ -718,10 +618,6 @@ class PostfixAs extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixAs);
         this.astype = astype;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
-    }
 }
 
 class PostfixHasIndex extends PostfixOperation {
@@ -731,10 +627,6 @@ class PostfixHasIndex extends PostfixOperation {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasIndex);
         this.idx = idx;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
-    }
 }
 
 class PostfixHasProperty extends PostfixOperation {
@@ -743,10 +635,6 @@ class PostfixHasProperty extends PostfixOperation {
     constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, pname: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixHasProperty);
         this.pname = pname;
-    }
-
-    isConstantPostfixOperation(): boolean {
-        return true;
     }
 }
 
@@ -767,24 +655,14 @@ class PostfixInvoke extends PostfixOperation {
         this.terms = terms;
         this.args = args;
     }
-
-    isConstantPostfixOperation(): boolean {
-        return this.args.isConstantArgList();
-    }
 }
 
 class PrefixNotOp extends Expression {
-    readonly op: string; //+, -, !
     readonly exp: Expression;
 
-    constructor(sinfo: SourceInfo, op: string, exp: Expression) {
+    constructor(sinfo: SourceInfo, exp: Expression) {
         super(ExpressionTag.PrefixNotOpExpression, sinfo);
-        this.op = op;
         this.exp = exp;
-    }
-
-    isConstantExpression(): boolean {
-        return this.exp.isConstantExpression();
     }
 }
 
@@ -799,10 +677,6 @@ class BinEqExpression extends Expression {
         this.op = op;
         this.rhs = rhs;
     }
-
-    isConstantExpression(): boolean {
-        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
-    }
 }
 
 class BinCmpExpression extends Expression {
@@ -815,10 +689,6 @@ class BinCmpExpression extends Expression {
         this.lhs = lhs;
         this.op = op;
         this.rhs = rhs;
-    }
-
-    isConstantExpression(): boolean {
-        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
     }
 }
 
@@ -833,10 +703,6 @@ class BinLogicExpression extends Expression {
         this.op = op;
         this.rhs = rhs;
     }
-
-    isConstantExpression(): boolean {
-        return this.lhs.isConstantExpression() && this.rhs.isConstantExpression();
-    }
 }
 
 class MapEntryConstructorExpression extends Expression {
@@ -847,10 +713,6 @@ class MapEntryConstructorExpression extends Expression {
         super(ExpressionTag.MapEntryConstructorExpression, sinfo);
         this.kexp = kexp;
         this.vexp = vexp;
-    }
-
-    isConstantExpression(): boolean {
-        return this.kexp.isConstantExpression() && this.vexp.isConstantExpression();
     }
 }
 
@@ -865,10 +727,6 @@ class NonecheckExpression extends Expression {
         this.customCheck = customCheck;
         this.rhs = rhs;
     }
-
-    isConstantExpression(): boolean {
-        return this.lhs.isConstantExpression() && (this.customCheck === undefined || this.customCheck.isConstantExpression()) && this.rhs.isConstantExpression();
-    }
 }
 
 class CoalesceExpression extends Expression {
@@ -882,10 +740,6 @@ class CoalesceExpression extends Expression {
         this.customCheck = customCheck;
         this.rhs = rhs;
     }
-
-    isConstantExpression(): boolean {
-        return this.lhs.isConstantExpression() && (this.customCheck === undefined || this.customCheck.isConstantExpression()) && this.rhs.isConstantExpression();
-    }
 }
 
 class SelectExpression extends Expression {
@@ -898,10 +752,6 @@ class SelectExpression extends Expression {
         this.test = test;
         this.option1 = option1;
         this.option2 = option2;
-    }
-
-    isConstantExpression(): boolean {
-        return this.test.isConstantExpression() && this.option1.isConstantExpression() && this.option2.isConstantExpression();
     }
 }
 
@@ -918,10 +768,6 @@ class ExpOrExpression extends Expression {
         this.result = result;
         this.cond = cond;
     }
-
-    isConstantExpression(): boolean {
-        return false;
-    }
 }
 
 class BlockStatementExpression extends Expression {
@@ -931,10 +777,6 @@ class BlockStatementExpression extends Expression {
         super(ExpressionTag.BlockStatementExpression, sinfo);
         this.ops = ops;
     }
-
-    isConstantExpression(): boolean {
-        return false;
-    }
 }
 
 class IfExpression extends Expression {
@@ -943,18 +785,6 @@ class IfExpression extends Expression {
     constructor(sinfo: SourceInfo, flow: IfElse<Expression>) {
         super(ExpressionTag.IfExpression, sinfo);
         this.flow = flow;
-    }
-
-    isConstantExpression(): boolean {
-        if(this.flow.conds.some((cc) => !cc.cond.isConstantExpression() || !cc.action.isConstantExpression())) {
-            return false;
-        }
-
-        if(this.flow.elseAction !== undefined && !this.flow.elseAction.isConstantExpression()) {
-            return false;
-        }
-
-        return true;
     }
 }
 
@@ -966,31 +796,6 @@ class MatchExpression extends Expression {
         super(ExpressionTag.MatchExpression, sinfo);
         this.sval = sval;
         this.flow = flow;
-    }
-
-    isConstantExpression(): boolean {
-        if(!this.sval.isConstantExpression()) {
-            return false;
-        } 
-        
-        const nonconstmatch = this.flow.some((match) => {
-            if(match instanceof StructureMatchGuard && !match.match.isConstantStructuredAssignment()) {
-                return true;
-            }
-
-            if(match.check.optionalWhen !== undefined && !(match.check.optionalWhen as Expression).isConstantExpression()) {
-                return true;
-            }
-
-            //TODO: we want to make constant check aware of constant binds as well -- so if the binds in the match are const
-            //      we should pass them along for const awareness in the action -- same for statements 
-            return !match.action.isConstantExpression();
-        });
-        if(nonconstmatch) {
-            return false;
-        }
-
-        return true;
     }
 }
 
@@ -1096,9 +901,6 @@ class VariablePackAssignmentStatement extends Statement {
 }
 
 class StructuredAssignment {
-    isConstantStructuredAssignment(): boolean {
-        return true;
-    }
 }
 
 class IgnoreTermStructuredAssignment extends StructuredAssignment {
@@ -1118,10 +920,6 @@ class ConstValueStructuredAssignment extends StructuredAssignment {
     constructor(constValue: Expression) {
         super();
         this.constValue = constValue;
-    }
-
-    isConstantStructuredAssignment(): boolean {
-        return this.constValue.isConstantExpression();
     }
 }
 
@@ -1154,10 +952,6 @@ class TupleStructuredAssignment extends StructuredAssignment {
         this.isvalue = isvalue;
         this.assigns = assigns;
     }
-
-    isConstantStructuredAssignment(): boolean {
-        return this.assigns.every((assign) => assign.isConstantStructuredAssignment());
-    }
 }
 
 class RecordStructuredAssignment extends StructuredAssignment {
@@ -1168,10 +962,6 @@ class RecordStructuredAssignment extends StructuredAssignment {
         super();
         this.isvalue = isvalue;
         this.assigns = assigns;
-    }
-
-    isConstantStructuredAssignment(): boolean {
-        return this.assigns.every((assign) => assign[1].isConstantStructuredAssignment());
     }
 }
 
@@ -1186,10 +976,6 @@ class NominalStructuredAssignment extends StructuredAssignment {
         this.atype = atype;
         this.assigns = assigns;
     }
-
-    isConstantStructuredAssignment(): boolean {
-        return this.assigns.every((assign) => assign[1].isConstantStructuredAssignment());
-    }
 }
 
 class ValueListStructuredAssignment extends StructuredAssignment {
@@ -1198,10 +984,6 @@ class ValueListStructuredAssignment extends StructuredAssignment {
     constructor(assigns: StructuredAssignment[]) {
         super();
         this.assigns = assigns;
-    }
-
-    isConstantStructuredAssignment(): boolean {
-        return this.assigns.every((assign) => assign.isConstantStructuredAssignment());
     }
 }
 
@@ -1332,15 +1114,16 @@ class BodyImplementation {
 
 export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
-    ExpressionTag, Expression, InvalidExpression,
+    ExpressionTag, Expression, LiteralExpressionValue, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
-    LiteralIntegerExpression, LiteralNaturalExpression, LiteralFloatExpression, LiteralDecimalExpression, LiteralBigIntegerExpression, LiteralBigNaturalExpression, LiteralRationalExpression, 
+    LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression,
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 
     LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
     ConstructorPCodeExpression, SpecialConstructorExpression,
     CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
+    OfTypeConvertExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
     PostfixIs, PostfixAs, PostfixHasIndex, PostfixHasProperty, PostfixInvoke, PCodeInvokeExpression,

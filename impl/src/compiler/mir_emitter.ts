@@ -623,7 +623,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRConstructorPrimaryCollectionMixed(sinfo, tkey, args, trgt));
     }
 
-    emitBinKeyEq(sinfo: SourceInfo, lhsType: MIRType, lhs: MIRArgument, rhsType: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyEq(sinfo: SourceInfo, ktype: MIRType, lhs: MIRArgument, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
@@ -631,7 +631,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRBinKeyEq(sinfo, lhsType, lhs, rhsType, rhs, trgt, relaxed));
     }
 
-    emitBinKeyLess(sinfo: SourceInfo, lhsType: MIRType, lhs: MIRArgument, rhsType: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyLess(sinfo: SourceInfo, ktype: MIRType, lhs: MIRArgument, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }

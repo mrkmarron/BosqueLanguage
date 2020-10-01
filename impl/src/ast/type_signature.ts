@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { AccessNamespaceConstantExpression, AccessStaticFieldExpression, Expression, LiteralBoolExpression, LiteralIntegerExpression, LiteralNaturalExpression } from "./body";
+import {  Expression, LiteralExpressionValue } from "./body";
 
 class TypeSignature {
 }
@@ -41,9 +41,9 @@ class NominalTypeSignature extends TypeSignature {
 }
 
 class LiteralTypeSignature extends TypeSignature {
-    readonly typevalue: LiteralBoolExpression | LiteralIntegerExpression | LiteralNaturalExpression | AccessNamespaceConstantExpression | AccessStaticFieldExpression;
+    readonly typevalue: LiteralExpressionValue;
 
-    constructor(typevalue: LiteralBoolExpression | LiteralIntegerExpression | LiteralNaturalExpression | AccessNamespaceConstantExpression | AccessStaticFieldExpression) {
+    constructor(typevalue: LiteralExpressionValue) {
         super();
         this.typevalue = typevalue;
     }
@@ -83,18 +83,18 @@ class EphemeralListTypeSignature extends TypeSignature {
 class FunctionParameter {
     readonly name: string;
     readonly type: TypeSignature;
-    readonly isRef: boolean;
+    readonly refKind: "ref" | "ref!" | "ref?" | undefined;
     readonly isOptional: boolean;
-    readonly isLiteral: boolean;
-    readonly exp: Expression | undefined;
+    readonly defaultexp: Expression | undefined;
+    readonly litexp: LiteralExpressionValue | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, isRef: boolean, isLiteral: boolean, exp: Expression | undefined) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, refKind: "ref" | "ref!" | "ref?" | undefined, defaultexp: Expression | undefined, litexp: LiteralExpressionValue | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
-        this.isRef = isRef;
-        this.isLiteral = isLiteral;
-        this.exp = exp;
+        this.refKind = refKind;
+        this.defaultexp = defaultexp;
+        this.litexp = litexp;
     }
 }
 
