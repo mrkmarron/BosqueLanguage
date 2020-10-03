@@ -85,8 +85,8 @@ parsable struct entity Bool provides Some, KeyType, PODType, APIType {
         return b ? "true" : "false";
     }
 }
-inline infix operator ==(a: Bool, b: Bool): Bool # default_eq
-inline infix operator !=(a: Bool, b: Bool): Bool # default_neq
+inline infix operator ==(a: Bool, b: Bool): Bool = default;
+inline infix operator !=(a: Bool, b: Bool): Bool = default;
 
 //<summary>Primitive integer value.</summary>
 parsable struct entity Int provides Some, KeyType, PODType, APIType {
@@ -102,18 +102,18 @@ parsable struct entity Int provides Some, KeyType, PODType, APIType {
         return this < 0 ? -this : this;
     }
 }
-inline prefix operator +(a: Int): Int # default_pos
-inline prefix operator -(a: Int): Int # default_neg
-inline infix operator *(a: Int, b, Int): Int # default_mult
-inline infix operator /(a: Int, b, Int): Int # default_div
-inline infix operator +(a: Int, b, Int): Int # default_add
-inline infix operator -(a: Int, b, Int): Int # default_sub
-inline infix operator ==(a: Int, b: Int): Bool # default_eq
-inline infix operator !=(a: Int, b: Int): Bool # default_neq
-inline infix operator <(a: Int, b: Int): Bool # default_lt
-inline infix operator >(a: Int, b: Int): Bool # default_gt
-inline infix operator <=(a: Int, b: Int): Bool # default_lteq
-inline infix operator >=(a: Int, b: Int): Bool # default_gteq
+inline prefix operator +(a: Int): Int = default;
+inline prefix operator -(a: Int): Int = default;
+inline infix operator *(a: Int, b, Int): Int = default;
+inline infix operator /(a: Int, b, Int): Int = default;
+inline infix operator +(a: Int, b, Int): Int = default;
+inline infix operator -(a: Int, b, Int): Int = default;
+inline infix operator ==(a: Int, b: Int): Bool = default;
+inline infix operator !=(a: Int, b: Int): Bool = default;
+inline infix operator <(a: Int, b: Int): Bool = default;
+inline infix operator >(a: Int, b: Int): Bool = default;
+inline infix operator <=(a: Int, b: Int): Bool = default;
+inline infix operator >=(a: Int, b: Int): Bool = default;
 
 //<summary>Primitive natural number value.</summary>
 parsable struct entity Nat provides Some, KeyType, PODType, APIType {
@@ -122,17 +122,17 @@ parsable struct entity Nat provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<Nat, String> # nat_tryparse
     function stringify(i: Nat): String # nat_tostring
 }
-inline prefix operator +(a: Nat): Nat # default_pos
-inline infix operator *(a: Nat, b, Nat): Nat # default_mult
-inline infix operator /(a: Nat, b, Nat): Nat # default_div
-inline infix operator +(a: Nat, b, Nat): Nat # default_add
-inline infix operator -(a: Nat, b, Nat): Nat # default_sub
-inline infix operator ==(a: Nat, b: Nat): Bool # default_eq
-inline infix operator !=(a: Nat, b: Nat): Bool # default_neq
-inline infix operator <(a: Nat, b: Nat): Bool # default_lt
-inline infix operator >(a: Nat, b: Nat): Bool # default_gt
-inline infix operator <=(a: Nat, b: Nat): Bool # default_lteq
-inline infix operator >=(a: Nat, b: Nat): Bool # default_gteq
+inline prefix operator +(a: Nat): Nat = default;
+inline infix operator *(a: Nat, b, Nat): Nat = default;
+inline infix operator /(a: Nat, b, Nat): Nat = default;
+inline infix operator +(a: Nat, b, Nat): Nat = default;
+inline infix operator -(a: Nat, b, Nat): Nat = default;
+inline infix operator ==(a: Nat, b: Nat): Bool = default;
+inline infix operator !=(a: Nat, b: Nat): Bool = default;
+inline infix operator <(a: Nat, b: Nat): Bool = default;
+inline infix operator >(a: Nat, b: Nat): Bool = default;
+inline infix operator <=(a: Nat, b: Nat): Bool = default;
+inline infix operator >=(a: Nat, b: Nat): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
@@ -149,18 +149,18 @@ parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
     function fromInt(i: Int): BigInt # bigint_fromint
     method toInt(): Int # bigint_toint 
 }
-inline prefix operator +(a: BigInt): BigInt # default_pos
-inline prefix operator -(a: BigInt): BigInt # default_neg
-inline infix operator *(a: BigInt, b, BigInt): BigInt # default_mult
-inline infix operator /(a: BigInt, b, BigInt): BigInt # default_div
-inline infix operator +(a: BigInt, b, BigInt): BigInt # default_add
-inline infix operator -(a: BigInt, b, BigInt): BigInt # default_sub
-inline infix operator ==(a: BigInt, b: BigInt): Bool # default_eq
-inline infix operator !=(a: BigInt, b: BigInt): Bool # default_neq
-inline infix operator <(a: BigInt, b: BigInt): Bool # default_lt
-inline infix operator >(a: BigInt, b: BigInt): Bool # default_gt
-inline infix operator <=(a: BigInt, b: BigInt): Bool # default_lteq
-inline infix operator >=(a: BigInt, b: BigInt): Bool # default_gteq
+inline prefix operator +(a: BigInt): BigInt = default;
+inline prefix operator -(a: BigInt): BigInt = default;
+inline infix operator *(a: BigInt, b, BigInt): BigInt = default;
+inline infix operator /(a: BigInt, b, BigInt): BigInt = default;
+inline infix operator +(a: BigInt, b, BigInt): BigInt = default;
+inline infix operator -(a: BigInt, b, BigInt): BigInt = default;
+inline infix operator ==(a: BigInt, b: BigInt): Bool = default;
+inline infix operator !=(a: BigInt, b: BigInt): Bool = default;
+inline infix operator <(a: BigInt, b: BigInt): Bool = default;
+inline infix operator >(a: BigInt, b: BigInt): Bool = default;
+inline infix operator <=(a: BigInt, b: BigInt): Bool = default;
+inline infix operator >=(a: BigInt, b: BigInt): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
@@ -176,17 +176,17 @@ parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
     function fromNat(n: Nat): BigInt # bignat_fromnat
     method toNat(): Nat # bignat_tonat
 }
-inline prefix operator +(a: BigNat): BigNat # default_pos
-inline infix operator *(a: BigNat, b, BigNat): BigNat # default_mult
-inline infix operator /(a: BigNat, b, BigNat): BigNat # default_div
-inline infix operator +(a: BigNat, b, BigNat): BigNat # default_add
-inline infix operator -(a: BigNat, b, BigNat): BigNat # default_sub
-inline infix operator ==(a: BigNat, b: BigNat): Bool # default_eq
-inline infix operator !=(a: BigNat, b: BigNat): Bool # default_neq
-inline infix operator <(a: BigNat, b: BigNat): Bool # default_lt
-inline infix operator >(a: BigNat, b: BigNat): Bool # default_gt
-inline infix operator <=(a: BigNat, b: BigNat): Bool # default_lteq
-inline infix operator >=(a: BigNat, b: BigNat): Bool # default_gteq
+inline prefix operator +(a: BigNat): BigNat = default;
+inline infix operator *(a: BigNat, b, BigNat): BigNat = default;
+inline infix operator /(a: BigNat, b, BigNat): BigNat = default;
+inline infix operator +(a: BigNat, b, BigNat): BigNat = default;
+inline infix operator -(a: BigNat, b, BigNat): BigNat = default;
+inline infix operator ==(a: BigNat, b: BigNat): Bool = default;
+inline infix operator !=(a: BigNat, b: BigNat): Bool = default;
+inline infix operator <(a: BigNat, b: BigNat): Bool = default;
+inline infix operator >(a: BigNat, b: BigNat): Bool = default;
+inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
+inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
 parsable struct entity Rational provides Some, KeyType, PODType, APIType {
@@ -202,18 +202,18 @@ parsable struct entity Rational provides Some, KeyType, PODType, APIType {
     function fromBigInt(bi: BigInt): Rational # rational_fromnat
     method toBigInt(): BigInt # rational_tonat
 }
-inline prefix operator +(a: Rational): Rational # default_pos
-inline prefix operator -(a: Rational): Rational # default_neg
-inline infix operator *(a: Rational, b, Rational): Rational # default_mult
-inline infix operator /(a: Rational, b, Rational): Rational # default_div
-inline infix operator +(a: Rational, b, Rational): Rational # default_add
-inline infix operator -(a: Rational, b, Rational): Rational # default_sub
-inline infix operator ==(a: Rational, b: Rational): Bool # default_eq
-inline infix operator !=(a: Rational, b: Rational): Bool # default_neq
-inline infix operator <(a: Rational, b: Rational): Bool # default_lt
-inline infix operator >(a: Rational, b: Rational): Bool # default_gt
-inline infix operator <=(a: Rational, b: Rational): Bool # default_lteq
-inline infix operator >=(a: Rational, b: Rational): Bool # default_gteq
+inline prefix operator +(a: Rational): Rational = default;
+inline prefix operator -(a: Rational): Rational = default;
+inline infix operator *(a: Rational, b, Rational): Rational = default;
+inline infix operator /(a: Rational, b, Rational): Rational = default;
+inline infix operator +(a: Rational, b, Rational): Rational = default;
+inline infix operator -(a: Rational, b, Rational): Rational = default;
+inline infix operator ==(a: Rational, b: Rational): Bool = default;
+inline infix operator !=(a: Rational, b: Rational): Bool = default;
+inline infix operator <(a: Rational, b: Rational): Bool = default;
+inline infix operator >(a: Rational, b: Rational): Bool = default;
+inline infix operator <=(a: Rational, b: Rational): Bool = default;
+inline infix operator >=(a: Rational, b: Rational): Bool = default;
 
 //<summary>Primitive float value -- compiler flags control bitness -- defaults to 64bit.</summary>
 parsable struct entity Float provides Some, PODType, APIType {
@@ -237,14 +237,14 @@ parsable struct entity Float provides Some, PODType, APIType {
     method isInfinite(): Bool # float_isinfinity
     method isNan(): Bool # float_isnan
 }
-inline prefix operator +(a: Float): Float # default_pos
-inline prefix operator -(a: Float): Float # default_neg
-inline infix operator *(a: Float, b, Float): Float # default_mult
-inline infix operator /(a: Float, b, Float): Float # default_div
-inline infix operator +(a: Float, b, Float): Float # default_add
-inline infix operator -(a: Float, b, Float): Float # default_sub
-inline infix operator <(a: Float, b: Float): Bool # default_lt
-inline infix operator >(a: Float, b: Float): Bool # default_gt
+inline prefix operator +(a: Float): Float = default;
+inline prefix operator -(a: Float): Float = default;
+inline infix operator *(a: Float, b, Float): Float = default;
+inline infix operator /(a: Float, b, Float): Float = default;
+inline infix operator +(a: Float, b, Float): Float = default;
+inline infix operator -(a: Float, b, Float): Float = default;
+inline infix operator <(a: Float, b: Float): Bool = default;
+inline infix operator >(a: Float, b: Float): Bool = default;
 
 //<summary>Primitive float decimal value.</summary>
 parsable struct entity Decimal provides Some, PODType, APIType {
@@ -261,14 +261,14 @@ parsable struct entity Decimal provides Some, PODType, APIType {
         return this < 0 ? -this : this;
     }
 }
-inline prefix operator +(a: Decimal): Decimal # default_pos
-inline prefix operator -(a: Decimal): Decimal # default_neg
-inline infix operator *(a: Decimal, b, Decimal): Decimal # default_mult
-inline infix operator /(a: Decimal, b, Decimal): Decimal # default_div
-inline infix operator +(a: Decimal, b, Decimal): Decimal # default_add
-inline infix operator -(a: Decimal, b, Decimal): Decimal # default_sub
-inline infix operator <(a: Decimal, b: Decimal): Bool # default_lt
-inline infix operator >(a: Decimal, b: Decimal): Bool # default_gt
+inline prefix operator +(a: Decimal): Decimal = default;
+inline prefix operator -(a: Decimal): Decimal = default;
+inline infix operator *(a: Decimal, b, Decimal): Decimal = default;
+inline infix operator /(a: Decimal, b, Decimal): Decimal = default;
+inline infix operator +(a: Decimal, b, Decimal): Decimal = default;
+inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
+inline infix operator <(a: Decimal, b: Decimal): Bool = default;
+inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
 //<summary>Primitive string value.</summary>
 entity String provides Some, KeyType, PODType, APIType {
@@ -329,12 +329,12 @@ entity String provides Some, KeyType, PODType, APIType {
 
     function compare(a: String, b: String): Bool # string_compare
 }
-inline infix operator ==(a: Rational, b: Rational): Bool # default_eq
-inline infix operator !=(a: Rational, b: Rational): Bool # default_neq
-inline infix operator <(a: Rational, b: Rational): Bool # default_lt
-inline infix operator >(a: Rational, b: Rational): Bool # default_gt
-inline infix operator <=(a: Rational, b: Rational): Bool # default_lteq
-inline infix operator >=(a: Rational, b: Rational): Bool # default_gteq
+inline infix operator ==(a: Rational, b: Rational): Bool = default;
+inline infix operator !=(a: Rational, b: Rational): Bool = default;
+inline infix operator <(a: Rational, b: Rational): Bool = default;
+inline infix operator >(a: Rational, b: Rational): Bool = default;
+inline infix operator <=(a: Rational, b: Rational): Bool = default;
+inline infix operator >=(a: Rational, b: Rational): Bool = default;
 
 //<summary>Primitive safe string value.</summary>
 entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
@@ -437,23 +437,23 @@ entity ByteBuffer provides Some, APIValue {
 unit ISOSecond = Int;
 unit ISOMilliSecond = Int;
 
-inline infix operator +(a: ISOSecond, b, ISOSecond): ISOSecond # default_add
-inline infix operator -(a: ISOSecond, b, ISOSecond): ISOSecond # default_sub
-inline infix operator ==(a: ISOSecond, b: ISOSecond): Bool # default_eq
-inline infix operator !=(a: ISOSecond, b: ISOSecond): Bool # default_neq
-inline infix operator <(a: ISOSecond, b: ISOSecond): Bool # default_lt
-inline infix operator >(a: ISOSecond, b: ISOSecond): Bool # default_gt
-inline infix operator <=(a: ISOSecond, b: ISOSecond): Bool # default_lteq
-inline infix operator >=(a: ISOSecond, b: ISOSecond): Bool # default_gteq
+inline infix operator +(a: ISOSecond, b, ISOSecond): ISOSecond = default;
+inline infix operator -(a: ISOSecond, b, ISOSecond): ISOSecond = default;
+inline infix operator ==(a: ISOSecond, b: ISOSecond): Bool = default;
+inline infix operator !=(a: ISOSecond, b: ISOSecond): Bool = default;
+inline infix operator <(a: ISOSecond, b: ISOSecond): Bool = default;
+inline infix operator >(a: ISOSecond, b: ISOSecond): Bool = default;
+inline infix operator <=(a: ISOSecond, b: ISOSecond): Bool = default;
+inline infix operator >=(a: ISOSecond, b: ISOSecond): Bool = default;
 
-inline infix operator +(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond # default_add
-inline infix operator -(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond # default_sub
-inline infix operator ==(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_eq
-inline infix operator !=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_neq
-inline infix operator <(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_lt
-inline infix operator >(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_gt
-inline infix operator <=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_lteq
-inline infix operator >=(a: ISOMilliSecond, b: ISOMilliSecond): Bool # default_gteq
+inline infix operator +(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond = default;
+inline infix operator -(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond = default;
+inline infix operator ==(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
+inline infix operator !=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
+inline infix operator <(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
+inline infix operator >(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
+inline infix operator <=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
+inline infix operator >=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
 
 //<summary>Primitive ISO standard date time value.</summary>
 parsable struct entity ISOTime provides Some, KeyType, PODType, APIType {
@@ -470,22 +470,22 @@ parsable struct entity ISOTime provides Some, KeyType, PODType, APIType {
         ISOMilliSecond::create(millis.value() / 1000);
     }
 }
-inline infix operator +(a: ISOMilliSecond, b, ISOTime): ISOTime # default_add
-inline infix operator +(a: ISOTime, b, ISOMilliSecond): ISOTime # default_add
-inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSecond # default_sub
-inline infix operator ==(a: ISOTime, b: ISOTime): Bool # default_eq
-inline infix operator !=(a: ISOTime, b: ISOTime): Bool # default_neq
-inline infix operator <(a: ISOTime, b: ISOTime): Bool # default_lt
-inline infix operator >(a: ISOTime, b: ISOTime): Bool # default_gt
-inline infix operator <=(a: ISOTime, b: ISOTime): Bool # default_lteq
-inline infix operator >=(a: ISOTime, b: ISOTime): Bool # default_gteq
+inline infix operator +(a: ISOMilliSecond, b, ISOTime): ISOTime = default;
+inline infix operator +(a: ISOTime, b, ISOMilliSecond): ISOTime = default;
+inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSecond = default;
+inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator >(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 
 //<summary>Primitive UUID value.</summary>
 parsable struct entity UUID provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<UUID, String> # uuid_tryparse
 }
-inline infix operator ==(a: UUID, b: UUID): Bool # default_eq
-inline infix operator !=(a: UUID, b: UUID): Bool # default_neq
+inline infix operator ==(a: UUID, b: UUID): Bool = default;
+inline infix operator !=(a: UUID, b: UUID): Bool = default;
 
 //<summary>All actual ordered event times implicitly provide this.</summary>
 parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
@@ -495,15 +495,15 @@ parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
 
     const zero: LogicalTime = LogicalTime::s_zero_value();
 }
-inline infix operator +(a: Int, b, LogicalTime): LogicalTime # default_add
-inline infix operator +(a: LogicalTime, b, Int): LogicalTime # default_add
-inline infix operator -(a: LogicalTime, b, LogicalTime): Int # default_sub
-inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool # default_eq
-inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool # default_neq
-inline infix operator <(a: LogicalTime, b: LogicalTime): Bool # default_lt
-inline infix operator >(a: LogicalTime, b: LogicalTime): Bool # default_gt
-inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool # default_lteq
-inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool # default_gteq
+inline infix operator +(a: Int, b, LogicalTime): LogicalTime = default;
+inline infix operator +(a: LogicalTime, b, Int): LogicalTime = default;
+inline infix operator -(a: LogicalTime, b, LogicalTime): Int = default;
+inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator >(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
@@ -511,8 +511,8 @@ parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
 
     function parse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
 }
-inline infix operator ==(a: CryptoHash, b: CryptoHash): Bool # default_eq
-inline infix operator !=(a: CryptoHash, b: CryptoHash): Bool # default_neq
+inline infix operator ==(a: CryptoHash, b: CryptoHash): Bool = default;
+inline infix operator !=(a: CryptoHash, b: CryptoHash): Bool = default;
 
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {

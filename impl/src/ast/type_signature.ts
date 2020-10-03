@@ -83,12 +83,12 @@ class EphemeralListTypeSignature extends TypeSignature {
 class FunctionParameter {
     readonly name: string;
     readonly type: TypeSignature;
-    readonly refKind: "ref" | "ref!" | "ref?" | undefined;
+    readonly refKind: "ref" | "out" | "out?" | undefined;
     readonly isOptional: boolean;
     readonly defaultexp: Expression | undefined;
     readonly litexp: LiteralExpressionValue | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, refKind: "ref" | "ref!" | "ref?" | undefined, defaultexp: Expression | undefined, litexp: LiteralExpressionValue | undefined) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, refKind: "ref" | "out" | "out?" | undefined, defaultexp: Expression | undefined, litexp: LiteralExpressionValue | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;

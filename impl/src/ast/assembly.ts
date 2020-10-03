@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegerExpression, AccessStaticFieldExpression, LiteralNaturalExpression, AccessNamespaceConstantExpression } from "./body";
+import { Expression, BodyImplementation, LiteralNoneExpression,  LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, CoalesceExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstructorTupleExpression, ConstructorRecordExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -310,8 +310,7 @@ enum SpecialTypeCategory {
     ParsableTypeDecl,
     ValidatorTypeDecl,
     EnumTypeDecl,
-    IdentifierTypeDecl,
-    UnitTypeDecl,
+    TypeDeclDecl,
     StringOfDecl,
     DataStringDecl,
     BufferDecl,
@@ -607,6 +606,175 @@ class Assembly {
         return fullbinds;
     }
 
+    private compileTimeReduceConstantExpression(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
+        if(exp.isCompileTimeInlineValue()) {
+            return exp;
+        }
+        else if (exp instanceof LiteralParamerterValueExpression) {
+            const vv = (binds.get(exp.ltype.name) as ResolvedType).options[0] as ResolvedLiteralAtomType;
+
+            if (typeof (vv.typevalue) === "boolean") {
+                return new LiteralBoolExpression(exp.sinfo, vv.typevalue);
+            }
+            else {
+                if (!/^([_\p{L}])/.test(vv.typevalue)) {
+                    return new LiteralIntegralExpression(exp.sinfo, vv.typevalue, vv.oftype);
+                }
+                else {
+                    return this.compileTimeReduceConstantExpression(new AccessStaticFieldExpression(exp.sinfo, vv.oftype, vv.typevalue), new Map<string, ResolvedType>());
+                }
+            }
+        }
+        else if (exp instanceof PrefixNotOp) {
+            const earg = this.compileTimeReduceConstantExpression(exp.exp, binds);
+            if (earg === undefined) {
+                return undefined;
+            }
+
+            if (earg instanceof LiteralBoolExpression) {
+                return new LiteralBoolExpression(exp.sinfo, !earg.value);
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (exp instanceof CallNamespaceFunctionOrOperatorExpression) {
+            if(exp.name !== "+" && exp.name !== "-") {
+                return undefined;
+            }
+
+            const earg = this.compileTimeReduceConstantExpression(exp.args.argList[0].value, binds);
+            if (earg === undefined) {
+                return undefined;
+            }
+
+            const nsdecl = this.m_namespaceMap.get("NSMain") as NamespaceDeclaration;
+            if (earg instanceof LiteralIntegralExpression || earg instanceof LiteralFloatPointExpression || earg instanceof LiteralRationalExpression) {
+                if(exp.name === "+") {
+                    return earg;
+                }
+                else {
+                    if(earg instanceof LiteralIntegralExpression) {
+                        return new LiteralIntegralExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.itype);
+                    }
+                    else if(earg instanceof LiteralRationalExpression) {
+                        return new LiteralRationalExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.rtype);
+                    }
+                    else {
+                        return new LiteralFloatPointExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.fptype);
+                    }
+                }
+            }
+            else if(earg instanceof LiteralTypedNumericConstructorExpression) {
+                const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+
+                const isigs = opdecls.map((opd) => this.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
+                const opidx = this.tryGetUniqueStaticOperatorResolve([this.normalizeTypeOnly(earg.ntype, new Map<string, ResolvedType>())], isigs);
+                if (opidx === -1 || (opdecls[opidx].invoke.body as BodyImplementation).body !== undefined) {
+                    return undefined;
+                }
+
+                if(exp.name === "+") {
+                    return earg;
+                }
+                else {
+                    return new LiteralTypedNumericConstructorExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.ntype, earg.vtype);
+                }
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (exp instanceof AccessNamespaceConstantExpression) {
+            if (!this.hasNamespace(exp.ns)) {
+                return undefined;
+            }
+            const nsdecl = this.getNamespace(exp.ns);
+
+            if (!nsdecl.consts.has(exp.name)) {
+                return undefined;
+            }
+
+            const cdecl = nsdecl.consts.get(exp.name) as NamespaceConstDecl;
+            return this.compileTimeReduceConstantExpression(cdecl.value, binds);
+        }
+        else if (exp instanceof AccessStaticFieldExpression) {
+            const oftype = this.normalizeTypeOnly(exp.stype, binds);
+            const cdecltry = this.tryGetConstMemberUniqueDeclFromType(oftype, exp.name);
+            if(cdecltry === undefined) {
+                return undefined;
+            }
+    
+            const cdecl = cdecltry as OOMemberLookupInfo<StaticMemberDecl>;
+            if(cdecl.contiainingType.specialDecls.has(SpecialTypeCategory.EnumTypeDecl)) {
+                return cdecl.decl.value //must be an enum which cannot have template terms so don't care about binds;
+            }
+            else {
+                return cdecl.decl.value !== undefined ? this.compileTimeReduceConstantExpression(cdecl.decl.value, cdecl.binds) : undefined;
+            }
+        }
+        else {
+            return undefined;
+        }
+    }
+
+    private reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, string] | undefined {
+        const cexp = this.compileTimeReduceConstantExpression(exp, binds);
+
+        if(cexp instanceof LiteralBoolExpression) {
+            return [cexp, `${cexp.value}`];
+        }
+        else if(cexp instanceof LiteralIntegralExpression) {
+            if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
+                return [cexp, cexp.value]
+            }
+            else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
+                return [cexp, cexp.value]
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if(cexp instanceof LiteralTypedNumericConstructorExpression) {
+            if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
+                return [cexp, cexp.value]
+            }
+            else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
+                return [cexp, cexp.value]
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if(cexp instanceof AccessStaticFieldExpression) {
+            return [cexp, `${this.normalizeTypeOnly(cexp.stype, new Map<string, ResolvedType>()).idStr}::${cexp.name}`];
+        }
+        else {
+            return undefined;
+        }
+
+    }
+
+    reduceExpressionAsConstantExpr(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
+        const cexp = this.compileTimeReduceConstantExpression(exp, binds);
+
+        const eexp = cexp !== undefined ? cexp : exp;
+        if(eexp.isCompileTimeInlineValue() || eexp instanceof AccessNamespaceConstantExpression || eexp instanceof AccessStaticFieldExpression) {
+            if (eexp instanceof ConstructorTupleExpression) {
+                xxxx;
+            }
+            else if (eexp instanceof ConstructorRecordExpression) {
+                xxxx;
+            }
+            else {
+                return eexp;
+            }
+        }
+        else {
+            return undefined;
+        }
+    }
+
     private checkTuplesMustDisjoint(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): boolean {
         if(t1.isvalue !== t2.isvalue) {
             return true;
@@ -672,7 +840,7 @@ class Assembly {
     private getConceptsProvidedByTuple(tt: ResolvedTupleAtomType): ResolvedConceptAtomType {
         let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialSomeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
         if (tt.grounded) {
-            if (this.checkAllTupleEntriesOfType(tt, this.getSpecialKeyTypeConceptType())) {
+            if (tt.isvalue && this.checkAllTupleEntriesOfType(tt, this.getSpecialKeyTypeConceptType())) {
                 tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
             if (this.checkAllTupleEntriesOfType(tt, this.getSpecialAPITypeConceptType())) {
@@ -695,7 +863,7 @@ class Assembly {
     private getConceptsProvidedByRecord(rr: ResolvedRecordAtomType): ResolvedConceptAtomType {
         let tci: ResolvedConceptAtomTypeEntry[] = [...(this.getSpecialSomeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes];
         if (rr.grounded) {
-            if (this.checkAllRecordEntriesOfType(rr, this.getSpecialKeyTypeConceptType())) {
+            if (rr.isvalue && this.checkAllRecordEntriesOfType(rr, this.getSpecialKeyTypeConceptType())) {
                 tci.push(...(this.getSpecialKeyTypeConceptType().options[0] as ResolvedConceptAtomType).conceptTypes);
             }
             if (this.checkAllRecordEntriesOfType(rr, this.getSpecialAPITypeConceptType())) {
@@ -1030,35 +1198,7 @@ class Assembly {
         else {
             let lexp: Expression = l.typevalue;
             while (lexp instanceof AccessNamespaceConstantExpression || lexp instanceof AccessStaticFieldExpression) {
-                if (lexp instanceof AccessNamespaceConstantExpression) {
-                    if (!this.hasNamespace(lexp.ns)) {
-                        return ResolvedType.createEmpty()
-                    }
-                    const nsdecl = this.getNamespace(lexp.ns);
-
-                    if (!nsdecl.consts.has(lexp.name)) {
-                        return ResolvedType.createEmpty();
-                    }
-
-                    const cdecl = nsdecl.consts.get(lexp.name) as NamespaceConstDecl;
-                    ltype = this.normalizeTypeOnly(cdecl.declaredType, new Map<string, ResolvedType>());
-                    lexp = cdecl.value;
-                }
-                else {
-                    const oftype = this.normalizeTypeOnly(lexp.stype, binds);
-                    if(oftype.isUniqueCallTargetType() && oftype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.EnumTypeDecl)) {
-                        break;
-                    }
-
-                    const cdecltry = this.tryGetConstMemberUniqueDeclFromType(oftype, lexp.name);
-                    if(cdecltry === undefined || cdecltry.decl.value === undefined) {
-                        return ResolvedType.createEmpty();
-                    }
-            
-                    const cdecl = cdecltry as OOMemberLookupInfo<StaticMemberDecl>;
-                    ltype = this.normalizeTypeOnly(cdecl.decl.declaredType, cdecl.binds);
-                    lexp = cdecl.decl.value as Expression;
-                }
+                xxxx;
             }
 
             //should be Bool, Int, or Enum
