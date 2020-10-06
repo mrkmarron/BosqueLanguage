@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ConceptTypeDecl, EntityTypeDecl, SpecialTypeCategory } from "./assembly";
+import { Expression } from "./body";
 
 abstract class ResolvedAtomType {
     readonly idStr: string;
@@ -55,16 +56,16 @@ class ResolvedEntityAtomType extends ResolvedAtomType {
 
 class ResolvedLiteralAtomType extends ResolvedAtomType {
     readonly oftype: ResolvedType;
-    readonly typevalue: boolean | string;
+    readonly vexp: Expression; //Literal bool, number, typed number, or enum
 
-    constructor(rstr: string, oftype: ResolvedType, ofvalue: boolean | string) {
+    constructor(rstr: string, oftype: ResolvedType, vexp: Expression) {
         super(rstr);
         this.oftype = oftype;
-        this.typevalue = ofvalue;
+        this.vexp = vexp;
     }
 
-    static create(oftype: ResolvedType, ofvalue: boolean | string): ResolvedLiteralAtomType {
-        return new ResolvedLiteralAtomType(`${oftype.idStr}::${ofvalue}`, oftype, ofvalue);
+    static create(oftype: ResolvedType, vexp: Expression, ofvalue: boolean | string): ResolvedLiteralAtomType {
+        return new ResolvedLiteralAtomType(`${oftype.idStr}::${ofvalue}`, oftype, vexp);
     }
 
     hasTemplateType(): boolean {
@@ -477,18 +478,16 @@ class ResolvedType {
 class ResolvedFunctionTypeParam {
     readonly name: string;
     readonly type: ResolvedType | ResolvedFunctionType;
-    readonly isRef: boolean;
+    readonly refKind: "ref" | "out" | "out?" | undefined;
     readonly isOptional: boolean;
-    readonly isLiteral: boolean;
-    readonly exp: string | undefined;
+    readonly litexp: string | undefined;
 
-    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, isRef: boolean, isLiteral: boolean, exp: string | undefined) {
+    constructor(name: string, type: ResolvedType | ResolvedFunctionType, isOpt: boolean, refKind: "ref" | "out" | "out?" | undefined, litexp: string | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;
-        this.isRef = isRef;
-        this.isLiteral = isLiteral;
-        this.exp = exp;
+        this.refKind = refKind;
+        this.litexp = litexp;
     }
 }
 
@@ -514,7 +513,7 @@ class ResolvedFunctionType {
     }
 
     static create(recursive: "yes" | "no" | "cond", params: ResolvedFunctionTypeParam[], optRestParamName: string | undefined, optRestParamType: ResolvedType | undefined, resultType: ResolvedType): ResolvedFunctionType {
-        const cvalues = params.map((param) => (param.isRef ? "ref " : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr + (param.isLiteral ? ("==" + param.exp) : ""));
+        const cvalues = params.map((param) => (param.refKind !== undefined ? param.refKind : "") + param.name + (param.isOptional ? "?: " : ": ") + param.type.idStr + (param.litexp !== undefined ? ("==" + param.litexp) : ""));
         let cvalue = cvalues.join(", ");
 
         let recstr = "";

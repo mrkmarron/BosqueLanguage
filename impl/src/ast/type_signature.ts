@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import {  Expression, LiteralExpressionValue } from "./body";
+import {  ConstantExpressionValue, LiteralExpressionValue } from "./body";
 
 class TypeSignature {
 }
@@ -85,10 +85,10 @@ class FunctionParameter {
     readonly type: TypeSignature;
     readonly refKind: "ref" | "out" | "out?" | undefined;
     readonly isOptional: boolean;
-    readonly defaultexp: Expression | undefined;
+    readonly defaultexp: ConstantExpressionValue | undefined;
     readonly litexp: LiteralExpressionValue | undefined;
 
-    constructor(name: string, type: TypeSignature, isOpt: boolean, refKind: "ref" | "out" | "out?" | undefined, defaultexp: Expression | undefined, litexp: LiteralExpressionValue | undefined) {
+    constructor(name: string, type: TypeSignature, isOpt: boolean, refKind: "ref" | "out" | "out?" | undefined, defaultexp: ConstantExpressionValue | undefined, litexp: LiteralExpressionValue | undefined) {
         this.name = name;
         this.type = type;
         this.isOptional = isOpt;

@@ -3,15 +3,15 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry, ResolvedLiteralAtomType, ResolvedAtomType } from "../ast/resolved_type";
+import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedFunctionTypeParam, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry, ResolvedLiteralAtomType } from "../ast/resolved_type";
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralIntegerExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, LiteralBigIntegerExpression, LiteralFloatExpression, MapEntryConstructorExpression, SpecialConstructorExpression, LiteralNaturalExpression, LiteralBigNaturalExpression, LiteralRationalExpression, LiteralDecimalExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, InvokeArgument, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRConstantKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRVariableArgument, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREntityType, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
 import * as assert from "assert";
 import { BSQRegex } from "../ast/bsqregex";
 
@@ -32,18 +32,18 @@ type ExpandedArgument = {
     name: string | undefined,
     argtype: ResolvedType | ResolvedFunctionType,
     expando: boolean,
-    ref: MIRVariableArgument | undefined,
+    ref: ["ref" | "out" | "out?", MIRVariableArgument] | undefined,
     pcode: PCode | undefined,
-    treg: MIRTempRegister
+    treg: MIRTempRegister | undefined
 };
 
 type FilledLocation = {
     vtype: ResolvedType | ResolvedFunctionType,
     mustDef: boolean,
     fflagchk: boolean,
-    ref: MIRVariableArgument | undefined,
+    ref: ["ref" | "out" | "out?", MIRVariableArgument] | undefined,
     pcode: PCode | undefined,
-    trgt: MIRArgument
+    trgt: MIRArgument | undefined
 };
 
 function createTupleStructuredAssignmentPathStep(fromtype: ResolvedType, t: ResolvedType, ival: number): StructuredAssignmentPathStep {
@@ -531,15 +531,6 @@ class TypeChecker {
         );
     }
 
-    private getTypeForParameter(p: ResolvedFunctionTypeParam): ResolvedType {
-        if (!p.isOptional) {
-            return p.type as ResolvedType;
-        }
-        else {
-            return p.exp === undefined ? this.m_assembly.typeUpperBound([p.type as ResolvedType, this.m_assembly.getSpecialNoneType()]) : (p.type as ResolvedType)
-        }
-    }
-
     private checkTypeOkForTupleExpando(sinfo: SourceInfo, rtype: ResolvedType): [number, number] {
         const tslist = rtype.options.map((opt) => {
             this.raiseErrorIf(sinfo, !(opt instanceof ResolvedTupleAtomType), "Can only expando into positional arguments with Tuple");
@@ -586,10 +577,9 @@ class TypeChecker {
 
         for(let i = 0; i < exp.invoke.params.length; ++i) {
             const p = fsig.params[i];
-            const ptype = this.getTypeForParameter(p);
-            cargs.set(exp.invoke.params[i].name, new VarInfo(ptype, !p.isRef, false, true, ptype, FlowTypeTruthValue.Unknown));
+            cargs.set(exp.invoke.params[i].name, new VarInfo(p.type as ResolvedType, p.refKind === undefined, false, true, p.type as ResolvedType, FlowTypeTruthValue.Unknown));
 
-            if (p.isRef) {
+            if (p.refKind !== undefined) {
                 refNames.push(p.name);
             }
         }
@@ -714,14 +704,14 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
                 const earg = (env.lookupVar(rvname) as VarInfo);
-                eargs.push({ name: "this", argtype: earg.declaredType, ref: new MIRParameterVariable(rvname), expando: false, pcode: undefined, treg: optSelfValue[2] });
+                eargs.push({ name: "this", argtype: earg.declaredType, ref: ["ref", new MIRParameterVariable(rvname)], expando: false, pcode: undefined, treg: optSelfValue[2] });
             }
         }
 
         const ridx = optSelfValue !== undefined ? 1 : 0;
         const noExpando = args.argList.every((arg) => !(arg instanceof PositionalArgument) || !arg.isSpread);
         
-        this.raiseErrorIf(sinfo, !refallowed && ((optSelfValue !== undefined && optSelfValue[1] !== undefined) || args.argList.some((arg) => arg.isRef)), "Cannot use ref params in this call position");
+        this.raiseErrorIf(sinfo, !refallowed && ((optSelfValue !== undefined && optSelfValue[1] !== undefined) || args.argList.some((arg) => arg.ref !== undefined)), "Cannot use ref params in this call position");
 
         //
         //TODO: we only end up doing type inference for calls that are simple (no expandos)
@@ -732,7 +722,8 @@ class TypeChecker {
             let fillednames = new Set<string>();
 
             for (let i = 0; i < args.argList.length; ++i) {
-                this.raiseErrorIf(args.argList[i].value.sinfo, args.argList[i].isRef && !refallowed, "Cannot use ref params in this call position");
+                const isref = args.argList[i].ref !== undefined;
+                this.raiseErrorIf(args.argList[i].value.sinfo, isref && !refallowed, "Cannot use ref params in this call position");
 
                 if (args.argList[i] instanceof PositionalArgument) {
                     continue;
@@ -747,30 +738,35 @@ class TypeChecker {
                 const treg = this.m_emitter.generateTmpRegister();
                 if (narg.value instanceof ConstructorPCodeExpression) {
                     this.raiseErrorIf(narg.value.sinfo, !(param.type instanceof ResolvedFunctionType), "Must have function type for function arg");
-                    this.raiseErrorIf(narg.value.sinfo, narg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(narg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = this.checkPCodeExpression(env, narg.value, sigbinds, param.type as ResolvedFunctionType);
                     eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else if (narg.value instanceof AccessVariableExpression && env.pcodes.has(narg.value.name)) {
                     this.raiseErrorIf(narg.value.sinfo, !(param.type instanceof ResolvedFunctionType), "Must have function type for function arg");
-                    this.raiseErrorIf(narg.value.sinfo, narg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(narg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = (env.pcodes.get(narg.value.name) as { pcode: PCode, captured: string[] }).pcode;
                     eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else {
-                    if (narg.isRef) {
+                    if (isref) {
                         this.raiseErrorIf(narg.value.sinfo, !(narg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
                         const rvname = (narg.value as AccessVariableExpression).name;
                         this.raiseErrorIf(narg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
-                        this.checkExpression(env, narg.value, treg, param.type as ResolvedType);
+                        let refreg: MIRTempRegister | undefined = undefined;
+                        if(narg.ref === "ref") {
+                            this.checkExpression(env, narg.value, treg, param.type as ResolvedType);
+                            refreg = treg;
+                        }
+
                         const earg = (env.lookupVar(rvname) as VarInfo);
                         const refv = env.getLocalVarInfo(rvname) !== undefined ? new MIRLocalVariable(rvname) : new MIRParameterVariable(rvname);
 
-                        eargs[i] = { name: narg.name, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg };
+                        eargs[i] = { name: narg.name, argtype: earg.declaredType, ref: [narg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
                     }
                     else {
                         const earg = this.checkExpression(env, narg.value, treg, param.type as ResolvedType).getExpressionResult();
@@ -785,6 +781,7 @@ class TypeChecker {
                     continue;
                 }
                 const parg = args.argList[i] as PositionalArgument;
+                const isref = parg.ref !== undefined;
 
                 while(sigidx < sig.params.length && fillednames.has(sig.params[sigidx].name)) {
                     sigidx++;
@@ -797,30 +794,37 @@ class TypeChecker {
                 const treg = this.m_emitter.generateTmpRegister();
                 if (parg.value instanceof ConstructorPCodeExpression) {
                     this.raiseErrorIf(parg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
-                    this.raiseErrorIf(parg.value.sinfo, parg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(parg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = this.checkPCodeExpression(env, parg.value, sigbinds, oftype as ResolvedFunctionType);
                     eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else if (parg.value instanceof AccessVariableExpression && env.pcodes.has(parg.value.name)) {
                     this.raiseErrorIf(parg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
-                    this.raiseErrorIf(parg.value.sinfo, parg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(parg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = (env.pcodes.get(parg.value.name) as { pcode: PCode, captured: string[] }).pcode;
                     eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else {
-                    if (parg.isRef) {
+                    if (isref) {
                         this.raiseErrorIf(parg.value.sinfo, !(parg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
                         const rvname = (parg.value as AccessVariableExpression).name;
                         this.raiseErrorIf(parg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
                         this.checkExpression(env, parg.value, treg, oftype as ResolvedType);
+
+                        let refreg: MIRTempRegister | undefined = undefined;
+                        if(parg.ref === "ref") {
+                            this.checkExpression(env, parg.value, treg, oftype as ResolvedType);
+                            refreg = treg;
+                        }
+
                         const earg = (env.lookupVar(rvname) as VarInfo);
                         const refv = env.getLocalVarInfo(rvname) !== undefined ? new MIRLocalVariable(rvname) : new MIRParameterVariable(rvname);
 
-                        eargs[i] = { name: undefined, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg };
+                        eargs[i] = { name: undefined, argtype: earg.declaredType, ref: [parg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
                     }
                     else {
                         const earg = this.checkExpression(env, parg.value, treg, oftype as ResolvedType).getExpressionResult();
@@ -834,14 +838,15 @@ class TypeChecker {
         else {
             for (let i = 0; i < args.argList.length; ++i) {
                 const arg = args.argList[i];
+                const isref = arg.ref !== undefined;
 
                 const treg = this.m_emitter.generateTmpRegister();
 
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef && !refallowed, "Cannot use ref params in this call position");
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
+                this.raiseErrorIf(arg.value.sinfo, isref && !refallowed, "Cannot use ref params in this call position");
+                this.raiseErrorIf(arg.value.sinfo, isref && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
 
                 if (arg.value instanceof ConstructorPCodeExpression) {
-                    this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(arg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = this.checkPCodeExpression(env, arg.value, sigbinds, undefined);
 
@@ -855,7 +860,7 @@ class TypeChecker {
                     }
                 }
                 else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
-                    this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                    this.raiseErrorIf(arg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
 
@@ -869,21 +874,28 @@ class TypeChecker {
                     }
                 }
                 else {
-                    if (arg.isRef) {
+                    if (isref) {
                         this.raiseErrorIf(arg.value.sinfo, !(arg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
                         const rvname = (arg.value as AccessVariableExpression).name;
                         this.raiseErrorIf(arg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
                         this.checkExpression(env, arg.value, treg, undefined);
+
+                        let refreg: MIRTempRegister | undefined = undefined;
+                        if(arg.ref === "ref") {
+                            this.checkExpression(env, arg.value, treg, undefined);
+                            refreg = treg;
+                        }
+
                         const earg = (env.lookupVar(rvname) as VarInfo);
                         const refv = env.getLocalVarInfo(rvname) !== undefined ? new MIRLocalVariable(rvname) : new MIRParameterVariable(rvname);
 
                         if (arg instanceof NamedArgument) {
-                            eargs.push({ name: arg.name, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg });
+                            eargs.push({ name: arg.name, argtype: earg.declaredType, ref: [arg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg });
                         }
                         else {
-                            eargs.push({ name: undefined, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg });
+                            eargs.push({ name: undefined, argtype: earg.declaredType, ref: [arg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg });
                         }
                     }
                     else {
@@ -937,18 +949,19 @@ class TypeChecker {
     private checkArgumentsEvaluationWOperator(sinfo: SourceInfo, env: TypeEnvironment, binds: Map<string, ResolvedType>, args: Arguments, refallowed: boolean): ExpandedArgument[] {
         let eargs: ExpandedArgument[] = [];
         
-        this.raiseErrorIf(sinfo, !refallowed && args.argList.some((arg) => arg.isRef), "Cannot use ref params in this call position");
+        this.raiseErrorIf(sinfo, !refallowed && args.argList.some((arg) => arg.ref !== undefined), "Cannot use ref params in this call position");
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
+            const isref = arg.ref !== undefined;
 
             const treg = this.m_emitter.generateTmpRegister();
 
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef && !refallowed, "Cannot use ref params in this call position");
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
+            this.raiseErrorIf(arg.value.sinfo, isref && !refallowed, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, isref && arg instanceof PositionalArgument && arg.isSpread, "Cannot use ref on spread argument");
 
             if (arg.value instanceof ConstructorPCodeExpression) {
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                this.raiseErrorIf(arg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                 const pcode = this.checkPCodeExpression(env, arg.value, binds, undefined);
 
@@ -962,7 +975,7 @@ class TypeChecker {
                 }
             }
             else if (arg.value instanceof AccessVariableExpression && env.pcodes.has(arg.value.name)) {
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params on function argument");
+                this.raiseErrorIf(arg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                 const pcode = (env.pcodes.get(arg.value.name) as { pcode: PCode, captured: string[] }).pcode;
 
@@ -976,21 +989,26 @@ class TypeChecker {
                 }
             }
             else {
-                if (arg.isRef) {
+                if (isref) {
                     this.raiseErrorIf(arg.value.sinfo, !(arg.value instanceof AccessVariableExpression), "Can only ref on variable names");
 
                     const rvname = (arg.value as AccessVariableExpression).name;
                     this.raiseErrorIf(arg.value.sinfo, env.lookupVar(rvname) === null, "Variable name is not defined");
 
-                    this.checkExpression(env, arg.value, treg, undefined);
+                    let refreg: MIRTempRegister | undefined = undefined;
+                    if(arg.ref === "ref") {
+                        this.checkExpression(env, arg.value, treg, undefined);
+                        refreg = treg;
+                    }
+
                     const earg = (env.lookupVar(rvname) as VarInfo);
                     const refv = env.getLocalVarInfo(rvname) !== undefined ? new MIRLocalVariable(rvname) : new MIRParameterVariable(rvname);
 
                     if (arg instanceof NamedArgument) {
-                        eargs.push({ name: arg.name, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg });
+                        eargs.push({ name: arg.name, argtype: earg.declaredType, ref: [arg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg });
                     }
                     else {
-                        eargs.push({ name: undefined, argtype: earg.declaredType, ref: refv, expando: false, pcode: undefined, treg: treg });
+                        eargs.push({ name: undefined, argtype: earg.declaredType, ref: [arg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg });
                     }
                 }
                 else {
@@ -1014,7 +1032,7 @@ class TypeChecker {
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.ref !== undefined, "Cannot use ref params in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
 
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in tuple constructor");
@@ -1059,7 +1077,7 @@ class TypeChecker {
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.ref !== undefined, "Cannot use ref params in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
 
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof NamedArgument), "Only named arguments allowed in record constructor");
@@ -1108,7 +1126,7 @@ class TypeChecker {
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.ref !== undefined, "Cannot use ref params in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
 
             this.raiseErrorIf(arg.value.sinfo, !(arg instanceof PositionalArgument), "Only positional arguments allowed in tuple constructor");
@@ -1161,7 +1179,7 @@ class TypeChecker {
 
         for (let i = 0; i < args.argList.length; ++i) {
             const arg = args.argList[i];
-            this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+            this.raiseErrorIf(arg.value.sinfo, arg.ref !== undefined, "Cannot use ref params in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg.value instanceof ConstructorPCodeExpression, "Cannot use function in this call position");
             this.raiseErrorIf(arg.value.sinfo, arg instanceof NamedArgument, "Cannot use named arguments in constructor");
 
@@ -1253,7 +1271,7 @@ class TypeChecker {
         if (noExpando) {
             let fillednames = new Set<string>();
             for (let i = 0; i < args.argList.length; ++i) {
-                this.raiseErrorIf(args.argList[i].value.sinfo, args.argList[i].isRef, "Cannot use ref params in this call position");
+                this.raiseErrorIf(args.argList[i].value.sinfo, args.argList[i].ref !== undefined, "Cannot use ref params in this call position");
 
                 if (args.argList[i] instanceof PositionalArgument) {
                     continue;
@@ -1296,7 +1314,7 @@ class TypeChecker {
         else {
             for (let i = 0; i < args.argList.length; ++i) {
                 const arg = args.argList[i];
-                this.raiseErrorIf(arg.value.sinfo, arg.isRef, "Cannot use ref params in this call position");
+                this.raiseErrorIf(arg.value.sinfo, arg.ref !== undefined, "Cannot use ref params in this call position");
 
                 const treg = this.m_emitter.generateTmpRegister();
 
@@ -1338,7 +1356,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, fidx === -1, `Entity ${oftype.idStr} does not have field named "${arg.name}"`);
                 this.raiseErrorIf(sinfo, filledLocations[fidx] !== undefined, `Duplicate definition of parameter name "${arg.name}"`);
 
-                filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg };
+                filledLocations[fidx] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg as MIRTempRegister };
                 if(flatfinfo[fidx][1][1].value !== undefined) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, fidx - optfirst, true);
                 }
@@ -1358,14 +1376,15 @@ class TypeChecker {
                     const ptype = this.m_emitter.registerResolvedTypeReference(lvtype);
 
                     if(expandInfo[0].has(pname)) {
-                        this.m_emitter.emitLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg);
+                        this.m_emitter.emitLoadProperty(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg);
                         filledLocations[fidx] = { vtype: lvtype, mustDef: true, fflagchk: false, trgt: etreg };
                     }
                     else {
                         const field = flatfinfo[fidx][1];
                         this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[fidx]}" is required and must be assigned a value in constructor`);
-
-                        this.m_emitter.emitCheckedLoadProperty(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
+                        
+                        this.m_emitter.emitLoadUninitVariableValue(sinfo, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), arg.treg as MIRTempRegister);
+                        this.m_emitter.emitCheckedLoadProperty(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), pname, !(arg.argtype as ResolvedType).isUniqueRecordTargetType(), ptype, etreg, fflag, fidx - optfirst);
                         filledLocations[fidx] = { vtype: lvtype, mustDef: false, fflagchk: true, trgt: etreg };
                     }
                 });
@@ -1391,7 +1410,7 @@ class TypeChecker {
 
             const arg = args[apos];
             if (!arg.expando) {
-                filledLocations[ii] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg };
+                filledLocations[ii] = { vtype: arg.argtype as ResolvedType, mustDef: true, fflagchk: false, trgt: arg.treg as MIRTempRegister };
                 if(flatfinfo[ii][1][1].value !== undefined) {
                     this.m_emitter.emitSetHasFlagConstant(fflag, ii - optfirst, true);
                 }
@@ -1411,14 +1430,15 @@ class TypeChecker {
                     const itype = this.m_emitter.registerResolvedTypeReference(lvtype);
                    
                     if(ectr < expandInfo[0]) {
-                        this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg);
+                        this.m_emitter.emitLoadTupleIndex(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg);
                         filledLocations[ii] = { vtype: lvtype, mustDef: true, fflagchk: false, trgt: etreg };
                     }
                     else {
                         const field = flatfinfo[ii][1];
                         this.raiseErrorIf(sinfo, field[1].value === undefined, `Field "${fields[ii]}" is required and must be assigned a value in constructor`);
 
-                        this.m_emitter.emitCheckedLoadTupleIndex(sinfo, arg.treg, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
+                        this.m_emitter.emitLoadUninitVariableValue(sinfo, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), arg.treg as MIRTempRegister);
+                        this.m_emitter.emitCheckedLoadTupleIndex(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference(arg.argtype as ResolvedType), ectr, !(arg.argtype as ResolvedType).isUniqueTupleTargetType(), itype, etreg, fflag, ii - optfirst);
                         filledLocations[ii] = { vtype: lvtype, mustDef: false, fflagchk: true, trgt: etreg };
                     }
 
@@ -1597,9 +1617,7 @@ class TypeChecker {
                 this.raiseErrorIf(sinfo, !sig.params[j].isOptional, `Parameter ${sig.params[j].name} is required and must be assigned a value in constructor`);
 
                 this.m_emitter.emitSetHasFlagConstant(fflag, j - optfirst, false);
-
-                const etreg = this.m_emitter.generateTmpRegister();
-                filledLocations[j] = { vtype: paramtype, mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
+                filledLocations[j] = { vtype: paramtype, mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: undefined };
             }
 
             if (sig.params[j].type instanceof ResolvedFunctionType) {
@@ -1611,10 +1629,11 @@ class TypeChecker {
             else {
                 this.raiseErrorIf(sinfo, filledLocations[j].pcode !== undefined, `Parameter ${sig.params[j].name} cannot take a function`);
 
-                if (sig.params[j].isRef) {
+                if (sig.params[j].refKind !== undefined) {
                     this.raiseErrorIf(sinfo, filledLocations[j].ref === undefined, `Parameter ${sig.params[j].name} expected reference parameter`);
-                    this.raiseErrorIf(sinfo, (filledLocations[j].vtype as ResolvedType).idStr !== (paramtype as ResolvedType).idStr, `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
+                    this.raiseErrorIf(sinfo, !(filledLocations[j].vtype as ResolvedType).isSameType(paramtype as ResolvedType), `Parameter ${sig.params[j].name} expected argument of type ${paramtype.idStr} but got ${filledLocations[j].vtype.idStr}`);
 
+                    xxxx;
                     refs.push(filledLocations[j].ref as MIRVariableArgument);
                 }
                 else {
@@ -1625,10 +1644,10 @@ class TypeChecker {
 
                 let narg = filledLocations[j].trgt;
                 if(filledLocations[j].fflagchk) {
-                    narg = this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType, fflag, j - optfirst);
+                    narg = this.emitCheckedInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType, fflag, j - optfirst);
                 }
                 else {
-                    narg = this.emitInlineConvertIfNeeded(sinfo, filledLocations[j].trgt, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType);
+                    narg = this.emitInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ResolvedType, sig.params[j].type as ResolvedType);
                 }
 
                 margs.push(narg);
@@ -2859,6 +2878,10 @@ class TypeChecker {
         this.emitConvertIfNeeded(exp.sinfo, pcode.ftype.resultType, infertype, iipack);
 
         return [env.setResultExpression(restype)];
+    }
+
+    private checkOfTypeConvertExpression(env: TypeEnvironment, exp: OfTypeConvertExpression, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
+        xxxx;
     }
 
     private checkAccessFromIndex(env: TypeEnvironment, op: PostfixAccessFromIndex, arg: MIRTempRegister, trgt: MIRTempRegister, infertype: ResolvedType | undefined): TypeEnvironment[] {
@@ -4399,6 +4422,8 @@ class TypeChecker {
                 return this.checkCallNamespaceFunctionOrOperatorExpression(env, exp as CallNamespaceFunctionOrOperatorExpression, trgt, (extraok && extraok.refok) || false, infertype);
             case ExpressionTag.CallStaticFunctionOrOperatorExpression:
                 return this.checkCallStaticFunctionOrOperatorExpression(env, exp as CallStaticFunctionOrOperatorExpression, trgt, (extraok && extraok.refok) || false, infertype);
+            case ExpressionTag.OfTypeConvertExpression:
+                return this.checkOfTypeConvertExpression(env, exp as OfTypeConvertExpression, trgt, infertype);
             case ExpressionTag.PostfixOpExpression:
                 return this.checkPostfixExpression(env, exp as PostfixOp, trgt, (extraok && extraok.refok) || false, infertype);
             case ExpressionTag.PrefixNotOpExpression:

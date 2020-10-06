@@ -197,12 +197,24 @@ abstract class Expression {
     }
 }
 
-//This just holds an expression but not a subtype of Expression so we can distinguish as types
+//This just holds an expression (for use in literal types) but not a subtype of Expression so we can distinguish as types
 class LiteralExpressionValue {
     readonly exp: Expression;
 
     constructor(exp: Expression) {
         this.exp = exp;
+    }
+}
+
+
+//This just holds an expression (for use where we expect and constant -- or restricted constant expression) but not a subtype of Expression so we can distinguish as types
+class ConstantExpressionValue {
+    readonly exp: Expression;
+    readonly captured: Set<string>;
+
+    constructor(exp: Expression, captured: Set<string>) {
+        this.exp = exp;
+        this.captured = captured;
     }
 }
 
@@ -428,10 +440,6 @@ class ConstructorTupleExpression extends Expression {
         this.isvalue = isvalue;
         this.args = args;
     }
-
-    isCompileTimeInlineValue(): boolean {
-        return this.isvalue;
-    }
 }
 
 class ConstructorRecordExpression extends Expression {
@@ -442,10 +450,6 @@ class ConstructorRecordExpression extends Expression {
         super(ExpressionTag.ConstructorRecordExpression, sinfo);
         this.isvalue = isvalue;
         this.args = args;
-    }
-
-    isCompileTimeInlineValue(): boolean {
-        return this.isvalue;
     }
 }
 
@@ -1008,9 +1012,9 @@ class IgnoreTermStructuredAssignment extends StructuredAssignment {
 }
 
 class ConstValueStructuredAssignment extends StructuredAssignment {
-    readonly constValue: LiteralExpressionValue;
+    readonly constValue: ConstantExpressionValue;
 
-    constructor(constValue: LiteralExpressionValue) {
+    constructor(constValue: ConstantExpressionValue) {
         super();
         this.constValue = constValue;
     }
@@ -1207,7 +1211,7 @@ class BodyImplementation {
 
 export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
-    ExpressionTag, Expression, LiteralExpressionValue, InvalidExpression,
+    ExpressionTag, Expression, LiteralExpressionValue, ConstantExpressionValue, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
     LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression,
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 

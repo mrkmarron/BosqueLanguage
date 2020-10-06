@@ -227,6 +227,16 @@ class MIREmitter {
         xxxx;
     }
 
+    emitLoadUninitVariableValue(sinfo: SourceInfo, oftype: MIRType, trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        //This value will not be read from but will be passed as an arg 
+        //we need to have space for it etc. so just plop a "fresh" or zero-filled value there
+        xxxx;
+    }
+
     emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;

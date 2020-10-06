@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralNoneExpression,  LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, CoalesceExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstructorTupleExpression, ConstructorRecordExpression } from "./body";
+import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -186,9 +186,9 @@ class StaticMemberDecl implements OOMemberDecl {
     readonly name: string;
 
     readonly declaredType: TypeSignature;
-    readonly value: Expression | undefined;
+    readonly value: ConstantExpressionValue | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: Expression | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
         this.pragmas = pragmas;
@@ -264,9 +264,9 @@ class MemberFieldDecl implements OOMemberDecl {
     readonly name: string;
 
     readonly declaredType: TypeSignature;
-    readonly value: Expression | undefined;
+    readonly value: ConstantExpressionValue | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: Expression | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
         this.pragmas = pragmas;
@@ -311,6 +311,7 @@ enum SpecialTypeCategory {
     ValidatorTypeDecl,
     EnumTypeDecl,
     TypeDeclDecl,
+    TypeDeclNumeric,
     StringOfDecl,
     DataStringDecl,
     BufferDecl,
@@ -434,9 +435,9 @@ class NamespaceConstDecl {
     readonly name: string;
 
     readonly declaredType: TypeSignature;
-    readonly value: Expression;
+    readonly value: ConstantExpressionValue;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: Expression) {
+    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: ConstantExpressionValue) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
 
@@ -612,18 +613,7 @@ class Assembly {
         }
         else if (exp instanceof LiteralParamerterValueExpression) {
             const vv = (binds.get(exp.ltype.name) as ResolvedType).options[0] as ResolvedLiteralAtomType;
-
-            if (typeof (vv.typevalue) === "boolean") {
-                return new LiteralBoolExpression(exp.sinfo, vv.typevalue);
-            }
-            else {
-                if (!/^([_\p{L}])/.test(vv.typevalue)) {
-                    return new LiteralIntegralExpression(exp.sinfo, vv.typevalue, vv.oftype);
-                }
-                else {
-                    return this.compileTimeReduceConstantExpression(new AccessStaticFieldExpression(exp.sinfo, vv.oftype, vv.typevalue), new Map<string, ResolvedType>());
-                }
-            }
+            return vv.vexp;
         }
         else if (exp instanceof PrefixNotOp) {
             const earg = this.compileTimeReduceConstantExpression(exp.exp, binds);
@@ -696,7 +686,7 @@ class Assembly {
             }
 
             const cdecl = nsdecl.consts.get(exp.name) as NamespaceConstDecl;
-            return this.compileTimeReduceConstantExpression(cdecl.value, binds);
+            return this.compileTimeReduceConstantExpression(cdecl.value.exp, binds);
         }
         else if (exp instanceof AccessStaticFieldExpression) {
             const oftype = this.normalizeTypeOnly(exp.stype, binds);
@@ -707,10 +697,10 @@ class Assembly {
     
             const cdecl = cdecltry as OOMemberLookupInfo<StaticMemberDecl>;
             if(cdecl.contiainingType.specialDecls.has(SpecialTypeCategory.EnumTypeDecl)) {
-                return cdecl.decl.value //must be an enum which cannot have template terms so don't care about binds;
+                return (cdecl.decl.value as ConstantExpressionValue).exp //must be an enum which cannot have template terms so don't care about binds;
             }
             else {
-                return cdecl.decl.value !== undefined ? this.compileTimeReduceConstantExpression(cdecl.decl.value, cdecl.binds) : undefined;
+                return cdecl.decl.value !== undefined ? this.compileTimeReduceConstantExpression(cdecl.decl.value.exp, cdecl.binds) : undefined;
             }
         }
         else {
@@ -718,18 +708,18 @@ class Assembly {
         }
     }
 
-    private reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, string] | undefined {
+    private reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, ResolvedType, string] | undefined {
         const cexp = this.compileTimeReduceConstantExpression(exp, binds);
 
         if(cexp instanceof LiteralBoolExpression) {
-            return [cexp, `${cexp.value}`];
+            return [cexp, this.getSpecialBoolType(), `${cexp.value}`];
         }
         else if(cexp instanceof LiteralIntegralExpression) {
             if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
-                return [cexp, cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value]
             }
             else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
-                return [cexp, cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value]
             }
             else {
                 return undefined;
@@ -737,42 +727,23 @@ class Assembly {
         }
         else if(cexp instanceof LiteralTypedNumericConstructorExpression) {
             if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
-                return [cexp, cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value]
             }
             else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
-                return [cexp, cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value]
             }
             else {
                 return undefined;
             }
         }
         else if(cexp instanceof AccessStaticFieldExpression) {
-            return [cexp, `${this.normalizeTypeOnly(cexp.stype, new Map<string, ResolvedType>()).idStr}::${cexp.name}`];
+            const stype = this.normalizeTypeOnly(cexp.stype, new Map<string, ResolvedType>());
+            return [cexp, stype, `${stype}.idStr}::${cexp.name}`];
         }
         else {
             return undefined;
         }
 
-    }
-
-    reduceExpressionAsConstantExpr(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
-        const cexp = this.compileTimeReduceConstantExpression(exp, binds);
-
-        const eexp = cexp !== undefined ? cexp : exp;
-        if(eexp.isCompileTimeInlineValue() || eexp instanceof AccessNamespaceConstantExpression || eexp instanceof AccessStaticFieldExpression) {
-            if (eexp instanceof ConstructorTupleExpression) {
-                xxxx;
-            }
-            else if (eexp instanceof ConstructorRecordExpression) {
-                xxxx;
-            }
-            else {
-                return eexp;
-            }
-        }
-        else {
-            return undefined;
-        }
     }
 
     private checkTuplesMustDisjoint(t1: ResolvedTupleAtomType, t2: ResolvedTupleAtomType): boolean {
@@ -1179,51 +1150,15 @@ class Assembly {
     }
 
     private normalizeType_Literal(l: LiteralTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
-        let ltype = this.getSpecialNoneType();
-        let tval: boolean | string = "[UNDEF]";
-
-        xxxx;
-        if (l.typevalue instanceof LiteralBoolExpression) {
-            ltype = this.getSpecialBoolType();
-            tval = l.typevalue.value;
-        } 
-        else if (l.typevalue instanceof LiteralIntegerExpression) {
-            ltype = this.getSpecialIntType();
-            tval = l.typevalue.value;
-        }
-        else if (l.typevalue instanceof LiteralNaturalExpression) {
-            ltype = this.getSpecialNatType();
-            tval = l.typevalue.value;
-        }
-        else {
-            let lexp: Expression = l.typevalue;
-            while (lexp instanceof AccessNamespaceConstantExpression || lexp instanceof AccessStaticFieldExpression) {
-                xxxx;
-            }
-
-            //should be Bool, Int, or Enum
-            if (!ltype.isUniqueCallTargetType()) {
-                return ResolvedType.createEmpty();
-            }
-
-            if (lexp instanceof LiteralBoolExpression) {
-                tval = lexp.value;
-            }
-            else if (lexp instanceof LiteralIntegerExpression) { 
-                tval = lexp.value;
-            }
-            else if (lexp instanceof LiteralNaturalExpression) { 
-                tval = lexp.value;
-            }
-            else if (lexp instanceof AccessStaticFieldExpression) { 
-                tval = lexp.name;
-            }
-            else {
-                return ResolvedType.createEmpty();
-            }
+        const cform = this.reduceLiteralValueToCanonicalForm(l.typevalue.exp, binds);
+        if(cform === undefined || cform[1].isEmptyType()) {
+            return ResolvedType.createEmpty();
         }
 
-        return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, tval));
+        let ltype = cform[1];
+        let tval = cform[0];
+
+        return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, tval, cform[2]));
     }
 
     private normalizeType_Tuple(t: TupleTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
@@ -1499,20 +1434,20 @@ class Assembly {
         const params = t.params.map((param) => {
             let ttl = this.normalizeTypeGeneral(param.type, binds);
             let llpv: string | undefined = undefined;
-            if(param.exp !== undefined) {
-                llpv = "[LITERAL EXP]"
+            if(param.litexp !== undefined) {
+                const lnv = this.reduceLiteralValueToCanonicalForm(param.litexp.exp, new Map<string, ResolvedType>());
+                if(lnv === undefined) {
+                    return new ResolvedFunctionTypeParam(param.name, ResolvedType.createEmpty(), false, undefined, undefined);
+                }
+                llpv = lnv[2];
             }
 
-            return new ResolvedFunctionTypeParam(param.name, ttl, param.isOptional, param.isRef, param.isLiteral, llpv) 
+            return new ResolvedFunctionTypeParam(param.name, ttl, param.isOptional, param.refKind, llpv);
         });
         const optRestParamType = (t.optRestParamType !== undefined) ? this.normalizeTypeOnly(t.optRestParamType, binds) : undefined;
         const rtype = this.normalizeTypeOnly(t.resultType, binds);
 
-        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && p.isRef) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || rtype.isEmptyType()) {
-            return undefined;
-        }
-
-        if (t.params.some((p) => p.exp !== undefined && !p.exp.isConstantExpression())) {
+        if (params.some((p) => p.type instanceof ResolvedType && p.type.isEmptyType()) || params.some((p) => p.isOptional && (p.refKind !== undefined)) || (optRestParamType !== undefined && optRestParamType.isEmptyType()) || rtype.isEmptyType()) {
             return undefined;
         }
 
@@ -1720,6 +1655,8 @@ class Assembly {
     getSpecialBufferEncodingType(): ResolvedType { return this.internSpecialObjectType(["BufferEncoding"]); }
     getSpecialBufferCompressionType(): ResolvedType { return this.internSpecialObjectType(["BufferCompression"]); }
     getSpecialByteBufferType(): ResolvedType { return this.internSpecialObjectType(["ByteBuffer"]); }
+    getSpecialISOMilliSecondType(): ResolvedType { return this.internSpecialObjectType(["ISOMilliSeconds"]); }
+    getSpecialISOSecondType(): ResolvedType { return this.internSpecialObjectType(["ISOSeconds"]); }
     getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType(["ISOTime"]); }
     getSpecialUUIDType(): ResolvedType { return this.internSpecialObjectType(["UUID"]); }
     getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType(["LogicalTime"]); }
@@ -1730,7 +1667,6 @@ class Assembly {
     getSpecialAnyConceptType(): ResolvedType { return this.internSpecialConceptType(["Any"]); }
     getSpecialSomeConceptType(): ResolvedType { return this.internSpecialConceptType(["Some"]); }
     getSpecialKeyTypeConceptType(): ResolvedType { return this.internSpecialConceptType(["KeyType"]); }
-    getSpecialOrderableType(): ResolvedType { return this.internSpecialConceptType(["Orderable"]); }
     getSpecialPODTypeConceptType(): ResolvedType { return this.internSpecialConceptType(["PODType"]); }
     getSpecialAPIValueConceptType(): ResolvedType { return this.internSpecialConceptType(["APIValue"]); }
     getSpecialAPITypeConceptType(): ResolvedType { return this.internSpecialConceptType(["APIType"]); }
@@ -2627,7 +2563,7 @@ class Assembly {
         for (let i = 0; i < t2.params.length; ++i) {
             const t2p = t2.params[i];
             const t1p = t1.params[i];
-            if ((t2p.isOptional !== t1p.isOptional) || (t2p.isRef !== t1p.isRef)) {
+            if ((t2p.isOptional !== t1p.isOptional) || (t2p.refKind !== t1p.refKind) || (t2p.litexp !== t1p.litexp)) {
                 return false;
             }
 

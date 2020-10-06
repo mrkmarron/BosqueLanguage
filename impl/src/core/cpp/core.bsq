@@ -433,46 +433,43 @@ enum BufferCompression {
 entity ByteBuffer provides Some, APIValue {
 }
 
-//<summary>Unit declarations for seconds and milliseconds</summary>
-unit ISOSecond = Int;
-unit ISOMilliSecond = Int;
-
-inline infix operator +(a: ISOSecond, b, ISOSecond): ISOSecond = default;
-inline infix operator -(a: ISOSecond, b, ISOSecond): ISOSecond = default;
-inline infix operator ==(a: ISOSecond, b: ISOSecond): Bool = default;
-inline infix operator !=(a: ISOSecond, b: ISOSecond): Bool = default;
-inline infix operator <(a: ISOSecond, b: ISOSecond): Bool = default;
-inline infix operator >(a: ISOSecond, b: ISOSecond): Bool = default;
-inline infix operator <=(a: ISOSecond, b: ISOSecond): Bool = default;
-inline infix operator >=(a: ISOSecond, b: ISOSecond): Bool = default;
-
-inline infix operator +(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond = default;
-inline infix operator -(a: ISOMilliSecond, b, ISOMilliSecond): ISOMilliSecond = default;
-inline infix operator ==(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-inline infix operator !=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-inline infix operator <(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-inline infix operator >(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-inline infix operator <=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-inline infix operator >=(a: ISOMilliSecond, b: ISOMilliSecond): Bool = default;
-
-//<summary>Primitive ISO standard date time value.</summary>
-parsable struct entity ISOTime provides Some, KeyType, PODType, APIType {
-    function parse(str: String): Result<ISOTime, String> # time_tryparse
-
-    function fromAbsoluteMilliSeconds(millis: ISOMilliSecond) # time_frommillis
-    method toAbsoluteMilliSeconds(): ISOMilliSecond # time_tomillis
-
-    function secondsToMilliSeconds(seconds: ISOSecond): ISOMilliSecond {
-        ISOMilliSecond::create(seconds.value() * 1000);
-    }
-
-    function milliSecondsToSeconds(millis: ISOMilliSecond): ISOSecond {
-        ISOMilliSecond::create(millis.value() / 1000);
+//<summary>Unit declarations for seconds, milliseconds, and ISOTime</summary>
+numeric typedecl ISOSeconds = Int & {
+    toMilliseconds(): ISOMilliSecond {
+        return ISOMilliSecond::create(this.value() * 1000);
     }
 }
-inline infix operator +(a: ISOMilliSecond, b, ISOTime): ISOTime = default;
-inline infix operator +(a: ISOTime, b, ISOMilliSecond): ISOTime = default;
-inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSecond = default;
+inline prefix operator +(a: ISOSeconds): ISOSeconds = default;
+inline prefix operator -(a: ISOSeconds): ISOSeconds = default;
+inline infix operator +(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
+inline infix operator -(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
+inline infix operator ==(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator !=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator <(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator >(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+
+numeric typedecl ISOMilliSeconds = Int & {
+    toSeconds(): ISOSeconds {
+        return ISOSeconds::create(this.value() / 1000);
+    }
+}
+inline prefix operator +(a: ISOMilliSeconds): ISOMilliSeconds = default;
+inline prefix operator -(a: ISOMilliSeconds): ISOMilliSeconds = default;
+inline infix operator +(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
+inline infix operator -(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
+inline infix operator ==(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator !=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator <(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator >(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+
+numeric ISOTime = Nat;
+inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime # default_isoaddsecl;
+inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime # default_isoaddsecr;
+inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSeconds # default_isodiff;
 inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
 inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
 inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
@@ -487,17 +484,13 @@ parsable struct entity UUID provides Some, KeyType, PODType, APIType {
 inline infix operator ==(a: UUID, b: UUID): Bool = default;
 inline infix operator !=(a: UUID, b: UUID): Bool = default;
 
-//<summary>All actual ordered event times implicitly provide this.</summary>
-parsable struct entity LogicalTime provides Some, KeyType, PODType, APIType {
-    private function s_zero_value(): LogicalTime # logicaltime_zero
-
-    function parse(str: String): Result<LogicalTime, String> # logicaltime_tryparse
-
-    const zero: LogicalTime = LogicalTime::s_zero_value();
-}
-inline infix operator +(a: Int, b, LogicalTime): LogicalTime = default;
-inline infix operator +(a: LogicalTime, b, Int): LogicalTime = default;
-inline infix operator -(a: LogicalTime, b, LogicalTime): Int = default;
+//<summary>Unit declarations for LogicalTime</summary>
+numeric LogicalTime = Nat;
+inline infix operator +(a: Int, b, LogicalTime): LogicalTime # default_logic_iltl;
+inline infix operator +(a: LogicalTime, b, Int): LogicalTime # default_logic_iltr;
+inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # default_logic_nltl;
+inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # default_logic_nltr;
+inline infix operator -(a: LogicalTime, b, LogicalTime): Int # default_logic_ltdiff;
 inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
 inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
 inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
