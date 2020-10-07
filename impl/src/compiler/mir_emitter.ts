@@ -277,36 +277,12 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, bv ? new MIRConstantTrue() : new MIRConstantFalse(), trgt));
     }
 
-    emitLoadConstInt(sinfo: SourceInfo, iv: string, trgt: MIRTempRegister) {
+    emitLoadConstIntegralValue(sinfo: SourceInfo, itype: MIRType, vv: string, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantInt(iv), trgt));
-    }
-
-    emitLoadConstNat(sinfo: SourceInfo, nv: string, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNat(nv), trgt));
-    }
-
-    emitLoadConstBigInt(sinfo: SourceInfo, iv: string, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigInt(iv), trgt));
-    }
-
-    emitLoadConstBigNat(sinfo: SourceInfo, iv: string, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigNat(iv), trgt));
     }
 
     emitLoadConstRational(sinfo: SourceInfo, iv: string, trgt: MIRTempRegister) {
@@ -317,20 +293,12 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRational(iv), trgt));
     }
 
-    emitLoadConstFloat(sinfo: SourceInfo, fv: string, trgt: MIRTempRegister) {
+    emitLoadConstFloatPoint(sinfo: SourceInfo,ftype: MIRType,  fv: string, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
         this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantFloat(fv), trgt));
-    }
-
-    emitLoadConstDecimal(sinfo: SourceInfo, iv: string, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantDecmial(iv), trgt));
     }
 
     emitLoadConstString(sinfo: SourceInfo, sv: string, trgt: MIRTempRegister) {
@@ -396,15 +364,7 @@ class MIREmitter {
         
         xxxx;
     }
-
-    emitReadHasFlag(sinfo: SourceInfo, hasflag: string) {
-        if(!this.emitEnabled) {
-            return;
-        }
-        
-        xxxx;
-    }
-
+    
     emitLoadTupleIndex(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, idx: number, isvirtual: boolean, resulttype: MIRType, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -633,7 +593,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRConstructorPrimaryCollectionMixed(sinfo, tkey, args, trgt));
     }
 
-    emitBinKeyEq(sinfo: SourceInfo, ktype: MIRType, lhs: MIRArgument, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyEq(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
@@ -641,7 +601,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRBinKeyEq(sinfo, lhsType, lhs, rhsType, rhs, trgt, relaxed));
     }
 
-    emitBinKeyLess(sinfo: SourceInfo, ktype: MIRType, lhs: MIRArgument, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyLess(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }

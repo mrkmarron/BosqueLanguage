@@ -701,18 +701,16 @@ class PostfixGetIndexOrNone extends PostfixOperation {
     }
 }
 
-
 class PostfixGetIndexTry extends PostfixOperation {
     readonly idx: number;
-    readonly argexp: Expression;
+    readonly vname: string;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, idx: number, argexp: Expression) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, idx: number, vname: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixGetIndexTry);
         this.idx = idx;
-        this.argexp = argexp;
+        this.vname = vname;
     }
 }
-
 
 class PostfixGetPropertyOrNone extends PostfixOperation {
     readonly pname: string;
@@ -723,15 +721,14 @@ class PostfixGetPropertyOrNone extends PostfixOperation {
     }
 }
 
-
 class PostfixGetPropertyTry extends PostfixOperation {
     readonly pname: string;
-    readonly argexp: Expression;
+    readonly vname: string;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, pname: string, argexp: Expression) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, pname: string, vname: string) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixGetPropertyTry);
         this.pname = pname;
-        this.argexp = argexp;
+        this.vname = vname;
     }
 }
 

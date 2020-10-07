@@ -9,7 +9,7 @@ import { Assembly } from "../ast/assembly";
 import { ResolvedType } from "../ast/resolved_type";
 import { MIRInvokeKey } from "../compiler/mir_ops";
 import { PCode } from "../compiler/mir_emitter";
-import { Expression } from "../ast/body";
+import { ConstantExpressionValue, Expression } from "../ast/body";
 
 enum FlowTypeTruthValue {
     True = "True",
@@ -124,9 +124,9 @@ type StructuredAssignmentCheck = {
     action: "eqchk" | "typechk" | "tstructchk" | "rstructchk",
     srctype: ResolvedType,
     oftype: ResolvedType | undefined,
-    eqvalue: Expression | undefined,
-    idxstructure: {idx: number, restype: ResolvedType, chk: "yes" | "opt" | "no" }[],
-    namestructure: {name: string, restype: ResolvedType, chk: "yes" | "opt" | "no" }[]
+    eqvalue: ConstantExpressionValue | undefined,
+    excludeidx: number[],
+    excludename: string[]
 };
 
 class TypeEnvironment {

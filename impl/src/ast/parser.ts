@@ -2139,7 +2139,7 @@ class Parser {
             this.ensureAndConsumeToken("(");
             this.ensureAndConsumeToken("out");
             this.ensureToken(TokenStrings.Identifier);
-            const exp = this.parsePrimaryExpression();
+            const exp = this.consumeTokenAndGetValue();
             this.ensureAndConsumeToken(")");
             return new PostfixGetIndexTry(sinfo, isElvis, customCheck, idx, exp);
         }
@@ -2160,7 +2160,7 @@ class Parser {
             this.ensureAndConsumeToken("(");
             this.ensureAndConsumeToken("out");
             this.ensureToken(TokenStrings.Identifier);
-            const exp = this.parsePrimaryExpression();
+            const exp = this.consumeTokenAndGetValue();
             this.ensureAndConsumeToken(")");
             return new PostfixGetPropertyTry(sinfo, isElvis, customCheck, pname, exp);
         }
@@ -2856,7 +2856,7 @@ class Parser {
     ////
     //Statement parsing
 
-    parseSimpleStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
+    parseSimpleStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, decls: Set<string>): StructuredAssignment {
         if (!this.testToken(TokenStrings.Identifier)) {
             const expr = this.parseConstExpression(false);
             return new ConstValueStructuredAssignment(expr);
@@ -2869,28 +2869,16 @@ class Parser {
                 const isopt = this.testAndConsumeTokenIf("?");
 
                 let itype = this.m_penv.SpecialAnySignature;
-                if (trequired) {
-                    this.ensureAndConsumeToken(":");
+                if (this.testAndConsumeTokenIf(":")) {
                     itype = this.parseTypeSignature(false);
-                }
-                else {
-                    if (this.testAndConsumeTokenIf(":")) {
-                        itype = this.parseTypeSignature(false);
-                    }
                 }
 
                 return new IgnoreTermStructuredAssignment(isopt, itype);
             }
             else {
                 let itype = this.m_penv.SpecialAutoSignature;
-                if (trequired && vars !== undefined) {
-                    this.ensureAndConsumeToken(":");
+                if (this.testAndConsumeTokenIf(":")) {
                     itype = this.parseTypeSignature(false);
-                }
-                else {
-                    if (this.testAndConsumeTokenIf(":")) {
-                        itype = this.parseTypeSignature(false);
-                    }
                 }
 
                 if (vars !== undefined) {
@@ -2916,14 +2904,14 @@ class Parser {
         }
     }
 
-    parseStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, trequired: boolean, decls: Set<string>): StructuredAssignment {
+    parseStructuredAssignment(sinfo: SourceInfo, vars: "let" | "var" | undefined, decls: Set<string>): StructuredAssignment {
         if (this.testToken("#") || this.testToken("@")) {
             const isvalue = this.testToken("#");
             this.consumeToken();
 
             if (this.testToken("[")) {
                 const assigns = this.parseListOf<StructuredAssignment>("[", "]", ",", () => {
-                    return this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
+                    return this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, decls);
                 })[0];
 
                 return new TupleStructuredAssignment(isvalue, assigns);
@@ -2934,7 +2922,7 @@ class Parser {
                     const name = this.consumeTokenAndGetValue();
 
                     this.ensureAndConsumeToken("=");
-                    const subg = this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
+                    const subg = this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, decls);
 
                     return [name, subg];
                 })[0];
@@ -2944,7 +2932,7 @@ class Parser {
         }
         else if (this.testToken("(|")) {
             const assigns = this.parseListOf<StructuredAssignment>("(|", "|)", ",", () => {
-                return this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
+                return this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, decls);
             })[0];
 
             return new ValueListStructuredAssignment(assigns);
@@ -2969,7 +2957,7 @@ class Parser {
                     const name = this.consumeTokenAndGetValue();
     
                     this.ensureAndConsumeToken("=");
-                    const subg = this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, trequired, decls);
+                    const subg = this.parseSimpleStructuredAssignment(this.getCurrentSrcInfo(), vars, decls);
     
                     return [name, subg];
                 })[0];
@@ -2978,7 +2966,7 @@ class Parser {
             }
         }
         else {
-            return this.parseSimpleStructuredAssignment(sinfo, vars, trequired, decls);
+            return this.parseSimpleStructuredAssignment(sinfo, vars, decls);
         }
     }
 
@@ -2998,7 +2986,7 @@ class Parser {
             if (this.testFollows("#", "[") || this.testFollows("#", "{") || this.testFollows("@", "[") || this.testFollows("@", "{")
                 || this.testToken("(|")  || this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Type) || this.testToken(TokenStrings.Type)) {
                 let decls = new Set<string>();
-                const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", false, decls);
+                const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", decls);
                 decls.forEach((dv) => {
                     if (this.m_penv.getCurrentFunctionScope().isVarNameDefined(dv)) {
                         this.raiseError(line, "Variable name is already defined");
@@ -3015,7 +3003,7 @@ class Parser {
             else {
                 let decls = new Set<string>();
                 const assigns = this.parseEphemeralListOf(() => {
-                    return this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", false, decls);
+                    return this.parseStructuredAssignment(this.getCurrentSrcInfo(), isConst ? "let" : "var", decls);
                 });
 
                 if(assigns.length === 0 || (assigns.length === 1 && !(assigns[0] instanceof VariableDeclarationStructuredAssignment))) {
@@ -3071,7 +3059,7 @@ class Parser {
         else if (this.testFollows("#", "[") || this.testFollows("#", "{") || this.testFollows("@", "[") || this.testFollows("@", "{")
                 || this.testToken("(|")) {
             let decls = new Set<string>();
-            const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
+            const assign = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, decls);
             
             this.ensureAndConsumeToken("=");
             const exp = this.parseExpression();
@@ -3082,7 +3070,7 @@ class Parser {
         else if (tk === TokenStrings.Identifier) {
             let decls = new Set<string>();
             const assigns = this.parseEphemeralListOf(() => {
-                return this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
+                return this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, decls);
             });
 
             if(assigns.length === 0 || (assigns.length === 1 && !(assigns[0] instanceof VariableAssignmentStructuredAssignment))) {
@@ -3233,7 +3221,7 @@ class Parser {
                     const name = this.consumeTokenAndGetValue();
     
                     this.ensureAndConsumeToken("=");
-                    const subg = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, false, decls);
+                    const subg = this.parseStructuredAssignment(this.getCurrentSrcInfo(), undefined, decls);
     
                     return [name, subg];
                 })[0];
@@ -3356,7 +3344,7 @@ class Parser {
         }
         else {
             //always let bind the match variables
-            layoutcheck = this.parseStructuredAssignment(sinfo, "let", true, decls);
+            layoutcheck = this.parseStructuredAssignment(sinfo, "let", decls);
         }
 
         let whencheck = undefined;
