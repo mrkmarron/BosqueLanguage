@@ -16,6 +16,7 @@ import { convertBodyToSSA } from "./mir_ssa";
 import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
 import { BSQRegex } from "../ast/bsqregex";
+import { ConstantExpressionValue } from "../ast/body";
 
 type PCode = {
     code: InvokeDecl,
@@ -349,6 +350,14 @@ class MIREmitter {
         xxxx;
     }
 
+    emitAllTrue(sinfo: SourceInfo, args: MIRArgument[], trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
+    }
+
     emitTupleHasIndex(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, idx: number, isvirtual: boolean, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -381,6 +390,14 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
     }
 
+    emitLoadTupleIndexTry(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, idx: number, isvirtual: boolean, resulttype: MIRType, trgt: MIRTempRegister, hastrgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
+    }
+
     emitLoadProperty(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, pname: string, isvirtual: boolean, resulttype: MIRType, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -395,6 +412,14 @@ class MIREmitter {
         }
 
         this.m_currentBlock.push(new MIRAccessFromProperty(sinfo, resultAccessType, arg, argInferType, pname, trgt));
+    }
+
+    emitLoadPropertyTry(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, pname: string, isvirtual: boolean, resulttype: MIRType, trgt: MIRTempRegister, hastrgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+        
+        this.m_currentBlock.push(new MIRAccessFromIndex(sinfo, arg, argInferType, idx, trgt));
     }
 
     emitLoadField(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, fname: MIRFieldKey, isvirtual: boolean, resulttype: MIRType, trgt: MIRTempRegister) {
@@ -625,7 +650,6 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRStructuredJoinRecord(sinfo, resultRecordType, arg, argInferType, update, updateInferType, trgt));
     }
 
-
     emitPrefixNotOp(sinfo: SourceInfo, arg: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
@@ -672,6 +696,14 @@ class MIREmitter {
         else {
             this.m_currentBlock.push(new MIRIsTypeOf(sinfo, srcInferType, src, chktype, trgt));
         }
+    }
+
+    emitTypeOfGuarded(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srctype: MIRType, guard: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
     }
 
     emitAbort(sinfo: SourceInfo, info: string) {
@@ -924,7 +956,7 @@ class MIREmitter {
     }
 
     registerPendingGlobalProcessing(decl: NamespaceConstDecl): MIRConstantKey {
-        const key = MIRKeyGenerator.generateFunctionKey(`${global}@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
+        const key = MIRKeyGenerator.generateFunctionKey(`global@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingGlobalProcessing.findIndex((gp) => gp[0] === key) !== -1) {
             return key;
         }
@@ -933,13 +965,23 @@ class MIREmitter {
         return key;
     }
 
-    registerPendingConstProcessing(containingType: OOPTypeDecl, decl: StaticMemberDecl, binds: Map<string, ResolvedType>): MIRConstantKey {
-        const key = MIRKeyGenerator.generateFunctionKey(`${global}@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
+    registerPendingConstProcessing(mircontaining: MIRType, containingType: OOPTypeDecl, decl: StaticMemberDecl, binds: Map<string, ResolvedType>): MIRConstantKey {
+        const key = MIRKeyGenerator.generateFunctionKey(`static@${mircontaining.trkey}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
             return key;
         }
 
         this.pendingConstProcessing.push([key, containingType, decl, binds]);
+        return key;
+    }
+
+    registerConstExpr(srcFile: string, exp: ConstantExpressionValue, binds: Map<string, ResolvedType>, etype: ResolvedType): MIRConstantKey {
+        const key = MIRKeyGenerator.generateFunctionKey(`cexpr@${srcFile}#${exp.exp.sinfo.pos}`, "expr", new Map<string, ResolvedType>(), []);
+        if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
+            return key;
+        }
+
+        this.pendingConstExprProcessing.push([key, exp, binds, etype]);
         return key;
     }
 

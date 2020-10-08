@@ -1082,11 +1082,13 @@ class ValueListStructuredAssignment extends StructuredAssignment {
 }
 
 class StructuredVariableAssignmentStatement extends Statement {
+    readonly isConst: boolean;
     readonly assign: StructuredAssignment;
     readonly exp: Expression;
 
-    constructor(sinfo: SourceInfo, assign: StructuredAssignment, exp: Expression) {
+    constructor(sinfo: SourceInfo, isConst: boolean, assign: StructuredAssignment, exp: Expression) {
         super(StatementTag.StructuredVariableAssignmentStatement, sinfo);
+        this.isConst = isConst;
         this.assign = assign;
         this.exp = exp;
     }

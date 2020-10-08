@@ -607,7 +607,7 @@ class Assembly {
         return fullbinds;
     }
 
-    private compileTimeReduceConstantExpression(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
+    compileTimeReduceConstantExpression(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
         if(exp.isCompileTimeInlineValue()) {
             return exp;
         }
@@ -708,7 +708,7 @@ class Assembly {
         }
     }
 
-    private reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, ResolvedType, string] | undefined {
+    reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, ResolvedType, string] | undefined {
         const cexp = this.compileTimeReduceConstantExpression(exp, binds);
 
         if(cexp instanceof LiteralBoolExpression) {
@@ -1047,6 +1047,29 @@ class Assembly {
         return {tp: ResolvedType.create(tpp), fp: ResolvedType.create(fpp)};
     }
 
+    restrictTupleBaseOnMatch(oftype: ResolvedType, isvalue: boolean, reqcount: number, optcount: number): ResolvedType {
+        let topts = (oftype.options.filter((opt) => {
+            if(!(opt instanceof ResolvedTupleAtomType) || opt.isvalue !== isvalue) {
+                return false;
+            }
+
+            if(opt.types.length < reqcount) {
+                return false;
+            }
+
+            if(opt.types.length > optcount && !opt.types[optcount].isOptional) {
+                return false;
+            }
+
+            return true;
+        }) as ResolvedTupleAtomType[])
+        .map((opt) => {
+            return ResolvedTupleAtomType.create(opt.isvalue, opt.types.slice(0, optcount));
+        });
+
+        return ResolvedType.create(topts);
+    }
+
     splitProperty(oft: ResolvedType, pname: string): { tp: ResolvedType, fp: ResolvedType } {
         if (oft.isEmptyType()) {
             return { tp: ResolvedType.createEmpty(), fp: ResolvedType.createEmpty() };
@@ -1083,6 +1106,30 @@ class Assembly {
         }
 
         return {tp: ResolvedType.create(tpp), fp: ResolvedType.create(fpp)};
+    }
+
+    restrictRecordBaseOnMatch(oftype: ResolvedType, isvalue: boolean, reqnames: Set<string>, optnames: Set<string>): ResolvedType {
+        let topts = (oftype.options.filter((opt) => {
+            if(!(opt instanceof ResolvedRecordAtomType) || opt.isvalue !== isvalue) {
+                return false;
+            }
+
+            if(opt.entries.length < reqnames.size) {
+                return false;
+            }
+
+            if(opt.entries.some((entry) => !entry.isOptional && !reqnames.has(entry.name) && !optnames.has(entry.name))) {
+                return false;
+            }
+
+            return true;
+        }) as ResolvedRecordAtomType[])
+        .map((opt) => {
+            const fentries = opt.entries.filter((entry) => reqnames.has(entry.name) || optnames.has(entry.name));
+            return ResolvedTupleAtomType.create(opt.isvalue, fentries);
+        });
+
+        return ResolvedType.create(topts);
     }
 
     getDerivedTypeProjection(fromtype: ResolvedType, oftype: ResolvedType): ResolvedType {

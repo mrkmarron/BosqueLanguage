@@ -2998,7 +2998,7 @@ class Parser {
                 const exp = this.parseExpression();
                 this.ensureAndConsumeToken(";");
 
-                return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
+                return new StructuredVariableAssignmentStatement(sinfo, isConst, assign, exp);
             }
             else {
                 let decls = new Set<string>();
@@ -3065,7 +3065,7 @@ class Parser {
             const exp = this.parseExpression();
             this.ensureAndConsumeToken(";");
 
-            return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
+            return new StructuredVariableAssignmentStatement(sinfo, false, assign, exp);
         }
         else if (tk === TokenStrings.Identifier) {
             let decls = new Set<string>();
@@ -3238,7 +3238,7 @@ class Parser {
                 const exp = this.parseExpression();
                 this.ensureAndConsumeToken(";");
 
-                return new StructuredVariableAssignmentStatement(sinfo, assign, exp);
+                return new StructuredVariableAssignmentStatement(sinfo, false, assign, exp);
             }
             else if(this.testFollows("::", TokenStrings.Identifier)) {
                 this.consumeToken();
