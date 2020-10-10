@@ -302,6 +302,26 @@ class MIRConstantRational extends MIRConstantArgument {
     }
 }
 
+class MIRConstantComplex extends MIRConstantArgument {
+    readonly rvalue: string;
+    readonly ivalue: string;
+
+    constructor(rvalue: string, ivalue: string) {
+        super(`=complex=${rvalue}${ivalue}`);
+
+        this.rvalue = rvalue;
+        this.ivalue = ivalue;
+    }
+
+    stringify(): string {
+        return `${this.rvalue}${this.ivalue}`;
+    }
+
+    jemit(): any {
+        return `${this.rvalue}#${this.ivalue}`;
+    }
+}
+
 class MIRConstantFloat extends MIRConstantArgument {
     readonly value: string;
 
@@ -2266,7 +2286,7 @@ class MIRBody {
 
 export {
     MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue,

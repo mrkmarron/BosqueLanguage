@@ -82,6 +82,7 @@ class ParserEnvironment {
     readonly SpecialBigIntSignature: TypeSignature;
     readonly SpecialBigNatSignature: TypeSignature;
     readonly SpecialRationalSignature: TypeSignature;
+    readonly SpecialComplexSignature: TypeSignature;
 
     readonly SpecialAutoSignature: TypeSignature;
 
@@ -106,6 +107,7 @@ class ParserEnvironment {
         this.SpecialBigIntSignature = new NominalTypeSignature("NSCore", ["BigInt"], []);
         this.SpecialBigNatSignature = new NominalTypeSignature("NSCore", ["BigNat"], []);
         this.SpecialRationalSignature = new NominalTypeSignature("NSCore", ["Rational"], []);
+        this.SpecialComplexSignature = new NominalTypeSignature("NSCore", ["Complex"], []);
 
         this.SpecialAutoSignature = new AutoTypeSignature();
     }

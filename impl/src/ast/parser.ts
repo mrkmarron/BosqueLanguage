@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralTypedComplexConstructorExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
@@ -183,6 +183,7 @@ const TokenStrings = {
     BigInt: "[LITERAL_BIGINT]",
     BigNat: "[LITERAL_BIGNAT]",
     Rational: "[LITERAL_RATIONAL]",
+    Complex: "[LITERAL_COMPLEX]",
     String: "[LITERAL_STRING]",
     Regex: "[LITERAL_REGEX]",
     TypedString: "[LITERAL_TYPED_STRING]",
@@ -367,17 +368,33 @@ class Lexer {
         return true;
     }
 
-    private static readonly _s_intRe = /(0|[1-9][0-9]*)/y;
+    private static readonly _s_intRe = /(0|[1-9][0-9]*)i/y;
     private static readonly _s_natRe = /(0|[1-9][0-9]*)n/y;
 
-    private static readonly _s_floatRe = /([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?/y;
+    private static readonly _s_floatRe = /([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?f/y;
     private static readonly _s_decimalRe = /([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?d/y;
 
     private static readonly _s_bigintRe = /(0|[1-9][0-9]*)I/y;
     private static readonly _s_bignatRe = /(0|[1-9][0-9]*)N/y;
-    private static readonly _s_rationalRe = /(0|[1-9][0-9]*)|((0|[1-9][0-9]*))\/(0|[1-9][0-9]*))R/y;
+    private static readonly _s_rationalRe = /(0|[1-9][0-9]*)|(0|[1-9][0-9]*)\/(0|[1-9][0-9]*)R/y;
+
+    private static readonly _s_complexRe = /(?<rvalue>([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?)(?<jvalue>([+-])([0-9]+\.[0-9]+)([eE][-+]?[0-9]+))?j/y;
+
+    static getComplexParts(cnum: string): { rvalue: string, jvalue: string } {
+        Lexer._s_complexRe.lastIndex = 0;
+        const mc = Lexer._s_complexRe.exec(cnum) as RegExpMatchArray;
+
+        return { rvalue: (mc.groups as any).rvalue, jvalue: (mc.groups as any).jvalue };
+    }
 
     private tryLexNumber(): boolean {
+        Lexer._s_complexRe.lastIndex = this.m_cpos;
+        const mc = Lexer._s_complexRe.exec(this.m_input);
+        if (mc !== null) {
+            this.recordLexTokenWData(this.m_cpos + mc[0].length, TokenStrings.Complex, mc[0]);
+            return true;
+        }
+
         Lexer._s_rationalRe.lastIndex = this.m_cpos;
         const mr = Lexer._s_rationalRe.exec(this.m_input);
         if (mr !== null) {
@@ -1613,6 +1630,9 @@ class Parser {
                 else if(exp instanceof LiteralRationalExpression) {
                     return [true, exp];
                 }
+                else if(exp instanceof LiteralComplexExpression) {
+                    return [true, exp];
+                }
                 else if(exp instanceof LiteralFloatPointExpression) {
                     return [true, exp];
                 }
@@ -1626,6 +1646,11 @@ class Parser {
                 }
                 else if(exp instanceof LiteralRationalExpression) {
                     return [true, new LiteralRationalExpression(exp.sinfo, exp.value.startsWith("-") ? exp.value.slice(1) : ("-" + exp.value), exp.rtype)];
+                }
+                else if(exp instanceof LiteralComplexExpression) {
+                    const rvalue = exp.rvalue.startsWith("-") ? exp.rvalue.slice(1) : ("-" + exp.rvalue);
+                    const jvalue = exp.jvalue.startsWith("-") ? exp.jvalue.slice(1) : ("-" + exp.jvalue);
+                    return [true, new LiteralComplexExpression(exp.sinfo, rvalue, jvalue, exp.rtype)];
                 }
                 else if(exp instanceof LiteralFloatPointExpression) {
                     return [true, new LiteralFloatPointExpression(exp.sinfo, exp.value.startsWith("-") ? exp.value.slice(1) : ("-" + exp.value), exp.fptype)];
@@ -1751,13 +1776,16 @@ class Parser {
             else if (exp instanceof LiteralFloatPointExpression) {
                 return new LiteralTypedNumericConstructorExpression(sinfo, exp.value, exp.fptype, ttype);
             }
+            else if (exp instanceof LiteralRationalExpression) {
+                return new LiteralTypedNumericConstructorExpression(sinfo, exp.value, exp.rtype, ttype);
+            }
             else {
-                if (!(exp instanceof LiteralRationalExpression)) {
-                    this.raiseError(sinfo.line, "Expected literal value -- int, float, or rational");
+                if (!(exp instanceof LiteralComplexExpression)) {
+                    this.raiseError(sinfo.line, "Expected literal value -- int, float, rational, or complex");
                 }
 
-                const rexp = exp as LiteralRationalExpression;
-                return new LiteralTypedNumericConstructorExpression(sinfo, rexp.value, rexp.rtype, ttype);
+                const cexp = exp as LiteralComplexExpression;
+                return new LiteralTypedComplexConstructorExpression(sinfo, cexp.rvalue, cexp.jvalue, cexp.rtype, ttype);
             }
         }
         else {
@@ -1838,6 +1866,10 @@ class Parser {
         else if (tk === TokenStrings.Rational) {
             const istr = this.consumeTokenAndGetValue();
             return new LiteralRationalExpression(sinfo, istr, this.m_penv.SpecialRationalSignature);
+        }
+        else if (tk === TokenStrings.Complex) {
+            const cstrs = Lexer.getComplexParts(this.consumeTokenAndGetValue());
+            return new LiteralComplexExpression(sinfo, cstrs.rvalue, cstrs.jvalue, this.m_penv.SpecialComplexSignature);
         }
         else if (tk === TokenStrings.String) {
             const sstr = this.consumeTokenAndGetValue(); //keep in escaped format
@@ -2041,13 +2073,16 @@ class Parser {
                 else if(exp instanceof LiteralFloatPointExpression) {
                     return [new LiteralTypedNumericConstructorExpression(sinfo, exp.value, exp.fptype, ttype), rops];
                 }
+                else if(exp instanceof LiteralRationalExpression) {
+                    return [new LiteralTypedNumericConstructorExpression(sinfo, exp.value, exp.rtype, ttype), rops];
+                }
                 else {
-                    if(!(exp instanceof LiteralRationalExpression)) {
-                        this.raiseError(sinfo.line, "Expected literal value -- int, float, or rational");
+                    if(!(exp instanceof LiteralComplexExpression)) {
+                        this.raiseError(sinfo.line, "Expected literal value -- int, float, rational, or complex");
                     }
 
-                    const rexp = exp as LiteralRationalExpression;
-                    return [new LiteralTypedNumericConstructorExpression(sinfo, rexp.value, rexp.rtype, ttype), rops];
+                    const cexp = exp as LiteralComplexExpression;
+                    return [new LiteralTypedComplexConstructorExpression(sinfo, cexp.rvalue, cexp.jvalue, cexp.rtype, ttype), rops];
                 }
             }
             else {

@@ -188,7 +188,7 @@ inline infix operator >(a: BigNat, b: BigNat): Bool = default;
 inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
 inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
-//<summary>Primitive big-integer value.</summary>
+//<summary>Primitive rational value.</summary>
 parsable struct entity Rational provides Some, KeyType, PODType, APIType {
     function parse(str: String): Result<Rational, String> # rational_tryparse
     function stringify(i: Rational): String # rational_tostring
@@ -269,6 +269,21 @@ inline infix operator +(a: Decimal, b, Decimal): Decimal = default;
 inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
 inline infix operator <(a: Decimal, b: Decimal): Bool = default;
 inline infix operator >(a: Decimal, b: Decimal): Bool = default;
+
+
+//<summary>Primitive complex floating point value.</summary>
+parsable struct entity Complex provides Some, PODType, APIType {
+    function parse(str: String): Result<Complex, String> # complex_tryparse
+    function stringify(c: Complex): String # complex_tostring
+}
+inline prefix operator +(a: Complex): Complex = default;
+inline prefix operator -(a: Complex): Complex = default;
+inline infix operator *(a: Complex, b, Complex): Complex = default;
+inline infix operator /(a: Complex, b, Complex): Complex = default;
+inline infix operator +(a: Complex, b, Complex): Complex = default;
+inline infix operator -(a: Complex, b, Complex): Complex = default;
+inline infix operator <(a: Complex, b: Complex): Bool = default;
+inline infix operator >(a: Complex, b: Complex): Bool = default;
 
 //<summary>Primitive string value.</summary>
 entity String provides Some, KeyType, PODType, APIType {

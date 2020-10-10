@@ -135,12 +135,14 @@ enum ExpressionTag {
     LiteralIntegralExpression = "LiteralIntegralExpression",
     LiteralRationalExpression = "LiteralRationalExpression",
     LiteralFloatPointExpression = "LiteralFloatExpression",
+    LiteralComplexExpression = "LiteralComplexExpression",
     LiteralStringExpression = "LiteralStringExpression",
     LiteralRegexExpression = "LiteralRegexExpression",
     LiteralParamerterValueExpression = "LiteralParamerterValueExpression",
     LiteralTypedStringExpression = "LiteralTypedStringExpression",
 
     LiteralTypedNumericConstructorExpression = "LiteralTypedNumericConstructorExpression",
+    LiteralTypedComplexConstructorExpression = "LiteralTypedComplexConstructorExpression",
     LiteralTypedStringConstructorExpression = "LiteralTypedStringConstructorExpression",
 
     AccessNamespaceConstantExpression = "AccessNamespaceConstantExpression",
@@ -277,6 +279,23 @@ class LiteralRationalExpression extends Expression {
     }
 }
 
+class LiteralComplexExpression extends Expression {
+    readonly rvalue: string;
+    readonly jvalue: string;
+    readonly rtype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, rvalue: string, jvalue: string, rtype: TypeSignature) {
+        super(ExpressionTag.LiteralComplexExpression, sinfo);
+        this.rvalue = rvalue;
+        this.jvalue = jvalue;
+        this.rtype = rtype;
+    }
+
+    isCompileTimeInlineValue(): boolean {
+        return true;
+    }
+}
+
 class LiteralFloatPointExpression extends Expression {
     readonly value: string;
     readonly fptype: TypeSignature;
@@ -346,6 +365,25 @@ class LiteralTypedNumericConstructorExpression extends Expression {
     constructor(sinfo: SourceInfo, value: string, ntype: TypeSignature, vtype: TypeSignature) {
         super(ExpressionTag.LiteralTypedNumericConstructorExpression, sinfo);
         this.value = value;
+        this.ntype = ntype;
+        this.vtype = vtype;
+    }
+
+    isCompileTimeInlineValue(): boolean {
+        return true;
+    }
+}
+
+class LiteralTypedComplexConstructorExpression extends Expression {
+    readonly rvalue: string;
+    readonly jvalue: string;
+    readonly ntype: TypeSignature;
+    readonly vtype: TypeSignature;
+
+    constructor(sinfo: SourceInfo, rvalue: string, jvalue: string, ntype: TypeSignature, vtype: TypeSignature) {
+        super(ExpressionTag.LiteralTypedComplexConstructorExpression, sinfo);
+        this.rvalue = rvalue;
+        this.jvalue = jvalue;
         this.ntype = ntype;
         this.vtype = vtype;
     }
@@ -1212,9 +1250,9 @@ export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, LiteralExpressionValue, ConstantExpressionValue, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
-    LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression,
+    LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression,
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 
-    LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
+    LiteralTypedNumericConstructorExpression, LiteralTypedComplexConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
     ConstructorPCodeExpression, SpecialConstructorExpression,

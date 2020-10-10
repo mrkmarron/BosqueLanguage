@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue } from "./body";
+import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -639,7 +639,7 @@ class Assembly {
             }
 
             const nsdecl = this.m_namespaceMap.get("NSMain") as NamespaceDeclaration;
-            if (earg instanceof LiteralIntegralExpression || earg instanceof LiteralFloatPointExpression || earg instanceof LiteralRationalExpression) {
+            if (earg instanceof LiteralIntegralExpression || earg instanceof LiteralFloatPointExpression || earg instanceof LiteralRationalExpression || earg instanceof LiteralComplexExpression) {
                 if(exp.name === "+") {
                     return earg;
                 }
@@ -650,12 +650,17 @@ class Assembly {
                     else if(earg instanceof LiteralRationalExpression) {
                         return new LiteralRationalExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.rtype);
                     }
-                    else {
+                    else if (earg instanceof LiteralFloatPointExpression) {
                         return new LiteralFloatPointExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.fptype);
+                    }
+                    else {
+                        const rvalue = earg.rvalue.startsWith("-") ? earg.rvalue.slice(1) : ("-" + earg.rvalue);
+                        const jvalue = earg.jvalue.startsWith("-") ? earg.jvalue.slice(1) : ("-" + earg.jvalue);
+                        return new LiteralComplexExpression(earg.sinfo, rvalue, jvalue, earg.rtype);
                     }
                 }
             }
-            else if(earg instanceof LiteralTypedNumericConstructorExpression) {
+            else if(earg instanceof LiteralTypedNumericConstructorExpression || earg instanceof LiteralTypedComplexConstructorExpression) {
                 const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
 
                 const isigs = opdecls.map((opd) => this.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
@@ -668,7 +673,14 @@ class Assembly {
                     return earg;
                 }
                 else {
-                    return new LiteralTypedNumericConstructorExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.ntype, earg.vtype);
+                    if (earg instanceof LiteralTypedNumericConstructorExpression) {
+                        return new LiteralTypedNumericConstructorExpression(earg.sinfo, earg.value.startsWith("-") ? earg.value.slice(1) : ("-" + earg.value), earg.ntype, earg.vtype);
+                    }
+                    else {
+                        const rvalue = earg.rvalue.startsWith("-") ? earg.rvalue.slice(1) : ("-" + earg.rvalue);
+                        const jvalue = earg.jvalue.startsWith("-") ? earg.jvalue.slice(1) : ("-" + earg.jvalue);
+                        return new LiteralTypedComplexConstructorExpression(earg.sinfo, rvalue, jvalue, earg.ntype, earg.vtype);
+                    }
                 }
             }
             else {
@@ -1695,6 +1707,7 @@ class Assembly {
     getSpecialBigIntType(): ResolvedType { return this.internSpecialObjectType(["BigInt"]); }
     getSpecialBigNatType(): ResolvedType { return this.internSpecialObjectType(["BigNat"]); }
     getSpecialRationalType(): ResolvedType { return this.internSpecialObjectType(["Rational"]); }
+    getSpecialComplexType(): ResolvedType { return this.internSpecialObjectType(["Complex"]); }
     getSpecialFloatType(): ResolvedType { return this.internSpecialObjectType(["Float"]); }
     getSpecialDecimalType(): ResolvedType { return this.internSpecialObjectType(["Decimal"]); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType(["String"]); }
