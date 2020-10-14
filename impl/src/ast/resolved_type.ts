@@ -361,6 +361,17 @@ class ResolvedType {
         return this.options[0] as ResolvedEntityAtomType;
     }
 
+    getCollectionContentsType(): ResolvedType {
+        const oodecl = oftype.getUniqueCallTargetType().object;
+        const oobinds = oftype.getUniqueCallTargetType().binds;
+        
+        const etype = oodecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl) 
+                ? ResolvedType.createSingle(ResolvedTupleAtomType.create(true, [new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]))
+                : oobinds.get("T") as ResolvedType;
+
+        return etype;
+    }
+
     tryGetInferrableValueListConstructorType(): ResolvedEphemeralListType | undefined {
         const vlopts = this.options.filter((opt) => opt instanceof ResolvedEphemeralListType);
 

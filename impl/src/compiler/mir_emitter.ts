@@ -246,7 +246,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitExtractResult(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRTempRegister) {
+    emitExtractResultOkValue(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, valuetype: MIRType, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
@@ -682,7 +682,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srctype: MIRType) {
+    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srclayouttype: MIRType, srcflowtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
@@ -698,7 +698,7 @@ class MIREmitter {
         }
     }
 
-    emitTypeOfGuarded(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srctype: MIRType, guard: MIRTempRegister) {
+    emitTypeOfGuarded(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srclayouttype: MIRType, srcflowtype: MIRType, guard: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
