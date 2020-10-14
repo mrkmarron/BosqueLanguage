@@ -204,7 +204,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
     }
 
-    emitConvertDown(sinfo: SourceInfo, srctype: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
+    emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
@@ -212,15 +212,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitConvertUp(sinfo: SourceInfo, srctype: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        xxxx;
-    }
-
-    emitCheckedConvertUp(sinfo: SourceInfo, srctype: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument, fflag: string, index: number) {
+    emitCheckedConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument, fflag: string, index: number) {
         if(!this.emitEnabled) {
             return;
         }
