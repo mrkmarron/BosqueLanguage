@@ -17,6 +17,7 @@ import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
 import { BSQRegex } from "../ast/bsqregex";
 import { ConstantExpressionValue } from "../ast/body";
+import { ValueType } from "../type_checker/type_environment";
 
 type PCode = {
     code: InvokeDecl,
@@ -95,8 +96,8 @@ class MIREmitter {
 
     private m_tmpIDCtr = 0;
 
-    private yieldPatchInfo: [string, MIRTempRegister, ResolvedType][][] = [];
-    private returnPatchInfo: [string, MIRTempRegister, ResolvedType][] = [];
+    private yieldPatchInfo: [string, MIRTempRegister, ValueType][][] = [];
+    private returnPatchInfo: [string, MIRTempRegister, ValueType][] = [];
 
     private constructor(assembly: Assembly, masm: MIRAssembly, emitEnabled: boolean) {
         this.assembly = assembly;
@@ -770,7 +771,7 @@ class MIREmitter {
         this.yieldPatchInfo.push([]);
     }
 
-    getActiveYieldSet(): [string, MIRTempRegister, ResolvedType][] {
+    getActiveYieldSet(): [string, MIRTempRegister, ValueType][] {
         return this.emitEnabled ? this.yieldPatchInfo[this.yieldPatchInfo.length - 1] : [];
     }
 
@@ -782,7 +783,7 @@ class MIREmitter {
         this.yieldPatchInfo.pop();
     }
 
-    getActiveReturnSet(): [string, MIRTempRegister, ResolvedType][] {
+    getActiveReturnSet(): [string, MIRTempRegister, ValueType][] {
         return this.emitEnabled ? this.returnPatchInfo : [];
     }
 

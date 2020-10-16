@@ -228,14 +228,35 @@ class TypeEnvironment {
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
     }
 
-    setResultExpression(vtype: ValueType, value?: FlowTypeTruthValue): TypeEnvironment {
+    setBoolResultExpression(btype: ResolvedType, value: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
 
-        const einfo = new ExpressionReturnResult(vtype, value || FlowTypeTruthValue.Unknown, undefined);
+        const einfo = new ExpressionReturnResult(ValueType.createUniform(btype), value || FlowTypeTruthValue.Unknown, undefined);
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
     }
 
-    setResultExpressionWVarOpt(vtype: ValueType, evar: string | undefined, value?: FlowTypeTruthValue): TypeEnvironment {
+    setVarResultExpression(layouttype: ResolvedType, flowtype: ResolvedType, vname: string): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const einfo = new ExpressionReturnResult(new ValueType(layouttype, flowtype), FlowTypeTruthValue.Unknown, vname);
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
+    }
+
+    updateResultExpression(layouttype: ResolvedType, flowtype: ResolvedType): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const einfo = new ExpressionReturnResult(new ValueType(layouttype, flowtype), this.getExpressionResult().truthval, this.getExpressionResult().expvar);
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
+    }
+
+    setResultExpression(layouttype: ResolvedType, flowtype: ResolvedType, value: FlowTypeTruthValue | undefined, vname: string | undefined): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const einfo = new ExpressionReturnResult(new ValueType(layouttype, flowtype), value || this.getExpressionResult().truthval, vname || this.getExpressionResult().expvar);
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
+    }
+
+    private setResultExpressionWVarOpt(vtype: ValueType, evar: string | undefined, value?: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
 
         const rvalue = value || FlowTypeTruthValue.Unknown;
@@ -243,16 +264,6 @@ class TypeEnvironment {
         const nte = new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
 
         return evar === undefined ? nte : nte.updateVarInfo(evar, (nte.lookupVar(evar) as VarInfo).infer(vtype.flowtype));
-    }
-
-    setResultExpressionWVarOptNoInfer(vtype: ValueType, evar: string | undefined, value?: FlowTypeTruthValue): TypeEnvironment {
-        assert(this.hasNormalFlow());
-
-        const rvalue = value || FlowTypeTruthValue.Unknown;
-        const einfo = new ExpressionReturnResult(vtype, rvalue, evar);
-        const nte = new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, einfo, this.returnResult, this.yieldResult, this.frozenVars);
-
-        return nte;
     }
 
     static convertToBoolFlowsOnResult(assembly: Assembly, options: TypeEnvironment[]): {tenvs: TypeEnvironment[], fenvs: TypeEnvironment[]} {
@@ -437,7 +448,7 @@ class TypeEnvironment {
         return names;
     }
 
-    freezeVars(): TypeEnvironment {
+    freezeVars(inferyield: ResolvedType | undefined): TypeEnvironment {
         assert(this.hasNormalFlow());
 
         let svars = new Set<string>();
@@ -445,7 +456,9 @@ class TypeEnvironment {
             (this.locals as Map<string, VarInfo>[])[i].forEach((v, k) => svars.add(k));
         }
 
-        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, svars);
+        const iyeild = [...this.inferYield, inferyield];
+
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, iyeild, this.expressionResult, this.returnResult, this.yieldResult, svars);
     }
 
     static join(assembly: Assembly, ...opts: TypeEnvironment[]): TypeEnvironment {
