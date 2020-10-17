@@ -392,7 +392,7 @@ class TypeEnvironment {
         return this.pcodes.get(pc);
     }
 
-    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, infertype: ResolvedType, tv?: FlowTypeTruthValue): TypeEnvironment {
+    addVar(name: string, isConst: boolean, dtype: ResolvedType, isDefined: boolean, infertype: ResolvedType): TypeEnvironment {
         assert(this.hasNormalFlow());
 
         let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
@@ -401,13 +401,24 @@ class TypeEnvironment {
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, this.frozenVars);
     }
 
-    setVar(name: string, flowtype: ResolvedType, tv?: FlowTypeTruthValue): TypeEnvironment {
+    setVar(name: string, flowtype: ResolvedType): TypeEnvironment {
         assert(this.hasNormalFlow());
 
         const oldv = this.lookupVar(name) as VarInfo;
         
         let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
         localcopy[localcopy.length - 1].set(name, oldv.assign(flowtype));
+
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, this.frozenVars);
+    }
+
+    setRefVar(name: string): TypeEnvironment {
+        assert(this.hasNormalFlow());
+
+        const oldv = this.lookupVar(name) as VarInfo;
+        
+        let localcopy = (this.locals as Map<string, VarInfo>[]).map((frame) => new Map<string, VarInfo>(frame));
+        localcopy[localcopy.length - 1].set(name, oldv.assign(oldv.declaredType));
 
         return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, localcopy, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, this.frozenVars);
     }
@@ -464,48 +475,53 @@ class TypeEnvironment {
     static join(assembly: Assembly, ...opts: TypeEnvironment[]): TypeEnvironment {
         assert(opts.length !== 0);
 
-        const fopts = opts.filter((opt) => opt.locals !== undefined);
+        if (opts.length === 1) {
+            return opts[0];
+        }
+        else {
+            const fopts = opts.filter((opt) => opt.locals !== undefined);
 
-        let argnames: string[] = [];
-        fopts.forEach((opt) => {
-            (opt.args as Map<string, VarInfo>).forEach((v, k) => argnames.push(k));
-        });
-
-        let args = fopts.length !== 0 ? new Map<string, VarInfo>() : undefined;
-        if (args !== undefined) {
-            argnames.forEach((aname) => {
-                const vinfo = VarInfo.join(assembly, ...fopts.map((opt) => (opt.args as Map<string, VarInfo>).get(aname) as VarInfo));
-                (args as Map<string, VarInfo>).set(aname, vinfo);
+            let argnames: string[] = [];
+            fopts.forEach((opt) => {
+                (opt.args as Map<string, VarInfo>).forEach((v, k) => argnames.push(k));
             });
-        }
 
-        let locals = fopts.length !== 0 ? ([] as Map<string, VarInfo>[]) : undefined;
-        if (locals !== undefined) {
-            for (let i = 0; i < (fopts[0].locals as Map<string, VarInfo>[]).length; ++i) {
-                let localsi = new Map<string, VarInfo>();
-                (fopts[0].locals as Map<string, VarInfo>[])[i].forEach((v, k) => {
-                    localsi.set(k, VarInfo.join(assembly, ...fopts.map((opt) => opt.lookupVar(k) as VarInfo)));
+            let args = fopts.length !== 0 ? new Map<string, VarInfo>() : undefined;
+            if (args !== undefined) {
+                argnames.forEach((aname) => {
+                    const vinfo = VarInfo.join(assembly, ...fopts.map((opt) => (opt.args as Map<string, VarInfo>).get(aname) as VarInfo));
+                    (args as Map<string, VarInfo>).set(aname, vinfo);
                 });
-
-                locals.push(localsi);
             }
+
+            let locals = fopts.length !== 0 ? ([] as Map<string, VarInfo>[]) : undefined;
+            if (locals !== undefined) {
+                for (let i = 0; i < (fopts[0].locals as Map<string, VarInfo>[]).length; ++i) {
+                    let localsi = new Map<string, VarInfo>();
+                    (fopts[0].locals as Map<string, VarInfo>[])[i].forEach((v, k) => {
+                        localsi.set(k, VarInfo.join(assembly, ...fopts.map((opt) => opt.lookupVar(k) as VarInfo)));
+                    });
+
+                    locals.push(localsi);
+                }
+            }
+
+            const expresall = fopts.filter((opt) => opt.expressionResult !== undefined).map((opt) => opt.getExpressionResult());
+            assert(expresall.length === 0 || expresall.length === fopts.length);
+
+            let expres: ExpressionReturnResult | undefined = undefined;
+            if (expresall.length !== 0) {
+                const retype = ValueType.join(assembly, ...expresall.map((opt) => opt.valtype));
+                const rflow = FlowTypeTruthOps.join(...expresall.map((opt) => opt.truthval));
+                const evar = expresall.every((ee) => ee.expvar === expresall[0].expvar) ? expresall[0].expvar : undefined;
+                expres = new ExpressionReturnResult(retype, rflow, evar);
+            }
+
+            const rflow = opts.filter((opt) => opt.returnResult !== undefined).map((opt) => opt.returnResult as ResolvedType);
+            const yflow = opts.filter((opt) => opt.yieldResult !== undefined).map((opt) => opt.yieldResult as ResolvedType);
+
+            return new TypeEnvironment(opts[0].scope, opts[0].terms, opts[0].refparams, opts[0].pcodes, args, locals, opts[0].inferResult, opts[0].inferYield, expres, rflow.length !== 0 ? assembly.typeUpperBound(rflow) : undefined, yflow.length !== 0 ? assembly.typeUpperBound(yflow) : undefined, opts[0].frozenVars);
         }
-
-        const expresall = fopts.filter((opt) => opt.expressionResult !== undefined).map((opt) => opt.getExpressionResult());
-        assert(expresall.length === 0 || expresall.length === fopts.length);
-
-        let expres: ExpressionReturnResult | undefined = undefined;
-        if(expresall.length !== 0) {
-            const retype = ValueType.join(assembly, ...expresall.map((opt) => opt.valtype));
-            const rflow = FlowTypeTruthOps.join(...expresall.map((opt) => opt.truthval));
-            const evar = expresall.every((ee) => ee.expvar === expresall[0].expvar) ? expresall[0].expvar : undefined;
-            expres = new ExpressionReturnResult(retype, rflow, evar);
-        }
-
-        const rflow = opts.filter((opt) => opt.returnResult !== undefined).map((opt) => opt.returnResult as ResolvedType);
-        const yflow = opts.filter((opt) => opt.yieldResult !== undefined).map((opt) => opt.yieldResult as ResolvedType);
-
-        return new TypeEnvironment(opts[0].scope, opts[0].terms, opts[0].refparams, opts[0].pcodes, args, locals, opts[0].inferResult, opts[0].inferYield, expres, rflow.length !== 0 ? assembly.typeUpperBound(rflow) : undefined, yflow.length !== 0 ? assembly.typeUpperBound(yflow) : undefined, opts[0].frozenVars);
     }
 }
 

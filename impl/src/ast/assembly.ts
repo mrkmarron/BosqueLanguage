@@ -307,6 +307,7 @@ class MemberMethodDecl implements OOMemberDecl {
 
 enum SpecialTypeCategory {
     None,
+    GroundedTypeDecl,
     ParsableTypeDecl,
     ValidatorTypeDecl,
     EnumTypeDecl,
@@ -398,6 +399,10 @@ class OOPTypeDecl {
 
     isTypeAMapEntity(): boolean {
         return this.specialDecls.has(SpecialTypeCategory.MapTypeDecl) || this.specialDecls.has(SpecialTypeCategory.DynamicMapTypeDecl);
+    }
+
+    isTypeGrounded(): boolean {
+        return this.specialDecls.has(SpecialTypeCategory.GroundedTypeDecl);
     }
 
     static attributeSetContains(attr: string, attrSet: string[]): boolean {

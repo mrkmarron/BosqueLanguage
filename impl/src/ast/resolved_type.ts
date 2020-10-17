@@ -362,8 +362,8 @@ class ResolvedType {
     }
 
     getCollectionContentsType(): ResolvedType {
-        const oodecl = oftype.getUniqueCallTargetType().object;
-        const oobinds = oftype.getUniqueCallTargetType().binds;
+        const oodecl = this.getUniqueCallTargetType().object;
+        const oobinds = this.getUniqueCallTargetType().binds;
         
         const etype = oodecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl) 
                 ? ResolvedType.createSingle(ResolvedTupleAtomType.create(true, [new ResolvedTupleAtomTypeEntry(oobinds.get("K") as ResolvedType, false), new ResolvedTupleAtomTypeEntry(oobinds.get("V") as ResolvedType, false)]))
@@ -437,10 +437,33 @@ class ResolvedType {
     isGroundedType(): boolean {
         return this.options.every((opt) => {
             if(opt instanceof ResolvedConceptAtomType) {
-                return opt.conceptTypes.length === 1 && opt.conceptTypes[0].concept.specialDecls.has(SpecialTypeCategory.ResultDecl);
+                return false;
             }
             else if(opt instanceof ResolvedEntityAtomType) {
-                return true;
+                if(opt.object.specialDecls.has(SpecialTypeCategory.GroundedTypeDecl)) {
+                    return true;
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.ListTypeDecl)) {
+                    return (opt.binds.get("T") as ResolvedType).isGroundedType();
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.VectorTypeDecl)) {
+                    return (opt.binds.get("T") as ResolvedType).isGroundedType();
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.StackTypeDecl)) {
+                    return (opt.binds.get("T") as ResolvedType).isGroundedType();
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.QueueTypeDecl)) {
+                    return (opt.binds.get("T") as ResolvedType).isGroundedType();
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.SetTypeDecl)) {
+                    return (opt.binds.get("T") as ResolvedType).isGroundedType();
+                }
+                else if(opt.object.specialDecls.has(SpecialTypeCategory.MapTypeDecl)) {
+                    return (opt.binds.get("K") as ResolvedType).isGroundedType() && (opt.binds.get("V") as ResolvedType).isGroundedType();
+                }
+                else {
+                    return false;
+                }
             }
             else if(opt instanceof ResolvedLiteralAtomType) {
                 return true;

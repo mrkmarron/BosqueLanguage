@@ -4032,6 +4032,10 @@ class Parser {
             }
 
             if(currentDecl.ns === "NSCore") {
+                if(OOPTypeDecl.attributeSetContains("grounded", attributes)) {
+                    specialinfo.push(SpecialTypeCategory.GroundedTypeDecl);
+                }
+
                 if(ename === "StringOf") {
                     specialinfo.push(SpecialTypeCategory.StringOfDecl);
                 }
@@ -4198,7 +4202,7 @@ class Parser {
             }
 
             this.clearRecover();
-            currentDecl.objects.set(ename, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, [SpecialTypeCategory.EnumTypeDecl], currentDecl.ns, ename, [], provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, new Map<string, EntityTypeDecl>()));
+            currentDecl.objects.set(ename, new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), pragmas, attributes, [SpecialTypeCategory.EnumTypeDecl, SpecialTypeCategory.GroundedTypeDecl], currentDecl.ns, ename, [], provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, new Map<string, EntityTypeDecl>()));
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + ename, currentDecl.objects.get(ename) as EntityTypeDecl);
         }
         catch (ex) {
@@ -4273,7 +4277,7 @@ class Parser {
             this.ensureAndConsumeToken(";");
         }
 
-        let categories = [SpecialTypeCategory.TypeDeclDecl];
+        let categories = [SpecialTypeCategory.TypeDeclDecl, SpecialTypeCategory.GroundedTypeDecl];
         if(OOPTypeDecl.attributeSetContains("numeric", attributes)) {
             categories.push(SpecialTypeCategory.TypeDeclNumeric);
             categories.push(SpecialTypeCategory.ParsableTypeDecl);
