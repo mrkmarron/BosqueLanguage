@@ -221,6 +221,19 @@ class TypeEnvironment {
         return this.expressionResult as ExpressionReturnResult;
     }
 
+    inferVarsOfType(ftype: ResolvedType, ...vars: (string | undefined)[]): TypeEnvironment {
+        let cenv = this as TypeEnvironment;
+
+        for(let i = 0; i < vars.length; ++i) {
+            const vv = vars[i];
+            if (vv !== undefined) {
+                cenv = cenv.updateVarInfo(vv, (cenv.lookupVar(vv) as VarInfo).infer(ftype));
+            }
+        }
+
+        return cenv;
+    }
+
     setUniformResultExpression(etype: ResolvedType, value?: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
 
