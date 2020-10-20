@@ -132,6 +132,7 @@ enum ExpressionTag {
 
     LiteralNoneExpression = "LiteralNoneExpression",
     LiteralBoolExpression = "LiteralBoolExpression",
+    LiteralNumberinoExpression = "LiteralNumberinoExpression",
     LiteralIntegralExpression = "LiteralIntegralExpression",
     LiteralRationalExpression = "LiteralRationalExpression",
     LiteralFloatPointExpression = "LiteralFloatExpression",
@@ -241,6 +242,19 @@ class LiteralBoolExpression extends Expression {
 
     constructor(sinfo: SourceInfo, value: boolean) {
         super(ExpressionTag.LiteralBoolExpression, sinfo);
+        this.value = value;
+    }
+
+    isCompileTimeInlineValue(): boolean {
+        return true;
+    }
+}
+
+class LiteralNumberinoExpression extends Expression {
+    readonly value: string;
+
+    constructor(sinfo: SourceInfo, value: string) {
+        super(ExpressionTag.LiteralNumberinoExpression, sinfo);
         this.value = value;
     }
 
@@ -1250,7 +1264,7 @@ export {
     InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
     ExpressionTag, Expression, LiteralExpressionValue, ConstantExpressionValue, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
-    LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression,
+    LiteralNumberinoExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression,
     LiteralStringExpression, LiteralRegexExpression, LiteralParamerterValueExpression, LiteralTypedStringExpression, 
     LiteralTypedNumericConstructorExpression, LiteralTypedComplexConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,

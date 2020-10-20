@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralTypedComplexConstructorExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, PragmaArguments, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
@@ -176,6 +176,7 @@ const TokenStrings = {
     Clear: "[CLEAR]",
     Error: "[ERROR]",
 
+    Numberino: "[LITERAL_NUMBERINO]",
     Int: "[LITERAL_INT]",
     Nat: "[LITERAL_NAT]",
     Float: "[LITERAL_FLOAT]",
@@ -368,6 +369,8 @@ class Lexer {
         return true;
     }
 
+    private static readonly _s_numberinoRe = /(0|[1-9][0-9]*)|([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?/y;
+
     private static readonly _s_intRe = /(0|[1-9][0-9]*)i/y;
     private static readonly _s_natRe = /(0|[1-9][0-9]*)n/y;
 
@@ -441,6 +444,13 @@ class Lexer {
         const mi = Lexer._s_intRe.exec(this.m_input);
         if (mi !== null) {
             this.recordLexTokenWData(this.m_cpos + mi[0].length, TokenStrings.Int, mi[0]);
+            return true;
+        }
+
+        Lexer._s_numberinoRe.lastIndex = this.m_cpos;
+        const mnio = Lexer._s_intRe.exec(this.m_input);
+        if (mnio !== null) {
+            this.recordLexTokenWData(this.m_cpos + mnio[0].length, TokenStrings.Numberino, mnio[0]);
             return true;
         }
 
@@ -1671,6 +1681,10 @@ class Parser {
             this.consumeToken();
             return new LiteralBoolExpression(sinfo, tk === "true");
         }
+        else if(tk === TokenStrings.Numberino) {
+            const niostr = this.consumeTokenAndGetValue();
+            return new LiteralNumberinoExpression(sinfo, niostr);
+        }
         else if (tk === TokenStrings.Int) {
             const istr = this.consumeTokenAndGetValue();
             return new LiteralIntegralExpression(sinfo, istr, this.m_penv.SpecialIntSignature);
@@ -1838,6 +1852,10 @@ class Parser {
             const ttype = this.parseTemplateTypeReference() as TemplateTypeSignature;
             this.ensureAndConsumeToken(")");
             return new LiteralParamerterValueExpression(sinfo, ttype);
+        }
+        else if(tk === TokenStrings.Numberino) {
+            const niostr = this.consumeTokenAndGetValue();
+            return new LiteralNumberinoExpression(sinfo, niostr);
         }
         else if (tk === TokenStrings.Int) {
             const istr = this.consumeTokenAndGetValue();
@@ -2092,12 +2110,16 @@ class Parser {
     }
 
     private parseTupleIndex(): number {
-        if(this.testToken(TokenStrings.Int)) {
+        if(this.testToken(TokenStrings.Numberino)) {
+            const niov = this.consumeTokenAndGetValue();
+            return Number.parseInt(niov);
+        }
+        else if(this.testToken(TokenStrings.Int)) {
             const iv = this.consumeTokenAndGetValue();
-            return Number.parseInt(iv);
+            return Number.parseInt(iv.substr(0, iv.length - 1));
         }
         else if(this.testToken(TokenStrings.Nat)) {
-            const nv =this.consumeTokenAndGetValue();
+            const nv = this.consumeTokenAndGetValue();
             return Number.parseInt(nv.substr(0, nv.length - 1));
         }
         else {
@@ -2220,7 +2242,7 @@ class Parser {
                 this.ensureAndConsumeToken(".");
                 const isBinder = this.testAndConsumeTokenIf("$");
 
-                if (this.testToken(TokenStrings.Int) || this.testToken(TokenStrings.Nat)) {
+                if (this.testToken(TokenStrings.Numberino) || this.testToken(TokenStrings.Int) || this.testToken(TokenStrings.Nat)) {
                     if(isBinder) {
                         this.raiseError(sinfo.line, "Cannot use binder in this position");
                     }
@@ -2232,7 +2254,7 @@ class Parser {
                     const isvalue = this.testToken("#");
                     this.consumeToken();
 
-                    if (this.testFollows(TokenStrings.Int, "=") || this.testFollows(TokenStrings.Nat, "=")) {
+                    if (this.testFollows(TokenStrings.Numberino, "=") ||this.testFollows(TokenStrings.Int, "=") || this.testFollows(TokenStrings.Nat, "=")) {
                         const updates = this.parseListOf<{ index: number, value: Expression }>("(", ")", ",", () => {
                             const idx = this.parseTupleIndex();
                             this.ensureAndConsumeToken("=");
@@ -2261,7 +2283,6 @@ class Parser {
                         }
 
                         const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("[", "]", ",", () => {
-                            this.ensureToken(TokenStrings.Int);
                             const idx = this.parseTupleIndex();
 
                             if (!this.testAndConsumeTokenIf(":")) {
@@ -2336,9 +2357,8 @@ class Parser {
                         this.raiseError(sinfo.line, "Cannot use binder in this position");
                     }
 
-                    if (this.testFollows("(|", TokenStrings.Int) || this.testFollows("(|", TokenStrings.Nat)) {
+                    if (this.testFollows("(|", TokenStrings.Numberino) || this.testFollows("(|", TokenStrings.Int) || this.testFollows("(|", TokenStrings.Nat)) {
                         const indecies = this.parseListOf<{ index: number, reqtype: TypeSignature | undefined }>("(|", "|)", ",", () => {
-                            this.ensureToken(TokenStrings.Int);
                             const idx = this.parseTupleIndex();
                             
                             if (!this.testAndConsumeTokenIf(":")) {

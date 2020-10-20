@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression } from "./body";
+import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -612,16 +612,81 @@ class Assembly {
         return fullbinds;
     }
 
-    compileTimeReduceConstantExpression(exp: Expression, binds: Map<string, ResolvedType>): Expression | undefined {
+    processNumberinoExpressionIntoTypedExpression(exp: LiteralNumberinoExpression, infertype: ResolvedType): Expression | undefined {
+        //We will do bounds checking later so just make sure general format is ok here
+        const isfpnum = exp.value.includes(".");
+
+        if(infertype.isSameType(this.getSpecialIntType())) {
+            return !isfpnum ? new LiteralIntegralExpression(exp.sinfo, exp.value + "i", this.getSpecialIntType()) : undefined;
+        }
+        else if(infertype.isSameType(this.getSpecialNatType())) {
+            return !isfpnum ? new LiteralIntegralExpression(exp.sinfo, exp.value + "n", this.getSpecialNatType()) : undefined;
+        }
+        else if(infertype.isSameType(this.getSpecialBigIntType())) {
+            return !isfpnum ? new LiteralIntegralExpression(exp.sinfo, exp.value + "I", this.getSpecialBigIntType()) : undefined;
+        }
+        else if(infertype.isSameType(this.getSpecialBigNatType())) {
+            return !isfpnum ? new LiteralIntegralExpression(exp.sinfo, exp.value + "N", this.getSpecialBigNatType()) : undefined;
+        }
+        else if(infertype.isSameType(this.getSpecialFloatType())) {
+            return new LiteralFloatPointExpression(exp.sinfo, exp.value + "f", this.getSpecialFloatType());
+        }
+        else if(infertype.isSameType(this.getSpecialDecimalType())) {
+            return new LiteralFloatPointExpression(exp.sinfo, exp.value + "d", this.getSpecialDecimalType());
+        }
+        else if(infertype.isSameType(this.getSpecialRationalType())) {
+            return new LiteralRationalExpression(exp.sinfo, exp.value + "/1R", this.getSpecialRationalType());
+        }
+        else if (infertype.isSameType(this.getSpecialComplexType())) {
+            return new LiteralComplexExpression(exp.sinfo, exp.value, "+0j", this.getSpecialComplexType());
+        }
+        else {
+            if(!infertype.isUniqueCallTargetType() || !infertype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.TypeDeclNumeric)) {
+                return undefined;
+            }
+
+            const tt = (infertype.getUniqueCallTargetType().object.memberFields.get("value") as MemberFieldDecl).declaredType;
+            const rtt = this.normalizeTypeOnly(tt, new Map<string, ResolvedType>());
+
+            const le = this.processNumberinoExpressionIntoTypedExpression(exp, rtt);
+            if(le === undefined) {
+                return undefined;
+            }
+
+            if(rtt.isSameType(this.getSpecialComplexType())) {
+                const cle = le as LiteralComplexExpression;
+                return new LiteralTypedComplexConstructorExpression(exp.sinfo, cle.rvalue, cle.jvalue, rtt, infertype);
+            }
+            else {
+                if(le instanceof LiteralIntegralExpression) {
+                    return new LiteralTypedNumericConstructorExpression(exp.sinfo, le.value, le.itype, infertype);
+                }
+                else if(le instanceof LiteralFloatPointExpression) {
+                    return new LiteralTypedNumericConstructorExpression(exp.sinfo, le.value, le.fptype, infertype);
+                }
+                else {
+                    const re = le as LiteralRationalExpression;
+                    return new LiteralTypedNumericConstructorExpression(exp.sinfo, re.value, re.rtype, infertype);
+                }
+            }
+        }
+    }
+
+    compileTimeReduceConstantExpression(exp: Expression, binds: Map<string, ResolvedType>, infertype: ResolvedType | undefined): Expression | undefined {
         if(exp.isCompileTimeInlineValue()) {
-            return exp;
+            if(exp instanceof LiteralNumberinoExpression && infertype !== undefined) {
+                return this.processNumberinoExpressionIntoTypedExpression(exp, infertype);
+            }
+            else {
+                return exp;
+            }
         }
         else if (exp instanceof LiteralParamerterValueExpression) {
             const vv = (binds.get(exp.ltype.name) as ResolvedType).options[0] as ResolvedLiteralAtomType;
             return vv.vexp;
         }
         else if (exp instanceof PrefixNotOp) {
-            const earg = this.compileTimeReduceConstantExpression(exp.exp, binds);
+            const earg = this.compileTimeReduceConstantExpression(exp.exp, binds, undefined);
             if (earg === undefined) {
                 return undefined;
             }
@@ -638,7 +703,7 @@ class Assembly {
                 return undefined;
             }
 
-            const earg = this.compileTimeReduceConstantExpression(exp.args.argList[0].value, binds);
+            const earg = this.compileTimeReduceConstantExpression(exp.args.argList[0].value, binds, infertype);
             if (earg === undefined) {
                 return undefined;
             }
@@ -703,7 +768,7 @@ class Assembly {
             }
 
             const cdecl = nsdecl.consts.get(exp.name) as NamespaceConstDecl;
-            return this.compileTimeReduceConstantExpression(cdecl.value.exp, binds);
+            return this.compileTimeReduceConstantExpression(cdecl.value.exp, binds, this.normalizeTypeOnly(cdecl.declaredType, new Map<string, ResolvedType>()));
         }
         else if (exp instanceof AccessStaticFieldExpression) {
             const oftype = this.normalizeTypeOnly(exp.stype, binds);
@@ -717,7 +782,7 @@ class Assembly {
                 return (cdecl.decl.value as ConstantExpressionValue).exp //must be an enum which cannot have template terms so don't care about binds;
             }
             else {
-                return cdecl.decl.value !== undefined ? this.compileTimeReduceConstantExpression(cdecl.decl.value.exp, cdecl.binds) : undefined;
+                return cdecl.decl.value !== undefined ? this.compileTimeReduceConstantExpression(cdecl.decl.value.exp, cdecl.binds, this.normalizeTypeOnly(cdecl.decl.declaredType, cdecl.binds)) : undefined;
             }
         }
         else {
@@ -725,8 +790,11 @@ class Assembly {
         }
     }
 
-    reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>): [Expression, ResolvedType, string] | undefined {
-        const cexp = this.compileTimeReduceConstantExpression(exp, binds);
+    reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>, infertype: ResolvedType | undefined): [Expression, ResolvedType, string] | undefined {
+        const cexp = this.compileTimeReduceConstantExpression(exp, binds, infertype);
+        if(cexp === undefined) {
+            return undefined;
+        }
 
         if(cexp instanceof LiteralBoolExpression) {
             return [cexp, this.getSpecialBoolType(), `${cexp.value}`];
@@ -1214,7 +1282,7 @@ class Assembly {
     }
 
     private normalizeType_Literal(l: LiteralTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
-        const cform = this.reduceLiteralValueToCanonicalForm(l.typevalue.exp, binds);
+        const cform = this.reduceLiteralValueToCanonicalForm(l.typevalue.exp, binds, undefined);
         if(cform === undefined || cform[1].isEmptyType()) {
             return ResolvedType.createEmpty();
         }
@@ -1499,7 +1567,7 @@ class Assembly {
             let ttl = this.normalizeTypeGeneral(param.type, binds);
             let llpv: string | undefined = undefined;
             if(param.litexp !== undefined) {
-                const lnv = this.reduceLiteralValueToCanonicalForm(param.litexp.exp, new Map<string, ResolvedType>());
+                const lnv = this.reduceLiteralValueToCanonicalForm(param.litexp.exp, new Map<string, ResolvedType>(), ttl as ResolvedType);
                 if(lnv === undefined) {
                     return new ResolvedFunctionTypeParam(param.name, ResolvedType.createEmpty(), false, undefined, undefined);
                 }
