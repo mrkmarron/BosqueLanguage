@@ -234,6 +234,10 @@ class TypeEnvironment {
         return cenv;
     }
 
+    clearExpressionResult(): TypeEnvironment {
+        return new TypeEnvironment(this.scope, this.terms, this.refparams, this.pcodes, this.args, this.locals, this.inferResult, this.inferYield, undefined, this.returnResult, this.yieldResult, this.frozenVars);
+    }
+
     setUniformResultExpression(etype: ResolvedType, value?: FlowTypeTruthValue): TypeEnvironment {
         assert(this.hasNormalFlow());
 

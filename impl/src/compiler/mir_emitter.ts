@@ -205,6 +205,22 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
     }
 
+    emitArgToLocalVarStore(sinfo: SourceInfo, src: string, name: string, vtype: MIRType) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRLocalVarStore(sinfo, new MIRParameterVariable(src), new MIRLocalVariable(name), vtype));
+    }
+
+    emitLocalVarMove(sinfo: SourceInfo, src: string, name: string, vtype: MIRType) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRLocalVarStore(sinfo, new MIRLocalVariable(src), new MIRLocalVariable(name), vtype));
+    }
+
     emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
@@ -755,11 +771,12 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRJumpNone(sinfo, arg, noneblck, someblk));
     }
 
-    emitReturnAssign(sinfo: SourceInfo, src: MIRArgument) {
+    emitReturnAssign(sinfo: SourceInfo, src: MIRArgument, rtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
 
+        xxxx;
         this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
     }
 
