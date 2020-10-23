@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo } from "../ast/parser";
-import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey, MIRNominalTypeKey } from "./mir_ops";
+import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey } from "./mir_ops";
 import assert = require("assert");
 
 //
@@ -157,7 +157,7 @@ abstract class MIRInvokeDecl {
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
     readonly body: MIRBody;
 
-    constructor(enclosingDecl: MIRNominalTypeKey | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRInvokeKey | undefined, postconds: MIRInvokeKey | undefined, body: MIRBody) {
+    constructor(enclosingDecl: MIRType | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRType, preconds: MIRInvokeKey | undefined, postconds: MIRInvokeKey | undefined, body: MIRBody) {
         super(enclosingDecl, name, iname, key, attributes, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
 
         this.body = body;

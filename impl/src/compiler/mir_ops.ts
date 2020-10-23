@@ -430,9 +430,6 @@ enum MIROpTag {
     MIRAccessConstantValue = "MIRAccessConstantValue",
     MIRLoadFieldDefaultValue = "MIRLoadFieldDefaultValue",
 
-    MIRInvokeInvariantCheckDirect = "MIRInvokeInvariantCheckDirect",
-    MIRInvokeInvariantCheckVirtualTarget = "MIRInvokeInvariantCheckVirtualTarget",
-
     MIRConstructorPrimary = "MIRConstructorPrimary",
     MIRConstructorPrimaryCollectionEmpty = "MIRConstructorPrimaryCollectionEmpty",
     MIRConstructorPrimaryCollectionSingletons = "MIRConstructorPrimaryCollectionSingletons",
@@ -753,58 +750,6 @@ class MIRLoadFieldDefaultValue extends MIRValueOp {
 
     static jparse(jobj: any): MIROp {
         return new MIRLoadFieldDefaultValue(jparsesinfo(jobj.sinfo), jobj.fkey, MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRInvokeInvariantCheckDirect extends MIRValueOp {
-    readonly ikey: MIRInvokeKey;
-    readonly tkey: MIRNominalTypeKey;
-    rcvr: MIRArgument;
-
-    constructor(sinfo: SourceInfo, ikey: MIRInvokeKey, tkey: MIRNominalTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRInvokeInvariantCheckDirect, sinfo, trgt);
-        this.ikey = ikey;
-        this.tkey = tkey;
-        this.rcvr = rcvr;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.rcvr]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.ikey}(${this.rcvr})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), ikey: this.ikey, tkey: this.tkey, rcvr: this.rcvr.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRInvokeInvariantCheckDirect(jparsesinfo(jobj.sinfo), jobj.ikey, jobj.tkey, MIRArgument.jparse(jobj.rcvr), MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRInvokeInvariantCheckVirtualTarget extends MIRValueOp {
-    readonly infertype: MIRResolvedTypeKey;
-    rcvr: MIRArgument;
-
-    constructor(sinfo: SourceInfo, infertype: MIRResolvedTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRInvokeInvariantCheckVirtualTarget, sinfo, trgt);
-        this.infertype = infertype;
-        this.rcvr = rcvr;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.rcvr]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = @@invariant(${this.rcvr})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), infertype: this.infertype, rcvr: this.rcvr.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRInvokeInvariantCheckVirtualTarget(jparsesinfo(jobj.sinfo), jobj.infertype, MIRArgument.jparse(jobj.rcvr), MIRTempRegister.jparse(jobj.trgt));
     }
 }
 

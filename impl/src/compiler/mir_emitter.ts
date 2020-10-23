@@ -189,7 +189,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitLocalVarStore(sinfo: SourceInfo, src: MIRTempRegister, name: string, vtype: MIRType) {
+    emitLocalVarStore(sinfo: SourceInfo, src: MIRArgument, name: string, vtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
@@ -197,7 +197,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLocalVarStore(sinfo, src, new MIRLocalVariable(name)));
     }
 
-    emitArgVarStore(sinfo: SourceInfo, src: MIRTempRegister, name: string, vtype: MIRType) {
+    emitArgVarStore(sinfo: SourceInfo, src: MIRArgument, name: string, vtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
@@ -205,20 +205,12 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
     }
 
-    emitArgToLocalVarStore(sinfo: SourceInfo, src: string, name: string, vtype: MIRType) {
+    emitArgVarStoreWithGuard(sinfo: SourceInfo, maskname: string, maskidx: number, src: MIRArgument, name: string, vtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLocalVarStore(sinfo, new MIRParameterVariable(src), new MIRLocalVariable(name), vtype));
-    }
-
-    emitLocalVarMove(sinfo: SourceInfo, src: string, name: string, vtype: MIRType) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRLocalVarStore(sinfo, new MIRLocalVariable(src), new MIRLocalVariable(name), vtype));
+        this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
     }
 
     emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
@@ -237,7 +229,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitLoadUninitVariableValue(sinfo: SourceInfo, oftype: MIRType, trgt: MIRTempRegister) {
+    emitLoadUninitVariableValue(sinfo: SourceInfo, oftype: MIRType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
@@ -465,12 +457,12 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, arg, resultType, argInferType, idx, trgt));
     }
 
-    emitInvokeInvariantCheckDirect(sinfo: SourceInfo, ikey: MIRInvokeKey, tkey: MIRResolvedTypeKey, rcvr: MIRArgument, trgt: MIRTempRegister) {
+    emitInvokeFixedFunctionWithGuard(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], maskname: string, maskidx: number, rretinfo: MIRType, trgt: MIRParameterVariable) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRInvokeInvariantCheckDirect(sinfo, ikey, tkey, rcvr, trgt));
+        this.m_currentBlock.push(new MIRInvokeFixedFunctionWithGuard(sinfo, rretinfo, ikey, args, maskname, maskidx, trgt));
     }
 
     emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
@@ -502,7 +494,7 @@ class MIREmitter {
         }
     }
 
-    emitInvokeVirtualFunction(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
+    emitInvokeVirtualFunction(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, rcvrflowtype: MIRType, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
@@ -821,7 +813,11 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRVarLifetimeEnd(sinfo, name));
     }
 
-    getBody(file: string, sinfo: SourceInfo, args: Map<string, MIRType>): MIRBody {
+    getBody(file: string, sinfo: SourceInfo, args: Map<string, MIRType>): MIRBody | undefined {
+        if(!this.emitEnabled) {
+            return undefined;
+        }
+
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
 
         propagateTmpAssignForBody(ibody);
