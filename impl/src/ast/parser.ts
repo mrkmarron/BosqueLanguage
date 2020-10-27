@@ -4143,7 +4143,7 @@ class Parser {
         try {
             this.setRecover(this.scanCodeParens());
 
-            let oftype: TypeSignature | undefined = new NominalTypeSignature("NSCore", ["Int"]);
+            let oftype: TypeSignature | undefined = new NominalTypeSignature("NSCore", ["Nat"]);
             if(this.testAndConsumeTokenIf(":")) {
                 oftype = this.parseTypeSignature(false);
             }

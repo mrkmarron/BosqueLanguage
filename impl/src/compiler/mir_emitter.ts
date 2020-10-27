@@ -465,85 +465,85 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRInvokeFixedFunctionWithGuard(sinfo, rretinfo, ikey, args, maskname, maskidx, trgt));
     }
 
-    emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
+    emitInvokeFixedFunction(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | { declresult: MIRType, runtimeresult: MIRType, elrcount: number, refargs: [MIRVariableArgument, MIRType][] }, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        const retinfo = (Array.isArray(rretinfo) ? rretinfo : [rretinfo, rretinfo, -1, []]) as [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]];
-        if (retinfo[3].length === 0) {
+        const retinfo = rretinfo instanceof MIRType ? { declresult: rretinfo, runtimeresult: rretinfo, elrcount: -1, refargs: [] } : rretinfo;
+        if (retinfo.refargs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[0].trkey, ikey, args, optstatusmask, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
             this.m_currentBlock.push(new MIRInvokeFixedFunction(sinfo, retinfo[1].trkey, ikey, args, optstatusmask, rr));
 
-            if (retinfo[2] === -1) {
+            if (retinfo.elrcount === -1) {
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[0].trkey, retinfo[1].trkey, 0, trgt));
             }
             else {
                 this.m_currentBlock.push(new MIRPackSlice(sinfo, rr, retinfo[0].trkey, trgt));
             }
 
-            const refbase = retinfo[2] != -1 ? retinfo[2] : 1;
-            const argvs = retinfo[3].map((rinfo, idx) => {
-                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo[0].options[0] as MIREphemeralListType).entries[refbase + idx]};
+            const refbase = retinfo.elrcount != -1 ? retinfo.elrcount : 1;
+            const argvs = retinfo.refargs.map((rinfo, idx) => {
+                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo.declresult.options[0] as MIREphemeralListType).entries[refbase + idx]};
             });
 
-            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo[0], argvs);
+            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo.declresult, argvs);
         }
     }
 
-    emitInvokeVirtualFunction(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, rcvrflowtype: MIRType, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
+    emitInvokeVirtualFunction(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, rcvrflowtype: MIRType, args: MIRArgument[], optstatusmask: string | undefined, rretinfo: MIRType | { declresult: MIRType, runtimeresult: MIRType, elrcount: number, refargs: [MIRVariableArgument, MIRType][] }, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        const retinfo = (Array.isArray(rretinfo) ? rretinfo : [rretinfo, rretinfo, -1, []]) as [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]];
-        if (retinfo[3].length === 0) {
+        const retinfo = rretinfo instanceof MIRType ? { declresult: rretinfo, runtimeresult: rretinfo, elrcount: -1, refargs: [] as [MIRVariableArgument, MIRType][] } : rretinfo;
+        if (retinfo.refargs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[0].trkey, vresolve, args, thisInferType, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[1].trkey, vresolve, args, thisInferType, rr));
            
-            if (retinfo[2] === -1) {
+            if (retinfo.elrcount === -1) {
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[0].trkey, retinfo[1].trkey, 0, trgt));
             }
             else {
                 this.m_currentBlock.push(new MIRPackSlice(sinfo, rr, retinfo[0].trkey, trgt));
             }
 
-            const refbase = retinfo[2] != -1 ? retinfo[2] : 1;
-            const argvs = retinfo[3].map((rinfo, idx) => {
-                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo[0].options[0] as MIREphemeralListType).entries[refbase + idx]};
+            const refbase = retinfo.elrcount != -1 ? retinfo.elrcount : 1;
+            const argvs = retinfo.refargs.map((rinfo, idx) => {
+                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo.declresult.options[0] as MIREphemeralListType).entries[refbase + idx]};
             });
 
-            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo[0], argvs);
+            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo.declresult, argvs);
         }
     }
 
-    emitInvokeVirtualOperator(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], retinfo: [MIRType, MIRType, number, [MIRVariableArgument, MIRType][]], trgt: MIRTempRegister) {
-        if (retinfo[3].length === 0) {
+    emitInvokeVirtualOperator(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: MIRArgument[], retinfo: { declresult: MIRType, runtimeresult: MIRType, elrcount: number, refargs: [MIRVariableArgument, MIRType][] }, trgt: MIRTempRegister) {
+        if (retinfo.refargs.length === 0) {
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[0].trkey, vresolve, args, thisInferType, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
             this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[1].trkey, vresolve, args, thisInferType, rr));
            
-            if (retinfo[2] === -1) {
+            if (retinfo.elrcount === -1) {
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo[0].trkey, retinfo[1].trkey, 0, trgt));
             }
             else {
                 this.m_currentBlock.push(new MIRPackSlice(sinfo, rr, retinfo[0].trkey, trgt));
             }
 
-            const refbase = retinfo[2] != -1 ? retinfo[2] : 1;
-            const argvs = retinfo[3].map((rinfo, idx) => {
-                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo[0].options[0] as MIREphemeralListType).entries[refbase + idx]};
+            const refbase = retinfo.elrcount != -1 ? retinfo.elrcount : 1;
+            const argvs = retinfo.refargs.map((rinfo, idx) => {
+                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo.declresult.options[0] as MIREphemeralListType).entries[refbase + idx]};
             });
 
-            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo[0], argvs);
+            this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo.declresult, argvs);
         }
     }
 

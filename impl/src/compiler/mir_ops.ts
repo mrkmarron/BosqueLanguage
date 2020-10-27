@@ -5,10 +5,10 @@
 
 import { SourceInfo } from "../ast/parser";
 import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
-import assert = require("assert");
 import { BSQRegex } from "../ast/bsqregex";
 
-type MIRConstantKey = string; //ns::[type]::const#binds
+import assert = require("assert");
+
 type MIRFieldKey = string; //ns::name::field#binds
 type MIRInvokeKey = string; //ns::[type]::func#binds%code
 
@@ -2230,12 +2230,11 @@ class MIRBody {
 }
 
 export {
-    MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
+    MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue,
-    MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget,
     MIRConstructorPrimary, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorEphemeralValueList,
     MIRAccessFromIndex, MIRProjectFromIndecies, MIRAccessFromProperty, MIRProjectFromProperties, MIRAccessFromField, MIRProjectFromFields, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject,
     MIRLoadFromEpehmeralList,

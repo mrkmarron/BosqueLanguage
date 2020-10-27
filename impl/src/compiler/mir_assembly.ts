@@ -64,7 +64,7 @@ class MIRRegex {
 class MIRConstantDecl {
     readonly enclosingDecl: MIRNominalTypeKey | undefined;
     readonly cname: string;
-    readonly key: MIRConstantKey;
+    readonly key: MIRInvokeKey; //constant key is same as argumentless function that defines it
 
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
@@ -74,7 +74,7 @@ class MIRConstantDecl {
     readonly declaredType: MIRResolvedTypeKey;
     readonly value: MIRInvokeKey;
 
-    constructor(enclosingDecl: MIRNominalTypeKey | undefined, cname: string, key: MIRConstantKey, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey, value: MIRInvokeKey) {
+    constructor(enclosingDecl: MIRResolvedTypeKey | undefined, cname: string, key: MIRInvokeKey, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey) {
         this.enclosingDecl = enclosingDecl;
         this.cname = cname;
         this.key = key;
