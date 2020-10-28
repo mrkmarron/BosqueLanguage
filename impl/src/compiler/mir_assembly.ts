@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo } from "../ast/parser";
-import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey } from "./mir_ops";
+import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey, MIRGlobalKey } from "./mir_ops";
 import assert = require("assert");
 
 //
@@ -64,7 +64,8 @@ class MIRRegex {
 class MIRConstantDecl {
     readonly enclosingDecl: MIRNominalTypeKey | undefined;
     readonly cname: string;
-    readonly key: MIRInvokeKey; //constant key is same as argumentless function that defines it
+    readonly gkey: MIRGlobalKey;
+    readonly key: MIRInvokeKey;
 
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
@@ -74,9 +75,10 @@ class MIRConstantDecl {
     readonly declaredType: MIRResolvedTypeKey;
     readonly value: MIRInvokeKey;
 
-    constructor(enclosingDecl: MIRResolvedTypeKey | undefined, cname: string, key: MIRInvokeKey, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey) {
+    constructor(enclosingDecl: MIRResolvedTypeKey | undefined, cname: string, key: MIRInvokeKey, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, declaredType: MIRResolvedTypeKey, gkey: MIRGlobalKey) {
         this.enclosingDecl = enclosingDecl;
         this.cname = cname;
+        this.gkey = gkey;
         this.key = key;
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;

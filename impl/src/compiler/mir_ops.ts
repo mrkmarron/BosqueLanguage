@@ -9,6 +9,7 @@ import { BSQRegex } from "../ast/bsqregex";
 
 import assert = require("assert");
 
+type MIRGlobalKey = string; //$global_IKEY
 type MIRFieldKey = string; //ns::name::field#binds
 type MIRInvokeKey = string; //ns::[type]::func#binds%code
 
@@ -2230,7 +2231,7 @@ class MIRBody {
 }
 
 export {
-    MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
+    MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,

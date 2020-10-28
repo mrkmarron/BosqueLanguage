@@ -1914,7 +1914,7 @@ class Parser {
         else if (tk === TokenStrings.Identifier) {
             let namestr = this.consumeTokenAndGetValue();
 
-            const isvar = this.m_penv.isVarDefinedInAnyScope(namestr);
+            const isvar = this.m_penv.isVarDefinedInAnyScope(namestr) || namestr.startsWith("$");
             if (isvar) {
                 const istr = this.m_penv.useLocalVar(namestr);
 
@@ -1934,7 +1934,7 @@ class Parser {
             else {
                 const ns = this.m_penv.tryResolveNamespace(undefined, namestr);
                 if (ns === undefined) {
-                    this.raiseError(line, "Cannot resolve namespace for invoke");
+                    this.raiseError(line, `Cannot resolve namespace for "${namestr}"`);
                 }
 
                 const targs = this.testToken("<") ? this.parseTemplateArguments() : new TemplateArguments([]);
@@ -3904,7 +3904,7 @@ class Parser {
                 let level: BuildLevel = this.parseBuildInfo("debug");
 
                 const sinfo = this.getCurrentSrcInfo();
-                const exp = this.parseExpression();
+                const exp = this.parseConstExpression(true);
 
                 invs.push(new InvariantDecl(sinfo, level, exp));
 

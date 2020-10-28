@@ -102,9 +102,9 @@ class PostConditionDecl {
 class InvariantDecl {
     readonly sinfo: SourceInfo;
     readonly level: BuildLevel;
-    readonly exp: Expression;
+    readonly exp: ConstantExpressionValue;
 
-    constructor(sinfo: SourceInfo, level: BuildLevel, exp: Expression) {
+    constructor(sinfo: SourceInfo, level: BuildLevel, exp: ConstantExpressionValue) {
         this.sinfo = sinfo;
         this.level = level;
         this.exp = exp;
@@ -1934,8 +1934,8 @@ class Assembly {
         return ResolvedEntityAtomType.create(object, fullbinds);
     }
 
-    getAllOOFields(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, fmap?: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>): Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> {
-        let declfields = fmap || new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>();
+    getAllOOFields(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, fmap?: { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> }): { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> } {
+        let declfields = fmap || { req: new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>(), opt: new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>() };
 
         //Important to do traversal in Left->Right Topmost traversal order
 
@@ -1947,8 +1947,15 @@ class Assembly {
         });
 
         ooptype.memberFields.forEach((mf, name) => {
-            if (!declfields.has(name)) {
-                declfields.set(name, [ooptype, mf, binds]);
+            if(mf.value === undefined) {
+                if(!declfields.req.has(name)) {
+                    declfields.req.set(name, [ooptype, mf, binds]);
+                }
+            }
+            else {
+                if (!declfields.opt.has(name)) {
+                    declfields.opt.set(name, [ooptype, mf, binds]);
+                }
             }
         });
 

@@ -58,7 +58,7 @@ class MIRKeyGenerator {
         return `${prefix}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
     }
 
-    static generateMethodKey(t: ResolvedType, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
+    static generateMethodKey(name: string, t: ResolvedType, binds: Map<string, ResolvedType>, pcodes: PCode[]): MIRInvokeKey {
         return `${this.generateTypeKey(t)}::${name}${MIRKeyGenerator.computeBindsKeyInfo(binds)}${MIRKeyGenerator.computePCodeKeyInfo(pcodes)}`;
     }
 
