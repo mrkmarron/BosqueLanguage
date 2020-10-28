@@ -104,6 +104,22 @@ class MIRTempRegister extends MIRRegisterArgument {
     }
 }
 
+class MIRGlobalVariable extends MIRRegisterArgument {
+    readonly gkey: MIRGlobalKey;
+
+    constructor(gkey: MIRGlobalKey) {
+        super(gkey);
+    }
+
+    jemit(): object {
+        return { tag: "global", gkey: this.gkey };
+    }
+
+    static jparse(jobj: any): MIRGlobalVariable {
+        return new MIRGlobalVariable(jobj.gkey);
+    }
+}
+
 abstract class MIRVariableArgument extends MIRRegisterArgument {
     readonly lname: string;
 
@@ -1770,7 +1786,7 @@ class MIRParameterVarStore extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRParameterVariable) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRParameterVariable, vtype: MIRResolvedTypeKey) {
         super(MIROpTag.MIRParameterVarStore, sinfo);
         this.src = src;
         this.name = name;
@@ -1796,7 +1812,7 @@ class MIRLocalVarStore extends MIRFlowOp {
     src: MIRArgument;
     name: MIRVariable;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRLocalVariable) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRLocalVariable, vtype: MIRResolvedTypeKey) {
         super(MIROpTag.MIRLocalVarStore, sinfo);
         this.src = src;
         this.name = name;
@@ -2232,7 +2248,8 @@ class MIRBody {
 
 export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, 
+    MIRConstantArgument, MIRConstantNone, MIRConstantEmpty, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRValueOp, MIRFlowOp, MIRJumpOp,
     MIRLoadConst, MIRLoadConstDataString,
     MIRAccessConstantValue, MIRLoadFieldDefaultValue,

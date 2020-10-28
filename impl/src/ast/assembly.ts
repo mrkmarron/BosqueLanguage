@@ -5,7 +5,7 @@
 
 import { ResolvedType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomTypeEntry, ResolvedAtomType, ResolvedFunctionTypeParam, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedLiteralAtomType, ResolvedTemplateUnifyType } from "./resolved_type";
 import { TemplateTypeSignature, NominalTypeSignature, TypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, ParseErrorTypeSignature, AutoTypeSignature, FunctionParameter, ProjectTypeSignature, EphemeralListTypeSignature, LiteralTypeSignature, PlusTypeSignature, AndTypeSignature } from "./type_signature";
-import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "./body";
+import { Expression, BodyImplementation, LiteralBoolExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, AccessStaticFieldExpression, AccessNamespaceConstantExpression, PrefixNotOp, CallNamespaceFunctionOrOperatorExpression, LiteralTypedNumericConstructorExpression, LiteralParamerterValueExpression, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression, LiteralTypedStringExpression } from "./body";
 import { SourceInfo } from "./parser";
 
 import * as assert from "assert";
@@ -678,7 +678,18 @@ class Assembly {
                 return this.processNumberinoExpressionIntoTypedExpression(exp, infertype);
             }
             else {
-                return exp;
+                if(exp instanceof LiteralTypedStringExpression) {
+                    const oftype = this.normalizeTypeOnly(exp.stype, binds);
+                    if(oftype.isUniqueCallTargetType() && oftype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.ValidatorTypeDecl)) {
+                        return exp;
+                    }
+                    else {
+                        return undefined;
+                    }
+                }
+                else {
+                    return exp;
+                }
             }
         }
         else if (exp instanceof LiteralParamerterValueExpression) {
@@ -1788,9 +1799,6 @@ class Assembly {
     getSpecialBufferEncodingType(): ResolvedType { return this.internSpecialObjectType(["BufferEncoding"]); }
     getSpecialBufferCompressionType(): ResolvedType { return this.internSpecialObjectType(["BufferCompression"]); }
     getSpecialByteBufferType(): ResolvedType { return this.internSpecialObjectType(["ByteBuffer"]); }
-    getSpecialISOMilliSecondType(): ResolvedType { return this.internSpecialObjectType(["ISOMilliSeconds"]); }
-    getSpecialISOSecondType(): ResolvedType { return this.internSpecialObjectType(["ISOSeconds"]); }
-    getSpecialISOTimeType(): ResolvedType { return this.internSpecialObjectType(["ISOTime"]); }
     getSpecialUUIDType(): ResolvedType { return this.internSpecialObjectType(["UUID"]); }
     getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType(["LogicalTime"]); }
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType(["CryptoHash"]); }
@@ -1934,7 +1942,7 @@ class Assembly {
         return ResolvedEntityAtomType.create(object, fullbinds);
     }
 
-    getAllOOFields(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, fmap?: { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> }): { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> } {
+    getAllOOFieldsConstructors(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, fmap?: { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> }): { req: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>, opt: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> } {
         let declfields = fmap || { req: new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>(), opt: new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>() };
 
         //Important to do traversal in Left->Right Topmost traversal order
@@ -1942,7 +1950,7 @@ class Assembly {
         this.resolveProvides(ooptype, binds).forEach((provide) => {
             const tt = this.normalizeTypeOnly(provide, binds);
             (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
-                declfields = this.getAllOOFields(concept.concept, concept.binds, declfields);
+                declfields = this.getAllOOFieldsConstructors(concept.concept, concept.binds, declfields);
             });
         });
 
@@ -1953,9 +1961,30 @@ class Assembly {
                 }
             }
             else {
-                if (!declfields.opt.has(name)) {
+                if (!declfields.opt.has(name) && !OOPTypeDecl.attributeSetContains("derived", mf.attributes)) {
                     declfields.opt.set(name, [ooptype, mf, binds]);
                 }
+            }
+        });
+
+        return declfields;
+    }
+
+    getAllOOFieldsLayout(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, fmap?: Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>): Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]> {
+        let declfields = fmap || new Map<string, [OOPTypeDecl, MemberFieldDecl, Map<string, ResolvedType>]>();
+
+        //Important to do traversal in Left->Right Topmost traversal order
+
+        this.resolveProvides(ooptype, binds).forEach((provide) => {
+            const tt = this.normalizeTypeOnly(provide, binds);
+            (tt.options[0] as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
+                declfields = this.getAllOOFieldsLayout(concept.concept, concept.binds, declfields);
+            });
+        });
+
+        ooptype.memberFields.forEach((mf, name) => {
+            if (!declfields.has(name)) {
+                declfields.set(name, [ooptype, mf, binds]);
             }
         });
 

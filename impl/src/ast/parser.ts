@@ -25,6 +25,7 @@ const KeywordStrings = [
     "recursive",
     "parsable",
     "validator",
+    "derived",
     "memoized",
     "inline",
     "prefix",

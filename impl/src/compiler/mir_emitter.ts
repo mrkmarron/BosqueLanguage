@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRArgument, MIRLoadConstDataString, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRBinOp, MIRBinCmp, MIRBinEq, MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRConstructorEphemeralValueList, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend, MIRConstantBigInt, MIRConstantFloat, MIRBinLess, MIRConstantRegex, MIRConstantEmpty, MIRConstantStringOf, MIRConstantDecmial, MIRConstantBigNat, MIRConstantRational, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantNat, MIRConstantComplex } from "./mir_ops";
+import { MIRTempRegister, MIROp, MIRLoadConst, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantString, MIRArgument, MIRLoadConstDataString, MIRConstructorPrimary, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRAccessFromIndex, MIRProjectFromIndecies, MIRProjectFromProperties, MIRProjectFromFields, MIRAccessFromProperty, MIRAccessFromField, MIRConstructorTuple, MIRConstructorRecord, MIRConstructorPrimaryCollectionEmpty, MIRResolvedTypeKey, MIRFieldKey, MIRLoadFieldDefaultValue, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRVirtualMethodKey, MIRJump, MIRJumpCond, MIRBinOp, MIRBinCmp, MIRBinEq, MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore, MIRReturnAssign, MIRVarLifetimeStart, MIRVarLifetimeEnd, MIRBody, MIRBasicBlock, MIRTruthyConvert, MIRJumpNone, MIRDebug, MIRAbort, MIRInvokeKey, MIRConstantKey, MIRAccessConstantValue, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRConstructorEphemeralValueList, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRLoadFromEpehmeralList, MIRRegisterArgument, MIRPackSlice, MIRPackExtend, MIRConstantBigInt, MIRConstantFloat, MIRBinLess, MIRConstantRegex, MIRConstantEmpty, MIRConstantStringOf, MIRConstantDecmial, MIRConstantBigNat, MIRConstantRational, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, MIRConstantNat, MIRConstantComplex, MIRGlobalKey } from "./mir_ops";
 import { OOPTypeDecl, StaticFunctionDecl, MemberMethodDecl, InvokeDecl, Assembly, NamespaceFunctionDecl, NamespaceConstDecl, StaticMemberDecl, ConceptTypeDecl, EntityTypeDecl, BuildLevel, NamespaceOperatorDecl, StaticOperatorDecl } from "../ast/assembly";
 import { ResolvedType, ResolvedEntityAtomType, ResolvedConceptAtomType, ResolvedTupleAtomType, ResolvedRecordAtomType, ResolvedFunctionType, ResolvedConceptAtomTypeEntry, ResolvedEphemeralListType } from "../ast/resolved_type";
 import { PackageConfig, MIRAssembly, MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType } from "./mir_assembly";
@@ -205,12 +205,17 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
     }
 
-    emitArgVarStoreWithGuard(sinfo: SourceInfo, maskname: string, maskidx: number, src: MIRArgument, name: string, vtype: MIRType) {
+    emitStoreWithGuard(sinfo: SourceInfo, maskname: string, maskidx: number, src: MIRArgument, trgt: MIRVariableArgument, vtype: MIRType) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRArgumentVarStore(sinfo, src, new MIRVariable(name)));
+        if(trgt instanceof MIRParameterVariable) {
+            this.m_currentBlock.push(new MIRParmaterVarStore(sinfo, src, trgt, vtype.trkey));
+        }
+        else {
+            this.m_currentBlock.push(new MIRLocalVarStore(sinfo, src, trgt, vtype.trkey));
+        }
     }
 
     emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument) {
@@ -457,7 +462,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, arg, resultType, argInferType, idx, trgt));
     }
 
-    emitInvokeFixedFunctionWithGuard(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], maskname: string, maskidx: number, rretinfo: MIRType, trgt: MIRParameterVariable) {
+    emitInvokeFixedFunctionWithGuard(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], maskname: string, maskidx: number, rretinfo: MIRType, trgt: MIRVariableArgument) {
         if(!this.emitEnabled) {
             return;
         }
@@ -772,6 +777,14 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
     }
 
+    emitReturnAssignOfCons(sinfo: SourceInfo, oftype: MIRType, args: MIRArgument[]) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        xxxx;
+    }
+
     processEnterYield() {
         if(!this.emitEnabled) {
             return;
@@ -969,7 +982,7 @@ class MIREmitter {
         }
     }
 
-    registerPendingGlobalProcessing(decl: NamespaceConstDecl): MIRConstantKey {
+    registerPendingGlobalProcessing(decl: NamespaceConstDecl): MIRGlobalKey {
         const key = MIRKeyGenerator.generateFunctionKey(`global@${decl.ns}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingGlobalProcessing.findIndex((gp) => gp[0] === key) !== -1) {
             return key;
@@ -979,7 +992,7 @@ class MIREmitter {
         return key;
     }
 
-    registerPendingConstProcessing(mircontaining: MIRType, containingType: OOPTypeDecl, decl: StaticMemberDecl, binds: Map<string, ResolvedType>): MIRConstantKey {
+    registerPendingConstProcessing(mircontaining: MIRType, containingType: OOPTypeDecl, decl: StaticMemberDecl, binds: Map<string, ResolvedType>): MIRGlobalKey {
         const key = MIRKeyGenerator.generateFunctionKey(`static@${mircontaining.trkey}`, decl.name, new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
             return key;
@@ -989,7 +1002,7 @@ class MIREmitter {
         return key;
     }
 
-    registerConstExpr(srcFile: string, exp: ConstantExpressionValue, binds: Map<string, ResolvedType>, etype: ResolvedType): MIRConstantKey {
+    registerConstExpr(srcFile: string, exp: ConstantExpressionValue, binds: Map<string, ResolvedType>, etype: ResolvedType): MIRGlobalKey {
         const key = MIRKeyGenerator.generateFunctionKey(`cexpr@${srcFile}#${exp.exp.sinfo.pos}`, "expr", new Map<string, ResolvedType>(), []);
         if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
             return key;

@@ -9,7 +9,7 @@ import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathS
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, FunctionTypeSignature, TupleTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRVariableArgument, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRBody, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRVariableArgument, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
@@ -69,6 +69,45 @@ function createTerminalEqCheck(srctype: ResolvedType, exp: ConstantExpressionVal
 
 function createOfTypeCheck(srctype: ResolvedType, oftype: ResolvedType, isoptional: boolean): StructuredAssignmentCheck {
     return { action: "typechk", srctype: srctype, oftype: oftype, isoptional: isoptional, eqvalue: undefined };
+}
+
+abstract class InitializerEvaluationAction {
+    readonly deps: string[];
+
+    constructor(deps: string[]) {
+        this.deps = deps;
+    }
+}
+
+class InitializerEvaluationLiteralExpression extends InitializerEvaluationAction {
+    readonly constexp: Expression;
+
+    constructor(constexp: Expression) {
+        super([]);
+        this.constexp = constexp;
+    }
+}
+
+class InitializerEvaluationConstantLoad extends InitializerEvaluationAction {
+    readonly gkey: MIRGlobalKey;
+
+    constructor(gkey: MIRGlobalKey) {
+        super([]);
+
+        this.gkey = gkey;
+    }
+}
+
+class InitializerEvaluationCallAction extends InitializerEvaluationAction {
+    readonly ikey: MIRInvokeKey;
+    readonly args: MIRArgument[];
+
+    constructor(ikey: MIRInvokeKey, args: MIRArgument[]) {
+        super(args.map((arg) => arg.nameID));
+
+        this.ikey = ikey;
+        this.args = args;
+    }
 }
 
 class TypeChecker {
@@ -1244,7 +1283,7 @@ class TypeChecker {
     }
 
     private checkArgumentsEvaluationEntity(sinfo: SourceInfo, env: TypeEnvironment, oftype: ResolvedEntityAtomType, args: Arguments): ExpandedArgument[] {
-        const rrfinfo = this.m_assembly.getAllOOFields(oftype.object, oftype.binds);
+        const rrfinfo = this.m_assembly.getAllOOFieldsConstructors(oftype.object, oftype.binds);
         const fieldinfo = [...rrfinfo.req, ...rrfinfo.opt];
         let eargs: ExpandedArgument[] = [];
 
@@ -1314,7 +1353,7 @@ class TypeChecker {
     }
 
     private checkArgumentsEntityConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, args: ExpandedArgument[], trgt: MIRTempRegister): ResolvedType {
-        const fieldInfo = this.m_assembly.getAllOOFields(oftype.object, oftype.binds);
+        const fieldInfo = this.m_assembly.getAllOOFieldsConstructors(oftype.object, oftype.binds);
         const flatfinfo = [...fieldInfo.req, ...fieldInfo.opt].map((ff) => ff[1]);
         const fields = flatfinfo.map((ff) => ff[0].name);
 
@@ -2348,7 +2387,7 @@ class TypeChecker {
         }
         else {
             const gkey = this.m_emitter.registerPendingGlobalProcessing(cdecl);
-            this.m_emitter.emitInvokeFixedFunction(exp.sinfo, gkey, [], undefined, this.m_emitter.registerResolvedTypeReference(rtype), trgt);
+            this.m_emitter.emitTempRegisterAssign(exp.sinfo, new MIRGlobalVariable(gkey), trgt);
         }
 
         return env.setUniformResultExpression(rtype);
@@ -2374,7 +2413,7 @@ class TypeChecker {
         else {
             const rctype = this.resolveOOTypeFromDecls(cdecl.contiainingType, cdecl.binds);
             const skey = this.m_emitter.registerPendingConstProcessing(this.m_emitter.registerResolvedTypeReference(rctype), cdecl.contiainingType, cdecl.decl, cdecl.binds);
-            this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [], undefined, this.m_emitter.registerResolvedTypeReference(rtype), trgt);
+            this.m_emitter.emitTempRegisterAssign(exp.sinfo, new MIRGlobalVariable(skey), trgt);
         }
         
         return env.setUniformResultExpression(rtype);
@@ -5003,15 +5042,13 @@ class TypeChecker {
             const ptype = ntype.options[0];
             let fields = new Set<string>();
             if (ptype instanceof ResolvedEntityAtomType) {
-                const fmap = this.m_assembly.getAllOOFields(ptype.object, ptype.binds);
-                fmap.req.forEach((v, k) => fields.add(k));
-                fmap.opt.forEach((v, k) => fields.add(k));
+                const fmap = this.m_assembly.getAllOOFieldsLayout(ptype.object, ptype.binds);
+                fmap.forEach((v, k) => fields.add(k));
             }
             else {
                 (ptype as ResolvedConceptAtomType).conceptTypes.forEach((concept) => {
-                    const fmap = this.m_assembly.getAllOOFields(concept.concept, concept.binds);
-                    fmap.req.forEach((v, k) => fields.add(k));
-                    fmap.opt.forEach((v, k) => fields.add(k));
+                    const fmap = this.m_assembly.getAllOOFieldsLayout(concept.concept, concept.binds);
+                    fmap.forEach((v, k) => fields.add(k));
                 });
             }
             this.raiseErrorIf(sinfo, fields.size !== assign.assigns.length, "Mismatch in field counts and assignment");
@@ -5931,7 +5968,7 @@ class TypeChecker {
         return this.m_emitter.getBody(srcFile, body.sinfo, args);
     }
 
-    private checkBodyStatement(srcFile: string, env: TypeEnvironment, body: BlockStatement, optparaminfofast: { pname: string, ptype: ResolvedType, maskidx: number, inlineexp: Expression }[], optparaminfo: { pname: string, ptype: ResolvedType, maskidx: number, ikey: MIRInvokeKey, pargs: MIRParameterVariable[] }[], outparaminfo: { pname: string, defonentry: boolean, ptype: ResolvedType }[], args: Map<string, MIRType>, preject: [MIRInvokeKey, MIRArgument[]] | undefined, postject: [MIRInvokeKey, MIRArgument[]] | undefined): MIRBody | undefined {
+    private checkBodyStatement(srcFile: string, env: TypeEnvironment, body: BlockStatement, optparaminfo: { pname: string, ptype: ResolvedType, maskidx: number, initaction: InitializerEvaluationAction }[], outparaminfo: { pname: string, defonentry: boolean, ptype: ResolvedType }[], args: Map<string, MIRType>, preject: [MIRInvokeKey, MIRArgument[]] | undefined, postject: [MIRInvokeKey, MIRArgument[]] | undefined): MIRBody | undefined {
         this.m_emitter.initializeBodyEmitter();
 
         for (let i = 0; i < outparaminfo.length; ++i) {
@@ -5939,20 +5976,28 @@ class TypeChecker {
             this.m_emitter.emitLoadUninitVariableValue(body.sinfo, this.m_emitter.registerResolvedTypeReference(opi.ptype), new MIRLocalVariable(opi.pname));
         }
 
-        for (let i = 0; i < optparaminfofast.length; ++i) {
-            const opi = optparaminfofast[i];
-
-            const ttreg = this.m_emitter.generateTmpRegister();
-            const evtype = this.checkExpression(env, opi.inlineexp, ttreg, opi.ptype).getExpressionResult().valtype;
-            this.m_emitter.emitArgVarStoreWithGuard(body.sinfo, "#maskparam#", opi.maskidx, this.emitInlineConvertIfNeeded(body.sinfo, ttreg, evtype, opi.ptype), opi.pname, this.m_emitter.registerResolvedTypeReference(opi.ptype));
-        }
-
         let opidone: Set<string> = new Set<string>();
         for (let i = 0; i < optparaminfo.length; ++i) {
-            const opidx = optparaminfo.findIndex((opp) => opp.pargs.every((pa) => opidone.has(pa.lname)));
+            const opidx = optparaminfo.findIndex((opp) => !opidone.has(opp.pname) && opp.initaction.deps.every((dep) => opidone.has(dep)));
             const opi = optparaminfo[opidx];
 
-            this.m_emitter.emitInvokeFixedFunctionWithGuard(body.sinfo, opi.ikey, opi.pargs, "#maskparam#", opi.maskidx, this.m_emitter.registerResolvedTypeReference(opi.ptype), new MIRParameterVariable(opi.pname));
+            const iv = opi.initaction;
+            const oftype = opi.ptype;
+            const storevar = new MIRParameterVariable(opi.pname);
+            if(iv instanceof InitializerEvaluationLiteralExpression) {
+                const ttmp = this.m_emitter.generateTmpRegister();
+                const oftt = this.checkExpression(env, iv.constexp, ttmp, oftype).getExpressionResult().valtype;
+
+                this.m_emitter.emitStoreWithGuard(body.sinfo, "#maskparam#", opidx, this.emitInlineConvertIfNeeded(iv.constexp.sinfo, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype));
+            }
+            else if (iv instanceof InitializerEvaluationConstantLoad) {
+                this.m_emitter.emitStoreWithGuard(body.sinfo, "#maskparam#", opidx, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype));
+            }
+            else {
+                const civ = iv as InitializerEvaluationCallAction;
+                this.m_emitter.emitInvokeFixedFunctionWithGuard(body.sinfo, civ.ikey, civ.args, "maskparam", opidx, this.m_emitter.registerResolvedTypeReference(oftype), storevar);
+            }
+
             opidone.add(opi.pname);
         }
 
@@ -6077,7 +6122,7 @@ class TypeChecker {
         return cci;
     }
 
-    private processExpressionForFieldInitializer(ikey: MIRInvokeKey, containingType: OOPTypeDecl, decl: MemberFieldDecl, binds: Map<string, ResolvedType>, allfieldstypes: Map<string, ResolvedType>): MIRGlobalKey | {op: MIRInvokeKey, args: MIRRegisterArgument[]} {
+    private processExpressionForFieldInitializer(ikey: MIRInvokeKey, containingType: OOPTypeDecl, decl: MemberFieldDecl, binds: Map<string, ResolvedType>, allfieldstypes: Map<string, ResolvedType>): InitializerEvaluationAction {
         try {
             const ddecltype = this.resolveAndEnsureTypeOnly(decl.sourceLocation, decl.declaredType, binds);
             const enclosingType = MIRKeyGenerator.generateTypeKey(this.resolveOOTypeFromDecls(containingType, binds));
@@ -6085,66 +6130,87 @@ class TypeChecker {
 
             const cexp = decl.value as ConstantExpressionValue;
             if (cexp.captured.size === 0) {
-                const gkey = "$global_" + ikey;
-                const idecl = this.processInvokeInfo_ExpressionIsolated(decl.srcFile, cexp.exp, iname, ikey, decl.sourceLocation, ["static_initializer", "private"], ddecltype, binds);
-                this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                const lexp = this.m_assembly.compileTimeReduceConstantExpression(cexp.exp, binds, ddecltype);
+                if(lexp !== undefined) {
+                    return new InitializerEvaluationLiteralExpression(lexp);
+                }
+                else {
+                    const gkey = "$global_" + ikey;
+                    if (!this.m_emitter.masm.constantDecls.has(gkey)) {
+                        const idecl = this.processInvokeInfo_ExpressionIsolated(decl.srcFile, cexp.exp, iname, ikey, decl.sourceLocation, ["static_initializer", "private"], ddecltype, binds);
+                        this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-                const pragmas = this.processPragmas(decl.sourceLocation, decl.pragmas);
-                const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
-                const mirglobal = new MIRConstantDecl(enclosingType, iname, ikey, pragmas, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
+                        const pragmas = this.processPragmas(decl.sourceLocation, decl.pragmas);
+                        const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
+                        const mirglobal = new MIRConstantDecl(enclosingType, iname, ikey, pragmas, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
 
-                this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
-                return gkey;
+                        this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
+                    }
+
+                    return new InitializerEvaluationConstantLoad(gkey);
+                }
             }
             else {
-                const capturedtypes = this.getCapturedTypeInfoForFields(decl.sourceLocation, cexp.captured, allfieldstypes);
-                const fparams = [...cexp.captured].sort().map((cp) => new FunctionParameter(cp, capturedtypes.get(cp) as TypeSignature, false, undefined, undefined, undefined));
+                if (!this.m_emitter.masm.invokeDecls.has(ikey)) {
+                    const capturedtypes = this.getCapturedTypeInfoForFields(decl.sourceLocation, cexp.captured, allfieldstypes);
+                    const fparams = [...cexp.captured].sort().map((cp) => new FunctionParameter(cp, capturedtypes.get(cp) as TypeSignature, false, undefined, undefined, undefined));
 
-                const idecl = this.processInvokeInfo_ExpressionLimitedArgs(decl.srcFile, cexp.exp, iname, ikey, decl.sourceLocation, ["dynamic_initializer", "private", ...decl.attributes], fparams, ddecltype, binds);
-                this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                    const idecl = this.processInvokeInfo_ExpressionLimitedArgs(decl.srcFile, cexp.exp, iname, ikey, decl.sourceLocation, ["dynamic_initializer", "private", ...decl.attributes], fparams, ddecltype, binds);
+                    this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                }
 
-                return { op: ikey, args: [...cexp.captured].sort().map((cp) => new MIRParameterVariable(cp)) };
+                return new InitializerEvaluationCallAction(ikey, [...cexp.captured].sort().map((cp) => new MIRParameterVariable(cp)));
             }
         }
         catch (ex) {
             this.m_emitter.setEmitEnabled(false);
             this.abortIfTooManyErrors();
 
-            return { op: ikey, args: [] };
+            return new InitializerEvaluationCallAction(ikey, []);
         }
     }
 
-    private processExpressionForOptParamDefault(srcFile: string, ikey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, invoke: InvokeDecl, pcodes: Map<string, { pcode: PCode, captured: string[] }>, pargs: [string, ResolvedType][]): MIRGlobalKey | undefined {
+    private processExpressionForOptParamDefault(srcFile: string, ikey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, invoke: InvokeDecl, pcodes: Map<string, { pcode: PCode, captured: string[] }>, pargs: [string, ResolvedType][]): InitializerEvaluationAction {
         try {
             const iname = `$initparam::${ikey}::${pname}`;
-
             if (cexp.captured.size === 0) {
-                const gkey = "$global_" + ikey;
-                const idecl = this.processInvokeInfo_ExpressionIsolated(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["static_initializer", "private"], ptype, binds);
-                this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                const lexp = this.m_assembly.compileTimeReduceConstantExpression(cexp.exp, binds, ptype);
+                if (lexp !== undefined) {
+                    return new InitializerEvaluationLiteralExpression(lexp);
+                }
+                else {
+                    const gkey = "$global_" + ikey;
+                    if (!this.m_emitter.masm.constantDecls.has(gkey)) {
+                        const idecl = this.processInvokeInfo_ExpressionIsolated(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["static_initializer", "private"], ptype, binds);
+                        this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-                const dtype = this.m_emitter.registerResolvedTypeReference(ptype);
-                const mirglobal = new MIRConstantDecl(undefined, iname, ikey, [], cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
+                        const dtype = this.m_emitter.registerResolvedTypeReference(ptype);
+                        const mirglobal = new MIRConstantDecl(undefined, iname, ikey, [], cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
 
-                this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
-                return gkey;
+                        this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
+                    }
+
+                    return new InitializerEvaluationConstantLoad(gkey);
+                }
             }
             else {
-                const ppnames = [...cexp.captured].sort().filter((cp) => !pcodes.has(cp.slice(1)));
-                this.raiseErrorIf(cexp.exp.sinfo, ppnames.some((cp) => invoke.params.findIndex((ip) => ip.name === cp) === -1), "Unbound variable in initializer expression");
-                const fparams: FunctionParameter[] = ppnames.map((cp) => new FunctionParameter(cp, (invoke.params.find((ip) => ip.name === cp) as FunctionParameter).type, false, undefined, undefined, undefined));
-                
-                const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, pcodes, pargs);
-                this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                if (!this.m_emitter.masm.invokeDecls.has(ikey)) {
+                    const ppnames = [...cexp.captured].sort().filter((cp) => !pcodes.has(cp.slice(1)));
+                    this.raiseErrorIf(cexp.exp.sinfo, ppnames.some((cp) => invoke.params.findIndex((ip) => ip.name === cp) === -1), "Unbound variable in initializer expression");
+                    const fparams: FunctionParameter[] = ppnames.map((cp) => new FunctionParameter(cp, (invoke.params.find((ip) => ip.name === cp) as FunctionParameter).type, false, undefined, undefined, undefined));
 
-                return undefined;
+                    const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, pcodes, pargs);
+                    this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
+                }
+
+                return new InitializerEvaluationCallAction(ikey, [...cexp.captured].sort().map((cp) => new MIRParameterVariable(cp)));
             }
         }
         catch (ex) {
             this.m_emitter.setEmitEnabled(false);
             this.abortIfTooManyErrors();
 
-            return undefined;
+            return new InitializerEvaluationCallAction(ikey, []);
         }
     }
 
@@ -6173,11 +6239,12 @@ class TypeChecker {
         }
     }
 
-    private generateConstructor(conskey: MIRInvokeKey, tdecl: EntityTypeDecl, binds: Map<string, ResolvedType>) {
-        const allfields = this.m_assembly.getAllOOFields(tdecl, binds);
+    private generateConstructor(env: TypeEnvironment, conskey: MIRInvokeKey, tdecl: EntityTypeDecl, binds: Map<string, ResolvedType>) {
+        const constype = this.resolveOOTypeFromDecls(tdecl, binds);
+
+        const allfields = this.m_assembly.getAllOOFieldsLayout(tdecl, binds);
         const allfieldstypes = new Map<string, ResolvedType>();
-        allfields.req.forEach((v, k) => allfieldstypes.set(k, this.resolveAndEnsureTypeOnly(tdecl.sourceLocation, v[1].declaredType, v[2])));
-        allfields.opt.forEach((v, k) => allfieldstypes.set(k, this.resolveAndEnsureTypeOnly(tdecl.sourceLocation, v[1].declaredType, v[2])));
+        allfields.forEach((v, k) => allfieldstypes.set(k, this.resolveAndEnsureTypeOnly(tdecl.sourceLocation, v[1].declaredType, v[2])));
 
         const invs = ([] as [ConstantExpressionValue, OOPTypeDecl, Map<string, ResolvedType>][]).concat(...
             this.m_assembly.getAllInvariantProvidingTypes(tdecl, binds).map((ipt) => 
@@ -6187,29 +6254,41 @@ class TypeChecker {
         );
 
         const clauses = this.processGenerateSpecialInvariantDirectFunction(conskey, invs, allfieldstypes);
+        const optfields = [...allfields].filter((ff) => ff[1][1].value !== undefined).map((af) => af[1]);
 
-        const reqfields = [...allfields.req].map((af) => af[1]);
-        const optfields = [...allfields.opt].map((af) => af[1]);
-        const mirparams = [...reqfields, ...optfields].map((ff) => new MIRFunctionParameter(`$${ff[1].name}`, this.m_emitter.registerResolvedTypeReference(this.m_assembly.normalizeTypeOnly(ff[1].declaredType, ff[2])).trkey));
+        const fieldparams = this.m_assembly.getAllOOFieldsConstructors(tdecl, binds);
 
         const optinits = optfields.map((opf) => {
             const ikey = MIRKeyGenerator.generateMethodKey("$initfield_func", this.resolveOOTypeFromDecls(opf[0], opf[2]), opf[2], []);
-            const gkey = "$global_" + ikey;
-
-            if (this.m_emitter.masm.constantDecls.has(gkey)) {
-                return gkey;
-            }
-            else if (this.m_emitter.masm.invokeDecls.has(ikey)) {
-                return { op: ikey, args: [...(opf[1].value as ConstantExpressionValue).captured].sort().map((cn) => new MIRParameterVariable(cn)) };
-            }
-            else {
-                return this.processExpressionForFieldInitializer(ikey, opf[0], opf[1], opf[2], allfieldstypes);
-            }
+            return this.processExpressionForFieldInitializer(ikey, opf[0], opf[1], opf[2], allfieldstypes);
         });
 
         this.m_emitter.initializeBodyEmitter();
 
-        xxxx; //do all optional guarded initialization
+        let opidone: Set<string> = new Set<string>();
+        for(let i = 0; i < optfields.length; ++i) {
+            const opidx = optfields.findIndex((vv, idx) => !opidone.has(`$${vv[1].name}`) && optinits[idx].deps.every((dep) => opidone.has(dep)));
+            const ofi = optfields[opidx];
+            const iv = optinits[opidx];
+
+            const oftype = this.resolveAndEnsureTypeOnly(ofi[1].sourceLocation, ofi[1].declaredType, ofi[2]);
+            const storevar = (fieldparams.req.has(ofi[1].name) || fieldparams.opt.has(ofi[1].name)) ? new MIRLocalVariable(`$${ofi[1].name}`) : new MIRParameterVariable(`$${ofi[1].name}`);
+            if(iv instanceof InitializerEvaluationLiteralExpression) {
+                const ttmp = this.m_emitter.generateTmpRegister();
+                const oftt = this.checkExpression(env, iv.constexp, ttmp, oftype).getExpressionResult().valtype;
+
+                this.m_emitter.emitStoreWithGuard(ofi[1].sourceLocation, "#maskparam#", opidx, this.emitInlineConvertIfNeeded(ofi[1].sourceLocation, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype));
+            }
+            else if (iv instanceof InitializerEvaluationConstantLoad) {
+                this.m_emitter.emitStoreWithGuard(ofi[1].sourceLocation, "#maskparam#", opidx, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype));
+            }
+            else {
+                const civ = iv as InitializerEvaluationCallAction;
+                this.m_emitter.emitInvokeFixedFunctionWithGuard(ofi[1].sourceLocation, civ.ikey, civ.args, "maskparam", opidx, this.m_emitter.registerResolvedTypeReference(oftype), storevar);
+            }
+
+            opidone.add(`$${ofi[1].name}`);
+        }
 
         for (let i = 0; i < clauses.length; ++i) {
             const ttarg = this.m_emitter.generateTmpRegister();
@@ -6217,30 +6296,37 @@ class TypeChecker {
             this.m_emitter.emitAssertCheck(clauses[i].sinfo, `Failed invariant on line ${clauses[i].srcFile}::${clauses[i].sinfo.line}`, ttarg);
         }
 
-        this.m_emitter.emitReturnAssign(body.sinfo, this.emitInlineConvertIfNeeded(body.sinfo, etreg, evalue.getExpressionResult().valtype, env.inferResult || evalue.getExpressionResult().valtype.flowtype), this.m_emitter.registerResolvedTypeReference(evalue.getExpressionResult().valtype.flowtype));
-        this.m_emitter.emitDirectJump(body.sinfo, "returnassign");
-    
-            this.m_emitter.setActiveBlock("returnassign");
-    
-            const rrinfo = this.generateRefInfoForReturnEmit(evalue.getExpressionResult().valtype.flowtype, []);
-            this.emitPrologForReturn(body.sinfo, [], rrinfo, false);
-            this.m_emitter.emitDirectJump(body.sinfo, "exit");
-    
-            return this.m_emitter.getBody(srcFile, body.sinfo, args);
-            
+        let consargs: MIRArgument[] = [];
+        allfields.forEach((v) => {
+            consargs.push((fieldparams.req.has(v[1].name) || fieldparams.opt.has(v[1].name)) ? new MIRParameterVariable(`$${v[1].name}`) : new MIRLocalVariable(`$${v[1].name}`));
+        });
 
-        const ibody = new MIRInvokeBodyDecl(mirthistype.trkey, "[SPECIAL]", iname, ikey, [], false, [], sinfo, srcFile, mirparams, mirbooltype.trkey, undefined, undefined, mirbody as MIRBody);
+        this.m_emitter.emitReturnAssignOfCons(tdecl.sourceLocation, this.m_emitter.registerResolvedTypeReference(constype), consargs);
+        this.m_emitter.emitDirectJump(tdecl.sourceLocation, "returnassign");
 
-        this.m_emitter.masm.invokeDecls.set(ikey, ibody);
+        this.m_emitter.setActiveBlock("returnassign");
 
-        xxxx;
+        const rrinfo = this.generateRefInfoForReturnEmit(constype, []);
+        this.emitPrologForReturn(tdecl.sourceLocation, [], rrinfo, false);
+        this.m_emitter.emitDirectJump(tdecl.sourceLocation, "exit");
+
+        let args = new Map<string, MIRType>();
+        let params: MIRFunctionParameter[] = [];
+        [...fieldparams.req, ...fieldparams.opt].forEach((fpi) => {
+            const ftype =  this.m_emitter.registerResolvedTypeReference(this.resolveAndEnsureTypeOnly(fpi[1][1].sourceLocation, fpi[1][1].declaredType, fpi[1][2]));
+
+            args.set(`$${fpi[0]}`, ftype);
+            params.push(new MIRFunctionParameter(`$${fpi[0]}`, ftype.trkey));
+        });
+
+        const consbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
+        if (consbody !== undefined) {
+            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype), "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, [], tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype), undefined, undefined, consbody);
+            this.m_emitter.masm.invokeDecls.set(conskey, consinv);
+        }
     }
 
     private processGenerateSpecialPreFunction_FailFast(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], declbinds: Map<string, ResolvedType>, exps: PreConditionDecl[], bodybinds: Map<string, ResolvedType>, srcFile: string, sinfo: SourceInfo) {
-        if(this.m_emitter.masm.invokeDecls.has(fkey)) {
-            return;
-        }
-
         try {
             let bexp = exps[0].exp;
             for(let i = 1; i < exps.length; ++i) {
@@ -6291,10 +6377,6 @@ class TypeChecker {
     }
 
     private processGenerateSpecialPostFunction(fkey: MIRInvokeKey, iname: string, args: FunctionParameter[], resultType: ResolvedType, declbinds: Map<string, ResolvedType>, exps: PostConditionDecl[], bodybinds: Map<string, ResolvedType>, srcFile: string, sinfo: SourceInfo) {
-        if(this.m_emitter.masm.invokeDecls.has(fkey)) {
-            return;
-        }
-
         try {
             let bexp = exps[0].exp;
             for(let i = 1; i < exps.length; ++i) {
@@ -6835,18 +6917,6 @@ class TypeChecker {
         this.m_assembly.getAllValidators().forEach((vre) => {
             const vkey = MIRKeyGenerator.generateTypeKey(vre[0].object, vre[0].binds);
             this.m_emitter.masm.validatorRegexs.set(vkey, vre[1]);
-        });
-    }
-
-    runFinalExhaustiveChecks() {
-        this.m_exhaustiveChecks.forEach((ec) => {
-            try {
-                //TODO: we need to do this!!!!
-            }
-            catch (ex) {
-                this.m_emitEnabled = false;
-                this.abortIfTooManyErrors();
-            }
         });
     }
 }
