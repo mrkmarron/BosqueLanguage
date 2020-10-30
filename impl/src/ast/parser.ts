@@ -2849,10 +2849,10 @@ class Parser {
             this.ensureAndConsumeToken("{");
             while (this.testToken("type") || this.testToken("case") || (this.testToken(TokenStrings.Identifier) && this.peekTokenData() === "_")) {
                 if (this.testToken("type")) {
-                    entries.push(this.parseMatchEntry<Expression>(this.getCurrentSrcInfo(), "type", () => this.parseExpression()));
+                    entries.push(this.parseMatchEntry<Expression>(this.getCurrentSrcInfo(), true, "type", () => this.parseExpression()));
                 }
                 else {
-                    entries.push(this.parseMatchEntry<Expression>(this.getCurrentSrcInfo(), "case", () => this.parseExpression()));
+                    entries.push(this.parseMatchEntry<Expression>(this.getCurrentSrcInfo(), true, "case", () => this.parseExpression()));
                 }
             }
             this.ensureAndConsumeToken("}");
@@ -3416,7 +3416,7 @@ class Parser {
         }
     }
 
-    private parseMatchEntry<T>(sinfo: SourceInfo, matchtype: "type" | "case", actionp: () => T): MatchEntry<T> {
+    private parseMatchEntry<T>(sinfo: SourceInfo, expsemi: boolean, matchtype: "type" | "case", actionp: () => T): MatchEntry<T> {
         if(!this.testToken(TokenStrings.Identifier)) {
             this.consumeToken();
         }
@@ -3424,6 +3424,9 @@ class Parser {
         const guard = this.parseMatchGuard(sinfo, matchtype);
         this.ensureAndConsumeToken("=>");
         const action = actionp();
+        if(expsemi) {
+            this.ensureAndConsumeToken(";");
+        }
 
         return new MatchEntry<T>(guard, action);
     }
@@ -3445,10 +3448,10 @@ class Parser {
             this.ensureAndConsumeToken("{");
             while (this.testToken("type") || this.testToken("case") || (this.testToken(TokenStrings.Identifier) && this.peekTokenData() === "_")) {
                 if (this.testToken("type")) {
-                    entries.push(this.parseMatchEntry<BlockStatement>(this.getCurrentSrcInfo(), "type", () => this.parseBlockStatement()));
+                    entries.push(this.parseMatchEntry<BlockStatement>(this.getCurrentSrcInfo(), false, "type", () => this.parseBlockStatement()));
                 }
                 else {
-                    entries.push(this.parseMatchEntry<BlockStatement>(this.getCurrentSrcInfo(), "case", () => this.parseBlockStatement()));
+                    entries.push(this.parseMatchEntry<BlockStatement>(this.getCurrentSrcInfo(), false, "case", () => this.parseBlockStatement()));
                 }
             }
             this.ensureAndConsumeToken("}");
