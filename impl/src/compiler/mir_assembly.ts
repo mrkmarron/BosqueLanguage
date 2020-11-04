@@ -114,10 +114,10 @@ abstract class MIRInvokeDecl {
     readonly params: MIRFunctionParameter[];
     readonly resultType: MIRResolvedTypeKey;
 
-    readonly preconditions: MIRInvokeKey | undefined;
-    readonly postconditions: MIRInvokeKey | undefined;
+    readonly preconditions: MIRInvokeKey[] | undefined;
+    readonly postconditions: MIRInvokeKey[] | undefined;
 
-    constructor(enclosingDecl: MIRNominalTypeKey | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRInvokeKey | undefined, postconds: MIRInvokeKey | undefined) {
+    constructor(enclosingDecl: MIRNominalTypeKey | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRInvokeKey[] | undefined, postconds: MIRInvokeKey[] | undefined) {
         this.enclosingDecl = enclosingDecl;
         this.name = name;
         this.iname = iname;
@@ -159,7 +159,7 @@ abstract class MIRInvokeDecl {
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
     readonly body: MIRBody;
 
-    constructor(enclosingDecl: MIRType | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRType, preconds: MIRInvokeKey | undefined, postconds: MIRInvokeKey | undefined, body: MIRBody) {
+    constructor(enclosingDecl: MIRType | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, pragmas: [MIRType, string][], sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRType, preconds: MIRInvokeKey[] | undefined, postconds: MIRInvokeKey[] | undefined, body: MIRBody) {
         super(enclosingDecl, name, iname, key, attributes, recursive, pragmas, sinfo, srcFile, params, resultType, preconds, postconds);
 
         this.body = body;
@@ -238,7 +238,7 @@ class MIRFieldDecl {
 
 abstract class MIROOTypeDecl {
     readonly ooname: string;
-    readonly tkey: MIRNominalTypeKey;
+    readonly tkey: MIRResolvedTypeKey;
 
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
@@ -249,13 +249,9 @@ abstract class MIROOTypeDecl {
     readonly ns: string;
     readonly name: string;
     readonly terms: Map<string, MIRType>;
-    readonly provides: MIRNominalTypeKey[];
+    readonly provides: MIRResolvedTypeKey[];
 
-    readonly invariants: MIRInvokeKey[] = [];
-    readonly fields: MIRFieldDecl[] = [];
-    readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
-
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRNominalTypeKey[], invariants: MIRInvokeKey[], fields: MIRFieldDecl[]) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[]) {
         this.ooname = ooname;
         this.tkey = tkey;
 
@@ -269,9 +265,6 @@ abstract class MIROOTypeDecl {
         this.name = name;
         this.terms = terms;
         this.provides = provides;
-
-        this.invariants = invariants;
-        this.fields = fields;
     }
 
     abstract jemit(): object;
@@ -294,8 +287,8 @@ abstract class MIROOTypeDecl {
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRNominalTypeKey[], invariants: MIRInvokeKey[], fields: MIRFieldDecl[]) {
-        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides, invariants, fields);
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[]) {
+        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides);
     }
 
     jemit(): object {
@@ -304,8 +297,19 @@ class MIRConceptTypeDecl extends MIROOTypeDecl {
 }
 
 class MIREntityTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRNominalTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRNominalTypeKey[], invariants: MIRInvokeKey[], fields: MIRFieldDecl[]) {
-        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides, invariants, fields);
+    readonly consfunc: MIRInvokeKey;
+    readonly invfunc: MIRInvokeKey | undefined;
+
+    readonly fields: MIRFieldDecl[] = [];
+    readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
+
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, invfunc: MIRInvokeKey | undefined, fields: MIRFieldDecl[]) {
+        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides);
+
+        this.consfunc = consfunc;
+        this.invfunc = invfunc;
+
+        this.fields = fields;
     }
 
     jemit(): object {

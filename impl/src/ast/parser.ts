@@ -2195,7 +2195,7 @@ class Parser {
             const idx = this.parseTupleIndex();
             this.ensureAndConsumeToken(">");
             this.ensureAndConsumeToken("(");
-            this.ensureAndConsumeToken("out");
+            this.ensureAndConsumeToken("out?");
             this.ensureToken(TokenStrings.Identifier);
             const exp = this.consumeTokenAndGetValue();
             this.ensureAndConsumeToken(")");
@@ -2216,7 +2216,7 @@ class Parser {
             const pname = this.consumeTokenAndGetValue(); 
             this.ensureAndConsumeToken(">");
             this.ensureAndConsumeToken("(");
-            this.ensureAndConsumeToken("out");
+            this.ensureAndConsumeToken("out?");
             this.ensureToken(TokenStrings.Identifier);
             const exp = this.consumeTokenAndGetValue();
             this.ensureAndConsumeToken(")");
