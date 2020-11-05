@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRDeadFlow, MIRFieldKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRSliceEpehmeralList, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVirtualMethodKey } from "./mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREphemeralListExtend, MIRFieldKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
 import { Assembly, InvokeDecl } from "../ast/assembly";
 import { ResolvedFunctionType, ResolvedType } from "../ast/resolved_type";
 import { MIRAssembly, MIREphemeralListType, MIRType } from "./mir_assembly";
@@ -180,6 +180,38 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRDeadFlow(sinfo));
     }
 
+    emitAbort(sinfo: SourceInfo, info: string) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRAbort(sinfo, info));
+    }
+
+    emitAssertCheck(sinfo: SourceInfo, msg: string, src: MIRArgument) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRAssertCheck(sinfo, msg, src));
+    }
+
+    emitDebugBreak(sinfo: SourceInfo) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRDebug(sinfo, undefined));
+    }
+
+    emitDebugPrint(sinfo: SourceInfo, value: MIRArgument) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRDebug(sinfo, value));
+    }
+
     emitRegisterStore(sinfo: SourceInfo, src: MIRArgument, trgt: MIRRegisterArgument, vtype: MIRType, guard: MIRGuard | undefined) {
         if (!this.emitEnabled) {
             return;
@@ -196,6 +228,33 @@ class MIREmitter {
         }
     }
 
+    emitLoadUninitVariableValue(sinfo: SourceInfo, oftype: MIRType, trgt: MIRRegisterArgument) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        //This value will not be accessed from but can be passed/assigned atomically
+        //we need to have space for it etc. so just plop a "fresh" or zero-filled value there
+        this.m_currentBlock.push(new MIRLoadUnintVariableValue(sinfo, trgt, oftype.trkey));
+    }
+
+    emitGuardFlagLocation(sinfo: SourceInfo, name: string, count: number): string {
+        if(!this.emitEnabled || count === 0) {
+            return "[IGNORE]";
+        }
+
+        this.m_currentBlock.push(new MIRDeclareGuardFlagLocation(sinfo, name, count));
+        return name;
+    }
+
+    emitSetGuardFlagConstant(sinfo: SourceInfo, name: string, position: number, flag: boolean) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIRSetConstantGuardFlag(sinfo, name, position, flag));
+    }
+
     emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
         if(!this.emitEnabled) {
             return;
@@ -204,41 +263,7 @@ class MIREmitter {
         xxxx;
     }
 
-    emitLoadUninitVariableValue(sinfo: SourceInfo, oftype: MIRType, trgt: MIRRegisterArgument) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        //This value will not be accessed from but can be passed/assigned atomically
-        //we need to have space for it etc. so just plop a "fresh" or zero-filled value there
-        xxxx;
-    }
-
-    emitGuardFlagLocation(name: string, count: number): string {
-        if(!this.emitEnabled || count === 0) {
-            return "[IGNORE]";
-        }
-
-        xxxx;
-    }
-
-    emitSetGuardFlagConstant(hasflag: string, position: number, flag: boolean) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        xxxx;
-    }
-
     emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRRegisterArgument) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        xxxx;
-    }
-
-    emitAssertCheck(sinfo: SourceInfo, msg: string, src: MIRArgument) {
         if(!this.emitEnabled) {
             return;
         }
@@ -491,14 +516,18 @@ class MIREmitter {
         }
     }
 
-    emitInvokeVirtualOperator(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: { arglayouttype: MIRType, argflowtype: MIRType, arg: MIRArgument }[], retinfo: { declresult: MIRType, runtimeresult: MIRType, elrcount: number, refargs: [MIRVariableArgument, MIRType][] }, trgt: MIRTempRegister) {
+    emitInvokeVirtualOperator(sinfo: SourceInfo, vresolve: MIRVirtualMethodKey, args: { arglayouttype: MIRType, argflowtype: MIRType, arg: MIRArgument }[], retinfo: { declresult: MIRType, runtimeresult: MIRType, elrcount: number, refargs: [MIRRegisterArgument, MIRType][] }, trgt: MIRTempRegister) {
+        const eargs = args.map((arg) => {
+            return { arglayouttype: arg.arglayouttype.trkey, argflowtype: arg.argflowtype.trkey, arg: arg.arg };
+        });
+
         if (retinfo.refargs.length === 0) {
-            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[0].trkey, vresolve, args, thisInferType, trgt));
+            this.m_currentBlock.push(new MIRInvokeVirtualOperator(sinfo, retinfo.declresult.trkey, vresolve, eargs, trgt));
         }
         else {
             const rr = this.generateTmpRegister();
-            this.m_currentBlock.push(new MIRInvokeVirtualFunction(sinfo, retinfo[1].trkey, vresolve, args, thisInferType, rr));
-           
+            this.m_currentBlock.push(new MIRInvokeVirtualOperator(sinfo, retinfo.runtimeresult.trkey, vresolve, eargs, rr));
+
             if (retinfo.elrcount === -1) {
                 this.m_currentBlock.push(new MIRLoadFromEpehmeralList(sinfo, rr, retinfo.runtimeresult.trkey, 0, retinfo.declresult.trkey, trgt));
             }
@@ -508,22 +537,19 @@ class MIREmitter {
 
             const refbase = retinfo.elrcount != -1 ? retinfo.elrcount : 1;
             const argvs = retinfo.refargs.map((rinfo, idx) => {
-                return {pos: refbase + idx, into: rinfo[0], oftype: (retinfo.declresult.options[0] as MIREphemeralListType).entries[refbase + idx]};
+                return { pos: refbase + idx, into: rinfo[0], oftype: (retinfo.declresult.options[0] as MIREphemeralListType).entries[refbase + idx] };
             });
 
             this.emitMultiLoadFromEpehmeralList(sinfo, rr, retinfo.declresult, argvs);
         }
     }
 
-
-////////////////////////////////////
-
     emitConstructorTuple(sinfo: SourceInfo, resultTupleType: MIRType, args: MIRArgument[], trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRConstructorTuple(sinfo, resultTupleType, args, trgt));
+        this.m_currentBlock.push(new MIRConstructorTuple(sinfo, resultTupleType.trkey, args, trgt));
     }
 
     emitConstructorTupleFromEphemeralList(sinfo: SourceInfo, resultTupleType: MIRType, arg: MIRArgument, elisttype: MIRType, trgt: MIRTempRegister) {
@@ -531,15 +557,7 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
-    }
-
-    emitMIRPackExtend(sinfo: SourceInfo, basepack: MIRArgument, ext: MIRArgument[], sltype: MIRType, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRPackExtend(sinfo, basepack, ext, sltype, trgt));
+        this.m_currentBlock.push(new MIRConstructorTupleFromEphemeralList(sinfo, resultTupleType.trkey, arg, elisttype.trkey, trgt));
     }
 
     emitConstructorRecord(sinfo: SourceInfo, resultRecordType: MIRType, args: [string, MIRArgument][], trgt: MIRTempRegister) {
@@ -547,15 +565,37 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRConstructorRecord(sinfo, resultRecordType, args, trgt));
+        this.m_currentBlock.push(new MIRConstructorRecord(sinfo, resultRecordType.trkey, args, trgt));
     }
 
-    emitConstructorRecordFromEphemeralList(sinfo: SourceInfo, resultTupleType: MIRType, arg: MIRArgument, elisttype: MIRType, namelayout: string[], trgt: MIRTempRegister) {
+    emitConstructorRecordFromEphemeralList(sinfo: SourceInfo, resultRecordType: MIRType, arg: MIRArgument, elisttype: MIRType, namelayout: string[], trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRConstructorRecordFromEphemeralList(sinfo, resultRecordType.trkey, arg, elisttype.trkey, namelayout, trgt));
+    }
+
+    emitStructuredAppendTuple(sinfo: SourceInfo, resultTupleType: MIRType, args: MIRArgument[], ttypes: {layout: MIRType, flow: MIRType}[], trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        const etypes = ttypes.map((tt) => {
+            return { layout: tt.layout.trkey, flow: tt.flow.trkey };
+        });
+        this.m_currentBlock.push(new MIRStructuredAppendTuple(sinfo, resultTupleType.trkey, args, etypes, trgt));
+    } 
+
+    emitStructuredJoinRecord(sinfo: SourceInfo, resultRecordType: MIRType, args: MIRArgument[], ttypes: {layout: MIRType, flow: MIRType}[], trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        const etypes = ttypes.map((tt) => {
+            return { layout: tt.layout.trkey, flow: tt.flow.trkey };
+        });
+        this.m_currentBlock.push(new MIRStructuredJoinRecord(sinfo, resultRecordType.trkey, args, etypes, trgt));
     }
 
     emitConstructorValueList(sinfo: SourceInfo, resultEphemeralType: MIRType, args: MIRArgument[], trgt: MIRTempRegister) {
@@ -563,7 +603,15 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRConstructorEphemeralValueList(sinfo, resultEphemeralType, args, trgt));
+        this.m_currentBlock.push(new MIRConstructorEphemeralList(sinfo, resultEphemeralType.trkey, args, trgt));
+    }
+
+    emitMIRPackExtend(sinfo: SourceInfo, basepack: MIRArgument, basetype: MIRType, ext: MIRArgument[], sltype: MIRType, trgt: MIRTempRegister) {
+        if(!this.emitEnabled) {
+            return;
+        }
+
+        this.m_currentBlock.push(new MIREphemeralListExtend(sinfo, basepack, basetype.trkey, ext, sltype.trkey, trgt));
     }
 
     emitConstructorPrimaryCollectionEmpty(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
@@ -598,36 +646,20 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRConstructorPrimaryCollectionMixed(sinfo, tkey, args, trgt));
     }
 
-    emitBinKeyEq(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyEq(sinfo: SourceInfo, lhslayouttype: MIRType, lhsflowtype: MIRType, lhs: MIRArgument, rhslayouttype: MIRType, rhsflowtype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRBinKeyEq(sinfo, lhsType, lhs, rhsType, rhs, trgt, relaxed));
+        this.m_currentBlock.push(new MIRBinKeyEq(sinfo, lhslayouttype.trkey, lhsflowtype.trkey, lhs, rhslayouttype.trkey, rhsflowtype.trkey, rhs, trgt));
     }
 
-    emitBinKeyLess(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
+    emitBinKeyLess(sinfo: SourceInfo, lhslayouttype: MIRType, lhsflowtype: MIRType, lhs: MIRArgument, rhslayouttype: MIRType, rhsflowtype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRBinKeyLess(sinfo, lhsType, lhs, rhsType, rhs, trgt, relaxed));
-    }
-
-    emitStructuredAppendTuple(sinfo: SourceInfo, resultTupleType: MIRType, args: MIRArgument[], ttypes: MIRType[], trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRStructuredAppendTuple(sinfo, resultTupleType, arg, argInferType, update, updateInferType, trgt));
-    } 
-
-    emitStructuredJoinRecord(sinfo: SourceInfo, resultRecordType: MIRType, args: MIRArgument[], ttypes: MIRType[], trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRStructuredJoinRecord(sinfo, resultRecordType, arg, argInferType, update, updateInferType, trgt));
+        this.m_currentBlock.push(new MIRBinKeyLess(sinfo, lhslayouttype.trkey, lhsflowtype.trkey, lhs, rhslayouttype.trkey, rhsflowtype.trkey, rhs, trgt));
     }
 
     emitPrefixNotOp(sinfo: SourceInfo, arg: MIRArgument, trgt: MIRTempRegister) {
@@ -635,23 +667,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRPrefixNotOp(sinfo, op, arg, infertype, trgt));
-    }
-
-    emitBinOp(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, op: string, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRBinOp(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
-    }
-
-    emitBinCmp(sinfo: SourceInfo, lhstype: MIRType, lhs: MIRArgument, op: string, rhstype: MIRType, rhs: MIRArgument, trgt: MIRTempRegister) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRBinCmp(sinfo, lhsInferType, lhs, op, rhsInferType, rhs, trgt));
+        this.m_currentBlock.push(new MIRPrefixNotOp(sinfo, arg, trgt));
     }
 
     emitAllTrue(sinfo: SourceInfo, args: MIRArgument[], trgt: MIRTempRegister) {
@@ -659,51 +675,15 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRAllTrue(sinfo, args, trgt));
     }
-
-///////////////////////////////
     
     emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srclayouttype: MIRType, srcflowtype: MIRType, guard: MIRGuard | undefined) {
         if(!this.emitEnabled) {
             return;
         }
 
-        if (chktype === "NSCore::None") {
-            this.m_currentBlock.push(new MIRIsTypeOfNone(sinfo, src, trgt));
-        }
-        else if (chktype === "NSCore::Some") {
-            this.m_currentBlock.push(new MIRIsTypeOfSome(sinfo, src, trgt));
-        }
-        else {
-            this.m_currentBlock.push(new MIRIsTypeOf(sinfo, srcInferType, src, chktype, trgt));
-        }
-    }
-
-/////////////////////////////
-
-    emitAbort(sinfo: SourceInfo, info: string) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRAbort(sinfo, info));
-    }
-
-    emitDebugBreak(sinfo: SourceInfo) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRDebug(sinfo, undefined));
-    }
-
-    emitDebugPrint(sinfo: SourceInfo, value: MIRArgument) {
-        if(!this.emitEnabled) {
-            return;
-        }
-
-        this.m_currentBlock.push(new MIRDebug(sinfo, value));
+        this.m_currentBlock.push(new MIRIsTypeOf(sinfo, trgt, chktype.trkey, src, srclayouttype.trkey, srcflowtype.trkey, guard));
     }
 
     emitDirectJump(sinfo: SourceInfo, blck: string) {
@@ -735,7 +715,6 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
         this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
     }
 
@@ -744,7 +723,7 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRReturnAssignOfCons(sinfo, oftype.trkey, args));
     }
 
     processEnterYield() {
