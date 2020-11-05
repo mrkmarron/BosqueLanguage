@@ -8,7 +8,6 @@ import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
 import { BSQRegex } from "../ast/bsqregex";
 
 import assert = require("assert");
-import { MIRType } from "./mir_assembly";
 
 type MIRGlobalKey = string; //$global_IKEY
 type MIRFieldKey = string; //ns::name::field#binds
@@ -26,6 +25,66 @@ function jemitsinfo(sinfo: SourceInfo): object {
 
 function jparsesinfo(jobj: any): SourceInfo {
     return new SourceInfo(jobj.line, jobj.column, jobj.pos, jobj.span);
+}
+
+abstract class MIRGuard {
+    abstract stringify(): string;
+    abstract jemit(): object;
+
+    static jparse(gg: any) : MIRGuard {
+        if(gg.kind === "VarGuard") {
+            return MIRVarGuard.jparse(gg);
+        }
+        else {
+            return MIRMaskGuard.jparse(gg);
+        }
+    }
+}
+
+class MIRVarGuard extends MIRGuard {
+    greg: MIRTempRegister;
+
+    constructor(greg: MIRTempRegister) {
+        super();
+
+        this.greg = greg;
+    }
+
+    stringify(): string {
+        return this.greg.stringify();
+    }
+
+    jemit(): object {
+        return { kind: "VarGuard", greg: this.greg.jemit() };
+    }
+
+    jparse(gg: any): MIRVarGuard {
+        return new MIRVarGuard(MIRTempRegister.jparse(gg.greg));
+    }
+}
+
+class MIRMaskGuard extends MIRGuard {
+    readonly gmask: string;
+    readonly gindex: number;
+
+    constructor(gmask: string, gindex: number) {
+        super();
+
+        this.gmask = gmask;
+        this.gindex = gindex;
+    }
+
+    stringify(): string {
+        return `${this.gmask}[${this.gindex}]`;
+    }
+
+    jemit(): object {
+        return { kind: "MaskGuard", gmask: this.gmask, gindex: this.gindex };
+    }
+
+    jparse(gg: any): MIRMaskGuard {
+        return new MIRMaskGuard(gg.gmask, gg.gindex);
+    }
 }
 
 abstract class MIRArgument {
@@ -103,9 +162,16 @@ class MIRTempRegister extends MIRRegisterArgument {
     }
 }
 
-class MIRGlobalVariable extends MIRRegisterArgument {
+class MIRGlobalVariable extends MIRArgument {
+    readonly gkey: MIRGlobalKey;
     constructor(gkey: MIRGlobalKey) {
         super(gkey);
+
+        this.gkey = gkey;
+    }
+
+    stringify(): string {
+        return this.gkey;
     }
 
     jemit(): object {
@@ -117,21 +183,15 @@ class MIRGlobalVariable extends MIRRegisterArgument {
     }
 }
 
-abstract class MIRVariableArgument extends MIRRegisterArgument {
+class MIRParameterVariable extends MIRRegisterArgument {
     readonly lname: string;
 
-    constructor(name: string, forcename: string | undefined) {
+    constructor(name: string, forcename?: string) {
         super(forcename || name);
         this.lname = name;
     }
-}
 
-class MIRParameterVariable extends MIRVariableArgument {
-    constructor(name: string, forcename?: string) {
-        super(name, forcename);
-    }
-
-    jemit(): any {
+    jemit(): object {
         return { tag: "paramvar", lname: this.lname, nameID: this.nameID };
     }
 
@@ -140,12 +200,15 @@ class MIRParameterVariable extends MIRVariableArgument {
     }
 }
 
-class MIRLocalVariable extends MIRVariableArgument {
+class MIRLocalVariable extends MIRRegisterArgument {
+    readonly lname: string;
+
     constructor(name: string, forcename?: string) {
-        super(name, forcename);
+        super(forcename || name);
+        this.lname = name;
     }
 
-    jemit(): any {
+    jemit(): object {
         return { tag: "localvar", lname: this.lname, nameID: this.nameID };
     }
 
@@ -429,22 +492,25 @@ enum MIROpTag {
     MIRTupleHasIndex = "MIRTupleHasIndex",
     MIRRecordHasProperty = "MIRRecordHasProperty",
     MIRLoadTupleIndex = "MIRLoadTupleIndex",
-    MIRCheckedLoadTupleIndex = "MIRCheckedLoadTupleIndex",
-    MIRLoadTupleIndexTry = "MIRLoadTupleIndexTry",
+    MIRLoadTupleIndexSetGuard = "MIRLoadTupleIndexSetGuard",
     MIRLoadRecordProperty = "MIRLoadRecordProperty",
-    MIRCheckedLoadRecordProperty = "MIRCheckedLoadRecordProperty",
-    MIRLoadRecordPropertyTry = "MIRLoadRecordPropertyTry",
+    MIRLoadRecordPropertySetGuard = "MIRLoadRecordPropertySetGuard",
 
     MIRLoadField = "MIRLoadField",
 
     MIRLoadFromEpehmeralList = "MIRLoadFromEpehmeralList",
     MIRMultiLoadFromEpehmeralList = "MIRMultiLoadFromEpehmeralList",
+    MIRSliceEpehmeralList = "MIRSliceEpehmeralList",
+
+    MIRInvokeFixedFunction = "MIRInvokeFixedFunction",
+    MIRInvokeVirtualFunction = "MIRInvokeVirtualFunction",
+    MIRInvokeVirtualOperator = "MIRInvokeVirtualOperator",
+
+    MIRIsTypeOf = "MIRIsTypeOf",
 
     MIRTempRegisterAssign = "MIRTempRegisterAssign",
     MIRParameterVarStore = "MIRParameterVarStore",
-    MIRLocalVarStore = "MIRParameterVarStore",
-    MIRParameterVarStoreWithGuard = "MIRParameterVarStoreWithGuard",
-    MIRLocalVarStoreWithGuard = "MIRLocalVarStoreWithGuard"
+    MIRLocalVarStore = "MIRParameterVarStore"
 }
 
 function varsOnlyHelper(args: MIRArgument[]): MIRRegisterArgument[] {
@@ -588,6 +654,8 @@ abstract class MIROp {
     }
 }
 
+////////////////////////
+
 class MIRNop extends MIROp {
     constructor(sinfo: SourceInfo) {
         super(MIROpTag.MIRNop, sinfo);
@@ -611,110 +679,93 @@ class MIRNop extends MIROp {
 
 class MIRDeadFlow extends MIROp {
     constructor(sinfo: SourceInfo) {
-        super(MIROpTag.MIRDeadFlow, sinfo); 
-     }
- 
-     getUsedVars(): MIRRegisterArgument[] { return []; }
-     getModVars(): MIRRegisterArgument[] { return []; }
- 
-     stringify(): string {
-         return `dead-flow`;
-     }
- 
-     jemit(): object {
-         return { ...this.jbemit() };
-     }
- 
-     static jparse(jobj: any): MIROp {
-         return new MIRNop(jparsesinfo(jobj.sinfo));
-     }
- }
-
-abstract class MIRValueOp extends MIROp {
-    trgt: MIRTempRegister;
-
-    constructor(tag: MIROpTag, sinfo: SourceInfo, trgt: MIRTempRegister) {
-        super(tag, sinfo);
-        this.trgt = trgt;
+        super(MIROpTag.MIRDeadFlow, sinfo);
     }
 
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+    getUsedVars(): MIRRegisterArgument[] { return []; }
+    getModVars(): MIRRegisterArgument[] { return []; }
 
-    protected jbemit(): object {
-        return {...super.jbemit(), trgt: this.trgt.jemit() };
+    stringify(): string {
+        return `dead-flow`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRNop(jparsesinfo(jobj.sinfo));
     }
 }
 
-abstract class MIRFlowOp extends MIROp {
-    constructor(tag: MIROpTag, sinfo: SourceInfo) {
-        super(tag, sinfo);
-    }
-}
-
-abstract class MIRJumpOp extends MIROp {
-    constructor(tag: MIROpTag, sinfo: SourceInfo) {
-        super(tag, sinfo);
-    }
-}
-
-class MIRLoadConst extends MIRValueOp {
+class MIRLoadConst extends MIROp {
+    trgt: MIRRegisterArgument;
     readonly src: MIRConstantArgument;
 
-    constructor(sinfo: SourceInfo, src: MIRConstantArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadConst, sinfo, trgt);
+    constructor(sinfo: SourceInfo, src: MIRConstantArgument, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadConst, sinfo);
+
+        this.trgt = trgt;
         this.src = src;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return []; }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.src.stringify()}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), trgt: this.trgt };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRLoadConstDataString extends MIRValueOp {
+class MIRLoadConstDataString extends MIROp {
+    trgt: MIRRegisterArgument;
     readonly ivalue: string;
     readonly tskey: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, ivalue: string, tskey: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadConstDataString, sinfo, trgt);
+    constructor(sinfo: SourceInfo, ivalue: string, tskey: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadConstDataString, sinfo);
+
+        this.trgt = trgt;
         this.ivalue = ivalue;
         this.tskey = tskey;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return []; }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.tskey}${this.ivalue}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), ivalue: this.ivalue, tskey: this.tskey };
+        return { ...this.jbemit(), ivalue: this.ivalue, tskey: this.tskey, trgt: this.trgt };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConstDataString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tskey, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadConstDataString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tskey, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRTupleHasIndex extends MIRValueOp {
+class MIRTupleHasIndex extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly idx: number;
     readonly isvirtual: boolean;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRTupleHasIndex, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRTupleHasIndex, sinfo);
 
+        this.trgt = trgt;
         this.arg = arg;
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
@@ -723,30 +774,33 @@ class MIRTupleHasIndex extends MIRValueOp {
     }
     
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.hasIndex<${this.idx}>()`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRTupleHasIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRTupleHasIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRRecordHasProperty extends MIRValueOp {
+class MIRRecordHasProperty extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly pname: string;
     readonly isvirtual: boolean;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRRecordHasProperty, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRRecordHasProperty, sinfo);
 
+        this.trgt = trgt;
         this.arg = arg;
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
@@ -755,21 +809,23 @@ class MIRRecordHasProperty extends MIRValueOp {
     }
     
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.hasProperty<${this.pname}>()`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual };
+        return { ...this.jbemit(), trgt: this.trgt, arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRRecordHasProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRRecordHasProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRLoadTupleIndex extends MIRValueOp {
+class MIRLoadTupleIndex extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
@@ -777,9 +833,10 @@ class MIRLoadTupleIndex extends MIRValueOp {
     readonly isvirtual: boolean;
     readonly resulttype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadTupleIndex, sinfo, trgt);
-        
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadTupleIndex, sinfo);
+
+        this.trgt = trgt;
         this.arg = arg;
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
@@ -789,6 +846,7 @@ class MIRLoadTupleIndex extends MIRValueOp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.idx}`;
@@ -799,88 +857,51 @@ class MIRLoadTupleIndex extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadTupleIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadTupleIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRCheckedLoadTupleIndex extends MIRValueOp {
+class MIRLoadTupleIndexSetGuard extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly idx: number;
     readonly isvirtual: boolean; 
     readonly resulttype: MIRResolvedTypeKey;
-    readonly mask: string;
-    readonly position: number;
+    guard: MIRGuard;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister, mask: string, position: number) {
-        super(MIROpTag.MIRCheckedLoadTupleIndex, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument, guard: MIRGuard) {
+        super(MIROpTag.MIRLoadTupleIndexSetGuard, sinfo);
 
-        this.arg = arg;
-        this.arglayouttype = arglayouttype;
-        this.argflowtype = argflowtype;
-        this.idx = idx;
-        this.isvirtual = isvirtual;
-        this.resulttype = resulttype;
-        this.mask = mask;
-        this.position = position;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.idx} | ${this.mask}[${this.position}]`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual, resulttype: this.resulttype, mask: this.mask, position: this.position };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRCheckedLoadTupleIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt), jobj.mask, jobj.position);
-    }
-}
-
-class MIRLoadTupleIndexTry extends MIRFlowOp {
-    arg: MIRArgument;
-    readonly arglayouttype: MIRResolvedTypeKey;
-    readonly argflowtype: MIRResolvedTypeKey;
-    readonly idx: number;
-    readonly isvirtual: boolean;
-    readonly resulttype: MIRResolvedTypeKey;
-    trgt: MIRRegisterArgument;
-    hastrgt: MIRTempRegister;
-
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument, hastrgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadTupleIndexTry, sinfo);
-
-        this.arg = arg;
-        this.arglayouttype = arglayouttype;
-        this.argflowtype = argflowtype;
-        this.idx = idx;
-        this.isvirtual = isvirtual;
-        this.resulttype = resulttype;
         this.trgt = trgt;
-        this.hastrgt = hastrgt;
+        this.arg = arg;
+        this.arglayouttype = arglayouttype;
+        this.argflowtype = argflowtype;
+        this.idx = idx;
+        this.isvirtual = isvirtual;
+        this.resulttype = resulttype;
+        this.guard = guard;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt, this.hastrgt]; }
+    getModVars(): MIRRegisterArgument[] { return this.guard instanceof MIRVarGuard ? [this.trgt, this.guard.greg] : [this.trgt]; }
 
     stringify(): string {
-        return `${this.hastrgt.stringify()} = ${this.arg.stringify()}.getIndexTry<${this.idx}>(out? ${this.trgt.stringify()})`;
+        return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.idx} | ${this.guard.stringify()}]`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual, resulttype: this.resulttype, trgt: this.trgt.jemit(), hastrgt: this.hastrgt.jemit() };
+        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual, resulttype: this.resulttype, guard: this.guard.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadTupleIndexTry(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt), MIRTempRegister.jparse(jobj.hastrgt));
+        return new MIRLoadTupleIndexSetGuard(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt), MIRGuard.jparse(jobj.guard));
     }
 }
 
-class MIRLoadRecordProperty extends MIRValueOp {
+class MIRLoadRecordProperty extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
@@ -888,9 +909,10 @@ class MIRLoadRecordProperty extends MIRValueOp {
     readonly isvirtual: boolean;
     readonly resulttype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadRecordProperty, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadRecordProperty, sinfo);
         
+        this.trgt = trgt;
         this.arg = arg;
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
@@ -900,6 +922,7 @@ class MIRLoadRecordProperty extends MIRValueOp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.pname}`;
@@ -910,88 +933,51 @@ class MIRLoadRecordProperty extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadRecordProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadRecordProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRCheckedLoadRecordProperty extends MIRValueOp {
+class MIRLoadRecordPropertySetGuard extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly pname: string;
     readonly isvirtual: boolean; 
     readonly resulttype: MIRResolvedTypeKey;
-    readonly mask: string;
-    readonly position: number;
+    guard: MIRGuard;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister, mask: string, position: number) {
-        super(MIROpTag.MIRCheckedLoadRecordProperty, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument, guard: MIRGuard) {
+        super(MIROpTag.MIRLoadRecordPropertySetGuard, sinfo);
 
-        this.arg = arg;
-        this.arglayouttype = arglayouttype;
-        this.argflowtype = argflowtype;
-        this.pname = pname;
-        this.isvirtual = isvirtual;
-        this.resulttype = resulttype;
-        this.mask = mask;
-        this.position = position;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.pname} | ${this.mask}[${this.position}]`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual, resulttype: this.resulttype, mask: this.mask, position: this.position };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRCheckedLoadRecordProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt), jobj.mask, jobj.position);
-    }
-}
-
-class MIRLoadRecordPropertyTry extends MIRFlowOp {
-    arg: MIRArgument;
-    readonly arglayouttype: MIRResolvedTypeKey;
-    readonly argflowtype: MIRResolvedTypeKey;
-    readonly pname: string;
-    readonly isvirtual: boolean;
-    readonly resulttype: MIRResolvedTypeKey;
-    trgt: MIRRegisterArgument;
-    hastrgt: MIRTempRegister;
-
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument, hastrgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadRecordPropertyTry, sinfo);
-
-        this.arg = arg;
-        this.arglayouttype = arglayouttype;
-        this.argflowtype = argflowtype;
-        this.pname = pname;
-        this.isvirtual = isvirtual;
-        this.resulttype = resulttype;
         this.trgt = trgt;
-        this.hastrgt = hastrgt;
+        this.arg = arg;
+        this.arglayouttype = arglayouttype;
+        this.argflowtype = argflowtype;
+        this.pname = pname;
+        this.isvirtual = isvirtual;
+        this.resulttype = resulttype;
+        this.guard = guard;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt, this.hastrgt]; }
+    getModVars(): MIRRegisterArgument[] { return this.guard instanceof MIRVarGuard ? [this.trgt, this.guard.greg] : [this.trgt]; }
 
     stringify(): string {
-        return `${this.hastrgt.stringify()} = ${this.arg.stringify()}.getPropertyTry<${this.pname}>(out? ${this.trgt.stringify()})`;
+        return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.pname} | ${this.guard.stringify()}]`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual, resulttype: this.resulttype, trgt: this.trgt.jemit(), hastrgt: this.hastrgt.jemit() };
+        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual, resulttype: this.resulttype, guard: this.guard.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadRecordPropertyTry(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt), MIRTempRegister.jparse(jobj.hastrgt));
+        return new MIRLoadRecordPropertySetGuard(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt), MIRGuard.jparse(jobj.guard));
     }
 }
 
-class MIRLoadField extends MIRValueOp {
+class MIRLoadField extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
@@ -999,9 +985,10 @@ class MIRLoadField extends MIRValueOp {
     readonly isvirtual: boolean;
     readonly resulttype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, field: MIRFieldKey, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadField, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, field: MIRFieldKey, isvirtual: boolean, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadField, sinfo);
 
+        this.trgt = trgt;
         this.arg = arg;
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
@@ -1011,6 +998,7 @@ class MIRLoadField extends MIRValueOp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.field}`;
@@ -1021,20 +1009,21 @@ class MIRLoadField extends MIRValueOp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadField(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.field, jobj.isvirtual, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadField(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.field, jobj.isvirtual, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-
-class MIRLoadFromEpehmeralList extends MIRValueOp {
+class MIRLoadFromEpehmeralList extends MIROp {
+    trgt: MIRRegisterArgument;
     arg: MIRArgument;
-    readonly argtype: MIRType;
+    readonly argtype: MIRResolvedTypeKey;
     readonly idx: number;
     readonly resulttype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, idx: number, resulttype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRLoadFromEpehmeralList, sinfo, trgt);
+    constructor(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, idx: number, resulttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRLoadFromEpehmeralList, sinfo);
 
+        this.trgt = trgt;
         this.arg = arg;
         this.argtype = argtype;
         this.idx = idx;
@@ -1042,50 +1031,195 @@ class MIRLoadFromEpehmeralList extends MIRValueOp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}(|${this.idx}|)`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), argtype: this.argtype, idx: this.idx, resulttype: this.resulttype };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), argtype: this.argtype, idx: this.idx, resulttype: this.resulttype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadFromEpehmeralList(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.argtype, jobj.idx, jobj.resulttype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRLoadFromEpehmeralList(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.argtype, jobj.idx, jobj.resulttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
-class MIRMultiLoadFromEpehmeralList extends MIRFlowOp {
-    arg: MIRRegisterArgument;
+class MIRMultiLoadFromEpehmeralList extends MIROp {
+    trgts: { pos: number, into: MIRRegisterArgument, oftype: MIRResolvedTypeKey }[];
+    arg: MIRArgument;
     readonly argtype: MIRResolvedTypeKey;
-    trgts: { pos: number, into: MIRRegisterArgument, oftype: MIRType }[];
 
-    constructor(sinfo: SourceInfo, arg: MIRRegisterArgument, resultType: MIRResolvedTypeKey, argInferType: MIRResolvedTypeKey, idx: number, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, trgts: { pos: number, into: MIRRegisterArgument, oftype: MIRResolvedTypeKey }[]) {
         super(MIROpTag.MIRMultiLoadFromEpehmeralList, sinfo);
+        
+        this.trgts = trgts;
         this.arg = arg;
-        this.resultType = resultType;
-        this.argInferType = argInferType;
-        this.idx = idx;
+        this.argtype = argtype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return this.trgts.map((trgt) => trgt.into); }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.arg.stringify()}(|${this.idx}|)`;
+        const lhs = this.trgts.map((trgt) => trgt.into.stringify());
+        const ops = this.trgts.map((trgt) => trgt.pos);
+        return `${lhs.join(", ")} = ${this.arg.stringify()}(|${ops.join(", ")}|)`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), resultType: this.resultType, argInferType: this.argInferType, idx: this.idx };
+        const etrgts = this.trgts.map((trgt) => {
+            return { pos: trgt.pos, into: trgt.into.jemit(), oftype: trgt.oftype };
+        });
+        return { ...this.jbemit(), trgts: etrgts, arg: this.arg.jemit(), argtype: this.argtype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadFromEpehmeralList(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg) as MIRRegisterArgument, jobj.resultType, jobj.argInferType, jobj.idx, MIRTempRegister.jparse(jobj.trgt));
+        const etrgts = jobj.etrgts.map((trgt: { pos: number, into: object, oftype: string }) => {
+            return { pos: trgt.pos, into: MIRRegisterArgument.jparse(trgt.into), oftype: trgt.oftype as MIRResolvedTypeKey };
+        });
+        return new MIRMultiLoadFromEpehmeralList(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.argtype, etrgts);
     }
 }
 
+class MIRSliceEpehmeralList extends MIROp {
+    trgt: MIRRegisterArgument;
+    arg: MIRArgument;
+    readonly argtype: MIRResolvedTypeKey;
+    readonly sltype: MIRResolvedTypeKey;
 
+    constructor(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRResolvedTypeKey, sltype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRSliceEpehmeralList, sinfo);
 
+        this.trgt = trgt;
+        this.arg = arg;
+        this.argtype = argtype;
+        this.sltype = sltype;
+        
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.arg.stringify()}(|${this.sltype}|)`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), arg: this.arg.jemit(), argtype: this.argtype, sltype: this.sltype, trgt: this.trgt.jemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRSliceEpehmeralList(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.argtype, jobj.sltype, MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRInvokeFixedFunction extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly resultType: MIRResolvedTypeKey;
+    readonly mkey: MIRInvokeKey;
+    args: MIRArgument[]; //this is args[0] for methods
+    optmask: string | undefined;
+    guard: MIRGuard | undefined;
+
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], optmask: string | undefined, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+        super(MIROpTag.MIRInvokeFixedFunction, sinfo,);
+
+        this.trgt = trgt;
+        this.resultType = resultType;
+        this.mkey = mkey;
+        this.args = args;
+        this.optmask = optmask;
+        this.guard = guard;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.guard.greg, ...this.args]) : varsOnlyHelper([...this.args]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        const oinfo = this.optmask !== undefined ? `, ${this.optmask}` : "";
+        return `${this.trgt.stringify()} = ${this.mkey}::(${this.args.map((arg) => arg.stringify()).join(", ")}${oinfo})${gstring}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), resultType: this.resultType, mkey: this.mkey, args: this.args.map((arg) => arg.jemit()), optmask: this.optmask, guard: this.guard !== undefined ? this.guard.jemit() : undefined };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.optmask, MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+    }
+}
+
+class MIRInvokeVirtualFunction extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly resultType: MIRResolvedTypeKey
+    readonly vresolve: MIRVirtualMethodKey;
+    readonly rcvrlayouttype: MIRResolvedTypeKey;
+    readonly rcvrflowtype: MIRResolvedTypeKey;
+    args: MIRArgument[];
+    readonly optmask: string | undefined;
+
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, vresolve: MIRVirtualMethodKey, rcvrlayouttype: MIRResolvedTypeKey, rcvrflowtype: MIRResolvedTypeKey, args: MIRArgument[], optmask: string | undefined, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRInvokeVirtualFunction, sinfo);
+
+        this.trgt = trgt;
+        this.resultType = resultType;
+        this.vresolve = vresolve;
+        this.rcvrlayouttype = rcvrlayouttype;
+        this.rcvrflowtype = rcvrflowtype;
+        this.args = args;
+        this.optmask = optmask;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.args[0].stringify()}.${this.vresolve}(${[...this.args].slice(1).map((arg) => arg.stringify()).join(", ")})`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), resultType: this.resultType, vresolve: this.vresolve, rcvrlayouttype: this.rcvrlayouttype, rcvrflowtype: this.rcvrflowtype, args: this.args.map((arg) => arg.jemit()), optmask: this.optmask };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRInvokeVirtualFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.vresolve, jobj.rcvrlayouttype, jobj.rcvrflowtype, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.optmask, MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRInvokeVirtualOperator extends MIROp {
+    trgt: MIRRegisterArgument;
+    resultType: MIRResolvedTypeKey;
+    readonly vresolve: MIRVirtualMethodKey;
+    args: MIRArgument[]; //this is args[0]
+    argtypes: MIRResolvedTypeKey[];
+
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, vresolve: MIRVirtualMethodKey, args: MIRArgument[], thisInferType: MIRResolvedTypeKey, trgt: MIRTempRegister) {
+        super(MIROpTag.MIRInvokeVirtualOperator, sinfo, trgt);
+        this.resultType = resultType;
+        this.vresolve = vresolve;
+        this.args = args;
+        this.thisInferType = thisInferType;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.args[0].stringify()}.${this.vresolve}(${[...this.args].slice(1).map((arg) => arg.stringify()).join(", ")})`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), resultType: this.resultType, vresolve: this.vresolve, args: this.args.map((arg) => arg.jemit()), thisInferType: this.thisInferType };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRInvokeVirtualFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.vresolve, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.thisInferType, MIRTempRegister.jparse(jobj.trgt));
+    }
+}
+
+////////////////////////
 
 
 class MIRConstructorPrimary extends MIRValueOp {
@@ -1286,65 +1420,6 @@ class MIRConstructorEphemeralValueList extends MIRValueOp {
     }
 }
 
-
-
-
-class MIRInvokeFixedFunction extends MIRValueOp {
-    resultType: MIRResolvedTypeKey;
-    readonly mkey: MIRInvokeKey;
-    args: MIRArgument[]; //this is args[0] for methods
-
-    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRInvokeFixedFunction, sinfo, trgt);
-        this.resultType = resultType;
-        this.mkey = mkey;
-        this.args = args;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.mkey}::(${this.args.map((arg) => arg.stringify()).join(", ")})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), resultType: this.resultType, mkey: this.mkey, args: this.args.map((arg) => arg.jemit()) };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRInvokeVirtualFunction extends MIRValueOp {
-    resultType: MIRResolvedTypeKey;
-    readonly vresolve: MIRVirtualMethodKey;
-    args: MIRArgument[]; //this is args[0]
-    thisInferType: MIRResolvedTypeKey;
-
-    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, vresolve: MIRVirtualMethodKey, args: MIRArgument[], thisInferType: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRInvokeVirtualTarget, sinfo, trgt);
-        this.resultType = resultType;
-        this.vresolve = vresolve;
-        this.args = args;
-        this.thisInferType = thisInferType;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.args[0].stringify()}.${this.vresolve}(${[...this.args].slice(1).map((arg) => arg.stringify()).join(", ")})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), resultType: this.resultType, vresolve: this.vresolve, args: this.args.map((arg) => arg.jemit()), thisInferType: this.thisInferType };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRInvokeVirtualFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.vresolve, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.thisInferType, MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
 class MIRPrefixOp extends MIRValueOp {
     readonly op: string; //+, -, !
     arg: MIRArgument;
@@ -1498,253 +1573,144 @@ class MIRBinCmp extends MIRValueOp {
     }
 }
 
-class MIRIsTypeOfNone extends MIRValueOp {
-    arg: MIRArgument;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRIsTypeOfNone, sinfo, trgt);
-        this.arg = arg;
+
+
+///////////////////////
+
+class MIRIsTypeOf extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly chktype: MIRResolvedTypeKey;
+    arg: MIRArgument;
+    readonly srclayouttype: MIRResolvedTypeKey;
+    readonly srcflowtype: MIRResolvedTypeKey;
+    guard: MIRGuard | undefined;
+
+    constructor(sinfo: SourceInfo, trgt: MIRRegisterArgument, chktype: MIRResolvedTypeKey, src: MIRArgument, srclayouttype: MIRResolvedTypeKey, srcflowtype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+        super(MIROpTag.MIRIsTypeOf, sinfo);
+
+        this.trgt = trgt;
+        this.chktype = chktype;
+        this.arg = src;
+        this.srclayouttype = srclayouttype;
+        this.srcflowtype = srcflowtype;
+        this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.arg, this.guard.greg]) : varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = $isNoneType(${this.arg.stringify()})`;
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        return `${this.trgt.stringify()} = $isTypeOf(${this.arg.stringify()}, ${this.chktype})${gstring}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit() };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), chktype: this.chktype, arg: this.arg.jemit(), srclayouttype: this.srclayouttype, srcflowtype: this.srcflowtype, guard: this.guard !== undefined ? this.guard.jemit() : undefined };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRIsTypeOfNone(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRIsTypeOf(jparsesinfo(jobj.sinfo), MIRRegisterArgument.jparse(jobj.trgt), jobj.chktype, MIRArgument.jparse(jobj.arg), jobj.srclayouttype, jobj.srcflowtype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
     }
 }
 
-class MIRIsTypeOfSome extends MIRValueOp {
-    arg: MIRArgument;
-
-    constructor(sinfo: SourceInfo, arg: MIRArgument, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRIsTypeOfSome, sinfo, trgt);
-        this.arg = arg;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = $isSomeType(${this.arg.stringify()})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit() };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRIsTypeOfSome(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRIsTypeOf extends MIRValueOp {
-    readonly argInferType: MIRResolvedTypeKey;
-    arg: MIRArgument;
-    readonly oftype: MIRResolvedTypeKey;
-
-    constructor(sinfo: SourceInfo, argInferType: MIRResolvedTypeKey, arg: MIRArgument, oftype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRIsTypeOf, sinfo, trgt);
-        this.argInferType = argInferType;
-        this.arg = arg;
-        this.oftype = oftype;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = $isTypeOf(${this.arg.stringify()}, ${this.oftype})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), argInferType: this.argInferType, arg: this.arg.jemit(), oftype: this.oftype };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRIsTypeOf(jparsesinfo(jobj.sinfo), jobj.argInferType, MIRArgument.jparse(jobj.arg), jobj.oftype, MIRTempRegister.jparse(jobj.trgt));
-    }
-}
-
-class MIRTempRegisterAssign extends MIRFlowOp {
-    src: MIRArgument;
+class MIRTempRegisterAssign extends MIROp {
     trgt: MIRTempRegister;
+    src: MIRArgument;
+    readonly layouttype: MIRResolvedTypeKey;
+    guard: MIRGuard | undefined;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRTempRegister) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRTempRegister, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
         super(MIROpTag.MIRTempRegisterAssign, sinfo);
-        this.src = src;
+
         this.trgt = trgt;
+        this.src = src;
+        this.layouttype = layouttype;
+        this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.src.stringify()}`;
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        return `${this.trgt.stringify()} = ${this.src.stringify()}${gstring}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), trgt: this.trgt.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), layouttype: this.layouttype, trgt: this.trgt.jemit(), guard: this.guard !== undefined ? this.guard.jemit() : undefined };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRTempRegisterAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRTempRegister.jparse(jobj.trgt));
+        return new MIRTempRegisterAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRTempRegister.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
     }
 }
 
-class MIRParameterVarStore extends MIRFlowOp {
+class MIRParameterVarStore extends MIROp {
+    trgt: MIRParameterVariable;
     src: MIRArgument;
-    name: MIRParameterVariable;
-    readonly oftype: MIRResolvedTypeKey;
+    readonly layouttype: MIRResolvedTypeKey;
+    guard: MIRGuard | undefined;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRParameterVariable, oftype: MIRResolvedTypeKey) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRParameterVariable, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
         super(MIROpTag.MIRParameterVarStore, sinfo);
-        this.src = src;
-        this.name = name;
-        this.oftype = oftype;
-    }
 
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.name.stringify()} = ${this.src.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit(), oftype: this.oftype };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRParameterVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.name), jobj.oftype);
-    }
-}
-
-class MIRLocalVarStore extends MIRFlowOp {
-    src: MIRArgument;
-    name: MIRLocalVariable;
-    readonly oftype: MIRResolvedTypeKey
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRLocalVariable, oftype: MIRResolvedTypeKey) {
-        super(MIROpTag.MIRLocalVarStore, sinfo);
-        this.src = src;
-        this.name = name;
-        this.oftype = oftype;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.name.stringify()} = ${this.src.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit(), oftype: this.oftype };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRLocalVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.name), jobj.oftype);
-    }
-}
-
-class MIRParameterVarStoreWithGuard extends MIRFlowOp {
-    src: MIRArgument;
-    name: MIRParameterVariable;
-    readonly oftype: MIRResolvedTypeKey;
-    readonly mask: string;
-    readonly index: number;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRParameterVariable, oftype: MIRResolvedTypeKey, mask: string, index: number) {
-        super(MIROpTag.MIRParameterVarStoreWithGuard, sinfo);
-        this.src = src;
-        this.name = name;
-        this.oftype = oftype;
-        this.mask = mask;
-        this.index = index;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.name.stringify()} = ${this.src.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit(), oftype: this.oftype, mask: this.mask, index: this.index };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRParameterVarStoreWithGuard(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRParameterVariable.jparse(jobj.name), jobj.oftype, jobj.mask, jobj.index);
-    }
-}
-
-class MIRLocalVarStoreWithGuard extends MIRFlowOp {
-    src: MIRArgument;
-    name: MIRLocalVariable;
-    readonly oftype: MIRResolvedTypeKey;
-    readonly mask: string;
-    readonly index: number;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, name: MIRLocalVariable, oftype: MIRResolvedTypeKey, mask: string, index: number) {
-        super(MIROpTag.MIRLocalVarStoreWithGuard, sinfo);
-        this.src = src;
-        this.name = name;
-        this.oftype = oftype;
-        this.mask = mask;
-        this.index = index;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.name]; }
-
-    stringify(): string {
-        return `${this.name.stringify()} = ${this.src.stringify()}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit(), oftype: this.oftype, mask: this.mask, index: this.index };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRLocalVarStoreWithGuard(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.name), , jobj.oftype, jobj.mask, jobj.index);
-    }
-}
-
-
-class MIRPackSlice extends MIRFlowOp {
-    src: MIRArgument;
-    readonly sltype: MIRResolvedTypeKey;
-    trgt: MIRTempRegister;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, sltype: MIRResolvedTypeKey, trgt: MIRTempRegister) {
-        super(MIROpTag.MIRPackSlice, sinfo);
-        this.src = src;
-        this.sltype = sltype;
         this.trgt = trgt;
+        this.src = src;
+        this.layouttype = layouttype;
+        this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
+    
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.src.stringify()}[${this.sltype}]`;
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        return `${this.trgt.stringify()} = ${this.src.stringify()}${gstring}`;
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), sltype: this.sltype, trgt: this.trgt.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), trgt: this.trgt.jemit(), layouttype: this.layouttype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRPackSlice(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.sltype, MIRTempRegister.jparse(jobj.trgt));
+        return new MIRParameterVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
     }
 }
+
+class MIRLocalVarStore extends MIROp {
+    trgt: MIRLocalVariable;
+    src: MIRArgument;
+    readonly layouttype: MIRResolvedTypeKey
+    guard: MIRGuard | undefined;
+
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRLocalVariable, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+        super(MIROpTag.MIRLocalVarStore, sinfo);
+
+        this.trgt = trgt;
+        this.src = src;
+        this.layouttype = layouttype;
+        this.guard = guard;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+    
+    stringify(): string {
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        return `${this.trgt.stringify()} = ${this.src.stringify()}${gstring}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), src: this.src.jemit(), trgt: this.trgt.jemit(), layouttype: this.layouttype };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRLocalVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+    }
+}
+
+//////////////////////////
 
 class MIRPackExtend extends MIRFlowOp {
     basepack: MIRArgument;
@@ -2132,15 +2098,17 @@ class MIRBody {
 
 export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRVariableArgument, MIRParameterVariable, MIRLocalVariable, 
+    MIRGuard, MIRMaskGuard, MIRVarGuard,
+    MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
-    MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRValueOp, MIRFlowOp, MIRJumpOp,
+    MIROpTag, MIROp, MIRNop, MIRDeadFlow,
     MIRLoadConst, MIRLoadConstDataString,
     MIRTupleHasIndex, MIRRecordHasProperty,
-    MIRLoadTupleIndex, MIRCheckedLoadTupleIndex, MIRLoadTupleIndexTry, MIRLoadRecordProperty, MIRCheckedLoadRecordProperty, MIRLoadRecordPropertyTry,
-    MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore, MIRParameterVarStoreWithGuard, MIRLocalVarStoreWithGuard,
+    MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard,
+    MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore,
     MIRLoadField,
-    MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList,
+    MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList,
+    MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator,
 
     MIRBody
 };
