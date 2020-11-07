@@ -4,8 +4,9 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo } from "../ast/parser";
-import { MIRBody, MIRResolvedTypeKey, MIRConstantKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey, MIRGlobalKey } from "./mir_ops";
+import { MIRBody, MIRResolvedTypeKey, MIRFieldKey, MIRInvokeKey, MIRVirtualMethodKey, MIRGlobalKey } from "./mir_ops";
 import assert = require("assert");
+import { BSQRegex } from "../ast/bsqregex";
 
 //
 //Probably want to declare a MIRSourceInfo class
@@ -41,23 +42,6 @@ class MIRFunctionParameter {
 
     static jparse(jobj: any): MIRFunctionParameter {
         return new MIRFunctionParameter(jobj.name, jobj.type);
-    }
-}
-
-class MIRRegex {
-    readonly re: string;
-    //TODO: later we want to have the parsed regex IR here too
-
-    constructor(re: string) {
-        this.re = re;
-    }
-
-    jemit(): object {
-        return { re: this.re };
-    }
-
-    static jparse(jobj: any): MIRRegex {
-        return new MIRRegex(jobj.re);
     }
 }
 
@@ -251,7 +235,9 @@ abstract class MIROOTypeDecl {
     readonly terms: Map<string, MIRType>;
     readonly provides: MIRResolvedTypeKey[];
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[]) {
+    readonly fields: MIRFieldDecl[] = [];
+
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], fields: MIRFieldDecl[]) {
         this.ooname = ooname;
         this.tkey = tkey;
 
@@ -265,6 +251,8 @@ abstract class MIROOTypeDecl {
         this.name = name;
         this.terms = terms;
         this.provides = provides;
+
+        this.fields = fields;
     }
 
     abstract jemit(): object;
@@ -287,8 +275,8 @@ abstract class MIROOTypeDecl {
 }
 
 class MIRConceptTypeDecl extends MIROOTypeDecl {
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[]) {
-        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides);
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], fields: MIRFieldDecl[]) {
+        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides, fields);
     }
 
     jemit(): object {
@@ -300,16 +288,13 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly consfunc: MIRInvokeKey;
     readonly invfunc: MIRInvokeKey | undefined;
 
-    readonly fields: MIRFieldDecl[] = [];
     readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
 
     constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], pragmas: [MIRType, string][], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, invfunc: MIRInvokeKey | undefined, fields: MIRFieldDecl[]) {
-        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides);
+        super(ooname, srcInfo, srcFile, tkey, attributes, pragmas, ns, name, terms, provides, fields);
 
         this.consfunc = consfunc;
         this.invfunc = invfunc;
-
-        this.fields = fields;
     }
 
     jemit(): object {
@@ -553,8 +538,8 @@ class MIRAssembly {
     readonly srcFiles: { relativePath: string, contents: string }[];
     readonly srcHash: string;
 
-    readonly literalRegexs: Map<string, MIRRegex> = new Map<string, MIRRegex>();
-    readonly validatorRegexs: Map<MIRNominalTypeKey, string> = new Map<MIRNominalTypeKey, string>();
+    readonly literalRegexs: Map<string, BSQRegex> = new Map<string, BSQRegex>();
+    readonly validatorRegexs: Map<MIRResolvedTypeKey, BSQRegex> = new Map<MIRResolvedTypeKey, BSQRegex>();
 
     readonly constantDecls: Map<MIRConstantKey, MIRConstantDecl> = new Map<MIRConstantKey, MIRConstantDecl>();
     readonly fieldDecls: Map<MIRFieldKey, MIRFieldDecl> = new Map<MIRFieldKey, MIRFieldDecl>();
@@ -859,7 +844,7 @@ class MIRAssembly {
 }
 
 export {
-    MIRRegex, MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
+    MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
     MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl, MIREphemeralListType,
     MIRType, MIRTypeOption, MIRNominalType, MIREntityType, MIRConceptType,
     MIRStructuralType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType,

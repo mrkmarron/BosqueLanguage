@@ -11,7 +11,7 @@ import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedSt
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRVarGuard, MIRGuard } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIROOTypeDecl, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIRRegex, MIREphemeralListType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
 
 import * as assert from "assert";
@@ -241,7 +241,9 @@ class TypeChecker {
 
             let opok = true;
             if(terminfo.opconstraint !== undefined) {
-                xxxx;
+                //
+                //TODO: we need to check op constraints!!!
+                //
             }
             this.raiseErrorIf(sinfo, !opok, "Template instantiation deos not satisfy the operator requirements");
 
@@ -326,9 +328,6 @@ class TypeChecker {
             }
             const rtype = this.m_assembly.normalizeTypeGeneral(invoke.params[i].type, invokeBinds);
             this.raiseErrorIf(sinfo, rtype instanceof ResolvedType && rtype.isEmptyType(), "Bad type signature");
-
-            xxxx;
-            //TODO: need to check that optional argument parameter default values are type ok and that we register the initialization functions 
         }
 
         const firstOptIndex = invoke.params.findIndex((param) => param.isOptional);
@@ -6464,7 +6463,7 @@ class TypeChecker {
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -6824,12 +6823,7 @@ class TypeChecker {
             this.m_emitter.masm.invokeDecls.set(mkey, invinfo as MIRInvokeBodyDecl);
 
             const tkey = MIRKeyGenerator.generateTypeKey(this.resolveOOTypeFromDecls(ctype, cbinds));
-            if (ctype instanceof EntityTypeDecl) {
-                (this.m_emitter.masm.entityDecls.get(tkey) as MIREntityTypeDecl).vcallMap.set(vkey, mkey);
-            }
-            else {
-                (this.m_emitter.masm.conceptDecls.get(tkey) as MIROOTypeDecl).vcallMap.set(vkey, mkey);
-            }
+            (this.m_emitter.masm.entityDecls.get(tkey) as MIREntityTypeDecl).vcallMap.set(vkey, mkey);
         }
         catch (ex) {
             this.m_emitter.setEmitEnabled(false);
@@ -6841,11 +6835,11 @@ class TypeChecker {
         //TODO: check regexs here and convert to MIRRegex IR too!!!
 
         this.m_assembly.getAllLiteralRegexs().forEach((lre) => {
-            this.m_emitter.masm.literalRegexs.set(lre, new MIRRegex(lre));
+            this.m_emitter.masm.literalRegexs.set(lre.restr, lre);
         })
 
         this.m_assembly.getAllValidators().forEach((vre) => {
-            const vkey = MIRKeyGenerator.generateTypeKey(vre[0].object, vre[0].binds);
+            const vkey = MIRKeyGenerator.generateTypeKey(ResolvedType.createSingle(vre[0]));
             this.m_emitter.masm.validatorRegexs.set(vkey, vre[1]);
         });
     }

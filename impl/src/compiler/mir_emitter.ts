@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREphemeralListExtend, MIRFieldKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
 import { Assembly, InvokeDecl } from "../ast/assembly";
 import { ResolvedFunctionType, ResolvedType } from "../ast/resolved_type";
 import { MIRAssembly, MIREphemeralListType, MIRType } from "./mir_assembly";
@@ -260,7 +260,7 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRConvertValue(sinfo, srctypelayout.trkey, srctypeflow.trkey, intotype.trkey, src, trgt, guard));
     }
 
     emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRRegisterArgument) {
@@ -268,7 +268,7 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRCheckNoError(sinfo, src, srctype.trkey, trgt));
     }
 
     emitExtractResultOkValue(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, valuetype: MIRType, trgt: MIRRegisterArgument) {
@@ -276,7 +276,7 @@ class MIREmitter {
             return;
         }
 
-        xxxx;
+        this.m_currentBlock.push(new MIRExtractResultOkValue(sinfo, src, srctype.trkey, valuetype.trkey, trgt));
     }
 
     emitLoadConstNone(sinfo: SourceInfo, trgt: MIRRegisterArgument) {

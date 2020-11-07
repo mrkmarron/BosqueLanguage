@@ -8,7 +8,6 @@ import { topologicalOrder, computeBlockLinks, FlowLink } from "./mir_info";
 import { BSQRegex } from "../ast/bsqregex";
 
 import assert = require("assert");
-import { MIREphemeralListType } from "./mir_assembly";
 
 type MIRGlobalKey = string; //$global_IKEY
 type MIRFieldKey = string; //ns::name::field#binds
@@ -494,6 +493,9 @@ enum MIROpTag {
     MIRLoadUnintVariableValue = "MIRLoadUnintVariableValue",
     MIRDeclareGuardFlagLocation = "MIRDeclareGuardFlagLocation",
     MIRSetConstantGuardFlag = "MIRSetConstantGuardFlag",
+    MIRConvertValue = "MIRConvertValue",
+    MIRCheckNoError = "MIRCheckNoError",
+    MIRExtractResultOkValue = "MIRExtractResultOkValue",
 
     MIRLoadConst = "MIRLoadConst",
     MIRLoadConstDataString = "MIRLoadConstDataString",
@@ -542,7 +544,7 @@ enum MIROpTag {
 
     MIRTempRegisterAssign = "MIRTempRegisterAssign",
     MIRParameterVarStore = "MIRParameterVarStore",
-    MIRLocalVarStore = "MIRParameterVarStore",
+    MIRLocalVarStore = "MIRLocalVarStore",
 
     MIRReturnAssign = "MIRReturnAssign",
     MIRReturnAssignOfCons = "MIRReturnAssignOfCons",
@@ -578,22 +580,74 @@ abstract class MIROp {
 
     static jparse(jobj: any & { tag: string }): MIROp {
         switch (jobj.tag) {
+            case MIROpTag.MIRNop:
+                return MIRNop.jparse(jobj);
+            case MIROpTag.MIRDeadFlow:
+                return MIRDeadFlow.jparse(jobj);
+            case MIROpTag.MIRAbort:
+                return MIRAbort.jparse(jobj);
+            case MIROpTag.MIRAssertCheck:
+                return MIRAssertCheck.jparse(jobj);
+            case MIROpTag.MIRDebug:
+                return MIRDebug.jparse(jobj);
+            case MIROpTag.MIRLoadUnintVariableValue:
+                return MIRLoadUnintVariableValue.jparse(jobj);
+            case MIROpTag.MIRDeclareGuardFlagLocation:
+                return MIRDeclareGuardFlagLocation.jparse(jobj);
+            case MIROpTag.MIRSetConstantGuardFlag:
+                return MIRSetConstantGuardFlag.jparse(jobj);
+            case MIROpTag.MIRConvertValue:
+                return MIRConvertValue.jparse(jobj);
+            case MIROpTag.MIRCheckNoError:
+                return MIRCheckNoError.jparse(jobj);
+            case MIROpTag.MIRExtractResultOkValue:
+                return MIRExtractResultOkValue.jparse(jobj);
             case MIROpTag.MIRLoadConst:
                 return MIRLoadConst.jparse(jobj);
-            case MIROpTag.MIRLoadConstSafeString:
-                return MIRLoadConstSafeString.jparse(jobj);
-            case MIROpTag.MIRLoadConstTypedString:
-                return MIRLoadConstTypedString.jparse(jobj);
-            case MIROpTag.MIRAccessConstantValue:
-                return MIRAccessConstantValue.jparse(jobj);
-            case MIROpTag.MIRLoadFieldDefaultValue:
-                return MIRLoadFieldDefaultValue.jparse(jobj);
-            case MIROpTag.MIRInvokeInvariantCheckDirect:
-                return MIRInvokeInvariantCheckDirect.jparse(jobj);
-            case MIROpTag.MIRInvokeInvariantCheckVirtualTarget:
-                return MIRInvokeInvariantCheckVirtualTarget.jparse(jobj);
-            case MIROpTag.MIRConstructorPrimary:
-                return MIRConstructorPrimary.jparse(jobj);
+            case MIROpTag.MIRLoadConstDataString:
+                return MIRLoadConstDataString.jparse(jobj);
+            case MIROpTag.MIRTupleHasIndex:
+                return MIRTupleHasIndex.jparse(jobj);
+            case MIROpTag.MIRRecordHasProperty:
+                return MIRRecordHasProperty.jparse(jobj);
+            case MIROpTag.MIRLoadTupleIndex:
+                return MIRLoadTupleIndex.jparse(jobj);
+            case MIROpTag.MIRLoadTupleIndexSetGuard:
+                return MIRLoadTupleIndexSetGuard.jparse(jobj);
+            case MIROpTag.MIRLoadRecordProperty:
+                return MIRLoadRecordProperty.jparse(jobj);
+            case MIROpTag.MIRLoadRecordPropertySetGuard:
+                return MIRLoadRecordPropertySetGuard.jparse(jobj);
+            case MIROpTag.MIRLoadField:
+                return MIRLoadField.jparse(jobj);
+            case MIROpTag.MIRLoadFromEpehmeralList:
+                return MIRLoadFromEpehmeralList.jparse(jobj);
+            case MIROpTag.MIRMultiLoadFromEpehmeralList:
+                return MIRMultiLoadFromEpehmeralList.jparse(jobj);
+            case MIROpTag.MIRSliceEpehmeralList:
+                return MIRSliceEpehmeralList.jparse(jobj);
+            case MIROpTag.MIRInvokeFixedFunction:
+                return MIRInvokeFixedFunction.jparse(jobj);
+            case MIROpTag.MIRInvokeVirtualFunction:
+                return MIRInvokeVirtualFunction.jparse(jobj);
+            case MIROpTag.MIRInvokeVirtualOperator:
+                return MIRInvokeVirtualOperator.jparse(jobj); 
+            case MIROpTag.MIRConstructorTuple:
+                return MIRConstructorTuple.jparse(jobj);
+            case MIROpTag.MIRConstructorTupleFromEphemeralList:
+                return MIRConstructorTupleFromEphemeralList.jparse(jobj);
+            case MIROpTag.MIRConstructorRecord:
+                return MIRConstructorRecord.jparse(jobj);
+            case MIROpTag.MIRConstructorRecordFromEphemeralList:
+                return MIRConstructorRecordFromEphemeralList.jparse(jobj);
+            case MIROpTag.MIRStructuredAppendTuple:
+                return MIRStructuredAppendTuple.jparse(jobj);
+            case MIROpTag.MIRStructuredJoinRecord:
+                return MIRStructuredJoinRecord.jparse(jobj);
+            case MIROpTag.MIRConstructorEphemeralList:
+                return MIRConstructorEphemeralList.jparse(jobj);
+            case MIROpTag.MIREphemeralListExtend:
+                return MIREphemeralListExtend.jparse(jobj);
             case MIROpTag.MIRConstructorPrimaryCollectionEmpty:
                 return MIRConstructorPrimaryCollectionEmpty.jparse(jobj);
             case MIROpTag.MIRConstructorPrimaryCollectionSingletons:
@@ -602,93 +656,39 @@ abstract class MIROp {
                 return MIRConstructorPrimaryCollectionCopies.jparse(jobj);
             case MIROpTag.MIRConstructorPrimaryCollectionMixed:
                 return MIRConstructorPrimaryCollectionMixed.jparse(jobj);
-            case MIROpTag.MIRConstructorTuple:
-                return MIRConstructorTuple.jparse(jobj);
-            case MIROpTag.MIRConstructorRecord:
-                return MIRConstructorRecord.jparse(jobj);
-            case MIROpTag.MIRConstructorEphemeralValueList:
-                return MIRConstructorEphemeralValueList.jparse(jobj);
-            case MIROpTag.MIRAccessFromIndex:
-                return MIRAccessFromIndex.jparse(jobj);
-            case MIROpTag.MIRProjectFromIndecies:
-                return MIRProjectFromIndecies.jparse(jobj);
-            case MIROpTag.MIRAccessFromProperty:
-                return MIRAccessFromProperty.jparse(jobj);
-            case MIROpTag.MIRProjectFromProperties:
-                return MIRProjectFromProperties.jparse(jobj);
-            case MIROpTag.MIRAccessFromField:
-                return MIRAccessFromField.jparse(jobj);
-            case MIROpTag.MIRProjectFromFields:
-                return MIRProjectFromFields.jparse(jobj);
-            case MIROpTag.MIRProjectFromTypeTuple:
-                return MIRProjectFromTypeTuple.jparse(jobj);
-            case MIROpTag.MIRProjectFromTypeRecord:
-                return MIRProjectFromTypeRecord.jparse(jobj);
-            case MIROpTag.MIRProjectFromTypeNominal:
-                return MIRProjectFromTypeNominal.jparse(jobj);
-            case MIROpTag.MIRModifyWithIndecies:
-                return MIRModifyWithIndecies.jparse(jobj);
-            case MIROpTag.MIRModifyWithProperties:
-                return MIRModifyWithProperties.jparse(jobj);
-            case MIROpTag.MIRModifyWithFields:
-                return MIRModifyWithFields.jparse(jobj);
-            case MIROpTag.MIRStructuredExtendTuple:
-                return MIRStructuredExtendTuple.jparse(jobj);
-            case MIROpTag.MIRStructuredExtendRecord:
-                return MIRStructuredExtendRecord.jparse(jobj);
-            case MIROpTag.MIRStructuredExtendObject:
-                return MIRStructuredExtendObject.jparse(jobj);
-            case MIROpTag.MIRLoadFromEpehmeralList:
-                return MIRLoadFromEpehmeralList.jparse(jobj);
-            case MIROpTag.MIRInvokeFixedFunction:
-                return MIRInvokeFixedFunction.jparse(jobj);
-            case MIROpTag.MIRInvokeVirtualTarget:
-                return MIRInvokeVirtualFunction.jparse(jobj);
-            case MIROpTag.MIRPrefixOp:
-                return MIRPrefixOp.jparse(jobj);
-            case MIROpTag.MIRBinOp:
-                return MIRBinOp.jparse(jobj);
-            case MIROpTag.MIRBinEq:
-                return MIRBinEq.jparse(jobj);
-            case MIROpTag.MIRBinLess:
-                return MIRBinLess.jparse(jobj);
-            case MIROpTag.MIRBinCmp:
-                return MIRBinCmp.jparse(jobj);
-            case MIROpTag.MIRIsTypeOfNone:
-                return MIRIsTypeOfNone.jparse(jobj);
-            case MIROpTag.MIRIsTypeOfSome:
-                return MIRIsTypeOfSome.jparse(jobj);
+            case MIROpTag.MIRBinKeyEq:
+                return MIRBinKeyEq.jparse(jobj);
+            case MIROpTag.MIRBinKeyLess:
+                return MIRBinKeyLess.jparse(jobj);
+            case MIROpTag.MIRPrefixNotOp:
+                return MIRPrefixNotOp.jparse(jobj);
+            case MIROpTag.MIRAllTrue:
+                return MIRAllTrue.jparse(jobj);
             case MIROpTag.MIRIsTypeOf:
                 return MIRIsTypeOf.jparse(jobj);
-            case MIROpTag.MIRRegAssign:
-                return MIRRegAssign.jparse(jobj);
-            case MIROpTag.MIRTruthyConvert:
-                return MIRTruthyConvert.jparse(jobj);
-            case MIROpTag.MIRVarStore:
-                return MIRVarStore.jparse(jobj);
-            case MIROpTag.MIRPackSlice:
-                return MIRPackSlice.jparse(jobj);
-            case MIROpTag.MIRPackExtend:
-                return MIRPackExtend.jparse(jobj);
-            case MIROpTag.MIRReturnAssign:
-                return MIRReturnAssign.jparse(jobj);
-            case MIROpTag.MIRAbort:
-                return MIRAbort.jparse(jobj);
-            case MIROpTag.MIRDebug:
-                return MIRDebug.jparse(jobj);
             case MIROpTag.MIRJump:
                 return MIRJump.jparse(jobj);
             case MIROpTag.MIRJumpCond:
                 return MIRJumpCond.jparse(jobj);
             case MIROpTag.MIRJumpNone:
                 return MIRJumpNone.jparse(jobj);
-            case MIROpTag.MIRPhi:
-                return MIRPhi.jparse(jobj);
+            case MIROpTag.MIRTempRegisterAssign:
+                return MIRTempRegisterAssign.jparse(jobj);
+            case MIROpTag.MIRParameterVarStore:
+                return MIRParameterVarStore.jparse(jobj);
+            case MIROpTag.MIRLocalVarStore:
+                return MIRLocalVarStore.jparse(jobj);
+            case MIROpTag.MIRReturnAssign:
+                return MIRReturnAssign.jparse(jobj);
+            case MIROpTag.MIRReturnAssignOfCons:
+                return MIRReturnAssignOfCons.jparse(jobj);
             case MIROpTag.MIRVarLifetimeStart:
                 return MIRVarLifetimeStart.jparse(jobj);
-            default:
-                assert(jobj.tag === MIROpTag.MIRVarLifetimeEnd);
+            case MIROpTag.MIRVarLifetimeEnd:
                 return MIRVarLifetimeEnd.jparse(jobj);
+            default:
+                assert(jobj.tag === MIROpTag.MIRPhi);
+                return MIRPhi.jparse(jobj);
         }
     }
 }
@@ -897,6 +897,102 @@ class MIRSetConstantGuardFlag extends MIROp {
 
     static jparse(jobj: any): MIROp {
         return new MIRSetConstantGuardFlag(jparsesinfo(jobj.sinfo), jobj.name, jobj.position, jobj.flag);
+    }
+}
+
+class MIRConvertValue extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly srctypelayout: MIRResolvedTypeKey;
+    readonly srctypeflow: MIRResolvedTypeKey;
+    readonly intotype: MIRResolvedTypeKey;
+    src: MIRArgument;
+    guard: MIRGuard | undefined;
+
+    constructor(sinfo: SourceInfo, srctypelayout: MIRResolvedTypeKey, srctypeflow: MIRResolvedTypeKey, intotype: MIRResolvedTypeKey, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+        super(MIROpTag.MIRConvertValue, sinfo);
+
+        this.trgt = trgt;
+        this.srctypelayout = srctypelayout;
+        this.srctypeflow = srctypeflow;
+        this.intotype = intotype;
+        this.src = src;
+        this.guard = guard;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.guard.greg, this.src]) : varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        const gstring = this.guard !== undefined ? ` | ${this.guard.stringify()}` : "";
+        return `${this.trgt.stringify()} = ${this.src} convert ${this.intotype}${gstring}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), srctypelayout: this.srctypelayout, srctypeflow: this.srctypeflow, intotype: this.intotype, src: this.src.jemit(), guard: this.guard !== undefined ? this.guard.jemit() : undefined };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRConvertValue(jparsesinfo(jobj.sinfo), jobj.srctypelayout, jobj.srctypeflow, jobj.intotype, MIRArgument.jparse(jobj.src), MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+    }
+}
+
+class MIRCheckNoError extends MIROp {
+    trgt: MIRRegisterArgument;
+    src: MIRArgument;
+    readonly srctype: MIRResolvedTypeKey;
+
+    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRCheckNoError, sinfo);
+
+        this.trgt = trgt;
+        this.src = src;
+        this.srctype = srctype;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = $notErr(${this.src})`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRCheckNoError(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRExtractResultOkValue extends MIROp {
+    trgt: MIRRegisterArgument;
+    src: MIRArgument;
+    readonly srctype: MIRResolvedTypeKey;
+    readonly valuetype: MIRResolvedTypeKey;
+
+    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, valuetype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRExtractResultOkValue, sinfo);
+
+        this.trgt = trgt;
+        this.src = src;
+        this.srctype = srctype;
+        this.valuetype = valuetype;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = $getOkValue(${this.src})`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, valuetype: this.valuetype };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRExtractResultOkValue(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.valuetype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2390,7 +2486,7 @@ export {
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,
-    MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag,
+    MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue, MIRCheckNoError, MIRExtractResultOkValue,
     MIRLoadConst, MIRLoadConstDataString,
     MIRTupleHasIndex, MIRRecordHasProperty,
     MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard,
