@@ -117,7 +117,6 @@ class InvokeDecl {
 
     readonly attributes: string[];
     readonly recursive: "yes" | "no" | "cond";
-    readonly pragmas: [TypeSignature, string][];
 
     readonly terms: TemplateTermDecl[];
     readonly termRestrictions: TypeConditionRestriction | undefined;
@@ -135,13 +134,12 @@ class InvokeDecl {
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
         this.attributes = attributes;
         this.recursive = recursive;
-        this.pragmas = pragmas;
 
         this.terms = terms;
         this.termRestrictions = termRestrictions;
@@ -165,11 +163,11 @@ class InvokeDecl {
     }
 
     static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, captureSet: Set<string>, body: BodyImplementation) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], [], undefined, params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], undefined, params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
     }
 
-    static createStandardInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", pragmas: [TypeSignature, string][], terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, pragmas, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
+    static createStandardInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
     }
 }
 
@@ -181,17 +179,15 @@ class StaticMemberDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly name: string;
 
     readonly declaredType: TypeSignature;
     readonly value: ConstantExpressionValue | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
-        this.pragmas = pragmas;
         this.attributes = attributes;
         this.name = name;
         this.declaredType = dtype;
@@ -259,17 +255,15 @@ class MemberFieldDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly name: string;
 
     readonly declaredType: TypeSignature;
     readonly value: ConstantExpressionValue | undefined;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
+    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], name: string, dtype: TypeSignature, value: ConstantExpressionValue | undefined) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
-        this.pragmas = pragmas;
         this.attributes = attributes;
         this.name = name;
         this.declaredType = dtype;
@@ -334,7 +328,6 @@ class OOPTypeDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly specialDecls: Set<SpecialTypeCategory>;
     readonly ns: string;
@@ -354,14 +347,13 @@ class OOPTypeDecl {
 
     readonly nestedEntityDecls: Map<string, EntityTypeDecl>;
 
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
         this.sourceLocation = sourceLocation;
         this.srcFile = srcFile;
-        this.pragmas = pragmas;
         this.attributes = attributes;
         this.specialDecls = new Set<SpecialTypeCategory>(specialDecls);
         this.ns = ns;
@@ -411,22 +403,22 @@ class OOPTypeDecl {
 }
 
 class ConceptTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
-        super(sourceLocation, srcFile, pragmas, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
+        super(sourceLocation, srcFile, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
 }
 
 class EntityTypeDecl extends OOPTypeDecl {
-    constructor(sourceLocation: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
+    constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
         staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
         memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
-        super(sourceLocation, srcFile, pragmas, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
+        super(sourceLocation, srcFile, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
 }
 
@@ -434,7 +426,6 @@ class NamespaceConstDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly pragmas: [TypeSignature, string][];
     readonly attributes: string[];
     readonly ns: string;
     readonly name: string;
@@ -442,11 +433,10 @@ class NamespaceConstDecl {
     readonly declaredType: TypeSignature;
     readonly value: ConstantExpressionValue;
 
-    constructor(srcInfo: SourceInfo, srcFile: string, pragmas: [TypeSignature, string][], attributes: string[], ns: string, name: string, dtype: TypeSignature, value: ConstantExpressionValue) {
+    constructor(srcInfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, dtype: TypeSignature, value: ConstantExpressionValue) {
         this.sourceLocation = srcInfo;
         this.srcFile = srcFile;
 
-        this.pragmas = pragmas;
         this.attributes = attributes;
         this.ns = ns;
         this.name = name;

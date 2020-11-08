@@ -52,15 +52,7 @@ class TemplateArguments {
     }
 }
 
-class PragmaArguments {
-    readonly recursive: "yes" | "no" | "cond";
-    readonly pragmas: [TypeSignature, string][];
-
-    constructor(rec: "yes" | "no" | "cond", pragmas: [TypeSignature, string][]) {
-        this.recursive = rec;
-        this.pragmas = pragmas;
-    }
-}
+type RecursiveAnnotation = "yes" | "no" | "cond";
 
 class CondBranchEntry<T> {
     readonly cond: Expression;
@@ -469,15 +461,15 @@ class ConstructorPrimaryWithFactoryExpression extends Expression {
     readonly ctype: TypeSignature;
     readonly factoryName: string;
     readonly terms: TemplateArguments;
-    readonly pragmas: PragmaArguments;
+    readonly rec: RecursiveAnnotation;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isvalue: boolean,  ctype: TypeSignature, factory: string, pragmas: PragmaArguments, terms: TemplateArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, isvalue: boolean,  ctype: TypeSignature, factory: string, rec: RecursiveAnnotation, terms: TemplateArguments, args: Arguments) {
         super(ExpressionTag.ConstructorPrimaryWithFactoryExpression, sinfo);
         this.isvalue = isvalue;
         this.ctype = ctype;
         this.factoryName = factory;
-        this.pragmas = pragmas;
+        this.rec = rec;
         this.terms = terms;
         this.args = args;
     }
@@ -527,13 +519,13 @@ class ConstructorPCodeExpression extends Expression {
 
 class PCodeInvokeExpression extends Expression {
     readonly pcode: string;
-    readonly pragmas: PragmaArguments;
+    readonly rec: RecursiveAnnotation;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, pcode: string, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, pcode: string, rec: RecursiveAnnotation, args: Arguments) {
         super(ExpressionTag.PCodeInvokeExpression, sinfo);
         this.pcode = pcode;
-        this.pragmas = pragmas;
+        this.rec = rec;
         this.args = args;
     }
 }
@@ -554,15 +546,15 @@ class SpecialConstructorExpression extends Expression {
 class CallNamespaceFunctionOrOperatorExpression extends Expression {
     readonly ns: string;
     readonly name: string;
-    readonly pragmas: PragmaArguments;
+    readonly rec: RecursiveAnnotation;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments) {
         super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ns = ns;
         this.name = name;
-        this.pragmas = pragmas;
+        this.rec = rec;
         this.terms = terms;
         this.args = args;
     }
@@ -571,15 +563,15 @@ class CallNamespaceFunctionOrOperatorExpression extends Expression {
 class CallStaticFunctionOrOperatorExpression extends Expression {
     readonly ttype: TypeSignature;
     readonly name: string;
-    readonly pragmas: PragmaArguments;
+    readonly rec: RecursiveAnnotation;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments) {
         super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ttype = ttype;
         this.name = name;
-        this.pragmas = pragmas;
+        this.rec = rec;
         this.terms = terms;
         this.args = args;
     }
@@ -788,16 +780,16 @@ class PostfixInvoke extends PostfixOperation {
     readonly isBinder: boolean;
     readonly specificResolve: TypeSignature | undefined;
     readonly name: string;
-    readonly pragmas: PragmaArguments;
+    readonly rec: RecursiveAnnotation;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
 
-    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isBinder: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, pragmas: PragmaArguments, args: Arguments) {
+    constructor(sinfo: SourceInfo, isElvis: boolean, customCheck: Expression | undefined, isBinder: boolean, specificResolve: TypeSignature | undefined, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments) {
         super(sinfo, isElvis, customCheck, PostfixOpTag.PostfixInvoke);
         this.isBinder = isBinder;
         this.specificResolve = specificResolve;
         this.name = name;
-        this.pragmas = pragmas;
+        this.rec = rec;
         this.terms = terms;
         this.args = args;
     }
@@ -1261,7 +1253,7 @@ class BodyImplementation {
 }
 
 export {
-    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, PragmaArguments, CondBranchEntry, IfElse,
+    InvokeArgument, NamedArgument, PositionalArgument, Arguments, TemplateArguments, RecursiveAnnotation, CondBranchEntry, IfElse,
     ExpressionTag, Expression, LiteralExpressionValue, ConstantExpressionValue, InvalidExpression,
     LiteralNoneExpression, LiteralBoolExpression, 
     LiteralNumberinoExpression, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, LiteralComplexExpression,

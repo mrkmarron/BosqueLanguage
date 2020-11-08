@@ -7,7 +7,7 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck, ValueType } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, PragmaArguments, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRVarGuard, MIRGuard } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
@@ -2475,7 +2475,7 @@ class TypeChecker {
         const [fsig, callbinds, eargs] = this.inferAndCheckArguments(exp.sinfo, env, exp.args, (fdecl as StaticFunctionDecl).invoke, exp.terms.targs, oobinds, env.terms, undefined, false);
         const rargs = this.checkArgumentsSignature(exp.sinfo, env, exp.factoryName, fsig, eargs);
 
-        this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.pragmas.recursive);
+        this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.rec);
 
         const etreg = this.m_emitter.generateTmpRegister();
         const skey = this.m_emitter.registerStaticCall(oodecl, oobinds, fdecl as StaticFunctionDecl, exp.factoryName, callbinds, rargs.pcodes, rargs.cinfo);
@@ -2563,9 +2563,9 @@ class TypeChecker {
         }
     }
 
-    private checkNamespaceOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, opdecl: NamespaceOperatorDecl, args: MIRArgument[], argtypes: ValueType[], refs: ["ref" | "out" | "out?", MIRParameterVariable | MIRLocalVariable, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][], pragmas: PragmaArguments, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
+    private checkNamespaceOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, opdecl: NamespaceOperatorDecl, args: MIRArgument[], argtypes: ValueType[], refs: ["ref" | "out" | "out?", MIRParameterVariable | MIRLocalVariable, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][], recursive: RecursiveAnnotation, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
         const fsig = this.m_assembly.normalizeTypeFunction(opdecl.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType;
-        this.checkRecursion(sinfo, fsig, pcodes, pragmas.recursive);
+        this.checkRecursion(sinfo, fsig, pcodes, recursive);
 
         //if it is a static operator or it has a unique dynamic resolution based on the types
         if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
@@ -2627,9 +2627,9 @@ class TypeChecker {
         return this.updateEnvForOutParams(env.setUniformResultExpression(fsig.resultType), refs);
     }
 
-    private checkStaticOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, oodecl: OOPTypeDecl, oobinds: Map<string, ResolvedType>, opdecl: StaticOperatorDecl, args: MIRArgument[], argtypes: ValueType[], refs: ["ref" | "out" | "out?", MIRParameterVariable | MIRLocalVariable, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][], pragmas: PragmaArguments, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
+    private checkStaticOperatorInvoke(sinfo: SourceInfo, env: TypeEnvironment, oodecl: OOPTypeDecl, oobinds: Map<string, ResolvedType>, opdecl: StaticOperatorDecl, args: MIRArgument[], argtypes: ValueType[], refs: ["ref" | "out" | "out?", MIRParameterVariable | MIRLocalVariable, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][], recursive: RecursiveAnnotation, trgt: MIRTempRegister, refok: boolean): TypeEnvironment[] {
         const fsig = this.m_assembly.normalizeTypeFunction(opdecl.invoke.generateSig(), oobinds) as ResolvedFunctionType;
-        this.checkRecursion(sinfo, fsig, pcodes, pragmas.recursive);
+        this.checkRecursion(sinfo, fsig, pcodes, recursive);
 
         //if it is a static operator or it has a unique dynamic resolution based on the types
         if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
@@ -2714,7 +2714,7 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, opidx !== -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
             const opdecl = opidx !== -1 ? opdecls[opidx] : opsintro as NamespaceOperatorDecl;
             
-            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.pragmas, trgt, refok);
+            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.rec, trgt, refok);
         } 
         else {
             this.raiseErrorIf(exp.sinfo, !nsdecl.functions.has(exp.name), `Function named '${exp.name}' is not defined`);
@@ -2724,7 +2724,7 @@ class TypeChecker {
             this.checkTemplateTypes(exp.sinfo, fdecl.invoke.terms, callbinds, fdecl.invoke.termRestrictions);
 
             const rargs = this.checkArgumentsSignature(exp.sinfo, env, exp.name, fsig, eargs);
-            this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.pragmas.recursive);
+            this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.rec);
 
             const ckey = this.m_emitter.registerFunctionCall(exp.ns, exp.name, fdecl, callbinds, rargs.pcodes, rargs.cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
@@ -2882,7 +2882,7 @@ class TypeChecker {
                 this.raiseErrorIf(exp.sinfo, opidx !== -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
                 const opdecl = opidx !== -1 ? opdecls[opidx] : opsintro as StaticOperatorDecl;
             
-                return this.checkStaticOperatorInvoke(exp.sinfo, env, oodecl, oobinds, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.pragmas, trgt, refok); 
+                return this.checkStaticOperatorInvoke(exp.sinfo, env, oodecl, oobinds, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.rec, trgt, refok); 
             }
             else {
                 const fdecl = fdecltry as OOMemberLookupInfo<StaticFunctionDecl>;
@@ -2891,7 +2891,7 @@ class TypeChecker {
                 this.checkTemplateTypes(exp.sinfo, fdecl.decl.invoke.terms, callbinds, fdecl.decl.invoke.termRestrictions);
 
                 const rargs = this.checkArgumentsSignature(exp.sinfo, env, exp.name, fsig, eargs);
-                this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.pragmas.recursive);
+                this.checkRecursion(exp.sinfo, fsig, rargs.pcodes, exp.rec);
 
                 const ckey = this.m_emitter.registerStaticCall(fdecl.contiainingType, fdecl.binds, fdecl.decl, exp.name, callbinds, rargs.pcodes, rargs.cinfo);
                 const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
@@ -2915,7 +2915,7 @@ class TypeChecker {
         const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs.slice(0, exp.args.argList.length));
         const cargsext = eargs.slice(exp.args.argList.length).map((ea) => ea.treg as MIRTempRegister);
 
-        this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.pragmas.recursive);
+        this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.rec);
 
         const refinfo = this.generateRefInfoForCallEmit((pcode as PCode).ftype, margs.refs);
         this.m_emitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), [...margs.args, ...cargsext], undefined, refinfo, trgt);   
@@ -3521,7 +3521,7 @@ class TypeChecker {
             this.checkTemplateTypes(op.sinfo, knownimpl.decl.invoke.terms, callbinds, knownimpl.decl.invoke.termRestrictions);
 
             const rargs = this.checkArgumentsSignature(op.sinfo, eev, op.name, fsig, eargs);
-            this.checkRecursion(op.sinfo, fsig, rargs.pcodes, op.pragmas.recursive);
+            this.checkRecursion(op.sinfo, fsig, rargs.pcodes, op.rec);
 
             const ckey = this.m_emitter.registerMethodCall(knownimpl.contiainingType, knownimpl.decl, knownimpl.binds, op.name, callbinds, rargs.pcodes, rargs.cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
@@ -3547,7 +3547,7 @@ class TypeChecker {
             this.checkTemplateTypes(op.sinfo, minfo.decl.invoke.terms, callbinds, minfo.decl.invoke.termRestrictions);
 
             const rargs = this.checkArgumentsSignature(op.sinfo, eev, op.name, fsig, eargs);
-            this.checkRecursion(op.sinfo, fsig, rargs.pcodes, op.pragmas.recursive);
+            this.checkRecursion(op.sinfo, fsig, rargs.pcodes, op.rec);
 
             const ckey = this.m_emitter.registerVirtualMethodCall(minfo.contiainingType, minfo.binds, op.name, callbinds, rargs.pcodes, rargs.cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, rargs.refs);
@@ -3899,7 +3899,7 @@ class TypeChecker {
                 this.raiseErrorIf(exp.sinfo, opidx !== -1, "Cannot resolve operator");
                 const opdecl = opdecls[opidx];
 
-                const renv = this.checkNamespaceOperatorInvoke(exp.sinfo, cenv, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, new PragmaArguments("no", []), trgt, false);
+                const renv = this.checkNamespaceOperatorInvoke(exp.sinfo, cenv, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, "no", trgt, false);
 
                 if(doneblock !== undefined) {
                     this.m_emitter.emitDirectJump(exp.sinfo, doneblock);
@@ -3963,7 +3963,7 @@ class TypeChecker {
             this.raiseErrorIf(exp.sinfo, opidx !== -1, "Cannot resolve operator");
             const opdecl = opdecls[opidx];
             
-            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, new PragmaArguments("no", []), trgt, false);
+            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, "no", trgt, false);
         }
     }
 
@@ -6004,16 +6004,6 @@ class TypeChecker {
         }
     }
 
-    private processPragmas(sinfo: SourceInfo, pragmas: [TypeSignature, string][]): [MIRType, string][] {
-        const emptybinds = new Map<string, ResolvedType>();
-
-        return pragmas.map((prg) => {
-            const ptype = this.resolveAndEnsureTypeOnly(sinfo, prg[0], emptybinds);
-            const pkey = this.m_emitter.registerResolvedTypeReference(ptype);
-            return [pkey, prg[1]] as [MIRType, string];
-        });
-    }
-
     private processExpressionForGobalConstExpr(ikey: MIRInvokeKey, decl: NamespaceConstDecl): MIRGlobalKey {
         const gkey = "$global_" + ikey;
         try {
@@ -6022,9 +6012,8 @@ class TypeChecker {
             const idecl = this.processInvokeInfo_ExpressionIsolated(decl.srcFile, decl.value.exp, iname, ikey, decl.sourceLocation, ["static_initializer", "private", ...decl.attributes], ddecltype, new Map<string, ResolvedType>());
             this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-            const pragmas = this.processPragmas(decl.sourceLocation, decl.pragmas);
             const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
-            const mirglobal = new MIRConstantDecl(undefined, iname, ikey, pragmas, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
+            const mirglobal = new MIRConstantDecl(undefined, iname, ikey, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
 
             this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
         }
@@ -6044,9 +6033,8 @@ class TypeChecker {
             const idecl = this.processInvokeInfo_ExpressionIsolated(decl.srcFile, (decl.value as ConstantExpressionValue).exp, iname, ikey, decl.sourceLocation, ["static_initializer", "private", ...decl.attributes], ddecltype, binds);
             this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-            const pragmas = this.processPragmas(decl.sourceLocation, decl.pragmas);
             const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
-            const mirconst = new MIRConstantDecl(enclosingType, iname, ikey, pragmas, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
+            const mirconst = new MIRConstantDecl(enclosingType, iname, ikey, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
 
             this.m_emitter.masm.constantDecls.set(gkey, mirconst);
         }
@@ -6065,7 +6053,7 @@ class TypeChecker {
             this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
             const dtype = this.m_emitter.registerResolvedTypeReference(ctype);
-            const mirglobal = new MIRConstantDecl(undefined, iname, ikey, [], cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
+            const mirglobal = new MIRConstantDecl(undefined, iname, ikey, cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
 
             this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
         }
@@ -6106,9 +6094,8 @@ class TypeChecker {
                         const idecl = this.processInvokeInfo_ExpressionIsolated(decl.srcFile, cexp.exp, iname, ikey, decl.sourceLocation, ["static_initializer", "private"], ddecltype, binds);
                         this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-                        const pragmas = this.processPragmas(decl.sourceLocation, decl.pragmas);
                         const dtype = this.m_emitter.registerResolvedTypeReference(ddecltype);
-                        const mirglobal = new MIRConstantDecl(enclosingType, iname, ikey, pragmas, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
+                        const mirglobal = new MIRConstantDecl(enclosingType, iname, ikey, decl.sourceLocation, decl.srcFile, dtype.trkey, gkey);
 
                         this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
                     }
@@ -6153,7 +6140,7 @@ class TypeChecker {
                     this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
                     const dtype = this.m_emitter.registerResolvedTypeReference(ptype);
-                    const mirglobal = new MIRConstantDecl(undefined, iname, ikey, [], cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
+                    const mirglobal = new MIRConstantDecl(undefined, iname, ikey, cexp.exp.sinfo, srcFile, dtype.trkey, gkey);
 
                     this.m_emitter.masm.constantDecls.set(gkey, mirglobal);
 
@@ -6247,7 +6234,7 @@ class TypeChecker {
 
         const chkbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (chkbody !== undefined) {
-            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype), "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, [], tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined, undefined, chkbody);
+            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype), "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined, undefined, chkbody);
             this.m_emitter.masm.invokeDecls.set(chkkey, chkinv);
         }
 
@@ -6336,7 +6323,7 @@ class TypeChecker {
 
         const consbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (consbody !== undefined) {
-            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype), "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, [], tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype), undefined, undefined, consbody);
+            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype), "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype), undefined, undefined, consbody);
             this.m_emitter.masm.invokeDecls.set(conskey, consinv);
         }
 
@@ -6443,12 +6430,11 @@ class TypeChecker {
                 if (!this.m_emitter.masm.fieldDecls.has(fkey)) {
                     let dkey: string | undefined = undefined;
 
-                    const fpragmas = this.processPragmas(f.sourceLocation, f.pragmas);
                     const dtypeResolved = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
                     const dtype = this.m_emitter.registerResolvedTypeReference(dtypeResolved);
 
                     const fname = `${fi[0].ns}::${fi[0].name}.${f.name}`;
-                    const mfield = new MIRFieldDecl(tkey, f.attributes, fname, f.sourceLocation, f.srcFile, fkey, fpragmas, f.name, dtype.trkey, dkey);
+                    const mfield = new MIRFieldDecl(tkey, f.attributes, fname, f.sourceLocation, f.srcFile, fkey, f.name, dtype.trkey, dkey);
                     this.m_emitter.masm.fieldDecls.set(fkey, mfield);
                 }
 
@@ -6456,14 +6442,12 @@ class TypeChecker {
             });
 
             const ooname = `${tdecl.ns}::${tdecl.name}`;
-            const pragmas = this.processPragmas(tdecl.sourceLocation, tdecl.pragmas);
-
             if (tdecl instanceof EntityTypeDecl) {
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, conskey, hasinv ? chkkey : undefined, fields);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, hasinv ? chkkey : undefined, fields);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, pragmas, tdecl.ns, tdecl.name, terms, provides, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, fields);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -6480,7 +6464,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>(), declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], new Map<string, MIRType>());
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, [], sinfo, this.m_file, [], resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, [], resultType, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. expressions as default arguments or field values which can only have other specific refs (but not pcodes or random other values)
@@ -6502,7 +6486,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, [], sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. things like pre and post conditions
@@ -6532,7 +6516,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, pcodes, cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, [], sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
     }
 
     private processInvokeInfo(fname: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member", iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
@@ -6542,8 +6526,7 @@ class TypeChecker {
         invoke.terms.forEach((term) => terms.set(term.name, this.m_emitter.registerResolvedTypeReference(binds.get(term.name) as ResolvedType)));
 
         const recursive = invoke.recursive === "yes" || (invoke.recursive === "cond" && pcodes.some((pc) => pc.code.recursive === "yes"));
-        const pragmas = this.processPragmas(invoke.sourceLocation, invoke.pragmas);
-
+        
         let cargs = new Map<string, VarInfo>();
         let fargs = new Map<string, { pcode: PCode, captured: string[] }>();
         let argTypes: Map<string, MIRType> = new Map<string, MIRType>();
@@ -6679,20 +6662,18 @@ class TypeChecker {
             let mbinds = new Map<string, MIRResolvedTypeKey>();
             binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
 
-            return new MIRInvokePrimitiveDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, mbinds, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
+            return new MIRInvokePrimitiveDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, sinfo, invoke.srcFile, mbinds, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
         }
         else {
             const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);
 
             const mirbody = this.checkBodyStatement(invoke.srcFile, env, (realbody as BodyImplementation).body as BlockStatement, optparaminfo, outparaminfo, argTypes, preject, postject);
-            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, pragmas, sinfo, invoke.srcFile, params, resultType, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
+            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, sinfo, invoke.srcFile, params, resultType, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
         }
     }
 
     private processPCodeInfo(iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, pci: InvokeDecl, binds: Map<string, ResolvedType>, fsig: ResolvedFunctionType, pargs: [string, ResolvedType][]): MIRInvokeDecl {
         this.checkPCodeDecl(sinfo, fsig, pci.recursive);
-
-        const pragmas = this.processPragmas(pci.sourceLocation, pci.pragmas);
 
         let cargs = new Map<string, VarInfo>();
         let argTypes: Map<string, MIRType> = new Map<string, MIRType>();
@@ -6754,7 +6735,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, fsig.resultType);
 
         const mirbody = this.checkBodyStatement(pci.srcFile, env, realbody, [], outparaminfo, argTypes, undefined, undefined);
-        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", pragmas, sinfo, pci.srcFile, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", sinfo, pci.srcFile, params, resultType, undefined, undefined, mirbody as MIRBody);
     }
 
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
