@@ -2617,7 +2617,7 @@ class Assembly {
             return memoval;
         }
 
-        const res = t1.options.every((t1opt) => t2.options.some((t2opt) => this.atomSubtypeOf(t1opt, t2opt)));
+        const res = (t1.idStr === t2.idStr) || t1.options.every((t1opt) => t2.options.some((t2opt) => this.atomSubtypeOf(t1opt, t2opt)));
 
         memores.set(t2.idStr, res);
         return res;

@@ -11,28 +11,9 @@ import { BSQRegex } from "./bsqregex";
 import { MIRNominalType } from "../compiler/mir_assembly";
 
 const KeywordStrings = [
-    "struct",
-    "hidden",
-    "private",
-    "factory",
-    "virtual",
-    "abstract",
-    "override",
-    "entrypoint",
     "recursive?",
     "recursive",
-    "parsable",
-    "validator",
-    "derived",
-    "lazy",
-    "memoized",
-    "interned",
-    "inline",
-    "prefix",
-    "infix",
-    "numeric",
-    "dynamic",
-
+    
     "_debug",
     "abort",
     "assert",
@@ -169,7 +150,28 @@ const RegexFollows = new Set<string>([
 const LeftScanParens = ["[", "(", "{", "(|", "{|"];
 const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
-const AttributeStrings = ["inline", "struct", "hidden", "private", "factory", "virtual", "abstract", "override", "entrypoint", "recursive?", "recursive", "parsable", "memoized", "grounded", "prefix", "infix", "numeric", "dynamic"];
+const AttributeStrings = [
+    "struct",
+    "hidden",
+    "private",
+    "factory",
+    "virtual",
+    "abstract",
+    "override",
+    "recursive?",
+    "recursive",
+    "parsable",
+    "validator",
+    "derived",
+    "lazy",
+    "memoized",
+    "interned",
+    "inline",
+    "prefix",
+    "infix",
+    "numeric",
+    "dynamic",
+];
 
 const UnsafeFieldNames = ["is", "as", "isNone", "isSome", "asTry", "asOrNone", "hasProperty", "getPropertyOrNone", "getPropertyTry"]
 
@@ -2256,18 +2258,18 @@ class Parser {
                             this.ensureAndConsumeToken("=");
 
                             try {
-                                if (isBinder) {
-                                    this.m_penv.getCurrentFunctionScope().pushLocalScope();
-                                    this.m_penv.getCurrentFunctionScope().defineLocalVar(`$${idx}`, `$${idx}_#${sinfo.pos}`, true);
+                                this.m_penv.getCurrentFunctionScope().pushLocalScope();
+                                this.m_penv.getCurrentFunctionScope().defineLocalVar(`$${idx}`, `$${idx}_#${sinfo.pos}`, true);
+                                
+                                if (isBinder) {    
+                                    this.m_penv.getCurrentFunctionScope().defineLocalVar(`$this`, `$this_#${sinfo.pos}`, true);
                                 }
 
                                 const value = this.parseOfExpression();
                                 return { index: idx, value: value };
                             }
                             finally {
-                                if (isBinder) {
-                                    this.m_penv.getCurrentFunctionScope().popLocalScope();
-                                }
+                                this.m_penv.getCurrentFunctionScope().popLocalScope();
                             }
                         })[0].sort((a, b) => a.index - b.index);
 
@@ -2307,9 +2309,11 @@ class Parser {
                             this.ensureAndConsumeToken("=");
 
                             try {
-                                if (isBinder) {
-                                    this.m_penv.getCurrentFunctionScope().pushLocalScope();
-                                    this.m_penv.getCurrentFunctionScope().defineLocalVar(`$${uname}`, `$${uname}_#${sinfo.pos}`, true);
+                                this.m_penv.getCurrentFunctionScope().pushLocalScope();
+                                this.m_penv.getCurrentFunctionScope().defineLocalVar(`$${uname}`, `$${uname}_#${sinfo.pos}`, true);
+
+                                if (isBinder) {    
+                                    this.m_penv.getCurrentFunctionScope().defineLocalVar(`$this`, `$this_#${sinfo.pos}`, true);
                                 }
 
                                 const value = this.parseOfExpression();
@@ -3498,7 +3502,7 @@ class Parser {
 
     private parseAttributes(): string[] {
         let attributes: string[] = [];
-        while (Lexer.isAttributeKW(this.peekToken())) {
+        while (Lexer.isAttributeKW(this.peekTokenData())) {
             attributes.push(this.consumeTokenAndGetValue());
         }
         return attributes;

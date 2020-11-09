@@ -7,7 +7,7 @@
 //Some handy helpers for computing IR info
 //
 
-import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp, MIRRegisterArgument, MIRVariable } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp, MIRRegisterArgument } from "./mir_ops";
 
 type FlowLink = {
     label: string,

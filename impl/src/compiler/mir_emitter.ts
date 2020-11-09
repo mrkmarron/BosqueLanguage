@@ -4,10 +4,10 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
-import { Assembly, InvokeDecl } from "../ast/assembly";
-import { ResolvedFunctionType, ResolvedType } from "../ast/resolved_type";
-import { MIRAssembly, MIREphemeralListType, MIRType } from "./mir_assembly";
+import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
+import { Assembly, EntityTypeDecl, InvokeDecl, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl } from "../ast/assembly";
+import { ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedFunctionType, ResolvedLiteralAtomType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedType } from "../ast/resolved_type";
+import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLiteralType, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRTupleTypeEntry, MIRType, MIRTypeOption } from "./mir_assembly";
 
 import { TypeChecker } from "../type_checker/type_checker";
 import { propagateTmpAssignForBody, removeDeadTempAssignsFromBody } from "./mir_cleanup";
@@ -827,38 +827,29 @@ class MIREmitter {
         return fres;
     }
 
-    private registerTypeInstantiation(decl: OOPTypeDecl, binds: Map<string, ResolvedType>) {
+    private registerTypeInstantiation(rtype: ResolvedType, decl: OOPTypeDecl, binds: Map<string, ResolvedType>) {
         if(!this.emitEnabled) {
             return;
         }
 
-        const key = MIRKeyGenerator.generateTypeKey(decl, binds);
+        const key = MIRKeyGenerator.generateTypeKey(rtype);
         if (this.masm.conceptDecls.has(key) || this.masm.entityDecls.has(key) || this.pendingOOProcessing.findIndex((oop) => oop[0] === key) !== -1) {
             return;
         }
 
         if (decl.ns === "NSCore" && decl.name === "Result") {    
-            const okdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Ok") as EntityTypeDecl;
-            const okkey = MIRKeyGenerator.generateTypeKey(okdecl, binds);
+            const okdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Result::Ok") as EntityTypeDecl;
+            const okkey = MIRKeyGenerator.generateTypeKey(ResolvedType.createSingle(ResolvedEntityAtomType.create(okdecl, binds)));
             if (!this.masm.entityDecls.has(okkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === okkey) === -1) {
                 this.pendingOOProcessing.push([okkey, okdecl, binds]);
                 this.entityInstantiationInfo.push([okkey, okdecl, binds]);
             }
 
-            const errdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Err") as EntityTypeDecl;
-            const errkey = MIRKeyGenerator.generateTypeKey(errdecl, binds);
+            const errdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Result::Err") as EntityTypeDecl;
+            const errkey = MIRKeyGenerator.generateTypeKey(ResolvedType.createSingle(ResolvedEntityAtomType.create(errdecl, binds)));
             if (!this.masm.entityDecls.has(errkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === errkey) === -1) {
                 this.pendingOOProcessing.push([errkey, errdecl, binds]);
                 this.entityInstantiationInfo.push([errkey, errdecl, binds]);
-            }
-        }
-
-        if (decl.ns === "NSCore" && decl.name === "Option") {
-            const optdecl = this.assembly.tryGetObjectTypeForFullyResolvedName("NSCore::Opt") as EntityTypeDecl;
-            const optkey = MIRKeyGenerator.generateTypeKey(optdecl, binds);
-            if (!this.masm.entityDecls.has(optkey) && this.pendingOOProcessing.findIndex((oop) => oop[0] === optkey) === -1) {
-                this.pendingOOProcessing.push([optkey, optdecl, binds]);
-                this.entityInstantiationInfo.push([optkey, optdecl, binds]);
             }
         }
 
@@ -879,31 +870,38 @@ class MIREmitter {
         }
         else {
             const sopt = t.options[0];
+            const rtt = ResolvedType.createSingle(sopt);
             let rt: MIRTypeOption | undefined = undefined;
 
             if (sopt instanceof ResolvedEntityAtomType) {
-                this.registerTypeInstantiation(sopt.object, sopt.binds);
-                rt = MIREntityType.create(MIRKeyGenerator.generateTypeKey(sopt.object, sopt.binds));
+                this.registerTypeInstantiation(rtt, sopt.object, sopt.binds);
+                rt = MIREntityType.create(MIRKeyGenerator.generateTypeKey(rtt));
             }
             else if (sopt instanceof ResolvedConceptAtomType) {
                 const natoms = sopt.conceptTypes.map((cpt) => {
-                    this.registerTypeInstantiation(cpt.concept, cpt.binds);
-                    return MIRKeyGenerator.generateTypeKey(cpt.concept, cpt.binds);
+                    this.registerTypeInstantiation(rtt, cpt.concept, cpt.binds);
+                    return MIRKeyGenerator.generateTypeKey(rtt);
                 });
                 rt = MIRConceptType.create(natoms);
             }
             else if (sopt instanceof ResolvedTupleAtomType) {
                 const tatoms = sopt.types.map((entry) => new MIRTupleTypeEntry(this.registerResolvedTypeReference(entry.type), entry.isOptional));
-                rt = MIRTupleType.create(tatoms);
+                rt = MIRTupleType.create(sopt.isvalue, sopt.grounded, tatoms);
                 if(!this.masm.tupleDecls.has(rt.trkey)) {
                     this.masm.tupleDecls.set(rt.trkey, rt as MIRTupleType);
                 }
             }
             else if (sopt instanceof ResolvedRecordAtomType) {
                 const tatoms = sopt.entries.map((entry) => new MIRRecordTypeEntry(entry.name, this.registerResolvedTypeReference(entry.type), entry.isOptional));
-                rt = MIRRecordType.create(tatoms);
+                rt = MIRRecordType.create(sopt.isvalue, sopt.grounded, tatoms);
                 if(!this.masm.recordDecls.has(rt.trkey)) {
                     this.masm.recordDecls.set(rt.trkey, rt as MIRRecordType);
+                }
+            }
+            else if(sopt instanceof ResolvedLiteralAtomType) {
+                rt = MIRLiteralType.create(sopt.idStr);
+                if(!this.masm.literalTypes.has(rt.trkey)) {
+                    this.masm.literalTypes.set(rt.trkey, rt as MIRLiteralType);
                 }
             }
             else {
@@ -945,7 +943,7 @@ class MIREmitter {
 
     registerConstExpr(srcFile: string, exp: ConstantExpressionValue, binds: Map<string, ResolvedType>, etype: ResolvedType): MIRGlobalKey {
         const key = MIRKeyGenerator.generateFunctionKey(`cexpr@${srcFile}#${exp.exp.sinfo.pos}`, "expr", new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstProcessing.findIndex((cp) => cp[0] === key) !== -1) {
+        if (!this.emitEnabled || this.masm.constantDecls.has(key) || this.pendingConstExprProcessing.findIndex((cp) => cp[0] === key) !== -1) {
             return key;
         }
 

@@ -3163,15 +3163,16 @@ class TypeChecker {
             const etreg = this.m_emitter.generateTmpRegister();
             const itype = this.getInfoForLoadFromSafeIndex(op.sinfo, texp.flowtype, update.index);
 
-            let eev = env;
+            let eev = this.checkDeclareSingleVariable(op.sinfo, env, `$${update.index}_#${op.sinfo.pos}`, true, itype, {etype: ValueType.createUniform(itype), etreg: etreg});
             if (op.isBinder) {
-                eev = this.checkDeclareSingleVariable(op.sinfo, env, `$${update.index}_#${op.sinfo.pos}`, true, itype, {etype: ValueType.createUniform(itype), etreg: etreg});
+                eev = this.checkDeclareSingleVariable(op.sinfo, eev, `$this_#${op.sinfo.pos}`, true, texp.layout, {etype: texp, etreg: arg});
             }
 
             const utype = this.checkExpression(eev, update.value, etreg, itype).getExpressionResult().valtype;
 
+            this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.index}_#${op.sinfo.pos}`);
             if (op.isBinder) {
-                this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.index}_#${op.sinfo.pos}`);
+                this.m_emitter.localLifetimeEnd(op.sinfo, `$this_#${op.sinfo.pos}`);
             }
 
             return [update.index, itype, this.emitInlineConvertIfNeeded(op.sinfo, etreg, utype, itype)];
@@ -3201,15 +3202,16 @@ class TypeChecker {
                 const etreg = this.m_emitter.generateTmpRegister();
                 const itype = this.getInfoForLoadFromSafeProperty(op.sinfo, texp.flowtype, update.name);
 
-                let eev = env;
+                let eev = this.checkDeclareSingleVariable(op.sinfo, env,`$${update.name}_#${op.sinfo.pos}`, true, itype, {etype: ValueType.createUniform(itype), etreg: etreg});
                 if (op.isBinder) {
-                    eev = this.checkDeclareSingleVariable(op.sinfo, env,`$${update.name}_#${op.sinfo.pos}`, true, itype, {etype: ValueType.createUniform(itype), etreg: etreg});
+                    eev = this.checkDeclareSingleVariable(op.sinfo, eev,`$this_#${op.sinfo.pos}`, true, texp.layout, {etype: texp, etreg: arg});
                 }
 
                 const utype = this.checkExpression(eev, update.value, etreg, itype).getExpressionResult().valtype;
 
+                this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.name}_#${op.sinfo.pos}`);
                 if (op.isBinder) {
-                    this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.name}_#${op.sinfo.pos}`);
+                    this.m_emitter.localLifetimeEnd(op.sinfo, `$this_#${op.sinfo.pos}`);
                 }
 
                 return [update.name, itype, this.emitInlineConvertIfNeeded(op.sinfo, etreg, utype, itype)];
@@ -3237,15 +3239,16 @@ class TypeChecker {
                 const finfo = tryfinfo as OOMemberLookupInfo<MemberFieldDecl>;
                 const ftype = this.resolveAndEnsureTypeOnly(op.sinfo, finfo.decl.declaredType, finfo.binds);
 
-                let eev = env;
+                let eev = this.checkDeclareSingleVariable(op.sinfo, env,`$${update.name}_#${op.sinfo.pos}`, true, ftype, {etype: ValueType.createUniform(ftype), etreg: etreg});
                 if (op.isBinder) {
-                    eev = this.checkDeclareSingleVariable(op.sinfo, env,`$${update.name}_#${op.sinfo.pos}`, true, ftype, {etype: ValueType.createUniform(ftype), etreg: etreg});
+                    eev = this.checkDeclareSingleVariable(op.sinfo, eev,`$${update.name}_#${op.sinfo.pos}`, true, texp.layout, {etype: texp, etreg: arg});
                 }
 
                 const utype = this.checkExpression(eev, update.value, etreg, ftype).getExpressionResult().valtype;
 
+                this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.name}_#${op.sinfo.pos}`);
                 if (op.isBinder) {
-                    this.m_emitter.localLifetimeEnd(op.sinfo, `$${update.name}_#${op.sinfo.pos}`);
+                    this.m_emitter.localLifetimeEnd(op.sinfo, `$this_#${op.sinfo.pos}`);
                 }
 
                 return [finfo, ftype, this.emitInlineConvertIfNeeded(op.sinfo, etreg, utype, ftype)];
@@ -6234,7 +6237,7 @@ class TypeChecker {
 
         const chkbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (chkbody !== undefined) {
-            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype), "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined, undefined, chkbody);
+            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype).trkey, "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()).trkey, undefined, undefined, chkbody);
             this.m_emitter.masm.invokeDecls.set(chkkey, chkinv);
         }
 
@@ -6323,7 +6326,7 @@ class TypeChecker {
 
         const consbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (consbody !== undefined) {
-            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype), "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype), undefined, undefined, consbody);
+            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype).trkey, "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype).trkey, undefined, undefined, consbody);
             this.m_emitter.masm.invokeDecls.set(conskey, consinv);
         }
 
@@ -6420,34 +6423,32 @@ class TypeChecker {
             //TODO: we need to check inheritance and provides rules here -- diamonds, virtual/abstract/override use, etc.
             //
 
-            const fields: MIRFieldDecl[] = [];
-            const finfos = [...this.m_assembly.getAllOOFieldsLayout(tdecl, binds)];
-            finfos.forEach((ff) => {
-                const fi = ff[1];
-                const f = fi[1];
-
-                const fkey = MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(fi[0], fi[2]), f.name);
-                if (!this.m_emitter.masm.fieldDecls.has(fkey)) {
-                    let dkey: string | undefined = undefined;
-
-                    const dtypeResolved = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
-                    const dtype = this.m_emitter.registerResolvedTypeReference(dtypeResolved);
-
-                    const fname = `${fi[0].ns}::${fi[0].name}.${f.name}`;
-                    const mfield = new MIRFieldDecl(tkey, f.attributes, fname, f.sourceLocation, f.srcFile, fkey, f.name, dtype.trkey, dkey);
-                    this.m_emitter.masm.fieldDecls.set(fkey, mfield);
-                }
-
-                fields.push(this.m_emitter.masm.fieldDecls.get(fkey) as MIRFieldDecl);
-            });
-
             const ooname = `${tdecl.ns}::${tdecl.name}`;
             if (tdecl instanceof EntityTypeDecl) {
+                const fields: MIRFieldDecl[] = [];
+                const finfos = [...this.m_assembly.getAllOOFieldsLayout(tdecl, binds)];
+                finfos.forEach((ff) => {
+                    const fi = ff[1];
+                    const f = fi[1];
+
+                    const fkey = MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(fi[0], fi[2]), f.name);
+                    if (!this.m_emitter.masm.fieldDecls.has(fkey)) {
+                        const dtypeResolved = this.resolveAndEnsureTypeOnly(f.sourceLocation, f.declaredType, binds);
+                        const dtype = this.m_emitter.registerResolvedTypeReference(dtypeResolved);
+
+                        const fname = `${fi[0].ns}::${fi[0].name}.${f.name}`;
+                        const mfield = new MIRFieldDecl(tkey, f.attributes, fname, f.sourceLocation, f.srcFile, fkey, f.name, dtype.trkey);
+                        this.m_emitter.masm.fieldDecls.set(fkey, mfield);
+                    }
+
+                    fields.push(this.m_emitter.masm.fieldDecls.get(fkey) as MIRFieldDecl);
+                });
+
                 const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, hasinv ? chkkey : undefined, fields);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
-                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, fields);
+                const mirconcept = new MIRConceptTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides);
                 this.m_emitter.masm.conceptDecls.set(tkey, mirconcept);
             }
         }
@@ -6464,7 +6465,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>(), declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], new Map<string, MIRType>());
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, [], resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, [], resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. expressions as default arguments or field values which can only have other specific refs (but not pcodes or random other values)
@@ -6486,7 +6487,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. things like pre and post conditions
@@ -6516,7 +6517,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, pcodes, cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     private processInvokeInfo(fname: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member", iname: string, ikey: MIRInvokeKey, sinfo: SourceInfo, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
@@ -6654,7 +6655,7 @@ class TypeChecker {
             postject = [[...abspostclauses, ...postcluases], [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
         }
 
-        const encdecl = enclosingDecl !== undefined ? enclosingDecl[0] : undefined;
+        const encdecl = enclosingDecl !== undefined ? enclosingDecl[0].trkey : undefined;
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
             let mpc = new Map<string, MIRPCode>();
             fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.generateCapturedVarName(cname)) }));
@@ -6668,7 +6669,7 @@ class TypeChecker {
             const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);
 
             const mirbody = this.checkBodyStatement(invoke.srcFile, env, (realbody as BodyImplementation).body as BlockStatement, optparaminfo, outparaminfo, argTypes, preject, postject);
-            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, sinfo, invoke.srcFile, params, resultType, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
+            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, sinfo, invoke.srcFile, params, resultType.trkey, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
         }
     }
 
@@ -6735,7 +6736,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, fsig.resultType);
 
         const mirbody = this.checkBodyStatement(pci.srcFile, env, realbody, [], outparaminfo, argTypes, undefined, undefined);
-        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", sinfo, pci.srcFile, params, resultType, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", sinfo, pci.srcFile, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     processNamespaceFunction(fkey: MIRInvokeKey, f: NamespaceFunctionDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
