@@ -435,20 +435,22 @@ class MIRRecordType extends MIRTypeOption {
 }
 
 class MIRLiteralType extends MIRTypeOption {
-    private constructor(ekey: MIRResolvedTypeKey) {
+    readonly primitiveValue: boolean | number | undefined;
+
+    private constructor(ekey: MIRResolvedTypeKey, primitiveValue: boolean | number | undefined) {
         super(ekey);
     }
 
-    static create(ekey: MIRResolvedTypeKey): MIRLiteralType {
-        return new MIRLiteralType(ekey);
+    static create(ekey: MIRResolvedTypeKey, primitiveValue: boolean | number | undefined): MIRLiteralType {
+        return new MIRLiteralType(ekey, primitiveValue);
     }
 
     jemit(): object {
-        return {kind: "literal", ekey: this.trkey };
+        return {kind: "literal", ekey: this.trkey, primitiveValue: this.primitiveValue };
     }
 
     static jparse(jobj: any): MIREntityType {
-        return MIRLiteralType.create(jobj.ekey);
+        return MIRLiteralType.create(jobj.ekey, jobj.primitiveValue);
     }
 }
 

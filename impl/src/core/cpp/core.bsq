@@ -613,7 +613,7 @@ struct concept Result<T, E=Any> provides Some {
         return this.as<Err>().info;
     }
 
-    method convert<U, V>(): Result<U, V> {
+    method convert<U?, V?>(): Result<U, V> {
         return this.isOk() ? Result<U, V>::createOk(this.value().as<U>()) ? Result<U, V>::createErr(this.error().as<V>()); 
     }
 }

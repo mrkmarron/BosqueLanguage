@@ -791,21 +791,21 @@ class Assembly {
         }
     }
 
-    reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>, infertype: ResolvedType | undefined): [Expression, ResolvedType, string] | undefined {
+    reduceLiteralValueToCanonicalForm(exp: Expression, binds: Map<string, ResolvedType>, infertype: ResolvedType | undefined): [Expression, ResolvedType, string, boolean | number | undefined] | undefined {
         const cexp = this.compileTimeReduceConstantExpression(exp, binds, infertype);
         if(cexp === undefined) {
             return undefined;
         }
 
         if(cexp instanceof LiteralBoolExpression) {
-            return [cexp, this.getSpecialBoolType(), `${cexp.value}`];
+            return [cexp, this.getSpecialBoolType(), `${cexp.value}`, cexp.value];
         }
         else if(cexp instanceof LiteralIntegralExpression) {
             if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
-                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value, Number.parseInt(cexp.value.slice(0, cexp.value.length - 1))];
             }
             else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()))) {
-                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.itype, new Map<string, ResolvedType>()), cexp.value, Number.parseInt(cexp.value.slice(0, cexp.value.length - 1))];
             }
             else {
                 return undefined;
@@ -813,10 +813,10 @@ class Assembly {
         }
         else if(cexp instanceof LiteralTypedNumericConstructorExpression) {
             if(this.getSpecialIntType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
-                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value, undefined];
             }
             else if(this.getSpecialNatType().isSameType(this.normalizeTypeOnly(cexp.ntype, new Map<string, ResolvedType>()))) {
-                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value]
+                return [cexp, this.normalizeTypeOnly(cexp.vtype, new Map<string, ResolvedType>()), cexp.value, undefined];
             }
             else {
                 return undefined;
@@ -824,7 +824,7 @@ class Assembly {
         }
         else if(cexp instanceof AccessStaticFieldExpression) {
             const stype = this.normalizeTypeOnly(cexp.stype, new Map<string, ResolvedType>());
-            return [cexp, stype, `${stype}.idStr}::${cexp.name}`];
+            return [cexp, stype, `${stype.idStr}::${cexp.name}`, undefined];
         }
         else {
             return undefined;
@@ -1291,7 +1291,7 @@ class Assembly {
         let ltype = cform[1];
         let tval = cform[0];
 
-        return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, tval, cform[2]));
+        return ResolvedType.createSingle(ResolvedLiteralAtomType.create(ltype, tval, cform[2], cform[3]));
     }
 
     private normalizeType_Tuple(t: TupleTypeSignature, binds: Map<string, ResolvedType>): ResolvedType {
