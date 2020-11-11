@@ -1790,7 +1790,6 @@ class Assembly {
     getSpecialBufferCompressionType(): ResolvedType { return this.internSpecialObjectType(["BufferCompression"]); }
     getSpecialByteBufferType(): ResolvedType { return this.internSpecialObjectType(["ByteBuffer"]); }
     getSpecialUUIDType(): ResolvedType { return this.internSpecialObjectType(["UUID"]); }
-    getSpecialLogicalTimeType(): ResolvedType { return this.internSpecialObjectType(["LogicalTime"]); }
     getSpecialCryptoHashType(): ResolvedType { return this.internSpecialObjectType(["CryptoHash"]); }
     getSpecialRegexType(): ResolvedType { return this.internSpecialObjectType(["Regex"]); }
     getSpecialRegexMatchType(): ResolvedType { return this.internSpecialObjectType(["RegexMatch"]); }
