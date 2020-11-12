@@ -7,7 +7,6 @@ import { MIRBody, MIRResolvedTypeKey, MIRPhi, MIRBasicBlock, MIRInvokeKey, MIRTe
 import { computeBlockLinks, topologicalOrder, FlowLink, computeBlockLiveVars, BlockLiveSet } from "./mir_info";
 import { MIRFunctionParameter, MIRType, MIRInvokeBodyDecl, MIRAssembly } from "./mir_assembly";
 import { SourceInfo } from "../ast/parser";
-import { computeVarTypesForInvoke } from "./mir_vartype";
 
 type NBodyInfo = {
     nname: MIRInvokeKey;
@@ -223,7 +222,7 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
 
         const bmap = new Map<string, MIRBasicBlock>();
         bproc.nblocks.map((bb) => bmap.set(bb.label, bb));
-        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, [...inv.pragmas], inv.sourceLocation, inv.srcFile, bproc.nparams, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
+        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, inv.sourceLocation, inv.srcFile, bproc.nparams, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
         rbl.push(ninv);
 
         let ninvargs = new Map<string, MIRType>();

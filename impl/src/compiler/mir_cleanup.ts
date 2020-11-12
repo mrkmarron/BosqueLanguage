@@ -106,7 +106,6 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRLoadTupleIndexSetGuard: {
             const ltig = op as MIRLoadTupleIndexSetGuard;
             ltig.arg = propagateAssign_Remap(ltig.arg, propMap);
-            ltig.guard = propagateAssign_RemapGuard(ltig.guard, propMap) as MIRGuard;
             break;
         }
         case MIROpTag.MIRLoadRecordProperty: {
@@ -117,7 +116,6 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRLoadRecordPropertySetGuard: {
             const lrpg = op as MIRLoadRecordPropertySetGuard;
             lrpg.arg = propagateAssign_Remap(lrpg.arg, propMap);
-            lrpg.guard = propagateAssign_RemapGuard(lrpg.guard, propMap) as MIRGuard;
             break;
         }
         case MIROpTag.MIRLoadField: {

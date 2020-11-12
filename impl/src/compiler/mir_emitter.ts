@@ -12,7 +12,6 @@ import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLi
 import { TypeChecker } from "../type_checker/type_checker";
 import { simplifyBody } from "./mir_cleanup";
 import { convertBodyToSSA } from "./mir_ssa";
-import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
 import { BSQRegex } from "../ast/bsqregex";
 import { ConstantExpressionValue, LiteralExpressionValue } from "../ast/body";
@@ -777,7 +776,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRReturnAssign(sinfo, src));
+        this.m_currentBlock.push(new MIRReturnAssign(sinfo, src, rtype.trkey));
     }
 
     emitReturnAssignOfCons(sinfo: SourceInfo, oftype: MIRType, args: MIRArgument[]) {
@@ -1398,12 +1397,6 @@ class MIREmitter {
 
             if (checker.getErrorList().length === 0) {
                 checker.processRegexInfo();
-
-                masm.invokeDecls.forEach((idecl) => {
-                    const args = new Map<string, MIRType>();
-                    idecl.params.forEach((param) => args.set(param.name, masm.typeMap.get(param.type) as MIRType));
-                    computeVarTypesForInvoke(idecl.body, args, masm.typeMap.get(idecl.resultType) as MIRType, masm);
-                });
 
                 if (functionalize) {
                     functionalizeInvokes(masm);

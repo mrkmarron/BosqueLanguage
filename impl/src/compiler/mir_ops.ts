@@ -2461,14 +2461,16 @@ class MIRJumpNone extends MIROp {
 }
 
 class MIRReturnAssign extends MIROp {
+    readonly oftype: MIRResolvedTypeKey
     src: MIRArgument;
-    name: MIRLocalVariable;
+    name: MIRRegisterArgument;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, name?: MIRLocalVariable) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, oftype: MIRResolvedTypeKey, name?: MIRRegisterArgument) {
         super(MIROpTag.MIRReturnAssign, sinfo);
 
         this.src = src;
         this.name = name || new MIRLocalVariable("$__ir_ret__");
+        this.oftype = oftype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
@@ -2479,20 +2481,20 @@ class MIRReturnAssign extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), src: this.src.jemit(), name: this.name.jemit() };
+        return { ...this.jbemit(), src: this.src.jemit(), oftype: this.oftype, name: this.name.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRReturnAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.name));
+        return new MIRReturnAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.oftype, MIRRegisterArgument.jparse(jobj.name));
     }
 }
 
 class MIRReturnAssignOfCons extends MIROp {
     readonly oftype: MIRResolvedTypeKey; 
     args: MIRArgument[];
-    name: MIRLocalVariable;
+    name: MIRRegisterArgument;
 
-    constructor(sinfo: SourceInfo, oftype: MIRResolvedTypeKey, args: MIRArgument[], name?: MIRLocalVariable) {
+    constructor(sinfo: SourceInfo, oftype: MIRResolvedTypeKey, args: MIRArgument[], name?: MIRRegisterArgument) {
         super(MIROpTag.MIRReturnAssignOfCons, sinfo);
 
         this.oftype = oftype;
@@ -2512,7 +2514,7 @@ class MIRReturnAssignOfCons extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRReturnAssignOfCons(jparsesinfo(jobj.sinfo), jobj.oftype, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRLocalVariable.jparse(jobj.name));
+        return new MIRReturnAssignOfCons(jparsesinfo(jobj.sinfo), jobj.oftype, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRRegisterArgument.jparse(jobj.name));
     }
 }
 
