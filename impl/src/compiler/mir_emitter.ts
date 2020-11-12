@@ -294,7 +294,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNone(), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNone(), this.registerResolvedTypeReference(this.assembly.getSpecialNoneType()).trkey, trgt));
     }
 
     emitLoadConstBool(sinfo: SourceInfo, bv: boolean, trgt: MIRRegisterArgument) {
@@ -302,7 +302,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, bv ? new MIRConstantTrue() : new MIRConstantFalse(), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, bv ? new MIRConstantTrue() : new MIRConstantFalse(), this.registerResolvedTypeReference(this.assembly.getSpecialBoolType()).trkey, trgt));
     }
 
     emitLoadConstIntegralValue(sinfo: SourceInfo, itype: MIRType, vv: string, trgt: MIRRegisterArgument) {
@@ -311,16 +311,16 @@ class MIREmitter {
         }
 
         if(itype.trkey === "NSCore::Int") {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantInt(vv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantInt(vv), itype.trkey, trgt));
         }
         else if(itype.trkey === "NSCore::Nat") {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNat(vv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantNat(vv), itype.trkey, trgt));
         }
         else if(itype.trkey === "NSCore::BigInt") {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigInt(vv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigInt(vv), itype.trkey, trgt));
         }
         else {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigNat(vv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantBigNat(vv), itype.trkey, trgt));
         }
     }
 
@@ -329,7 +329,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRational(iv), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRational(iv), this.registerResolvedTypeReference(this.assembly.getSpecialRationalType()).trkey, trgt));
     }
 
     emitLoadConstFloatPoint(sinfo: SourceInfo, ftype: MIRType, fv: string, trgt: MIRRegisterArgument) {
@@ -338,10 +338,10 @@ class MIREmitter {
         }
 
         if(ftype.trkey === "NSCore::Float") {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantFloat(fv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantFloat(fv), ftype.trkey, trgt));
         }
         else {
-            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantDecmial(fv), trgt));
+            this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantDecmial(fv), ftype.trkey, trgt));
         }
     }
 
@@ -350,7 +350,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantComplex(rv, iv), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantComplex(rv, iv), this.registerResolvedTypeReference(this.assembly.getSpecialComplexType()).trkey, trgt));
     }
 
     emitLoadConstString(sinfo: SourceInfo, sv: string, trgt: MIRRegisterArgument) {
@@ -358,7 +358,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantString(sv), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantString(sv), this.registerResolvedTypeReference(this.assembly.getSpecialStringType()).trkey, trgt));
     }
 
     emitLoadLiteralRegex(sinfo: SourceInfo, restr: BSQRegex, trgt: MIRRegisterArgument) {
@@ -366,7 +366,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRegex(restr), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantRegex(restr), this.registerResolvedTypeReference(this.assembly.getSpecialRegexType()).trkey, trgt));
     }
 
     emitLoadLiteralStringOf(sinfo: SourceInfo, sv: string, tskey: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
@@ -374,7 +374,7 @@ class MIREmitter {
             return;
         }
 
-        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantStringOf(sv, tskey), trgt));
+        this.m_currentBlock.push(new MIRLoadConst(sinfo, new MIRConstantStringOf(sv, tskey), tskey, trgt));
     }
 
     emitLoadConstDataString(sinfo: SourceInfo, sv: string, tskey: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
@@ -835,7 +835,7 @@ class MIREmitter {
 
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
         simplifyBody(ibody);
-        convertBodyToSSA(ibody, args);
+        convertBodyToSSA(ibody, this.registerResolvedTypeReference(this.assembly.getSpecialBoolType()), args);
 
         return ibody;
     }

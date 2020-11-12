@@ -10,15 +10,20 @@ import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topolo
 import { MIRType } from "./mir_assembly";
 
 type SSAState = {
+    newtidctr: number,
+    booltype: MIRResolvedTypeKey,
+
     remap: Map<string, MIRRegisterArgument>,
     ctrs: Map<string, number>,
-    tmpregids: Map<string, number>
+    vartypes: Map<string, MIRResolvedTypeKey>
 };
 
-function convertToSSA(reg: MIRRegisterArgument, ssastate: SSAState): MIRTempRegister {
+function convertToSSA(reg: MIRRegisterArgument, oftype: MIRResolvedTypeKey, ssastate: SSAState): MIRTempRegister {
     if (reg instanceof MIRTempRegister && !ssastate.ctrs.has(reg.nameID)) {
         ssastate.ctrs.set(reg.nameID, 0);
+
         ssastate.remap.set(reg.nameID, reg);
+        ssastate.vartypes.set(reg.nameID, oftype);
 
         return reg;
     }
@@ -28,14 +33,12 @@ function convertToSSA(reg: MIRRegisterArgument, ssastate: SSAState): MIRTempRegi
 
         const vname = reg.nameID + `$${ssaCtr}`;
 
-        if (reg instanceof MIRTempRegister) {
-            ssastate.remap.set(reg.nameID, new MIRTempRegister(reg.regID, vname));
-        }
-        else {
-            ssastate.remap.set(reg.nameID, new MIRTempRegister(ssastate.tmpregids.get(reg.nameID) as number, vname));
-        }
+        let rreg = (reg instanceof MIRTempRegister) ? new MIRTempRegister(reg.regID, vname) : new MIRTempRegister(ssastate.newtidctr++, vname);
+        
+        ssastate.remap.set(reg.nameID, rreg);
+        ssastate.vartypes.set(rreg.nameID, oftype);
 
-        return ssastate.remap.get(reg.nameID) as MIRTempRegister;
+        return rreg;
     }
 }
 
@@ -46,7 +49,7 @@ function convertToSSA_Guard(guard: MIRGuard, ssastate: SSAState): MIRGuard {
     else {
         const vg = guard as MIRArgGuard;
         if(vg.greg instanceof MIRRegisterArgument) {
-            return new MIRArgGuard(convertToSSA(vg.greg as MIRRegisterArgument, ssastate));
+            return new MIRArgGuard(convertToSSA(vg.greg as MIRRegisterArgument, ssastate.booltype, ssastate));
         }
         else {
             return vg;
@@ -108,151 +111,151 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
         }
         case MIROpTag.MIRLoadUnintVariableValue: {
             const luv = op as MIRLoadUnintVariableValue;
-            luv.trgt = convertToSSA(luv.trgt, ssastate);
+            luv.trgt = convertToSSA(luv.trgt, luv.oftype, ssastate);
             return op;
         }
         case MIROpTag.MIRConvertValue: {
             const conv = op as MIRConvertValue;
             conv.src = processSSA_Use(conv.src, ssastate);
             conv.guard = processSSAUse_RemapGuard(conv.guard, ssastate);
-            conv.trgt = convertToSSA(conv.trgt, ssastate);
+            conv.trgt = convertToSSA(conv.trgt, conv.intotype, ssastate);
             return op;
         }
         case MIROpTag.MIRCheckNoError: {
             const chk = op as MIRCheckNoError;
             chk.src = processSSA_Use(chk.src, ssastate);
-            chk.trgt = convertToSSA(chk.trgt, ssastate);
+            chk.trgt = convertToSSA(chk.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRExtractResultOkValue: {
             const erok = op as MIRExtractResultOkValue;
             erok.src = processSSA_Use(erok.src, ssastate);
-            erok.trgt = convertToSSA(erok.trgt, ssastate);
+            erok.trgt = convertToSSA(erok.trgt, erok.valuetype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadConst: {
             const lc = op as MIRLoadConst;
-            lc.trgt = convertToSSA(lc.trgt, ssastate);
+            lc.trgt = convertToSSA(lc.trgt, lc.consttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadConstDataString: {
             const lcd = op as MIRLoadConstDataString;
-            lcd.trgt = convertToSSA(lcd.trgt, ssastate);
+            lcd.trgt = convertToSSA(lcd.trgt, lcd.tskey, ssastate);
             return op;
         }
         case MIROpTag.MIRTupleHasIndex: {
             const thi = op as MIRTupleHasIndex;
             thi.arg = processSSA_Use(thi.arg, ssastate);
-            thi.trgt = convertToSSA(thi.trgt, ssastate);
+            thi.trgt = convertToSSA(thi.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRRecordHasProperty: {
             const rhi = op as MIRRecordHasProperty;
             rhi.arg = processSSA_Use(rhi.arg, ssastate);
-            rhi.trgt = convertToSSA(rhi.trgt, ssastate);
+            rhi.trgt = convertToSSA(rhi.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadTupleIndex: {
             const lti = op as MIRLoadTupleIndex;
             lti.arg = processSSA_Use(lti.arg, ssastate);
-            lti.trgt = convertToSSA(lti.trgt, ssastate);
+            lti.trgt = convertToSSA(lti.trgt, lti.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadTupleIndexSetGuard: {
             const ltig = op as MIRLoadTupleIndexSetGuard;
             ltig.arg = processSSA_Use(ltig.arg, ssastate);
             ltig.guard = convertToSSA_Guard(ltig.guard, ssastate);
-            ltig.trgt = convertToSSA(ltig.trgt, ssastate);
+            ltig.trgt = convertToSSA(ltig.trgt, ltig.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadRecordProperty: {
             const lrp = op as MIRLoadRecordProperty;
             lrp.arg = processSSA_Use(lrp.arg, ssastate);
-            lrp.trgt = convertToSSA(lrp.trgt, ssastate);
+            lrp.trgt = convertToSSA(lrp.trgt, lrp.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadRecordPropertySetGuard: {
             const lrpg = op as MIRLoadRecordPropertySetGuard;
             lrpg.arg = processSSA_Use(lrpg.arg, ssastate);
             lrpg.guard = convertToSSA_Guard(lrpg.guard, ssastate);
-            lrpg.trgt = convertToSSA(lrpg.trgt, ssastate);
+            lrpg.trgt = convertToSSA(lrpg.trgt, lrpg.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadField: {
             const lmf = op as MIRLoadField;
             lmf.arg = processSSA_Use(lmf.arg, ssastate);
-            lmf.trgt = convertToSSA(lmf.trgt, ssastate);
+            lmf.trgt = convertToSSA(lmf.trgt, lmf.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRTupleProjectToEphemeral: {
             const pte = op as MIRTupleProjectToEphemeral;
             pte.arg = processSSA_Use(pte.arg, ssastate);
-            pte.trgt = convertToSSA(pte.trgt, ssastate);
+            pte.trgt = convertToSSA(pte.trgt, pte.epht, ssastate);
             return op;
         }
         case MIROpTag.MIRRecordProjectToEphemeral: {
             const pre = op as MIRRecordProjectToEphemeral;
             pre.arg = processSSA_Use(pre.arg, ssastate);
-            pre.trgt = convertToSSA(pre.trgt, ssastate);
+            pre.trgt = convertToSSA(pre.trgt, pre.epht, ssastate);
             return op;
         }
         case MIROpTag.MIREntityProjectToEphemeral: {
             const pee = op as MIREntityProjectToEphemeral;
             pee.arg = processSSA_Use(pee.arg, ssastate);
-            pee.trgt = convertToSSA(pee.trgt, ssastate);
+            pee.trgt = convertToSSA(pee.trgt, pee.epht, ssastate);
             return op;
         }
         case MIROpTag.MIRTupleUpdate: {
             const mi = op as MIRTupleUpdate;
             mi.arg = processSSA_Use(mi.arg, ssastate);
             mi.updates = processSSAUse_RemapStructuredArgs<[number, MIRArgument, MIRResolvedTypeKey]>(mi.updates, (u) => [u[0], processSSA_Use(u[1], ssastate), u[2]]);
-            mi.trgt = convertToSSA(mi.trgt, ssastate);
+            mi.trgt = convertToSSA(mi.trgt, mi.argflowtype, ssastate);
             return op;
         }
         case MIROpTag.MIRRecordUpdate: {
             const mp = op as MIRRecordUpdate;
             mp.arg = processSSA_Use(mp.arg, ssastate);
             mp.updates = processSSAUse_RemapStructuredArgs<[string, MIRArgument, MIRResolvedTypeKey]>(mp.updates, (u) => [u[0], processSSA_Use(u[1], ssastate), u[2]]);
-            mp.trgt = convertToSSA(mp.trgt, ssastate);
+            mp.trgt = convertToSSA(mp.trgt, mp.argflowtype, ssastate);
             return op;
         }
         case MIROpTag.MIREntityUpdate: {
             const mf = op as MIREntityUpdate;
             mf.arg = processSSA_Use(mf.arg, ssastate);
             mf.updates = processSSAUse_RemapStructuredArgs<[string, MIRArgument, MIRResolvedTypeKey]>(mf.updates, (u) => [u[0], processSSA_Use(u[1], ssastate), u[2]]);
-            mf.trgt = convertToSSA(mf.trgt, ssastate);
+            mf.trgt = convertToSSA(mf.trgt, mf.argflowtype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadFromEpehmeralList: {
             const mle = op as MIRLoadFromEpehmeralList;
             mle.arg = processSSA_Use(mle.arg, ssastate);
-            mle.trgt = convertToSSA(mle.trgt, ssastate);
+            mle.trgt = convertToSSA(mle.trgt, mle.resulttype, ssastate);
             return op;
         }
         case MIROpTag.MIRMultiLoadFromEpehmeralList: {
             const mle = op as MIRMultiLoadFromEpehmeralList;
             mle.arg = processSSA_Use(mle.arg, ssastate);
             mle.trgts.forEach((trgt) => {
-                trgt.into = convertToSSA(trgt.into, ssastate);
+                trgt.into = convertToSSA(trgt.into, trgt.oftype, ssastate);
             });
             return op;
         }
         case MIROpTag.MIRSliceEpehmeralList: {
             const mle = op as MIRSliceEpehmeralList;
             mle.arg = processSSA_Use(mle.arg, ssastate);
-            mle.trgt = convertToSSA(mle.trgt, ssastate);
+            mle.trgt = convertToSSA(mle.trgt, mle.sltype, ssastate);
             return op;
         }
         case MIROpTag.MIRInvokeFixedFunction: {
             const invk = op as MIRInvokeFixedFunction;
             invk.args = processSSAUse_RemapArgs(invk.args, ssastate);
-            invk.trgt = convertToSSA(invk.trgt, ssastate);
+            invk.trgt = convertToSSA(invk.trgt, invk.resultType, ssastate);
             return op;
         }
         case MIROpTag.MIRInvokeVirtualFunction: {
             const invk = op as MIRInvokeVirtualFunction;
             invk.args = processSSAUse_RemapArgs(invk.args, ssastate);
-            invk.trgt = convertToSSA(invk.trgt, ssastate);
+            invk.trgt = convertToSSA(invk.trgt, invk.resultType, ssastate);
             return op;
         }
         case MIROpTag.MIRInvokeVirtualOperator: {
@@ -260,112 +263,112 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
             invk.args = processSSAUse_RemapStructuredArgs<{ arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, arg: MIRArgument }>(invk.args, (u) => {
                 return { arglayouttype: u.arglayouttype, argflowtype: u.argflowtype, arg: processSSA_Use(u.arg, ssastate) };
             });
-            invk.trgt = convertToSSA(invk.trgt, ssastate);
+            invk.trgt = convertToSSA(invk.trgt, invk.resultType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorTuple: {
             const tc = op as MIRConstructorTuple;
             tc.args = processSSAUse_RemapArgs(tc.args, ssastate);
-            tc.trgt = convertToSSA(tc.trgt, ssastate);
+            tc.trgt = convertToSSA(tc.trgt, tc.resultTupleType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorTupleFromEphemeralList: {
             const tc = op as MIRConstructorTupleFromEphemeralList;
             tc.arg = processSSA_Use(tc.arg, ssastate);
-            tc.trgt = convertToSSA(tc.trgt, ssastate);
+            tc.trgt = convertToSSA(tc.trgt, tc.resultTupleType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorRecord: {
             const tc = op as MIRConstructorRecord;
             tc.args = processSSAUse_RemapStructuredArgs<[string, MIRArgument]>(tc.args, (v) => [v[0], processSSA_Use(v[1], ssastate)]);
-            tc.trgt = convertToSSA(tc.trgt, ssastate);
+            tc.trgt = convertToSSA(tc.trgt, tc.resultRecordType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorRecordFromEphemeralList: {
             const tc = op as MIRConstructorRecordFromEphemeralList;
             tc.arg = processSSA_Use(tc.arg, ssastate);
-            tc.trgt = convertToSSA(tc.trgt, ssastate);
+            tc.trgt = convertToSSA(tc.trgt, tc.resultRecordType, ssastate);
             return op;
         }
         case MIROpTag.MIRStructuredAppendTuple: {
             const at = op as MIRStructuredAppendTuple;
             at.args = processSSAUse_RemapArgs(at.args, ssastate);
-            at.trgt = convertToSSA(at.trgt, ssastate);
+            at.trgt = convertToSSA(at.trgt, at.resultTupleType, ssastate);
             return op;
         }
         case MIROpTag.MIRStructuredJoinRecord: {
             const sj = op as MIRStructuredJoinRecord;
             sj.args = processSSAUse_RemapArgs(sj.args, ssastate);
-            sj.trgt = convertToSSA(sj.trgt, ssastate);
+            sj.trgt = convertToSSA(sj.trgt, sj.resultRecordType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorEphemeralList: {
             const tc = op as MIRConstructorEphemeralList;
             tc.args = processSSAUse_RemapArgs(tc.args, ssastate);
-            tc.trgt = convertToSSA(tc.trgt, ssastate);
+            tc.trgt = convertToSSA(tc.trgt, tc.resultEphemeralListType, ssastate);
             return op;
         }
         case MIROpTag.MIREphemeralListExtend: {
             const pse = op as MIREphemeralListExtend;
             pse.arg = processSSA_Use(pse.arg, ssastate);
             pse.ext = processSSAUse_RemapArgs(pse.ext, ssastate);
-            pse.trgt = convertToSSA(pse.trgt, ssastate);
+            pse.trgt = convertToSSA(pse.trgt, pse.resultType, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
             const cc = op as MIRConstructorPrimaryCollectionEmpty;
-            cc.trgt = convertToSSA(cc.trgt, ssastate);
+            cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
             const cc = op as MIRConstructorPrimaryCollectionSingletons;
             cc.args = processSSAUse_RemapArgs(cc.args, ssastate);
-            cc.trgt = convertToSSA(cc.trgt, ssastate);
+            cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
             const cc = op as MIRConstructorPrimaryCollectionCopies;
             cc.args = processSSAUse_RemapArgs(cc.args, ssastate);
-            cc.trgt = convertToSSA(cc.trgt, ssastate);
+            cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
             const cc = op as MIRConstructorPrimaryCollectionMixed;
             cc.args = processSSAUse_RemapStructuredArgs<[boolean, MIRArgument]>(cc.args, (v) => [v[0], processSSA_Use(v[1], ssastate)]);
-            cc.trgt = convertToSSA(cc.trgt, ssastate);
+            cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRBinKeyEq: {
             const beq = op as MIRBinKeyEq;
             beq.lhs = processSSA_Use(beq.lhs, ssastate);
             beq.rhs = processSSA_Use(beq.rhs, ssastate);
-            beq.trgt = convertToSSA(beq.trgt, ssastate);
+            beq.trgt = convertToSSA(beq.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRBinKeyLess: {
             const bl = op as MIRBinKeyLess;
             bl.lhs = processSSA_Use(bl.lhs, ssastate);
             bl.rhs = processSSA_Use(bl.rhs, ssastate);
-            bl.trgt = convertToSSA(bl.trgt, ssastate);
+            bl.trgt = convertToSSA(bl.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRPrefixNotOp: {
             const pfx = op as MIRPrefixNotOp;
             pfx.arg = processSSA_Use(pfx.arg, ssastate);
-            pfx.trgt = convertToSSA(pfx.trgt, ssastate);
+            pfx.trgt = convertToSSA(pfx.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRAllTrue: {
             const at = op as MIRAllTrue;
             at.args = processSSAUse_RemapArgs(at.args, ssastate);
-            at.trgt = convertToSSA(at.trgt, ssastate);
+            at.trgt = convertToSSA(at.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRIsTypeOf: {
             const it = op as MIRIsTypeOf;
             it.arg = processSSA_Use(it.arg, ssastate);
             it.guard = processSSAUse_RemapGuard(it.guard, ssastate);
-            it.trgt = convertToSSA(it.trgt, ssastate);
+            it.trgt = convertToSSA(it.trgt, ssastate.booltype, ssastate);
             return op;
         }
         case MIROpTag.MIRJump: {
@@ -385,33 +388,33 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
             const regop = op as MIRTempRegisterAssign;
             regop.src = processSSA_Use(regop.src, ssastate);
             regop.guard = processSSAUse_RemapGuard(regop.guard, ssastate);
-            regop.trgt = convertToSSA(regop.trgt, ssastate);
+            regop.trgt = convertToSSA(regop.trgt, regop.layouttype, ssastate);
             return op;
         }
         case MIROpTag.MIRLocalVarStore: {
             const vs = op as MIRLocalVarStore;
             const src = processSSA_Use(vs.src, ssastate);
             const guard = processSSAUse_RemapGuard(vs.guard, ssastate);
-            const trgt = convertToSSA(vs.trgt, ssastate);
+            const trgt = convertToSSA(vs.trgt, vs.layouttype, ssastate);
             return new MIRTempRegisterAssign(vs.sinfo, src, trgt, vs.layouttype, guard);
         }
         case MIROpTag.MIRParameterVarStore: {
             const vs = op as MIRParameterVarStore;
             const src = processSSA_Use(vs.src, ssastate);
             const guard = processSSAUse_RemapGuard(vs.guard, ssastate);
-            const trgt = convertToSSA(vs.trgt, ssastate);
+            const trgt = convertToSSA(vs.trgt, vs.layouttype, ssastate);
             return new MIRTempRegisterAssign(vs.sinfo, src, trgt, vs.layouttype, guard);
         }
         case MIROpTag.MIRReturnAssign: {
             const ra = op as MIRReturnAssign;
             ra.src = processSSA_Use(ra.src, ssastate);
-            ra.name = convertToSSA(ra.name, ssastate);
+            ra.name = convertToSSA(ra.name, ra.oftype, ssastate);
             return op;
         }
         case MIROpTag.MIRReturnAssignOfCons: {
             const ra = op as MIRReturnAssignOfCons;
             ra.args = processSSAUse_RemapArgs(ra.args, ssastate);
-            ra.name = convertToSSA(ra.name, ssastate);
+            ra.name = convertToSSA(ra.name, ra.oftype, ssastate);
             return op;
         }
         case MIROpTag.MIRPhi: {
@@ -424,23 +427,18 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
     }
 }
 
-function generatePhi(sinfo: SourceInfo, lv: string, opts: [string, MIRRegisterArgument][], ctrs: Map<string, number>): MIRPhi {
+function generatePhi(sinfo: SourceInfo, lv: MIRRegisterArgument, opts: [string, MIRRegisterArgument][], ssastate: SSAState): MIRPhi {
     let vassign = new Map<string, MIRRegisterArgument>();
     opts.forEach((e) => vassign.set(e[0], e[1]));
 
-    const ssaCtr = ctrs.get(lv) as number + 1;
-    ctrs.set(lv, ssaCtr);
+    const ptype = ssastate.vartypes.get(opts[0][1].nameID) as MIRResolvedTypeKey;
+    assert(opts.every((opt) => (ssastate.vartypes.get(opt[1].nameID) as MIRResolvedTypeKey) === ptype));
 
-    const vname = lv + `$${ssaCtr}`;
-    if (lv.startsWith("#tmp_")) {
-        return new MIRPhi(sinfo, vassign, new MIRTempRegister(Number.parseInt(lv.substr(5)), vname));
-    }
-    else {
-        return new MIRPhi(sinfo, vassign, new MIRVariable(lv, vname));
-    }
+    const nlv = convertToSSA(lv, ptype, ssastate);
+    return new MIRPhi(sinfo, vassign, ptype, nlv);
 }
 
-function computePhis(sinfo: SourceInfo, block: string, ctrs: Map<string, number>, remapped: Map<string, Map<string, MIRRegisterArgument>>, links: Map<string, FlowLink>, live: Map<string, BlockLiveSet>): [MIRPhi[], Map<string, MIRRegisterArgument>] {
+function computePhis(sinfo: SourceInfo, block: string, ssastate: SSAState, remapped: Map<string, Map<string, MIRRegisterArgument>>, links: Map<string, FlowLink>, live: Map<string, BlockLiveSet>): [MIRPhi[], Map<string, MIRRegisterArgument>] {
     let remap = new Map<string, MIRRegisterArgument>();
     let phis: MIRPhi[] = [];
 
@@ -461,7 +459,7 @@ function computePhis(sinfo: SourceInfo, block: string, ctrs: Map<string, number>
             remap.set(n, rmp);
         }
         else {
-            const phi = generatePhi(sinfo, n, phiOpts, ctrs);
+            const phi = generatePhi(sinfo, v, phiOpts, ssastate);
 
             phis.push(phi);
             remap.set(n, phi.trgt);
@@ -471,35 +469,41 @@ function computePhis(sinfo: SourceInfo, block: string, ctrs: Map<string, number>
     return [phis, remap];
 }
 
-function convertBodyToSSA(body: MIRBody, args: Map<string, MIRType>) {
+function convertBodyToSSA(body: MIRBody, booltype: MIRType, args: Map<string, MIRType>) {
     const blocks = body.body as Map<string, MIRBasicBlock>;
     const links = computeBlockLinks(blocks);
     const live = computeBlockLiveVars(blocks);
     const torder = topologicalOrder(blocks);
 
     let remapped = new Map<string, Map<string, MIRRegisterArgument>>();
-    let ctrs = new Map<string, number>();
+    let ssastate = {
+        newtidctr: 100000,
+        booltype: booltype.trkey,
+        
+        remap: new Map<string, MIRRegisterArgument>(),
+        ctrs: new Map<string, number>(),
+        vartypes: new Map<string, MIRResolvedTypeKey>()
+    };
 
     for (let j = 0; j < torder.length; ++j) {
         const block = torder[j];
 
         if (block.label === "entry") {
-            let remap = new Map<string, MIRRegisterArgument>();
-            args.forEach((arg, name) => remap.set(name, new MIRParameterVariable(name)));
-            remap.set("$__ir_ret__", new MIRLocalVariable("$__ir_ret__"));
-            remap.set("$$return", new MIRLocalVariable("$$return"));
+            args.forEach((arg, name) => ssastate.remap.set(name, new MIRParameterVariable(name)));
+            ssastate.remap.set("$__ir_ret__", new MIRLocalVariable("$__ir_ret__"));
+            ssastate.remap.set("$$return", new MIRLocalVariable("$$return"));
 
             for (let i = 0; i < block.ops.length; ++i) {
-                block.ops[i] = assignSSA(block.ops[i], remap, ctrs);
+                block.ops[i] = assignSSA(block.ops[i], ssastate);
             }
 
-            remapped.set(block.label, remap);
+            remapped.set(block.label, ssastate.remap);
         }
         else {
-            const [phis, remap] = computePhis(body.sinfo, block.label, ctrs, remapped, links, live);
+            const [phis, remap] = computePhis(body.sinfo, block.label, ssastate, remapped, links, live);
 
             for (let i = 0; i < block.ops.length; ++i) {
-                assignSSA(block.ops[i], remap, ctrs);
+                assignSSA(block.ops[i], ssastate);
             }
 
             block.ops.unshift(...phis);

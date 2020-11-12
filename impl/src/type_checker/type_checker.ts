@@ -6190,7 +6190,7 @@ class TypeChecker {
 
         const chkbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (chkbody !== undefined) {
-            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype).trkey, "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()).trkey, undefined, undefined, chkbody);
+            const chkinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(chktype).trkey, "@@explicit_invariant", `${chktype.idStr}@@explicit_invariant`, chkkey, ["explicit_invariant", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, false, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()).trkey, undefined, undefined, chkbody);
             this.m_emitter.masm.invokeDecls.set(chkkey, chkinv);
         }
 
@@ -6279,7 +6279,7 @@ class TypeChecker {
 
         const consbody = this.m_emitter.getBody(tdecl.srcFile, tdecl.sourceLocation, args);
         if (consbody !== undefined) {
-            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype).trkey, "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, this.m_emitter.registerResolvedTypeReference(constype).trkey, undefined, undefined, consbody);
+            const consinv = new MIRInvokeBodyDecl(this.m_emitter.registerResolvedTypeReference(constype).trkey, "@@constructor", `${constype.idStr}@@constructor`, conskey, ["constructor", "private"], false, tdecl.sourceLocation, tdecl.srcFile, params, optfields.length !== 0, this.m_emitter.registerResolvedTypeReference(constype).trkey, undefined, undefined, consbody);
             this.m_emitter.masm.invokeDecls.set(conskey, consinv);
         }
 
@@ -6418,7 +6418,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), new Map<string, VarInfo>(), declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], new Map<string, MIRType>());
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, [], resultType.trkey, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, [], false, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. expressions as default arguments or field values which can only have other specific refs (but not pcodes or random other values)
@@ -6440,7 +6440,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, false, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     //e.g. things like pre and post conditions
@@ -6470,7 +6470,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, pcodes, cargs, declaredResult);
         
         const mirbody = this.checkBodyExpression(srcFile, env, exp, [], argTypes);
-        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, false, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     private processInvokeInfo(fname: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member" | "operator", iname: string, ikey: MIRInvokeKey, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
@@ -6621,7 +6621,7 @@ class TypeChecker {
             const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);
 
             const mirbody = this.checkBodyStatement(invoke.srcFile, env, (realbody as BodyImplementation).body as BlockStatement, optparaminfo, outparaminfo, argTypes, preject, postject);
-            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, params, resultType.trkey, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
+            return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, params, optparaminfo.length !== 0, resultType.trkey, preject !== undefined ? preject[0].map((pc) => pc.ikey) : undefined, postject !== undefined ? postject[0].map((pc) => pc.ikey) : undefined, mirbody as MIRBody);
         }
     }
 
@@ -6688,7 +6688,7 @@ class TypeChecker {
         const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), cargs, fsig.resultType);
 
         const mirbody = this.checkBodyStatement(pci.srcFile, env, realbody, [], outparaminfo, argTypes, undefined, undefined);
-        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", sinfo, pci.srcFile, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
+        return new MIRInvokeBodyDecl(undefined, "[PCODE]", iname, ikey, pci.attributes, pci.recursive === "yes", sinfo, pci.srcFile, params, false, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
     processConstExpr(ikey: MIRInvokeKey, srcFile: string, name: string, containingType: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, cexp: ConstantExpressionValue, attribs: string[], binds: Map<string, ResolvedType>, ddecltype: ResolvedType) {

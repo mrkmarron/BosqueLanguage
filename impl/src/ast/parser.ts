@@ -150,6 +150,7 @@ const LeftScanParens = ["[", "(", "{", "(|", "{|"];
 const RightScanParens = ["]", ")", "}", "|)", "|}"];
 
 const AttributeStrings = [
+    "entrypoint",
     "struct",
     "hidden",
     "private",
@@ -170,6 +171,9 @@ const AttributeStrings = [
     "infix",
     "numeric",
     "dynamic",
+
+    "__safe",
+    "__assume_safe"
 ];
 
 const UnsafeFieldNames = ["is", "as", "isNone", "isSome", "asTry", "asOrNone", "hasProperty", "getPropertyOrNone", "getPropertyTry"]

@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRBody, MIRResolvedTypeKey, MIRPhi, MIRBasicBlock, MIRInvokeKey, MIRTempRegister, MIRVariable, MIRRegisterArgument, MIROpTag, MIRJump, MIRInvokeFixedFunction, MIRJumpCond, MIRJumpNone } from "./mir_ops";
+import { MIRBody, MIRResolvedTypeKey, MIRPhi, MIRBasicBlock, MIRInvokeKey, MIRTempRegister,  MIRRegisterArgument, MIROpTag, MIRJump, MIRInvokeFixedFunction, MIRJumpCond, MIRJumpNone, MIRLocalVariable } from "./mir_ops";
 import { computeBlockLinks, topologicalOrder, FlowLink, computeBlockLiveVars, BlockLiveSet } from "./mir_info";
 import { MIRFunctionParameter, MIRType, MIRInvokeBodyDecl, MIRAssembly } from "./mir_assembly";
 import { SourceInfo } from "../ast/parser";
@@ -18,7 +18,7 @@ const sinfo_undef = new SourceInfo(-1, -1, -1, -1);
 
 class FunctionalizeEnv
 {
-    tmpctr: number = 100000;
+    tmpctr: number = 200000;
     readonly rtype: MIRResolvedTypeKey;
     readonly invid: MIRInvokeKey;
     readonly largs: MIRRegisterArgument[];
@@ -54,7 +54,7 @@ function generateTailCall(bblabel: string, fenv: FunctionalizeEnv): MIRInvokeFix
     const phiargs = fenv.trgtphis.map((phi) => phi.src.get(bblabel) as MIRRegisterArgument);
     const args = [...fenv.largs, ...phiargs];
 
-    return new MIRInvokeFixedFunction(sinfo_undef, fenv.rtype, fenv.invid, args, fenv.generateTempRegister());
+    return new MIRInvokeFixedFunction(sinfo_undef, fenv.rtype, fenv.invid, args, undefined, fenv.generateTempRegister(), undefined);
 }
 
 function updateJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv) {
@@ -149,7 +149,7 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
     const exit = bbl.find((bb) => bb.label === "exit") as MIRBasicBlock;
 
     if(exit.ops.length === 0 || !(exit.ops[0] instanceof MIRPhi)) {
-        const phi = new MIRPhi(sinfo_undef, new Map<string, MIRRegisterArgument>(fenv.rphimap), new MIRVariable("$$return"));
+        const phi = new MIRPhi(sinfo_undef, new Map<string, MIRRegisterArgument>(fenv.rphimap), fenv.rtype, new MIRLocalVariable("$$return"));
         exit.ops = [phi, ...exit.ops];
     }
     else {
@@ -210,30 +210,33 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
         return [];
     }
 
-    const invargs = new Map<string, MIRType>();
-    inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-    computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
+    //
+    //TODO: Currently we leave types in the body var map for vars that don't exist -- not a bug but a bit messy. Can clean this up by implementing a reflow var types method.
+    //
+    //const invargs = new Map<string, MIRType>();
+    //inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
+    //computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
 
     let rbl: MIRInvokeBodyDecl[] = [];
     let wl = [{ nbi: f1, post: inv.postconditions }];
     while (wl.length !== 0) {
-        const item = wl.shift() as { nbi: NBodyInfo, post: MIRInvokeKey | undefined };
+        const item = wl.shift() as { nbi: NBodyInfo, post: MIRInvokeKey[] | undefined };
         const bproc = item.nbi;
 
         const bmap = new Map<string, MIRBasicBlock>();
         bproc.nblocks.map((bb) => bmap.set(bb.label, bb));
-        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, inv.sourceLocation, inv.srcFile, bproc.nparams, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
+        const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, inv.sourceLocation, inv.srcFile, bproc.nparams, false, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
         rbl.push(ninv);
 
-        let ninvargs = new Map<string, MIRType>();
-        ninv.params.forEach((param) => ninvargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-        computeVarTypesForInvoke(ninv.body, ninvargs, masm.typeMap.get(ninv.resultType) as MIRType, masm);
+        //let ninvargs = new Map<string, MIRType>();
+        //ninv.params.forEach((param) => ninvargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
+        //computeVarTypesForInvoke(ninv.body, ninvargs, masm.typeMap.get(ninv.resultType) as MIRType, masm);
 
         const ff = processBody(inv.key, inv.body, masm.typeMap.get(ninv.resultType) as MIRType);
         if (ff !== undefined) {
-            let invargs = new Map<string, MIRType>();
-            inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-            computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
+            //let invargs = new Map<string, MIRType>();
+            //inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
+            //computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
 
             wl.push({ nbi: ff, post: undefined })
         }

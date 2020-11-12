@@ -108,7 +108,7 @@ abstract class MIRInvokeDecl {
 
     static jparse(jobj: any): MIRInvokeDecl {
         if (jobj.body) {
-            return new MIRInvokeBodyDecl(jobj.enclosingDecl, jobj.name, jobj.iname, jobj.key, jobj.attributes, jobj.recursive, jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.resultType, jobj.preconditions || undefined, jobj.postconditions || undefined, MIRBody.jparse(jobj.body));
+            return new MIRInvokeBodyDecl(jobj.enclosingDecl, jobj.name, jobj.iname, jobj.key, jobj.attributes, jobj.recursive, jparsesinfo(jobj.sinfo), jobj.file, jobj.params.map((p: any) => MIRFunctionParameter.jparse(p)), jobj.takesmask, jobj.resultType, jobj.preconditions || undefined, jobj.postconditions || undefined, MIRBody.jparse(jobj.body));
         }
         else {
             let binds = new Map<string, MIRResolvedTypeKey>();
@@ -124,15 +124,17 @@ abstract class MIRInvokeDecl {
 
 class MIRInvokeBodyDecl extends MIRInvokeDecl {
     readonly body: MIRBody;
+    readonly takesmask: boolean;
 
-    constructor(enclosingDecl: MIRResolvedTypeKey | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], resultType: MIRResolvedTypeKey, preconds: MIRInvokeKey[] | undefined, postconds: MIRInvokeKey[] | undefined, body: MIRBody) {
+    constructor(enclosingDecl: MIRResolvedTypeKey | undefined, name: string, iname: string, key: MIRInvokeKey, attributes: string[], recursive: boolean, sinfo: SourceInfo, srcFile: string, params: MIRFunctionParameter[], takesmask: boolean, resultType: MIRResolvedTypeKey, preconds: MIRInvokeKey[] | undefined, postconds: MIRInvokeKey[] | undefined, body: MIRBody) {
         super(enclosingDecl, name, iname, key, attributes, recursive, sinfo, srcFile, params, resultType, preconds, postconds);
 
         this.body = body;
+        this.takesmask = takesmask;
     }
 
     jemit(): object {
-        return { enclosingDecl: this.enclosingDecl, name: this.name, iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, recursive: this.recursive, params: this.params.map((p) => p.jemit()), resultType: this.resultType, preconditions: this.preconditions, postconditions: this.postconditions, body: this.body.jemit() };
+        return { enclosingDecl: this.enclosingDecl, name: this.name, iname: this.iname, key: this.key, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, recursive: this.recursive, params: this.params.map((p) => p.jemit()), takesmask: this.takesmask, resultType: this.resultType, preconditions: this.preconditions, postconditions: this.postconditions, body: this.body.jemit() };
     }
 }
 

@@ -1018,12 +1018,14 @@ class MIRExtractResultOkValue extends MIROp {
 class MIRLoadConst extends MIROp {
     trgt: MIRRegisterArgument;
     readonly src: MIRConstantArgument;
+    readonly consttype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, src: MIRConstantArgument, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: MIRConstantArgument, consttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRLoadConst, sinfo);
 
         this.trgt = trgt;
         this.src = src;
+        this.consttype = consttype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return []; }
@@ -1034,11 +1036,11 @@ class MIRLoadConst extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit() };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), consttype: this.consttype, src: this.src.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, jobj.consttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2573,12 +2575,14 @@ class MIRVarLifetimeEnd extends MIROp {
 class MIRPhi extends MIROp {
     src: Map<string, MIRRegisterArgument>;
     trgt: MIRRegisterArgument;
+    readonly layouttype: MIRResolvedTypeKey
 
-    constructor(sinfo: SourceInfo, src: Map<string, MIRRegisterArgument>, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: Map<string, MIRRegisterArgument>, layouttype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRPhi, sinfo);
 
         this.src = src;
         this.trgt = trgt;
+        this.layouttype = layouttype;
     }
 
     getUsedVars(): MIRRegisterArgument[] {
@@ -2599,13 +2603,13 @@ class MIRPhi extends MIROp {
 
     jemit(): object {
         const phis = [...this.src].map((phi) => [phi[0], phi[1].jemit()]);
-        return { ...this.jbemit(), src: phis, trgt: this.trgt.jemit() };
+        return { ...this.jbemit(), src: phis, layouttype: this.layouttype, trgt: this.trgt.jemit() };
     }
 
     static jparse(jobj: any): MIROp {
         let phis = new Map<string, MIRRegisterArgument>();
         jobj.src.forEach((phi: [string, any]) => phis.set(phi[0], MIRRegisterArgument.jparse(phi[1])));
-        return new MIRPhi(jparsesinfo(jobj.sinfo), phis, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRPhi(jparsesinfo(jobj.sinfo), phis, jobj.layouttype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
