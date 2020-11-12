@@ -533,6 +533,7 @@ class MIRAssembly {
 
     readonly invokeDecls: Map<MIRInvokeKey, MIRInvokeBodyDecl> = new Map<MIRInvokeKey, MIRInvokeBodyDecl>();
     readonly primitiveInvokeDecls: Map<MIRInvokeKey, MIRInvokePrimitiveDecl> = new Map<MIRInvokeKey, MIRInvokePrimitiveDecl>();
+    readonly virtualOperatorDecls: Map<MIRVirtualMethodKey, MIRInvokeKey[]> = new Map<MIRVirtualMethodKey, MIRInvokeKey[]>();
 
     readonly conceptDecls: Map<MIRResolvedTypeKey, MIRConceptTypeDecl> = new Map<MIRResolvedTypeKey, MIRConceptTypeDecl>();
     readonly entityDecls: Map<MIRResolvedTypeKey, MIREntityTypeDecl> = new Map<MIRResolvedTypeKey, MIREntityTypeDecl>();
@@ -782,6 +783,7 @@ class MIRAssembly {
             fieldDecls: [...this.fieldDecls].map((fd) => [fd[0], fd[1].jemit()]),
             invokeDecls: [...this.invokeDecls].map((id) => [id[0], id[1].jemit()]),
             primitiveInvokeDecls: [...this.primitiveInvokeDecls].map((id) => [id[0], id[1].jemit()]),
+            virtualOperatorDecls: [...this.virtualOperatorDecls],
             conceptDecls: [...this.conceptDecls].map((cd) => [cd[0], cd[1].jemit()]),
             entityDecls: [...this.entityDecls].map((ed) => [ed[0], ed[1].jemit()]),
             literalTypes: [...this.literalTypes].map((lt) => [lt[0], lt[1].jemit()]),
@@ -804,6 +806,7 @@ class MIRAssembly {
         jobj.fieldDecls.forEach((fd: any) => masm.fieldDecls.set(fd[0], MIRFieldDecl.jparse(fd[1])));
         jobj.invokeDecls.forEach((id: any) => masm.invokeDecls.set(id[0], MIRInvokeDecl.jparse(id[1]) as MIRInvokeBodyDecl));
         jobj.primitiveInvokeDecls.forEach((id: any) => masm.primitiveInvokeDecls.set(id[0], MIRInvokeDecl.jparse(id[1]) as MIRInvokePrimitiveDecl));
+        jobj.virtualOperatorDecls.forEach((od: any) => masm.virtualOperatorDecls.set(od[0], od[1]));
         jobj.conceptDecls.forEach((cd: any) => masm.conceptDecls.set(cd[0], MIROOTypeDecl.jparse(cd[1]) as MIRConceptTypeDecl));
         jobj.entityDecls.forEach((id: any) => masm.entityDecls.set(id[0], MIROOTypeDecl.jparse(id[1]) as MIREntityTypeDecl));
         jobj.literalTypes.forEach((lt: any) => masm.literalTypes.set(lt[0], MIRLiteralType.jparse(lt[1]) as MIRLiteralType));

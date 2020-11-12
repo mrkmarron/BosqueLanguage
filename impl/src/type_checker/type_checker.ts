@@ -9,7 +9,7 @@ import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathS
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRVarGuard, MIRGuard } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRGuard } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
@@ -2571,7 +2571,7 @@ class TypeChecker {
         this.checkRecursion(sinfo, fsig, pcodes, recursive);
 
         //if it is a static operator or it has a unique dynamic resolution based on the types
-        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
+        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.invoke.attributes)) {
             let cargs: MIRArgument[] = [];
             let sigkeys: string[] = [];
             for (let i = 0; i < fsig.params.length; ++i) {
@@ -2627,7 +2627,7 @@ class TypeChecker {
                 cargs.push({ arglayouttype: this.m_emitter.registerResolvedTypeReference(fsig.params[argidx].type as ResolvedType), argflowtype: this.m_emitter.registerResolvedTypeReference(argtypes[argidx].flowtype), arg: this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], fsig.params[argidx].type as ResolvedType) });
             }
 
-            const opkey = this.m_emitter.registerVirtualNamespaceOperatorCall(opdecl.ns, opdecl.name, opdecl, pcodes, cinfo);
+            const opkey = this.m_emitter.registerVirtualNamespaceOperatorCall(opdecl.ns, opdecl.name, pcodes, cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
             this.m_emitter.emitInvokeVirtualOperator(sinfo, opkey, cargs, refinfo, trgt);
         }
@@ -2698,7 +2698,7 @@ class TypeChecker {
                 cargs.push({ arglayouttype: this.m_emitter.registerResolvedTypeReference(fsig.params[argidx].type as ResolvedType), argflowtype: this.m_emitter.registerResolvedTypeReference(argtypes[argidx].flowtype), arg: this.emitInlineConvertIfNeeded(sinfo, args[argidx], argtypes[argidx], fsig.params[argidx].type as ResolvedType) });
             }
 
-            const opkey = this.m_emitter.registerVirtualStaticOperatorCall(ootype, opdecl.name, opdecl, oobinds, pcodes, cinfo);
+            const opkey = this.m_emitter.registerVirtualStaticOperatorCall([mirootype, oodecl, oobinds], opdecl.name, oobinds, pcodes, cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
             this.m_emitter.emitInvokeVirtualOperator(sinfo, opkey, cargs,  refinfo, trgt);
         }
@@ -2711,8 +2711,8 @@ class TypeChecker {
         const nsdecl = this.m_assembly.getNamespace(exp.ns);
 
         if (nsdecl.operators.has(exp.name)) {
-            const opsintro = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
-            const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+            const opsintro = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+            const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
             this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
             const pnames = (opsintro as NamespaceOperatorDecl).invoke.params.map((p) => p.name);
@@ -3371,7 +3371,7 @@ class TypeChecker {
 
             const loadreg = this.m_emitter.generateTmpRegister();
             const hasreg = this.m_emitter.generateTmpRegister();
-            const guard = new MIRVarGuard(hasreg);
+            const guard = new MIRArgGuard(hasreg);
             this.m_emitter.emitLoadTupleIndexSetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.idx, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(ttype), loadreg, guard);
             if(ttype.isSameType(linfo)) {
                 this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), guard);
@@ -3406,7 +3406,7 @@ class TypeChecker {
         else {
             const linfo = this.getInfoForLoadFromSafeIndex(op.sinfo, texp.flowtype, op.idx);
 
-            this.m_emitter.emitLoadTupleIndexSetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.idx, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(linfo), env.getLocalVarInfo(op.vname) !== undefined ? new MIRLocalVariable(op.vname) : new MIRParameterVariable(op.vname), new MIRVarGuard(trgt));
+            this.m_emitter.emitLoadTupleIndexSetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.idx, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(linfo), env.getLocalVarInfo(op.vname) !== undefined ? new MIRLocalVariable(op.vname) : new MIRParameterVariable(op.vname), new MIRArgGuard(trgt));
             return [
                 env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False),
                 env.setVar(op.vname, linfo).setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)
@@ -3469,7 +3469,7 @@ class TypeChecker {
 
             const loadreg = this.m_emitter.generateTmpRegister();
             const hasreg = this.m_emitter.generateTmpRegister();
-            const guard = new MIRVarGuard(hasreg);
+            const guard = new MIRArgGuard(hasreg);
             this.m_emitter.emitLoadRecordPropertySetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.pname, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(rtype), loadreg, guard);
             if(rtype.isSameType(linfo)) {
                 this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), guard);
@@ -3504,7 +3504,7 @@ class TypeChecker {
         else {
             const linfo = this.getInfoForLoadFromSafePropertyOnly(op.sinfo, texp.flowtype, op.pname);
             
-            this.m_emitter.emitLoadRecordPropertySetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.pname, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(linfo), env.getLocalVarInfo(op.vname) !== undefined ? new MIRLocalVariable(op.vname) : new MIRParameterVariable(op.vname), new MIRVarGuard(trgt));
+            this.m_emitter.emitLoadRecordPropertySetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.pname, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(linfo), env.getLocalVarInfo(op.vname) !== undefined ? new MIRLocalVariable(op.vname) : new MIRParameterVariable(op.vname), new MIRArgGuard(trgt));
             return [
                 env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False),
                 env.setVar(op.vname, linfo).setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True)
@@ -3903,7 +3903,7 @@ class TypeChecker {
                 ];
 
                 const opns = this.m_assembly.getNamespace("NSMain") as NamespaceDeclaration;
-                const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+                const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
                 this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
                 const rargs = this.checkArgumentsWOperator(exp.sinfo, cenv, ["a", "b"], false, eargs);
@@ -3968,7 +3968,7 @@ class TypeChecker {
             ];
 
             const opns = this.m_assembly.getNamespace("NSMain") as NamespaceDeclaration;
-            const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+            const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
             this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
             const rargs = this.checkArgumentsWOperator(exp.sinfo, env, ["a", "b"], false, eargs);
@@ -5159,10 +5159,10 @@ class TypeChecker {
             const loadtype = this.m_emitter.registerResolvedTypeReference(path.t);
 
             if (path.step === "tuple") {
-                this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, ereg, fromtype, fromtype, path.ival, path.fromtype.isUniqueTupleTargetType(), loadtype, nreg, new MIRVarGuard(greg));
+                this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, ereg, fromtype, fromtype, path.ival, path.fromtype.isUniqueTupleTargetType(), loadtype, nreg, new MIRArgGuard(greg));
             }
             else {
-                this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, ereg, fromtype, fromtype, path.nval, path.fromtype.isUniqueRecordTargetType(), loadtype, nreg, new MIRVarGuard(greg));
+                this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, ereg, fromtype, fromtype, path.nval, path.fromtype.isUniqueRecordTargetType(), loadtype, nreg, new MIRArgGuard(greg));
             }
 
             return [nreg, greg, path.t];
@@ -5210,7 +5210,7 @@ class TypeChecker {
 
                     const ncr = this.m_emitter.generateTmpRegister();
                     results.push(ncr);
-                    this.m_emitter.emitTypeOf(sinfo, ncr, this.m_emitter.registerResolvedTypeReference(tcc[1].oftype as ResolvedType), treg, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), new MIRVarGuard(greg));
+                    this.m_emitter.emitTypeOf(sinfo, ncr, this.m_emitter.registerResolvedTypeReference(tcc[1].oftype as ResolvedType), treg, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), new MIRArgGuard(greg));
                 }
                 else {
                     const [treg, ttype] = this.generateRootReg(sinfo, tcc[0], okereg, oketype.flowtype);
@@ -6473,7 +6473,7 @@ class TypeChecker {
         return new MIRInvokeBodyDecl(undefined, "[SPECIAL]", iname, ikey, attributes, false, sinfo, this.m_file, params, resultType.trkey, undefined, undefined, mirbody as MIRBody);
     }
 
-    private processInvokeInfo(fname: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member", iname: string, ikey: MIRInvokeKey, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
+    private processInvokeInfo(fname: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, kind: "namespace" | "static" | "member" | "operator", iname: string, ikey: MIRInvokeKey, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], pargs: [string, ResolvedType][]): MIRInvokeDecl {
         this.checkInvokeDecl(invoke.sourceLocation, invoke, binds, pcodes);
 
         let terms = new Map<string, MIRType>();
@@ -6753,6 +6753,29 @@ class TypeChecker {
 
             const tkey = MIRKeyGenerator.generateTypeKey(this.resolveOOTypeFromDecls(enclosingDecl[1], enclosingDecl[2]));
             (this.m_emitter.masm.entityDecls.get(tkey) as MIREntityTypeDecl).vcallMap.set(vkey, mkey);
+        }
+        catch (ex) {
+            this.m_emitter.setEmitEnabled(false);
+            this.abortIfTooManyErrors();
+        }
+    }
+
+    processVirtualOperator(vkey: MIRVirtualMethodKey, mkey: MIRInvokeKey, shortname: string, name: string, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, invoke: InvokeDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]) {
+        try {
+            this.m_file = invoke.srcFile;
+            const invinfo = this.processInvokeInfo(shortname, enclosingDecl, "operator", name, mkey, invoke, binds, pcodes, cargs);
+
+            if (invinfo instanceof MIRInvokePrimitiveDecl) {
+                this.m_emitter.masm.primitiveInvokeDecls.set(mkey, invinfo);
+            }
+            else {
+                this.m_emitter.masm.invokeDecls.set(mkey, invinfo as MIRInvokeBodyDecl);
+            }
+
+            if(!this.m_emitter.masm.virtualOperatorDecls.has(vkey)) {
+                this.m_emitter.masm.virtualOperatorDecls.set(vkey, []);
+            }
+            (this.m_emitter.masm.virtualOperatorDecls.get(vkey) as MIRInvokeKey[]).push(mkey);
         }
         catch (ex) {
             this.m_emitter.setEmitEnabled(false);

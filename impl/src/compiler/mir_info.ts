@@ -7,7 +7,7 @@
 //Some handy helpers for computing IR info
 //
 
-import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp, MIRRegisterArgument } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRJump, MIRJumpCond, MIRJumpNone, MIROp, MIRRegisterArgument, MIRLocalVariable } from "./mir_ops";
 
 type FlowLink = {
     label: string,
@@ -172,7 +172,7 @@ function computeBlockLiveVars(blocks: Map<string, MIRBasicBlock>): Map<string, B
         linfo.forEach((ls) => ls.liveEntry.forEach((v, n) => lexit.set(n, v)));
 
         if (bb.label === "exit") {
-            lexit.set("$$return", new MIRVariable("$$return"));
+            lexit.set("$$return", new MIRLocalVariable("$$return"));
         }
 
         const lentry = computeLiveVarsInBlock(bb.ops, lexit);

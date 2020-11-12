@@ -8,8 +8,8 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRLoadConstTypedString, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRBody, MIRInvokeInvariantCheckDirect } from "./mir_ops";
-import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRFieldDecl } from "./mir_assembly";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBody, MIRInvokeVirtualOperator, MIRInvokeVirtualFunction } from "./mir_ops";
+import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRType } from "./mir_assembly";
 
 type CallGNode = {
     invoke: MIRInvokeKey,
@@ -29,40 +29,25 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
         for (let i = 0; i < block.ops.length; ++i) {
             const op = block.ops[i];
             switch (op.tag) {
-                case MIROpTag.MIRLoadConstTypedString: {
-                    const lcs = (op as MIRLoadConstTypedString);
-                    if (lcs.pfunckey !== undefined) {
-                        invokeNode.callees.add(lcs.pfunckey);
-                    }
-                    break;
-                }
-                case MIROpTag.MIRAccessConstantValue: {
-                    const cdecl = assembly.constantDecls.get((op as MIRAccessConstantValue).ckey) as MIRConstantDecl;
-                    invokeNode.callees.add(cdecl.value);
-                    break;
-                }
-                case MIROpTag.MIRLoadFieldDefaultValue: {
-                    const fdecl = assembly.fieldDecls.get((op as MIRLoadFieldDefaultValue).fkey) as MIRFieldDecl;
-                    invokeNode.callees.add(fdecl.value as MIRInvokeKey);
-                    break;
-                }
-                case MIROpTag.MIRInvokeInvariantCheckDirect: {
-                    const icd = (op as MIRInvokeInvariantCheckDirect);
-                    invokeNode.callees.add(icd.ikey);
-                    break;
-                }
-                case MIROpTag.MIRInvokeInvariantCheckVirtualTarget: {
-                    //TODO lookup all possible vtargets and add them
-                    assert(false);
-                    break;
-                }
                 case MIROpTag.MIRInvokeFixedFunction: {
                     invokeNode.callees.add((op as MIRInvokeFixedFunction).mkey);
                     break;
                 }
-                case MIROpTag.MIRInvokeVirtualTarget: {
-                    //TODO lookup all possible vtargets and add them
-                    assert(false);
+                case MIROpTag.MIRInvokeVirtualFunction: {
+                    const vcall = (op as MIRInvokeVirtualFunction).vresolve;
+                    const rcvrtype = assembly.typeMap.get((op as MIRInvokeVirtualFunction).rcvrflowtype) as MIRType;
+                    const trgts: MIRInvokeKey[] = [];
+                    assembly.entityDecls.forEach((edcl) => {
+                        if(assembly.subtypeOf(assembly.typeMap.get(edcl.tkey) as MIRType, rcvrtype)) {
+                            assert(edcl.vcallMap.has(vcall));
+                            trgts.push(edcl.vcallMap.get(vcall) as MIRInvokeKey);
+                        }
+                    });
+                    break;
+                }
+                case MIROpTag.MIRInvokeVirtualOperator: {
+                    const trgts = assembly.virtualOperatorDecls.get((op as MIRInvokeVirtualOperator).vresolve) as MIRInvokeKey[];
+                    trgts.forEach((trgt) => invokeNode.callees.add(trgt));
                     break;
                 }
                 default: {

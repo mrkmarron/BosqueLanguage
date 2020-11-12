@@ -475,22 +475,20 @@ class NamespaceOperatorDecl {
     readonly isInfix: boolean;
     readonly isDynamic: boolean;
     readonly level: number;
-    readonly attributes: string[];
 
     readonly ns: string;
     readonly name: string;
 
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, invoke: InvokeDecl, level?: number) {
+    constructor(sinfo: SourceInfo, srcFile: string, ns: string, name: string, invoke: InvokeDecl, level?: number) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
-        this.isPrefix = attributes.includes("prefix");
-        this.isInfix = attributes.includes("infix");
-        this.isDynamic = attributes.includes("dynamic");
+        this.isPrefix = invoke.attributes.includes("prefix");
+        this.isInfix = invoke.attributes.includes("infix");
+        this.isDynamic = invoke.attributes.includes("dynamic");
         this.level = level || -1;
-        this.attributes = attributes;
         this.ns = ns;
         this.name = name;
 
@@ -732,7 +730,7 @@ class Assembly {
                 }
             }
             else if(earg instanceof LiteralTypedNumericConstructorExpression || earg instanceof LiteralTypedComplexConstructorExpression) {
-                const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+                const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
 
                 const isigs = opdecls.map((opd) => this.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
                 const opidx = this.tryGetUniqueStaticOperatorResolve([this.normalizeTypeOnly(earg.ntype, new Map<string, ResolvedType>())], isigs);

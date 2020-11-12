@@ -32,8 +32,8 @@ abstract class MIRGuard {
     abstract jemit(): object;
 
     static jparse(gg: any) : MIRGuard {
-        if(gg.kind === "VarGuard") {
-            return MIRVarGuard.jparse(gg);
+        if(gg.kind === "ArgGuard") {
+            return MIRArgGuard.jparse(gg);
         }
         else {
             return MIRMaskGuard.jparse(gg);
@@ -41,10 +41,10 @@ abstract class MIRGuard {
     }
 }
 
-class MIRVarGuard extends MIRGuard {
-    greg: MIRTempRegister;
+class MIRArgGuard extends MIRGuard {
+    greg: MIRArgument;
 
-    constructor(greg: MIRTempRegister) {
+    constructor(greg: MIRArgument) {
         super();
 
         this.greg = greg;
@@ -55,11 +55,11 @@ class MIRVarGuard extends MIRGuard {
     }
 
     jemit(): object {
-        return { kind: "VarGuard", greg: this.greg.jemit() };
+        return { kind: "ArgGuard", greg: this.greg.jemit() };
     }
 
-    jparse(gg: any): MIRVarGuard {
-        return new MIRVarGuard(MIRTempRegister.jparse(gg.greg));
+    jparse(gg: any): MIRArgGuard {
+        return new MIRArgGuard(MIRArgument.jparse(gg.greg));
     }
 }
 
@@ -784,7 +784,7 @@ class MIRAssertCheck extends MIROp {
     arg: MIRArgument;
 
     constructor(sinfo: SourceInfo, info: string, arg: MIRArgument) {
-        super(MIROpTag.MIRAbort, sinfo);
+        super(MIROpTag.MIRAssertCheck, sinfo);
 
         this.info = info;
         this.arg = arg;
@@ -938,7 +938,7 @@ class MIRConvertValue extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.guard.greg, this.src]) : varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRArgGuard) ? varsOnlyHelper([this.guard.greg, this.src]) : varsOnlyHelper([this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
@@ -1202,7 +1202,7 @@ class MIRLoadTupleIndexSetGuard extends MIROp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-    getModVars(): MIRRegisterArgument[] { return this.guard instanceof MIRVarGuard ? [this.trgt, this.guard.greg] : [this.trgt]; }
+    getModVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.guard instanceof MIRArgGuard ? [this.trgt, this.guard.greg] : [this.trgt]); }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.idx} | ${this.guard.stringify()}]`;
@@ -1278,7 +1278,7 @@ class MIRLoadRecordPropertySetGuard extends MIROp {
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
-    getModVars(): MIRRegisterArgument[] { return this.guard instanceof MIRVarGuard ? [this.trgt, this.guard.greg] : [this.trgt]; }
+    getModVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.guard instanceof MIRArgGuard ? [this.trgt, this.guard.greg] : [this.trgt]); }
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.arg.stringify()}.${this.pname} | ${this.guard.stringify()}]`;
@@ -1442,7 +1442,7 @@ class MIRTupleUpdate extends MIROp {
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
-    readonly updates: [number, MIRArgument, MIRResolvedTypeKey][];
+    updates: [number, MIRArgument, MIRResolvedTypeKey][];
 
     constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, updates: [number, MIRArgument, MIRResolvedTypeKey][], trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRTupleUpdate, sinfo);
@@ -1478,7 +1478,7 @@ class MIRRecordUpdate extends MIROp {
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
-    readonly updates: [string, MIRArgument, MIRResolvedTypeKey][];
+    updates: [string, MIRArgument, MIRResolvedTypeKey][];
 
     constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, updates: [string, MIRArgument, MIRResolvedTypeKey][], trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRRecordUpdate, sinfo);
@@ -1514,7 +1514,7 @@ class MIREntityUpdate extends MIROp {
     arg: MIRArgument;
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
-    readonly updates: [MIRFieldKey, MIRArgument, MIRResolvedTypeKey][];
+    updates: [MIRFieldKey, MIRArgument, MIRResolvedTypeKey][];
 
     constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, updates: [MIRFieldKey, MIRArgument, MIRResolvedTypeKey][], trgt: MIRRegisterArgument) {
         super(MIROpTag.MIREntityUpdate, sinfo);
@@ -1666,7 +1666,7 @@ class MIRInvokeFixedFunction extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.guard.greg, ...this.args]) : varsOnlyHelper([...this.args]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper((this.guard !== undefined && this.guard instanceof MIRArgGuard) ? [this.guard.greg, ...this.args] : [...this.args]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
@@ -2266,7 +2266,7 @@ class MIRIsTypeOf extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.arg, this.guard.greg]) : varsOnlyHelper([this.arg]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper((this.guard !== undefined && this.guard instanceof MIRArgGuard) ? [this.arg, this.guard.greg] : [this.arg]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
@@ -2298,7 +2298,7 @@ class MIRTempRegisterAssign extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper((this.guard !== undefined && this.guard instanceof MIRArgGuard) ? [this.src, this.guard.greg] : [this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
@@ -2330,7 +2330,7 @@ class MIRParameterVarStore extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper((this.guard !== undefined && this.guard instanceof MIRArgGuard) ? [this.src, this.guard.greg] : [this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
     
     stringify(): string {
@@ -2362,7 +2362,7 @@ class MIRLocalVarStore extends MIROp {
         this.guard = guard;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return (this.guard !== undefined && this.guard instanceof MIRVarGuard) ? varsOnlyHelper([this.src, this.guard.greg]) : varsOnlyHelper([this.src]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper((this.guard !== undefined && this.guard instanceof MIRArgGuard) ? [this.src, this.guard.greg] : [this.src]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
     
     stringify(): string {
@@ -2716,7 +2716,7 @@ class MIRBody {
 
 export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRGuard, MIRMaskGuard, MIRVarGuard,
+    MIRGuard, MIRMaskGuard, MIRArgGuard,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,

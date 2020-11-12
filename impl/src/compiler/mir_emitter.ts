@@ -5,8 +5,8 @@
 
 import { SourceInfo, Parser } from "../ast/parser";
 import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecmial, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
-import { Assembly, BuildLevel, EntityTypeDecl, InvokeDecl, MemberMethodDecl, NamespaceConstDecl, NamespaceFunctionDecl, NamespaceOperatorDecl, OOPTypeDecl, StaticFunctionDecl, StaticMemberDecl, StaticOperatorDecl } from "../ast/assembly";
-import { ResolvedConceptAtomType, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedFunctionType, ResolvedLiteralAtomType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedType } from "../ast/resolved_type";
+import { Assembly, BuildLevel, ConceptTypeDecl, EntityTypeDecl, InvokeDecl, MemberMethodDecl, NamespaceConstDecl, NamespaceFunctionDecl, NamespaceOperatorDecl, OOPTypeDecl, StaticFunctionDecl, StaticMemberDecl, StaticOperatorDecl } from "../ast/assembly";
+import { ResolvedConceptAtomType, ResolvedConceptAtomTypeEntry, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedFunctionType, ResolvedLiteralAtomType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedType } from "../ast/resolved_type";
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLiteralType, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRTupleTypeEntry, MIRType, MIRTypeOption, PackageConfig } from "./mir_assembly";
 
 import { TypeChecker } from "../type_checker/type_checker";
@@ -15,7 +15,7 @@ import { convertBodyToSSA } from "./mir_ssa";
 import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
 import { BSQRegex } from "../ast/bsqregex";
-import { ConstantExpressionValue } from "../ast/body";
+import { ConstantExpressionValue, LiteralExpressionValue } from "../ast/body";
 import { ValueType } from "../type_checker/type_environment";
 
 import * as Crypto from "crypto";
@@ -94,9 +94,9 @@ class MIREmitter {
     private readonly pendingOperatorProcessing: [MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, InvokeDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly pendingOOMethodProcessing: [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>], MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly pendingPCodeProcessing: [MIRInvokeKey, InvokeDecl, ResolvedFunctionType, Map<string, ResolvedType>, [string, ResolvedType][]][] = [];
+    private readonly pendingOPVirtualProcessing: [MIRVirtualMethodKey, string | undefined, [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
     private readonly entityInstantiationInfo: [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>][] = [];
     private readonly allVInvokes: [MIRVirtualMethodKey, MIRResolvedTypeKey, ResolvedType, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
-    private readonly allVOPInvokes: [MIRVirtualMethodKey, string | undefined, ResolvedType | undefined, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
 
     private emitEnabled: boolean;
     
@@ -844,16 +844,16 @@ class MIREmitter {
         return ibody;
     }
 
-    getVCallInstantiations(assembly: Assembly): [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] | undefined {
+    getVCallInstantiations(assembly: Assembly): [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>], MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] {
         if (this.allVInvokes.length === 0) {
-            return undefined;
+            return [];
         }
 
-        let resvi = new Map<string, [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]]>();
+        let resvi = new Map<string, [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>], MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]]>();
         for (let i = 0; i < this.allVInvokes.length; ++i) {
             const vinv = this.allVInvokes[i];
 
-            const vcpt = ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(vinv[2] as ConceptTypeDecl, vinv[3])]));
+            const vcpt = vinv[2];
             const impls = this.entityInstantiationInfo.filter((iinfo) => {
                 if (iinfo[1] instanceof EntityTypeDecl) {
                     const etype = ResolvedType.createSingle(ResolvedEntityAtomType.create(iinfo[1] as EntityTypeDecl, iinfo[2]));
@@ -870,23 +870,88 @@ class MIREmitter {
                 const impl = impls[j];
                 const itype = ResolvedType.createSingle(ResolvedEntityAtomType.create(impl[1] as EntityTypeDecl, impl[2]));
 
-                const mcreate = assembly.tryGetOOMemberDeclUnique(itype, "method", vinv[4]);
+                const mcreate = assembly.tryGetMethodUniqueConcreteDeclFromType(itype, vinv[3]);
                 if (mcreate !== undefined) {
                     const binds = new Map<string, ResolvedType>(mcreate.binds);
-                    vinv[5].forEach((v, k) => binds.set(k, v));
+                    vinv[4].forEach((v, k) => binds.set(k, v));
 
-                    const mkey = MIRKeyGenerator.generateMethodKey(mcreate.contiainingType, (mcreate.decl as MemberMethodDecl).name, mcreate.binds, vinv[6]);
+                    const mctype = (mcreate.contiainingType instanceof EntityTypeDecl) ? ResolvedType.createSingle(ResolvedEntityAtomType.create(mcreate.contiainingType, mcreate.binds)) : ResolvedType.createSingle(ResolvedConceptAtomType.create([ResolvedConceptAtomTypeEntry.create(mcreate.contiainingType as ConceptTypeDecl, mcreate.binds)]));
+                    const mirmctype = this.registerResolvedTypeReference(mctype);
+                    const mkey = MIRKeyGenerator.generateMethodKey(mcreate.decl.name, mirmctype.trkey, binds, vinv[5]);
                     if (!resvi.has(mkey)) {
-                        resvi.set(mkey, [vinv[0], mkey, mcreate.contiainingType, mcreate.binds, mcreate.decl as MemberMethodDecl, binds as Map<string, ResolvedType>, vinv[6], vinv[7]]);
+                        resvi.set(mkey, [vinv[0], mkey, mcreate.decl.name, `${mirmctype.trkey}::${mcreate.decl.name}`, [mirmctype, mcreate.contiainingType, mcreate.binds], mcreate.decl, binds, vinv[5], vinv[6]] as [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>], MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]]);
                     }
                 }
             }
         }
 
-        let fres: [MIRVirtualMethodKey, MIRInvokeKey, OOPTypeDecl, Map<string, ResolvedType>, MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
-        resvi.forEach((v, k) => fres.push(v));
+        let fres: [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>], MemberMethodDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
+        resvi.forEach((v) => fres.push(v));
 
         return fres;
+    }
+
+    private generateSigKeys(invoke: InvokeDecl, binds: Map<string, ResolvedType>): string[] {
+        const sigkeys: string[] = [];
+
+        for (let i = 0; i < invoke.params.length; ++i) {
+            const ptype = this.assembly.normalizeTypeGeneral(invoke.params[i], binds);
+            if (ptype instanceof ResolvedFunctionType || ptype.isEmptyType()) {
+                continue;
+            }
+
+            if (invoke.params[i].litexp === undefined) {
+                sigkeys.push(this.registerResolvedTypeReference(ptype).trkey);
+            }
+            else {
+                const lev = (invoke.params[i].litexp as LiteralExpressionValue);
+                const cexp = this.assembly.reduceLiteralValueToCanonicalForm(lev.exp, binds, ptype);
+                if(cexp === undefined) {
+                    return [];
+                }
+
+                sigkeys.push(cexp[2]);
+            }
+        }
+
+        return sigkeys;
+    }
+
+    private getVirtualOpImpls(vkey: MIRVirtualMethodKey, optns: string | undefined, optenclosingType: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[], cargs: [string, ResolvedType][]): [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, InvokeDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] {
+        let impls: [MIRVirtualMethodKey, MIRInvokeKey, string, string, [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, InvokeDecl, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]][] = [];
+        
+        if(optns !== undefined) {
+            const ns = optns as string;
+
+            const nsd = this.assembly.getNamespace(ns);
+            if (nsd !== undefined) {
+                nsd.operators.forEach((op) => {
+                    if (op[1].name === name && !OOPTypeDecl.attributeSetContains("abstract", op[1].invoke.attributes)) {
+                        const sigkeys = this.generateSigKeys(op[1].invoke, binds);
+                        const key = MIRKeyGenerator.generateFunctionKey(ns, name, binds, pcodes);
+                        const okey = MIRKeyGenerator.generateOperatorSignatureKey(key, op[1].isPrefix, op[1].isInfix, sigkeys);
+
+                        impls.push([vkey, okey, op[1].name, `${ns}::${op[1].name}`, undefined, op[1].invoke, binds, pcodes, cargs]);
+                    }
+                });
+            }
+        }
+        else {
+            const enclosingType = optenclosingType as [MIRType, OOPTypeDecl, Map<string, ResolvedType>];
+
+            const ootype = enclosingType[1];
+            ootype.staticOperators.forEach((op) => {
+                if (op[1].name === name && !OOPTypeDecl.attributeSetContains("abstract", op[1].invoke.attributes)) {
+                    const sigkeys = this.generateSigKeys(op[1].invoke, binds);
+                    const key = MIRKeyGenerator.generateFunctionKey(enclosingType[0].trkey, name, binds, pcodes);
+                    const okey = MIRKeyGenerator.generateOperatorSignatureKey(key, op[1].isPrefix, op[1].isInfix, sigkeys);
+
+                    impls.push([vkey, okey, op[1].name, `${enclosingType[0].trkey}::${op[1].name}`, enclosingType, op[1].invoke, binds, pcodes, cargs]);
+                }
+            });
+        }
+
+        return impls;
     }
 
     private registerTypeInstantiation(rtype: ResolvedType, decl: OOPTypeDecl, binds: Map<string, ResolvedType>) {
@@ -1083,23 +1148,23 @@ class MIREmitter {
         return key;
     }
 
-    registerVirtualNamespaceOperatorCall(ns: string, name: string, opdecl: NamespaceOperatorDecl, pcodes: PCode[], cinfo: [string, ResolvedType][]): MIRVirtualMethodKey {
+    registerVirtualNamespaceOperatorCall(ns: string, name: string, pcodes: PCode[], cinfo: [string, ResolvedType][]): MIRVirtualMethodKey {
         const key = MIRKeyGenerator.generateVirtualMethodKey(`${ns}::${name}`, new Map<string, ResolvedType>(), pcodes);
-        if (!this.emitEnabled || this.allVOPInvokes.findIndex((vi) => vi[0] === key) !== -1) {
+        if (!this.emitEnabled || this.masm.virtualOperatorDecls.has(key) || this.pendingOPVirtualProcessing.findIndex((vi) => vi[0] === key) !== -1) {
             return key;
         }
 
-        this.allVOPInvokes.push([key, ns, undefined, name, new Map<string, ResolvedType>(), pcodes, cinfo]);
+        this.pendingOPVirtualProcessing.push([key, ns, undefined, name, new Map<string, ResolvedType>(), pcodes, cinfo]);
         return key;
     }
 
-    registerVirtualStaticOperatorCall(containingType: ResolvedType, name: string, opdecl: StaticOperatorDecl, binds: Map<string, ResolvedType>, pcodes: PCode[], cinfo: [string, ResolvedType][]): MIRVirtualMethodKey {
-        const key = MIRKeyGenerator.generateVirtualMethodKey(`${containingType.idStr}::${name}`, new Map<string, ResolvedType>(), pcodes);
-        if (!this.emitEnabled || this.allVOPInvokes.findIndex((vi) => vi[0] === key) !== -1) {
+    registerVirtualStaticOperatorCall(containingType: [MIRType, OOPTypeDecl, Map<string, ResolvedType>], name: string, binds: Map<string, ResolvedType>, pcodes: PCode[], cinfo: [string, ResolvedType][]): MIRVirtualMethodKey {
+        const key = MIRKeyGenerator.generateVirtualMethodKey(`${containingType[0].trkey}::${name}`, new Map<string, ResolvedType>(), pcodes);
+        if (!this.emitEnabled || this.masm.virtualOperatorDecls.has(key) || this.pendingOPVirtualProcessing.findIndex((vi) => vi[0] === key) !== -1) {
             return key;
         }
 
-        this.allVOPInvokes.push([key, undefined, containingType, name, new Map<string, ResolvedType>(), pcodes, cinfo]);
+        this.pendingOPVirtualProcessing.push([key, undefined, containingType, name, binds, pcodes, cinfo]);
         return key;
     }
 
@@ -1278,12 +1343,12 @@ class MIREmitter {
         ////////////////
         //While there is more to process get an item and run the checker on it
         try {
-            let lastVCount = 0;
-            let lastVOPCount = 0;
+            let lastVCount = -1;
             while (true) {
                 while (emitter.pendingOOProcessing.length !== 0 || emitter.pendingConstExprProcessing.length !== 0
                     || emitter.pendingFunctionProcessing.length !== 0 || emitter.pendingOperatorProcessing.length !== 0 
-                    || emitter.pendingOOMethodProcessing.length !== 0 || emitter.pendingPCodeProcessing.length !== 0) {
+                    || emitter.pendingOOMethodProcessing.length !== 0 || emitter.pendingPCodeProcessing.length !== 0
+                    || emitter.pendingOPVirtualProcessing.length !== 0) {
 
                     while (emitter.pendingOOProcessing.length !== 0) {
                         const tt = emitter.pendingOOProcessing.pop() as [MIRResolvedTypeKey, OOPTypeDecl, Map<string, ResolvedType>];
@@ -1310,6 +1375,13 @@ class MIREmitter {
                         const lf = emitter.pendingPCodeProcessing.pop() as [MIRInvokeKey, InvokeDecl, ResolvedFunctionType, Map<string, ResolvedType>, [string, ResolvedType][]];
                         checker.processLambdaFunction(...lf);
                     }
+                    else if (emitter.pendingOPVirtualProcessing.length !== 0) {
+                        const vop = emitter.pendingOPVirtualProcessing.pop() as [MIRVirtualMethodKey, string | undefined, [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, string, Map<string, ResolvedType>, PCode[], [string, ResolvedType][]];
+                        const opimpls = emitter.getVirtualOpImpls(...vop);
+                        for (let i = 0; i < opimpls.length; ++i) {
+                            checker.processVirtualOperator(...opimpls[i]);
+                        }
+                    }
                     else {
                         ;
                     }
@@ -1317,13 +1389,11 @@ class MIREmitter {
 
                 //make sure all vcall candidates are processed
                 const vcgens = emitter.getVCallInstantiations(assembly);
-                const vopgens = emitter.getVOPCallInstantiations(assembly);
-                if ((vcgens === undefined || vcgens.length === lastVCount) && (vopgens === undefined || vopgens.length === lastVOPCount)) {
+                if (vcgens.length === lastVCount) {
                     break;
                 }
                 lastVCount = vcgens.length;
-                lastVOPCount = 
-
+                
                 for (let i = 0; i < vcgens.length; ++i) {
                     checker.processMethodFunction(...vcgens[i]);
                 }
