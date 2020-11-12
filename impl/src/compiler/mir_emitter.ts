@@ -10,7 +10,7 @@ import { ResolvedConceptAtomType, ResolvedConceptAtomTypeEntry, ResolvedEntityAt
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLiteralType, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRTupleTypeEntry, MIRType, MIRTypeOption, PackageConfig } from "./mir_assembly";
 
 import { TypeChecker } from "../type_checker/type_checker";
-import { propagateTmpAssignForBody, removeDeadTempAssignsFromBody } from "./mir_cleanup";
+import { simplifyBody } from "./mir_cleanup";
 import { convertBodyToSSA } from "./mir_ssa";
 import { computeVarTypesForInvoke } from "./mir_vartype";
 import { functionalizeInvokes } from "./functionalize";
@@ -835,10 +835,7 @@ class MIREmitter {
         }
 
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
-
-        propagateTmpAssignForBody(ibody);
-        removeDeadTempAssignsFromBody(ibody);
-
+        simplifyBody(ibody);
         convertBodyToSSA(ibody, args);
 
         return ibody;

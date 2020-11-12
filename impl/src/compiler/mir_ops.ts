@@ -2462,7 +2462,7 @@ class MIRJumpNone extends MIROp {
 
 class MIRReturnAssign extends MIROp {
     src: MIRArgument;
-    name: MIRRegisterArgument;
+    name: MIRLocalVariable;
 
     constructor(sinfo: SourceInfo, src: MIRArgument, name?: MIRLocalVariable) {
         super(MIROpTag.MIRReturnAssign, sinfo);
@@ -2490,7 +2490,7 @@ class MIRReturnAssign extends MIROp {
 class MIRReturnAssignOfCons extends MIROp {
     readonly oftype: MIRResolvedTypeKey; 
     args: MIRArgument[];
-    name: MIRRegisterArgument;
+    name: MIRLocalVariable;
 
     constructor(sinfo: SourceInfo, oftype: MIRResolvedTypeKey, args: MIRArgument[], name?: MIRLocalVariable) {
         super(MIROpTag.MIRReturnAssignOfCons, sinfo);

@@ -4,37 +4,38 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
-import { MIRBody, MIRRegisterArgument, MIRBasicBlock, MIROpTag, MIRJumpNone, MIRJumpCond, MIROp, MIRValueOp, MIRTempRegister, MIRArgument, MIRAccessLocalVariable, MIRConstructorPrimary, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorTuple, MIRConstructorRecord, MIRProjectFromFields, MIRAccessFromField, MIRProjectFromProperties, MIRAccessFromProperty, MIRProjectFromIndecies, MIRAccessFromIndex, MIRProjectFromTypeTuple, MIRProjectFromTypeRecord, MIRProjectFromTypeNominal, MIRModifyWithIndecies, MIRModifyWithProperties, MIRModifyWithFields, MIRStructuredExtendTuple, MIRStructuredExtendRecord, MIRStructuredExtendObject, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRDebug, MIRPhi, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRIsTypeOf, MIRAccessArgVariable, MIRInvokeVirtualFunction, MIRInvokeFixedFunction, MIRVariable, MIRInvokeInvariantCheckDirect, MIRInvokeInvariantCheckVirtualTarget, MIRConstructorEphemeralValueList, MIRLoadFromEpehmeralList, MIRBinLess, MIRPackSlice, MIRPackExtend } from "./mir_ops";
+import { MIRArgument, MIROp, MIRRegisterArgument, MIRTempRegister } from "./mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topologicalOrder } from "./mir_info";
 import { MIRType } from "./mir_assembly";
 
-//
-//Convert MIR into SSA form
-//
+type SSAState = {
+    remap: Map<string, MIRRegisterArgument>,
+    ctrs: Map<string, number>,
+    tmpregids: Map<string, number>
+};
 
-function convertToSSA(reg: MIRRegisterArgument, remap: Map<string, MIRRegisterArgument>, ctrs: Map<string, number>): MIRRegisterArgument {
-    if (!ctrs.has(reg.nameID)) {
-        ctrs.set(reg.nameID, 0);
-        remap.set(reg.nameID, reg);
+function convertToSSA(reg: MIRRegisterArgument, ssastate: SSAState): MIRTempRegister {
+    if (reg instanceof MIRTempRegister && !ssastate.ctrs.has(reg.nameID)) {
+        ssastate.ctrs.set(reg.nameID, 0);
+        ssastate.remap.set(reg.nameID, reg);
 
         return reg;
     }
     else {
-        const ssaCtr = ctrs.get(reg.nameID) as number + 1;
-        ctrs.set(reg.nameID, ssaCtr);
+        const ssaCtr = ssastate.ctrs.has(reg.nameID) ? ssastate.ctrs.get(reg.nameID) as number + 1 : 0;
+        ssastate.ctrs.set(reg.nameID, ssaCtr);
 
         const vname = reg.nameID + `$${ssaCtr}`;
 
         if (reg instanceof MIRTempRegister) {
-            remap.set(reg.nameID, new MIRTempRegister(reg.regID, vname));
+            ssastate.remap.set(reg.nameID, new MIRTempRegister(reg.regID, vname));
         }
         else {
-            assert(reg instanceof MIRVariable);
-            remap.set(reg.nameID, new MIRVariable(reg.nameID, vname));
+            ssastate.remap.set(reg.nameID, new MIRTempRegister(ssastate.tmpregids.get(reg.nameID) as number, vname));
         }
 
-        return remap.get(reg.nameID) as MIRRegisterArgument;
+        return ssastate.remap.get(reg.nameID) as MIRTempRegister;
     }
 }
 
@@ -55,11 +56,7 @@ function processSSAUse_RemapStructuredArgs<T>(args: T[], remap: (arg: T) => T): 
     return args.map((v) => remap(v));
 }
 
-function processValueOpTempSSA(op: MIRValueOp, remap: Map<string, MIRRegisterArgument>, ctrs: Map<string, number>) {
-    op.trgt = convertToSSA(op.trgt, remap, ctrs) as MIRTempRegister;
-}
-
-function assignSSA(op: MIROp, remap: Map<string, MIRRegisterArgument>, ctrs: Map<string, number>) {
+function assignSSA(op: MIROp, ssastate: SSAState) {
     switch (op.tag) {
         case MIROpTag.MIRLoadConst:
         case MIROpTag.MIRLoadConstSafeString:
