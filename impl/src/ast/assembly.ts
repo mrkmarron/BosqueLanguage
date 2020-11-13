@@ -203,15 +203,13 @@ class StaticFunctionDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly attributes: string[];
     readonly name: string;
 
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, invoke: InvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, name: string, invoke: InvokeDecl) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
-        this.attributes = attributes;
         this.name = name;
 
         this.invoke = invoke;
@@ -229,18 +227,16 @@ class StaticOperatorDecl implements OOMemberDecl {
     readonly isPrefix: boolean;
     readonly isInfix: boolean;
     readonly isDynamic: boolean;
-    readonly attributes: string[];
     readonly name: string;
 
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, invoke: InvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, name: string, invoke: InvokeDecl) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
-        this.isPrefix = attributes.includes("prefix");
-        this.isInfix = attributes.includes("infix");
-        this.isDynamic = attributes.includes("dynamic");
-        this.attributes = attributes;
+        this.isPrefix = invoke.attributes.includes("prefix");
+        this.isInfix = invoke.attributes.includes("infix");
+        this.isDynamic = invoke.attributes.includes("dynamic");
         this.name = name;
 
         this.invoke = invoke;
@@ -279,16 +275,14 @@ class MemberMethodDecl implements OOMemberDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
 
-    readonly attributes: string[];
     readonly name: string;
-
     readonly refRcvr: boolean;
+
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], name: string, refrcvr: boolean, invoke: InvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, name: string, refrcvr: boolean, invoke: InvokeDecl) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
-        this.attributes = attributes;
         this.refRcvr = refrcvr;
         this.name = name;
         this.invoke = invoke;
@@ -449,18 +443,16 @@ class NamespaceConstDecl {
 class NamespaceFunctionDecl {
     readonly sourceLocation: SourceInfo;
     readonly srcFile: string;
-    readonly attributes: string[];
 
     readonly ns: string;
     readonly name: string;
 
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], ns: string, name: string, invoke: InvokeDecl) {
+    constructor(sinfo: SourceInfo, srcFile: string, ns: string, name: string, invoke: InvokeDecl) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
-        this.attributes = attributes;
         this.ns = ns;
         this.name = name;
 
@@ -2146,7 +2138,7 @@ class Assembly {
         }
 
         const mmd = ooptype.memberMethods.get(name) as MemberMethodDecl;
-        if(!findspecific && OOPTypeDecl.attributeSetContains("override", mmd.attributes)) {
+        if(!findspecific && OOPTypeDecl.attributeSetContains("override", mmd.invoke.attributes)) {
             return undefined;
         }
 
@@ -2316,7 +2308,7 @@ class Assembly {
                 return undefined;
             }
 
-            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.attributes)) {
+            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.invoke.attributes)) {
                 return undefined;
             }
             else {

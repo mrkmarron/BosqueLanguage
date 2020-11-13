@@ -3716,8 +3716,8 @@ class Parser {
             const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], "vregex", new NominalTypeSignature("NSCore", ["Regex"]), new ConstantExpressionValue(new LiteralRegexExpression(sinfo, re as BSQRegex), new Set<string>()));
             const param = new FunctionParameter("arg", new NominalTypeSignature("NSCore", ["String"]), false, undefined, undefined, undefined);
             const acceptsbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "validator_accepts");
-            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", ["Bool"]), [], [], false, new Set<string>(), acceptsbody);
-            const accepts = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), [], "accepts", acceptsinvoke);
+            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["validator_accepts", "__safe"], "no", [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", ["Bool"]), [], [], false, new Set<string>(), acceptsbody);
+            const accepts = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "accepts", acceptsinvoke);
             const provides = [[new NominalTypeSignature("NSCore", ["Validator"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
             const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [SpecialTypeCategory.ValidatorTypeDecl], currentDecl.ns, tyname, [], provides, [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>().set("accepts", accepts), new Map<string, StaticOperatorDecl[]>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>(), new Map<string, EntityTypeDecl>());
 
@@ -3802,7 +3802,7 @@ class Parser {
         }
         allMemberNames.add(fname);
 
-        staticFunctions.set(fname, new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), attributes, fname, sig));
+        staticFunctions.set(fname, new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
     }
 
     private parseStaticOperator(staticOperators: Map<string, StaticOperatorDecl[]>, allMemberNames: Set<string>, attributes: string[]) {
@@ -3830,7 +3830,7 @@ class Parser {
         if(!staticOperators.has(fname)) {
             staticOperators.set(fname, []);
         }
-        (staticOperators.get(fname) as StaticOperatorDecl[]).push(new StaticOperatorDecl(sinfo, this.m_penv.getCurrentFile(), attributes, fname, sig));
+        (staticOperators.get(fname) as StaticOperatorDecl[]).push(new StaticOperatorDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
     }
 
     private parseMemberField(memberFields: Map<string, MemberFieldDecl>, allMemberNames: Set<string>, attributes: string[]) {
@@ -3880,7 +3880,7 @@ class Parser {
         }
         allMemberNames.add(mname);
 
-        memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), attributes, mname, refrcvr, sig));
+        memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), mname, refrcvr, sig));
     }
 
     private parseInvariantsInto(invs: InvariantDecl[]) {
@@ -4146,12 +4146,12 @@ class Parser {
 
             const cparam = new FunctionParameter("v", oftype, false, undefined, undefined, undefined);
             const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_create");
-            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], undefined, [cparam], undefined, undefined, simpleETypeResult, [], [], false, new Set<string>(), cbody);
-            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", createdecl);
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_enum", "__safe"], "no", [], undefined, [cparam], undefined, undefined, simpleETypeResult, [], [], false, new Set<string>(), cbody);
+            const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "create", createdecl);
 
             const vbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_value");
-            const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], undefined, [], undefined, undefined, oftype, [], [], false, new Set<string>(), vbody);
-            const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), [], "value", false, valuedecl);
+            const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_enum_value", "__safe"], "no", [], undefined, [], undefined, undefined, oftype, [], [], false, new Set<string>(), vbody);
+            const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), "value", false, valuedecl);
 
             const provides = [
                 [new NominalTypeSignature("NSCore", ["Some"]), undefined],
@@ -4238,12 +4238,12 @@ class Parser {
 
         const cparam = new FunctionParameter("v", idval, false, undefined, undefined, undefined);
         const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "typedecl_create");
-        const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], undefined, [cparam], undefined, undefined, itype, [], [], false, new Set<string>(), cbody);
-        const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), ["private"], "create", createdecl);
+        const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_typedecl", "__safe"], "no", [], undefined, [cparam], undefined, undefined, itype, [], [], false, new Set<string>(), cbody);
+        const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "create", createdecl);
 
         const vbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "typedecl_value");
-        const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), [], "no", [], undefined, [], undefined, undefined, idval, [], [], false, new Set<string>(), vbody);
-        const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), [], "value", false, valuedecl);
+        const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_typedecl_value", "__safe"], "no", [], undefined, [], undefined, undefined, idval, [], [], false, new Set<string>(), vbody);
+        const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), "value", false, valuedecl);
 
         let provides = [[new NominalTypeSignature("NSCore", ["Some"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][]
         provides.push([new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]);
@@ -4332,7 +4332,7 @@ class Parser {
         }
         const sig = this.parseInvokableCommon(InvokableKind.Basic, false, attributes, recursive, terms, undefined);
 
-        currentDecl.functions.set(fname, new NamespaceFunctionDecl(sinfo, this.m_penv.getCurrentFile(), attributes, currentDecl.ns, fname, sig));
+        currentDecl.functions.set(fname, new NamespaceFunctionDecl(sinfo, this.m_penv.getCurrentFile(), currentDecl.ns, fname, sig));
     }
 
     private parseNamespaceOperator(currentDecl: NamespaceDeclaration) {

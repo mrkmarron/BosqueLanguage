@@ -11,11 +11,11 @@ concept Any {
     method is<T>(): Bool # special_method
     method as<T>(): T # special_method
 
-    __safe method asOrNone<T>(): T? {
+    method asOrNone<T>(): T? {
         return this->is<T>() ? this->as<T>() : none;
     }
 
-    __safe method asTry<T>(ref? v: T): Bool {
+    method asTry<T>(ref? v: T): Bool {
         if(!this->is<T>()) {
             return false;
         }
@@ -41,8 +41,6 @@ concept KeyType provides Any {
 
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
 concept PODType provides APIType {
-    function bufferify<T grounded PODType>(data: T, format?: BufferFormat = BufferFormat::bosque, encoding?: BufferEncoding = BufferEncoding::utf8, compression?: BufferCompression = BufferCompression::off): Buffer<T> # pod_bufferify
-    function parseBuffer<T grounded PODType>(data: Buffer<T>): Result<T, String> # pod_tryparsebuffer
 }
 
 //<summary>Type to unify Buffers and APITypes at top level for checking</summary>
@@ -51,46 +49,20 @@ concept APIValue provides Any {
 
 //<summary>Type for indicating that a datatype can be exported as part of a stable API.</summary>
 concept APIType provides APIValue {
-    function bufferify<T grounded APIType>(data: T, format?: BufferFormat = BufferFormat::bosque, encoding?: BufferEncoding = BufferEncoding::utf8, compression?: BufferCompression = BufferCompression::off): Buffer<T> # api_bufferify
-    function parseBuffer<T grounded APIType>(data: Buffer<T>): Result<T, String> # api_tryparsebuffer
 }
 
 //<summary>Type for representing the none-value.</summary>
-grounded parsable struct entity None provides KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<None, String> {
-        if(str == "none") {
-            return ok(none);
-        }
-        else {
-            return err("Expected None");
-        }
-    }
+grounded struct entity None provides KeyType, PODType, APIType {
 }
 
 //<summary>Primitive boolean value.</summary>
-grounded parsable struct entity Bool provides Some, KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<Bool, String> {
-        if(str == "false") {
-            return ok(false);
-        }
-        elif(str == "true") {
-            return ok(true);
-        }
-        else {
-            return err("Expected Bool");
-        }
-    }
+grounded struct entity Bool provides Some, KeyType, PODType, APIType {
 }
 inline infix operator ==(a: Bool, b: Bool): Bool = default;
 inline infix operator !=(a: Bool, b: Bool): Bool = default;
 
 //<summary>Primitive integer value.</summary>
-grounded parsable struct entity Int provides Some, KeyType, PODType, APIType {
-    const min_value: Int = -9223372036854775808i;
-    const max_value: Int = 9223372036854775807i;
-
-    __safe function parse(str: String): Result<Int, String> # int_tryparse
-    __safe function stringify(i: Int): String # int_tostring
+grounded struct entity Int provides Some, KeyType, PODType, APIType {
 }
 inline prefix operator +(a: Int): Int = default;
 inline prefix operator -(a: Int): Int = default;
@@ -106,11 +78,7 @@ inline infix operator <=(a: Int, b: Int): Bool = default;
 inline infix operator >=(a: Int, b: Int): Bool = default;
 
 //<summary>Primitive natural number value.</summary>
-grounded parsable struct entity Nat provides Some, KeyType, PODType, APIType {
-    const max_value: Nat = 18446744073709551615n;
-
-    __safe function parse(str: String): Result<Nat, String> # nat_tryparse
-    __safe function stringify(i: Nat): String # nat_tostring
+grounded struct entity Nat provides Some, KeyType, PODType, APIType {
 }
 inline prefix operator +(a: Nat): Nat = default;
 inline infix operator *(a: Nat, b, Nat): Nat = default;
@@ -125,16 +93,7 @@ inline infix operator <=(a: Nat, b: Nat): Bool = default;
 inline infix operator >=(a: Nat, b: Nat): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
-grounded parsable struct entity BigInt provides Some, KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<BigInt, String> # bigint_tryparse
-    __safe function stringify(i: BigInt): String # bigint_tostring
-
-    const min_safeInt: BigInt = -9223372036854775808I;
-    const max_safeInt: BigInt = 9223372036854775807I;
-
-    __safe method isSafeInt(): Bool {
-        return BigInt::min_safeInt <= this && this <= BigInt::max_safeInt;
-    }
+grounded struct entity BigInt provides Some, KeyType, PODType, APIType {
 }
 inline prefix operator +(a: BigInt): BigInt = default;
 inline prefix operator -(a: BigInt): BigInt = default;
@@ -150,15 +109,7 @@ inline infix operator <=(a: BigInt, b: BigInt): Bool = default;
 inline infix operator >=(a: BigInt, b: BigInt): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
-grounded parsable struct entity BigNat provides Some, KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<BigNat, String> # bignat_tryparse
-    __safe function stringify(i: BigInt): String # bignat_tostring
-
-    const max_safeNat: BigInt = 18446744073709551615N;
-
-    __safe method isSafeNat(): Bool {
-        return this <= BigNat::max_safeInt;
-    }
+grounded struct entity BigNat provides Some, KeyType, PODType, APIType {
 }
 inline prefix operator +(a: BigNat): BigNat = default;
 inline infix operator *(a: BigNat, b, BigNat): BigNat = default;
@@ -173,9 +124,7 @@ inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
 inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
 //<summary>Primitive rational value.</summary>
-grounded parsable struct entity Rational provides Some, KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<Rational, String> # rational_tryparse
-    __safe function stringify(i: Rational): String # rational_tostring
+grounded struct entity Rational provides Some, KeyType, PODType, APIType {
 }
 inline prefix operator +(a: Rational): Rational = default;
 inline prefix operator -(a: Rational): Rational = default;
@@ -191,34 +140,7 @@ inline infix operator <=(a: Rational, b: Rational): Bool = default;
 inline infix operator >=(a: Rational, b: Rational): Bool = default;
 
 //<summary>Primitive float value -- compiler flags control bitness -- defaults to 64bit.</summary>
-grounded parsable struct entity Float provides Some, PODType, APIType {
-    __safe private function s_float_min_value(): Float # float_min_value
-    __safe private function s_float_max_value(): Float # float_max_value
-    __safe private function s_float_infinity_value(): Float # float_infinity_value
-    __safe private function s_float_nan_value(): Float # float_nan_value
-
-    __safe private function s_isInfinite(f: Float): Bool # float_isinfinity
-    __safe private function s_isNan(f: Float): Bool # float_isnan
-
-    const min_value: Float = Float::s_float_min_value();
-    const max_value: Float = Float::s_float_max_value();
-
-    const infinity: Float = Float::s_float_infinity_value();
-    const nan: Float = Float::s_float_nan_value();
-    
-    const pi: Float = 3.1415926535897931f;
-    const e: Float = 2.7182818284590451f;
-
-    __safe function parse(str: String): Result<Float, String> # float_tryparse
-    __safe function stringify(f: Float): String # float_tostring
-
-    __safe method isInfinite(): Bool {
-        return Float::s_isInfinite(this);
-    }
-
-    __safe method isNan(): Bool {
-        return Float::s_isNan(this);
-    }
+grounded struct entity Float provides Some, PODType, APIType {
 }
 inline prefix operator +(a: Float): Float = default;
 inline prefix operator -(a: Float): Float = default;
@@ -230,15 +152,7 @@ inline infix operator <(a: Float, b: Float): Bool = default;
 inline infix operator >(a: Float, b: Float): Bool = default;
 
 //<summary>Primitive float decimal value.</summary>
-grounded parsable struct entity Decimal provides Some, PODType, APIType {
-    __safe private function s_decimal_min_value(): Decimal # decimal_min_value
-    __safe private function s_decimal_max_value(): Decimal # decimal_max_value
-
-    const min_value: Decimal = Decimal::s_decimal_min_value();
-    const max_value: Decimal = Decimal::s_decimal_max_value();
-
-    __safe function parse(str: String): Result<Decimal, String> # decimal_tryparse
-    __safe function stringify(d: Decimal): String # decimal_tostring
+grounded struct entity Decimal provides Some, PODType, APIType {
 }
 inline prefix operator +(a: Decimal): Decimal = default;
 inline prefix operator -(a: Decimal): Decimal = default;
@@ -249,11 +163,8 @@ inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
 inline infix operator <(a: Decimal, b: Decimal): Bool = default;
 inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
-
 //<summary>Primitive complex floating point value.</summary>
-grounded parsable struct entity Complex provides Some, PODType, APIType {
-    __safe function parse(str: String): Result<Complex, String> # complex_tryparse
-    __safe function stringify(c: Complex): String # complex_tostring
+grounded struct entity Complex provides Some, PODType, APIType {
 }
 inline prefix operator +(a: Complex): Complex = default;
 inline prefix operator -(a: Complex): Complex = default;
@@ -266,17 +177,17 @@ inline infix operator >(a: Complex, b: Complex): Bool = default;
 
 //<summary>Primitive string value.</summary>
 grounded entity String provides Some, KeyType, PODType, APIType {
-    __safe private function s_length(s: String): Int # string_count
-    __safe private function s_charat(s: String): Int # string_charat
+    __safe private function s_length(s: String): Nat # string_count
+    __assume_safe private function s_unsafe_charat(s: String): String # string_charat
     
-    __safe method length(): Int {
+    method length(): Nat {
         return String::s_length(this);
     }
 
-    method charAt(idx: Int): String
-        requires release 0 <= idx && idx < String::s_length(this);
+    method charAt(idx: Nat): String
+        requires release 0n <= idx && idx < String::s_length(this);
     {
-        return String::s_charat(this, idx);
+        return String::s_unsafe_charat(this, idx);
     }
 }
 inline infix operator ==(a: Rational, b: Rational): Bool = default;
@@ -291,7 +202,7 @@ grounded entity StringOf<T where validator> provides Some, KeyType, PODType, API
     __assume_safe private function s_unsafe_from(str: String): SafeString<T> # stringof_unsafe_from
     __safe private function s_string(sof: StringOf<T>): String # stringof_string
 
-    __safe method string(): String {
+    method string(): String {
         return StringOf<T>::s_string(this);
     }
 
@@ -308,7 +219,7 @@ grounded entity DataString<T where parsable> provides Some, KeyType, APIValue {
     __assume_safe private function s_unsafe_from(str: String): DataString<T> # datastring_unsafe_from
     __safe private function s_string(sof: DataString<T>): String # stringof_string
 
-    __safe method string(): String {
+    method string(): String {
         return DataString<T>::s_string(this);
     }
 
@@ -351,7 +262,7 @@ entity ByteBuffer provides Some, APIValue {
 
 //<summary>Unit declarations for seconds, milliseconds, and ISOTime</summary>
 numeric typedecl ISOSeconds = Int & {
-    __safe method toMilliseconds(): ISOMilliSecond {
+    method toMilliseconds(): ISOMilliSecond {
         return ISOMilliSecond::create(this.value() * 1000);
     }
 }
@@ -367,7 +278,7 @@ inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
 inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
 
 numeric typedecl ISOMilliSeconds = Int & {
-    __safe method toSeconds(): ISOSeconds {
+    method toSeconds(): ISOSeconds {
         return ISOSeconds::create(this.value() / 1000);
     }
 }
@@ -394,8 +305,7 @@ inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
 inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 
 //<summary>Primitive UUID value.</summary>
-grounded parsable struct entity UUID provides Some, KeyType, PODType, APIType {
-    __safe function parse(str: String): Result<UUID, String> # uuid_tryparse
+grounded struct entity UUID provides Some, KeyType, PODType, APIType {
 }
 inline infix operator ==(a: UUID, b: UUID): Bool = default;
 inline infix operator !=(a: UUID, b: UUID): Bool = default;
@@ -415,56 +325,31 @@ inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
 inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
-grounded parsable entity CryptoHash provides Some, KeyType, PODType, APIType {
-    function compute<T>(value: T): CryptoHash # cryptohash_compute
-
-    function parse(str: String): Result<CryptoHash, String> # cryptohash_tryparse
+grounded entity CryptoHash provides Some, KeyType, PODType, APIType {
+    __safe function compute<T>(value: T): CryptoHash # cryptohash_compute
 }
 inline infix operator ==(a: CryptoHash, b: CryptoHash): Bool = default;
 inline infix operator !=(a: CryptoHash, b: CryptoHash): Bool = default;
 
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {
-    private function s_accepts(str: String, start: Int, end: Int): Bool # regex_accepts
-    private function s_match(str: String, start: Int, end: Int): Int, Int # regex_match
-
-    private function s_rangeInBounds(str: String, start: Int?, end: Int?): Bool {
-        let s, e = start ?| 0, end ?| String::s_length(str);
-        return 0 <= s && s <= e && e <= String::s_length(str); 
-    }
-
-    method accepts(str: String, start?: Int, end?: Int): Bool
-        requires release Regex::s_rangeInBounds(s, start, end);
-    {
-        let s, e = start ?| 0, end ?| String::s_length(str);
-        return Regex::s_accepts(str, s, e);
-    }
-
-    method match(str: String, start?: Int, end?: Int): RegexMatch?
-        requires release Regex::s_rangeInBounds(s, start, end);
-    {
-        let s, e = start ?| 0, end ?| String::s_length(str);
-
-        let i, l = Regex::s_match(str, s, e);
-        return (l != -1) ? RegexMatch#{ success=true, index=i, length=l } : none;
-    }
 }
 
 struct entity RegexMatch provides Some {
-    field index: Int;
-    field length: Int;
+    field index: Nat;
+    field length: Nat;
 
     invariant $index >= 0 && $length >= 0;
 }
 
 //<summary>Static methods for Tuples.</summary>
 concept Tuple provides Some {
-    function append(...args: List<Tuple>): Tuple # special_method
+    function append(arg: Any): Tuple # special_method
 }
 
 //<summary>Static methods for Records.</summary>
 concept Record provides Some {
-    function join(...args: List<Record>): Record # special_method
+    function join(arg: Any): Record # special_method
 }
 
 //<summary>Result type.</summary>

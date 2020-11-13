@@ -1,0 +1,127 @@
+//-------------------------------------------------------------------------------------------------------
+// Copyright (C) Microsoft. All rights reserved.
+// Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
+//-------------------------------------------------------------------------------------------------------
+
+//The core namespace implements the primitive concepts used in the bosque core language
+namespace NSCore;
+
+struct entity Vector<T, K=Nat> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
+    __assume_safe private static s_unsafe_get(l: Vector<T, K>, i: Nat): T # vector_unsafe_get
+
+    method size(): Nat {
+        return expression(K);
+    }
+
+    method empty(): Bool {
+        return expression(K) == 0n;
+    }
+
+    method front(): T 
+        requires release expression(K) != 0n;
+    {
+        return Vector<T, K>::s_unsafe_get(this, 0n);
+    }
+
+    method back(): T 
+        requires release expression(K) != 0n;
+    {
+        return Vector<T, K>::s_unsafe_get(this, expression(K) - 1n);
+    }
+
+    method get(i: Nat): T 
+        requires release 0n <= i && i < expression(K);
+    {
+        return Vector<T, K>::s_unsafe_get(this, i);
+    }
+}
+
+entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
+    __safe private static s_size(l: List<T>): Nat # list_size
+    __assume_safe private static s_unsafe_get(l: List<T>, i: Nat): T # list_unsafe_get
+    
+    private static s_rangeInBounds(l: List<T>, start: Nat?, end: Nat?): Bool {
+        let s, e = start ?| 0n, end ?| List<T>::s_size(l);
+        return 0n <= s && s <= e && e <= List<T>::s_size(l); 
+    }
+
+    method size(): Int {
+        return List<T>::s_size(this);
+    }
+
+    method empty(): Bool {
+        return List<T>::s_size(this) == 0n;
+    }
+
+    method front(): T 
+        requires release List<T>::s_size(this) != 0n;
+    {
+        return List<T>::s_unsafe_get(this, 0n);
+    }
+
+    method frontOrNone(): T? {
+        return List<T>::s_size(this) !== 0n ? List<T>::s_unsafe_get(this, 0n) : none;
+    }
+
+    method frontOrDefault(d: T): T {
+        return List<T>::s_size(this) !== 0n ? List<T>::s_unsafe_get(this, 0n) : d;
+    }
+
+    method frontTry(out? v: T): Bool {
+        if(List<T>::s_size(this) !== 0n) {
+            v = List<T>::s_unsafe_get(this, 0n);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    method back(): T 
+        requires release List<T>::s_size(this) != 0n;
+    {
+        return List<T>::s_unsafe_get(this, List<T>::s_size(this) - 1n);
+    }
+
+    method backOrNone(): T? {
+        return List<T>::s_size(this) !== 0n ? List<T>::s_unsafe_get(this, List<T>::s_size(this) - 1n) : none;
+    }
+
+    method backOrDefault(d: T): T {
+        return List<T>::s_size(this) !== 0n ? List<T>::s_unsafe_get(this, List<T>::s_size(this) - 1n) : d;
+    }
+
+    method backTry(out? v: T): Bool {
+        if(List<T>::s_size(this) !== 0n) {
+            v = List<T>::s_unsafe_get(this, List<T>::s_size(this) - 1n);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    method get(i: Nat): T 
+        requires release i < List<T>::s_size(this);
+    {
+        return List<T>::s_unsafe_get(this, i);
+    }
+
+    method getOrNone(i: Nat): T? {
+        return i < List<T>::s_size(this) ? List<T>::s_unsafe_get(this, i) : none;
+    }
+
+    method getOrDefault(i: Nat, d: T): T {
+        return i < List<T>::s_size(this) ? List<T>::s_unsafe_get(this, i) : d;
+    }
+
+    method getTry(i: Nat, out? v: T): Bool {
+        if(i < List<T>::s_size(this)) {
+            v = List<T>::s_unsafe_get(this, i);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+}

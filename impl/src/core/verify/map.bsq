@@ -7,20 +7,19 @@
 namespace NSCore;
 
 entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, PODType when K PODType && V PODType, APIType when K APIType && V APIType {
-    __safe private static s_size(m: Map<K, V>): Int # map_size
+    __safe private static s_size(m: Map<K, V>): Nat # map_size
     __safe private static s_has_key(m: Map<K, V>, key: K): Bool # map_has_key
     __safe private static s_at_val(m: Map<K, V>, key: K): V # map_at_val
-    __safe private static s_get_keylist(m: Map<K, V>): KeyList<K>? # map_get_keylist
     
-    __safe method size(): Int {
+    method size(): Nat {
         return Map<K, V>::s_size(this);
     }
 
-    __safe method empty(): Bool {
-        return Map<K, V>::s_size(this) == 0;
+    method empty(): Bool {
+        return Map<K, V>::s_size(this) == 0n;
     }
 
-    __safe method has(key: K): Bool {
+    method has(key: K): Bool {
         return Map<K, V>::s_has_key(this, key);
     }
 
@@ -30,17 +29,17 @@ entity Map<K where KeyType, V> provides Object, Expandoable<MapEntry<K, V>>, POD
         return Map<K, V>::s_at_val(this, key);
     }
 
-    __safe method getOrNone(k: K): V? {
+    method getOrNone(k: K): V? {
         return Map<K, V>::s_has_key(this, k) ? Map<K, V>::s_at_val(this, k) : none;
     }
 
-    __safe method getOrDefault(k: K, d: V): V {
+    method getOrDefault(k: K, d: V): V {
         return Map<K, V>::s_has_key(this, k) ? Map<K, V>::s_at_val(this, k) : d;
     }
 
-    __safe method getTry(out? k: K): Bool {
+    method getTry(k: K, out? v: V): Bool {
         if(Map<K, V>::s_has_key(this, k)) {
-            k = Map<K, V>::s_at_val(this, k);
+            v = Map<K, V>::s_at_val(this, k);
             return true;
         }
         else {

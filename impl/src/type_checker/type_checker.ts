@@ -2470,7 +2470,7 @@ class TypeChecker {
         this.checkTemplateTypes(exp.sinfo, oodecl.terms, oobinds);
 
         const fdecl = oodecl.staticFunctions.get(exp.factoryName);
-        this.raiseErrorIf(exp.sinfo, fdecl === undefined || !OOPTypeDecl.attributeSetContains("factory", fdecl.attributes), `Function is not a factory function for type '${ctype.idStr}'`);
+        this.raiseErrorIf(exp.sinfo, fdecl === undefined || !OOPTypeDecl.attributeSetContains("factory", fdecl.invoke.attributes), `Function is not a factory function for type '${ctype.idStr}'`);
 
         const [fsig, callbinds, eargs] = this.inferAndCheckArguments(exp.sinfo, env, exp.args, (fdecl as StaticFunctionDecl).invoke, exp.terms.targs, oobinds, env.terms, undefined, false);
         const rargs = this.checkArgumentsSignature(exp.sinfo, env, exp.factoryName, fsig, eargs);
@@ -2642,7 +2642,7 @@ class TypeChecker {
         this.checkRecursion(sinfo, fsig, pcodes, recursive);
 
         //if it is a static operator or it has a unique dynamic resolution based on the types
-        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.attributes)) {
+        if (!opdecl.isDynamic || !OOPTypeDecl.attributeSetContains("abstract", opdecl.invoke.attributes)) {
             let cargs: MIRArgument[] = [];
             let sigkeys: string[] = [];
             for (let i = 0; i < fsig.params.length; ++i) {
@@ -2879,8 +2879,8 @@ class TypeChecker {
                 const oodecl = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).contiainingType;
                 const oobinds = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).binds;
 
-                const opsintro = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
-                const opdecls = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.attributes));
+                const opsintro = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+                const opdecls = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
                 this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
                 const pnames = (opsintro as StaticOperatorDecl).invoke.params.map((p) => p.name);
