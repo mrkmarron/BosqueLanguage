@@ -294,7 +294,6 @@ class MemberMethodDecl implements OOMemberDecl {
 }
 
 enum SpecialTypeCategory {
-    None,
     GroundedTypeDecl,
     ParsableTypeDecl,
     ValidatorTypeDecl,

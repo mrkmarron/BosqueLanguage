@@ -4,7 +4,8 @@
 ;;-------------------------------------------------------------------------------------------------------
 
 (set-option :smt.auto-config false) ; disable automatic self configuration
-(set-option :smt.mbqi false) ; disable model-based quantifier instantiation
+(set-option :smt.mbqi true) ; enable model-based quantifier instantiation
+(set-option :smt.macro-finder true)
 
 (set-option :timeout 10000)
 

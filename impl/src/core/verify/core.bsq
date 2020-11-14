@@ -58,8 +58,6 @@ grounded struct entity None provides KeyType, PODType, APIType {
 //<summary>Primitive boolean value.</summary>
 grounded struct entity Bool provides Some, KeyType, PODType, APIType {
 }
-inline infix operator ==(a: Bool, b: Bool): Bool = default;
-inline infix operator !=(a: Bool, b: Bool): Bool = default;
 
 //<summary>Primitive integer value.</summary>
 grounded struct entity Int provides Some, KeyType, PODType, APIType {
@@ -190,53 +188,45 @@ grounded entity String provides Some, KeyType, PODType, APIType {
         return String::s_unsafe_charat(this, idx);
     }
 }
-inline infix operator ==(a: Rational, b: Rational): Bool = default;
-inline infix operator !=(a: Rational, b: Rational): Bool = default;
-inline infix operator <(a: Rational, b: Rational): Bool = default;
-inline infix operator >(a: Rational, b: Rational): Bool = default;
-inline infix operator <=(a: Rational, b: Rational): Bool = default;
-inline infix operator >=(a: Rational, b: Rational): Bool = default;
 
 //<summary>Primitive safe string value.</summary>
-grounded entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
-    __assume_safe private function s_unsafe_from(str: String): SafeString<T> # stringof_unsafe_from
-    __safe private function s_string(sof: StringOf<T>): String # stringof_string
+grounded struct entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
+    private str: String;
 
     method string(): String {
-        return StringOf<T>::s_string(this);
+        return this.str;
     }
 
     function from(str: String): StringOf<T>
         requires release T::accepts(str);
     {
-        return StringOf<T>::s_unsafe_from(str);
+        return StringOf<T>#{ str=str };
     }
 }
-//special case for == and < operations
 
 //<summary>Primitive DataString value.</summary>
-grounded entity DataString<T where parsable> provides Some, KeyType, APIValue {
-    __assume_safe private function s_unsafe_from(str: String): DataString<T> # datastring_unsafe_from
-    __safe private function s_string(sof: DataString<T>): String # stringof_string
+grounded struct entity DataString<T where parsable> provides Some, APIValue {
+    private str: String;
 
     method string(): String {
-        return DataString<T>::s_string(this);
+        return this.str;
     }
 
     function from(str: String): DataString<T> 
         requires release T::parse(str).isOk();
     {
-        return DataString<T>::s_unsafe_from(str);
+        return DataString<T>#{ str=str };
     }
 }
-//special case for == and < operations
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity Buffer<T where grounded PODType | APIType> provides Some, APIValue {
+struct entity Buffer<T where grounded PODType | APIType> provides Some, APIValue {
+    private buf: ByteBuffer;
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
-entity DataBuffer<T where parsable> provides Some, APIValue {
+struct entity DataBuffer<T where parsable> provides Some, APIValue {
+    private buf: ByteBuffer;
 }
 
 enum BufferFormat {
@@ -294,9 +284,9 @@ inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default
 inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
 
 numeric ISOTime = Nat;
-inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime # default_isoaddsecl;
-inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime # default_isoaddsecr;
-inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSeconds # default_isodiff;
+inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime # op_isoaddsecl;
+inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime # op_isoaddsecr;
+inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSeconds # op_isodiff;
 inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
 inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
 inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
@@ -307,16 +297,14 @@ inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
 }
-inline infix operator ==(a: UUID, b: UUID): Bool = default;
-inline infix operator !=(a: UUID, b: UUID): Bool = default;
 
 //<summary>Unit declarations for LogicalTime</summary>
 numeric LogicalTime = Nat;
-inline infix operator +(a: Int, b, LogicalTime): LogicalTime # default_logic_iltl;
-inline infix operator +(a: LogicalTime, b, Int): LogicalTime # default_logic_iltr;
-inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # default_logic_nltl;
-inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # default_logic_nltr;
-inline infix operator -(a: LogicalTime, b, LogicalTime): Int # default_logic_ltdiff;
+inline infix operator +(a: Int, b, LogicalTime): LogicalTime # op_logic_iltl;
+inline infix operator +(a: LogicalTime, b, Int): LogicalTime # op_logic_iltr;
+inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # op_logic_nltl;
+inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # op_logic_nltr;
+inline infix operator -(a: LogicalTime, b, LogicalTime): Int # op_logic_ltdiff;
 inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
 inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
 inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
@@ -328,8 +316,6 @@ inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {
     __safe function compute<T>(value: T): CryptoHash # cryptohash_compute
 }
-inline infix operator ==(a: CryptoHash, b: CryptoHash): Bool = default;
-inline infix operator !=(a: CryptoHash, b: CryptoHash): Bool = default;
 
 //<summary>Primitive regex value.</summary>
 entity Regex provides Some {

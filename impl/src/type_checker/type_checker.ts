@@ -7,7 +7,7 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck, ValueType } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, BinEqExpression, BinCmpExpression, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecmial, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRGuard } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
@@ -391,81 +391,50 @@ class TypeChecker {
         this.raiseErrorIf(sinfo, (sigr === "yes" && callr === "no") || (sigr === "no" && callr === "yes"), "Mismatched recursive annotations on call");
     }
 
-    private checkValueEq(lhsexp: Expression, lhs: ResolvedType, rhsexp: Expression, rhs: ResolvedType): { chk: "truealways" | "falsealways" | "lhsnone" | "rhsnone" | "stringof" | "datastring" | "keytuple"  | "keyrecord" | "operator", lnotnonechk: boolean, rnotnonechk: boolean } {
+    private checkValueEq(lhsexp: Expression, lhs: ResolvedType, rhsexp: Expression, rhs: ResolvedType): "err" | "truealways" | "falsealways" | "lhsnone" | "rhsnone" | "lhssomekey" | "rhssomekey" | "stdkey" {
         if (lhsexp instanceof LiteralNoneExpression && rhsexp instanceof LiteralNoneExpression) {
-            return { chk: "truealways", lnotnonechk: false, rnotnonechk: false };
+            return "truealways";
         }
 
         if (lhsexp instanceof LiteralNoneExpression) {
-            return { chk: rhs.options.some((opt) => opt.idStr === "NSCore::None") ? "lhsnone" : "falsealways", lnotnonechk: false, rnotnonechk: false };
+            return rhs.options.some((opt) => opt.idStr === "NSCore::None") ? "lhsnone" : "falsealways";
         }
 
         if (rhsexp instanceof LiteralNoneExpression) {
-            return { chk: lhs.options.some((opt) => opt.idStr === "NSCore::None") ? "rhsnone" : "falsealways", lnotnonechk: false, rnotnonechk: false };
+            return lhs.options.some((opt) => opt.idStr === "NSCore::None") ? "rhsnone" : "falsealways";
         }
         
-        const lhsnone = lhs.options.some((opt) => opt.idStr == "NSCore::None");
-        const simplelhsopts = lhs.options.filter((opt) => opt.idStr == "NSCore::None");
+        //we want T | None === T or T === T | None so at most 3 options are ok
+        if(lhs.options.length + rhs.options.length > 3) {
+            return "err";
+        }
 
-        const rhsnone = rhs.options.some((opt) => opt.idStr == "NSCore::None");
+        const simplelhsopts = lhs.options.filter((opt) => opt.idStr == "NSCore::None");
         const simplerhsopts = rhs.options.filter((opt) => opt.idStr == "NSCore::None");
 
-        const lnotnonechk = lhsnone && !rhsnone;
-        const simplelhs = simplelhsopts.length !== 0 && lnotnonechk ? ResolvedType.create(simplelhsopts) : lhs;
-
-        const rnotnonechk = !lhsnone && rhsnone;
-        const simplerhs = simplerhsopts.length !== 0 && rnotnonechk ? ResolvedType.create(simplerhsopts) : rhs;
-
-        if((simplelhs.isUniqueCallTargetType() && simplelhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl)) 
-            && (simplerhs.isUniqueCallTargetType() && simplerhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl))) {
-            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "stringof", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
+        if(simplelhsopts.length === 0 && simplerhsopts.length === 0) {
+            return "truealways";
         }
-
-        if((simplelhs.isUniqueCallTargetType() && simplelhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl)) 
-            && (simplerhs.isUniqueCallTargetType() && simplerhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl))) {
-            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "datastring", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
+        else if (simplelhsopts.length === 0) {
+            return rhs.options.some((opt) => opt.idStr === "NSCore::None") ? "lhsnone" : "falsealways";
         }
-
-        if ((simplelhs.isUniqueTupleTargetType() && this.m_assembly.subtypeOf(simplelhs, this.m_assembly.getSpecialKeyTypeConceptType())) 
-            && (simplerhs.isUniqueTupleTargetType() && this.m_assembly.subtypeOf(simplerhs, this.m_assembly.getSpecialKeyTypeConceptType()))) {
-            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "keytuple", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
+        else if (simplerhsopts.length === 0) {
+            return lhs.options.some((opt) => opt.idStr === "NSCore::None") ? "rhsnone" : "falsealways";
         }
-
-        if ((simplelhs.isUniqueRecordTargetType() && this.m_assembly.subtypeOf(simplelhs, this.m_assembly.getSpecialKeyTypeConceptType())) 
-            && (simplerhs.isUniqueRecordTargetType() && this.m_assembly.subtypeOf(simplerhs, this.m_assembly.getSpecialKeyTypeConceptType()))) {
-            return { chk: !simplelhs.isSameType(simplerhs) ? "falsealways" : "keyrecord", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
-        }
-        
-        return { chk: "operator", lnotnonechk: lnotnonechk, rnotnonechk: rnotnonechk };
-    }
-    
-    private checkValueLess(lhs: ResolvedType, rhs: ResolvedType): "truealways" | "falsealways" | "stringof" | "datastring" | "operator" {
-        if((lhs.isUniqueCallTargetType() && lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl)) && (rhs.isUniqueCallTargetType() && rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.StringOfDecl))) {
-            if(lhs.idStr < rhs.idStr) {
-                return "truealways";
+        else {
+            //should be 1 non-none type on each side then -- so 1 less than the orig number of types
+            if (simplelhsopts.length + simplerhsopts.length !== 2) {
+                return "err";
             }
-            else if(lhs.idStr > rhs.idStr) {
-                return "falsealways";
+
+            if(lhs.options.length === 1 && rhs.options.length === 1) {
+                return lhs.options[0].idStr === rhs.options[0].idStr ? "stdkey" : "falsealways";
             }
             else {
-                return "stringof";
+                xxxx;
+                return simplelhsopts[0].idStr === simplerhsopts[0].idStr ? "somekey" : "falsealways";
             }
         }
-
-        if((lhs.isUniqueCallTargetType() && lhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl)) && (rhs.isUniqueCallTargetType() && rhs.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.DataStringDecl))) {
-            if(lhs.idStr < rhs.idStr) {
-                return "truealways";
-            }
-            else if(lhs.idStr > rhs.idStr) {
-                return "falsealways";
-            }
-            else {
-                return "datastring";
-            }
-        }
-        
-        //We need to ensure in operator checking that users do not override operations for core types
-        return "operator";
     }
 
     private getInfoForHasIndex(sinfo: SourceInfo, rtype: ResolvedType, idx: number): "yes" | "no" | "maybe" {
@@ -2765,13 +2734,15 @@ class TypeChecker {
             const lhsreg = this.m_emitter.generateTmpRegister();
             const tlhs = this.checkExpression(env, lhsexp, lhsreg, undefined).getExpressionResult().valtype;
 
+            this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(tlhs.flowtype, ktype), "Invalid argument");
+            this.raiseErrorIf(exp.sinfo, !tlhs.flowtype.isGroundedType(), "Invalid argument");
+
             const rhsexp = exp.args.argList[1].value;
             const rhsreg = this.m_emitter.generateTmpRegister();
             const trhs = this.checkExpression(env, rhsexp, rhsreg, undefined).getExpressionResult().valtype;
 
-            this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(tlhs.flowtype, ktype), "Invalid argument");
             this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(trhs.flowtype, ktype), "Invalid argument");
-
+            this.raiseErrorIf(exp.sinfo, !trhs.flowtype.isGroundedType(), "Invalid argument");
 
             if (exp.name === "equal") {
                 this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(tlhs.layout), this.m_emitter.registerResolvedTypeReference(tlhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(trhs.layout), this.m_emitter.registerResolvedTypeReference(trhs.flowtype), rhsreg, trgt);
@@ -3788,27 +3759,37 @@ class TypeChecker {
         return [...ntstates, ...nfstates];
     }
 
-    private checkBinEq(env: TypeEnvironment, exp: BinEqExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkKeyEq(env: TypeEnvironment, exp: BinEqExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const lhsreg = this.m_emitter.generateTmpRegister();
         const lhs = this.checkExpression(env, exp.lhs, lhsreg, undefined);
+        let olhs = lhs.getExpressionResult().valtype;
+
+        this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(olhs.flowtype, this.m_assembly.getSpecialKeyTypeConceptType()), "Type must be KeyType");
+        this.raiseErrorIf(exp.sinfo, !olhs.flowtype.isGroundedType(), "Type must be grounded");
 
         const rhsreg = this.m_emitter.generateTmpRegister();
         const rhs = this.checkExpression(env, exp.rhs, rhsreg, undefined);
+        let orhs = rhs.getExpressionResult().valtype;
+
+        this.raiseErrorIf(exp.sinfo, !this.m_assembly.subtypeOf(orhs.flowtype, this.m_assembly.getSpecialKeyTypeConceptType()), "Type must be KeyType");
+        this.raiseErrorIf(exp.sinfo, !orhs.flowtype.isGroundedType(), "Type must be grounded");
 
         const action = this.checkValueEq(exp.lhs, lhs.getExpressionResult().valtype.flowtype, exp.rhs, rhs.getExpressionResult().valtype.flowtype);
-        if(action.chk === "truealways" || action.chk === "falsealways") {
-            this.m_emitter.emitLoadConstBool(exp.sinfo, action.chk === "truealways" ? true : false, trgt);
-            return [env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), action.chk === "truealways" ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
+        this.raiseErrorIf(exp.sinfo, action === "err", "Compared types are not equivalent (or not unique modulo none)");
+
+        if(action === "truealways" || action === "falsealways") {
+            this.m_emitter.emitLoadConstBool(exp.sinfo, action === "truealways" ? true : false, trgt);
+            return [env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), action === "truealways" ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
         }
-        else if (action.chk === "lhsnone" || action.chk === "rhsnone") {
-            if(action.chk === "lhsnone") {
+        else if (action === "lhsnone" || action === "rhsnone") {
+            if(action === "lhsnone") {
                 this.m_emitter.emitTypeOf(exp.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()), rhsreg, this.m_emitter.registerResolvedTypeReference(rhs.getExpressionResult().valtype.layout), this.m_emitter.registerResolvedTypeReference(rhs.getExpressionResult().valtype.flowtype), undefined);
             }
             else if (exp.rhs instanceof LiteralNoneExpression) {
                 this.m_emitter.emitTypeOf(exp.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialNoneType()), lhsreg, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().valtype.layout), this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().valtype.flowtype), undefined);
             }
 
-            const eevs = (action.chk === "lhsnone") ? rhs : lhs;
+            const eevs = (action === "lhsnone") ? rhs : lhs;
             const renvs = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, this.m_assembly.getSpecialNoneType(), [eevs]);
             return [
                 ...(renvs.tenvs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True))),
@@ -3817,10 +3798,7 @@ class TypeChecker {
         }
         else {
             let olhsreg = lhsreg;
-            let olhs = lhs.getExpressionResult().valtype;
-
             let orhsreg = rhsreg;
-            let orhs = rhs.getExpressionResult().valtype;
 
             let doneblock: string | undefined = undefined;
             let cenv = env;
@@ -3861,125 +3839,17 @@ class TypeChecker {
 
                 fenv = fenv.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
             }
-
-            if (action.chk === "stringof" || action.chk === "datastring") {
-                const sstr = this.m_assembly.getSpecialStringType();
-                const mirstr = this.m_emitter.registerResolvedTypeReference(sstr);
-
-                const sobj = olhs.flowtype.options[0] as ResolvedEntityAtomType;
-                const strcont = [this.m_emitter.registerResolvedTypeReference(olhs.flowtype), sobj.object, sobj.binds] as [MIRType, OOPTypeDecl, Map<string, ResolvedType>];
-                const ikey = this.m_emitter.registerMethodCall(strcont, sobj.object.memberMethods.get("string") as MemberMethodDecl, "string", new Map<string, ResolvedType>(), [], []);
-
-                olhsreg = this.m_emitter.generateTmpRegister();
-                olhs = ValueType.createUniform(sstr);
-                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, ikey, [lhsreg], undefined, mirstr, olhsreg);
-
-                orhsreg = this.m_emitter.generateTmpRegister();
-                orhs = ValueType.createUniform(sstr);
-                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, ikey, [rhsreg], undefined, mirstr, orhsreg);
-            }
             
-            if(action.chk === "keytuple" || action.chk === "keyrecord") {
-                if(exp.op === "==") {
-                    this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, trgt);
-                }
-                if(exp.op === "!=") {
-                    const treg = this.m_emitter.generateTmpRegister();
-                    this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, treg);
-                    this.m_emitter.emitPrefixNotOp(exp.sinfo, treg, trgt);
-                }
-
-                if(doneblock !== undefined) {
-                    this.m_emitter.emitDirectJump(exp.sinfo, doneblock);
-                    this.m_emitter.setActiveBlock(doneblock);
-                }
-
-                return [cenv.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.Unknown), ...fenv];
+            if (exp.op === "==") {
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, trgt);
             }
-            else {
-                const eargs = [
-                    { name: undefined, argtype: olhs, ref: undefined, expando: false, pcode: undefined, treg: olhsreg },
-                    { name: undefined, argtype: orhs, ref: undefined, expando: false, pcode: undefined, treg: orhsreg }
-                ];
-
-                const opns = this.m_assembly.getNamespace("NSMain") as NamespaceDeclaration;
-                const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
-                this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
-
-                const rargs = this.checkArgumentsWOperator(exp.sinfo, cenv, ["a", "b"], false, eargs);
-
-                const isigs = opdecls.map((opd) => this.m_assembly.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
-                const opidx = this.m_assembly.tryGetUniqueStaticOperatorResolve(rargs.types.map((tv) => tv.flowtype), isigs);
-
-                this.raiseErrorIf(exp.sinfo, opidx !== -1, "Cannot resolve operator");
-                const opdecl = opdecls[opidx];
-
-                const renv = this.checkNamespaceOperatorInvoke(exp.sinfo, cenv, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, "no", trgt, false);
-
-                if(doneblock !== undefined) {
-                    this.m_emitter.emitDirectJump(exp.sinfo, doneblock);
-                    this.m_emitter.setActiveBlock(doneblock);
-                }
-
-                return [...renv, ...fenv];
-            }
-        }
-    }
-
-    private checkBinCmp(env: TypeEnvironment, exp: BinCmpExpression, trgt: MIRTempRegister): TypeEnvironment[] {
-        const lhsreg = this.m_emitter.generateTmpRegister();
-        const lhs = this.checkExpression(env, exp.lhs, lhsreg, undefined);
-
-        const rhsreg = this.m_emitter.generateTmpRegister();
-        const rhs = this.checkExpression(env, exp.rhs, rhsreg, undefined);
-
-        const action = this.checkValueLess(lhs.getExpressionResult().valtype.flowtype, rhs.getExpressionResult().valtype.flowtype);
-        if(action === "truealways" || action === "falsealways") {
-            this.m_emitter.emitLoadConstBool(exp.sinfo, action === "truealways" ? true : false, trgt);
-            return [env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), action === "truealways" ? FlowTypeTruthValue.True : FlowTypeTruthValue.False)];
-        }
-        else {
-            let olhsreg = lhsreg;
-            let olhs = lhs.getExpressionResult().valtype;
-
-            let orhsreg = rhsreg;
-            let orhs = rhs.getExpressionResult().valtype;
-
-            if (action === "stringof" || action === "datastring") {
-                const sstr = this.m_assembly.getSpecialStringType();
-                const mirstr = this.m_emitter.registerResolvedTypeReference(sstr);
-
-                const sobj = olhs.flowtype.options[0] as ResolvedEntityAtomType;
-                const strcont = [this.m_emitter.registerResolvedTypeReference(olhs.flowtype), sobj.object, sobj.binds] as [MIRType, OOPTypeDecl, Map<string, ResolvedType>];
-                const ikey = this.m_emitter.registerMethodCall(strcont, sobj.object.memberMethods.get("string") as MemberMethodDecl, "string", new Map<string, ResolvedType>(), [], []);
-
-                olhsreg = this.m_emitter.generateTmpRegister();
-                olhs = ValueType.createUniform(sstr);
-                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, ikey, [lhsreg], undefined, mirstr, olhsreg);
-
-                orhsreg = this.m_emitter.generateTmpRegister();
-                orhs = ValueType.createUniform(sstr);
-                this.m_emitter.emitInvokeFixedFunction(exp.sinfo, ikey, [rhsreg], undefined, mirstr, orhsreg);
+            if (exp.op === "!=") {
+                const treg = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, treg);
+                this.m_emitter.emitPrefixNotOp(exp.sinfo, treg, trgt);
             }
 
-            const eargs = [
-                { name: undefined, argtype: olhs, ref: undefined, expando: false, pcode: undefined, treg: olhsreg },
-                { name: undefined, argtype: orhs, ref: undefined, expando: false, pcode: undefined, treg: orhsreg }
-            ];
-
-            const opns = this.m_assembly.getNamespace("NSMain") as NamespaceDeclaration;
-            const opdecls = (opns.operators.get(exp.op) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
-            this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
-
-            const rargs = this.checkArgumentsWOperator(exp.sinfo, env, ["a", "b"], false, eargs);
-
-            const isigs = opdecls.map((opd) => this.m_assembly.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
-            const opidx = this.m_assembly.tryGetUniqueStaticOperatorResolve(rargs.types.map((tv) => tv.flowtype), isigs);
-
-            this.raiseErrorIf(exp.sinfo, opidx !== -1, "Cannot resolve operator");
-            const opdecl = opdecls[opidx];
-            
-            return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, "no", trgt, false);
+            return [cenv.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.Unknown), ...fenv];
         }
     }
 
@@ -4630,11 +4500,8 @@ class TypeChecker {
                 else if (exp.tag === ExpressionTag.PrefixNotOpExpression) {
                     res = this.checkPrefixNotOp(env, exp as PrefixNotOp, trgt, (extraok && extraok.refok) || false);
                 }
-                else if (exp.tag === ExpressionTag.BinEqExpression) {
-                    res = this.checkBinEq(env, exp as BinEqExpression, trgt);
-                }
-                else if (exp.tag === ExpressionTag.BinCmpExpression) {
-                    res = this.checkBinCmp(env, exp as BinCmpExpression, trgt);
+                else if (exp.tag === ExpressionTag.BinKeyExpression) {
+                    res = this.checkKeyEq(env, exp as BinKeyExpression, trgt);
                 }
                 else {
                     assert(exp.tag === ExpressionTag.BinLogicExpression);
@@ -4662,11 +4529,8 @@ class TypeChecker {
         else if (exp.tag === ExpressionTag.PrefixNotOpExpression) {
             return this.checkPrefixNotOp(env, exp as PrefixNotOp, trgt, (extraok && extraok.refok) || false);
         }
-        else if (exp.tag === ExpressionTag.BinEqExpression) {
-            return this.checkBinEq(env, exp as BinEqExpression, trgt);
-        }
-        else if (exp.tag === ExpressionTag.BinCmpExpression) {
-            return this.checkBinCmp(env, exp as BinCmpExpression, trgt);
+        else if (exp.tag === ExpressionTag.BinKeyExpression) {
+            return this.checkKeyEq(env, exp as BinKeyExpression, trgt);
         }
         else if (exp.tag  === ExpressionTag.BinLogicExpression) {
             return this.checkBinLogic(env, exp as BinLogicExpression, trgt, (extraok && extraok.refok) || false);
