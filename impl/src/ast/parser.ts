@@ -27,7 +27,7 @@ const KeywordStrings = [
     "entity",
     "ensures",
     "err",
-    "expression",
+    "literal",
     "false",
     "field",
     "fn",
@@ -1849,7 +1849,7 @@ class Parser {
             this.consumeToken();
             return new LiteralBoolExpression(sinfo, tk === "true");
         }
-        else if (tk === "expression") {
+        else if (tk === "literal") {
             this.consumeToken();
             this.ensureAndConsumeToken("(")
             const ttype = this.parseTemplateTypeReference() as TemplateTypeSignature;
@@ -3545,6 +3545,11 @@ class Parser {
                         isinfer = true;
                     }
                     else {
+                        //
+                        //TODO: we want to mark this as a literal only term and check it later but right now just eat it
+                        //
+                        this.consumeTokenIf("literal");
+
                         defaulttype = this.parseTypeSignature(false);
                     }
                 }

@@ -9,54 +9,82 @@
 
 (set-option :timeout 10000)
 
+;;
+;; Type Tags
+;;
+
+xxxxx --- decl kind and distinct decl
+
+(declare-const TypeTag_None String)
+(declare-const TypeTag_Bool String)
+(declare-const TypeTag_Int String)
+(declare-const TypeTag_Nat String)
+(declare-const TypeTag_BigInt String)
+(declare-const TypeTag_BigNat String)
+(declare-const TypeTag_Float String)
+(declare-const TypeTag_Decimal String)
+(declare-const TypeTag_String String)
+(declare-const TypeTag_Regex String)
+(declare-const TypeTag_GeneralTuple String)
+(declare-const TypeTag_GeneralRecord String)
+
+;;TYPE_TAG_DECLS;;
+
+xxxxx --- decl kind and distinct decl
+
+;;
+;; Primitive datatypes 
+;;
 (declare-datatypes (
-      (StructuralSpecialTypeInfo 0)
+      (bsq_none 0)
+      ; Bool -> Bool
+      ; Int -> Int
+      ; Nat -> Int
+      ; BigInt -> Int
+      ; BigNat -> Int
+      ; Float -> Float
+      ; Decimal -> Float
+      ; String -> (Seq Int)
     ) (
-    ( (StructuralSpecialTypeInfo@cons (StructuralSpecialTypeInfo$PODType Bool) (StructuralSpecialTypeInfo$APIType Bool) (StructuralSpecialTypeInfo$Parsable Bool)) )
+    ( (bsq_none@cons) )
 ))
 
+;;
+;; KeyType Concept datatypes
+;;
 (declare-datatypes (
-      (bsq_safestring 0)
-      (bsq_stringof 0)
-      (bsq_uuid 0)
-      (bsq_logicaltime 0)
-      (bsq_cryptohash 0)
-      (bsq_enum 0)
-      (bsq_idkeysimple 0)
-      (bsq_idkeycompound 0)
-      (BKeyValue 0)
+      (bsq_keytuple 0)
+      (bsq_keytuple_entry 0)
+      (bsq_keyrecord 0)
+      (bsq_keyrecord_entry 0)
+      ;;KEY_TYPE_DECLS;;
+      (bsq_keytype 0)
+      (BKey 0)
     ) (
-    ( (bsq_safestring@cons (bsq_safestring_type Int) (bsq_safestring_value String)) )
-    ( (bsq_stringof@cons (bsq_stringof_type Int) (bsq_stringof_value String)) )
-    ( (bsq_uuid@cons (bsq_uuid_value String)) )
-    ( (bsq_logicaltime@cons (bsq_logicaltime_value Int)) )
-    ( (bsq_cryptohash@cons (bsq_cryptohash_value String)) )
-    ( (bsq_enum@cons (bsq_enum_type Int) (bsq_enum_value Int)) )
-    ( (bsq_idkeysimple@cons (bsq_idkeysimple_type Int) (bsq_idkeysimple_value BKeyValue)) )
-    ( (bsq_idkeycompound@cons (bsq_idkeycompound_type Int) (bsq_idkeycompound_value (Array Int BKeyValue))) )
+    ( (bsq_keytuple@cons (bsq_keytuple_entries (Array Int bsq_keytype))) )
+    ( (bsq_keytuple_entry@empty) (bsq_keytuple_entry@cons (bsq_keytuple_entry_value bsq_keytype)) )
+    ( (bsq_keyrecord@cons (bsq_keyrecord_entries (Array String bsq_keytype))) )
+    ( (bsq_keyrecord_entry@empty) (bsq_keyrecord_entry@cons (bsq_keyrecord_entry_value bsq_keytype)) )
+    ;;KEY_TYPE_CONSTRUCTORS;;
     (
-      (bsqkey_none) 
-      (bsqkey_bool (bsqkey_bool_value Bool))
-      (bsqkey_int (bsqkey_int_value Int))
-      (bsqkey_bigint (bsqkey_bigint_value Int))
-      (bsqkey_string (bsqkey_string_value String))
-      (bsqkey_safestring (bsqkey_safestring_value bsq_safestring))
-      (bsqkey_stringof (bsqkey_stringof_value bsq_stringof))
-      (bsqkey_uuid (bsqkey_uuid_value bsq_uuid))
-      (bsqkey_logicaltime (bsqkey_logicaltime_value bsq_logicaltime))
-      (bsqkey_cryptohash (bsqkey_cryptohash_value bsq_cryptohash))
-      (bsqkey_enum (bsqkey_enum_value bsq_enum))
-      (bsqkey_idkeysimple (bsqkey_idkeysimple_value bsq_idkeysimple))
-      (bsqkey_idkeycompound (bsqkey_idkeycompound_value bsq_idkeycompound))
+      (bsqkey_none@cons) 
+      (bsqkey_bool@cons (bsqkey_bool_value Bool))
+      (bsqkey_int@cons (bsqkey_int_value Int))
+      (bsqkey_nat@cons (bsqkey_nat_value Int))
+      (bsqkey_bigint@cons (bsqkey_bigint_value Int))
+      (bsqkey_bignat@cons (bsqkey_bignat_value Int))
+      (bsqkey_string@cons (bsqkey_string_value String))
+      (bsqkey_keytuple@cons (bsqkey_keytuple_value bsq_keytuple))
+      (bsqkey_keyrecord@cons (bsqkey_keyrecord_value bsq_keyrecord))
+      ;;KEY_TYPE_BOXING;;
     )
+    ( (BKey@cons (BKey_type TypeTag) (BKey_value bsq_keytype)) )
 ))
 
+;;
+;; Any Concept datatypes
+;;
 (declare-datatypes ( 
-    (bsq_buffer 0)
-    (bsq_bufferof 0)
-    (bsq_bytebuffer 0)
-    (bsq_isotime 0)
-    (bsq_regex 0)
     (bsq_tuple 0)
     (bsq_record 0)
     ;;NOMINAL_DECLS_FWD;;
@@ -89,6 +117,37 @@
       (bsqterm_object (bsqterm_object_type Int) (bsqterm_object_value bsq_object))
     )
 ))
+
+;;
+;; Type Decls
+;;
+(declare-datatypes (
+      (bsq_nominal_type 0)
+      (bsq_literal_type 0)
+      (bsq_tuple_type 0)
+      (bsq_record_type 0)
+      (bsq_ephemeral_type 0)
+    ) (
+    ( (bsq_nominal_type@cons (bsq_nominal_type_id String) (bsq_nominal_type_iskey String) (bsq_nominal_type_isapi String) (bsq_nominal_type_ispod String) (bsq_nominal_type_subtypes (Array String bsq_nominal_type))) )
+    ( (bsq_literal_type@cons (bsq_literal_type_id String)) )
+
+    ( (bsq_tuple_type@cons (bsq_tuple_type_id String)) )
+    ( (bsq_record_type@cons (bsq_record_type_id String)) )
+
+    ( (bsq_ephemeral_type@cons (bsq_ephemeral_type_id String)) )
+
+    (
+      (bsqkey_none@cons) 
+      (bsqkey_bool@cons (bsqkey_bool_value Bool))
+      (bsqkey_int@cons (bsqkey_int_value Int))
+      (bsqkey_nat@cons (bsqkey_nat_value Int))
+      (bsqkey_bigint@cons (bsqkey_bigint_value Int))
+      (bsqkey_bignat@cons (bsqkey_bignat_value Int))
+      (bsqkey_string@cons (bsqkey_string_value String))
+      ;;KEY_TYPE_CONSTRUCTORS;;
+    )
+))
+
 
 ;;NOMINAL_TYPE_KIND_DECLS;;
 

@@ -441,6 +441,8 @@ class MIRLiteralType extends MIRTypeOption {
 
     private constructor(ekey: MIRResolvedTypeKey, primitiveValue: boolean | number | undefined) {
         super(ekey);
+
+        this.primitiveValue = primitiveValue;
     }
 
     static create(ekey: MIRResolvedTypeKey, primitiveValue: boolean | number | undefined): MIRLiteralType {

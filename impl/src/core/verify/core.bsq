@@ -123,6 +123,8 @@ inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
 //<summary>Primitive rational value.</summary>
 grounded struct entity Rational provides Some, KeyType, PODType, APIType {
+    private numerator: BigInt;   //fake data store for verifier to use
+    private denominator: BigNat; //fake data store for verifier to use
 }
 inline prefix operator +(a: Rational): Rational = default;
 inline prefix operator -(a: Rational): Rational = default;
@@ -163,6 +165,8 @@ inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
 //<summary>Primitive complex floating point value.</summary>
 grounded struct entity Complex provides Some, PODType, APIType {
+    private real: Float; //fake data store for verifier to use
+    private imag: Float; //fake data store for verifier to use
 }
 inline prefix operator +(a: Complex): Complex = default;
 inline prefix operator -(a: Complex): Complex = default;
@@ -248,6 +252,7 @@ enum BufferCompression {
 
 //<summary>An efficient byte buffer for data.</summary>
 entity ByteBuffer provides Some, APIValue {
+    private bytes: String; //fake data store for verifier to use
 }
 
 //<summary>Unit declarations for seconds, milliseconds, and ISOTime</summary>
@@ -296,6 +301,7 @@ inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
+    private bytes: String; //fake data store for verifier to use
 }
 
 //<summary>Unit declarations for LogicalTime</summary>
@@ -314,6 +320,8 @@ inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {
+    private bytes: String; //fake data store for verifier to use
+
     __safe function compute<T>(value: T): CryptoHash # cryptohash_compute
 }
 

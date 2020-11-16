@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTupleAtomTypeEntry, ResolvedRecordAtomType, ResolvedRecordAtomTypeEntry, ResolvedConceptAtomType, ResolvedFunctionType, ResolvedEphemeralListType, ResolvedConceptAtomTypeEntry, ResolvedLiteralAtomType } from "../ast/resolved_type";
-import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl, NamespaceDeclaration } from "../ast/assembly";
+import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck, ValueType } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
@@ -431,8 +431,12 @@ class TypeChecker {
                 return lhs.options[0].idStr === rhs.options[0].idStr ? "stdkey" : "falsealways";
             }
             else {
-                xxxx;
-                return simplelhsopts[0].idStr === simplerhsopts[0].idStr ? "somekey" : "falsealways";
+                if (simplelhsopts[0].idStr !== simplerhsopts[0].idStr) {
+                    return "falsealways";
+                }
+                else {
+                    return lhs.options.length === 2 ? "lhssomekey" : "rhssomekey";
+                }
             }
         }
     }
@@ -3759,7 +3763,7 @@ class TypeChecker {
         return [...ntstates, ...nfstates];
     }
 
-    private checkKeyEq(env: TypeEnvironment, exp: BinEqExpression, trgt: MIRTempRegister): TypeEnvironment[] {
+    private checkKeyEq(env: TypeEnvironment, exp: BinKeyExpression, trgt: MIRTempRegister): TypeEnvironment[] {
         const lhsreg = this.m_emitter.generateTmpRegister();
         const lhs = this.checkExpression(env, exp.lhs, lhsreg, undefined);
         let olhs = lhs.getExpressionResult().valtype;
@@ -3796,60 +3800,34 @@ class TypeChecker {
                 ...(renvs.fenvs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False)))
             ];
         }
-        else {
-            let olhsreg = lhsreg;
-            let orhsreg = rhsreg;
-
-            let doneblock: string | undefined = undefined;
-            let cenv = env;
-            let fenv: TypeEnvironment[] = [];
-            if(action.lnotnonechk || action.rnotnonechk) {
-                const okblock = this.m_emitter.createNewBlock("notnone");
-                doneblock = this.m_emitter.createNewBlock("doneeq");
-
-                if(action.lnotnonechk) {
-                    this.m_emitter.emitTypeOf(exp.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeConceptType()), olhsreg, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), undefined);
-
-                    const nlhs = new ValueType(ResolvedType.create(olhs.layout.options.filter((opt) => opt.idStr !== "NSCore::None")), ResolvedType.create(olhs.flowtype.options.filter((opt) => opt.idStr !== "NSCore::None")));
-                    const nlhsreg = this.emitInlineConvertIfNeeded(exp.sinfo, olhsreg, new ValueType(olhs.layout, nlhs.flowtype), nlhs.layout);
-
-                    olhsreg = nlhsreg;
-                    olhs = nlhs;
-
-                    const splits = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, this.m_assembly.getSpecialSomeConceptType(), [lhs]);
-                    cenv = TypeEnvironment.join(this.m_assembly, ...splits.tenvs);
-                    splits.fenvs;
-                }
-                else {
-                    this.m_emitter.emitTypeOf(exp.sinfo, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialSomeConceptType()), orhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), undefined);
-
-                    const nrhs = new ValueType(ResolvedType.create(orhs.layout.options.filter((opt) => opt.idStr !== "NSCore::None")), ResolvedType.create(orhs.flowtype.options.filter((opt) => opt.idStr !== "NSCore::None")));
-                    const nrhsreg = this.emitInlineConvertIfNeeded(exp.sinfo, orhsreg, new ValueType(orhs.layout, nrhs.flowtype), nrhs.layout);
-
-                    orhsreg = nrhsreg;
-                    orhs = nrhs;
-
-                    const splits = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, this.m_assembly.getSpecialSomeConceptType(), [rhs]);
-                    cenv = TypeEnvironment.join(this.m_assembly, ...splits.tenvs);
-                    fenv = splits.fenvs;
-                }
-
-                this.m_emitter.emitBoolJump(exp.sinfo, trgt, okblock, doneblock);
-                this.m_emitter.setActiveBlock(doneblock);
-
-                fenv = fenv.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
-            }
-            
+        else if(action === "lhssomekey" || action === "rhssomekey") {
             if (exp.op === "==") {
-                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, trgt);
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, trgt);
             }
-            if (exp.op === "!=") {
+            else {
                 const treg = this.m_emitter.generateTmpRegister();
-                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), olhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), orhsreg, treg);
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, treg);
                 this.m_emitter.emitPrefixNotOp(exp.sinfo, treg, trgt);
             }
 
-            return [cenv.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.Unknown), ...fenv];
+            const eevs = (action === "lhssomekey") ? rhs : lhs;
+            const renvs = TypeEnvironment.convertToTypeNotTypeFlowsOnResult(this.m_assembly, this.m_assembly.getSpecialNoneType(), [eevs]);
+            return [
+                ...(renvs.tenvs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False))),
+                ...(renvs.fenvs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.Unknown)))
+            ];
+        }
+        else {
+            if (exp.op === "==") {
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, trgt);
+            }
+            else {
+                const treg = this.m_emitter.generateTmpRegister();
+                this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, treg);
+                this.m_emitter.emitPrefixNotOp(exp.sinfo, treg, trgt);
+            }
+
+            return [env.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.Unknown)];
         }
     }
 
