@@ -14,7 +14,7 @@
         "./src/ast/*.ts",
         "./src/type_checker/*.ts",
         "./src/compiler/*.ts",
-        "./src/tooling/bmc/*.ts",
+        "src/tooling/verifier/*.ts",
         "./src/runtimes/symtest/*.ts",
     ]
 }

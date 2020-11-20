@@ -321,8 +321,6 @@ inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {
     private bytes: String; //fake data store for verifier to use
-
-    __safe function compute<T>(value: T): CryptoHash # cryptohash_compute
 }
 
 //<summary>Primitive regex value.</summary>

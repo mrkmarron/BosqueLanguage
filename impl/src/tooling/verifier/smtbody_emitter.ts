@@ -3,178 +3,128 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRType, MIRInvokeDecl, MIRInvokeBodyDecl, MIRInvokePrimitiveDecl, MIRConstantDecl, MIRFieldDecl, MIREntityTypeDecl, MIREntityType, MIRTupleType, MIRRecordType, MIRConceptType, MIREphemeralListType, MIRRegex, MIRPCode } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRArgument, MIRRegisterArgument, MIRConstantNone, MIRConstantFalse, MIRConstantTrue, MIRConstantInt, MIRConstantArgument, MIRConstantString, MIROp, MIROpTag, MIRLoadConst, MIRAccessArgVariable, MIRAccessLocalVariable, MIRInvokeFixedFunction, MIRPrefixOp, MIRBinOp, MIRBinEq, MIRBinCmp, MIRIsTypeOfNone, MIRIsTypeOfSome, MIRRegAssign, MIRTruthyConvert, MIRVarStore, MIRReturnAssign, MIRJumpCond, MIRJumpNone, MIRAbort, MIRPhi, MIRBasicBlock, MIRJump, MIRConstructorTuple, MIRConstructorRecord, MIRAccessFromIndex, MIRAccessFromProperty, MIRInvokeKey, MIRAccessConstantValue, MIRLoadFieldDefaultValue, MIRConstructorPrimary, MIRAccessFromField, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRIsTypeOf, MIRProjectFromIndecies, MIRModifyWithIndecies, MIRStructuredExtendTuple, MIRProjectFromProperties, MIRModifyWithProperties, MIRStructuredExtendRecord, MIRLoadConstTypedString, MIRConstructorEphemeralValueList, MIRProjectFromFields, MIRModifyWithFields, MIRStructuredExtendObject, MIRLoadConstSafeString, MIRInvokeInvariantCheckDirect, MIRLoadFromEpehmeralList, MIRNominalTypeKey, MIRConstantBigInt, MIRConstantFloat64, MIRFieldKey, MIRPackSlice, MIRPackExtend, MIRResolvedTypeKey, MIRBinLess, MIRConstantRegex } from "../../compiler/mir_ops";
-import { SMTExp, SMTValue, SMTCond, SMTLet, SMTFreeVar } from "./smt_exp";
+import { MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantTrue, MIRGlobalVariable, MIRRegisterArgument } from "../../compiler/mir_ops";
+import { SMTCall, SMTConst, SMTExp, SMTVar, VerifierLevel } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
+import { SMTAssembly, SMTErrorCode } from "./smtassembly";
 
 import * as assert from "assert";
-import { compileRegexSMTMatch } from "./smt_regex";
 
 function NOT_IMPLEMENTED<T>(msg: string): T {
     throw new Error(`Not Implemented: ${msg}`);
 }
 
-enum AxiomLevel {
-    none,
-    basic,
-    standard,
-    full
-}
-
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
+    readonly smtasm: SMTAssembly;
     readonly typegen: SMTTypeEmitter;
+    readonly level: VerifierLevel;
 
-    private standard_gas = 4;
-    private collection_gas = 5;
-    private string_gas = 10;
-
-    private errorCodes = new Map<string, number>();
-    private gasLimits = new Map<string, number>().set("default", this.standard_gas).set("collection", this.collection_gas).set("string",this.string_gas);
-
-    readonly allConstRegexes: Map<string, string> = new Map<string, string>();
+    private tmpvarctr = 0;
 
     private currentFile: string = "[No File]";
     private currentRType: MIRType;
-    private tmpvarctr = 0;
     private currentSCC = new Set<string>();
-
-    private vtypes: Map<string, MIRType> = new Map<string, MIRType>();
 
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
-    checkedConcepts: Set<MIRResolvedTypeKey> = new Set<MIRResolvedTypeKey>();
 
-    vfieldLookups: { infertype: MIRType, fdecl: MIRFieldDecl, lname: string }[] = [];
-    vfieldProjects: { infertype: MIRType, fprojs: MIRFieldDecl[], resultAccessType: MIRType, uname: string }[] = [];
-    vfieldUpdates: { infertype: MIRType, fupds: [MIRFieldDecl, MIRArgument][], resultAccessType: MIRType, uname: string }[] = [];
-    vobjmerges: { infertype: MIRType, merge: MIRArgument, infermergetype: MIRType, fieldResolves: [string, MIRFieldDecl][], resultAccessType: MIRType, mname: string }[] = [];
-
-    readonly axiomgen: AxiomLevel;
-    uninterpDecl: Set<string> = new Set<string>();
-    uninterpAxioms: Set<string> = new Set<string>();
-
-    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, isverify: boolean, axlevel?: AxiomLevel) {
+    constructor(assembly: MIRAssembly, smtasm: SMTAssembly, typegen: SMTTypeEmitter, level: VerifierLevel) {
         this.assembly = assembly;
+        this.smtasm = smtasm;
         this.typegen = typegen;
+        this.level = level;
 
-        this.currentRType = typegen.noneType;
-
-        this.axiomgen = axlevel || (isverify ? AxiomLevel.standard : AxiomLevel.none);
-    }
-
-    private static cleanStrRepr(s: string): string {
-        return "\"" + s.substring(1, s.length - 1) + "\"";
+        this.currentRType = typegen.getMIRType("NSCore::None");
     }
 
     generateTempName(): string {
         return `@tmpvar@${this.tmpvarctr++}`;
     }
 
-    generateErrorCreate(sinfo: SourceInfo, rtype: string): SMTValue {
-        const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`;
-        if (!this.errorCodes.has(errorinfo)) {
-            this.errorCodes.set(errorinfo, this.errorCodes.size);
+    generateErrorCreate(sinfo: SourceInfo, rtype: string): SMTConst {
+        const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- pos ${sinfo.pos}`;
+        const errorid = `error#${this.smtasm.errors.size}`;
+        if (!this.smtasm.errors.has(errorinfo)) {
+            this.smtasm.errors.set(errorinfo, new SMTErrorCode(errorid, this.currentFile, sinfo));
         }
-        const errid = this.errorCodes.get(errorinfo) as number;
 
-        return new SMTValue(`(result_error@${rtype} (result_error ${errid}))`);
-    }
-
-    getErrorIds(...sinfos: SourceInfo[]): number[] {
-        const ekeys = sinfos.map((sinfo) => `${this.currentFile} @ line ${sinfo.line} -- column ${sinfo.column}`);
-        return [...new Set<number>(ekeys.map((k) => this.errorCodes.get(k) as number))].sort();
-    }
-
-    getGasKeyForOperation(ikey: MIRInvokeKey): "collection" | "string" | "regex" | "default" {
-        if(ikey.startsWith("NSCore::List::") ||ikey.startsWith("NSCore::Stack::") || ikey.startsWith("NSCore::Queue::") 
-            || ikey.startsWith("NSCore::Set::") || ikey.startsWith("NSCore::DynamicSet::")
-            || ikey.startsWith("NSCore::Map::") || ikey.startsWith("NSCore::DynamicMap::")) {
-            return "collection";
-        }
-        else if(ikey.startsWith("NSCore::String::")) {
-            return "string";
-        }
-        else {
-            return "default";
-        }
-    }
-
-    getGasForOperation(ikey: MIRInvokeKey): number {
-        return this.gasLimits.get(this.getGasKeyForOperation(ikey)) as number;
-    }
-
-    generateBMCLimitCreate(ikey: MIRInvokeKey, rtype: string): SMTValue {
-        const errid = this.getGasKeyForOperation(ikey);
-        return new SMTValue(`(result_error@${rtype} (result_bmc "${errid}"))`);
+        return new SMTConst(errorid);
     }
 
     isSafeInvoke(idecl: MIRInvokeDecl): boolean {
-        return idecl.pragmas.some((pragma) => pragma[0].trkey === "NSCore::AssumeSafe" || pragma[0].trkey === "NSCore::KnownSafe");
+        return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe");
     }
 
-    varNameToSMTName(name: string): string {
+    varStringToSMT(name: string): SMTVar {
         if (name === "$$return") {
-            return "$$return";
+            return new SMTVar("$$return");
         }
         else {
-            return this.typegen.mangleStringForSMT(name);
+            return new SMTVar(this.typegen.mangle(name));
         }
     }
 
-    varToSMTName(varg: MIRRegisterArgument): string {
-        return this.varNameToSMTName(varg.nameID);
+    varToSMTName(varg: MIRRegisterArgument): SMTVar {
+        return this.varStringToSMT(varg.nameID);
     }
 
-    invokenameToSMT(ivk: MIRInvokeKey): string {
-        return this.typegen.mangleStringForSMT(ivk);
+    globalToSMT(gval: MIRGlobalVariable): SMTConst {
+        return new SMTConst(this.typegen.mangle(gval.gkey));
     }
 
-    getArgType(arg: MIRArgument): MIRType {
-        if (arg instanceof MIRRegisterArgument) {
-            return this.vtypes.get(arg.nameID) as MIRType;
-        }
-        else {
-            if (arg instanceof MIRConstantNone) {
-                return this.typegen.noneType;
-            }
-            else if (arg instanceof MIRConstantTrue || arg instanceof MIRConstantFalse) {
-                return this.typegen.boolType;
-            }
-            else if (arg instanceof MIRConstantInt) {
-                return this.typegen.intType;
-            }
-            else if (arg instanceof MIRConstantString) {
-                return this.typegen.stringType;
-            }
-            else {
-                return this.typegen.regexType;
-            }
-        }
-    }
-
-    generateConstantExp(cval: MIRConstantArgument, into: MIRType): SMTExp {
+    constantToSMT(cval: MIRConstantArgument): SMTExp {
         if (cval instanceof MIRConstantNone) {
-            return this.typegen.coerce(new SMTValue("bsqkey_none"), this.typegen.noneType, into);
+            return new SMTConst("bsq_none@literal");
         }
         else if (cval instanceof MIRConstantTrue) {
-            return this.typegen.coerce(new SMTValue("true"), this.typegen.boolType, into);
+            return new SMTConst("true");
         }
         else if (cval instanceof MIRConstantFalse) {
-            return this.typegen.coerce(new SMTValue("false"), this.typegen.boolType, into);
+            return new SMTConst("false");
         }
         else if (cval instanceof MIRConstantInt) {
-            return this.typegen.coerce(new SMTValue(cval.value), this.typegen.intType, into);
+            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+        }
+        else if (cval instanceof MIRConstantNat) {
+            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantBigInt) {
-            return this.typegen.coerce(new SMTValue(cval.digits()), this.typegen.bigIntType, into);
+            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
-        else if (cval instanceof MIRConstantFloat64) {
+        else if (cval instanceof MIRConstantBigNat) {
+            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+        }
+        else if (cval instanceof MIRConstantRational) {
+            const spos = cval.value.indexOf("/");
+            const num = new SMTConst(cval.value.slice(0, spos));
+            const denom = new SMTConst(cval.value.slice(spos + 1, cval.value.length - 1));
+            return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType("NSCore::Rational")).cons, [num, denom]);
+        }
+        else if (cval instanceof MIRConstantComplex) {
+            const real = new SMTConst(cval.rvalue);
+            const imag = new SMTConst(cval.ivalue.slice(0, cval.ivalue.length - 1));
+            return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType("NSCore::Complex")).cons, [real, imag]);
+        }
+        else if (cval instanceof MIRConstantFloat) {
+            if(this.level === "Strong") {
+                return new SMTCall("UFloatUnary", [new SMTConst("@cons"), new SMTConst(cval.value)]);
+            }
+            else {
+                const sv = cval.value.includes(".") ? cval.value.slice(0, cval.value.length - 1) : (cval.value.slice(0, cval.value.length - 1) + ".0");
+                return new SMTConst(sv);
+            }
+        }
+        else if (cval instanceof MIRConstantDecimal) {
             return this.typegen.coerce(new SMTValue(cval.digits()), this.typegen.float64Type, into);
         }
         else if (cval instanceof MIRConstantString) {
+            const sval = SMTBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
+            return this.typegen.coerce(new SMTValue(sval), this.typegen.stringType, into);
+        }
+        else if (cval instanceof MIRConstantStringOf) {
             const sval = SMTBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
             return this.typegen.coerce(new SMTValue(sval), this.typegen.stringType, into);
         }
