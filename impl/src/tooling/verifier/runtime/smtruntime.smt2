@@ -21,6 +21,8 @@
   TypeTag_BigNat
   TypeTag_Float
   TypeTag_Decimal
+  TypeTag_Rational
+  TypeTag_Complex
   TypeTag_String
   TypeTag_Regex
   TypeTag_GeneralTuple
@@ -29,19 +31,35 @@
   )
 ))
 
-(declare-fun nominal_subtype (TypeTag, TypeTag) Bool)
+(declare-datatypes () (
+  (TupleIndexTag
+  ;;INDEX_TAG_DECLS;;
+  )
+))
+
+(declare-datatypes () (
+  (RecordPropertyTag
+  ;;PROPERTY_TAG_DECLS;;
+  )
+))
+
+(declare-fun Subtype@ (TypeTag, TypeTag) Bool)
 ;;NOMINAL_SUBTYPE_DECLS;;
 
-(declare-fun keytype_tag_less (TypeTag, TypeTag) Bool)
+(declare-fun HasIndex@ (TypeTag, TupleIndex) Bool)
+;;TUPLE_HAS_INDEX_DECLS;;
+
+(declare-fun HasProperty@ (TypeTag, RecordProperty) Bool)
+;;RECORD_HAS_PROPERTY_DECLS;;
+
+(declare-fun TypeTagLess@ (TypeTag, TypeTag) Bool)
 ;;KEY_TYPE_TAG_LESS;;
 
 ;;
-;;UFloat kind and other UF ops for strong refutation checks
+;;UFloat and UComplex kind + UF ops for strong refutation checks
 ;;
 (declare-sort UFloat)
-
-(declare-fun UFloatUnary (String, UFloat) UFloat)
-(declare-fun UFloatBinary (String, UFloat, UFloat) UFloat)
+(declare-sort UComplex)
 
 ;;
 ;; Primitive datatypes 
@@ -53,12 +71,21 @@
       ; Nat -> Int
       ; BigInt -> Int
       ; BigNat -> Int
-      ; Float ->   Float | UFloat
-      ; Decimal -> Float | UFloat
-      ; String -> String | (Seq (_ BitVec 64))
+      ; Float ->   Float | UFloat as BFloat
+      ; Decimal -> Float | UFloat as BDecimal
+      ; Rational -> Float | UFloat as BRational
+      ; Complex -> UComplex as BComplex
+      ; String -> String | (Seq (_ BitVec 64)) as BString
     ) (
     ( (bsq_none@literal) )
 ))
+
+;;
+;; Define sort aliases for Float/String representation options
+;;
+(define-sort BComplex () UComplex)
+;;FP_TYPE_ALIAS;;
+;;STRING_TYPE_ALIAS;;
 
 ;;
 ;; KeyType Concept datatypes
@@ -84,7 +111,7 @@
       (bsqkey_nat@cons (bsqkey_nat_value Int))
       (bsqkey_bigint@cons (bsqkey_bigint_value Int))
       (bsqkey_bignat@cons (bsqkey_bignat_value Int))
-      (bsqkey_string@cons (bsqkey_string_value String))
+      (bsqkey_string@cons (bsqkey_string_value BString))
       ;;KEY_TUPLE_TYPE_BOXING;;
       ;;KEY_RECORD_TYPE_BOXING;;
       ;;KEY_TYPE_BOXING;;
@@ -143,17 +170,49 @@
     ;;RECORD_TYPE_CONSTRUCTORS;;
     ;;TYPE_CONSTRUCTORS;;
     (
-      (bsqobject_key@cons (bsqobject_key_value BKey))
+      (bsqobject_float@cons (bsqobject_float_value BFloat))
+      (bsqobject_decimal@cons (bsqobject_decimal_value BDecimal))
+      (bsqobject_rational@cons (bsqobject_rational_value BRational))
+      (bsqobject_complex@cons (bsqobject_complex_value BComplex))
       (bsqobject_regex@cons (bsqobject_regex_value bsq_regex))
       ;;TUPLE_TYPE_BOXING;;
       ;;RECORD_TYPE_BOXING;;
       ;;TYPE_BOXING;;
     )
-    ( (BTerm@cons (BTerm_type TypeTag) (BTerm_value bsq_object)) )
+    ( 
+      (BTerm@termcons (BTerm_termtype TypeTag) (BTerm_termvalue bsq_object))
+      (BTerm@keycons (BTerm_keyvalue BKey)) 
+    )
 ))
 
 (declare-const BTerm@none BTerm)
-(assert (= BTerm@none (BTerm@cons TypeTag_None (bsqobject_key@cons BKey@none))))
+(assert (= BTerm@none (BTerm@keycons BKey@none)))
+
+;;
+;;Define utility functions
+;;
+(define-fun GetTypeTag@BKey ((t BKey)) TypeTag
+  (BKey_type t)
+)
+
+(define-fun GetTypeTag@BTerm ((t BKey)) TypeTag
+  (ite (is-BTerm@termcons t) (BTerm_termtype t) (BKey_type (BTerm_keyvalue t)))
+)
+
+;;
+;; Define uninterpreted functions for various kinds
+;;
+(declare-fun BFloatUnary_UF (String BFloat) BFloat)
+(declare-fun BFloatBinary_UF (String BFloat BFloat) BFloat)
+
+(declare-fun BDecimalUnary_UF (String BDecimal) BDecimal)
+(declare-fun BDecimalBinary_UF (String BDecimal BDecimal) BDecimal)
+
+(declare-fun BRationalUnary_UF (String BRational) BRational)
+(declare-fun BRationalBinary_UF (String BRational BRational) BRational)
+
+(declare-fun BComplexUnary_UF (String BComplex) BComplex)
+(declare-fun BComplexBinary_UF (String BComplex BComplex) BComplex)
 
 ;;EPHEMERAL_DECLS;;
 

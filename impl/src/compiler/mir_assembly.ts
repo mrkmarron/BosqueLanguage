@@ -529,7 +529,7 @@ class MIRAssembly {
     readonly srcFiles: { relativePath: string, contents: string }[];
     readonly srcHash: string;
 
-    readonly literalRegexs: Map<string, BSQRegex> = new Map<string, BSQRegex>();
+    readonly literalRegexs: BSQRegex[] = [];
     readonly validatorRegexs: Map<MIRResolvedTypeKey, BSQRegex> = new Map<MIRResolvedTypeKey, BSQRegex>();
 
     readonly constantDecls: Map<MIRGlobalKey, MIRConstantDecl> = new Map<MIRGlobalKey, MIRConstantDecl>();
@@ -781,7 +781,7 @@ class MIRAssembly {
             package: this.package.jemit(),
             srcFiles: this.srcFiles,
             srcHash: this.srcHash,
-            literalRegexs: [...this.literalRegexs].map((lre) => [lre[0], lre[1].jemit()]),
+            literalRegexs: [...this.literalRegexs].map((lre) => lre.jemit()),
             validatorRegexs: [...this.validatorRegexs].map((vre) => [vre[0], vre[1]]),
             constantDecls: [...this.constantDecls].map((cd) => [cd[0], cd[1].jemit()]),
             fieldDecls: [...this.fieldDecls].map((fd) => [fd[0], fd[1].jemit()]),
@@ -804,7 +804,7 @@ class MIRAssembly {
     static jparse(jobj: any): MIRAssembly {
         let masm = new MIRAssembly(PackageConfig.jparse(jobj.package), jobj.srcFiles, jobj.srcHash);
 
-        jobj.literalRegexs.forEach((lre: any) => masm.literalRegexs.set(lre[0], BSQRegex.jparse(lre[1])));
+        jobj.literalRegexs.forEach((lre: any) => masm.literalRegexs.push(BSQRegex.jparse(lre)));
         jobj.validatorRegexs.forEach((vre: any) => masm.validatorRegexs.set(vre[0], vre[1]));
         jobj.constantDecls.forEach((cd: any) => masm.constantDecls.set(cd[0], MIRConstantDecl.jparse(cd[1])));
         jobj.fieldDecls.forEach((fd: any) => masm.fieldDecls.set(fd[0], MIRFieldDecl.jparse(fd[1])));

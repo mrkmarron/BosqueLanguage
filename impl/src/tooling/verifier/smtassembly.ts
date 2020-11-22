@@ -5,7 +5,6 @@
 
 import { SourceInfo } from "../../ast/parser";
 import { MIRAssembly } from "../../compiler/mir_assembly";
-import { SMTConst } from "./smt_exp";
 
 class SMTErrorCode {
     readonly code: string;
@@ -22,8 +21,8 @@ class SMTErrorCode {
 class SMTAssembly {
     readonly masm: MIRAssembly;
 
-    readonly errors: Map<string, SMTErrorCode> = new Map<string, SMTErrorCode>();
-    readonly strings: Map<string, SMTConst> = new Map<string, SMTConst>();
+    readonly errorDefinitions: Map<string, SMTErrorCode> = new Map<string, SMTErrorCode>();
+    readonly uninterpTypeConstructors: Set<string> = new Set<string>();
 
     constructor(masm: MIRAssembly) {
         this.masm = masm;

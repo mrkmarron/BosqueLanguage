@@ -565,7 +565,7 @@ class Assembly {
     private m_conceptMap: Map<string, ConceptTypeDecl> = new Map<string, ConceptTypeDecl>();
     private m_objectMap: Map<string, EntityTypeDecl> = new Map<string, EntityTypeDecl>();
 
-    private m_literalRegexs: Set<BSQRegex> = new Set<BSQRegex>();
+    private m_literalRegexs: BSQRegex[] = [];
     private m_validatorRegexs: Map<string, BSQRegex> = new Map<string, BSQRegex>();
 
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
@@ -1855,15 +1855,23 @@ class Assembly {
     }
 
     addValidatorRegex(resolvedName: string, validator: BSQRegex) {
-        this.m_literalRegexs.add(validator);
-        this.m_validatorRegexs.set(resolvedName, validator);
+        let ere = this.m_literalRegexs.findIndex((lre) => lre.restr === validator.restr);
+        if(ere !== -1) {
+            ere = this.m_literalRegexs.length;
+            this.m_literalRegexs.push(validator);
+        }
+
+        this.m_validatorRegexs.set(resolvedName, this.m_literalRegexs[ere]);
     }
 
     addLiteralRegex(re: BSQRegex) {
-        this.m_literalRegexs.add(re);
+        const ere = this.m_literalRegexs.findIndex((lre) => lre.restr === re.restr);
+        if(ere !== -1) {
+            this.m_literalRegexs.push(re);
+        }
     }
 
-    getAllLiteralRegexs(): Set<BSQRegex> {
+    getAllLiteralRegexs(): BSQRegex[] {
         return this.m_literalRegexs;
     }
 

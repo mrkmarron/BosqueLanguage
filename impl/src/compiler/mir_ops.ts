@@ -126,7 +126,7 @@ abstract class MIRArgument {
                 case "float":
                     return new MIRConstantFloat(jobj.value);
                 case "decimal":
-                    return new MIRConstantDecmial(jobj.value);
+                    return new MIRConstantDecimal(jobj.value);
                 case "regex":
                     return new MIRConstantRegex(jobj.value);
                 default:
@@ -393,7 +393,7 @@ class MIRConstantFloat extends MIRConstantArgument {
     }
 }
 
-class MIRConstantDecmial extends MIRConstantArgument {
+class MIRConstantDecimal extends MIRConstantArgument {
     readonly value: string;
 
     constructor(value: string) {
@@ -1063,9 +1063,8 @@ class MIRTupleHasIndex extends MIROp {
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly idx: number;
-    readonly isvirtual: boolean;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, isvirtual: boolean, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, idx: number, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRTupleHasIndex, sinfo);
 
         this.trgt = trgt;
@@ -1073,7 +1072,6 @@ class MIRTupleHasIndex extends MIROp {
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
         this.idx = idx;
-        this.isvirtual = isvirtual;
     }
     
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
@@ -1084,11 +1082,11 @@ class MIRTupleHasIndex extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx, isvirtual: this.isvirtual };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, idx: this.idx };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRTupleHasIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, jobj.isvirtual, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRTupleHasIndex(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.idx, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -1098,9 +1096,8 @@ class MIRRecordHasProperty extends MIROp {
     readonly arglayouttype: MIRResolvedTypeKey;
     readonly argflowtype: MIRResolvedTypeKey;
     readonly pname: string;
-    readonly isvirtual: boolean;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, isvirtual: boolean, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, argflowtype: MIRResolvedTypeKey, pname: string, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRRecordHasProperty, sinfo);
 
         this.trgt = trgt;
@@ -1108,7 +1105,6 @@ class MIRRecordHasProperty extends MIROp {
         this.arglayouttype = arglayouttype;
         this.argflowtype = argflowtype;
         this.pname = pname;
-        this.isvirtual = isvirtual;
     }
     
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
@@ -1119,11 +1115,11 @@ class MIRRecordHasProperty extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname, isvirtual: this.isvirtual };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, argflowtype: this.argflowtype, pname: this.pname };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRRecordHasProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, jobj.isvirtual, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRRecordHasProperty(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.argflowtype, jobj.pname, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2708,7 +2704,7 @@ export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRGuard, MIRMaskGuard, MIRArgGuard,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
-    MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecmial, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,
     MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue, MIRCheckNoError, MIRExtractResultOkValue,
     MIRLoadConst, MIRLoadConstDataString,

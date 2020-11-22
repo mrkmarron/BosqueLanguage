@@ -16,6 +16,14 @@ class SMTType extends SMTTerm {
 
         this.name = name;
     }
+
+    isGeneralKeyType(): boolean {
+        return this.name === "BKey";
+    }
+
+    isGeneralTermType(): boolean {
+        return this.name === "BTerm";
+    }
 }
 
 abstract class SMTExp extends SMTTerm {
@@ -57,10 +65,43 @@ class SMTCall extends SMTExp {
 }
 
 class SMTLet extends SMTExp {
+    readonly vname: string;
+    readonly value: SMTExp;
+    readonly inexp: SMTExp;
+
+    constructor(vname: string, value: SMTExp, inexp: SMTExp) {
+        super();
+
+        this.vname = vname;
+        this.value = value;
+        this.inexp = inexp;
+    }
+}
+
+class SMTLetMulti extends SMTExp {
+    readonly assigns: { vname: string, value: SMTExp }[];
+    readonly inexp: SMTExp
+
+    constructor(assigns: { vname: string, value: SMTExp }[], inexp: SMTExp) {
+        super();
+
+        this.assigns = assigns;
+        this.inexp = inexp;
+    }
 }
 
 class SMTIf extends SMTExp {
+    readonly cond: SMTExp;
+    readonly tval: SMTExp;
+    readonly fval: SMTExp;
 
+    constructor(cond: SMTExp, tval: SMTExp, fval: SMTExp) {
+        super();
+
+        this.cond = cond;
+        this.tval = tval;
+        this.fval = fval;
+    }
 }
 
 class SMTCond extends SMTExp {
@@ -69,5 +110,5 @@ class SMTCond extends SMTExp {
 
 export {
     VerifierLevel,
-    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTLet, SMTIf, SMTCond
+    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTLet, SMTLetMulti, SMTIf, SMTCond
 };

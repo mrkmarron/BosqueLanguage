@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIREntityType, MIREphemeralListType, MIRRecordType, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
-import { SMTCall, SMTConst, SMTExp, SMTType, VerifierLevel } from "./smt_exp";
+import { SMTCall, SMTConst, SMTExp, SMTType } from "./smt_exp";
 
 import * as assert from "assert";
 
@@ -13,13 +13,9 @@ class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
-    private level: VerifierLevel;
-
-    constructor(assembly: MIRAssembly, level: VerifierLevel, mangledNameMap?: Map<string, string>) {
+    constructor(assembly: MIRAssembly, mangledNameMap?: Map<string, string>) {
         this.assembly = assembly;
         this.mangledNameMap = mangledNameMap || new Map<string, string>();
-
-        this.level = level;
     }
 
     mangle(name: string): string {
@@ -75,13 +71,19 @@ class SMTTypeEmitter {
             return new SMTType("Int");
         }
         else if (this.isType(tt, "NSCore::Float")) {
-            return this.level === "Strong" ? new SMTType("UFloat") : new SMTType("Real");
+            return new SMTType("BFloat");
         }
         else if (this.isType(tt, "NSCore::Decimal")) {
-            return this.level === "Strong" ? new SMTType("UFloat") : new SMTType("Real");
+            return new SMTType("BDecimal");
+        }
+        else if (this.isType(tt, "NSCore::Rational")) {
+            return new SMTType("BRational");
+        }
+        else if (this.isType(tt, "NSCore::Complex")) {
+            return new SMTType("BComplex");
         }
         else if (this.isType(tt, "NSCore::String")) {
-            return this.level === "Strong" ? new SMTType("(Seq (_ BitVec 64))") : new SMTType("String");
+            return new SMTType("BString");
         }
         else if (this.isType(tt, "NSCore::Regex")) {
             return new SMTType("bsq_regex");
@@ -107,8 +109,9 @@ class SMTTypeEmitter {
     }
 
     getSMTTypeTag(tt: MIRType): string {
-        assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat")
-            || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal")
+        assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
+            || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") 
+            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational") || this.isType(tt, "NSCore::Complex")
             || this.isType(tt, "NSCore::String") || this.isType(tt, "NSCore::Regex")), "Special types should be tagged in special ways");
 
 
@@ -134,7 +137,13 @@ class SMTTypeEmitter {
             return "TypeTag_Float";
         }
         else if (this.isType(tt, "NSCore::Decimal")) {
-            return "TypeTag_Decimal"
+            return "TypeTag_Decimal";
+        }
+        else if (this.isType(tt, "NSCore::Rational")) {
+            return "TypeTag_Rational";
+        }
+        else if (this.isType(tt, "NSCore::Complex")) {
+            return "TypeTag_Complex";
         }
         else if (this.isType(tt, "NSCore::String")) {
             return "TypeTag_String";
@@ -155,8 +164,9 @@ class SMTTypeEmitter {
     }
 
     getSMTConstructorName(tt: MIRType): { cons: string, box: string, bfield: string } {
-        assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat")
-            || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal")
+        assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
+            || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") 
+            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational") || this.isType(tt, "NSCore::Complex")
             || this.isType(tt, "NSCore::String") || this.isType(tt, "NSCore::Regex")), "Special types should be constructed in special ways");
 
 
@@ -176,11 +186,11 @@ class SMTTypeEmitter {
         }
     }
 
-    private coerceFromAtomicToKey(exp: SMTExp, from: MIRType): { typetag: string, cexp: SMTExp } {
+    private coerceFromAtomicToKey(exp: SMTExp, from: MIRType): SMTExp  {
         assert(this.assembly.subtypeOf(from, this.getMIRType("NSCore::KeyType")));
 
         if (from.trkey === "NSCore::None") {
-            return { typetag: "TypeTag_None", cexp: new SMTConst("BKey@none") };
+            return new SMTConst("BKey@none");
         }
         else {
             let objval: SMTExp | undefined = undefined;
@@ -225,24 +235,39 @@ class SMTTypeEmitter {
                 typetag = this.getSMTTypeTag(from);
             }
 
-            return { typetag: typetag, cexp: new SMTCall("BKey@cons", [new SMTConst(typetag), objval as SMTExp]) };
+            return new SMTCall("BKey@cons", [new SMTConst(typetag), objval as SMTExp]);
         }
     }
 
-    private coerceFromAtomicToTerm(exp: SMTExp, from: MIRType): { typetag: string, cexp: SMTExp } {
+    private coerceFromAtomicToTerm(exp: SMTExp, from: MIRType): SMTExp {
         if (from.trkey === "NSCore::None") {
-            return { typetag: "TypeTag_None", cexp: new SMTConst(`BTerm@none`) };
+            return new SMTConst(`BTerm@none`);
         }
         else {
             if(this.assembly.subtypeOf(from, this.getMIRType("NSCore::KeyType"))) {
-                const bkey = this.coerceFromAtomicToKey(exp, from);
-                return { typetag: bkey.typetag, cexp: new SMTCall("BTerm@cons", [new SMTConst(bkey.typetag), new SMTCall("bsqobject_key@cons", [bkey.cexp])]) }; 
+                return new SMTCall("BTerm@keycons", [this.coerceFromAtomicToKey(exp, from)]);
             }
             else {
                 let objval: SMTExp | undefined = undefined;
                 let typetag = "[NOT SET]";
 
-                if (this.isType(from, "NSCore::Regex")) {
+                if (this.isType(from, "NSCore::Float")) {
+                    objval = new SMTCall("bsq_float@cons", [exp]);
+                    typetag = "TypeTag_Float";
+                }
+                else if (this.isType(from, "NSCore::Decimal")) {
+                    objval = new SMTCall("bsq_decimal@cons", [exp]);
+                    typetag = "TypeTag_Decimal";
+                }
+                else if (this.isType(from, "NSCore::Rational")) {
+                    objval = new SMTCall("bsq_rational@cons", [exp]);
+                    typetag = "TypeTag_Rational";
+                }
+                else if (this.isType(from, "NSCore::Complex")) {
+                    objval = new SMTCall("bsq_complex@cons", [exp]);
+                    typetag = "TypeTag_Complex";
+                }
+                else if (this.isType(from, "NSCore::Regex")) {
                     objval = new SMTCall("bsq_regex@cons", [exp]);
                     typetag = "TypeTag_Regex";
                 }
@@ -261,7 +286,7 @@ class SMTTypeEmitter {
                     typetag = this.getSMTTypeTag(from);
                 }
 
-                return { typetag: typetag, cexp: new SMTCall("BTerm@cons", [new SMTConst(typetag), objval as SMTExp]) };
+                return new SMTCall("BTerm@termcons", [new SMTConst(typetag), objval as SMTExp]);
             }
         }
     }
@@ -311,13 +336,25 @@ class SMTTypeEmitter {
         }
         else {
             if(this.assembly.subtypeOf(into, this.getMIRType("NSCore::KeyType"))) {
-                return this.coerceKeyIntoAtomic(new SMTCall("BTerm_value", [exp]), into)
+                return this.coerceKeyIntoAtomic(new SMTCall("BTerm_keyvalue", [exp]), into)
             }
             else {
-                const oexp = new SMTCall("BTerm_value", [exp]);
+                const oexp = new SMTCall("BTerm_termvalue", [exp]);
 
-                if (this.isType(into, "NSCore::Regex")) {
-                    return new SMTCall("bsq_regex@cons", [oexp]);
+                if (this.isType(into, "NSCore::Float")) {
+                    return new SMTCall("bsqobject_float_value", [oexp]);
+                }
+                else if (this.isType(into, "NSCore::Decimal")) {
+                    return new SMTCall("bsqobject_decimal_value", [oexp]);
+                }
+                else if (this.isType(into, "NSCore::Rational")) {
+                    return new SMTCall("bsqobject_rational_value", [oexp]);
+                }
+                else if (this.isType(into, "NSCore::Complex")) {
+                    return new SMTCall("bsqobject_complex_value", [oexp]);
+                }
+                else if (this.isType(into, "NSCore::Regex")) {
+                    return new SMTCall("bsqobject_regex_value", [oexp]);
                 }
                 else if (this.isUniqueTupleType(into)) {
                     return new SMTCall(this.getSMTConstructorName(into).bfield, [oexp]);
@@ -343,18 +380,18 @@ class SMTTypeEmitter {
         }
         else if (smtinto.name === "BKey") {
             if(smtfrom.name === "BTerm") {
-                return new SMTCall("BTerm_value", [exp]);
+                return new SMTCall("BTerm_keyvalue", [exp]);
             }
             else {
-                return this.coerceFromAtomicToKey(exp, from).cexp;
+                return this.coerceFromAtomicToKey(exp, from);
             }
         }
         else if (smtinto.name === "BTerm") {
             if(smtfrom.name === "BKey") {
-                return new SMTCall("BTerm@cons", [new SMTCall("BKey_type", [exp]), new SMTCall("bsqobject_key@cons", [exp])]);
+                return new SMTCall("BTerm@keycons", [exp]);
             }
             else {
-                return this.coerceFromAtomicToTerm(exp, from).cexp;
+                return this.coerceFromAtomicToTerm(exp, from);
             }
         }
         else {
@@ -388,10 +425,22 @@ class SMTTypeEmitter {
         else if (this.isType(tt, "NSCore::BigNat")) {
             return true;
         }
-        else if (this.isType(tt, "NSCore::String")) {
+        else if (this.isType(tt, "NSCore::Float")) {
+            return true;
+        }
+        else if (this.isType(tt, "NSCore::Decimal")) {
+            return true;
+        }
+        else if (this.isType(tt, "NSCore::Rational")) {
+            return true;
+        }
+        else if (this.isType(tt, "NSCore::Complex")) {
             return true;
         }
         else if (this.isType(tt, "NSCore::String")) {
+            return true;
+        }
+        else if (this.isType(tt, "NSCore::Regex")) {
             return true;
         }
         else {

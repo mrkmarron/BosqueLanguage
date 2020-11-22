@@ -5,8 +5,8 @@
 
 import { MIRAssembly, MIRInvokeDecl, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantTrue, MIRGlobalVariable, MIRRegisterArgument } from "../../compiler/mir_ops";
-import { SMTCall, SMTConst, SMTExp, SMTVar, VerifierLevel } from "./smt_exp";
+import { MIRAbort, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantTrue, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIRExtractResultOkValue, MIRGlobalVariable, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIROp, MIRRecordHasProperty, MIRRegisterArgument, MIRSetConstantGuardFlag, MIRTupleHasIndex } from "../../compiler/mir_ops";
+import { SMTCall, SMTConst, SMTExp, SMTIf, SMTLet, SMTType, SMTVar, VerifierLevel } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTAssembly, SMTErrorCode } from "./smtassembly";
 
@@ -31,6 +31,9 @@ class SMTBodyEmitter {
     private subtypeOrderCtr = 0;
     subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
 
+    private pendingMask = "";
+    private pendingAssigns: { idx: number, value: string }[] = [];
+
     constructor(assembly: MIRAssembly, smtasm: SMTAssembly, typegen: SMTTypeEmitter, level: VerifierLevel) {
         this.assembly = assembly;
         this.smtasm = smtasm;
@@ -44,14 +47,14 @@ class SMTBodyEmitter {
         return `@tmpvar@${this.tmpvarctr++}`;
     }
 
-    generateErrorCreate(sinfo: SourceInfo, rtype: string): SMTConst {
+    generateErrorCreate(sinfo: SourceInfo, rtype: SMTType): SMTCall {
         const errorinfo = `${this.currentFile} @ line ${sinfo.line} -- pos ${sinfo.pos}`;
-        const errorid = `error#${this.smtasm.errors.size}`;
-        if (!this.smtasm.errors.has(errorinfo)) {
-            this.smtasm.errors.set(errorinfo, new SMTErrorCode(errorid, this.currentFile, sinfo));
+        const errorid = `error#${this.smtasm.errorDefinitions.size}`;
+        if (!this.smtasm.errorDefinitions.has(errorinfo)) {
+            this.smtasm.errorDefinitions.set(errorinfo, new SMTErrorCode(errorid, this.currentFile, sinfo));
         }
 
-        return new SMTConst(errorid);
+        return new SMTCall(`Result_${rtype.name}@error`, [new SMTConst(errorid)]);
     }
 
     isSafeInvoke(idecl: MIRInvokeDecl): boolean {
@@ -98,19 +101,22 @@ class SMTBodyEmitter {
             return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantRational) {
-            const spos = cval.value.indexOf("/");
-            const num = new SMTConst(cval.value.slice(0, spos));
-            const denom = new SMTConst(cval.value.slice(spos + 1, cval.value.length - 1));
-            return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType("NSCore::Rational")).cons, [num, denom]);
+            if(this.level === "Strong") {
+                return new SMTCall("BRationalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
+            }
+            else {
+                const spos = cval.value.indexOf("/");
+                const num = new SMTConst(cval.value.slice(0, spos) + ".0");
+                const denom = new SMTConst(cval.value.slice(spos + 1, cval.value.length - 1) + ".0");
+                return new SMTCall("/", [num, denom]);
+            }
         }
         else if (cval instanceof MIRConstantComplex) {
-            const real = new SMTConst(cval.rvalue);
-            const imag = new SMTConst(cval.ivalue.slice(0, cval.ivalue.length - 1));
-            return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType("NSCore::Complex")).cons, [real, imag]);
+            return new SMTCall("BComplexUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.rvalue + cval.ivalue + "\"")]);
         }
         else if (cval instanceof MIRConstantFloat) {
-            if(this.level === "Strong") {
-                return new SMTCall("UFloatUnary", [new SMTConst("@cons"), new SMTConst(cval.value)]);
+            if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
+                return new SMTCall("BFloatUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
                 const sv = cval.value.includes(".") ? cval.value.slice(0, cval.value.length - 1) : (cval.value.slice(0, cval.value.length - 1) + ".0");
@@ -118,71 +124,232 @@ class SMTBodyEmitter {
             }
         }
         else if (cval instanceof MIRConstantDecimal) {
-            return this.typegen.coerce(new SMTValue(cval.digits()), this.typegen.float64Type, into);
+            if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
+                return new SMTCall("BDecimalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
+            }
+            else {
+                const sv = cval.value.includes(".") ? cval.value.slice(0, cval.value.length - 1) : (cval.value.slice(0, cval.value.length - 1) + ".0");
+                return new SMTConst(sv);
+            }
         }
         else if (cval instanceof MIRConstantString) {
-            const sval = SMTBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
-            return this.typegen.coerce(new SMTValue(sval), this.typegen.stringType, into);
+            if(this.level === "Strong") {
+                let args: SMTExp[] = [];
+                for(let i = 0; i < cval.value.length; ++i) {
+                    args.push(new SMTCall("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
+                }
+                return new SMTCall("seq.++", args);
+            }
+            else {
+                return new SMTConst(cval.value);
+            }
         }
-        else if (cval instanceof MIRConstantStringOf) {
-            const sval = SMTBodyEmitter.cleanStrRepr((cval as MIRConstantString).value);
-            return this.typegen.coerce(new SMTValue(sval), this.typegen.stringType, into);
+        else if (cval instanceof MIRConstantString) {
+            if(this.level === "Strong") {
+                let args: SMTExp[] = [];
+                for(let i = 0; i < cval.value.length; ++i) {
+                    args.push(new SMTCall("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
+                }
+                return new SMTCall("seq.++", args);
+            }
+            else {
+                return new SMTConst(cval.value);
+            }
         }
         else {
             assert(cval instanceof MIRConstantRegex);
 
             const rval = (cval as MIRConstantRegex).value;
-            const rname = "REGEX__" + this.allConstRegexes.size;
-            if (!this.allConstRegexes.has(rval)) {
-                this.allConstRegexes.set(rval, rname);
-            }
+            const ere = this.assembly.literalRegexs.findIndex((re) => re.restr === rval.restr);
 
-            const regexval = `${this.allConstRegexes.get(rval) as string}`;
-            return this.typegen.coerce(new SMTValue(regexval), this.typegen.regexType, into);
+            return new SMTCall("bsq_regex@cons", [new SMTConst(`${ere}`)]);
         }
     }
 
-    argToSMT(arg: MIRArgument, into: MIRType): SMTExp {
+    argToSMT(arg: MIRArgument): SMTExp {
         if (arg instanceof MIRRegisterArgument) {
-            return this.typegen.coerce(new SMTValue(this.varToSMTName(arg)), this.getArgType(arg), into);
+            return this.varToSMTName(arg);
+        }
+        else if(arg instanceof MIRGlobalVariable) {
+            return this.globalToSMT(arg);
         }
         else {
-            return this.generateConstantExp(arg as MIRConstantArgument, into);
+            return this.constantToSMT(arg as MIRConstantArgument);
         }
     }
 
-    generateTruthyConvert(arg: MIRArgument): SMTExp {
-        const argtype = this.getArgType(arg);
-
-        if (this.assembly.subtypeOf(argtype, this.typegen.noneType)) {
-            return new SMTValue("false");
+    generateNoneCheck(arg: MIRArgument, argtype: MIRType): SMTExp {
+        if (this.typegen.isType(argtype, "NSCore::None")) {
+            return new SMTConst("true");
         }
-        else if (this.assembly.subtypeOf(argtype, this.typegen.boolType)) {
-            return this.argToSMT(arg, this.typegen.boolType);
-        }
-        else if (this.typegen.typecheckAllKeys(argtype)) {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} (bsqkey_bool true))`);
+        else if (!this.assembly.subtypeOf(this.typegen.getMIRType("NScore::None"), argtype)) {
+            return new SMTConst("false");
         }
         else {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} (bsqterm_key (bsqkey_bool true)))`);
+            const trepr = this.typegen.getSMTTypeFor(argtype);
+            if(trepr.isGeneralKeyType()) {
+                return new SMTCall("=", [new SMTConst("BKey@none")]);
+            }
+            else {
+                return new SMTCall("=", [new SMTConst("BTerm@none")]);
+            }
         }
     }
 
-    generateNoneCheck(arg: MIRArgument): SMTExp {
-        const argtype = this.getArgType(arg);
-
-        if (this.assembly.subtypeOf(argtype, this.typegen.noneType)) {
-            return new SMTValue("true");
+    generateSomeCheck(arg: MIRArgument, argtype: MIRType): SMTExp {
+        if (this.typegen.isType(argtype, "NSCore::None")) {
+            return new SMTConst("false");
         }
-        else if (!this.assembly.subtypeOf(this.typegen.noneType, argtype)) {
-            return new SMTValue("false");
-        }
-        else if(this.typegen.typecheckAllKeys(argtype)) {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.keyType).emit()} bsqkey_none)`);
+        else if (!this.assembly.subtypeOf(this.typegen.getMIRType("NScore::None"), argtype)) {
+            return new SMTConst("true");
         }
         else {
-            return new SMTValue(`(= ${this.argToSMT(arg, this.typegen.anyType).emit()} bsqterm_none)`);
+            const trepr = this.typegen.getSMTTypeFor(argtype);
+            if(trepr.isGeneralKeyType()) {
+                return new SMTCall("not", [new SMTCall("=", [new SMTConst("BKey@none")])]);
+            }
+            else {
+                return new SMTCall("not", [new SMTCall("=", [new SMTConst("BTerm@none")])]);
+            }
         }
+    }
+
+    processDeadFlow(op: MIRDeadFlow): SMTExp {
+        return this.generateErrorCreate(op.sinfo, this.typegen.getSMTTypeFor(this.currentRType));
+    }
+
+    processAbort(op: MIRAbort): SMTExp {
+        return this.generateErrorCreate(op.sinfo, this.typegen.getSMTTypeFor(this.currentRType));
+    }
+
+    processAssertCheck(op: MIRAssertCheck, continuation: SMTExp): SMTExp {
+        const chkval = this.argToSMT(op.arg);
+        const errorval = this.generateErrorCreate(op.sinfo, this.typegen.getSMTTypeFor(this.currentRType));
+        
+        return new SMTIf(chkval, continuation, errorval);
+    }
+
+    processLoadUnintVariableValue(op: MIRLoadUnintVariableValue, continuation: SMTExp): SMTExp {
+        const ctype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.oftype));
+        const ufcname = `${ctype}@uicons_UF`;
+
+        this.smtasm.uninterpTypeConstructors.add(ufcname);
+        return new SMTConst(ufcname);
+    }
+
+    processDeclareGuardFlagLocation(op: MIRDeclareGuardFlagLocation) {
+        assert(this.pendingMask === "");
+
+        this.pendingMask = op.name;
+    }
+
+    processSetConstantGuardFlag(op: MIRSetConstantGuardFlag) {
+        assert(this.pendingMask !== "");
+
+        this.pendingAssigns.push({idx: op.position, value: `${op.flag}`});
+    }
+
+    processConvertValue(op: MIRConvertValue, continuation: SMTExp): SMTExp {
+        xxxx;
+    }
+    
+    processCheckNoError(op: MIRCheckNoError, continuation: SMTExp): SMTExp {
+        xxxx;
+    }
+
+    processExtractResultOkValue(op: MIRExtractResultOkValue, continuation: SMTExp): SMTExp {
+        xxxx;
+    }
+
+    processLoadConst(op: MIRLoadConst, continuation: SMTExp): SMTExp {
+        return new SMTLet(this.varToSMTName(op.trgt).vname, this.argToSMT(op.src), continuation);
+    }
+
+    processLoadConstDataString(op: MIRLoadConstDataString, continuation: SMTExp): SMTExp {
+        xxxx;
+    }
+
+    processTupleHasIndex(op: MIRTupleHasIndex, continuation: SMTExp): SMTExp {
+        const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
+        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("HasIndex@", [accessTypeTag, new SMTConst(`TupleIndexTag_${op.idx}`)]), continuation);
+    }
+
+    processRecordHasProperty(op: MIRRecordHasProperty, continuation: SMTExp): SMTExp {
+        const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
+        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("HasProperty@", [accessTypeTag, new SMTConst(`RecordPropertyTag_${op.pname}`)]), continuation);
+    }
+
+    processLoadTupleIndex(op: MIRLoadTupleIndex, continuation: SMTExp): SMTExp {
+        if(op.isvirtual) {
+            xxxx;
+        }
+        else {
+            xxxx;
+        }
+    }
+
+    processLoadTupleIndexSetGuard(op: MIRLoadTupleIndexSetGuard, continuation: SMTExp): SMTExp {
+    }
+
+    processLoadRecordProperty(op: MIRLoadRecordProperty, continuation: SMTExp): SMTExp {
+    }
+
+    processLoadRecordPropertySetGuard(op: MIRLoadRecordPropertySetGuard, continuation: SMTExp): SMTExp {
+    }
+
+    processLoadField(op: MIRLoadField, continuation: SMTExp): SMTExp {
+    }
+
+    MIRTupleProjectToEphemeral = "MIRTupleProjectToEphemeral",
+    MIRRecordProjectToEphemeral = "MIRRecordProjectToEphemeral",
+    MIREntityProjectToEphemeral = "MIREntityProjectToEphemeral",
+    MIRTupleUpdate = "MIRTupleUpdate",
+    MIRRecordUpdate = "MIRRecordUpdate",
+    MIREntityUpdate = "MIREntityUpdate",
+
+    MIRLoadFromEpehmeralList = "MIRLoadFromEpehmeralList",
+    MIRMultiLoadFromEpehmeralList = "MIRMultiLoadFromEpehmeralList",
+    MIRSliceEpehmeralList = "MIRSliceEpehmeralList",
+
+    MIRInvokeFixedFunction = "MIRInvokeFixedFunction",
+    MIRInvokeVirtualFunction = "MIRInvokeVirtualFunction",
+    MIRInvokeVirtualOperator = "MIRInvokeVirtualOperator",
+
+    MIRConstructorTuple = "MIRConstructorTuple",
+    MIRConstructorTupleFromEphemeralList = "MIRConstructorTupleFromEphemeralList",
+    MIRConstructorRecord = "MIRConstructorRecord",
+    MIRConstructorRecordFromEphemeralList = "MIRConstructorRecordFromEphemeralList",
+    MIRStructuredAppendTuple = "MIRStructuredAppendTuple",
+    MIRStructuredJoinRecord = "MIRStructuredJoinRecord",
+    MIRConstructorEphemeralList = "MIRConstructorEphemeralList",
+    MIREphemeralListExtend = "MIREphemeralListExtend",
+
+    MIRConstructorPrimaryCollectionEmpty = "MIRConstructorPrimaryCollectionEmpty",
+    MIRConstructorPrimaryCollectionSingletons = "MIRConstructorPrimaryCollectionSingletons",
+    MIRConstructorPrimaryCollectionCopies = "MIRConstructorPrimaryCollectionCopies",
+    MIRConstructorPrimaryCollectionMixed = "MIRConstructorPrimaryCollectionMixed",
+
+    MIRBinKeyEq = "MIRBinKeyEq",
+    MIRBinKeyLess = "MIRBinKeyLess",
+    MIRPrefixNotOp = "MIRPrefixNotOp",
+    MIRAllTrue = "MIRAllTrue",
+
+    MIRIsTypeOf = "MIRIsTypeOf",
+
+    MIRTempRegisterAssign = "MIRTempRegisterAssign",
+    MIRParameterVarStore = "MIRParameterVarStore",
+    MIRLocalVarStore = "MIRLocalVarStore",
+
+    MIRReturnAssign = "MIRReturnAssign",
+    MIRReturnAssignOfCons = "MIRReturnAssignOfCons",
+    MIRVarLifetimeStart = "MIRVarLifetimeStart",
+    MIRVarLifetimeEnd = "MIRVarLifetimeEnd",
+
+
+    processOp(op: MIROp, continuation: SMTExp): SMTExp {
+        xxxx;
     }
 
     generateLoadConstSafeString(op: MIRLoadConstSafeString): SMTExp {

@@ -122,9 +122,7 @@ inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
 inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
 //<summary>Primitive rational value.</summary>
-grounded struct entity Rational provides Some, KeyType, PODType, APIType {
-    private numerator: BigInt;   //fake data store for verifier to use
-    private denominator: BigNat; //fake data store for verifier to use
+grounded struct entity Rational provides Some, PODType, APIType {
 }
 inline prefix operator +(a: Rational): Rational = default;
 inline prefix operator -(a: Rational): Rational = default;
@@ -165,8 +163,6 @@ inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
 //<summary>Primitive complex floating point value.</summary>
 grounded struct entity Complex provides Some, PODType, APIType {
-    private real: Float; //fake data store for verifier to use
-    private imag: Float; //fake data store for verifier to use
 }
 inline prefix operator +(a: Complex): Complex = default;
 inline prefix operator -(a: Complex): Complex = default;
