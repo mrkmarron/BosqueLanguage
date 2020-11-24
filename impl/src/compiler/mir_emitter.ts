@@ -441,55 +441,55 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadField(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, fname, isvirtual, resulttype.trkey, trgt));
     }
 
-    emitTupleProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, indecies: number[], epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
+    emitTupleProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, indecies: number[], isvirtual: boolean, epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRTupleProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, indecies, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
+        this.m_currentBlock.push(new MIRTupleProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, indecies, isvirtual, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
     }
 
-    emitRecordProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, properties: string[], epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
+    emitRecordProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, properties: string[], isvirtual: boolean, epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRRecordProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, properties, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
+        this.m_currentBlock.push(new MIRRecordProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, properties, isvirtual, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
     }
 
-    emitEntityProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, fields: MIRFieldKey[], epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
+    emitEntityProjectToEphemeral(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, fields: MIRFieldKey[], isvirtual: boolean, epht: ResolvedEphemeralListType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIREntityProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, fields, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
+        this.m_currentBlock.push(new MIREntityProjectToEphemeral(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, fields, isvirtual, this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey, trgt));
     }
 
-    emitTupleUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [number, ResolvedType, MIRArgument][], trgt: MIRRegisterArgument) {
+    emitTupleUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [number, ResolvedType, MIRArgument][], isvirtual: boolean, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
         const upds = updates.map((upd) => [upd[0], upd[2], this.registerResolvedTypeReference(upd[1]).trkey] as [number, MIRArgument, MIRResolvedTypeKey]);
-        this.m_currentBlock.push(new MIRTupleUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, trgt));
+        this.m_currentBlock.push(new MIRTupleUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, isvirtual, trgt));
     }
 
-    emitRecordUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [string, ResolvedType, MIRArgument][], trgt: MIRRegisterArgument) {
+    emitRecordUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [string, ResolvedType, MIRArgument][], isvirtual: boolean, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
         const upds = updates.map((upd) => [upd[0], upd[2], this.registerResolvedTypeReference(upd[1]).trkey] as [string, MIRArgument, MIRResolvedTypeKey]);
-        this.m_currentBlock.push(new MIRRecordUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, trgt));
+        this.m_currentBlock.push(new MIRRecordUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, isvirtual, trgt));
     }
 
-    emitEntityUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [MIRFieldKey, ResolvedType, MIRArgument][], trgt: MIRRegisterArgument) {
+    emitEntityUpdate(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRType, argflowtype: MIRType, updates: [MIRFieldKey, ResolvedType, MIRArgument][], isvirtual: boolean, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
         const upds = updates.map((upd) => [upd[0], upd[2], this.registerResolvedTypeReference(upd[1]).trkey] as [MIRFieldKey, MIRArgument, MIRResolvedTypeKey]);
-        this.m_currentBlock.push(new MIREntityUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, trgt));
+        this.m_currentBlock.push(new MIREntityUpdate(sinfo, arg, arglayouttype.trkey, argflowtype.trkey, upds, isvirtual, trgt));
     }
 
     emitLoadFromEpehmeralList(sinfo: SourceInfo, arg: MIRArgument, argtype: MIRType, idx: number, resulttype: MIRType, trgt: MIRTempRegister) {
@@ -1175,84 +1175,6 @@ class MIREmitter {
         }
 
         this.pendingPCodeProcessing.push([key, idecl, fsig, binds, cinfo]);
-        return key;
-    }
-
-    registerTupleProjectToEphemeralVirtual(tt: ValueType, indecies: number[], epht: ResolvedEphemeralListType): MIRVirtualMethodKey {
-        const idxname = indecies.map((idx) => `${idx}`).join(", ");
-        const vname = `$TupleProject_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${idxname})%%${this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey}`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allTupleVirtualProject.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allTupleVirtualProject.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, indecies: indecies, reph: this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey });
-        return key;
-    }
-
-    registerRecordProjectToEphemeralVirtual(tt: ValueType, properties: string[], epht: ResolvedEphemeralListType): MIRVirtualMethodKey {
-        const pnames = properties.join(", ");
-        const vname = `$RecordProject_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${pnames})%%${this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey}`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allRecordVirtualProject.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allRecordVirtualProject.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, properties: properties, reph: this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey });
-        return key;
-    }
-
-    registerOOTypeProjectToEphemeralVirtual(tt: ValueType, fields: MIRFieldKey[], epht: ResolvedEphemeralListType): MIRVirtualMethodKey {
-        const fnames = fields.join(", ");
-        const vname = `$EntityProject_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${fnames})%%${this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey}`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allEntityVirtualProject.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allEntityVirtualProject.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, fields: fields, reph: this.registerResolvedTypeReference(ResolvedType.createSingle(epht)).trkey });
-        return key;
-    }
-
-    registerTupleUpdateVirtual(tt: ValueType, updates: [number, ResolvedType][]): MIRVirtualMethodKey {
-        const idxname = updates.map((udp) => `${udp[0]} ${this.registerResolvedTypeReference(udp[1]).trkey}`).join(", ");
-        const vname = `$TupleUpdate_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${idxname})`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allTupleVirtualUpdate.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allTupleVirtualUpdate.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, updates: updates.map((upd) => [upd[0], this.registerResolvedTypeReference(upd[1]).trkey]) });
-        return key;
-    }
-
-    registerRecordUpdateVirtual(tt: ValueType, updates: [string, ResolvedType][]): MIRVirtualMethodKey {
-        const pname = updates.map((udp) => `${udp[0]} ${this.registerResolvedTypeReference(udp[1]).trkey}`).join(", ");
-        const vname = `$RecordUpdate_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${pname})`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allRecordVirtualUpdate.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allRecordVirtualUpdate.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, updates: updates.map((upd) => [upd[0], this.registerResolvedTypeReference(upd[1]).trkey]) });
-        return key;
-    }
-
-    registerOOTypeUpdateVirtual(tt: ValueType, updates: [MIRFieldKey, ResolvedType][]): MIRVirtualMethodKey {
-        const fname = updates.map((udp) => `${udp[0]} ${this.registerResolvedTypeReference(udp[1]).trkey}`).join(", ");
-        const vname = `$EntityUpdate_${this.registerResolvedTypeReference(tt.layout).trkey}##${this.registerResolvedTypeReference(tt.flowtype).trkey}(${fname})`;
-
-        const key = MIRKeyGenerator.generateVirtualMethodKey(vname, new Map<string, ResolvedType>(), []);
-        if (!this.emitEnabled || this.masm.allEntityVirtualUpdate.findIndex((vi) => vi.vkey === key) !== -1) {
-            return key;
-        }
-
-        this.masm.allEntityVirtualUpdate.push({vkey: key, layouttype: this.registerResolvedTypeReference(tt.layout).trkey, flowtype: this.registerResolvedTypeReference(tt.flowtype).trkey, updates: updates.map((upd) => [upd[0], this.registerResolvedTypeReference(upd[1]).trkey]) });
         return key;
     }
 

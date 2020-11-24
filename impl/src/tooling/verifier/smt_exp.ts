@@ -105,7 +105,15 @@ class SMTIf extends SMTExp {
 }
 
 class SMTCond extends SMTExp {
+    readonly opts: {test: SMTExp, result: SMTExp}[];
+    readonly orelse: SMTExp;
 
+    constructor(opts: {test: SMTExp, result: SMTExp}[], orelse: SMTExp) {
+        super();
+
+        this.opts = opts;
+        this.orelse = orelse;
+    }
 }
 
 export {

@@ -5,6 +5,7 @@
 
 import { SourceInfo } from "../../ast/parser";
 import { MIRAssembly } from "../../compiler/mir_assembly";
+import { SMTExp, SMTType } from "./smt_exp";
 
 class SMTErrorCode {
     readonly code: string;
@@ -17,6 +18,38 @@ class SMTErrorCode {
         this.sinfo = sinfo; 
     }
 };
+
+class SMTFunction {
+    readonly fname: string;
+    readonly args: { vname: string, vtype: SMTType }[];
+    readonly result: SMTType;
+
+    readonly body: SMTExp;
+
+    constructor(fname: string, args: { vname: string, vtype: SMTType }[], result: SMTType, body: SMTExp) {
+        this.fname = fname;
+        this.args = args;
+        this.result = result;
+
+        this.body = body;
+    }
+}
+
+class SMTFunctionUninterpreted {
+    readonly fname: string;
+    readonly args: SMTType[];
+    readonly result: SMTType;
+
+    //
+    //TODO: we want to put in info on pcode functions and axioms here
+    //
+
+    constructor(fname: string, args: SMTType[], result: SMTType) {
+        this.fname = fname;
+        this.args = args;
+        this.result = result;
+    }
+}
 
 class SMTAssembly {
     readonly masm: MIRAssembly;
@@ -31,5 +64,5 @@ class SMTAssembly {
 
 export {
     SMTErrorCode,
-    SMTAssembly
+    SMTAssembly, SMTFunction, SMTFunctionUninterpreted
 };

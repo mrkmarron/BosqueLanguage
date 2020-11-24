@@ -447,6 +447,58 @@ class SMTTypeEmitter {
             return false;
         }
     }
+
+    generateTupleIndexGetFunction(tt: MIRTupleType, idx: number): string {
+        return `${this.mangle(tt.trkey)}@_${idx}`;
+    } 
+
+    generateRecordPropertyGetFunction(tt: MIRRecordType, pname: string): string {
+        return `${this.mangle(tt.trkey)}@_${pname}`;
+    }
+
+    generateResultType(ttype: MIRType): SMTType {
+        return new SMTType(`$Result_${this.mangle(ttype.trkey)}`);
+    }
+
+    generateResultTypeConstructorSuccess(ttype: MIRType, val: SMTExp): SMTExp {
+        return new SMTCall(`$Result_${this.mangle(ttype.trkey)}@success`, [val]);
+    }
+
+    generateResultTypeConstructorError(ttype: MIRType, err: SMTExp): SMTExp {
+        return new SMTCall(`$Result_${this.mangle(ttype.trkey)}@error`, [err]);
+    }
+
+    generateResultIsSuccessTest(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`is-$Result_${this.mangle(ttype.trkey)}`, [exp]);
+    }
+
+    generateResultGetSuccess(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`$Result_${this.mangle(ttype.trkey)}@success_value`, [exp]);
+    }
+
+    generateResultGetError(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`$Result_${this.mangle(ttype.trkey)}@error_value`, [exp]);
+    }
+
+    generateAccessWithSetGuardResultType(): SMTType {
+
+    }
+
+    generateAccessWithSetGuardResultTypeConstructorLoad(): SMTType {
+
+    }
+
+    generateAccessWithSetGuardResultTypeConstructorEmpty(): SMTType {
+
+    }
+
+    generateAccessWithSetGuardResultGetValue(): SMTExp {
+
+    }
+
+    generateAccessWithSetGuardResultGetFlag(): SMTExp {
+        
+    }
 }
 
 export {

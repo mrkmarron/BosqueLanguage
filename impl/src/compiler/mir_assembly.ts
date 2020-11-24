@@ -551,14 +551,6 @@ class MIRAssembly {
 
     readonly typeMap: Map<MIRResolvedTypeKey, MIRType> = new Map<MIRResolvedTypeKey, MIRType>();
 
-    readonly allTupleVirtualProject: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, indecies: number[], reph: MIRResolvedTypeKey }[] = [];
-    readonly allRecordVirtualProject: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, properties: string[], reph: MIRResolvedTypeKey }[] = [];
-    readonly allEntityVirtualProject: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, fields: MIRFieldKey[], reph: MIRResolvedTypeKey }[] = [];
-
-    readonly allTupleVirtualUpdate: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, updates: [number, MIRResolvedTypeKey][] }[] = [];
-    readonly allRecordVirtualUpdate: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, updates: [string, MIRResolvedTypeKey][] }[] = [];
-    readonly allEntityVirtualUpdate: { vkey: MIRVirtualMethodKey, layouttype: MIRResolvedTypeKey, flowtype: MIRResolvedTypeKey, updates: [MIRFieldKey, MIRResolvedTypeKey][]}[] = [];
-
     private m_subtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
     private m_atomSubtypeRelationMemo: Map<string, Map<string, boolean>> = new Map<string, Map<string, boolean>>();
 
@@ -791,13 +783,7 @@ class MIRAssembly {
             conceptDecls: [...this.conceptDecls].map((cd) => [cd[0], cd[1].jemit()]),
             entityDecls: [...this.entityDecls].map((ed) => [ed[0], ed[1].jemit()]),
             literalTypes: [...this.literalTypes].map((lt) => [lt[0], lt[1].jemit()]),
-            typeMap: [...this.typeMap].map((t) => [t[0], t[1].jemit()]),
-            allTupleVirtualProject: this.allEntityVirtualProject,
-            allRecordVirtualProject: this.allRecordVirtualProject,
-            allEntityVirtualProject: this.allEntityVirtualProject,
-            allTupleVirtualUpdate: this.allTupleVirtualUpdate,
-            allRecordVirtualUpdate: this.allRecordVirtualUpdate,
-            allEntityVirtualUpdate: this.allEntityVirtualUpdate
+            typeMap: [...this.typeMap].map((t) => [t[0], t[1].jemit()])
         };
     }
 
@@ -815,13 +801,6 @@ class MIRAssembly {
         jobj.entityDecls.forEach((id: any) => masm.entityDecls.set(id[0], MIROOTypeDecl.jparse(id[1]) as MIREntityTypeDecl));
         jobj.literalTypes.forEach((lt: any) => masm.literalTypes.set(lt[0], MIRLiteralType.jparse(lt[1]) as MIRLiteralType));
         jobj.typeMap.forEach((t: any) => masm.typeMap.set(t[0], MIRType.jparse(t[1])));
-
-        masm.allTupleVirtualProject.push(...jobj.allTupleVirtualProject);
-        masm.allRecordVirtualProject.push(...jobj.allRecordVirtualProject);
-        masm.allEntityVirtualProject.push(...jobj.allEntityVirtualProject);
-        masm.allTupleVirtualUpdate.push(...jobj.allTupleVirtualUpdate);
-        masm.allRecordVirtualUpdate.push(...jobj.allRecordVirtualUpdate);
-        masm.allEntityVirtualUpdate.push(...jobj.allEntityVirtualUpdate);
 
         return masm;
     }

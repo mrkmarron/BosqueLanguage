@@ -224,8 +224,10 @@
 
 (declare-datatypes (
       ;;RESULT_DECLS;;
+      ;;FLAG_RESULT_DECLS;;
     ) (
     ;;RESULTS;;
+    ;;FLAG_RESULTS;;
 ))
 
 ;;SUBTYPE_DECLS;;

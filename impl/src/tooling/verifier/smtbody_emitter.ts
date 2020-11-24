@@ -3,12 +3,12 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRInvokeDecl, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantTrue, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIRExtractResultOkValue, MIRGlobalVariable, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIROp, MIRRecordHasProperty, MIRRegisterArgument, MIRSetConstantGuardFlag, MIRTupleHasIndex } from "../../compiler/mir_ops";
+import { MIRAbort, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantTrue, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIROp, MIRRecordHasProperty, MIRRegisterArgument, MIRSetConstantGuardFlag, MIRTupleHasIndex } from "../../compiler/mir_ops";
 import { SMTCall, SMTConst, SMTExp, SMTIf, SMTLet, SMTType, SMTVar, VerifierLevel } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
-import { SMTAssembly, SMTErrorCode } from "./smtassembly";
+import { SMTAssembly, SMTErrorCode, SMTFunction } from "./smtassembly";
 
 import * as assert from "assert";
 
@@ -33,6 +33,64 @@ class SMTBodyEmitter {
 
     private pendingMask = "";
     private pendingAssigns: { idx: number, value: string }[] = [];
+
+    private requiredTypecheck: { inv: string, flowtype: MIRType, oftype: MIRType }[] = [];
+
+    private requiredLoadVirtualTupleIndex: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }[] = [];
+    private requiredLoadVirtualRecordProperty: [] = [];
+    private completeLoadVirtualEntityField: [] = [];
+    
+    private generateTypeCheckName(argflowtype: MIRType, oftype: MIRType): string {
+        return `$SubtypeCheck_${this.typegen.mangle(argflowtype.trkey)}_oftype_${this.typegen.mangle(oftype.trkey)}`;
+    }
+
+    private registerRequiredTypeCheck(argflowtype: MIRType, oftype: MIRType): string {
+        const inv = this.generateTypeCheckName(argflowtype, oftype);
+        if (this.requiredTypecheck.findIndex((rtc) => rtc.inv === inv) === -1) {
+            this.requiredTypecheck.push({ inv: inv, flowtype: argflowtype, oftype: oftype });
+        }
+
+        return inv;
+    }
+
+    private generateLoadVirtualTupleInvName(argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined): string {
+        return `$TupleLoadIndex_${this.typegen.mangle(argflowtype.trkey)}_${idx}_${this.typegen.mangle(resulttype.trkey)}${guard !== undefined ? "_WG" : ""}`);
+    }
+
+    private generateLoadVirtualPropertyInvName(argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined): string {
+        return `$RecordLoadProperty_${this.typegen.mangle(argflowtype.trkey)}_${pname}_${this.typegen.mangle(resulttype.trkey)}${guard !== undefined ? "_WG" : ""}`);
+    }
+
+    private generateLoadVirtualFieldInvName(argflowtype: MIRType, fkey: MIRFieldKey, resulttype: MIRType): string {
+        return `$EntityLoadField_${this.typegen.mangle(argflowtype.trkey)}_${fkey}_${this.typegen.mangle(resulttype.trkey)}`);
+    }
+
+    private generateLoadTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
+        const ttuples = [...this.assembly.tupleDecls]
+            .filter((tt) => {
+                const mtt = MIRType.createSingle(tt[1]);
+                return this.typegen.isUniqueTupleType(mtt) && geninfo.idx < tt[1].entries.length && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
+            })
+            .map((tt) => tt[1]);
+
+        const ctype = this.typegen.getSMTTypeFor(geninfo.resulttype);
+        const ufcname = `${ctype}@uicons_UF`;
+
+        if(ttuples.length === 0) {
+            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], ctype, new SMTConst(ufcname), geninfo.guard !== undefined ? "false" : undefined);
+        }
+        else {
+            const ops = ttuples.map((tt) => {
+                const mtt = MIRType.createSingle(tt);
+                const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+
+                const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
+                const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(tt, geninfo.idx), [argpp]);
+                const body = this.typegen.coerce(idxr, (geninfo.argflowtype.options[0] as MIRTupleType).entries[geninfo.idx].type, geninfo.resulttype);
+                const action = 
+            });
+        }
+    }
 
     constructor(assembly: MIRAssembly, smtasm: SMTAssembly, typegen: SMTTypeEmitter, level: VerifierLevel) {
         this.assembly = assembly;
@@ -214,6 +272,8 @@ class SMTBodyEmitter {
         }
     }
 
+
+
     processDeadFlow(op: MIRDeadFlow): SMTExp {
         return this.generateErrorCreate(op.sinfo, this.typegen.getSMTTypeFor(this.currentRType));
     }
@@ -282,11 +342,17 @@ class SMTBodyEmitter {
     }
 
     processLoadTupleIndex(op: MIRLoadTupleIndex, continuation: SMTExp): SMTExp {
+        const arglayouttype = this.typegen.getMIRType(op.arglayouttype);
+        const argflowtype = this.typegen.getMIRType(op.argflowtype);
+        const resulttype = this.typegen.getMIRType(op.resulttype);
+
         if(op.isvirtual) {
             xxxx;
         }
         else {
-            xxxx;
+            const argpp = this.typegen.coerce(op.arg, arglayouttype, argflowtype);
+            const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, op.idx), [argpp]);
+            return this.typegen.coerce(idxr, (argflowtype.options[0] as MIRTupleType).entries[op.idx].type, resulttype);
         }
     }
 

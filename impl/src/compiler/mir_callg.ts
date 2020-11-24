@@ -8,7 +8,7 @@
 //
 
 import * as assert from "assert";
-import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBody, MIRInvokeVirtualOperator, MIRInvokeVirtualFunction } from "./mir_ops";
+import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBody, MIRInvokeVirtualOperator, MIRInvokeVirtualFunction, MIREntityUpdate } from "./mir_ops";
 import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRType } from "./mir_assembly";
 
 type CallGNode = {
@@ -48,6 +48,16 @@ function computeCalleesInBlocks(blocks: Map<string, MIRBasicBlock>, invokeNode: 
                 case MIROpTag.MIRInvokeVirtualOperator: {
                     const trgts = assembly.virtualOperatorDecls.get((op as MIRInvokeVirtualOperator).vresolve) as MIRInvokeKey[];
                     trgts.forEach((trgt) => invokeNode.callees.add(trgt));
+                    break;
+                }
+                case MIROpTag.MIREntityUpdate: {
+                    const rcvrtype = assembly.typeMap.get((op as MIREntityUpdate).argflowtype) as MIRType;
+                    const trgts: MIRInvokeKey[] = [];
+                    assembly.entityDecls.forEach((edcl) => {
+                        if(assembly.subtypeOf(assembly.typeMap.get(edcl.tkey) as MIRType, rcvrtype)) {
+                            trgts.push(`${edcl.tkey}@@constructor`);
+                        }
+                    });
                     break;
                 }
                 default: {

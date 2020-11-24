@@ -2990,14 +2990,8 @@ class TypeChecker {
         const rindecies = op.indecies.map((idv) => idv.index);
 
         const prjtemp = this.m_emitter.generateTmpRegister();
-        if (texp.flowtype.isUniqueTupleTargetType()) {
-            this.m_emitter.emitTupleProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), rindecies, rephemeralatom, trgt);
-        }
-        else {
-            const invk = this.m_emitter.registerTupleProjectToEphemeralVirtual(texp, rindecies, rephemeralatom);
-            this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
-        }
-
+        this.m_emitter.emitTupleProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), rindecies, !texp.flowtype.isUniqueTupleTargetType(), rephemeralatom, trgt);
+       
         if (op.isEphemeralListResult) {
             this.m_emitter.emitRegisterStore(op.sinfo, prjtemp, trgt, this.m_emitter.registerResolvedTypeReference(rephemeral), undefined);
             return env.setUniformResultExpression(rephemeral);
@@ -3078,13 +3072,7 @@ class TypeChecker {
             const pindecies = op.names.map((ndv) => ndv.name);
 
             const prjtemp = this.m_emitter.generateTmpRegister();
-            if (texp.flowtype.isUniqueRecordTargetType()) {
-                this.m_emitter.emitRecordProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), pindecies, rephemeralatom, trgt);
-            }
-            else {
-                const invk = this.m_emitter.registerRecordProjectToEphemeralVirtual(texp, pindecies, rephemeralatom);
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
-            }
+            this.m_emitter.emitRecordProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), pindecies, !texp.flowtype.isUniqueRecordTargetType(), rephemeralatom, trgt);
 
             if (op.isEphemeralListResult) {
                 this.m_emitter.emitRegisterStore(op.sinfo, prjtemp, trgt, this.m_emitter.registerResolvedTypeReference(rephemeral), undefined);
@@ -3115,13 +3103,7 @@ class TypeChecker {
             const pindecies = rfields.map((ndv) => MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(ndv.contiainingType, ndv.binds), ndv.decl.name));
 
             const prjtemp = this.m_emitter.generateTmpRegister();
-            if (texp.flowtype.isUniqueCallTargetType()) {
-                this.m_emitter.emitEntityProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), pindecies, rephemeralatom, trgt);
-            }
-            else {
-                const invk = this.m_emitter.registerOOTypeProjectToEphemeralVirtual(texp, pindecies, rephemeralatom);
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg], undefined, this.m_emitter.registerResolvedTypeReference(rephemeral), prjtemp);
-            }
+            this.m_emitter.emitEntityProjectToEphemeral(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), pindecies, !texp.flowtype.isUniqueCallTargetType(), rephemeralatom, trgt);
 
             if (op.isEphemeralListResult) {
                 this.m_emitter.emitRegisterStore(op.sinfo, prjtemp, trgt, this.m_emitter.registerResolvedTypeReference(rephemeral), undefined);
@@ -3166,14 +3148,8 @@ class TypeChecker {
             return [update.index, itype, this.emitInlineConvertIfNeeded(op.sinfo, etreg, utype, itype)];
         });
 
-        if (texp.flowtype.isUniqueTupleTargetType()) {
-            this.m_emitter.emitTupleUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updates, trgt);
-        }
-        else {
-            const invk = this.m_emitter.registerTupleUpdateVirtual(texp, updates.map((upd) => [upd[0], upd[1]] as [number, ResolvedType]));
-            this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg, ...updates.map((upd) => upd[2])], undefined, this.m_emitter.registerResolvedTypeReference(texp.flowtype), trgt);
-        }
-
+        this.m_emitter.emitTupleUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updates, !texp.flowtype.isUniqueTupleTargetType(), trgt);
+        
         return env.setUniformResultExpression(texp.flowtype);
     }
 
@@ -3188,9 +3164,9 @@ class TypeChecker {
                 const etreg = this.m_emitter.generateTmpRegister();
                 const itype = this.getInfoForLoadFromSafeProperty(op.sinfo, texp.flowtype, update.name);
 
-                let eev = this.checkDeclareSingleVariable(op.sinfo, env,`$${update.name}_#${op.sinfo.pos}`, true, itype, {etype: ValueType.createUniform(itype), etreg: etreg});
+                let eev = this.checkDeclareSingleVariable(op.sinfo, env, `$${update.name}_#${op.sinfo.pos}`, true, itype, { etype: ValueType.createUniform(itype), etreg: etreg });
                 if (op.isBinder) {
-                    eev = this.checkDeclareSingleVariable(op.sinfo, eev,`$this_#${op.sinfo.pos}`, true, texp.layout, {etype: texp, etreg: arg});
+                    eev = this.checkDeclareSingleVariable(op.sinfo, eev, `$this_#${op.sinfo.pos}`, true, texp.layout, { etype: texp, etreg: arg });
                 }
 
                 const utype = this.checkExpression(eev, update.value, etreg, itype).getExpressionResult().valtype;
@@ -3203,13 +3179,7 @@ class TypeChecker {
                 return [update.name, itype, this.emitInlineConvertIfNeeded(op.sinfo, etreg, utype, itype)];
             });
 
-            if (texp.flowtype.isUniqueRecordTargetType()) {
-                this.m_emitter.emitRecordUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updates, trgt);
-        }
-            else {
-                const invk = this.m_emitter.registerRecordUpdateVirtual(texp, updates.map((upd) => [upd[0], upd[1]] as [string, ResolvedType]));
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg, ...updates.map((upd) => upd[2])], undefined, this.m_emitter.registerResolvedTypeReference(texp.flowtype), trgt);
-            }
+            this.m_emitter.emitRecordUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updates, !texp.flowtype.isUniqueRecordTargetType(), trgt);
 
             return env.setUniformResultExpression(texp.flowtype);
         }
@@ -3243,13 +3213,7 @@ class TypeChecker {
                 return [fkey, upd[1], upd[2]] as [MIRFieldKey, ResolvedType, MIRArgument];
             });
 
-            if (texp.flowtype.isUniqueRecordTargetType()) {
-                this.m_emitter.emitEntityUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updateinfo, trgt);
-        }
-            else {
-                const invk = this.m_emitter.registerOOTypeUpdateVirtual(texp, updateinfo.map((upd) => [upd[0], upd[1]] as [MIRFieldKey, ResolvedType]));
-                this.m_emitter.emitInvokeVirtualFunction(op.sinfo, invk, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), [arg, ...updates.map((upd) => upd[2])], undefined, this.m_emitter.registerResolvedTypeReference(texp.flowtype), trgt);
-            }
+            this.m_emitter.emitEntityUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updateinfo, !texp.flowtype.isUniqueRecordTargetType(), trgt);
 
             return env.setUniformResultExpression(texp.flowtype);
         }
