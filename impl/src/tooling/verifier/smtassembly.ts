@@ -22,13 +22,15 @@ class SMTErrorCode {
 class SMTFunction {
     readonly fname: string;
     readonly args: { vname: string, vtype: SMTType }[];
+    readonly mask: string | undefined;
     readonly result: SMTType;
 
     readonly body: SMTExp;
 
-    constructor(fname: string, args: { vname: string, vtype: SMTType }[], result: SMTType, body: SMTExp) {
+    constructor(fname: string, args: { vname: string, vtype: SMTType }[], mask: string | undefined, result: SMTType, body: SMTExp) {
         this.fname = fname;
         this.args = args;
+        this.mask = mask;
         this.result = result;
 
         this.body = body;
@@ -38,15 +40,17 @@ class SMTFunction {
 class SMTFunctionUninterpreted {
     readonly fname: string;
     readonly args: SMTType[];
+    readonly mask: string | undefined;
     readonly result: SMTType;
 
     //
     //TODO: we want to put in info on pcode functions and axioms here
     //
 
-    constructor(fname: string, args: SMTType[], result: SMTType) {
+    constructor(fname: string, args: SMTType[], mask: string | undefined, result: SMTType) {
         this.fname = fname;
         this.args = args;
+        this.mask = mask;
         this.result = result;
     }
 }
@@ -55,7 +59,7 @@ class SMTAssembly {
     readonly masm: MIRAssembly;
 
     readonly errorDefinitions: Map<string, SMTErrorCode> = new Map<string, SMTErrorCode>();
-    readonly uninterpTypeConstructors: Set<string> = new Set<string>();
+    readonly uninterpTypeConstructors: Map<string, SMTType> = new Map<string, SMTType>();
 
     constructor(masm: MIRAssembly) {
         this.masm = masm;

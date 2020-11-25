@@ -105,18 +105,30 @@ class SMTIf extends SMTExp {
 }
 
 class SMTCond extends SMTExp {
+    readonly mvar: SMTExp;
     readonly opts: {test: SMTExp, result: SMTExp}[];
     readonly orelse: SMTExp;
 
-    constructor(opts: {test: SMTExp, result: SMTExp}[], orelse: SMTExp) {
+    constructor(mvar: SMTExp, opts: {test: SMTExp, result: SMTExp}[], orelse: SMTExp) {
         super();
 
+        this.mvar = mvar;
         this.opts = opts;
         this.orelse = orelse;
     }
 }
 
+class SMTMaskConstruct {
+    readonly maskname: string;
+    readonly entries: SMTExp[] = [];
+
+    constructor(maskname: string) {
+        this.maskname = maskname;
+    }
+}
+
 export {
     VerifierLevel,
-    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTLet, SMTLetMulti, SMTIf, SMTCond
+    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTLet, SMTLetMulti, SMTIf, SMTCond,
+    SMTMaskConstruct
 };

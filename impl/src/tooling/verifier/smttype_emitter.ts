@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { MIRAssembly, MIREntityType, MIREphemeralListType, MIRRecordType, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
-import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
+import { MIRFieldKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTCall, SMTConst, SMTExp, SMTType } from "./smt_exp";
 
 import * as assert from "assert";
@@ -456,6 +456,14 @@ class SMTTypeEmitter {
         return `${this.mangle(tt.trkey)}@_${pname}`;
     }
 
+    generateEntityFieldGetFunction(tt: MIREntityType, field: MIRFieldKey): string {
+        return `${this.mangle(tt.trkey)}@_${field}`;
+    }
+
+    generateEphemeralListGetFunction(tt: MIREphemeralListType, idx: number): string {
+        return `${this.mangle(tt.trkey)}@_${idx}`;
+    }
+
     generateResultType(ttype: MIRType): SMTType {
         return new SMTType(`$Result_${this.mangle(ttype.trkey)}`);
     }
@@ -480,24 +488,20 @@ class SMTTypeEmitter {
         return new SMTCall(`$Result_${this.mangle(ttype.trkey)}@error_value`, [exp]);
     }
 
-    generateAccessWithSetGuardResultType(): SMTType {
-
+    generateAccessWithSetGuardResultType(ttype: MIRType): SMTType {
+        return new SMTType(`$GuardResult_${this.mangle(ttype.trkey)}`);
     }
 
-    generateAccessWithSetGuardResultTypeConstructorLoad(): SMTType {
-
+    generateAccessWithSetGuardResultTypeConstructorLoad(ttype: MIRType, value: SMTExp, flag: boolean): SMTExp {
+        return new SMTCall(`$GuardResult_${this.mangle(ttype.trkey)}@cons`, [value, new SMTConst(flag ? "true" : "false")]);
     }
 
-    generateAccessWithSetGuardResultTypeConstructorEmpty(): SMTType {
-
+    generateAccessWithSetGuardResultGetValue(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`$GuardResult_${this.mangle(ttype.trkey)}@result`, [exp]);
     }
 
-    generateAccessWithSetGuardResultGetValue(): SMTExp {
-
-    }
-
-    generateAccessWithSetGuardResultGetFlag(): SMTExp {
-        
+    generateAccessWithSetGuardResultGetFlag(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`$GuardResult_${this.mangle(ttype.trkey)}@flag`, [exp]);
     }
 }
 
