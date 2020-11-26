@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRTempRegisterAssign, MIRLocalVarStore, MIRParameterVarStore, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRTempRegister } from "./mir_ops";
+import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRTempRegisterAssign, MIRLocalVarStore, MIRParameterVarStore, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRTempRegister, MIRStatmentGuard } from "./mir_ops";
 
 function propagateAssign_Bind(treg: MIRRegisterArgument, arg: MIRArgument, propMap: Map<string, MIRArgument>) {
     assert(!propMap.has(treg.nameID));
@@ -36,6 +36,18 @@ function propagateAssign_RemapGuard(arg: MIRGuard | undefined, propMap: Map<stri
     }
     else {
         return new MIRArgGuard(propagateAssign_Remap((arg as MIRArgGuard).greg, propMap));
+    }
+}
+
+function propagateAssign_RemapStatementGuard(arg: MIRStatmentGuard | undefined, propMap: Map<string, MIRArgument>): MIRStatmentGuard | undefined {
+    if(arg === undefined) {
+        return arg;
+    }
+    else {
+        const rguard = propagateAssign_RemapGuard(arg.guard, propMap) as MIRGuard;
+        const ralt = arg.altvalue !== undefined ? propagateAssign_Remap(arg.altvalue, propMap) : undefined;
+
+        return new MIRStatmentGuard(rguard, ralt);
     }
 }
 
@@ -75,7 +87,7 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRConvertValue: {
             const conv = op as MIRConvertValue;
             conv.src = propagateAssign_Remap(conv.src, propMap);
-            conv.guard = propagateAssign_RemapGuard(conv.guard, propMap);
+            conv.guard = propagateAssign_RemapStatementGuard(conv.guard, propMap);
             break;
         }
         case MIROpTag.MIRCheckNoError: {
@@ -174,6 +186,7 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRInvokeFixedFunction: {
             const invk = op as MIRInvokeFixedFunction;
             invk.args = propagateAssign_RemapArgs(invk.args, propMap);
+            invk.guard = propagateAssign_RemapStatementGuard(invk.guard, propMap);
             break;
         }
         case MIROpTag.MIRInvokeVirtualFunction: {
@@ -272,7 +285,7 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRIsTypeOf: {
             const it = op as MIRIsTypeOf;
             it.arg = propagateAssign_Remap(it.arg, propMap);
-            it.guard = propagateAssign_RemapGuard(it.guard, propMap);
+            it.guard = propagateAssign_RemapStatementGuard(it.guard, propMap);
             break;
         }
         case MIROpTag.MIRJump: {
@@ -291,22 +304,21 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRTempRegisterAssign: {
             const regop = op as MIRTempRegisterAssign;
             regop.src = propagateAssign_Remap(regop.src, propMap);
-            regop.guard = propagateAssign_RemapGuard(regop.guard, propMap);
+            regop.guard = propagateAssign_RemapStatementGuard(regop.guard, propMap);
             break;
         }
         case MIROpTag.MIRLocalVarStore: {
             const vs = op as MIRLocalVarStore;
             vs.src = propagateAssign_Remap(vs.src, propMap);
-            vs.guard = propagateAssign_RemapGuard(vs.guard, propMap);
+            vs.guard = propagateAssign_RemapStatementGuard(vs.guard, propMap);
             break;
         }
         case MIROpTag.MIRParameterVarStore: {
             const vs = op as MIRParameterVarStore;
             vs.src = propagateAssign_Remap(vs.src, propMap);
-            vs.guard = propagateAssign_RemapGuard(vs.guard, propMap);
+            vs.guard = propagateAssign_RemapStatementGuard(vs.guard, propMap);
             break;
         }
-
         case MIROpTag.MIRReturnAssign: {
             const ra = op as MIRReturnAssign;
             ra.src = propagateAssign_Remap(ra.src, propMap);

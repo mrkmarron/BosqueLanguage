@@ -9,7 +9,7 @@ import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathS
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
 import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRGuard } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
@@ -207,7 +207,7 @@ class TypeChecker {
         return rr;
     }
 
-    private emitCheckedInlineConvertIfNeeded<T extends MIRArgument>(sinfo: SourceInfo, src: T, srctype: ValueType, trgttype: ResolvedType, guard: MIRGuard): T | MIRTempRegister {
+    private emitCheckedInlineConvertIfNeeded<T extends MIRArgument>(sinfo: SourceInfo, src: T, srctype: ValueType, trgttype: ResolvedType, guard: MIRStatmentGuard): T | MIRTempRegister {
         if(srctype.layout.isSameType(trgttype)) {
             return src;
         }
@@ -1371,7 +1371,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, field.value === undefined, `Field "${fields[fidx]}" is required and must be assigned a value in constructor`);
                         
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, ptype, etreg);
-                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst));
+                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst, optcount));
                         filledLocations[fidx] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, trgt: etreg };
                     }
                 });
@@ -1425,7 +1425,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, field.value === undefined, `Field "${fields[ii]}" is required and must be assigned a value in constructor`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, itype, etreg);
-                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst));
+                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst, optcount));
                         filledLocations[ii] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, trgt: etreg };
                     }
 
@@ -1458,7 +1458,7 @@ class TypeChecker {
             }
 
             if(filledLocations[i].fflagchk) {
-                cargs.push(this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype, new MIRMaskGuard(fflag, i - optfirst)));
+                cargs.push(this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype, new MIRStatmentGuard(new MIRMaskGuard(fflag, i - optfirst, optcount), undefined)));
             }
             else {
                 cargs.push(this.emitInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype));
@@ -1516,7 +1516,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, ptype, etreg);
-                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst));
+                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst, optcount));
                         filledLocations[fidx] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
                     }
                 });
@@ -1570,7 +1570,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, itype, etreg);
-                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst));
+                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRTempRegister, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst, optcount));
                         filledLocations[ii] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
                     }
 
@@ -1638,7 +1638,7 @@ class TypeChecker {
                 if (sig.params[j].refKind === undefined || sig.params[j].refKind === "ref") {
                     let narg = filledLocations[j].trgt as MIRArgument;
                     if (filledLocations[j].fflagchk) {
-                        narg = this.emitCheckedInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType, new MIRMaskGuard(fflag, j - optfirst));
+                        narg = this.emitCheckedInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType, new MIRStatmentGuard(new MIRMaskGuard(fflag, j - optfirst, optcount), undefined));
                     }
                     else {
                         narg = this.emitInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType);
@@ -2807,7 +2807,7 @@ class TypeChecker {
                 const treg = this.m_emitter.generateTmpRegister();
                 const earg = this.checkExpression(env, arg.value, treg, undefined).getExpressionResult().valtype;
 
-                this.raiseErrorIf(exp.sinfo, earg.flowtype.isRecordTargetType(), "Can only join arguments of (known) Record types");
+                this.raiseErrorIf(exp.sinfo, earg.flowtype.isUniqueRecordTargetType(), "Can only join arguments of (known) Record types");
                 eargs.push([earg.layout, earg.flowtype, treg]);
                 
                 const allnamegroups = earg.flowtype.options.map((opt) => (opt as ResolvedRecordAtomType).entries.map((entry) => entry.name));
@@ -2839,7 +2839,7 @@ class TypeChecker {
             }
 
             const vcons = isvalue.every((vv) => vv);
-            this.raiseErrorIf(exp.sinfo, isvalue.some((vv) => vv !== vcons), "Mix of value and reference tuple types is not allowed");
+            this.raiseErrorIf(exp.sinfo, isvalue.some((vv) => vv !== vcons), "Mix of value and reference record types is not allowed");
 
             const rrecordtype = ResolvedType.createSingle(ResolvedRecordAtomType.create(vcons, ttypes));
             const argstypes = eargs.map((arg) => {
@@ -3315,10 +3315,10 @@ class TypeChecker {
             const guard = new MIRArgGuard(hasreg);
             this.m_emitter.emitLoadTupleIndexSetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.idx, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(ttype), loadreg, guard);
             if(ttype.isSameType(linfo)) {
-                this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), guard);
+                this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), new MIRStatmentGuard(guard, trgt));
             }
             else {
-                this.m_emitter.emitConvert(op.sinfo, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(linfo), loadreg, trgt, guard);
+                this.m_emitter.emitConvert(op.sinfo, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(linfo), loadreg, trgt, new MIRStatmentGuard(guard, trgt));
             }
 
             return env.setUniformResultExpression(linfo);
@@ -3415,10 +3415,10 @@ class TypeChecker {
             const guard = new MIRArgGuard(hasreg);
             this.m_emitter.emitLoadRecordPropertySetGuard(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), op.pname, !texp.flowtype.isUniqueTupleTargetType(), this.m_emitter.registerResolvedTypeReference(rtype), loadreg, guard);
             if(rtype.isSameType(linfo)) {
-                this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), guard);
+                this.m_emitter.emitRegisterStore(op.sinfo, loadreg, trgt, this.m_emitter.registerResolvedTypeReference(linfo), new MIRStatmentGuard(guard, trgt));
             }
             else {
-                this.m_emitter.emitConvert(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype), this.m_emitter.registerResolvedTypeReference(rtype), this.m_emitter.registerResolvedTypeReference(linfo), loadreg, trgt, guard);
+                this.m_emitter.emitConvert(op.sinfo, this.m_emitter.registerResolvedTypeReference(rtype), this.m_emitter.registerResolvedTypeReference(rtype), this.m_emitter.registerResolvedTypeReference(linfo), loadreg, trgt, new MIRStatmentGuard(guard, trgt));
             }
 
             return env.setUniformResultExpression(linfo);
@@ -5020,7 +5020,7 @@ class TypeChecker {
 
                     const ncr = this.m_emitter.generateTmpRegister();
                     results.push(ncr);
-                    this.m_emitter.emitTypeOf(sinfo, ncr, this.m_emitter.registerResolvedTypeReference(tcc[1].oftype as ResolvedType), treg, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), new MIRArgGuard(greg));
+                    this.m_emitter.emitTypeOf(sinfo, ncr, this.m_emitter.registerResolvedTypeReference(tcc[1].oftype as ResolvedType), treg, this.m_emitter.registerResolvedTypeReference(ttype), this.m_emitter.registerResolvedTypeReference(ttype), new MIRStatmentGuard(new MIRArgGuard(greg), new MIRConstantFalse()));
                 }
                 else {
                     const [treg, ttype] = this.generateRootReg(sinfo, tcc[0], okereg, oketype.flowtype);
@@ -5765,19 +5765,19 @@ class TypeChecker {
             const iv = opi.initaction;
             const oftype = opi.ptype;
             const storevar = new MIRParameterVariable(opi.pname);
-            const guard = new MIRMaskGuard("#maskparam#", opidx);
+            const guard = new MIRMaskGuard("#maskparam#", opidx, optparaminfo.length);
             if(iv instanceof InitializerEvaluationLiteralExpression) {
                 const ttmp = this.m_emitter.generateTmpRegister();
                 const oftt = this.checkExpression(env, iv.constexp, ttmp, oftype).getExpressionResult().valtype;
 
-                this.m_emitter.emitRegisterStore(body.sinfo, this.emitInlineConvertIfNeeded(iv.constexp.sinfo, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype), guard);
+                this.m_emitter.emitRegisterStore(body.sinfo, this.emitInlineConvertIfNeeded(iv.constexp.sinfo, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype), new MIRStatmentGuard(guard, storevar));
             }
             else if (iv instanceof InitializerEvaluationConstantLoad) {
-                this.m_emitter.emitRegisterStore(body.sinfo, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype), guard);
+                this.m_emitter.emitRegisterStore(body.sinfo, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype), new MIRStatmentGuard(guard, storevar));
             }
             else {
                 const civ = iv as InitializerEvaluationCallAction;
-                this.m_emitter.emitInvokeFixedFunctionWithGuard(body.sinfo, civ.ikey, civ.args, undefined, this.m_emitter.registerResolvedTypeReference(oftype), storevar, guard);
+                this.m_emitter.emitInvokeFixedFunctionWithGuard(body.sinfo, civ.ikey, civ.args, undefined, this.m_emitter.registerResolvedTypeReference(oftype), storevar, new MIRStatmentGuard(guard, storevar));
             }
 
             opidone.add(opi.pname);
@@ -6039,19 +6039,19 @@ class TypeChecker {
 
             const oftype = this.resolveAndEnsureTypeOnly(ofi[1].sourceLocation, ofi[1].declaredType, ofi[2]);
             const storevar = (fieldparams.req.has(ofi[1].name) || fieldparams.opt.has(ofi[1].name)) ? new MIRParameterVariable(`$${ofi[1].name}`) : new MIRLocalVariable(`$${ofi[1].name}`);
-            const guard = new MIRMaskGuard("#maskparam#", opidx);
+            const guard = new MIRMaskGuard("#maskparam#", opidx, optfields.length);
             if(iv instanceof InitializerEvaluationLiteralExpression) {
                 const ttmp = this.m_emitter.generateTmpRegister();
                 const oftt = this.checkExpression(env, iv.constexp, ttmp, oftype).getExpressionResult().valtype;
 
-                this.m_emitter.emitRegisterStore(ofi[1].sourceLocation, this.emitInlineConvertIfNeeded(ofi[1].sourceLocation, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype), guard);
+                this.m_emitter.emitRegisterStore(ofi[1].sourceLocation, this.emitInlineConvertIfNeeded(ofi[1].sourceLocation, ttmp, oftt, oftype), storevar, this.m_emitter.registerResolvedTypeReference(oftype), new MIRStatmentGuard(guard, storevar));
             }
             else if (iv instanceof InitializerEvaluationConstantLoad) {
-                this.m_emitter.emitRegisterStore(ofi[1].sourceLocation, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype), guard);
+                this.m_emitter.emitRegisterStore(ofi[1].sourceLocation, new MIRGlobalVariable(iv.gkey), storevar, this.m_emitter.registerResolvedTypeReference(oftype), new MIRStatmentGuard(guard, storevar));
             }
             else {
                 const civ = iv as InitializerEvaluationCallAction;
-                this.m_emitter.emitInvokeFixedFunctionWithGuard(ofi[1].sourceLocation, civ.ikey, civ.args, undefined, this.m_emitter.registerResolvedTypeReference(oftype), storevar, guard);
+                this.m_emitter.emitInvokeFixedFunctionWithGuard(ofi[1].sourceLocation, civ.ikey, civ.args, undefined, this.m_emitter.registerResolvedTypeReference(oftype), storevar, new MIRStatmentGuard(guard, storevar));
             }
 
             opidone.add(`$${ofi[1].name}`);

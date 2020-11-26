@@ -58,7 +58,7 @@ class MIRArgGuard extends MIRGuard {
         return { kind: "ArgGuard", greg: this.greg.jemit() };
     }
 
-    jparse(gg: any): MIRArgGuard {
+    static jparse(gg: any): MIRArgGuard {
         return new MIRArgGuard(MIRArgument.jparse(gg.greg));
     }
 }
@@ -66,12 +66,14 @@ class MIRArgGuard extends MIRGuard {
 class MIRMaskGuard extends MIRGuard {
     readonly gmask: string;
     readonly gindex: number;
+    readonly gsize: number;
 
-    constructor(gmask: string, gindex: number) {
+    constructor(gmask: string, gindex: number, gsize: number) {
         super();
 
         this.gmask = gmask;
         this.gindex = gindex;
+        this.gsize = gsize;
     }
 
     stringify(): string {
@@ -79,11 +81,33 @@ class MIRMaskGuard extends MIRGuard {
     }
 
     jemit(): object {
-        return { kind: "MaskGuard", gmask: this.gmask, gindex: this.gindex };
+        return { kind: "MaskGuard", gmask: this.gmask, gindex: this.gindex, gsize: this.gsize };
     }
 
-    jparse(gg: any): MIRMaskGuard {
-        return new MIRMaskGuard(gg.gmask, gg.gindex);
+    static jparse(gg: any): MIRMaskGuard {
+        return new MIRMaskGuard(gg.gmask, gg.gindex, gg.gsize);
+    }
+}
+
+class MIRStatmentGuard {
+    readonly guard: MIRGuard;
+    readonly altvalue: MIRArgument | undefined;
+
+    constructor(guard: MIRGuard, altvalue: MIRArgument | undefined) {
+        this.guard = guard;
+        this.altvalue = altvalue;
+    }
+
+    stringify(): string {
+        return `${this.guard.stringify()} or ${this.altvalue !== undefined ? this.altvalue.stringify() : "UNINIT"}`;
+    }
+
+    jemit(): object {
+        return { guard: this.guard.jemit(), altvalue: this.altvalue !== undefined ? this.altvalue.jemit() : undefined };
+    }
+
+    static jparse(gg: any): MIRStatmentGuard {
+        return new MIRStatmentGuard(MIRGuard.jparse(gg.guard), gg.altvalue !== undefined ? MIRArgument.jparse(gg.altvalue) : undefined);
     }
 }
 
@@ -909,9 +933,9 @@ class MIRConvertValue extends MIROp {
     readonly srctypeflow: MIRResolvedTypeKey;
     readonly intotype: MIRResolvedTypeKey;
     src: MIRArgument;
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, srctypelayout: MIRResolvedTypeKey, srctypeflow: MIRResolvedTypeKey, intotype: MIRResolvedTypeKey, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, srctypelayout: MIRResolvedTypeKey, srctypeflow: MIRResolvedTypeKey, intotype: MIRResolvedTypeKey, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRConvertValue, sinfo);
 
         this.trgt = trgt;
@@ -935,7 +959,7 @@ class MIRConvertValue extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRConvertValue(jparsesinfo(jobj.sinfo), jobj.srctypelayout, jobj.srctypeflow, jobj.intotype, MIRArgument.jparse(jobj.src), MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRConvertValue(jparsesinfo(jobj.sinfo), jobj.srctypelayout, jobj.srctypeflow, jobj.intotype, MIRArgument.jparse(jobj.src), MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -1646,9 +1670,9 @@ class MIRInvokeFixedFunction extends MIROp {
     readonly mkey: MIRInvokeKey;
     args: MIRArgument[]; //this is args[0] for methods
     optmask: string | undefined;
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], optmask: string | undefined, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, resultType: MIRResolvedTypeKey, mkey: MIRInvokeKey, args: MIRArgument[], optmask: string | undefined, trgt: MIRRegisterArgument, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRInvokeFixedFunction, sinfo,);
 
         this.trgt = trgt;
@@ -1673,7 +1697,7 @@ class MIRInvokeFixedFunction extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.optmask, MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRInvokeFixedFunction(jparsesinfo(jobj.sinfo), jobj.resultType, jobj.mkey, jobj.args.map((arg: any) => MIRArgument.jparse(arg)), jobj.optmask, MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -2246,9 +2270,9 @@ class MIRIsTypeOf extends MIROp {
     arg: MIRArgument;
     readonly srclayouttype: MIRResolvedTypeKey;
     readonly srcflowtype: MIRResolvedTypeKey;
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, trgt: MIRRegisterArgument, chktype: MIRResolvedTypeKey, src: MIRArgument, srclayouttype: MIRResolvedTypeKey, srcflowtype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, trgt: MIRRegisterArgument, chktype: MIRResolvedTypeKey, src: MIRArgument, srclayouttype: MIRResolvedTypeKey, srcflowtype: MIRResolvedTypeKey, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRIsTypeOf, sinfo);
 
         this.trgt = trgt;
@@ -2272,7 +2296,7 @@ class MIRIsTypeOf extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRIsTypeOf(jparsesinfo(jobj.sinfo), MIRRegisterArgument.jparse(jobj.trgt), jobj.chktype, MIRArgument.jparse(jobj.arg), jobj.srclayouttype, jobj.srcflowtype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRIsTypeOf(jparsesinfo(jobj.sinfo), MIRRegisterArgument.jparse(jobj.trgt), jobj.chktype, MIRArgument.jparse(jobj.arg), jobj.srclayouttype, jobj.srcflowtype, jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -2280,9 +2304,9 @@ class MIRTempRegisterAssign extends MIROp {
     trgt: MIRTempRegister;
     src: MIRArgument;
     readonly layouttype: MIRResolvedTypeKey;
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRTempRegister, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRTempRegister, layouttype: MIRResolvedTypeKey, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRTempRegisterAssign, sinfo);
 
         this.trgt = trgt;
@@ -2304,7 +2328,7 @@ class MIRTempRegisterAssign extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRTempRegisterAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRTempRegister.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRTempRegisterAssign(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRTempRegister.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -2312,9 +2336,9 @@ class MIRParameterVarStore extends MIROp {
     trgt: MIRParameterVariable;
     src: MIRArgument;
     readonly layouttype: MIRResolvedTypeKey;
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRParameterVariable, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRParameterVariable, layouttype: MIRResolvedTypeKey, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRParameterVarStore, sinfo);
 
         this.trgt = trgt;
@@ -2336,7 +2360,7 @@ class MIRParameterVarStore extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRParameterVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRParameterVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -2344,9 +2368,9 @@ class MIRLocalVarStore extends MIROp {
     trgt: MIRLocalVariable;
     src: MIRArgument;
     readonly layouttype: MIRResolvedTypeKey
-    guard: MIRGuard | undefined;
+    guard: MIRStatmentGuard | undefined;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRLocalVariable, layouttype: MIRResolvedTypeKey, guard: MIRGuard | undefined) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, trgt: MIRLocalVariable, layouttype: MIRResolvedTypeKey, guard: MIRStatmentGuard | undefined) {
         super(MIROpTag.MIRLocalVarStore, sinfo);
 
         this.trgt = trgt;
@@ -2368,7 +2392,7 @@ class MIRLocalVarStore extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRLocalVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRGuard.jparse(jobj.guard) : undefined);
+        return new MIRLocalVarStore(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), MIRLocalVariable.jparse(jobj.trgt), jobj.layouttype, jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
     }
 }
 
@@ -2713,7 +2737,7 @@ class MIRBody {
 
 export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
-    MIRGuard, MIRMaskGuard, MIRArgGuard,
+    MIRGuard, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,

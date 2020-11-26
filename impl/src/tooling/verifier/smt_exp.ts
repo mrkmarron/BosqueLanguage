@@ -5,6 +5,15 @@
 
 type VerifierLevel = "Weak" | "Strong";
 
+class SMTMaskConstruct {
+    readonly maskname: string;
+    readonly entries: SMTExp[] = [];
+
+    constructor(maskname: string) {
+        this.maskname = maskname;
+    }
+}
+
 abstract class SMTTerm {
 }
 
@@ -64,6 +73,20 @@ class SMTCall extends SMTExp {
     }
 }
 
+class SMTCallWOptMask extends SMTExp {
+    readonly fname: string;
+    readonly args: SMTExp[];
+    readonly mask: SMTMaskConstruct;
+
+    constructor(fname: string, args: SMTExp[], mask: SMTMaskConstruct) {
+        super();
+
+        this.fname = fname;
+        this.args = args;
+        this.mask = mask;
+    }
+}
+
 class SMTLet extends SMTExp {
     readonly vname: string;
     readonly value: SMTExp;
@@ -118,17 +141,8 @@ class SMTCond extends SMTExp {
     }
 }
 
-class SMTMaskConstruct {
-    readonly maskname: string;
-    readonly entries: SMTExp[] = [];
-
-    constructor(maskname: string) {
-        this.maskname = maskname;
-    }
-}
-
 export {
     VerifierLevel,
-    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTLet, SMTLetMulti, SMTIf, SMTCond,
-    SMTMaskConstruct
+    SMTMaskConstruct,
+    SMTType, SMTExp, SMTVar, SMTConst, SMTCall, SMTCallWOptMask, SMTLet, SMTLetMulti, SMTIf, SMTCond
 };

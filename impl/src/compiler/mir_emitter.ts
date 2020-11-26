@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo, Parser } from "../ast/parser";
-import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRBody, MIRCheckNoError, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalKey, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMultiLoadFromEpehmeralList, MIRNop, MIROp, MIRParameterVariable, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStatmentGuard, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegister, MIRTempRegisterAssign, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVarLifetimeEnd, MIRVarLifetimeStart, MIRVirtualMethodKey } from "./mir_ops";
 import { Assembly, BuildLevel, ConceptTypeDecl, EntityTypeDecl, InvokeDecl, MemberMethodDecl, NamespaceConstDecl, NamespaceFunctionDecl, NamespaceOperatorDecl, OOPTypeDecl, StaticFunctionDecl, StaticMemberDecl, StaticOperatorDecl } from "../ast/assembly";
 import { ResolvedConceptAtomType, ResolvedConceptAtomTypeEntry, ResolvedEntityAtomType, ResolvedEphemeralListType, ResolvedFunctionType, ResolvedLiteralAtomType, ResolvedRecordAtomType, ResolvedTupleAtomType, ResolvedType } from "../ast/resolved_type";
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLiteralType, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRTupleTypeEntry, MIRType, MIRTypeOption, PackageConfig } from "./mir_assembly";
@@ -222,7 +222,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRDebug(sinfo, value));
     }
 
-    emitRegisterStore(sinfo: SourceInfo, src: MIRArgument, trgt: MIRRegisterArgument, vtype: MIRType, guard: MIRGuard | undefined) {
+    emitRegisterStore(sinfo: SourceInfo, src: MIRArgument, trgt: MIRRegisterArgument, vtype: MIRType, guard: MIRStatmentGuard | undefined) {
         if (!this.emitEnabled) {
             return;
         }
@@ -265,7 +265,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRSetConstantGuardFlag(sinfo, name, position, flag));
     }
 
-    emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+    emitConvert(sinfo: SourceInfo, srctypelayout: MIRType, srctypeflow: MIRType, intotype: MIRType, src: MIRArgument, trgt: MIRRegisterArgument, guard: MIRStatmentGuard | undefined) {
         if(!this.emitEnabled) {
             return;
         }
@@ -540,7 +540,7 @@ class MIREmitter {
         }
     }
 
-    emitInvokeFixedFunctionWithGuard(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, retinfo: MIRType, trgt: MIRRegisterArgument, guard: MIRGuard | undefined) {
+    emitInvokeFixedFunctionWithGuard(sinfo: SourceInfo, ikey: MIRInvokeKey, args: MIRArgument[], optstatusmask: string | undefined, retinfo: MIRType, trgt: MIRRegisterArgument, guard: MIRStatmentGuard | undefined) {
         if(!this.emitEnabled) {
             return;
         }
@@ -739,7 +739,7 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRAllTrue(sinfo, args, trgt));
     }
     
-    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srclayouttype: MIRType, srcflowtype: MIRType, guard: MIRGuard | undefined) {
+    emitTypeOf(sinfo: SourceInfo, trgt: MIRTempRegister, chktype: MIRType, src: MIRArgument, srclayouttype: MIRType, srcflowtype: MIRType, guard: MIRStatmentGuard | undefined) {
         if(!this.emitEnabled) {
             return;
         }

@@ -406,6 +406,22 @@ class SMTTypeEmitter {
         }
     }
 
+    coerceToKey(exp: SMTExp, from: MIRType): SMTExp {
+        const smtfrom = this.getSMTTypeFor(from);
+
+        if (smtfrom.name === "BKey") {
+            return exp;
+        }
+        else {
+            if(smtfrom.name === "BTerm") {
+                return new SMTCall("BTerm_keyvalue", [exp]);
+            }
+            else {
+                return this.coerceFromAtomicToKey(exp, from);
+            }
+        }
+    }
+
     isSpecialReprEntity(tt: MIRType): boolean {
         if (this.isType(tt, "NSCore::None")) {
             return true;
@@ -477,7 +493,11 @@ class SMTTypeEmitter {
     }
 
     generateResultIsSuccessTest(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCall(`is-$Result_${this.mangle(ttype.trkey)}`, [exp]);
+        return new SMTCall(`is-$Result_${this.mangle(ttype.trkey)}@success`, [exp]);
+    }
+
+    generateResultIsErrorTest(ttype: MIRType, exp: SMTExp): SMTExp {
+        return new SMTCall(`is-$Result_${this.mangle(ttype.trkey)}@error`, [exp]);
     }
 
     generateResultGetSuccess(ttype: MIRType, exp: SMTExp): SMTExp {
