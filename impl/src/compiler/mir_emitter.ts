@@ -273,20 +273,20 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRConvertValue(sinfo, srctypelayout.trkey, srctypeflow.trkey, intotype.trkey, src, trgt, guard));
     }
 
-    emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, trgt: MIRRegisterArgument) {
+    emitCheckNoError(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, oktype: MIRType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRCheckNoError(sinfo, src, srctype.trkey, trgt));
+        this.m_currentBlock.push(new MIRCheckNoError(sinfo, src, srctype.trkey, oktype.trkey, trgt));
     }
 
-    emitExtractResultOkValue(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, valuetype: MIRType, trgt: MIRRegisterArgument) {
+    emitExtractResultOkValue(sinfo: SourceInfo, src: MIRArgument, srctype: MIRType, oktype: MIRType, valuetype: MIRType, trgt: MIRRegisterArgument) {
         if(!this.emitEnabled) {
             return;
         }
 
-        this.m_currentBlock.push(new MIRExtractResultOkValue(sinfo, src, srctype.trkey, valuetype.trkey, trgt));
+        this.m_currentBlock.push(new MIRExtractResultOkValue(sinfo, src, srctype.trkey, oktype.trkey, valuetype.trkey, trgt));
     }
 
     emitLoadConstNone(sinfo: SourceInfo, trgt: MIRRegisterArgument) {

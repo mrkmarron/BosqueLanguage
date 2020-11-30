@@ -3485,7 +3485,7 @@ class Parser {
                 this.raiseError(this.getCurrentSrcInfo().line, "Only valid option is 'default'");
             }
             this.ensureAndConsumeToken(";")
-            return new BodyImplementation(bodyid, file, undefined);
+            return new BodyImplementation(bodyid, file, "default");
         }
         else if (this.testToken("{")) {
             return new BodyImplementation(bodyid, file, this.parseBlockStatement());

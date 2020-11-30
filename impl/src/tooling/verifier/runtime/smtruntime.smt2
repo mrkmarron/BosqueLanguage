@@ -25,9 +25,13 @@
   TypeTag_Complex
   TypeTag_String
   TypeTag_Regex
-  TypeTag_GeneralTuple
-  TypeTag_GeneralRecord
   ;;TYPE_TAG_DECLS;;
+  )
+))
+
+(declare-datatypes () (
+  (AbstractTypeTag
+  ;;ABSTRACT_TYPE_TAG_DECLS;;
   )
 ))
 
@@ -43,13 +47,13 @@
   )
 ))
 
-(declare-fun Subtype@ (TypeTag, TypeTag) Bool)
-;;NOMINAL_SUBTYPE_DECLS;;
+(declare-fun SubtypeOf@ (TypeTag, AbstractTypeTag) Bool)
+;;SUBTYPE_DECLS;;
 
-(declare-fun HasIndex@ (TypeTag, TupleIndex) Bool)
+(declare-fun HasIndex@ (TypeTag, TupleIndexTag) Bool)
 ;;TUPLE_HAS_INDEX_DECLS;;
 
-(declare-fun HasProperty@ (TypeTag, RecordProperty) Bool)
+(declare-fun HasProperty@ (TypeTag, RecordPropertyTag) Bool)
 ;;RECORD_HAS_PROPERTY_DECLS;;
 
 (declare-fun TypeTagLess@ (TypeTag, TypeTag) Bool)

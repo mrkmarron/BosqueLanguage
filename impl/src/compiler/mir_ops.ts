@@ -967,13 +967,15 @@ class MIRCheckNoError extends MIROp {
     trgt: MIRRegisterArgument;
     src: MIRArgument;
     readonly srctype: MIRResolvedTypeKey;
+    readonly oktype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, oktype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRCheckNoError, sinfo);
 
         this.trgt = trgt;
         this.src = src;
         this.srctype = srctype;
+        this.oktype = oktype;
     }
 
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
@@ -984,11 +986,11 @@ class MIRCheckNoError extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, oktype: this.oktype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRCheckNoError(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRCheckNoError(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.oktype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -996,14 +998,16 @@ class MIRExtractResultOkValue extends MIROp {
     trgt: MIRRegisterArgument;
     src: MIRArgument;
     readonly srctype: MIRResolvedTypeKey;
+    readonly oktype: MIRResolvedTypeKey
     readonly valuetype: MIRResolvedTypeKey;
 
-    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, valuetype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, valuetype: MIRResolvedTypeKey, oktype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRExtractResultOkValue, sinfo);
 
         this.trgt = trgt;
         this.src = src;
         this.srctype = srctype;
+        this.oktype = oktype;
         this.valuetype = valuetype;
     }
 
@@ -1015,11 +1019,11 @@ class MIRExtractResultOkValue extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, valuetype: this.valuetype };
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, valuetype: this.valuetype, oktype: this.oktype };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRExtractResultOkValue(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.valuetype, MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRExtractResultOkValue(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.valuetype, jobj.oktype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 

@@ -1229,9 +1229,9 @@ class BlockStatement extends Statement {
 class BodyImplementation {
     readonly id: string;
     readonly file: string;
-    readonly body: string | BlockStatement | Expression | undefined;
+    readonly body: string | BlockStatement | Expression;
 
-    constructor(bodyid: string, file: string, body: string | BlockStatement | Expression | undefined) {
+    constructor(bodyid: string, file: string, body: string | BlockStatement | Expression) {
         this.id = bodyid;
         this.file = file;
         this.body = body;
