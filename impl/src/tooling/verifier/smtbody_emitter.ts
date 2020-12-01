@@ -3,10 +3,10 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRFieldDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBinKeyEq, MIRBinKeyLess, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantComplex, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantTrue, MIRConstructorEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDebug, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRLoadConst, MIRLoadConstDataString, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRLocalVarStore, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIRParameterVarStore, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegisterAssign, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate } from "../../compiler/mir_ops";
-import { SMTCall, SMTCallWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTType, SMTVar, VerifierLevel } from "./smt_exp";
+import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBinKeyEq, MIRBinKeyLess, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTempRegisterAssign, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
+import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTType, SMTVar, VerifierLevel } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTAssembly, SMTErrorCode, SMTFunction } from "./smtassembly";
 
@@ -28,9 +28,6 @@ class SMTBodyEmitter {
     private currentRType: MIRType;
     private currentSCC = new Set<string>();
 
-    private subtypeOrderCtr = 0;
-    subtypeFMap: Map<string, {order: number, decl: string}> = new Map<string, {order: number, decl: string}>();
-
     private pendingMask: SMTMaskConstruct[] = [];
 
     private requiredTypecheck: { inv: string, flowtype: MIRType, oftype: MIRType }[] = [];
@@ -46,6 +43,13 @@ class SMTBodyEmitter {
     private requiredProjectVirtualTupleIndex: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }[] = [];
     private requiredProjectVirtualRecordProperty: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }[] = [];
     private requiredProjectVirtualEntityField: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }[] = [];
+
+    private requiredUpdateVirtualTuple: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+    private requiredUpdateVirtualRecord: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+    private requiredUpdateVirtualEntity: { inv: string, argflowtype: MIRType, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+
+    private requiredVirtualFunctionInvokes: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }[] = [];
+    private requiredVirtualOperatorInvokes: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }[] = [];
 
     private generateTypeCheckName(argflowtype: MIRType, oftype: MIRType): string {
         return `$SubtypeCheck_${this.typegen.mangle(argflowtype.trkey)}_oftype_${this.typegen.mangle(oftype.trkey)}`;
@@ -72,7 +76,7 @@ class SMTBodyEmitter {
 
     private generateBoolForGuard(guard: MIRGuard): SMTExp {
         if(guard instanceof MIRMaskGuard) {
-            return new SMTCall(`$MaskLoad_${guard.gsize}_@${guard.gindex}`, [new SMTVar(this.typegen.mangle(guard.gmask))]);
+            return new SMTCallSimple(`$MaskLoad_${guard.gsize}_@${guard.gindex}`, [new SMTVar(this.typegen.mangle(guard.gmask))]);
         }
         else {
             return this.argToSMT((guard as MIRArgGuard).greg);
@@ -110,10 +114,35 @@ class SMTBodyEmitter {
         return `$EntityProject_${this.typegen.mangle(argflowtype.trkey)}_${fkeys}_${this.typegen.mangle(resulttype.trkey)}`;
     }
 
+    private generateUpdateVirtualTupleInvName(argflowtype: MIRType, indecies: [number, MIRResolvedTypeKey][], resulttype: MIRType): string {
+        const idxs = this.typegen.mangle(indecies.map((idx) => `(${idx[0]} ${idx[1]})`).join(","));
+        return `$TupleUpdate_${this.typegen.mangle(argflowtype.trkey)}_${idxs}_${this.typegen.mangle(resulttype.trkey)}`;
+    }
+
+    private generateUpdateVirtualRecordInvName(argflowtype: MIRType, properties: [string, MIRResolvedTypeKey][], resulttype: MIRType): string {
+        const pnames = this.typegen.mangle(properties.map((pname) => `(${pname[0]} ${pname[1]})`).join(","));
+        return `$RecordUpdate_${this.typegen.mangle(argflowtype.trkey)}_${pnames}_${this.typegen.mangle(resulttype.trkey)}`;
+    }
+
+    private generateUpdateVirtualEntityInvName(argflowtype: MIRType, fields: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType): string {
+        const fnames = this.typegen.mangle(fields.map((fname) => `(${fname[0]} ${fname[1]})`).join(","));
+        return `$EntityUpdate_${this.typegen.mangle(argflowtype.trkey)}_${fnames}_${this.typegen.mangle(resulttype.trkey)}`;
+    }
+
+    private generateVirtualInvokeFunctionName(argflowtype: MIRType, fname: MIRVirtualMethodKey, optmask: boolean, resulttype: MIRType): string {
+        const rname = this.typegen.mangle(fname);
+        return `$VirtualInvoke_${this.typegen.mangle(argflowtype.trkey)}_${rname}${optmask ? "_WM_" : ""}_${this.typegen.mangle(resulttype.trkey)}`;
+    }
+
+    private generateVirtualInvokeOperatorName(argflowtype: MIRType, fname: MIRVirtualMethodKey, rcvrtypes: MIRResolvedTypeKey[], resulttype: MIRType): string {
+        const rnames = this.typegen.mangle(`${fname}::(${rcvrtypes.join(",")})`);
+        return `$VirtualOperator_${this.typegen.mangle(argflowtype.trkey)}_${rnames}_${this.typegen.mangle(resulttype.trkey)}`;
+    }
+
     private generateLoadTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
         const ttuples = [...this.assembly.tupleDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
                 return this.typegen.isUniqueTupleType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
@@ -126,11 +155,11 @@ class SMTBodyEmitter {
         }
         else {
             const ops = ttuples.map((tt) => {
-                const mtt = MIRType.createSingle(tt);
-                const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+                const mtt = this.typegen.getMIRType(tt.trkey);
+                const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
                 const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
-                const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(tt, geninfo.idx), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(tt, geninfo.idx), [argpp]);
                 const crt = this.typegen.coerce(idxr, (geninfo.argflowtype.options[0] as MIRTupleType).entries[geninfo.idx].type, geninfo.resulttype);
                 const action = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, crt, true) : crt;
 
@@ -146,7 +175,7 @@ class SMTBodyEmitter {
     private generateLoadRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
         const trecords = [...this.assembly.recordDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
                 return this.typegen.isUniqueRecordType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
@@ -159,11 +188,11 @@ class SMTBodyEmitter {
         }
         else {
             const ops = trecords.map((tt) => {
-                const mtt = MIRType.createSingle(tt);
-                const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+                const mtt = this.typegen.getMIRType(tt.trkey);
+                const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
                 const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
-                const idxr = new SMTCall(this.typegen.generateRecordPropertyGetFunction(tt, geninfo.pname), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(tt, geninfo.pname), [argpp]);
                 const crt = this.typegen.coerce(idxr, ((geninfo.argflowtype.options[0] as MIRRecordType).entries.find((vv) => vv.name === geninfo.pname) as MIRRecordTypeEntry).type, geninfo.resulttype);
                 const action = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, crt, true) : crt;
 
@@ -177,20 +206,20 @@ class SMTBodyEmitter {
     }
 
     private generateLoadEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, field: MIRFieldDecl, resulttype: MIRType }): SMTFunction {
-        const tentities = [...this.assembly.recordDecls]
+        const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].tkey);
                 return this.typegen.isUniqueEntityType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
 
         const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
         let ops = tentities.map((tt) => {
-            const mtt = MIRType.createSingle(tt);
-            const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+            const mtt = this.typegen.getMIRType(tt.tkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
             const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
-            const action = new SMTCall(this.typegen.generateEntityFieldGetFunction(tt, geninfo.field.fkey), [argpp]);
+            const action = new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(tt, geninfo.field.fkey), [argpp]);
 
             return { test: test, result: action };
         });
@@ -204,22 +233,22 @@ class SMTBodyEmitter {
     private generateProjectTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }): SMTFunction {
         const ttuples = [...this.assembly.tupleDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
                 return this.typegen.isUniqueTupleType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
 
         const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
         let ops = ttuples.map((tt) => {
-            const mtt = MIRType.createSingle(tt);
-            const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+            const mtt = this.typegen.getMIRType(tt.trkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
             const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
             const pargs = geninfo.indecies.map((idx, i) => {
-                const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(geninfo.argflowtype.options[0] as MIRTupleType, idx), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(geninfo.argflowtype.options[0] as MIRTupleType, idx), [argpp]);
                 return this.typegen.coerce(idxr, (geninfo.argflowtype.options[0] as MIRTupleType).entries[idx].type, (geninfo.resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
-            const action = new SMTCall(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
+            const action = new SMTCallSimple(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
 
             return { test: test, result: action };
         });
@@ -233,22 +262,22 @@ class SMTBodyEmitter {
     private generateProjectRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }): SMTFunction {
         const trecords = [...this.assembly.recordDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
                 return this.typegen.isUniqueRecordType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
 
         const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
         let ops = trecords.map((tt) => {
-            const mtt = MIRType.createSingle(tt);
-            const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+            const mtt = this.typegen.getMIRType(tt.trkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
             const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
             const pargs = geninfo.properties.map((pname, i) => {
-                const idxr = new SMTCall(this.typegen.generateRecordPropertyGetFunction(geninfo.argflowtype.options[0] as MIRRecordType, pname), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(geninfo.argflowtype.options[0] as MIRRecordType, pname), [argpp]);
                 return this.typegen.coerce(idxr, ((geninfo.argflowtype.options[0] as MIRRecordType).entries.find((vv) => vv.name === pname) as MIRRecordTypeEntry).type, (geninfo.resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
-            const action = new SMTCall(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
+            const action = new SMTCallSimple(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
 
             return { test: test, result: action };
         });
@@ -260,24 +289,24 @@ class SMTBodyEmitter {
     }
 
     private generateProjectEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }): SMTFunction {
-        const tentities = [...this.assembly.recordDecls]
+        const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
-                const mtt = MIRType.createSingle(tt[1]);
+                const mtt = this.typegen.getMIRType(tt[1].tkey);
                 return this.typegen.isUniqueEntityType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
             })
             .map((tt) => tt[1]);
 
         const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
         let ops = tentities.map((tt) => {
-            const mtt = MIRType.createSingle(tt);
-            const test = new SMTCall(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+            const mtt = this.typegen.getMIRType(tt.tkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
 
             const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
             const pargs = geninfo.fields.map((field, i) => {
-                const idxr = new SMTCall(this.typegen.generateEntityFieldGetFunction(geninfo.argflowtype.options[0] as MIREntityType, field.fkey), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(tt, field.fkey), [argpp]);
                 return this.typegen.coerce(idxr, this.typegen.getMIRType(field.declaredType), (geninfo.resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
-            const action = new SMTCall(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
+            const action = new SMTCallSimple(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, pargs);
 
             return { test: test, result: action };
         });
@@ -286,6 +315,199 @@ class SMTBodyEmitter {
         ops = ops.slice(0, ops.length - 1);
 
         return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+    }
+
+    private generateUpdateTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+        const ttuples = [...this.assembly.tupleDecls]
+            .filter((tt) => {
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
+                return this.typegen.isUniqueTupleType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
+            })
+            .map((tt) => tt[1]);
+
+        const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
+        let ops = ttuples.map((tt) => {
+            const mtt = this.typegen.getMIRType(tt.trkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+
+            const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
+            let cargs: SMTExp[] = [];
+            for (let i = 0; i < tt.entries.length; ++i) {
+                const upd = geninfo.updates.findIndex((vv) => vv[0] === i);
+                if(upd === undefined) {
+                    cargs.push(new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(tt, i), [argpp]));
+                }
+                else {
+                    cargs.push(new SMTVar(`arg_${i}`));
+                }
+            }
+
+            const action = new SMTCallSimple(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, cargs);
+
+            return { test: test, result: action };
+        });
+
+        const orelse = ops[ops.length - 1].result;
+        ops = ops.slice(0, ops.length - 1);
+
+        const fargs = [
+            { vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) },
+            ...geninfo.updates.map((upd, i) => {
+                return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
+            })
+        ];
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+    }
+
+    private generateUpdateRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+        const trecords = [...this.assembly.recordDecls]
+            .filter((tt) => {
+                const mtt = this.typegen.getMIRType(tt[1].trkey);
+                return this.typegen.isUniqueRecordType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
+            })
+            .map((tt) => tt[1]);
+
+        const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
+        let ops = trecords.map((tt) => {
+            const mtt = this.typegen.getMIRType(tt.trkey);
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+
+            const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
+            let cargs: SMTExp[] = [];
+            for (let i = 0; i < tt.entries.length; ++i) {
+                const upd = geninfo.updates.find((vv) => vv[0] === tt.entries[i].name);
+                if(upd === undefined) {
+                    cargs.push(new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(tt, tt.entries[i].name), [argpp]));
+                }
+                else {
+                    cargs.push(new SMTVar(`arg_${i}`));
+                }
+            }
+            const action = new SMTCallSimple(this.typegen.getSMTConstructorName(geninfo.resulttype).cons, cargs);
+
+            return { test: test, result: action };
+        });
+
+        const orelse = ops[ops.length - 1].result;
+        ops = ops.slice(0, ops.length - 1);
+
+        const fargs = [
+            { vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) },
+            ...geninfo.updates.map((upd, i) => {
+                return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
+            })
+        ];
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+    }
+
+    private generateUpdateEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+        const tentities = [...this.assembly.entityDecls]
+            .filter((tt) => {
+                const mtt = this.typegen.getMIRType(tt[1].tkey);
+                return this.typegen.isUniqueEntityType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
+            })
+            .map((tt) => tt[1]);
+
+        const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
+        let ops = tentities.map((tt) => {
+            const mtt = this.typegen.getMIRType(tt.tkey);
+            const consfunc = (this.assembly.entityDecls.get(tt.tkey) as MIREntityTypeDecl).consfunc;
+            const consfields = (this.assembly.entityDecls.get(tt.tkey) as MIREntityTypeDecl).consfuncfields.map((ccf) => this.assembly.fieldDecls.get(ccf) as MIRFieldDecl);
+
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+
+            const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
+           
+            let cargs: SMTExp[] = [];
+            for (let i = 0; i < consfields.length; ++i) {
+                const upd = geninfo.updates.find((vv) => vv[0] === consfields[i].name);
+                if(upd === undefined) {
+                    cargs.push(new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(tt, consfields[i].name), [argpp]));
+                }
+                else {
+                    cargs.push(new SMTVar(`arg_${i}`));
+                }
+            }
+            const action = new SMTCall(this.typegen.mangle(consfunc), cargs);
+
+            return { test: test, result: action };
+        });
+
+        const orelse = ops[ops.length - 1].result;
+        ops = ops.slice(0, ops.length - 1);
+
+        const fargs = [
+            { vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) },
+            ...geninfo.updates.map((upd, i) => {
+                return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
+            })
+        ];
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+    }
+
+    private generateVirtualFunctionInvoke(geninfo: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }): SMTFunction {
+        const tentities = [...this.assembly.entityDecls]
+            .filter((tt) => {
+                const mtt = this.typegen.getMIRType(tt[1].tkey);
+                return this.typegen.isUniqueEntityType(mtt) && this.assembly.subtypeOf(mtt, geninfo.argflowtype);
+            })
+            .map((tt) => tt[1]);
+
+        const rtype = this.typegen.getSMTTypeFor(geninfo.resulttype);
+        let ops = tentities.map((tt) => {
+            const mtt = this.typegen.getMIRType(tt.tkey);
+            const vfunc = (this.assembly.entityDecls.get(tt.tkey) as MIREntityTypeDecl).vcallMap.get(geninfo.vfname) as MIRInvokeKey;
+            
+            const test = new SMTCallSimple(this.registerRequiredTypeCheck(geninfo.argflowtype, mtt), [new SMTVar("arg")]);
+
+            const argpp = this.typegen.coerce(new SMTVar("arg"), geninfo.argflowtype, mtt);
+            const invk = this.assembly.invokeDecls.get(vfunc) as MIRInvokeBodyDecl;
+            const atype = this.typegen.getMIRType(invk.resultType);
+
+            const cargs: [SMTExp, SMTType][] = geninfo.args.map((arg, i) => [new SMTVar(`arg_${i}`), this.typegen.getSMTTypeFor(this.typegen.getMIRType(arg))]);
+
+            const call = geninfo.optmask !== undefined ? new SMTCallWOptMask(this.typegen.mangle(op.mkey), args, mask) : new SMTCall(this.typegen.mangle(op.mkey), args);
+
+            let action: xxx; 
+            if (this.isSafeInvoke(vfunc) && geninfo.allsafe) {
+                return new SMTLet(this.varToSMTName(op.trgt).vname, gcall, continuation);
+            }
+            else if(this.isSafeInvoke(vfunc)) {
+                xxxx;
+            }
+            else {
+                const cres = this.generateTempName();
+                const gcall = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), call, this.typegen.generateResultTypeConstructorSuccess(rtype, this.generateAltForGuardStmt(op.guard.altvalue, rtype))) : call;
+
+                const okpath = new SMTLet(this.varToSMTName(op.trgt).vname, this.typegen.generateResultGetSuccess(rtype, gcall), continuation);
+                const errpath = this.generateErrorCreate(op.sinfo, rtype);
+
+                const icond = new SMTIf(this.typegen.generateResultIsErrorTest(rtype, new SMTVar(cres)), errpath, okpath);
+                return new SMTLet(cres, gcall, icond);
+            }
+
+
+            const action = this.typegen.coerce(new SMTCall(this.typegen.mangle(vfunc), [argpp, ...cargs.map((vv) => vv[0])]), atype, geninfo.resulttype);
+
+            return { test: test, result: action };
+        });
+
+        const orelse = ops[ops.length - 1].result;
+        ops = ops.slice(0, ops.length - 1);
+
+        const fargs = [
+            { vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) },
+            ...cargs.map((vv, i) => {
+                return { vname: `arg_${i}`, vtype: vv[1] };
+            })
+        ];
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+    }
+
+    private generateVirtualOperatorInvoke(geninfo: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }): SMTFunction {
+        //const otrgts = this.assembly.virtualOperatorDecls.get(geninfo.opname) as MIRInvokeKey[];
+
+        return new SMTFunction("NOT_IMPLEMENTED", [], undefined, this.typegen.getSMTTypeFor(geninfo.resulttype), NOT_IMPLEMENTED("generateVirtualOperatorInvoke"));
     }
 
     private generateSubtypeCheckEntity(arg: MIRArgument, layout: MIRType, flow: MIRType, ofentity: MIRType): SMTExp {
@@ -297,8 +519,8 @@ class SMTBodyEmitter {
             return new SMTConst(flow.trkey === ofentity.trkey ? "true" : "false");
         }
         else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(arg)]);
-            return new SMTCall("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofentity.trkey)}`)]);
+            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
+            return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofentity.trkey)}`)]);
         }
     }
 
@@ -307,8 +529,8 @@ class SMTBodyEmitter {
             return new SMTConst(this.assembly.subtypeOf(flow, ofconcept) ? "true" : "false");
         }
         else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(arg)]);
-            return new SMTCall("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofconcept.trkey)}`)]);
+            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
+            return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofconcept.trkey)}`)]);
         }
     }
 
@@ -321,13 +543,13 @@ class SMTBodyEmitter {
             return new SMTConst(this.assembly.subtypeOf(flow, oftuple) ? "true" : "false");
         }
         else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(arg)]);
+            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
 
             if ((oftuple.options[0] as MIRTupleType).entries.every((entry) => !entry.isOptional)) {
-                return new SMTCall("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
+                return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
             else {
-                return new SMTCall("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
+                return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
         }
     }
@@ -341,13 +563,13 @@ class SMTBodyEmitter {
             return new SMTConst(this.assembly.subtypeOf(flow, ofrecord) ? "true" : "false");
         }
         else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(arg)]);
+            const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
 
             if ((ofrecord.options[0] as MIRRecordType).entries.every((entry) => !entry.isOptional)) {
-                return new SMTCall("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
+                return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
             else {
-                return new SMTCall("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
+                return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
         }
     }
@@ -375,8 +597,20 @@ class SMTBodyEmitter {
         return this.typegen.generateResultTypeConstructorError(rtype, new SMTConst(errorid));
     }
 
-    isSafeInvoke(idecl: MIRInvokeDecl): boolean {
+    isSafeInvoke(mkey: MIRInvokeKey): boolean {
+        const idecl = this.assembly.invokeDecls.get(mkey) || this.assembly.primitiveInvokeDecls.get(mkey) as MIRInvokeDecl;
         return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe");
+    }
+
+    isSafeVirtualInvoke(vkey: MIRVirtualMethodKey, rcvrtype: MIRType): boolean {
+        return [...this.assembly.entityDecls]
+        .filter((tt) => {
+            const mtt = this.typegen.getMIRType(tt[1].tkey);
+            return this.typegen.isUniqueEntityType(mtt) && this.assembly.subtypeOf(mtt, rcvrtype);
+        })
+        .every((edcl) => {
+            return this.isSafeInvoke((this.assembly.entityDecls.get(edcl[1].tkey) as MIREntityTypeDecl).vcallMap.get(vkey) as MIRInvokeKey);
+        });
     }
 
     varStringToSMT(name: string): SMTVar {
@@ -420,30 +654,31 @@ class SMTBodyEmitter {
         }
         else if (cval instanceof MIRConstantRational) {
             if(this.level === "Strong") {
-                return new SMTCall("BRationalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
+                return new SMTCallSimple("BRationalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
                 const spos = cval.value.indexOf("/");
                 const num = new SMTConst(cval.value.slice(0, spos) + ".0");
                 const denom = new SMTConst(cval.value.slice(spos + 1, cval.value.length - 1) + ".0");
-                return new SMTCall("/", [num, denom]);
+                return new SMTCallSimple("/", [num, denom]);
             }
-        }
-        else if (cval instanceof MIRConstantComplex) {
-            return new SMTCall("BComplexUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.rvalue + cval.ivalue + "\"")]);
         }
         else if (cval instanceof MIRConstantFloat) {
             if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
-                return new SMTCall("BFloatUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
+                return new SMTCallSimple("BFloatUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
                 const sv = cval.value.includes(".") ? cval.value.slice(0, cval.value.length - 1) : (cval.value.slice(0, cval.value.length - 1) + ".0");
                 return new SMTConst(sv);
             }
+        }
+        else if (cval instanceof MIRConstantTypedNumber) {
+            const sctype = this.typegen.getMIRType(cval.tnkey);
+            return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [this.constantToSMT(cval.value)]);
         }
         else if (cval instanceof MIRConstantDecimal) {
             if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
-                return new SMTCall("BDecimalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
+                return new SMTCallSimple("BDecimalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
                 const sv = cval.value.includes(".") ? cval.value.slice(0, cval.value.length - 1) : (cval.value.slice(0, cval.value.length - 1) + ".0");
@@ -454,24 +689,38 @@ class SMTBodyEmitter {
             if(this.level === "Strong") {
                 let args: SMTExp[] = [];
                 for(let i = 0; i < cval.value.length; ++i) {
-                    args.push(new SMTCall("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
+                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
                 }
-                return new SMTCall("seq.++", args);
+                return new SMTCallSimple("seq.++", args);
             }
             else {
                 return new SMTConst(cval.value);
             }
         }
-        else if (cval instanceof MIRConstantString) {
+        else if (cval instanceof MIRConstantStringOf) {
+            const sctype = this.typegen.getMIRType(cval.tskey);
             if(this.level === "Strong") {
                 let args: SMTExp[] = [];
                 for(let i = 0; i < cval.value.length; ++i) {
-                    args.push(new SMTCall("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
+                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
                 }
-                return new SMTCall("seq.++", args);
+                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTCallSimple("seq.++", args)]);
             }
             else {
-                return new SMTConst(cval.value);
+                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
+            }
+        }
+        else if (cval instanceof MIRConstantDataString) {
+            const sctype = this.typegen.getMIRType(cval.tskey);
+            if(this.level === "Strong") {
+                let args: SMTExp[] = [];
+                for(let i = 0; i < cval.value.length; ++i) {
+                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
+                }
+                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTCallSimple("seq.++", args)]);
+            }
+            else {
+                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
             }
         }
         else {
@@ -480,7 +729,7 @@ class SMTBodyEmitter {
             const rval = (cval as MIRConstantRegex).value;
             const ere = this.assembly.literalRegexs.findIndex((re) => re.restr === rval.restr);
 
-            return new SMTCall("bsq_regex@cons", [new SMTConst(`${ere}`)]);
+            return new SMTCallSimple("bsq_regex@cons", [new SMTConst(`${ere}`)]);
         }
     }
 
@@ -506,10 +755,10 @@ class SMTBodyEmitter {
         else {
             const trepr = this.typegen.getSMTTypeFor(argtype);
             if(trepr.isGeneralKeyType()) {
-                return new SMTCall("=", [new SMTConst("BKey@none")]);
+                return new SMTCallSimple("=", [new SMTConst("BKey@none")]);
             }
             else {
-                return new SMTCall("=", [new SMTConst("BTerm@none")]);
+                return new SMTCallSimple("=", [new SMTConst("BTerm@none")]);
             }
         }
     }
@@ -524,10 +773,10 @@ class SMTBodyEmitter {
         else {
             const trepr = this.typegen.getSMTTypeFor(argtype);
             if(trepr.isGeneralKeyType()) {
-                return new SMTCall("not", [new SMTCall("=", [new SMTConst("BKey@none")])]);
+                return new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTConst("BKey@none")])]);
             }
             else {
-                return new SMTCall("not", [new SMTCall("=", [new SMTConst("BTerm@none")])]);
+                return new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTConst("BTerm@none")])]);
             }
         }
     }
@@ -577,8 +826,8 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst(srctype.trkey === oktype.trkey ? "true" : "false"), continuation);
         }
         else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(srctype).isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(op.src)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(op.src)]);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oktype.trkey)}`)]), continuation);
+            const accessTypeTag = this.typegen.getSMTTypeFor(srctype).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.src)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.src)]);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oktype.trkey)}`)]), continuation);
         }
     }
 
@@ -594,20 +843,16 @@ class SMTBodyEmitter {
         return new SMTLet(this.varToSMTName(op.trgt).vname, this.argToSMT(op.src), continuation);
     }
 
-    processLoadConstDataString(op: MIRLoadConstDataString, continuation: SMTExp): SMTExp {
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.tskey)).cons, [new SMTConst(op.ivalue)]), continuation);
-    }
-
     processTupleHasIndex(op: MIRTupleHasIndex, continuation: SMTExp): SMTExp {
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
-        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("HasIndex@", [accessTypeTag, new SMTConst(`TupleIndexTag_${op.idx}`)]), continuation);
+        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasIndex@", [accessTypeTag, new SMTConst(`TupleIndexTag_${op.idx}`)]), continuation);
     }
 
     processRecordHasProperty(op: MIRRecordHasProperty, continuation: SMTExp): SMTExp {
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
-        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCall("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCall("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("HasProperty@", [accessTypeTag, new SMTConst(`RecordPropertyTag_${op.pname}`)]), continuation);
+        const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasProperty@", [accessTypeTag, new SMTConst(`RecordPropertyTag_${op.pname}`)]), continuation);
     }
 
     processLoadTupleIndex(op: MIRLoadTupleIndex, continuation: SMTExp): SMTExp {
@@ -622,11 +867,11 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, op.idx), [argpp]);
+            const idxr = new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, op.idx), [argpp]);
             return new SMTLet(this.varToSMTName(op.trgt).vname, idxr, continuation);
         }
     }
@@ -643,7 +888,7 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const cc = new SMTCall(icall, [argpp]);
+            const cc = new SMTCallSimple(icall, [argpp]);
 
             const callbind = this.generateTempName();
             const smtcallvar = new SMTVar(callbind);
@@ -666,7 +911,7 @@ class SMTBodyEmitter {
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, op.idx), [argpp]);
+            const idxr = new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, op.idx), [argpp]);
 
             if(op.guard instanceof MIRMaskGuard) {
                 const pm = this.pendingMask.find((mm) => mm.maskname === (op.guard as MIRMaskGuard).gmask) as SMTMaskConstruct;
@@ -695,11 +940,11 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const idxr = new SMTCall(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, op.pname), [argpp]);
+            const idxr = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, op.pname), [argpp]);
             return new SMTLet(this.varToSMTName(op.trgt).vname, idxr, continuation);
         }
     }
@@ -716,7 +961,7 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const cc = new SMTCall(icall, [argpp]);
+            const cc = new SMTCallSimple(icall, [argpp]);
 
             const callbind = this.generateTempName();
             const smtcallvar = new SMTVar(callbind);
@@ -739,7 +984,7 @@ class SMTBodyEmitter {
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const idxr = new SMTCall(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, op.pname), [argpp]);
+            const idxr = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, op.pname), [argpp]);
             
             if(op.guard instanceof MIRMaskGuard) {
                 const pm = this.pendingMask.find((mm) => mm.maskname === (op.guard as MIRMaskGuard).gmask) as SMTMaskConstruct;
@@ -768,11 +1013,11 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            const idxr = new SMTCall(this.typegen.generateEntityFieldGetFunction(argflowtype.options[0] as MIREntityType, op.field), [argpp]);
+            const idxr = new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(this.assembly.entityDecls.get(arglayouttype.trkey) as MIREntityTypeDecl, op.field), [argpp]);
             return new SMTLet(this.varToSMTName(op.trgt).vname, idxr, continuation);
         }
     }
@@ -790,16 +1035,16 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
             const pargs = op.indecies.map((idx, i) => {
-                const idxr = new SMTCall(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, idx), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(argflowtype.options[0] as MIRTupleType, idx), [argpp]);
                 return this.typegen.coerce(idxr, (argflowtype.options[0] as MIRTupleType).entries[idx].type, (resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
 
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
         }
     }
 
@@ -816,16 +1061,16 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
             const pargs = op.properties.map((pname, i) => {
-                const idxr = new SMTCall(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, pname), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(argflowtype.options[0] as MIRRecordType, pname), [argpp]);
                 return this.typegen.coerce(idxr, ((argflowtype.options[0] as MIRRecordType).entries.find((vv) => vv.name === pname) as MIRRecordTypeEntry).type, (resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
 
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
         }
     }
 
@@ -842,16 +1087,16 @@ class SMTBodyEmitter {
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
             const pargs = op.fields.map((fkey, i) => {
-                const idxr = new SMTCall(this.typegen.generateEntityFieldGetFunction(argflowtype.options[0] as MIREntityType, fkey), [argpp]);
+                const idxr = new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(this.assembly.entityDecls.get(argflowtype.trkey) as MIREntityTypeDecl, fkey), [argpp]);
                 return this.typegen.coerce(idxr, this.typegen.getMIRType((this.assembly.fieldDecls.get(fkey) as MIRFieldDecl).declaredType), (resulttype.options[0] as MIREphemeralListType).entries[i]);
             });
 
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(resulttype).cons, pargs), continuation);
         }
     }
 
@@ -863,12 +1108,12 @@ class SMTBodyEmitter {
         if(op.isvirtual) {
             const icall = this.generateUpdateVirtualTupleInvName(this.typegen.getMIRType(op.argflowtype), op.updates.map((upd) => [upd[0], upd[2]]), resulttype);
             if(this.requiredUpdateVirtualTuple.findIndex((vv) => vv.inv === icall) === -1) {
-                const geninfo = { inv: icall, argflowtype: this.typegen.getMIRType(op.argflowtype), updates: op.updates.map((upd) => [upd[0], upd[2]]), resulttype: resulttype };
+                const geninfo = { inv: icall, argflowtype: this.typegen.getMIRType(op.argflowtype), updates: op.updates.map((upd) => [upd[0], upd[2]] as [number, MIRResolvedTypeKey]), resulttype: resulttype };
                 this.requiredUpdateVirtualTuple.push(geninfo);
             }
             
             const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
         }
         else {
             const ttype = argflowtype.options[0] as MIRTupleType;
@@ -878,28 +1123,94 @@ class SMTBodyEmitter {
             for (let i = 0; i < ttype.entries.length; ++i) {
                 const upd = op.updates.find((vv) => vv[0] === i);
                 if(upd === undefined) {
-                    cargs.push(new SMTCall(this.typegen.generateTupleIndexGetFunction(ttype, i), [argpp]));
+                    cargs.push(new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(ttype, i), [argpp]));
                 }
                 else {
                     cargs.push(this.argToSMT(upd[1]));
                 }
             }
 
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(resulttype).cons, cargs), continuation);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(resulttype).cons, cargs), continuation);
         }
     }
 
     processRecordUpdate(op: MIRRecordUpdate, continuation: SMTExp): SMTExp {
+        const arglayouttype = this.typegen.getMIRType(op.arglayouttype);
+        const argflowtype = this.typegen.getMIRType(op.argflowtype);
+        const resulttype = this.typegen.getMIRType(op.arglayouttype);
+
+        if(op.isvirtual) {
+            const icall = this.generateUpdateVirtualRecordInvName(this.typegen.getMIRType(op.argflowtype), op.updates.map((upd) => [upd[0], upd[2]]), resulttype);
+            if(this.requiredUpdateVirtualRecord.findIndex((vv) => vv.inv === icall) === -1) {
+                const geninfo = { inv: icall, argflowtype: this.typegen.getMIRType(op.argflowtype), updates: op.updates.map((upd) => [upd[0], upd[2]] as [string, MIRResolvedTypeKey]), resulttype: resulttype };
+                this.requiredUpdateVirtualRecord.push(geninfo);
+            }
+            
+            const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(icall, [argpp]), continuation);
+        }
+        else {
+            const ttype = argflowtype.options[0] as MIRRecordType;
+
+            const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
+            let cargs: SMTExp[] = [];
+            for (let i = 0; i < ttype.entries.length; ++i) {
+                const upd = op.updates.find((vv) => vv[0] === ttype.entries[i].name);
+                if(upd === undefined) {
+                    cargs.push(new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(ttype, ttype.entries[i].name), [argpp]));
+                }
+                else {
+                    cargs.push(this.argToSMT(upd[1]));
+                }
+            }
+
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(resulttype).cons, cargs), continuation);
+        }
     }
 
     processEntityUpdate(op: MIREntityUpdate, continuation: SMTExp): SMTExp {
+        const arglayouttype = this.typegen.getMIRType(op.arglayouttype);
+        const argflowtype = this.typegen.getMIRType(op.argflowtype);
+        const resulttype = this.typegen.getMIRType(op.arglayouttype);
+
+        if(op.isvirtual) {
+            const icall = this.generateUpdateVirtualEntityInvName(this.typegen.getMIRType(op.argflowtype), op.updates.map((upd) => [upd[0], upd[2]]), resulttype);
+            if(this.requiredUpdateVirtualEntity.findIndex((vv) => vv.inv === icall) === -1) {
+                const geninfo = { inv: icall, argflowtype: this.typegen.getMIRType(op.argflowtype), updates: op.updates.map((upd) => [upd[0], upd[2]] as [MIRFieldKey, MIRResolvedTypeKey]), resulttype: resulttype };
+                this.requiredUpdateVirtualEntity.push(geninfo);
+            }
+            
+            const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
+            xxxx;
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
+        }
+        else {
+            const ttype = argflowtype.options[0] as MIREntityType;
+            const consfunc = (this.assembly.entityDecls.get(ttype.trkey) as MIREntityTypeDecl).consfunc;
+            const consfields = (this.assembly.entityDecls.get(ttype.trkey) as MIREntityTypeDecl).consfuncfields.map((ccf) => this.assembly.fieldDecls.get(ccf) as MIRFieldDecl);
+
+            const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
+            let cargs: SMTExp[] = [];
+            for (let i = 0; i < consfields.length; ++i) {
+                const upd = op.updates.find((vv) => vv[0] === consfields[i].name);
+                if(upd === undefined) {
+                    cargs.push(new SMTCallSimple(this.typegen.generateEntityFieldGetFunction(ttype, consfields[i].name), [argpp]));
+                }
+                else {
+                    cargs.push(this.argToSMT(upd[1]));
+                }
+            }
+
+            xxxx;
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.mangle(consfunc), cargs), continuation);
+        }
     }
 
     processLoadFromEpehmeralList(op: MIRLoadFromEpehmeralList, continuation: SMTExp): SMTExp {
         const argtype = this.typegen.getMIRType(op.argtype);
         const resulttype = this.typegen.getMIRType(op.resulttype);
 
-        const idxr = new SMTCall(this.typegen.generateEphemeralListGetFunction(argtype.options[0] as MIREphemeralListType, op.idx), [this.argToSMT(op.arg)]);
+        const idxr = new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(argtype.options[0] as MIREphemeralListType, op.idx), [this.argToSMT(op.arg)]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, this.typegen.coerce(idxr, (argtype.options[0] as MIREphemeralListType).entries[op.idx], resulttype), continuation);
     }
 
@@ -907,7 +1218,7 @@ class SMTBodyEmitter {
         const eltype = this.typegen.getMIRType(op.argtype).options[0] as MIREphemeralListType;
 
         const assigns = op.trgts.map((asgn) => {
-            const idxr = new SMTCall(this.typegen.generateEphemeralListGetFunction(eltype, asgn.pos), [this.argToSMT(op.arg)]);
+            const idxr = new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(eltype, asgn.pos), [this.argToSMT(op.arg)]);
             const cexp = this.typegen.coerce(idxr, eltype.entries[asgn.pos], this.typegen.getMIRType(asgn.oftype));
 
             return { vname: this.varToSMTName(asgn.into).vname, value: cexp };
@@ -920,8 +1231,8 @@ class SMTBodyEmitter {
         const eltype = this.typegen.getMIRType(op.argtype).options[0] as MIREphemeralListType;
         const sltype = this.typegen.getMIRType(op.sltype).options[0] as MIREphemeralListType;
 
-        const pargs = sltype.entries.map((sle, i) => new SMTCall(this.typegen.generateEphemeralListGetFunction(eltype, i), [this.argToSMT(op.arg)]));
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.sltype)).cons, pargs), continuation);
+        const pargs = sltype.entries.map((sle, i) => new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(eltype, i), [this.argToSMT(op.arg)]));
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.sltype)).cons, pargs), continuation);
     }
 
     processInvokeFixedFunction(op: MIRInvokeFixedFunction, continuation: SMTExp): SMTExp {
@@ -939,9 +1250,9 @@ class SMTBodyEmitter {
             }
 
             const args = op.args.map((arg) => this.argToSMT(arg));
-            const call = mask !== undefined ? new SMTCallWOptMask(this.typegen.mangle(op.mkey), args, mask) : new SMTCall(this.typegen.mangle(op.mkey), args);
+            const call = mask !== undefined ? new SMTCallGeneralWOptMask(this.typegen.mangle(op.mkey), args, mask) : new SMTCallGeneral(this.typegen.mangle(op.mkey), args);
 
-            if (invk.attributes.includes("__safe") || invk.attributes.includes("__assume_safe")) {
+            if (this.isSafeInvoke(op.mkey)) {
                 const gcall = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), call, this.generateAltForGuardStmt(op.guard.altvalue, rtype)) : call;
                 return new SMTLet(this.varToSMTName(op.trgt).vname, gcall, continuation);
             }
@@ -959,7 +1270,19 @@ class SMTBodyEmitter {
     }
 
     processInvokeVirtualFunction(op: MIRInvokeVirtualFunction, continuation: SMTExp): SMTExp {
-        xxxx;
+        const rcvrlayouttype = this.typegen.getMIRType(op.rcvrlayouttype);
+        const rcvrflowtype = this.typegen.getMIRType(op.rcvrflowtype);
+        const resulttype = this.typegen.getMIRType(op.resultType);
+
+        const allsafe = this.isSafeVirtualInvoke(op.vresolve, rcvrflowtype);
+        const icall = this.generateVirtualInvokeFunctionName(rcvrflowtype, op.vresolve, op.optmask !== undefined, resulttype);
+        if(this.requiredVirtualFunctionInvokes.findIndex((vv) => vv.inv === icall) === -1) {
+            const geninfo = { inv: icall, allsafe: allsafe, argflowtype: rcvrflowtype, vfname: op.vresolve, optmask: op.optmask, resulttype: resulttype };
+            this.requiredVirtualFunctionInvokes.push(geninfo);
+        }
+            
+            const argpp = this.typegen.coerce(this.argToSMT(op.arg), arglayouttype, argflowtype);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall(icall, [argpp]), continuation);
     }
 
     processInvokeVirtualOperator(op: MIRInvokeVirtualOperator, continuation: SMTExp): SMTExp {
@@ -969,25 +1292,25 @@ class SMTBodyEmitter {
     processConstructorTuple(op: MIRConstructorTuple, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg));
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
     }
 
     processConstructorTupleFromEphemeralList(op: MIRConstructorTupleFromEphemeralList, continuation: SMTExp): SMTExp {
         const elt = this.typegen.getMIRType(op.elistType).options[0] as MIREphemeralListType;
-        const args = elt.entries.map((tt, i) => new SMTCall(this.typegen.generateEphemeralListGetFunction(elt, i), [this.argToSMT(op.arg)]));
+        const args = elt.entries.map((tt, i) => new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(elt, i), [this.argToSMT(op.arg)]));
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
     }
 
     processConstructorRecord(op: MIRConstructorRecord, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg[1]));
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
     }
 
     processConstructorRecordFromEphemeralList(op: MIRConstructorRecordFromEphemeralList, continuation: SMTExp): SMTExp {
         const elt = this.typegen.getMIRType(op.elistType).options[0] as MIREphemeralListType;
-        const eargs = elt.entries.map((tt, i) => new SMTCall(this.typegen.generateEphemeralListGetFunction(elt, i), [this.argToSMT(op.arg)]));
+        const eargs = elt.entries.map((tt, i) => new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(elt, i), [this.argToSMT(op.arg)]));
 
         const rtype = this.typegen.getMIRType(op.resultRecordType).options[0] as MIRRecordType;
         const args = rtype.entries.map((rentry) => {
@@ -995,7 +1318,7 @@ class SMTBodyEmitter {
             return eargs[eidx];
         });
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
     }
 
     processStructuredAppendTuple(op: MIRStructuredAppendTuple, continuation: SMTExp): SMTExp {
@@ -1005,11 +1328,11 @@ class SMTBodyEmitter {
             const argi = this.argToSMT(op.args[i]);
 
             for (let j = 0; j < tt.entries.length; ++j) {
-                args.push(new SMTCall(this.typegen.generateTupleIndexGetFunction(tt, j), [argi]));
+                args.push(new SMTCallSimple(this.typegen.generateTupleIndexGetFunction(tt, j), [argi]));
             }
         }
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
     }
 
     processStructuredJoinRecord(op: MIRStructuredJoinRecord, continuation: SMTExp): SMTExp {
@@ -1022,17 +1345,17 @@ class SMTBodyEmitter {
 
             for (let j = 0; j < tt.entries.length; ++j) {
                 const ppidx = rtype.entries.findIndex((ee) => ee.name === tt.entries[j].name);
-                args[ppidx] = new SMTCall(this.typegen.generateRecordPropertyGetFunction(tt, tt.entries[j].name), [argi]);
+                args[ppidx] = new SMTCallSimple(this.typegen.generateRecordPropertyGetFunction(tt, tt.entries[j].name), [argi]);
             }
         }
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
     }
 
     processConstructorEphemeralList(op: MIRConstructorEphemeralList, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg));
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultEphemeralListType)).cons, args);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultEphemeralListType)).cons, args);
     }
 
     processEphemeralListExtend(op: MIREphemeralListExtend, continuation: SMTExp): SMTExp {
@@ -1041,7 +1364,7 @@ class SMTBodyEmitter {
 
         const eargs = op.ext.map((arg) => this.argToSMT(arg));
 
-        return new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultType)).cons, [...iargs, ...eargs]);
+        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultType)).cons, [...iargs, ...eargs]);
     }
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
@@ -1064,7 +1387,7 @@ class SMTBodyEmitter {
         const lhs = this.typegen.coerceToKey(this.argToSMT(op.lhs), this.typegen.getMIRType(op.lhslayouttype));
         const rhs = this.typegen.coerceToKey(this.argToSMT(op.rhs), this.typegen.getMIRType(op.rhslayouttype));
 
-        const eqcmp = new SMTCall("=", [lhs, rhs]);
+        const eqcmp = new SMTCallSimple("=", [lhs, rhs]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, eqcmp, continuation);
     }
 
@@ -1073,11 +1396,11 @@ class SMTBodyEmitter {
     }
 
     processPrefixNotOp(op: MIRPrefixNotOp, continuation: SMTExp): SMTExp {
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("not", [this.argToSMT(op.arg)]), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("not", [this.argToSMT(op.arg)]), continuation);
     }
 
     processAllTrue(op: MIRAllTrue, continuation: SMTExp): SMTExp {
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCall("and", [op.args.map((arg) => this.argToSMT(arg))]), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("and", [op.args.map((arg) => this.argToSMT(arg))]), continuation);
     }
 
     processIsTypeOf(op: MIRIsTypeOf, continuation: SMTExp): SMTExp {
@@ -1127,7 +1450,7 @@ class SMTBodyEmitter {
                 return tests[0];
             }
             else {
-                return new SMTCall("or", tests);
+                return new SMTCallSimple("or", tests);
             }
         }
     }
@@ -1147,7 +1470,7 @@ class SMTBodyEmitter {
     }
 
     processReturnAssignOfCons(op: MIRReturnAssignOfCons, continuation: SMTExp): SMTExp {
-        const conscall = new SMTCall(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.oftype)).cons, op.args.map((arg) => this.argToSMT(arg)));
+        const conscall = new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.oftype)).cons, op.args.map((arg) => this.argToSMT(arg)));
         return new SMTLet(this.varToSMTName(op.name).vname, conscall, continuation);
     }
 

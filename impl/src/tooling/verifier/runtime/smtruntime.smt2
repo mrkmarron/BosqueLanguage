@@ -22,7 +22,6 @@
   TypeTag_Float
   TypeTag_Decimal
   TypeTag_Rational
-  TypeTag_Complex
   TypeTag_String
   TypeTag_Regex
   ;;TYPE_TAG_DECLS;;
@@ -47,6 +46,10 @@
   )
 ))
 
+;;
+;;TODO: There may be a large number of trivially "false" entries in this relation. 
+;;      We can do better by splitting it into some type aware sub-relations (e.g. a tuple is never a subtype of Object etc.).
+;;
 (declare-fun SubtypeOf@ (TypeTag, AbstractTypeTag) Bool)
 ;;SUBTYPE_DECLS;;
 
@@ -60,10 +63,9 @@
 ;;KEY_TYPE_TAG_LESS;;
 
 ;;
-;;UFloat and UComplex kind + UF ops for strong refutation checks
+;;UFloat kind + UF ops for strong refutation checks
 ;;
 (declare-sort UFloat)
-(declare-sort UComplex)
 
 ;;
 ;; Primitive datatypes 
@@ -78,7 +80,6 @@
       ; Float ->   Float | UFloat as BFloat
       ; Decimal -> Float | UFloat as BDecimal
       ; Rational -> Float | UFloat as BRational
-      ; Complex -> UComplex as BComplex
       ; String -> String | (Seq (_ BitVec 64)) as BString
     ) (
     ( (bsq_none@literal) )
@@ -87,7 +88,6 @@
 ;;
 ;; Define sort aliases for Float/String representation options
 ;;
-(define-sort BComplex () UComplex)
 ;;FP_TYPE_ALIAS;;
 ;;STRING_TYPE_ALIAS;;
 
@@ -177,7 +177,6 @@
       (bsqobject_float@cons (bsqobject_float_value BFloat))
       (bsqobject_decimal@cons (bsqobject_decimal_value BDecimal))
       (bsqobject_rational@cons (bsqobject_rational_value BRational))
-      (bsqobject_complex@cons (bsqobject_complex_value BComplex))
       (bsqobject_regex@cons (bsqobject_regex_value bsq_regex))
       ;;TUPLE_TYPE_BOXING;;
       ;;RECORD_TYPE_BOXING;;
@@ -214,9 +213,6 @@
 
 (declare-fun BRationalUnary_UF (String BRational) BRational)
 (declare-fun BRationalBinary_UF (String BRational BRational) BRational)
-
-(declare-fun BComplexUnary_UF (String BComplex) BComplex)
-(declare-fun BComplexBinary_UF (String BComplex BComplex) BComplex)
 
 ;;EPHEMERAL_DECLS;;
 

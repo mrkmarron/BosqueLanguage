@@ -67,7 +67,6 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         case MIROpTag.MIRLoadUnintVariableValue: 
         case MIROpTag.MIRDeclareGuardFlagLocation: 
         case MIROpTag.MIRSetConstantGuardFlag:
-        case MIROpTag.MIRLoadConstDataString:
         case MIROpTag.MIRLoadConst:
         case MIROpTag.MIRVarLifetimeStart:
         case MIROpTag.MIRVarLifetimeEnd: {

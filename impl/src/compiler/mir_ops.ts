@@ -145,16 +145,18 @@ abstract class MIRArgument {
                     return new MIRConstantBigNat(jobj.value);
                 case "rational":
                     return new MIRConstantRational(jobj.value);
-                case "complex":
-                    return new MIRConstantComplex(jobj.rvalue, jobj.cvalue);
                 case "float":
                     return new MIRConstantFloat(jobj.value);
                 case "decimal":
                     return new MIRConstantDecimal(jobj.value);
-                case "regex":
-                    return new MIRConstantRegex(jobj.value);
-                default:
+                case "stringof":
                     return new MIRConstantStringOf(jobj.value, jobj.oftype);
+                case "datastring":
+                    return new MIRConstantDataString(jobj.value, jobj.oftype);
+                case "typednumber":
+                    return new MIRConstantTypedNumber(MIRArgument.jparse(jobj.value), jobj.oftype);
+                default:
+                    return new MIRConstantRegex(jobj.value);
             }
         }
     }
@@ -379,26 +381,6 @@ class MIRConstantRational extends MIRConstantArgument {
     }
 }
 
-class MIRConstantComplex extends MIRConstantArgument {
-    readonly rvalue: string;
-    readonly ivalue: string;
-
-    constructor(rvalue: string, ivalue: string) {
-        super(`=complex=${rvalue}${ivalue}`);
-
-        this.rvalue = rvalue;
-        this.ivalue = ivalue;
-    }
-
-    stringify(): string {
-        return `${this.rvalue}${this.ivalue}`;
-    }
-
-    jemit(): any {
-        return { constkind: "complex", rvalue: this.rvalue, cvalue: this.ivalue };
-    }
-}
-
 class MIRConstantFloat extends MIRConstantArgument {
     readonly value: string;
 
@@ -491,6 +473,46 @@ class MIRConstantStringOf extends MIRConstantArgument {
     }
 }
 
+class MIRConstantDataString extends MIRConstantArgument {
+    readonly value: string;
+    readonly tskey: MIRResolvedTypeKey;
+
+    constructor(value: string, tskey: MIRResolvedTypeKey) {
+        super(`=datastring=${tskey} of ${value}`);
+
+        this.value = value;
+        this.tskey = tskey;
+    }
+
+    stringify(): string {
+        return `${this.tskey} of ${this.value}`;
+    }
+
+    jemit(): any {
+        return { constkind: "datastring", value: this.value, oftype: this.tskey };
+    }
+}
+
+class MIRConstantTypedNumber extends MIRConstantArgument {
+    readonly value: MIRConstantArgument;
+    readonly tnkey: MIRResolvedTypeKey;
+
+    constructor(value: MIRConstantArgument, tnkey: MIRResolvedTypeKey) {
+        super(`=typednumber=${tnkey} of ${value.stringify()}`);
+
+        this.value = value;
+        this.tnkey = tnkey;
+    }
+
+    stringify(): string {
+        return `${this.tnkey} of ${this.value}`;
+    }
+
+    jemit(): any {
+        return { constkind: "typednumber", value: this.value.jemit(), oftype: this.tnkey };
+    }
+}
+
 enum MIROpTag {
     MIRNop = "MIRNop",
     MIRDeadFlow = "MIRDeadFlow",
@@ -506,7 +528,6 @@ enum MIROpTag {
     MIRExtractResultOkValue = "MIRExtractResultOkValue",
 
     MIRLoadConst = "MIRLoadConst",
-    MIRLoadConstDataString = "MIRLoadConstDataString",
 
     MIRTupleHasIndex = "MIRTupleHasIndex",
     MIRRecordHasProperty = "MIRRecordHasProperty",
@@ -619,8 +640,6 @@ abstract class MIROp {
                 return MIRExtractResultOkValue.jparse(jobj);
             case MIROpTag.MIRLoadConst:
                 return MIRLoadConst.jparse(jobj);
-            case MIROpTag.MIRLoadConstDataString:
-                return MIRLoadConstDataString.jparse(jobj);
             case MIROpTag.MIRTupleHasIndex:
                 return MIRTupleHasIndex.jparse(jobj);
             case MIROpTag.MIRRecordHasProperty:
@@ -1053,35 +1072,6 @@ class MIRLoadConst extends MIROp {
 
     static jparse(jobj: any): MIROp {
         return new MIRLoadConst(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src) as MIRConstantArgument, jobj.consttype, MIRRegisterArgument.jparse(jobj.trgt));
-    }
-}
-
-class MIRLoadConstDataString extends MIROp {
-    trgt: MIRRegisterArgument;
-    readonly ivalue: string;
-    readonly tskey: MIRResolvedTypeKey;
-
-    constructor(sinfo: SourceInfo, ivalue: string, tskey: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRLoadConstDataString, sinfo);
-
-        this.trgt = trgt;
-        this.ivalue = ivalue;
-        this.tskey = tskey;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return []; }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tskey}${this.ivalue}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), ivalue: this.ivalue, tskey: this.tskey };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRLoadConstDataString(jparsesinfo(jobj.sinfo), jobj.ivalue, jobj.tskey, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2743,10 +2733,10 @@ export {
     MIRGlobalKey, MIRFieldKey, MIRInvokeKey, MIRResolvedTypeKey, MIRVirtualMethodKey,
     MIRGuard, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard,
     MIRArgument, MIRRegisterArgument, MIRTempRegister, MIRGlobalVariable, MIRParameterVariable, MIRLocalVariable, 
-    MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantComplex, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf,
+    MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf, MIRConstantDataString, MIRConstantTypedNumber,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,
     MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue, MIRCheckNoError, MIRExtractResultOkValue,
-    MIRLoadConst, MIRLoadConstDataString,
+    MIRLoadConst,
     MIRTupleHasIndex, MIRRecordHasProperty,
     MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard,
     MIRTempRegisterAssign, MIRParameterVarStore, MIRLocalVarStore,

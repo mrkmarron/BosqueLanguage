@@ -7,9 +7,9 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck, ValueType } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralComplexExpression, LiteralTypedComplexConstructorExpression, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
-import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRConstantComplex, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
+import { MIRTempRegister, MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRParameterVariable, MIRLocalVariable, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
 import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
@@ -2048,44 +2048,36 @@ class TypeChecker {
         else if(iitype.isSameType(this.m_assembly.getSpecialRationalType())) {
             return this.checkLiteralRationalExpression(env, new LiteralRationalExpression(exp.sinfo, exp.value + "/1R", iitype), trgt);
         }
-        else if (iitype.isSameType(this.m_assembly.getSpecialComplexType())) {
-            return this.checkLiteralComplexExpression(env, new LiteralComplexExpression(exp.sinfo, exp.value, "0j", iitype), trgt);
-        }
         else {
             this.raiseErrorIf(exp.sinfo, !iitype.isUniqueCallTargetType() || !iitype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.TypeDeclNumeric), "Not a valid numeric decl type");
 
             const tt = (iitype.getUniqueCallTargetType().object.memberFields.get("value") as MemberFieldDecl).declaredType;
             const rtt = this.m_assembly.normalizeTypeOnly(tt, new Map<string, ResolvedType>());
 
-            if (rtt.isSameType(this.m_assembly.getSpecialComplexType())) {
-                return this.checkTypedTypedComplexConstructor(env, new LiteralTypedComplexConstructorExpression(exp.sinfo, exp.value, "0j", rtt, iitype), trgt);
+            let fspec = "[INVALID]";
+            if (iitype.isSameType(this.m_assembly.getSpecialIntType())) {
+                fspec = "i";
+            }
+            else if (iitype.isSameType(this.m_assembly.getSpecialNatType())) {
+                fspec = "n";
+            }
+            else if (iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
+                fspec = "I";
+            }
+            else if (iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
+                fspec = "N";
+            }
+            else if (iitype.isSameType(this.m_assembly.getSpecialFloatType())) {
+                fspec = "f";
+            }
+            else if (iitype.isSameType(this.m_assembly.getSpecialDecimalType())) {
+                fspec = "d";
             }
             else {
-                let fspec = "[INVALID]";
-                if (iitype.isSameType(this.m_assembly.getSpecialIntType())) {
-                    fspec = "i";
-                }
-                else if (iitype.isSameType(this.m_assembly.getSpecialNatType())) {
-                    fspec = "n";
-                }
-                else if (iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
-                    fspec = "I";
-                }
-                else if (iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
-                    fspec = "N";
-                }
-                else if (iitype.isSameType(this.m_assembly.getSpecialFloatType())) {
-                    fspec = "f";
-                }
-                else if (iitype.isSameType(this.m_assembly.getSpecialDecimalType())) {
-                    fspec = "d";
-                }
-                else {
-                    fspec = "/1R";
-                }
-
-                return this.checkTypedTypedNumericConstructor(env, new LiteralTypedNumericConstructorExpression(exp.sinfo, exp.value + fspec, rtt, iitype), trgt);
+                fspec = "/1R";
             }
+
+            return this.checkTypedTypedNumericConstructor(env, new LiteralTypedNumericConstructorExpression(exp.sinfo, exp.value + fspec, rtt, iitype), trgt);
         }
     }
 
@@ -2108,12 +2100,6 @@ class TypeChecker {
         this.m_emitter.emitLoadConstRational(exp.sinfo, exp.value, trgt);
 
         return env.setUniformResultExpression(this.m_assembly.getSpecialRationalType());
-    }
-
-    private checkLiteralComplexExpression(env: TypeEnvironment, exp: LiteralComplexExpression, trgt: MIRTempRegister): TypeEnvironment {
-        this.m_emitter.emitLoadConstComplex(exp.sinfo, exp.rvalue, exp.jvalue, trgt);
-
-        return env.setUniformResultExpression(this.m_assembly.getSpecialComplexType());
     }
 
     private checkLiteralFloatExpression(env: TypeEnvironment, exp: LiteralFloatPointExpression, trgt: MIRTempRegister): TypeEnvironment {
@@ -2298,36 +2284,8 @@ class TypeChecker {
             this.m_emitter.emitInvokeFixedFunction(exp.sinfo, fkey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), tmps);
             this.m_emitter.emitAssertCheck(exp.sinfo, "Number does not satisfy requirements for type", tmps);    
         }
-
-        const ctype = this.m_emitter.registerResolvedTypeReference(this.resolveOOTypeFromDecls(oftype, ofbinds));
-        const skey = this.m_emitter.registerStaticCall([ctype, oftype, ofbinds], consf as StaticFunctionDecl, "create", new Map<string, ResolvedType>(), [], []);
-        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(tntt), trgt);
-
-        return env.setUniformResultExpression(tntt);
-    }
-
-    private checkTypedTypedComplexConstructor(env: TypeEnvironment, exp: LiteralTypedComplexConstructorExpression, trgt: MIRTempRegister): TypeEnvironment {
-        const tntt = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.vtype, env.terms);
-        const oftype = (tntt.options[0] as ResolvedEntityAtomType).object;
-        const ofbinds = (tntt.options[0] as ResolvedEntityAtomType).binds;
-
-        const consf = oftype.staticFunctions.get("create");
-        this.raiseErrorIf(exp.sinfo, consf === undefined, "Missing static function 'create'");
-
-        const nval: MIRArgument = new MIRConstantComplex(exp.rvalue, exp.jvalue);
-
-        if(oftype.invariants.length !== 0) {
-            const fkey = MIRKeyGenerator.generateFunctionKey(`${oftype.ns}::${oftype.name}`, "@@invariant", ofbinds, []);
         
-            const tmps = this.m_emitter.generateTmpRegister();
-            this.m_emitter.emitInvokeFixedFunction(exp.sinfo, fkey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), tmps);
-            this.m_emitter.emitAssertCheck(exp.sinfo, "Number does not satisfy requirements for type", tmps);    
-        }
-
-        const ctype = this.m_emitter.registerResolvedTypeReference(this.resolveOOTypeFromDecls(oftype, ofbinds));
-        const skey = this.m_emitter.registerStaticCall([ctype, oftype, ofbinds], consf as StaticFunctionDecl, "create", new Map<string, ResolvedType>(), [], []);
-        this.m_emitter.emitInvokeFixedFunction(exp.sinfo, skey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(tntt), trgt);
-
+        this.m_emitter.emitLoadTypedNumeric(exp.sinfo, nval, this.m_emitter.registerResolvedTypeReference(tntt).trkey, trgt);
         return env.setUniformResultExpression(tntt);
     }
 
@@ -4380,8 +4338,6 @@ class TypeChecker {
                 return this.checkLiteralFloatExpression(env, exp as LiteralFloatPointExpression, trgt);
             case ExpressionTag.LiteralRationalExpression:
                 return this.checkLiteralRationalExpression(env, exp as LiteralRationalExpression, trgt);
-            case ExpressionTag.LiteralComplexExpression:
-                return this.checkLiteralComplexExpression(env, exp as LiteralComplexExpression, trgt);
             case ExpressionTag.LiteralStringExpression:
                 return this.checkLiteralStringExpression(env, exp as LiteralStringExpression, trgt);
             case ExpressionTag.LiteralRegexExpression:
@@ -4392,8 +4348,6 @@ class TypeChecker {
                 return this.checkCreateTypedString(env, exp as LiteralTypedStringExpression, trgt);
             case ExpressionTag.LiteralTypedNumericConstructorExpression:
                 return this.checkTypedTypedNumericConstructor(env, exp as LiteralTypedNumericConstructorExpression, trgt);
-            case ExpressionTag.LiteralTypedComplexConstructorExpression:
-                return this.checkTypedTypedComplexConstructor(env, exp as LiteralTypedComplexConstructorExpression, trgt);
             case ExpressionTag.LiteralTypedStringConstructorExpression:
                 return this.checkDataStringConstructor(env, exp as LiteralTypedStringConstructorExpression, trgt);
             case ExpressionTag.AccessNamespaceConstantExpression:
@@ -6177,6 +6131,7 @@ class TypeChecker {
                 const ftype = this.resolveAndEnsureTypeOnly(fdi[1].sourceLocation, fdi[1].declaredType, fdi[2]);
                 consenvargs.set(`$${fdi[1].name}`, new VarInfo(ftype, fdi[1].value === undefined, false, true, ftype));
             });
+            const consfuncfields = [...ccfields.req, ...ccfields.opt].map((ccf) => MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(ccf[1][0], ccf[1][2]), ccf[1][1].name));
 
             const chkkey = MIRKeyGenerator.generateFunctionKey(tkey, "@@explicit_invariant", new Map<string, ResolvedType>(), []);
             let hasinv = false;
@@ -6211,7 +6166,7 @@ class TypeChecker {
                     fields.push(this.m_emitter.masm.fieldDecls.get(fkey) as MIRFieldDecl);
                 });
 
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, hasinv ? chkkey : undefined, fields);
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, consfuncfields, hasinv ? chkkey : undefined, fields);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {
