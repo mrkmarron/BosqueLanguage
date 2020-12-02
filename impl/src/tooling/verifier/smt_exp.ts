@@ -99,6 +99,20 @@ class SMTCallGeneralWOptMask extends SMTExp {
     }
 }
 
+class SMTCallGeneralWPassThroughMask extends SMTExp {
+    readonly fname: string;
+    readonly args: SMTExp[];
+    readonly mask: string;
+
+    constructor(fname: string, args: SMTExp[], mask: string) {
+        super();
+
+        this.fname = fname;
+        this.args = args;
+        this.mask = mask;
+    }
+}
+
 class SMTLet extends SMTExp {
     readonly vname: string;
     readonly value: SMTExp;
@@ -156,5 +170,7 @@ class SMTCond extends SMTExp {
 export {
     VerifierLevel,
     SMTMaskConstruct,
-    SMTType, SMTExp, SMTVar, SMTConst, SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTLet, SMTLetMulti, SMTIf, SMTCond
+    SMTType, SMTExp, SMTVar, SMTConst, 
+    SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCallGeneralWPassThroughMask,
+    SMTLet, SMTLetMulti, SMTIf, SMTCond
 };

@@ -5,7 +5,7 @@
 
 import * as assert from "assert";
 
-import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRTempRegisterAssign, MIRLocalVarStore, MIRParameterVarStore, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRTempRegister, MIRStatmentGuard } from "./mir_ops";
+import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRRegisterAssign, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard } from "./mir_ops";
 
 function propagateAssign_Bind(treg: MIRRegisterArgument, arg: MIRArgument, propMap: Map<string, MIRArgument>) {
     assert(!propMap.has(treg.nameID));
@@ -300,22 +300,10 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
             njop.arg = propagateAssign_Remap(njop.arg, propMap);
             break;
         }
-        case MIROpTag.MIRTempRegisterAssign: {
-            const regop = op as MIRTempRegisterAssign;
+        case MIROpTag.MIRRegisterAssign: {
+            const regop = op as MIRRegisterAssign;
             regop.src = propagateAssign_Remap(regop.src, propMap);
             regop.guard = propagateAssign_RemapStatementGuard(regop.guard, propMap);
-            break;
-        }
-        case MIROpTag.MIRLocalVarStore: {
-            const vs = op as MIRLocalVarStore;
-            vs.src = propagateAssign_Remap(vs.src, propMap);
-            vs.guard = propagateAssign_RemapStatementGuard(vs.guard, propMap);
-            break;
-        }
-        case MIROpTag.MIRParameterVarStore: {
-            const vs = op as MIRParameterVarStore;
-            vs.src = propagateAssign_Remap(vs.src, propMap);
-            vs.guard = propagateAssign_RemapStatementGuard(vs.guard, propMap);
             break;
         }
         case MIROpTag.MIRReturnAssign: {
@@ -347,19 +335,9 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
             propagateAssign_Bind(lc.trgt, lc.src, propMap);
             break;
         }
-        case MIROpTag.MIRTempRegisterAssign: {
-            const regop = op as MIRTempRegisterAssign;
+        case MIROpTag.MIRRegisterAssign: {
+            const regop = op as MIRRegisterAssign;
             propagateAssign_Bind(regop.trgt, regop.src, propMap);
-            break;
-        }
-        case MIROpTag.MIRLocalVarStore: {
-            const vs = op as MIRLocalVarStore;
-            propagateAssign_Bind(vs.trgt, vs.src, propMap);
-            break;
-        }
-        case MIROpTag.MIRParameterVarStore: {
-            const vs = op as MIRParameterVarStore;
-            propagateAssign_Bind(vs.trgt, vs.src, propMap);
             break;
         }
         default: {
@@ -381,17 +359,17 @@ function propagateAssignForBody(body: MIRBody) {
     });
 }
 
-function computeTempUseForBody(body: MIRBody): Set<number> {
+function computeTempUseForBody(body: MIRBody): Set<string> {
     if (typeof (body) === "string") {
-        return new Set<number>();
+        return new Set<string>();
     }
 
-    let usedTemps = new Set<number>();
+    let usedTemps = new Set<string>();
     (body.body as Map<string, MIRBasicBlock>).forEach((blk) => {
         for (let i = 0; i < blk.ops.length; ++i) {
-            const optmps = blk.ops[i].getUsedVars().filter((arg) => arg instanceof MIRTempRegister);
+            const optmps = blk.ops[i].getUsedVars().filter((arg) => arg instanceof MIRRegisterArgument);
             for (let j = 0; j < optmps.length; ++j) {
-                usedTemps.add((optmps[j] as MIRTempRegister).regID);
+                usedTemps.add((optmps[j] as MIRRegisterArgument).nameID);
             }
         }
     });
@@ -402,13 +380,7 @@ function computeTempUseForBody(body: MIRBody): Set<number> {
 function removeSelfAssigns(body: MIRBody) {
     (body.body as Map<string, MIRBasicBlock>).forEach((blk, tag) => {
         const nblock = blk.ops.filter((op) => {
-            if(op instanceof MIRTempRegisterAssign) {
-                return op.trgt.nameID !== op.src.nameID;
-            }
-            else if(op instanceof MIRLocalVarStore) {
-                return op.trgt.nameID !== op.src.nameID;
-            }
-            else if (op instanceof MIRParameterVarStore) {
+            if(op instanceof MIRRegisterAssign) {
                 return op.trgt.nameID !== op.src.nameID;
             }
             else {
@@ -420,11 +392,11 @@ function removeSelfAssigns(body: MIRBody) {
     });
 }
 
-function isDeadTempAssign(op: MIROp, liveTemps: Set<number>): boolean {
+function isDeadTempAssign(op: MIROp, liveTemps: Set<string>): boolean {
     switch (op.tag) {
         case MIROpTag.MIRLoadConst:
-        case MIROpTag.MIRTempRegisterAssign: {
-            return op.getModVars().every((mv) => mv instanceof MIRTempRegister && !liveTemps.has(mv.regID));
+        case MIROpTag.MIRRegisterAssign: {
+            return op.getModVars().every((mv) => mv instanceof MIRRegisterArgument && mv.nameID.startsWith("#tmp") && !liveTemps.has(mv.nameID));
         }
         default:
             return false;

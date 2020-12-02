@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
-import { MIRArgGuard, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConvertValue, MIRDebug, MIREntityProjectToEphemeral, MIREntityUpdate, MIRExtractResultOkValue, MIRGuard, MIRLoadConst, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIROp, MIROpTag, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRTempRegister, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionEmpty, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRTempRegisterAssign, MIRLocalVarStore, MIRParameterVarStore, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRParameterVariable, MIRLocalVariable, MIRStatmentGuard } from "./mir_ops";
+import { MIRArgGuard, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConvertValue, MIRDebug, MIREntityProjectToEphemeral, MIREntityUpdate, MIRExtractResultOkValue, MIRGuard, MIRLoadConst, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIROp, MIROpTag, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionEmpty, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRRegisterAssign } from "./mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topologicalOrder } from "./mir_info";
 import { MIRType } from "./mir_assembly";
@@ -18,8 +18,8 @@ type SSAState = {
     vartypes: Map<string, MIRResolvedTypeKey>
 };
 
-function convertToSSA(reg: MIRRegisterArgument, oftype: MIRResolvedTypeKey, ssastate: SSAState): MIRTempRegister {
-    if (reg instanceof MIRTempRegister && !ssastate.ctrs.has(reg.nameID)) {
+function convertToSSA(reg: MIRRegisterArgument, oftype: MIRResolvedTypeKey, ssastate: SSAState): MIRRegisterArgument {
+    if (!ssastate.ctrs.has(reg.nameID)) {
         ssastate.ctrs.set(reg.nameID, 0);
 
         ssastate.remap.set(reg.nameID, reg);
@@ -33,7 +33,7 @@ function convertToSSA(reg: MIRRegisterArgument, oftype: MIRResolvedTypeKey, ssas
 
         const vname = reg.nameID + `$${ssaCtr}`;
 
-        let rreg = (reg instanceof MIRTempRegister) ? new MIRTempRegister(reg.regID, vname) : new MIRTempRegister(ssastate.newtidctr++, vname);
+        let rreg = new MIRRegisterArgument(`#tmp_${ssastate.newtidctr++}`, vname);
         
         ssastate.remap.set(reg.nameID, rreg);
         ssastate.vartypes.set(rreg.nameID, oftype);
@@ -57,7 +57,7 @@ function convertToSSA_Guard(guard: MIRGuard, ssastate: SSAState): MIRGuard {
     }
 }
 
-function processSSA_Use(arg: MIRArgument, ssastate: SSAState): MIRRegisterArgument {
+function processSSA_Use(arg: MIRArgument, ssastate: SSAState): MIRArgument {
     if (arg instanceof MIRRegisterArgument) {
         return ssastate.remap.get(arg.nameID) || arg;
     }
@@ -392,26 +392,12 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
             njop.arg = processSSA_Use(njop.arg, ssastate);
             return op;
         }
-        case MIROpTag.MIRTempRegisterAssign: {
-            const regop = op as MIRTempRegisterAssign;
+        case MIROpTag.MIRRegisterAssign: {
+            const regop = op as MIRRegisterAssign;
             regop.src = processSSA_Use(regop.src, ssastate);
             regop.guard = processSSAUse_RemapStatementGuard(regop.guard, ssastate);
             regop.trgt = convertToSSA(regop.trgt, regop.layouttype, ssastate);
             return op;
-        }
-        case MIROpTag.MIRLocalVarStore: {
-            const vs = op as MIRLocalVarStore;
-            const src = processSSA_Use(vs.src, ssastate);
-            const guard = processSSAUse_RemapStatementGuard(vs.guard, ssastate);
-            const trgt = convertToSSA(vs.trgt, vs.layouttype, ssastate);
-            return new MIRTempRegisterAssign(vs.sinfo, src, trgt, vs.layouttype, guard);
-        }
-        case MIROpTag.MIRParameterVarStore: {
-            const vs = op as MIRParameterVarStore;
-            const src = processSSA_Use(vs.src, ssastate);
-            const guard = processSSAUse_RemapStatementGuard(vs.guard, ssastate);
-            const trgt = convertToSSA(vs.trgt, vs.layouttype, ssastate);
-            return new MIRTempRegisterAssign(vs.sinfo, src, trgt, vs.layouttype, guard);
         }
         case MIROpTag.MIRReturnAssign: {
             const ra = op as MIRReturnAssign;
@@ -429,9 +415,10 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
            assert(false);
            return op;
         }
-        default:
+        default: {
             assert(false);
             return op;
+        }
     }
 }
 
@@ -497,9 +484,9 @@ function convertBodyToSSA(body: MIRBody, booltype: MIRType, args: Map<string, MI
         const block = torder[j];
 
         if (block.label === "entry") {
-            args.forEach((arg, name) => ssastate.remap.set(name, new MIRParameterVariable(name)));
-            ssastate.remap.set("$__ir_ret__", new MIRLocalVariable("$__ir_ret__"));
-            ssastate.remap.set("$$return", new MIRLocalVariable("$$return"));
+            args.forEach((arg, name) => ssastate.remap.set(name, new MIRRegisterArgument(name)));
+            ssastate.remap.set("$__ir_ret__", new MIRRegisterArgument("$__ir_ret__"));
+            ssastate.remap.set("$$return", new MIRRegisterArgument("$$return"));
 
             for (let i = 0; i < block.ops.length; ++i) {
                 block.ops[i] = assignSSA(block.ops[i], ssastate);

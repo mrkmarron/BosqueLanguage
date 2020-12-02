@@ -3,8 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRBody, MIRResolvedTypeKey, MIRPhi, MIRBasicBlock, MIRInvokeKey, MIRTempRegister,  MIRRegisterArgument, MIROpTag, MIRJump, MIRInvokeFixedFunction, MIRJumpCond, MIRJumpNone, MIRLocalVariable } from "./mir_ops";
-import { computeBlockLinks, topologicalOrder, FlowLink, computeBlockLiveVars, BlockLiveSet } from "./mir_info";
+import { MIRBody, MIRResolvedTypeKey, MIRPhi, MIRBasicBlock, MIRInvokeKey, MIRRegisterArgument, MIROpTag, MIRJump, MIRInvokeFixedFunction, MIRJumpCond, MIRJumpNone } from "./mir_ops";
+import { computeBlockLinks, topologicalOrder, FlowLink, computeBlockLiveVars, BlockLiveSet, computeVarTypes } from "./mir_info";
 import { MIRFunctionParameter, MIRType, MIRInvokeBodyDecl, MIRAssembly } from "./mir_assembly";
 import { SourceInfo } from "../ast/parser";
 
@@ -36,8 +36,8 @@ class FunctionalizeEnv
         this.jlabel = jlabel;
     }
 
-    generateTempRegister(): MIRTempRegister {
-        return new MIRTempRegister(this.tmpctr++);
+    generateTempRegister(): MIRRegisterArgument {
+        return new MIRRegisterArgument(`#tmp_${this.tmpctr++}`);
     }
 
     setResultPhiEntry(srcblock: string, v: MIRRegisterArgument) {
@@ -149,7 +149,7 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
     const exit = bbl.find((bb) => bb.label === "exit") as MIRBasicBlock;
 
     if(exit.ops.length === 0 || !(exit.ops[0] instanceof MIRPhi)) {
-        const phi = new MIRPhi(sinfo_undef, new Map<string, MIRRegisterArgument>(fenv.rphimap), fenv.rtype, new MIRLocalVariable("$$return"));
+        const phi = new MIRPhi(sinfo_undef, new Map<string, MIRRegisterArgument>(fenv.rphimap), fenv.rtype, new MIRRegisterArgument("$$return"));
         exit.ops = [phi, ...exit.ops];
     }
     else {
@@ -168,7 +168,7 @@ function processBody(invid: string, b: MIRBody, rtype: MIRType): NBodyInfo | und
     const links = computeBlockLinks(b.body);
     const bo = topologicalOrder(b.body);
     const lv = computeBlockLiveVars(b.body);
-    const vtypes = b.vtypes as Map<string, MIRResolvedTypeKey>;
+    const vtypes = computeVarTypes(xxxx);
 
     const lidx = bo.findIndex((bb) => bb.label === "returnassign");
     const fjidx = bo.findIndex((bb) => (links.get(bb.label) as FlowLink).preds.size > 1);
@@ -210,13 +210,6 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
         return [];
     }
 
-    //
-    //TODO: Currently we leave types in the body var map for vars that don't exist -- not a bug but a bit messy. Can clean this up by implementing a reflow var types method.
-    //
-    //const invargs = new Map<string, MIRType>();
-    //inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-    //computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
-
     let rbl: MIRInvokeBodyDecl[] = [];
     let wl = [{ nbi: f1, post: inv.postconditions }];
     while (wl.length !== 0) {
@@ -228,16 +221,8 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
         const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, inv.sourceLocation, inv.srcFile, bproc.nparams, false, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
         rbl.push(ninv);
 
-        //let ninvargs = new Map<string, MIRType>();
-        //ninv.params.forEach((param) => ninvargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-        //computeVarTypesForInvoke(ninv.body, ninvargs, masm.typeMap.get(ninv.resultType) as MIRType, masm);
-
         const ff = processBody(inv.key, inv.body, masm.typeMap.get(ninv.resultType) as MIRType);
         if (ff !== undefined) {
-            //let invargs = new Map<string, MIRType>();
-            //inv.params.forEach((param) => invargs.set(param.name, masm.typeMap.get(param.type) as MIRType));
-            //computeVarTypesForInvoke(inv.body, invargs, masm.typeMap.get(inv.resultType) as MIRType, masm);
-
             wl.push({ nbi: ff, post: undefined })
         }
     }
