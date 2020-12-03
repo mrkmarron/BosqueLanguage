@@ -5,10 +5,10 @@
 
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBinKeyEq, MIRBinKeyLess, MIRCheckNoError, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeadFlow, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRExtractResultOkValue, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
 import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
-import { SMTAssembly, SMTErrorCode, SMTFunction } from "./smtassembly";
+import { SMTAssembly, SMTErrorCode, SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 
 import * as assert from "assert";
 
@@ -87,7 +87,7 @@ class SMTBodyEmitter {
         return arg !== undefined ? this.argToSMT(arg) : new SMTConst(this.generateUFConstantForType(oftype));
     }
 
-    private generateGeneralCallValueProcessing(sinfo: SourceInfo, callerrtype: MIRType, calleertype: MIRType, gcall: SMTExp, trgt: MIRRegisterArgument, continuation: SMTExp): SMTLet {
+    private generateGeneralCallValueProcessing(callerrtype: MIRType, calleertype: MIRType, gcall: SMTExp, trgt: MIRRegisterArgument, continuation: SMTExp): SMTLet {
         const cres = this.generateTempName();
         
         const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(calleertype, cres), continuation);
@@ -812,10 +812,10 @@ class SMTBodyEmitter {
         else {
             const trepr = this.typegen.getSMTTypeFor(argtype);
             if(trepr.isGeneralKeyType()) {
-                return new SMTCallSimple("=", [new SMTConst("BKey@none")]);
+                return new SMTCallSimple("=", [this.argToSMT(arg), new SMTConst("BKey@none")]);
             }
             else {
-                return new SMTCallSimple("=", [new SMTConst("BTerm@none")]);
+                return new SMTCallSimple("=", [this.argToSMT(arg), new SMTConst("BTerm@none")]);
             }
         }
     }
@@ -830,10 +830,10 @@ class SMTBodyEmitter {
         else {
             const trepr = this.typegen.getSMTTypeFor(argtype);
             if(trepr.isGeneralKeyType()) {
-                return new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTConst("BKey@none")])]);
+                return new SMTCallSimple("not", [new SMTCallSimple("=", [this.argToSMT(arg), new SMTConst("BKey@none")])]);
             }
             else {
-                return new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTConst("BTerm@none")])]);
+                return new SMTCallSimple("not", [new SMTCallSimple("=", [this.argToSMT(arg), new SMTConst("BTerm@none")])]);
             }
         }
     }
@@ -869,27 +869,6 @@ class SMTBodyEmitter {
         const call = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), conv, this.generateAltForGuardStmt(op.guard.altvalue, this.typegen.getMIRType(op.intotype))) : conv;
 
         return new SMTLet(this.varToSMTName(op.trgt).vname, call, continuation);
-    }
-    
-    processCheckNoError(op: MIRCheckNoError, continuation: SMTExp): SMTExp {
-        const srctype = this.typegen.getMIRType(op.srctype);
-        const oktype = this.typegen.getMIRType(op.oktype);
-
-        if(this.typegen.isUniqueEntityType(srctype)) {
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst(srctype.trkey === oktype.trkey ? "true" : "false"), continuation);
-        }
-        else {
-            const accessTypeTag = this.typegen.getSMTTypeFor(srctype).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.src)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.src)]);
-            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oktype.trkey)}`)]), continuation);
-        }
-    }
-
-    processExtractResultOkValue(op: MIRExtractResultOkValue, continuation: SMTExp): SMTExp {
-        const srctype = this.typegen.getMIRType(op.srctype);
-        const oktype = this.typegen.getMIRType(op.oktype);
-
-        const conv = this.typegen.coerce(this.argToSMT(op.src), srctype, oktype);
-        return new SMTLet(this.varToSMTName(op.trgt).vname, conv, continuation);
     }
 
     processLoadConst(op: MIRLoadConst, continuation: SMTExp): SMTExp {
@@ -1242,7 +1221,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt).vname, ccall, continuation);
             }
             else {
-                return this.generateGeneralCallValueProcessing(op.sinfo, this.currentRType, resulttype, ccall, op.trgt, continuation);
+                return this.generateGeneralCallValueProcessing(this.currentRType, resulttype, ccall, op.trgt, continuation);
             }
         }
         else {
@@ -1268,7 +1247,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt).vname, ccall, continuation);
             }
             else {
-                return this.generateGeneralCallValueProcessing(op.sinfo, this.currentRType, resulttype, ccall, op.trgt, continuation);
+                return this.generateGeneralCallValueProcessing(this.currentRType, resulttype, ccall, op.trgt, continuation);
             }
         }
     }
@@ -1328,7 +1307,7 @@ class SMTBodyEmitter {
                 return new SMTLet(this.varToSMTName(op.trgt).vname, gcall, continuation);
             }
             else {
-                return this.generateGeneralCallValueProcessing(op.sinfo, this.currentRType, rtype, gcall, op.trgt, continuation);
+                return this.generateGeneralCallValueProcessing(this.currentRType, rtype, gcall, op.trgt, continuation);
             }
         }
     }
@@ -1359,7 +1338,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt).vname, call, continuation);
         }
         else {
-            return this.generateGeneralCallValueProcessing(op.sinfo, this.currentRType, resulttype, call, op.trgt, continuation);
+            return this.generateGeneralCallValueProcessing(this.currentRType, resulttype, call, op.trgt, continuation);
         }
     }
 
@@ -1541,7 +1520,7 @@ class SMTBodyEmitter {
         }
     }
 
-    processTempRegisterAssign(op: MIRRegisterAssign, continuation: SMTExp): SMTExp {
+    processRegisterAssign(op: MIRRegisterAssign, continuation: SMTExp): SMTExp {
         if(op.guard === undefined) {
             return new SMTLet(this.varToSMTName(op.trgt).vname, this.argToSMT(op.src), continuation);
         }
@@ -1560,8 +1539,163 @@ class SMTBodyEmitter {
         return new SMTLet(this.varToSMTName(op.name).vname, conscall, continuation);
     }
 
-    processOp(op: MIROp, continuation: SMTExp): SMTExp {
-        xxxx;
+    processOp(op: MIROp, continuation: SMTExp): SMTExp | undefined {
+        switch (op.tag) {
+            case MIROpTag.MIRNop:
+            case MIROpTag.MIRDebug:
+            case MIROpTag.MIRJump:
+            case MIROpTag.MIRJumpCond:
+            case MIROpTag.MIRJumpNone:
+            case MIROpTag.MIRVarLifetimeStart:
+            case MIROpTag.MIRVarLifetimeEnd: {
+                return undefined;
+            }
+            case MIROpTag.MIRAbort: {
+                return this.processAbort(op as MIRAbort);
+            }
+            case MIROpTag.MIRAssertCheck: {
+                return this.processAssertCheck(op as MIRAssertCheck, continuation);
+            }
+            case MIROpTag.MIRLoadUnintVariableValue: {
+                return this.processLoadUnintVariableValue(op as MIRLoadUnintVariableValue, continuation);
+            }
+            case MIROpTag.MIRDeclareGuardFlagLocation: {
+                this.processDeclareGuardFlagLocation(op as MIRDeclareGuardFlagLocation);
+                return undefined;
+            }
+            case MIROpTag.MIRSetConstantGuardFlag: {
+                this.processSetConstantGuardFlag(op as MIRSetConstantGuardFlag);
+                return undefined;
+            }
+            case MIROpTag.MIRConvertValue: {
+                return this.processConvertValue(op as MIRConvertValue, continuation);
+            }
+            case MIROpTag.MIRLoadConst: {
+                return this.processLoadConst(op as MIRLoadConst, continuation);
+            }
+            case MIROpTag.MIRTupleHasIndex: {
+                return this.processTupleHasIndex(op as MIRTupleHasIndex, continuation);
+            }
+            case MIROpTag.MIRRecordHasProperty: {
+                return this.processRecordHasProperty(op as MIRRecordHasProperty, continuation);
+            }
+            case MIROpTag.MIRLoadTupleIndex: {
+                return this.processLoadTupleIndex(op as MIRLoadTupleIndex, continuation);
+            }
+            case MIROpTag.MIRLoadTupleIndexSetGuard: {
+                return this.processLoadTupleIndexSetGuard(op as MIRLoadTupleIndexSetGuard, continuation);
+            }
+            case MIROpTag.MIRLoadRecordProperty: {
+                return this.processLoadRecordProperty(op as MIRLoadRecordProperty, continuation);
+            }
+            case MIROpTag.MIRLoadRecordPropertySetGuard: {
+                return this.processLoadRecordPropertySetGuard(op as MIRLoadRecordPropertySetGuard, continuation);
+            }
+            case MIROpTag.MIRLoadField: {
+                return this.processLoadField(op as MIRLoadField, continuation);
+            }
+            case MIROpTag.MIRTupleProjectToEphemeral: {
+                return this.processTupleProjectToEphemeral(op as MIRTupleProjectToEphemeral, continuation);
+            }
+            case MIROpTag.MIRRecordProjectToEphemeral: {
+                return this.processRecordProjectToEphemeral(op as MIRRecordProjectToEphemeral, continuation);
+            }
+            case MIROpTag.MIREntityProjectToEphemeral: {
+                return this.processEntityProjectToEphemeral(op as MIREntityProjectToEphemeral, continuation);
+            }
+            case MIROpTag.MIRTupleUpdate: {
+                return this.processTupleUpdate(op as MIRTupleUpdate, continuation);
+            }
+            case MIROpTag.MIRRecordUpdate: {
+                return this.processRecordUpdate(op as MIRRecordUpdate, continuation);
+            }
+            case MIROpTag.MIREntityUpdate: {
+                return this.processEntityUpdate(op as MIREntityUpdate, continuation);
+            }
+            case MIROpTag.MIRLoadFromEpehmeralList: {
+                return this.processLoadFromEpehmeralList(op as MIRLoadFromEpehmeralList, continuation);
+            }
+            case MIROpTag.MIRMultiLoadFromEpehmeralList: {
+                return this.processMultiLoadFromEpehmeralList(op as MIRMultiLoadFromEpehmeralList, continuation);
+            }
+            case MIROpTag.MIRSliceEpehmeralList: {
+                return this.processSliceEpehmeralList(op as MIRSliceEpehmeralList, continuation);
+            }
+            case MIROpTag.MIRInvokeFixedFunction: {
+                return this.processInvokeFixedFunction(op as MIRInvokeFixedFunction, continuation);
+            }
+            case MIROpTag.MIRInvokeVirtualFunction: {
+                return this.processInvokeVirtualFunction(op as MIRInvokeVirtualFunction, continuation);
+            }
+            case MIROpTag.MIRInvokeVirtualOperator: {
+                return this.processInvokeVirtualOperator(op as MIRInvokeVirtualOperator, continuation);
+            }
+            case MIROpTag.MIRConstructorTuple: {
+                return this.processConstructorTuple(op as MIRConstructorTuple, continuation);
+            }
+            case MIROpTag.MIRConstructorTupleFromEphemeralList: {
+                return this.processConstructorTupleFromEphemeralList(op as MIRConstructorTupleFromEphemeralList, continuation);
+            }
+            case MIROpTag.MIRConstructorRecord: {
+                return this.processConstructorRecord(op as MIRConstructorRecord, continuation);
+            }
+            case MIROpTag.MIRConstructorRecordFromEphemeralList: {
+                return this.processConstructorRecordFromEphemeralList(op as MIRConstructorRecordFromEphemeralList, continuation);
+            }
+            case MIROpTag.MIRStructuredAppendTuple: {
+                return this.processStructuredAppendTuple(op as MIRStructuredAppendTuple, continuation);
+            }
+            case MIROpTag.MIRStructuredJoinRecord: {
+                return this.processStructuredJoinRecord(op as MIRStructuredJoinRecord, continuation);
+            }
+            case MIROpTag.MIRConstructorEphemeralList: {
+                return this.processConstructorEphemeralList(op as MIRConstructorEphemeralList, continuation);
+            }
+            case MIROpTag.MIREphemeralListExtend: {
+                return this.processEphemeralListExtend(op as MIREphemeralListExtend, continuation);
+            }
+            case MIROpTag.MIRConstructorPrimaryCollectionEmpty: {
+                return this.processConstructorPrimaryCollectionEmpty(op as MIRConstructorPrimaryCollectionEmpty, continuation);
+            }
+            case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
+                return this.processConstructorPrimaryCollectionSingletons(op as MIRConstructorPrimaryCollectionSingletons, continuation);
+            }
+            case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
+                return this.processConstructorPrimaryCollectionCopies(op as MIRConstructorPrimaryCollectionCopies, continuation);
+            }
+            case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
+                return this.processConstructorPrimaryCollectionMixed(op as MIRConstructorPrimaryCollectionMixed, continuation);
+            }
+            case MIROpTag.MIRBinKeyEq: {
+                return this.processBinKeyEq(op as MIRBinKeyEq, continuation);
+            }
+            case MIROpTag.MIRBinKeyLess: {
+                return this.processBinKeyLess(op as MIRBinKeyLess, continuation);
+            }
+            case MIROpTag.MIRPrefixNotOp: {
+                return this.processPrefixNotOp(op as MIRPrefixNotOp, continuation);
+            }
+            case MIROpTag.MIRAllTrue: {
+                return this.processAllTrue(op as MIRAllTrue, continuation);
+            }
+            case MIROpTag.MIRIsTypeOf: {
+                return this.processIsTypeOf(op as MIRIsTypeOf, continuation);
+            }
+            case MIROpTag.MIRRegisterAssign: {
+                return this.processRegisterAssign(op as MIRRegisterAssign, continuation);
+            }
+            case MIROpTag.MIRReturnAssign: {
+                return this.processReturnAssign(op as MIRReturnAssign, continuation);
+            }
+            case MIROpTag.MIRReturnAssignOfCons: {
+                return this.processReturnAssignOfCons(op as MIRReturnAssignOfCons, continuation);
+            }
+            case MIROpTag.MIRDeadFlow:
+            case MIROpTag.MIRPhi: {
+                assert(false, "Should be eliminated in cleanup");
+                return undefined;
+            }
+        }
     }
 
     processGenerateResultWithZeroArgCheck(sinfo: SourceInfo, not0arg: SMTExp, oftype: MIRType, val: SMTExp): SMTExp {
@@ -1573,17 +1707,18 @@ class SMTBodyEmitter {
         const vtmp = this.generateTempName();
         const val = new SMTVar(vtmp);
 
-        const chkbounds = new SMTCallSimple("<=", [new SMTConst("0"), val]);
+        const chkbounds = new SMTCallSimple("<", [val, new SMTConst("0")]);
         const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Result is negative"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
 
         return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
     }
-    
+
     processDefaultOperatorInvokePrimitiveType(sinfo: SourceInfo, trgt: MIRRegisterArgument, op: MIRInvokeKey, args: SMTExp[], varargcount: number, continuation: SMTExp): SMTExp {
         let smte: SMTExp = new SMTConst("[INVALID]");
         let erropt = false;
+        let rtype = this.typegen.getMIRType("NSCore::None");
 
-        switch(op) {
+        switch (op) {
             //op unary +
             case "NSCore::+=prefix=(NSCore::Int)":
             case "NSCore::+=prefix=(NSCore::Nat)":
@@ -1593,7 +1728,7 @@ class SMTBodyEmitter {
             case "NSCore::+=prefix=(NSCore::Float)":
             case "NSCore::+=prefix=(NSCore::Decimal)": {
                 smte = args[0];
-                break; 
+                break;
             }
             //op unary -
             case "NSCore::-=prefix=(NSCore::Int)":
@@ -1601,7 +1736,7 @@ class SMTBodyEmitter {
                 smte = new SMTCallSimple("-", args);
                 break;
             }
-            case "NSCore::-=prefix=(NSCore::Rational)":  {
+            case "NSCore::-=prefix=(NSCore::Rational)": {
                 smte = (this.level === "Strong") ? new SMTCallSimple("BRationalUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
@@ -1615,13 +1750,13 @@ class SMTBodyEmitter {
             }
             //op infix +
             case "NSCore::+=infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)": 
-            case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)": 
+            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)":
             case "NSCore::+=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 smte = new SMTCallSimple("+", args);
                 break
             }
-            case "NSCore::+=infix=(NSCore::Rational, NSCore::Rational)":  {
+            case "NSCore::+=infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = (this.level === "Strong") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
                 break;
             }
@@ -1639,7 +1774,8 @@ class SMTBodyEmitter {
                 break;
             }
             case "NSCore::-=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, this.typegen.getMIRType("NSCore::Nat"));
+                rtype = this.typegen.getMIRType("NSCore::Nat");
+                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, rtype);
                 erropt = true;
                 break;
             }
@@ -1648,11 +1784,12 @@ class SMTBodyEmitter {
                 break
             }
             case "NSCore::-=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, this.typegen.getMIRType("NSCore::BigNat"));
+                rtype = this.typegen.getMIRType("NSCore::BigNat");
+                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, rtype);
                 erropt = true;
                 break
             }
-            case "NSCore::-=infix=(NSCore::Rational, NSCore::Rational)":  {
+            case "NSCore::-=infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = (this.level === "Strong") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
@@ -1667,12 +1804,10 @@ class SMTBodyEmitter {
             //op infix *
             case "NSCore::*=infix=(NSCore::Int, NSCore::Int)": {
                 smte = varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
-                erropt = true;
                 break;
             }
             case "NSCore::*=infix=(NSCore::Nat, NSCore::Nat)": {
                 smte = varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
-                erropt = true;
                 break;
             }
             case "NSCore::*=infix=(NSCore::BigInt, NSCore::BigInt)": {
@@ -1683,7 +1818,7 @@ class SMTBodyEmitter {
                 smte = varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break
             }
-            case "NSCore::*=infix=(NSCore::Rational, NSCore::Rational)":  {
+            case "NSCore::*=infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break;
             }
@@ -1697,27 +1832,32 @@ class SMTBodyEmitter {
             }
             //op infix /
             case "NSCore::/=infix=(NSCore::Int, NSCore::Int)": {
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Int"), varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                rtype = this.typegen.getMIRType("NSCore::Int");
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Nat"), varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                rtype = this.typegen.getMIRType("NSCore::Nat");
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::BigInt, NSCore::BigInt)": {
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::BigInt"), varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                rtype = this.typegen.getMIRType("NSCore::BigInt");
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break
             }
             case "NSCore::/=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::BigNat"), varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                rtype = this.typegen.getMIRType("NSCore::BigNat");
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break
             }
-            case "NSCore::/=infix=(NSCore::Rational, NSCore::Rational)":  {
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Rational"), (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+            case "NSCore::/=infix=(NSCore::Rational, NSCore::Rational)": {
+                rtype = this.typegen.getMIRType("NSCore::Rational");
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
@@ -1736,7 +1876,7 @@ class SMTBodyEmitter {
             case "NSCore::===infix=(NSCore::BigNat, NSCore::BigNat)":
             case "NSCore::===infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("=", args);
-                break; 
+                break;
             }
             //op infix !=
             case "NSCore::===infix=(NSCore::Int, NSCore::Int)":
@@ -1776,7 +1916,7 @@ class SMTBodyEmitter {
             case "NSCore::<==infix=(NSCore::BigNat, NSCore::BigNat)":
             case "NSCore::<==infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("<=", args);
-                break; 
+                break;
             }
             //op infix >=
             case "NSCore::>==infix=(NSCore::Int, NSCore::Int)":
@@ -1792,108 +1932,121 @@ class SMTBodyEmitter {
             }
         }
 
-        if(!erropt) {
+        if (!erropt) {
             return new SMTLet(this.varToSMTName(trgt).vname, smte, continuation);
         }
         else {
-            xxxx;
+            const cres = this.generateTempName();
+
+            const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(rtype, cres), continuation);
+            const errpath = (rtype.trkey === this.currentRType.trkey) ? cres : this.typegen.generateResultTypeConstructorError(this.currentRType, this.typegen.generateResultGetError(rtype, cres));
+
+            const icond = new SMTIf(this.typegen.generateResultIsErrorTest(rtype, new SMTVar(cres)), errpath, okpath);
+            return new SMTLet(cres, smte, icond);
         }
     }
 
-    generateBlockExps(issafe: boolean, block: MIRBasicBlock, fromblock: string, blocks: Map<string, MIRBasicBlock>, gas: number | undefined): SMTExp {
-        const exps: SMTExp[] = [];
-        for (let i = 0; i < block.ops.length; ++i) {
-            const exp = this.generateStmt(block.ops[i], fromblock, gas);
-            if (exp !== undefined) {
-                exps.push(exp);
-            }
-        }
-
-        if (block.label === "exit") {
-            const resulttype = this.typegen.getSMTTypeFor(this.currentRType);
-            let rexp = issafe ? new SMTValue("$$return") : new SMTValue(`(result_success@${resulttype} $$return)`) as SMTExp;
-            for (let i = exps.length - 1; i >= 0; --i) {
-                rexp = exps[i].bind(rexp, "#body#");
+    getReadyBlock(blocks: Map<string, MIRBasicBlock>, done: Map<string, SMTExp>): MIRBasicBlock | undefined {
+        return [...blocks].map((bb) => bb[1]).find((bb) => {
+            if(done.has(bb.label)) {
+                return false;
             }
 
-            return rexp;
-        }
-        else {
-            const jop = block.ops[block.ops.length - 1];
+            const jop = bb.ops[bb.ops.length - 1];
             if(jop.tag === MIROpTag.MIRAbort) {
-                let rexp = exps[exps.length - 1];
-                for (let i = exps.length - 2; i >= 0; --i) {
-                    rexp = exps[i].bind(rexp, "#body#");
-                }
-
-                return rexp;
+               return true;
             }
             else if (jop.tag === MIROpTag.MIRJump) {
-                let rexp = this.generateBlockExps(issafe, blocks.get((jop as MIRJump).trgtblock) as MIRBasicBlock, block.label, blocks, gas);
-                for (let i = exps.length - 1; i >= 0; --i) {
-                    rexp = exps[i].bind(rexp, "#body#");
-                }
-
-                return rexp;
+               return done.has((jop as MIRJump).trgtblock);
             }
             else {
                 assert(jop.tag === MIROpTag.MIRJumpCond || jop.tag === MIROpTag.MIRJumpNone);
 
-                let tblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).trueblock) : blocks.get((jop as MIRJumpNone).noneblock)) as MIRBasicBlock;
-                let texp = this.generateBlockExps(issafe, tblock, block.label, blocks, gas);
-
-                let fblock = ((jop.tag === MIROpTag.MIRJumpCond) ? blocks.get((jop as MIRJumpCond).falseblock) : blocks.get((jop as MIRJumpNone).someblock)) as MIRBasicBlock;
-                let fexp = this.generateBlockExps(issafe, fblock, block.label, blocks, gas);
-
-                let rexp = exps[exps.length - 1].bind(texp, "#true_trgt#").bind(fexp, "#false_trgt#");
-                for (let i = exps.length - 2; i >= 0; --i) {
-                    rexp = exps[i].bind(rexp, "#body#");
-                }
-
-                return rexp;
+                let tdone = (jop.tag === MIROpTag.MIRJumpCond) ? done.has((jop as MIRJumpCond).trueblock) : done.has((jop as MIRJumpNone).noneblock);
+                let fdone = (jop.tag === MIROpTag.MIRJumpCond) ? done.has((jop as MIRJumpCond).falseblock) : done.has((jop as MIRJumpNone).someblock);
+                
+                return tdone && fdone;
             }
-        }
+        });
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>, gas: number | undefined, gasdown: number | undefined): string {
+    generateBlockExps(issafe: boolean, blocks: Map<string, MIRBasicBlock>): SMTExp {
+        let smtexps = new Map<string, SMTExp>();
+
+        const eblock = blocks.get("exit") as MIRBasicBlock;
+        let rexp: SMTExp = issafe ? new SMTVar("$$return") : this.typegen.generateResultTypeConstructorSuccess(this.currentRType, new SMTVar("$$return"));
+        for (let i = eblock.ops.length - 1; i >= 0; --i) {
+            const texp = this.processOp(eblock.ops[i], rexp);
+            if(texp !== undefined) {
+                rexp = texp;
+            }
+        }
+        smtexps.set("exit", rexp);
+
+        let bb = this.getReadyBlock(blocks, smtexps);
+        while(bb !== undefined) {
+            const jop = bb.ops[bb.ops.length - 1];
+
+            let rexp: SMTExp = new SMTConst("[UNITIALIZED FLOW]");
+            if(jop.tag === MIROpTag.MIRAbort) {
+                ; //No continuation so just leave uninit
+            }
+            else if (jop.tag === MIROpTag.MIRJump) {
+                rexp = smtexps.get((jop as MIRJump).trgtblock) as SMTExp;
+            }
+            else if (jop.tag === MIROpTag.MIRJumpCond) {
+                const smtcond = this.argToSMT((jop as MIRJumpCond).arg);
+                const texp = smtexps.get((jop as MIRJumpCond).trueblock) as SMTExp;
+                const fexp = smtexps.get((jop as MIRJumpCond).falseblock) as SMTExp;
+                
+                rexp = new SMTIf(smtcond, texp, fexp);
+            }
+            else {
+                assert(jop.tag === MIROpTag.MIRJumpNone);
+
+                const smtcond = this.generateNoneCheck((jop as MIRJumpNone).arg, this.typegen.getMIRType((jop as MIRJumpNone).arglayouttype));
+                const nexp = smtexps.get((jop as MIRJumpNone).noneblock) as SMTExp;
+                const sexp = smtexps.get((jop as MIRJumpNone).someblock) as SMTExp;
+                
+                rexp = new SMTIf(smtcond, nexp, sexp);
+            }
+
+            for (let i = eblock.ops.length - 1; i >= 0; --i) {
+                const texp = this.processOp(eblock.ops[i], rexp);
+                if(texp !== undefined) {
+                    rexp = texp;
+                }
+            }
+
+            bb = this.getReadyBlock(blocks, smtexps);
+        }
+
+        return smtexps.get("entry") as SMTExp;
+    }
+
+    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): SMTFunction | SMTFunctionUninterpreted {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.currentSCC = cscc;
 
-        let argvars = new Map<string, MIRType>();
-        idecl.params.forEach((arg) => argvars.set(arg.name, this.assembly.typeMap.get(arg.type) as MIRType));
+        const fname = this.typegen.mangle(idecl.key);
+        const args = idecl.params.map((arg) => {
+            return { vname: this.varStringToSMT(arg.name).vname, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(arg.type)) };
+        });
 
-        const args = idecl.params.map((arg) => `(${this.varNameToSMTName(arg.name)} ${this.typegen.getSMTTypeFor(this.typegen.getMIRType(arg.type))})`);
-        const restype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(idecl.resultType));
-
-        const issafe = this.isSafeInvoke(idecl);
-
-        const decl = issafe
-            ? `(define-fun ${this.invokenameToSMT(idecl.key)} (${args.join(" ")}) ${restype}`
-            : `(define-fun ${this.invokenameToSMT(idecl.key)}${gas !== undefined ? `@gas${gas}` : ""} (${args.join(" ")}) Result@${restype}`;
+        const issafe = this.isSafeInvoke(idecl.key);
+        const restype = issafe ? this.typegen.getSMTTypeFor(this.typegen.getMIRType(idecl.resultType)) : this.typegen.generateResultType(this.typegen.getMIRType(idecl.resultType));
 
         if (idecl instanceof MIRInvokeBodyDecl) {
-            this.vtypes = new Map<string, MIRType>();
-            (idecl.body.vtypes as Map<string, string>).forEach((tkey, name) => {
-                this.vtypes.set(name, this.typegen.getMIRType(tkey));
-            });
+            const body = this.generateBlockExps(issafe, (idecl as MIRInvokeBodyDecl).body.body);
 
-            const blocks = (idecl as MIRInvokeBodyDecl).body.body;
-            const body = this.generateBlockExps(issafe, blocks.get("entry") as MIRBasicBlock, "[NO PREVIOUS]", blocks, gasdown);
-
-            return `${decl} \n${body.emit("  ")})`;
-
+            return new SMTFunction(fname, args, idecl.takesmask ? "#maskparam#" : undefined, restype, body);
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            const params = idecl.params.map((arg) => this.varNameToSMTName(arg.name));
-            return `${decl} \n  ${this.generateBuiltinBody(issafe, idecl as MIRInvokePrimitiveDecl, params).emit("  ")}\n)`;
+            return new SMTFunctionUninterpreted(fname, args.map((arg) => arg.vtype), restype);
         }
-    }
-
-    generateBuiltinBody(idecl: MIRInvokePrimitiveDecl, params: string[]): SMTExp {
-        
     }
 }
 

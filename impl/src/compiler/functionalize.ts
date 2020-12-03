@@ -102,7 +102,7 @@ function updateNoneJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
 
         const tc = generateTailCall(bb.label, fenv);
         const ntb = new MIRBasicBlock(bb.label + "tbb", [tc, new MIRJump(sinfo_undef, "exit")]);
-        bb.ops[bb.ops.length - 1] = new MIRJumpNone(tjop.sinfo, tjop.arg, ntb.label, tjop.someblock);
+        bb.ops[bb.ops.length - 1] = new MIRJumpNone(tjop.sinfo, tjop.arg, tjop.arglayouttype, ntb.label, tjop.someblock);
 
         nbb.push(ntb);
         fenv.setResultPhiEntry(ntb.label, tc.trgt);
@@ -113,7 +113,7 @@ function updateNoneJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
 
         const tc = generateTailCall(bb.label, fenv);
         const ntb = new MIRBasicBlock(bb.label + "fbb", [tc, new MIRJump(sinfo_undef, "exit")]);
-        bb.ops[bb.ops.length - 1] = new MIRJumpNone(fjop.sinfo, fjop.arg, fjop.noneblock, ntb.label);
+        bb.ops[bb.ops.length - 1] = new MIRJumpNone(fjop.sinfo, fjop.arg, fjop.arglayouttype, fjop.noneblock, ntb.label);
 
         nbb.push(ntb);
         fenv.setResultPhiEntry(ntb.label, tc.trgt);

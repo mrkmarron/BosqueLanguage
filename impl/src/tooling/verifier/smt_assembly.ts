@@ -4,7 +4,6 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { SourceInfo } from "../../ast/parser";
-import { MIRAssembly } from "../../compiler/mir_assembly";
 import { SMTExp, SMTType } from "./smt_exp";
 
 class SMTErrorCode {
@@ -40,29 +39,27 @@ class SMTFunction {
 class SMTFunctionUninterpreted {
     readonly fname: string;
     readonly args: SMTType[];
-    readonly mask: string | undefined;
     readonly result: SMTType;
 
     //
     //TODO: we want to put in info on pcode functions and axioms here
     //
 
-    constructor(fname: string, args: SMTType[], mask: string | undefined, result: SMTType) {
+    constructor(fname: string, args: SMTType[], result: SMTType) {
         this.fname = fname;
         this.args = args;
-        this.mask = mask;
         this.result = result;
     }
 }
 
 class SMTAssembly {
-    readonly masm: MIRAssembly;
-
     readonly errorDefinitions: Map<string, SMTErrorCode> = new Map<string, SMTErrorCode>();
     readonly uninterpTypeConstructors: Map<string, SMTType> = new Map<string, SMTType>();
 
-    constructor(masm: MIRAssembly) {
-        this.masm = masm;
+    readonly uninterpfunctions: SMTFunctionUninterpreted[] = [];
+    readonly functions: SMTFunction[] = [];
+
+    constructor() {
     }
 }
 

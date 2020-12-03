@@ -11,7 +11,7 @@ import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedSt
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType, MIREntityType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
 
 import * as assert from "assert";
@@ -2205,10 +2205,11 @@ class TypeChecker {
 
         const tmpokt = this.m_emitter.generateTmpRegister();
         const oktype = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(aoftype.parsetype)[0]);
+        const okvfield = MIRKeyGenerator.generateFieldKey(this.getResultSubtypes(aoftype.parsetype)[0], "value");
         this.m_emitter.emitCheckNoError(exp.sinfo, tmps, presult, oktype, tmpokt);
         this.m_emitter.emitAssertCheck(exp.sinfo, "String not parsable as given type", tmpokt);
 
-        this.m_emitter.emitExtractResultOkValue(exp.sinfo, tmps, presult, oktype, this.m_emitter.registerResolvedTypeReference(this.getResultBinds(aoftype.parsetype).T), trgt);
+        this.m_emitter.emitExtractResultOkValue(exp.sinfo, tmps, presult, oktype, okvfield, this.m_emitter.registerResolvedTypeReference(this.getResultBinds(aoftype.parsetype).T), trgt);
         return env.setUniformResultExpression(this.getResultBinds(aoftype.parsetype).T);
     }
 
@@ -3473,7 +3474,7 @@ class TypeChecker {
             }
             else {
                 const nextblk = this.m_emitter.createNewBlock("Lelvis");
-                this.m_emitter.emitNoneJump(sinfo, etrgt, bailblck, nextblk);
+                this.m_emitter.emitNoneJump(sinfo, etrgt, this.m_emitter.registerResolvedTypeReference(env.getExpressionResult().valtype.layout), bailblck, nextblk);
                 this.m_emitter.setActiveBlock(nextblk);
             }
 
@@ -3862,7 +3863,7 @@ class TypeChecker {
                 const doneblck = this.m_emitter.createNewBlock("Lnonecheck_done");
                 const restblck = this.m_emitter.createNewBlock("Lnonecheck_rest");
 
-                this.m_emitter.emitNoneJump(exp.sinfo, lhsreg, noneblck, restblck);
+                this.m_emitter.emitNoneJump(exp.sinfo, lhsreg, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().valtype.layout), noneblck, restblck);
 
                 this.m_emitter.setActiveBlock(restblck);
                 const rhsreg = this.m_emitter.generateTmpRegister();
@@ -3908,7 +3909,7 @@ class TypeChecker {
                 const doneblck = this.m_emitter.createNewBlock("Lcoalesce_done");
                 const restblck = this.m_emitter.createNewBlock("Lcoalesce_rest");
 
-                this.m_emitter.emitNoneJump(exp.sinfo, lhsreg, restblck, someblck);
+                this.m_emitter.emitNoneJump(exp.sinfo, lhsreg, this.m_emitter.registerResolvedTypeReference(lhs.getExpressionResult().valtype.layout), restblck, someblck);
 
                 this.m_emitter.setActiveBlock(restblck);
                 const rhsreg = this.m_emitter.generateTmpRegister();
@@ -4027,7 +4028,7 @@ class TypeChecker {
                     this.m_emitter.emitDirectJump(exp.sinfo, normalexps.length !== 0 ? regularblck : scblck);
                 }
                 else {
-                    this.m_emitter.emitNoneJump(exp.sinfo, eereg, scblck, regularblck);
+                    this.m_emitter.emitNoneJump(exp.sinfo, eereg, this.m_emitter.registerResolvedTypeReference(evalue.getExpressionResult().valtype.layout), scblck, regularblck);
                 }
             }
             else {
@@ -4084,8 +4085,9 @@ class TypeChecker {
                 else {
                     const rtype = evalue.getExpressionResult().valtype.flowtype;
                     const oktype = this.m_emitter.registerResolvedTypeReference(this.getResultSubtypes(rtype)[0]);
+                    const okvfield = MIRKeyGenerator.generateFieldKey(this.getResultSubtypes(rtype)[0], "value");
                     const vtype = this.getResultBinds(rtype).T
-                    this.m_emitter.emitExtractResultOkValue(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, eereg, evalue.getExpressionResult().valtype), this.m_emitter.registerResolvedTypeReference(rtype), oktype, this.m_emitter.registerResolvedTypeReference(vtype), trgt);
+                    this.m_emitter.emitExtractResultOkValue(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, eereg, evalue.getExpressionResult().valtype), this.m_emitter.registerResolvedTypeReference(rtype), oktype, okvfield, this.m_emitter.registerResolvedTypeReference(vtype), trgt);
 
                     normalenvironments = normalexps.map((eev) => eev.setUniformResultExpression(vtype));
                 }

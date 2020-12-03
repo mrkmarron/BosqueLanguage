@@ -13,36 +13,36 @@
 
 (declare-datatypes () (
   (TypeTag
-  TypeTag_None
-  TypeTag_Bool
-  TypeTag_Int
-  TypeTag_Nat
-  TypeTag_BigInt
-  TypeTag_BigNat
-  TypeTag_Float
-  TypeTag_Decimal
-  TypeTag_Rational
-  TypeTag_String
-  TypeTag_Regex
-  ;;TYPE_TAG_DECLS;;
+    TypeTag_None
+    TypeTag_Bool
+    TypeTag_Int
+    TypeTag_Nat
+    TypeTag_BigInt
+    TypeTag_BigNat
+    TypeTag_Float
+    TypeTag_Decimal
+    TypeTag_Rational
+    TypeTag_String
+    TypeTag_Regex
+    ;;TYPE_TAG_DECLS;;
   )
 ))
 
 (declare-datatypes () (
   (AbstractTypeTag
-  ;;ABSTRACT_TYPE_TAG_DECLS;;
+    ;;ABSTRACT_TYPE_TAG_DECLS;;
   )
 ))
 
 (declare-datatypes () (
   (TupleIndexTag
-  ;;INDEX_TAG_DECLS;;
+    ;;INDEX_TAG_DECLS;;
   )
 ))
 
 (declare-datatypes () (
   (RecordPropertyTag
-  ;;PROPERTY_TAG_DECLS;;
+    ;;PROPERTY_TAG_DECLS;;
   )
 ))
 
@@ -232,7 +232,8 @@
 
 (declare-datatypes () (
   (ErrorID
-  ;;ERROR_ID_DECLS;;
+    ErrorID_AssumeCheck
+    ;;ERROR_ID_DECLS;;
   )
 ))
 

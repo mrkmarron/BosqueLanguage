@@ -486,8 +486,6 @@ enum MIROpTag {
     MIRDeclareGuardFlagLocation = "MIRDeclareGuardFlagLocation",
     MIRSetConstantGuardFlag = "MIRSetConstantGuardFlag",
     MIRConvertValue = "MIRConvertValue",
-    MIRCheckNoError = "MIRCheckNoError",
-    MIRExtractResultOkValue = "MIRExtractResultOkValue",
 
     MIRLoadConst = "MIRLoadConst",
 
@@ -593,10 +591,6 @@ abstract class MIROp {
                 return MIRSetConstantGuardFlag.jparse(jobj);
             case MIROpTag.MIRConvertValue:
                 return MIRConvertValue.jparse(jobj);
-            case MIROpTag.MIRCheckNoError:
-                return MIRCheckNoError.jparse(jobj);
-            case MIROpTag.MIRExtractResultOkValue:
-                return MIRExtractResultOkValue.jparse(jobj);
             case MIROpTag.MIRLoadConst:
                 return MIRLoadConst.jparse(jobj);
             case MIROpTag.MIRTupleHasIndex:
@@ -934,70 +928,6 @@ class MIRConvertValue extends MIROp {
 
     static jparse(jobj: any): MIROp {
         return new MIRConvertValue(jparsesinfo(jobj.sinfo), jobj.srctypelayout, jobj.srctypeflow, jobj.intotype, MIRArgument.jparse(jobj.src), MIRRegisterArgument.jparse(jobj.trgt), jobj.guard !== undefined ? MIRStatmentGuard.jparse(jobj.guard) : undefined);
-    }
-}
-
-class MIRCheckNoError extends MIROp {
-    trgt: MIRRegisterArgument;
-    src: MIRArgument;
-    readonly srctype: MIRResolvedTypeKey;
-    readonly oktype: MIRResolvedTypeKey;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, oktype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRCheckNoError, sinfo);
-
-        this.trgt = trgt;
-        this.src = src;
-        this.srctype = srctype;
-        this.oktype = oktype;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = $notErr(${this.src})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, oktype: this.oktype };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRCheckNoError(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.oktype, MIRRegisterArgument.jparse(jobj.trgt));
-    }
-}
-
-class MIRExtractResultOkValue extends MIROp {
-    trgt: MIRRegisterArgument;
-    src: MIRArgument;
-    readonly srctype: MIRResolvedTypeKey;
-    readonly oktype: MIRResolvedTypeKey
-    readonly valuetype: MIRResolvedTypeKey;
-
-    constructor(sinfo: SourceInfo, src: MIRArgument, srctype: MIRResolvedTypeKey, valuetype: MIRResolvedTypeKey, oktype: MIRResolvedTypeKey, trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRExtractResultOkValue, sinfo);
-
-        this.trgt = trgt;
-        this.src = src;
-        this.srctype = srctype;
-        this.oktype = oktype;
-        this.valuetype = valuetype;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.src]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = $getOkValue(${this.src})`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), src: this.src.jemit(), srctype: this.srctype, valuetype: this.valuetype, oktype: this.oktype };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRExtractResultOkValue(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.src), jobj.srctype, jobj.valuetype, jobj.oktype, MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2336,12 +2266,14 @@ class MIRJumpCond extends MIROp {
 
 class MIRJumpNone extends MIROp {
     arg: MIRArgument;
+    readonly arglayouttype: MIRResolvedTypeKey;
     readonly noneblock: string;
     readonly someblock: string;
 
-    constructor(sinfo: SourceInfo, arg: MIRArgument, noneblck: string, someblck: string) {
+    constructor(sinfo: SourceInfo, arg: MIRArgument, arglayouttype: MIRResolvedTypeKey, noneblck: string, someblck: string) {
         super(MIROpTag.MIRJumpNone, sinfo);
         this.arg = arg;
+        this.arglayouttype = arglayouttype;
         this.noneblock = noneblck;
         this.someblock = someblck;
     }
@@ -2354,11 +2286,11 @@ class MIRJumpNone extends MIROp {
     }
 
     jemit(): object {
-        return { ...this.jbemit(), arg: this.arg.jemit(), noneblock: this.noneblock, someblock: this.someblock };
+        return { ...this.jbemit(), arg: this.arg.jemit(), arglayouttype: this.arglayouttype, noneblock: this.noneblock, someblock: this.someblock };
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRJumpNone(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.noneblock, jobj.someblock);
+        return new MIRJumpNone(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg), jobj.arglayouttype, jobj.noneblock, jobj.someblock);
     }
 }
 
@@ -2616,7 +2548,7 @@ export {
     MIRArgument, MIRRegisterArgument, MIRGlobalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf, MIRConstantDataString, MIRConstantTypedNumber,
     MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,
-    MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue, MIRCheckNoError, MIRExtractResultOkValue,
+    MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue,
     MIRLoadConst,
     MIRTupleHasIndex, MIRRecordHasProperty,
     MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard,

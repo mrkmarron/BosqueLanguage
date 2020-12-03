@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
-import { MIRArgGuard, MIRArgument, MIRAssertCheck, MIRCheckNoError, MIRConvertValue, MIRDebug, MIREntityProjectToEphemeral, MIREntityUpdate, MIRExtractResultOkValue, MIRGuard, MIRLoadConst, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIROp, MIROpTag, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionEmpty, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRRegisterAssign } from "./mir_ops";
+import { MIRArgGuard, MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIREntityProjectToEphemeral, MIREntityUpdate, MIRGuard, MIRLoadConst, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIROp, MIROpTag, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionEmpty, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRRegisterAssign } from "./mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topologicalOrder } from "./mir_info";
 import { MIRType } from "./mir_assembly";
@@ -131,18 +131,6 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
             conv.src = processSSA_Use(conv.src, ssastate);
             conv.guard = processSSAUse_RemapStatementGuard(conv.guard, ssastate);
             conv.trgt = convertToSSA(conv.trgt, conv.intotype, ssastate);
-            return op;
-        }
-        case MIROpTag.MIRCheckNoError: {
-            const chk = op as MIRCheckNoError;
-            chk.src = processSSA_Use(chk.src, ssastate);
-            chk.trgt = convertToSSA(chk.trgt, ssastate.booltype, ssastate);
-            return op;
-        }
-        case MIROpTag.MIRExtractResultOkValue: {
-            const erok = op as MIRExtractResultOkValue;
-            erok.src = processSSA_Use(erok.src, ssastate);
-            erok.trgt = convertToSSA(erok.trgt, erok.valuetype, ssastate);
             return op;
         }
         case MIROpTag.MIRLoadConst: {
