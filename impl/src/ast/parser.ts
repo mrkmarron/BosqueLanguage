@@ -1742,9 +1742,8 @@ class Parser {
                     this.raiseError(sinfo.line, "Could not resolve operator");
                 }
 
-
                 const arg = new PositionalArgument(undefined, false, exp);
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([arg]));
+                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([arg]), "prefix");
             }
         }
         else {
@@ -1909,7 +1908,7 @@ class Parser {
                 const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                 const args = this.parseArguments("(", ")");
 
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, namestr, targs, rec, args);
+                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, namestr, targs, rec, args, "std");
             }
         }
         else if (tk === TokenStrings.Operator) {
@@ -1922,7 +1921,7 @@ class Parser {
             const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
             const args = this.parseArguments("(", ")");
 
-            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, istr, new TemplateArguments([]), rec, args);
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, istr, new TemplateArguments([]), rec, args, "std");
         }
         else if (tk === "fn" || this.testFollows("recursive", "fn")) {
             return this.parsePCodeTerm();
@@ -1975,7 +1974,7 @@ class Parser {
                 const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                 const args = this.parseArguments("(", ")");
 
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, targs, rec, args);
+                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, targs, rec, args, "std");
             }
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Operator)) {
@@ -1987,7 +1986,7 @@ class Parser {
             const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
             const args = this.parseArguments("(", ")");
 
-            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, new TemplateArguments([]), rec, args);
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, new TemplateArguments([]), rec, args, "std");
         }
         else {
             const ttype = this.parseTypeSignature(false);
@@ -2003,7 +2002,7 @@ class Parser {
                     const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                     const args = this.parseArguments("(", ")");
 
-                    return new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, rec, args);
+                    return new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, rec, args, "std");
                 }
             }
             else if (this.testFollows("@", TokenStrings.Identifier) || this.testFollows("#", TokenStrings.Identifier)) {
@@ -2476,7 +2475,6 @@ class Parser {
         }
     }
 
-    
     private prefixStackApplicationHandler(sinfo: SourceInfo, ops: ("!" | "+" | "-")[]): Expression {
         let [exp, remainingops] = this.parseStatementExpression(ops);
         
@@ -2493,7 +2491,7 @@ class Parser {
                 }
 
                 const arg = new PositionalArgument(undefined, false, exp);
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([arg]));
+                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([arg]), "prefix");
             }
         }
 
@@ -2524,7 +2522,7 @@ class Parser {
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
             const rhs = new PositionalArgument(undefined, false, this.parseMultiplicativeExpression());
-            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]));
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
         }
         else {
             return exp;
@@ -2544,7 +2542,7 @@ class Parser {
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
             const rhs = new PositionalArgument(undefined, false, this.parseAdditiveExpression());
-            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]));
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
         }
         else {
             return exp;
@@ -2570,7 +2568,7 @@ class Parser {
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
             const rhs = new PositionalArgument(undefined, false, this.parseRelationalExpression());
-            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]));
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
         }
         else {
             return exp;
@@ -3214,7 +3212,7 @@ class Parser {
             const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
             const args = this.parseArguments("(", ")");
 
-            return new NakedCallStatement(sinfo, new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, targs, rec, args));
+            return new NakedCallStatement(sinfo, new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, targs, rec, args, "std"));
         }
         else if (this.testFollows(TokenStrings.Namespace, "::", TokenStrings.Operator)) {
             //it is a namespace function call
@@ -3225,7 +3223,7 @@ class Parser {
             const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
             const args = this.parseArguments("(", ")");
 
-            return new NakedCallStatement(sinfo, new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, new TemplateArguments([]), rec, args));
+            return new NakedCallStatement(sinfo, new CallNamespaceFunctionOrOperatorExpression(sinfo, ns, name, new TemplateArguments([]), rec, args, "std"));
         }
         else {
             //we should find a type (nominal here) and it is a static invoke or a structured assign
@@ -3267,7 +3265,7 @@ class Parser {
                 const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                 const args = this.parseArguments("(", ")");
 
-                return new NakedCallStatement(sinfo, new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, rec, args));
+                return new NakedCallStatement(sinfo, new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, targs, rec, args, "std"));
             }
             else if(this.testFollows("::", TokenStrings.Operator)) {
                 this.consumeToken();
@@ -3275,7 +3273,7 @@ class Parser {
                 const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                 const args = this.parseArguments("(", ")");
 
-                return new NakedCallStatement(sinfo, new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, new TemplateArguments([]), rec, args));
+                return new NakedCallStatement(sinfo, new CallStaticFunctionOrOperatorExpression(sinfo, ttype, name, new TemplateArguments([]), rec, args, "std"));
             }
             else {
                 this.raiseError(line, "Unknown statement structure");
@@ -3468,28 +3466,12 @@ class Parser {
         return attributes;
     }
 
-    private parseTemplateConstraint(hasconstraint: boolean): [TypeSignature, { ns: string, op: string, args: TypeSignature[] } | undefined] {
+    private parseTemplateConstraint(hasconstraint: boolean): TypeSignature {
         if(!hasconstraint) {
-            return [this.m_penv.SpecialAnySignature, undefined];
+            return this.m_penv.SpecialAnySignature;
         }
         else {
-            if(!this.testToken("operator")) {
-                return [this.parseTypeSignature(false), undefined];
-            }
-            else {
-                this.ensureAndConsumeToken("operator");
-
-                const ns = this.testToken(TokenStrings.Namespace) ? this.consumeTokenAndGetValue() : this.m_penv.getCurrentNamespace();
-                this.testAndConsumeTokenIf("::");
-
-                const operator = this.consumeTokenAndGetValue();
-
-                const args = this.parseListOf("(", ")", ",", () => {
-                    return this.parseTypeSignature(false);
-                });
-
-                return [this.m_penv.SpecialAnySignature, { ns: ns, op: operator, args: args }];
-            }
+            return this.parseTypeSignature(false);
         }
     }
 
@@ -3537,8 +3519,8 @@ class Parser {
                     } 
                 }
 
-                const [tconstraint, opconstraint] = this.parseTemplateConstraint(hasconstraint);
-                return new TemplateTermDecl(templatename, specialConstraints, tconstraint, opconstraint, isinfer, defaulttype);
+                const tconstraint = this.parseTemplateConstraint(hasconstraint);
+                return new TemplateTermDecl(templatename, specialConstraints, tconstraint, isinfer, defaulttype);
             })[0];
         }
         return terms;
@@ -3547,9 +3529,9 @@ class Parser {
     private parseSingleTermRestriction(): TemplateTypeRestriction {
         this.ensureToken(TokenStrings.Template);
         const templatename = this.consumeTokenAndGetValue();
-        const [tconstraint, opconstraint] = this.parseTemplateConstraint(true);
+        const tconstraint = this.parseTemplateConstraint(true);
 
-        return new TemplateTypeRestriction(new TemplateTypeSignature(templatename), tconstraint, opconstraint);
+        return new TemplateTypeRestriction(new TemplateTypeSignature(templatename), tconstraint);
     }
 
     private parseTermRestrictionList(): TemplateTypeRestriction[] {
@@ -3779,7 +3761,10 @@ class Parser {
         this.ensureAndConsumeToken("operator");
         const termRestrictions = this.parseTermRestriction(true);
 
-        this.ensureToken(TokenStrings.Identifier);
+        if(!this.testToken(TokenStrings.Identifier) && !this.testToken(TokenStrings.Operator)) {
+            this.raiseError(sinfo.line, "Expected valid name for operator");
+        }
+
         const fname = this.consumeTokenAndGetValue();
         let recursive: "yes" | "no" | "cond" = "no";
         if (Parser.attributeSetContains("recursive", attributes) || Parser.attributeSetContains("recursive?", attributes)) {
@@ -4164,7 +4149,7 @@ class Parser {
                 const exp = enums[i][1] !== undefined ? (enums[i][1] as ConstantExpressionValue).exp : new LiteralIntegralExpression(sinfo, (i + 1).toString(), this.m_penv.SpecialNatSignature);
                 const parg = new PositionalArgument(undefined, false, exp);
 
-                const enminit = new CallStaticFunctionOrOperatorExpression(sinfo, etype, `@@create_${enums[i][0]}`, new TemplateArguments([]), "no", new Arguments([parg]));
+                const enminit = new CallStaticFunctionOrOperatorExpression(sinfo, etype, `@@create_${enums[i][0]}`, new TemplateArguments([]), "no", new Arguments([parg]), "std");
                 const enm = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], enums[i][0], etype, new ConstantExpressionValue(enminit, new Set<string>()));
                 staticMembers.set(enums[i][0], enm);
             }
@@ -4213,8 +4198,8 @@ class Parser {
         const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), "value", false, valuedecl);
 
         let provides = [[new NominalTypeSignature("NSCore", ["Some"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][]
-        provides.push([new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]), undefined)])]);
-        provides.push([new NominalTypeSignature("NSCore", ["APIType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["APIType"]), undefined)])]);
+        provides.push([new NominalTypeSignature("NSCore", ["KeyType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["KeyType"]))])]);
+        provides.push([new NominalTypeSignature("NSCore", ["APIType"]), new TypeConditionRestriction([new TemplateTypeRestriction(idval, new NominalTypeSignature("NSCore", ["APIType"]))])]);
 
         //
         //TODO: maybe want to make this parsable too!
@@ -4326,7 +4311,10 @@ class Parser {
             (ns.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), "NSMain", fname, sig));
         }
         else {
-            this.ensureToken(TokenStrings.Identifier);
+            if(!this.testToken(TokenStrings.Identifier) && !this.testToken(TokenStrings.Operator)) {
+                this.raiseError(sinfo.line, "Expected valid name for operator");
+            }
+
             const fname = this.consumeTokenAndGetValue();
 
             let recursive: "yes" | "no" | "cond" = "no";

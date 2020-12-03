@@ -7,11 +7,11 @@ import { ResolvedType, ResolvedTupleAtomType, ResolvedEntityAtomType, ResolvedTu
 import { Assembly, NamespaceConstDecl, OOPTypeDecl, StaticMemberDecl, EntityTypeDecl, StaticFunctionDecl, InvokeDecl, MemberFieldDecl, NamespaceFunctionDecl, TemplateTermDecl, OOMemberLookupInfo, MemberMethodDecl, BuildLevel, isBuildLevelEnabled, PreConditionDecl, PostConditionDecl, TypeConditionRestriction, ConceptTypeDecl, SpecialTypeCategory, TemplateTermSpecialRestriction, NamespaceOperatorDecl, StaticOperatorDecl } from "../ast/assembly";
 import { TypeEnvironment, VarInfo, FlowTypeTruthValue, StructuredAssignmentPathStep, StructuredAssignmentCheck, ValueType } from "./type_environment";
 import { TypeSignature, TemplateTypeSignature, NominalTypeSignature, AutoTypeSignature, FunctionParameter, TupleTypeSignature } from "../ast/type_signature";
-import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralNumberinoExpression, BinKeyExpression } from "../ast/body";
+import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedStringConstructorExpression, AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression, NamedArgument, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, Arguments, PositionalArgument, CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression, PostfixOp, PostfixOpTag, PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixInvoke, PostfixModifyWithIndecies, PostfixModifyWithNames, PrefixNotOp, LiteralNoneExpression, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, VariableDeclarationStatement, VariableAssignmentStatement, IfElseStatement, Statement, StatementTag, BlockStatement, ReturnStatement, LiteralBoolExpression, LiteralStringExpression, BodyImplementation, AssertStatement, CheckStatement, DebugStatement, StructuredVariableAssignmentStatement, StructuredAssignment, RecordStructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, TupleStructuredAssignment, MatchStatement, MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, AbortStatement, YieldStatement, IfExpression, MatchExpression, BlockStatementExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ConstructorEphemeralValueList, VariablePackDeclarationStatement, VariablePackAssignmentStatement, NominalStructuredAssignment, ValueListStructuredAssignment, NakedCallStatement, ValidateStatement, IfElse, CondBranchEntry, MapEntryConstructorExpression, SpecialConstructorExpression, RecursiveAnnotation, PostfixIs, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralParamerterValueExpression, LiteralTypedNumericConstructorExpression, OfTypeConvertExpression, LiteralIntegralExpression, LiteralRationalExpression, LiteralFloatPointExpression, LiteralExpressionValue, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralNumberinoExpression, BinKeyExpression, TemplateArguments } from "../ast/body";
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType, MIREntityType } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
 
 import * as assert from "assert";
@@ -236,14 +236,6 @@ class TypeChecker {
             const termconstraint = this.resolveAndEnsureTypeOnly(sinfo, terminfo.tconstraint, new Map<string, ResolvedType>());
             const boundsok = this.m_assembly.subtypeOf(termtype, termconstraint);
             this.raiseErrorIf(sinfo, !boundsok, `Template instantiation does not satisfy specified bounds -- not subtype of ${termconstraint.idStr}`);
-
-            let opok = true;
-            if(terminfo.opconstraint !== undefined) {
-                //
-                //TODO: we need to check op constraints!!!
-                //
-            }
-            this.raiseErrorIf(sinfo, !opok, "Template instantiation deos not satisfy the operator requirements");
 
             if (terminfo.specialRestrictions.size !== 0) {
                 terminfo.specialRestrictions.forEach((srv) => {
@@ -1205,7 +1197,7 @@ class TypeChecker {
         return texpandoT.isSameType(oftexpandoT);
     }
 
-    private checkArgumentsCollectionConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedType, args: [ResolvedType, boolean, MIRRegisterArgument][], trgt: MIRRegisterArgument, generatekeylistT: string | undefined): ResolvedType {
+    private checkArgumentsCollectionConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, entrytype: ResolvedType, args: [ResolvedType, boolean, MIRRegisterArgument][], trgt: MIRRegisterArgument): ResolvedType {
         for (let i = 0; i < args.length; ++i) {
             const arg = args[i];
 
@@ -1218,13 +1210,6 @@ class TypeChecker {
         }
 
         const resulttype = ResolvedType.createSingle(oftype);
-
-        if (generatekeylistT !== undefined && this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") !== undefined) {
-            const klobj = this.m_assembly.tryGetObjectTypeForFullyResolvedName("NSCore::KeyList") as EntityTypeDecl;
-            const klbinds = new Map<string, ResolvedType>().set("K", oftype.binds.get(generatekeylistT) as ResolvedType);
-            const kltype = ResolvedType.createSingle(ResolvedEntityAtomType.create(klobj, klbinds));
-            this.m_emitter.registerResolvedTypeReference(kltype);
-        }
 
         const tkey = this.m_emitter.registerResolvedTypeReference(resulttype).trkey;
         this.m_emitter.registerResolvedTypeReference(entrytype);
@@ -1669,19 +1654,8 @@ class TypeChecker {
                 }
             }) as [ResolvedType, boolean, MIRRegisterArgument][];
 
-            let genkl: string | undefined = undefined;
-            if(oodecl.specialDecls.has(SpecialTypeCategory.SetTypeDecl)) {
-                genkl = "T";
-            } 
-            else if (oodecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl)) {
-                genkl = "K";
-            }
-            else {
-                //nothing
-            }
-
             const rtreg = this.m_emitter.generateTmpRegister();
-            this.checkArgumentsCollectionConstructor(sinfo, oftype, etype, cargs, rtreg, genkl);
+            this.checkArgumentsCollectionConstructor(sinfo, oftype, etype, cargs, rtreg);
 
             margs.push(rtreg);
         }
@@ -1854,7 +1828,7 @@ class TypeChecker {
             const oftype = ResolvedEntityAtomType.create(lentity, new Map<string, ResolvedType>().set("T", etype));
 
             const rtreg = this.m_emitter.generateTmpRegister();
-            this.checkArgumentsCollectionConstructor(sinfo, oftype, etype, cargs, rtreg, undefined);
+            this.checkArgumentsCollectionConstructor(sinfo, oftype, etype, cargs, rtreg);
 
             margs.push(rtreg);
             mtypes.push(ValueType.createUniform(ResolvedType.createSingle(oftype)));
@@ -2362,14 +2336,14 @@ class TypeChecker {
         if (oodecl.isTypeAListEntity() || oodecl.isTypeAStackEntity() || oodecl.isTypeAQueueEntity()) {
             const ctype = oobinds.get("T") as ResolvedType;
             const eargs = this.checkArgumentsEvaluationCollection(env, exp.args, ctype);
-            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, ctype, eargs, trgt, undefined);
+            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, ctype, eargs, trgt);
 
             return env.setUniformResultExpression(atype);
         }
         else if (oodecl.isTypeASetEntity()) {
             const ctype = oobinds.get("T") as ResolvedType;
             const eargs = this.checkArgumentsEvaluationCollection(env, exp.args, ctype);
-            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, ctype, eargs, trgt, "T");
+            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, ctype, eargs, trgt);
 
             return env.setUniformResultExpression(atype);
         }
@@ -2379,7 +2353,7 @@ class TypeChecker {
             const entryobj = this.resolveAndEnsureTypeOnly(exp.sinfo, entrytuple, entrybinds);
 
             const eargs = this.checkArgumentsEvaluationCollection(env, exp.args, entryobj);
-            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, entryobj, eargs, trgt, "K");
+            const atype = this.checkArgumentsCollectionConstructor(exp.sinfo, oftype, entryobj, eargs, trgt);
 
             return env.setUniformResultExpression(atype);
         }
@@ -2644,8 +2618,8 @@ class TypeChecker {
         const nsdecl = this.m_assembly.getNamespace(exp.ns);
 
         if (nsdecl.operators.has(exp.name)) {
-            const opsintro = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
-            const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+            const opsintro = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).find((nso) => nso.doesKindTagMatch(exp.opkind) && OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+            const opdecls = (nsdecl.operators.get(exp.name) as NamespaceOperatorDecl[]).filter((nso) => nso.doesKindTagMatch(exp.opkind) && !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
             this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
             const pnames = (opsintro as NamespaceOperatorDecl).invoke.params.map((p) => p.name);
@@ -2814,8 +2788,8 @@ class TypeChecker {
                 const oodecl = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).contiainingType;
                 const oobinds = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).binds;
 
-                const opsintro = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.find((nso) => OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
-                const opdecls = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.filter((nso) => !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+                const opsintro = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.find((nso) => nso.doesKindTagMatch(exp.opkind) && OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
+                const opdecls = (opdecltry as OOMemberLookupInfo<StaticOperatorDecl[]>).decl.filter((nso) => nso.doesKindTagMatch(exp.opkind) && !OOPTypeDecl.attributeSetContains("abstract", nso.invoke.attributes));
                 this.raiseErrorIf(exp.sinfo, opdecls.length === 0, "Operator must have at least one decl");
 
                 const pnames = (opsintro as StaticOperatorDecl).invoke.params.map((p) => p.name);
@@ -6372,13 +6346,33 @@ class TypeChecker {
 
         const encdecl = enclosingDecl !== undefined ? enclosingDecl[0].trkey : undefined;
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
-            let mpc = new Map<string, MIRPCode>();
-            fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.generateCapturedVarName(cname)) }));
+            if ((invoke.body as BodyImplementation).body !== "default") {
+                let mpc = new Map<string, MIRPCode>();
+                fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.generateCapturedVarName(cname)) }));
 
-            let mbinds = new Map<string, MIRResolvedTypeKey>();
-            binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
+                let mbinds = new Map<string, MIRResolvedTypeKey>();
+                binds.forEach((v, k) => mbinds.set(k, this.m_emitter.registerResolvedTypeReference(v).trkey));
 
-            return new MIRInvokePrimitiveDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, mbinds, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
+                return new MIRInvokePrimitiveDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, mbinds, params, resultType.trkey, (invoke.body as BodyImplementation).body as string, mpc);
+            }
+            else {
+                //
+                //TODO: should do some checking that this is a valid thing to default implement
+                //
+
+                const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);
+                const doptype = this.resolveAndEnsureTypeOnly(invoke.sourceLocation, params[0].type, new Map<string, ResolvedType>());
+                const dopdecl = doptype.options[0] as ResolvedEntityAtomType;
+                
+                const vops = invoke.params.map((p) => new PostfixOp(invoke.sourceLocation, new AccessVariableExpression(invoke.sourceLocation, p.name), [new PostfixInvoke(invoke.sourceLocation, false, undefined, false, p.type, "value", new TemplateArguments([]), "no", new Arguments([]))]));
+                const throughtype = declaredResult.isSameType(this.m_assembly.getSpecialBoolType()) ? invoke.resultType : (dopdecl.object.memberFields.get("value") as MemberFieldDecl).declaredType;
+                const callthrough = new CallStaticFunctionOrOperatorExpression(invoke.sourceLocation, throughtype, fname, new TemplateArguments([]), "no", new Arguments(vops.map((op) => new PositionalArgument(undefined, false, op))), "std");
+
+                const body = declaredResult.isSameType(this.m_assembly.getSpecialBoolType()) ? callthrough : new CallStaticFunctionOrOperatorExpression(invoke.sourceLocation, invoke.resultType, "create", new TemplateArguments([]), "no", new Arguments([new PositionalArgument(undefined, false, callthrough)]), "std");
+
+                const mirbody = this.checkBodyExpression(invoke.srcFile, env, body, [], argTypes) as MIRBody;
+                return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, params, false, resultType.trkey, undefined, undefined, mirbody);
+            }
         }
         else {
             const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);

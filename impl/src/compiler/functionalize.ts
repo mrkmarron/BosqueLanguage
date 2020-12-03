@@ -164,11 +164,11 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
     }
 }
 
-function processBody(invid: string, b: MIRBody, rtype: MIRType): NBodyInfo | undefined {
+function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFunctionParameter[], rtype: MIRType): NBodyInfo | undefined {
     const links = computeBlockLinks(b.body);
     const bo = topologicalOrder(b.body);
     const lv = computeBlockLiveVars(b.body);
-    const vtypes = computeVarTypes(xxxx);
+    const vtypes = computeVarTypes(b.body, params, masm, "NSCore::Bool");
 
     const lidx = bo.findIndex((bb) => bb.label === "returnassign");
     const fjidx = bo.findIndex((bb) => (links.get(bb.label) as FlowLink).preds.size > 1);
@@ -188,8 +188,8 @@ function processBody(invid: string, b: MIRBody, rtype: MIRType): NBodyInfo | und
     const fblocks = [new MIRBasicBlock("entry", bo[jidx].ops.slice(phis.length)), ...bo.slice(jidx + 1)];
 
     const jvars = [...(lv.get(bo[jidx].label) as BlockLiveSet).liveEntry].filter((lvn) => !phivkill.has(lvn[0])).sort((a, b) => a[0].localeCompare(b[0]));
-    const oparams = jvars.map((lvn) => new MIRFunctionParameter(lvn[0], vtypes.get(lvn[0]) as MIRResolvedTypeKey));
-    const phiparams = phivargs.map((pv) => new MIRFunctionParameter(pv, vtypes.get(pv) as MIRResolvedTypeKey));
+    const oparams = jvars.map((lvn) => new MIRFunctionParameter(lvn[0], (vtypes.get(lvn[0]) as MIRType).trkey));
+    const phiparams = phivargs.map((pv) => new MIRFunctionParameter(pv, (vtypes.get(pv) as MIRType).trkey));
 
     const nparams = [...oparams, ...phiparams];
     const ninvid = generateTargetFunctionName(invid, jlabel);
@@ -205,7 +205,7 @@ function processBody(invid: string, b: MIRBody, rtype: MIRType): NBodyInfo | und
 }
 
 function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBodyDecl[] {
-    const f1 = processBody(inv.key, inv.body, masm.typeMap.get(inv.resultType) as MIRType);
+    const f1 = processBody(inv.key, masm, inv.body, inv.params, masm.typeMap.get(inv.resultType) as MIRType);
     if(f1 === undefined) {
         return [];
     }
@@ -221,7 +221,7 @@ function processInvoke(inv: MIRInvokeBodyDecl, masm: MIRAssembly): MIRInvokeBody
         const ninv = new MIRInvokeBodyDecl(inv.enclosingDecl, "[FUNCTIONALIZE_SPECIAL]", bproc.nname, bproc.nname, [...inv.attributes], inv.recursive, inv.sourceLocation, inv.srcFile, bproc.nparams, false, inv.resultType, undefined, item.post, new MIRBody(inv.srcFile, inv.sourceLocation, bmap));
         rbl.push(ninv);
 
-        const ff = processBody(inv.key, inv.body, masm.typeMap.get(ninv.resultType) as MIRType);
+        const ff = processBody(inv.key, masm, inv.body, inv.params, masm.typeMap.get(ninv.resultType) as MIRType);
         if (ff !== undefined) {
             wl.push({ nbi: ff, post: undefined })
         }

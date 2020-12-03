@@ -37,15 +37,13 @@ class TemplateTermDecl {
     readonly name: string;
     readonly specialRestrictions: Set<TemplateTermSpecialRestriction>;
     readonly tconstraint: TypeSignature;
-    readonly opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined;
     readonly isInfer: boolean;
     readonly defaultType: TypeSignature | undefined;
 
-    constructor(name: string, specialRestrictions: Set<TemplateTermSpecialRestriction>, tconstraint: TypeSignature, opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined, isinfer: boolean, defaulttype: TypeSignature | undefined) {
+    constructor(name: string, specialRestrictions: Set<TemplateTermSpecialRestriction>, tconstraint: TypeSignature, isinfer: boolean, defaulttype: TypeSignature | undefined) {
         this.name = name;
         this.specialRestrictions = specialRestrictions;
         this.tconstraint = tconstraint;
-        this.opconstraint = opconstraint;
         this.isInfer = isinfer;
         this.defaultType = defaulttype;
     }
@@ -54,12 +52,10 @@ class TemplateTermDecl {
 class TemplateTypeRestriction {
     readonly t: TypeSignature;
     readonly tconstraint: TypeSignature;
-    readonly opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined;
 
-    constructor(t: TypeSignature, tconstraint: TypeSignature, opconstraint: { ns: string, op: string, args: TypeSignature[] } | undefined) {
+    constructor(t: TypeSignature, tconstraint: TypeSignature) {
         this.t = t;
         this.tconstraint = tconstraint;
-        this.opconstraint = opconstraint;
     }
 }
 
@@ -244,6 +240,10 @@ class StaticOperatorDecl implements OOMemberDecl {
 
     getName(): string {
         return this.name;
+    }
+
+    doesKindTagMatch(tag: "prefix" | "infix" | "std"): boolean {
+        return (tag === "prefix" && this.isPrefix) || (tag === "infix" && this.isInfix) || (tag === "std" && !this.isPrefix && !this.isInfix);
     }
 }
 
@@ -485,6 +485,10 @@ class NamespaceOperatorDecl {
 
         this.invoke = invoke;
     }
+
+    doesKindTagMatch(tag: "prefix" | "infix" | "std"): boolean {
+        return (tag === "prefix" && this.isPrefix) || (tag === "infix" && this.isInfix) || (tag === "std" && !this.isPrefix && !this.isInfix);
+    }
 }
 
 class NamespaceTypedef {
@@ -680,6 +684,10 @@ class Assembly {
             }
         }
         else if (exp instanceof CallNamespaceFunctionOrOperatorExpression) {
+            if(exp.opkind !== "prefix") {
+                return undefined;
+            }
+
             if(exp.name !== "+" && exp.name !== "-") {
                 return undefined;
             }

@@ -68,12 +68,12 @@ inline infix operator *(a: Int, b, Int): Int = default;
 inline infix operator /(a: Int, b, Int): Int = default;
 inline infix operator +(a: Int, b, Int): Int = default;
 inline infix operator -(a: Int, b, Int): Int = default;
-inline infix operator ==(a: Int, b: Int): Bool = default;
-inline infix operator !=(a: Int, b: Int): Bool = default;
-inline infix operator <(a: Int, b: Int): Bool = default;
-inline infix operator >(a: Int, b: Int): Bool = default;
-inline infix operator <=(a: Int, b: Int): Bool = default;
-inline infix operator >=(a: Int, b: Int): Bool = default;
+__safe inline infix operator ==(a: Int, b: Int): Bool = default;
+__safe inline infix operator !=(a: Int, b: Int): Bool = default;
+__safe inline infix operator <(a: Int, b: Int): Bool = default;
+__safe inline infix operator >(a: Int, b: Int): Bool = default;
+__safe inline infix operator <=(a: Int, b: Int): Bool = default;
+__safe inline infix operator >=(a: Int, b: Int): Bool = default;
 
 //<summary>Primitive natural number value.</summary>
 grounded struct entity Nat provides Some, KeyType, PODType, APIType {
@@ -83,95 +83,83 @@ inline infix operator *(a: Nat, b, Nat): Nat = default;
 inline infix operator /(a: Nat, b, Nat): Nat = default;
 inline infix operator +(a: Nat, b, Nat): Nat = default;
 inline infix operator -(a: Nat, b, Nat): Nat = default;
-inline infix operator ==(a: Nat, b: Nat): Bool = default;
-inline infix operator !=(a: Nat, b: Nat): Bool = default;
-inline infix operator <(a: Nat, b: Nat): Bool = default;
-inline infix operator >(a: Nat, b: Nat): Bool = default;
-inline infix operator <=(a: Nat, b: Nat): Bool = default;
-inline infix operator >=(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator ==(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator !=(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator <(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator >(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator <=(a: Nat, b: Nat): Bool = default;
+__safe inline infix operator >=(a: Nat, b: Nat): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
 grounded struct entity BigInt provides Some, KeyType, PODType, APIType {
 }
-inline prefix operator +(a: BigInt): BigInt = default;
-inline prefix operator -(a: BigInt): BigInt = default;
-inline infix operator *(a: BigInt, b, BigInt): BigInt = default;
+__safe inline prefix operator +(a: BigInt): BigInt = default;
+__safe inline prefix operator -(a: BigInt): BigInt = default;
+__safe inline infix operator *(a: BigInt, b, BigInt): BigInt = default;
 inline infix operator /(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator +(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator -(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator ==(a: BigInt, b: BigInt): Bool = default;
-inline infix operator !=(a: BigInt, b: BigInt): Bool = default;
-inline infix operator <(a: BigInt, b: BigInt): Bool = default;
-inline infix operator >(a: BigInt, b: BigInt): Bool = default;
-inline infix operator <=(a: BigInt, b: BigInt): Bool = default;
-inline infix operator >=(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator +(a: BigInt, b, BigInt): BigInt = default;
+__safe inline infix operator -(a: BigInt, b, BigInt): BigInt = default;
+__safe inline infix operator ==(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator !=(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator <(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator >(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator <=(a: BigInt, b: BigInt): Bool = default;
+__safe inline infix operator >=(a: BigInt, b: BigInt): Bool = default;
 
 //<summary>Primitive big-integer value.</summary>
 grounded struct entity BigNat provides Some, KeyType, PODType, APIType {
 }
-inline prefix operator +(a: BigNat): BigNat = default;
-inline infix operator *(a: BigNat, b, BigNat): BigNat = default;
+__safe inline prefix operator +(a: BigNat): BigNat = default;
+__safe inline infix operator *(a: BigNat, b, BigNat): BigNat = default;
 inline infix operator /(a: BigNat, b, BigNat): BigNat = default;
-inline infix operator +(a: BigNat, b, BigNat): BigNat = default;
+__safe inline infix operator +(a: BigNat, b, BigNat): BigNat = default;
 inline infix operator -(a: BigNat, b, BigNat): BigNat = default;
-inline infix operator ==(a: BigNat, b: BigNat): Bool = default;
-inline infix operator !=(a: BigNat, b: BigNat): Bool = default;
-inline infix operator <(a: BigNat, b: BigNat): Bool = default;
-inline infix operator >(a: BigNat, b: BigNat): Bool = default;
-inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
-inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator ==(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator !=(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator <(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator >(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator <=(a: BigNat, b: BigNat): Bool = default;
+__safe inline infix operator >=(a: BigNat, b: BigNat): Bool = default;
 
 //<summary>Primitive rational value.</summary>
 grounded struct entity Rational provides Some, PODType, APIType {
 }
-inline prefix operator +(a: Rational): Rational = default;
-inline prefix operator -(a: Rational): Rational = default;
-inline infix operator *(a: Rational, b, Rational): Rational = default;
+__safe inline prefix operator +(a: Rational): Rational = default;
+__safe inline prefix operator -(a: Rational): Rational = default;
+__safe inline infix operator *(a: Rational, b, Rational): Rational = default;
 inline infix operator /(a: Rational, b, Rational): Rational = default;
-inline infix operator +(a: Rational, b, Rational): Rational = default;
-inline infix operator -(a: Rational, b, Rational): Rational = default;
-inline infix operator ==(a: Rational, b: Rational): Bool = default;
-inline infix operator !=(a: Rational, b: Rational): Bool = default;
-inline infix operator <(a: Rational, b: Rational): Bool = default;
-inline infix operator >(a: Rational, b: Rational): Bool = default;
-inline infix operator <=(a: Rational, b: Rational): Bool = default;
-inline infix operator >=(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator +(a: Rational, b, Rational): Rational = default;
+__safe inline infix operator -(a: Rational, b, Rational): Rational = default;
+__safe inline infix operator ==(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator !=(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator <(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator >(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator <=(a: Rational, b: Rational): Bool = default;
+__safe inline infix operator >=(a: Rational, b: Rational): Bool = default;
 
 //<summary>Primitive float value -- compiler flags control bitness -- defaults to 64bit.</summary>
 grounded struct entity Float provides Some, PODType, APIType {
 }
-inline prefix operator +(a: Float): Float = default;
-inline prefix operator -(a: Float): Float = default;
-inline infix operator *(a: Float, b, Float): Float = default;
-inline infix operator /(a: Float, b, Float): Float = default;
-inline infix operator +(a: Float, b, Float): Float = default;
-inline infix operator -(a: Float, b, Float): Float = default;
-inline infix operator <(a: Float, b: Float): Bool = default;
-inline infix operator >(a: Float, b: Float): Bool = default;
+__safe inline prefix operator +(a: Float): Float = default;
+__safe inline prefix operator -(a: Float): Float = default;
+__safe inline infix operator *(a: Float, b, Float): Float = default;
+__safe inline infix operator /(a: Float, b, Float): Float = default;
+__safe inline infix operator +(a: Float, b, Float): Float = default;
+__safe inline infix operator -(a: Float, b, Float): Float = default;
+__safe inline infix operator <(a: Float, b: Float): Bool = default;
+__safe inline infix operator >(a: Float, b: Float): Bool = default;
 
 //<summary>Primitive float decimal value.</summary>
 grounded struct entity Decimal provides Some, PODType, APIType {
 }
-inline prefix operator +(a: Decimal): Decimal = default;
-inline prefix operator -(a: Decimal): Decimal = default;
-inline infix operator *(a: Decimal, b, Decimal): Decimal = default;
-inline infix operator /(a: Decimal, b, Decimal): Decimal = default;
-inline infix operator +(a: Decimal, b, Decimal): Decimal = default;
-inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
-inline infix operator <(a: Decimal, b: Decimal): Bool = default;
-inline infix operator >(a: Decimal, b: Decimal): Bool = default;
-
-//<summary>Primitive complex floating point value.</summary>
-grounded struct entity Complex provides Some, PODType, APIType {
-}
-inline prefix operator +(a: Complex): Complex = default;
-inline prefix operator -(a: Complex): Complex = default;
-inline infix operator *(a: Complex, b, Complex): Complex = default;
-inline infix operator /(a: Complex, b, Complex): Complex = default;
-inline infix operator +(a: Complex, b, Complex): Complex = default;
-inline infix operator -(a: Complex, b, Complex): Complex = default;
-inline infix operator <(a: Complex, b: Complex): Bool = default;
-inline infix operator >(a: Complex, b: Complex): Bool = default;
+__safe inline prefix operator +(a: Decimal): Decimal = default;
+__safe inline prefix operator -(a: Decimal): Decimal = default;
+__safe inline infix operator *(a: Decimal, b, Decimal): Decimal = default;
+__safe inline infix operator /(a: Decimal, b, Decimal): Decimal = default;
+__safe inline infix operator +(a: Decimal, b, Decimal): Decimal = default;
+__safe inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
+__safe inline infix operator <(a: Decimal, b: Decimal): Bool = default;
+__safe inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
 //<summary>Primitive string value.</summary>
 grounded entity String provides Some, KeyType, PODType, APIType {
@@ -261,12 +249,12 @@ inline prefix operator +(a: ISOSeconds): ISOSeconds = default;
 inline prefix operator -(a: ISOSeconds): ISOSeconds = default;
 inline infix operator +(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
 inline infix operator -(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
-inline infix operator ==(a: ISOSeconds, b: ISOSeconds): Bool = default;
-inline infix operator !=(a: ISOSeconds, b: ISOSeconds): Bool = default;
-inline infix operator <(a: ISOSeconds, b: ISOSeconds): Bool = default;
-inline infix operator >(a: ISOSeconds, b: ISOSeconds): Bool = default;
-inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
-inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator ==(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator !=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator <(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator >(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+__safe inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
 
 numeric typedecl ISOMilliSeconds = Int & {
     method toSeconds(): ISOSeconds {
@@ -277,23 +265,22 @@ inline prefix operator +(a: ISOMilliSeconds): ISOMilliSeconds = default;
 inline prefix operator -(a: ISOMilliSeconds): ISOMilliSeconds = default;
 inline infix operator +(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
 inline infix operator -(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
-inline infix operator ==(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-inline infix operator !=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-inline infix operator <(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-inline infix operator >(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator ==(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator !=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator <(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator >(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+__safe inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
 
 numeric ISOTime = Nat;
-inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime # op_isoaddsecl;
-inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime # op_isoaddsecr;
-inline infix operator -(a: ISOTime, b, ISOTime): ISOMilliSeconds # op_isodiff;
-inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
-inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
-inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
-inline infix operator >(a: ISOTime, b: ISOTime): Bool = default;
-inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
-inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime { return ISOTime.create(b.value() + a.value()); }
+inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime { return ISOTime.create(a.value() + b.value()); }
+__safe inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
+__safe inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
+__safe inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
+__safe nline infix operator >(a: ISOTime, b: ISOTime): Bool = default;
+__safe inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
+__safe inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
@@ -302,17 +289,15 @@ grounded struct entity UUID provides Some, KeyType, PODType, APIType {
 
 //<summary>Unit declarations for LogicalTime</summary>
 numeric LogicalTime = Nat;
-inline infix operator +(a: Int, b, LogicalTime): LogicalTime # op_logic_iltl;
-inline infix operator +(a: LogicalTime, b, Int): LogicalTime # op_logic_iltr;
-inline infix operator +(a: Nat, b, LogicalTime): LogicalTime # op_logic_nltl;
-inline infix operator +(a: LogicalTime, b, Nat): LogicalTime # op_logic_nltr;
+inline infix operator +(a: Nat, b, LogicalTime): LogicalTime { return LogicalTime.create(b.value() + a); }
+inline infix operator +(a: LogicalTime, b, Nat): LogicalTime { return LogicalTime.create(a.value() + b); }
 inline infix operator -(a: LogicalTime, b, LogicalTime): Int # op_logic_ltdiff;
-inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
-inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
-inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
-inline infix operator >(a: LogicalTime, b: LogicalTime): Bool = default;
-inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
-inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator >(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
+__safe inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {

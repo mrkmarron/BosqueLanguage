@@ -510,14 +510,16 @@ class CallNamespaceFunctionOrOperatorExpression extends Expression {
     readonly rec: RecursiveAnnotation;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
+    readonly opkind: "prefix" | "infix" | "std";
 
-    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments) {
+    constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments, opkind: "prefix" | "infix" | "std") {
         super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ns = ns;
         this.name = name;
         this.rec = rec;
         this.terms = terms;
         this.args = args;
+        this.opkind = opkind;
     }
 }
 
@@ -527,14 +529,16 @@ class CallStaticFunctionOrOperatorExpression extends Expression {
     readonly rec: RecursiveAnnotation;
     readonly terms: TemplateArguments;
     readonly args: Arguments;
+    readonly opkind: "prefix" | "infix" | "std";
 
-    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments) {
+    constructor(sinfo: SourceInfo, ttype: TypeSignature, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments, opkind: "prefix" | "infix" | "std") {
         super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
         this.ttype = ttype;
         this.name = name;
         this.rec = rec;
         this.terms = terms;
         this.args = args;
+        this.opkind = opkind;
     }
 }
 

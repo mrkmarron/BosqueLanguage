@@ -5,7 +5,35 @@
 
 import * as assert from "assert";
 
-import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRRegisterAssign, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard } from "./mir_ops";
+import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRCheckNoError, MIRExtractResultOkValue, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRRegisterAssign, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRJump } from "./mir_ops";
+
+function cleanDeadBlocks(b: MIRBody) {
+    let dblock = [...b.body].find((bb) => bb[1].ops.some((op) => op.tag === MIROpTag.MIRDeadFlow));
+    while(dblock !== undefined) {
+        const rblock = dblock;
+        b.body.delete(rblock[0]);
+
+        b.body.forEach((bb) => {
+            const jidx = bb.ops.length - 1;
+            if(jidx >= 0) {
+                const jop = bb.ops[jidx];
+                if(jop instanceof MIRJumpCond && (jop.trueblock === rblock[0] || jop.falseblock === rblock[0])) {
+                    const ujop = new MIRJump(jop.sinfo, jop.trueblock !== rblock[0] ? jop.trueblock : jop.falseblock);
+                    bb.ops[jidx] = ujop;
+                }
+                else if(jop instanceof MIRJumpNone && (jop.noneblock === rblock[0] || jop.someblock === rblock[0])) {
+                    const ujop = new MIRJump(jop.sinfo, jop.noneblock !== rblock[0] ? jop.noneblock : jop.someblock);
+                    bb.ops[jidx] = ujop;
+                }
+                else {
+                    ;
+                }
+            }
+        });
+
+        dblock = [...b.body].find((bb) => bb[1].ops.some((op) => op.tag === MIROpTag.MIRDeadFlow));
+    }
+}
 
 function propagateAssign_Bind(treg: MIRRegisterArgument, arg: MIRArgument, propMap: Map<string, MIRArgument>) {
     assert(!propMap.has(treg.nameID));
@@ -321,9 +349,10 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
             mp.src 
             break;
         }
-        default:
+        default: {
             assert(false);
             break;
+        }
     }
 
     const ks = op.getModVars();
@@ -424,6 +453,7 @@ function simplifyBody(body: MIRBody) {
         return;
     }
 
+    cleanDeadBlocks(body);
     propagateAssignForBody(body);
     removeSelfAssigns(body);
     removeDeadTempAssignsFromBody(body);

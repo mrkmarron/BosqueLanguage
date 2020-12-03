@@ -9,7 +9,7 @@
 
 import * as assert from "assert";
 import { MIRBasicBlock, MIROpTag, MIRInvokeKey, MIRInvokeFixedFunction, MIRBody, MIRInvokeVirtualOperator, MIRInvokeVirtualFunction, MIREntityUpdate } from "./mir_ops";
-import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRType } from "./mir_assembly";
+import { MIRAssembly, MIRConstantDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRType } from "./mir_assembly";
 
 type CallGNode = {
     invoke: MIRInvokeKey,
@@ -141,8 +141,76 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
     return { invokes: invokes, topologicalOrder: tordered, roots: roots, recursive: recursive };
 }
 
+function isSafeInvoke(idecl: MIRInvokeDecl): boolean {
+    return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe") || idecl.attributes.includes("__infer_safe");
+}
+
+function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, callg: CallGInfo, doneset: Set<MIRInvokeKey>): boolean {
+    if(masm.primitiveInvokeDecls.has(ikey)) {
+        const pinvk = masm.primitiveInvokeDecls.get(ikey) as MIRInvokePrimitiveDecl;
+        if(isSafeInvoke(pinvk)) {
+            return true;
+        }
+
+        //
+        //TODO: if this is a default operator on a user defined type we should resolve the primitive type and check if it is safe
+        //
+
+        return false;
+    }
+    else {
+        const invk = masm.invokeDecls.get(ikey) as MIRInvokeBodyDecl;
+        const haserrorop = [...invk.body.body].some((bb) => bb[1].ops.some((op) => {
+            return op.tag === MIROpTag.MIRAbort || op.tag === MIROpTag.MIRAssertCheck;
+        }));
+
+        if(haserrorop) {
+            return false;
+        }
+        else {
+            const cn = callg.invokes.get(ikey) as CallGNode;
+            return [...cn.callees].every((callee) => {
+                const ceivk = (masm.primitiveInvokeDecls.get(callee) || masm.invokeDecls.get(callee)) as MIRInvokeDecl;
+                return isSafeInvoke(ceivk) || !doneset.has(callee);
+            });
+        }
+    }
+}
+
+function markSafeCalls(entryPoints: MIRInvokeKey[], masm: MIRAssembly) {
+    const cginfo = constructCallGraphInfo(entryPoints, masm);
+    const rcg = [...cginfo.topologicalOrder].reverse();
+
+    let doneset = new Set<MIRInvokeKey>();
+
+    for (let i = 0; i < rcg.length; ++i) {
+        const cn = rcg[i];
+        if(doneset.has(cn.invoke)) {
+            continue;
+        }
+
+        const cscc = cginfo.recursive.find((scc) => scc.has(cn.invoke));
+        let worklist = cscc !== undefined ? [...cscc].sort() : [cn.invoke];
+
+        for (let mi = 0; mi < worklist.length; ++mi) {
+            const ikey = worklist[mi];
+            const idcl = (masm.invokeDecls.get(ikey) || masm.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
+           
+            const issafe = isBodySafe(ikey, masm, cginfo, doneset);
+            if(issafe && !isSafeInvoke(idcl)) {
+                idcl.attributes.push("__infer_safe");
+            }
+        }
+
+        if (cscc !== undefined) {
+            cscc.forEach((v) => doneset.add(v));
+        }
+    }
+}
+
 export {
     CallGNode,
     CallGInfo,
-    constructCallGraphInfo
+    constructCallGraphInfo,
+    markSafeCalls
 };
