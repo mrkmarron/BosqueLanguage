@@ -62,12 +62,12 @@ grounded struct entity Bool provides Some, KeyType, PODType, APIType {
 //<summary>Primitive integer value.</summary>
 grounded struct entity Int provides Some, KeyType, PODType, APIType {
 }
-inline prefix operator +(a: Int): Int = default;
-inline prefix operator -(a: Int): Int = default;
-inline infix operator *(a: Int, b, Int): Int = default;
+__safe inline prefix operator +(a: Int): Int = default;
+__safe inline prefix operator -(a: Int): Int = default;
+__safe inline infix operator *(a: Int, b, Int): Int = default;
 inline infix operator /(a: Int, b, Int): Int = default;
-inline infix operator +(a: Int, b, Int): Int = default;
-inline infix operator -(a: Int, b, Int): Int = default;
+__safe inline infix operator +(a: Int, b, Int): Int = default;
+__safe inline infix operator -(a: Int, b, Int): Int = default;
 __safe inline infix operator ==(a: Int, b: Int): Bool = default;
 __safe inline infix operator !=(a: Int, b: Int): Bool = default;
 __safe inline infix operator <(a: Int, b: Int): Bool = default;
@@ -78,10 +78,10 @@ __safe inline infix operator >=(a: Int, b: Int): Bool = default;
 //<summary>Primitive natural number value.</summary>
 grounded struct entity Nat provides Some, KeyType, PODType, APIType {
 }
-inline prefix operator +(a: Nat): Nat = default;
-inline infix operator *(a: Nat, b, Nat): Nat = default;
+__safe inline prefix operator +(a: Nat): Nat = default;
+__safe inline infix operator *(a: Nat, b, Nat): Nat = default;
 inline infix operator /(a: Nat, b, Nat): Nat = default;
-inline infix operator +(a: Nat, b, Nat): Nat = default;
+__safe inline infix operator +(a: Nat, b, Nat): Nat = default;
 inline infix operator -(a: Nat, b, Nat): Nat = default;
 __safe inline infix operator ==(a: Nat, b: Nat): Bool = default;
 __safe inline infix operator !=(a: Nat, b: Nat): Bool = default;

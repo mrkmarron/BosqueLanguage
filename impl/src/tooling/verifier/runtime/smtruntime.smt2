@@ -214,6 +214,20 @@
 (declare-fun BRationalUnary_UF (String BRational) BRational)
 (declare-fun BRationalBinary_UF (String BRational BRational) BRational)
 
+(declare-fun BIntNonLinear_UF (String Int Int) Int)
+(declare-fun BBigIntNonLinear_UF (String Int Int) Int)
+
+(declare-fun BNatNonLinear_X_UF (String Int Int) Int)
+(declare-fun BBigNatNonLinear_X_UF (String Int Int) Int)
+
+(define-fun BNatNonLinear_UF ((op String) (a Int) (b Int)) Int 
+  (let ((r (BNatNonLinear_X_UF op a b))) (ite (<= 0 r) r (- r)))
+)
+
+(define-fun BBigNatNonLinear_UF ((op String) (a Int) (b Int)) Int 
+  (let ((r (BNatNonLinear_X_UF op a b))) (ite (<= 0 r) r (- r)))
+)
+
 ;;EPHEMERAL_DECLS;;
 
 (declare-datatypes () (

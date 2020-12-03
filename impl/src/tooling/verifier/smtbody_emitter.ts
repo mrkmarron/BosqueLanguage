@@ -1309,7 +1309,9 @@ class SMTBodyEmitter {
         if(invk instanceof MIRInvokePrimitiveDecl && invk.implkey === "default") {
             assert(op.guard === undefined && op.optmask === undefined);
 
-            return this.processDefaultOperatorInvoke(op, invk, continuation);
+            const args = op.args.map((arg) => this.argToSMT(arg));
+            const varargcount = op.args.filter((arg) => !(arg instanceof MIRConstantArgument)).length;
+            return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, varargcount, continuation);
         }
         else {
             let mask: SMTMaskConstruct | undefined = undefined;
@@ -1562,22 +1564,9 @@ class SMTBodyEmitter {
         xxxx;
     }
 
-    processGenerateResultWithBounds(sinfo: SourceInfo, op: string, args: SMTExp[], not0arg: SMTExp | undefined, lb: string, ub: string, oftype: MIRType): SMTExp {
-        const vtmp = this.generateTempName();
-        const val = new SMTVar(vtmp);
-
-        const chkbounds = new SMTCallSimple("and", [new SMTCallSimple("<=", [new SMTConst(lb), val]), new SMTCallSimple("<=", [val, new SMTConst(ub)])]);
-        const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Arith out of bounds"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
-
-        if(not0arg === undefined) {
-            return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
-        }
-        else {
-            const chkzero = new SMTCallSimple("==", [new SMTConst("0"), not0arg]);
-            const zop = new SMTIf(chkzero, this.generateErrorCreate(sinfo, oftype, "Div by 0"), bop);
-
-            return new SMTLet(vtmp, new SMTCallSimple(op, args), zop);
-        }
+    processGenerateResultWithZeroArgCheck(sinfo: SourceInfo, not0arg: SMTExp, oftype: MIRType, val: SMTExp): SMTExp {
+        const chkzero = new SMTCallSimple("==", [new SMTConst("0"), not0arg]);
+        return new SMTIf(chkzero, this.generateErrorCreate(sinfo, oftype, "Div by 0"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
     }
 
     processGenerateResultWithPositiveCheck(sinfo: SourceInfo, op: string, args: SMTExp[], oftype: MIRType): SMTExp {
@@ -1585,12 +1574,12 @@ class SMTBodyEmitter {
         const val = new SMTVar(vtmp);
 
         const chkbounds = new SMTCallSimple("<=", [new SMTConst("0"), val]);
-        const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Arith out of bounds"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
+        const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Result is negative"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
 
         return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
     }
     
-    processDefaultOperatorInvokePrimitiveType(sinfo: SourceInfo, trgt: MIRRegisterArgument, op: MIRInvokeKey, args: SMTExp[], oftype: MIRType, varargcount: number, continuation: SMTExp): {value: SMTExp, erropt: boolean} {
+    processDefaultOperatorInvokePrimitiveType(sinfo: SourceInfo, trgt: MIRRegisterArgument, op: MIRInvokeKey, args: SMTExp[], varargcount: number, continuation: SMTExp): SMTExp {
         let smte: SMTExp = new SMTConst("[INVALID]");
         let erropt = false;
 
@@ -1625,16 +1614,8 @@ class SMTBodyEmitter {
                 break;
             }
             //op infix +
-            case "NSCore::+=infix=(NSCore::Int, NSCore::Int)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "+", args, undefined, "-9223372036854775808", "9223372036854775807", this.typegen.getMIRType("NSCore::Int"));
-                erropt = true;
-                break;
-            }
-            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "+", args, undefined, "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
-                erropt = true;
-                break;
-            }
+            case "NSCore::+=infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)": 
             case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)": 
             case "NSCore::+=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 smte = new SMTCallSimple("+", args);
@@ -1654,12 +1635,11 @@ class SMTBodyEmitter {
             }
             //op infix -
             case "NSCore::-=infix=(NSCore::Int, NSCore::Int)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "-", args, undefined, "-9223372036854775808", "9223372036854775807", this.typegen.getMIRType("NSCore::Int"));
-                erropt = true;
+                smte = new SMTCallSimple("-", args);
                 break;
             }
             case "NSCore::-=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "-", args, undefined, "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
+                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, this.typegen.getMIRType("NSCore::Nat"));
                 erropt = true;
                 break;
             }
@@ -1686,21 +1666,21 @@ class SMTBodyEmitter {
             }
             //op infix *
             case "NSCore::*=infix=(NSCore::Int, NSCore::Int)": {
-                smte = varargcount > 1 ? xxxx : this.processGenerateResultWithBounds(sinfo, "*", args, undefined, "-9223372036854775808", "9223372036854775807", this.typegen.getMIRType("NSCore::Int"));
+                smte = varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 erropt = true;
                 break;
             }
             case "NSCore::*=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = varargcount > 1 ? xxxx : this.processGenerateResultWithBounds(sinfo, "*", args, undefined, "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
+                smte = varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 erropt = true;
                 break;
             }
             case "NSCore::*=infix=(NSCore::BigInt, NSCore::BigInt)": {
-                smte = varargcount > 1 ? xxxx : new SMTCallSimple("*", args);
+                smte = varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break
             }
             case "NSCore::*=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = varargcount > 1 ? xxxx : new SMTCallSimple("*", args);
+                smte = varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break
             }
             case "NSCore::*=infix=(NSCore::Rational, NSCore::Rational)":  {
@@ -1717,332 +1697,106 @@ class SMTBodyEmitter {
             }
             //op infix /
             case "NSCore::/=infix=(NSCore::Int, NSCore::Int)": {
-                smte = varargcount > 1 ? xxxx : this.processGenerateResultWithBounds(sinfo, "/", args, args[0], "-9223372036854775808", "9223372036854775807", this.typegen.getMIRType("NSCore::Int"));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Int"), varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = varargcount > 1 ? xxxx : this.processGenerateResultWithBounds(sinfo, "/", args, args[0], "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Nat"), varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::BigInt, NSCore::BigInt)": {
-                smte = varargcount > 1 ? xxxx : new SMTCallSimple("/", args);
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::BigInt"), varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                erropt = true;
                 break
             }
             case "NSCore::/=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = varargcount > 1 ? xxxx : new SMTCallSimple("/", args);
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::BigNat"), varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                erropt = true;
                 break
             }
             case "NSCore::/=infix=(NSCore::Rational, NSCore::Rational)":  {
-                xxxx;
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("*", args);
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], this.typegen.getMIRType("NSCore::Rational"), (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::Float, NSCore::Float)": {
-                xxxx;
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("*", args);
+                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
                 break;
             }
             case "NSCore::/=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                xxxx;
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("*", args);
+                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
                 break;
             }
-
-
-
-
-            
-
-            
-            case "NSCore::/=infix=(NSCore::Int, NSCore::Int)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "/", args, args[1], "-9223372036854775808", "9223372036854775807", this.typegen.getMIRType("NSCore::Int"));
-                erropt = true;
-                break;
-            }
-            case "NSCore::===infix=(NSCore::Int, NSCore::Int)": {
+            //op infix ==
+            case "NSCore::===infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::===infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::===infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::===infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::===infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("=", args);
-                break;
+                break; 
             }
-            case "NSCore::!==infix=(NSCore::Int, NSCore::Int)": {
+            //op infix !=
+            case "NSCore::===infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::===infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::===infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::===infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::===infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("not", [new SMTCallSimple("=", args)]);
                 break;
             }
-            case "NSCore::<=infix=(NSCore::Int, NSCore::Int)": {
+            //op infix <
+            case "NSCore::<=infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::<=infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::<=infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::<=infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::<=infix=(NSCore::Rational, NSCore::Rational)":
+            case "NSCore::<=infix=(NSCore::Float, NSCore::Float)":
+            case "NSCore::<=infix=(NSCore::Decimal, NSCore::Decimal)": {
                 smte = new SMTCallSimple("<", args);
                 break;
             }
-            case "NSCore::>=infix=(NSCore::Int, NSCore::Int)": {
+            //op infix >
+            case "NSCore::>=infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::>=infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::>=infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::>=infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::>=infix=(NSCore::Rational, NSCore::Rational)":
+            case "NSCore::>=infix=(NSCore::Float, NSCore::Float)":
+            case "NSCore::>=infix=(NSCore::Decimal, NSCore::Decimal)": {
                 smte = new SMTCallSimple(">", args);
                 break;
             }
-            case "NSCore::<==infix=(NSCore::Int, NSCore::Int)": {
+            //op infix <=
+            case "NSCore::<==infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::<==infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::<==infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::<==infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::<==infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("<=", args);
-                break;
+                break; 
             }
-            case "NSCore::>==infix=(NSCore::Int, NSCore::Int)": {
+            //op infix >=
+            case "NSCore::>==infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::>==infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::>==infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::>==infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::>==infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple(">=", args);
                 break;
             }
-
-           
-            
-            case "NSCore::-=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "-", args, undefined, "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
-                erropt = true;
-                break;
-            }
-            case "NSCore::*=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "*", args, undefined, "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
-                erropt = true;
-                break;
-            }
-            case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = this.processGenerateResultWithBounds(sinfo, "/", args, args[1], "0", "18446744073709551615", this.typegen.getMIRType("NSCore::Nat"));
-                erropt = true;
-                break;
-            }
-            case "NSCore::===infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple("=", args);
-                break;
-            }
-            case "NSCore::!==infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple("not", [new SMTCallSimple("=", args)]);
-                break;
-            }
-            case "NSCore::<=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple("<", args);
-                break;
-            }
-            case "NSCore::>=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple(">", args);
-                break;
-            }
-            case "NSCore::<==infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple("<=", args);
-                break;
-            }
-            case "NSCore::>==infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = new SMTCallSimple(">=", args);
-                break;
+            default: {
+                assert(false);
             }
         }
 
-        else if(this.typegen.isType(oftype, "NSCore::BigInt")) {
-
-        }
-        else if(this.typegen.isType(oftype, "NSCore::BigNat")) {
-            
-        }
-        else if(this.typegen.isType(oftype, "NSCore::Rational")) {
-            
-        }
-        else if(this.typegen.isType(oftype, "NSCore::Float")) {
-            
+        if(!erropt) {
+            return new SMTLet(this.varToSMTName(trgt).vname, smte, continuation);
         }
         else {
-            
-        }
-    }
-
-    processDefaultOperatorInvoke(op: MIRInvokeFixedFunction, invk: MIRInvokePrimitiveDecl, continuation: SMTExp): SMTExp {
-
-
-    }
-
-
-    generateMIRConstructorPrimaryCollectionEmpty(cpce: MIRConstructorPrimaryCollectionEmpty): SMTExp {
-        const cpcetype = this.typegen.getMIRType(cpce.tkey);
-        const smtctype = this.typegen.generateEntityConstructor(cpce.tkey);
-        
-        if(this.typegen.typecheckIsName(cpcetype, /^NSCore::List<.*>$/)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcetype, /^NSCore::Stack<.*>$/)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcetype, /^NSCore::Queue<.*>$/)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 0 ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcetype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcetype, /^NSCore::DynamicSet<.*>$/)) {
-            return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyHasArrayFor(cpce.tkey)} bsqterm_none)`));
-        }
-        else {
-           return new SMTLet(this.varToSMTName(cpce.trgt), new SMTValue(`(${smtctype} 0 ${this.typegen.generateEmptyHasArrayFor(cpce.tkey)} ${this.typegen.generateEmptyDataArrayFor(cpce.tkey)} bsqterm_none)`));
-        }
-    }
-
-    generateMIRConstructorPrimaryCollectionSingletons(cpcs: MIRConstructorPrimaryCollectionSingletons): SMTExp {
-        const cpcstype = this.typegen.getMIRType(cpcs.tkey);
-        const smtctype = this.typegen.generateEntityConstructor(cpcs.tkey);
-
-        if(this.typegen.typecheckIsName(cpcstype, /^NSCore::List<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            let consv = this.typegen.generateEmptyDataArrayFor(cpcs.tkey);
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], oftype).emit()})`;
-            }
-
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${consv})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcstype, /^NSCore::Stack<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            let consv = this.typegen.generateEmptyDataArrayFor(cpcs.tkey);
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], oftype).emit()})`;
-            }
-
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${smtctype} ${cpcs.args.length} ${consv})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcstype, /^NSCore::Queue<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-            let consv = this.typegen.generateEmptyDataArrayFor(cpcs.tkey);
-            for (let i = 0; i < cpcs.args.length; ++i) {
-                consv = `(store ${consv} ${i} ${this.argToSMT(cpcs.args[i], oftype).emit()})`;
-            }
-
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(`(${smtctype} 0 ${cpcs.args.length} ${consv})`));
-        }
-        else if(this.typegen.typecheckIsName(cpcstype, /^NSCore::Set<.*>$/) || this.typegen.typecheckIsName(cpcstype, /^NSCore::DynamicSet<.*>$/)) {
-            const oftype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("T") as MIRType;
-
-            const kltype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "KeyList" && (edecl[1].terms.get("K") as MIRType).trkey === oftype.trkey) as [string, MIREntityTypeDecl];
-            const klcons = this.typegen.generateEntityConstructor(kltype[1].tkey);
-            const klstore = this.typegen.getKeyListTypeForSet(this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl);
-
-            let consv = `(${smtctype} %CTR% %HAS% %KEY%)`;
-            for (let i = cpcs.args.length - 1; i >= 1; --i) {
-                const arg = cpcs.args[i];
-
-                const key = this.argToSMT(arg, oftype).emit();
-                const ctrvar = this.generateTempName();
-                const ctrup = `(ite (select %HAS% ${key}) %CTR% (+ %CTR% 1))`;
-
-                const hasvar = this.generateTempName();
-                const hasup = `(store %HAS% ${key} true)`;
-
-                const keyvar = this.generateTempName();
-                const keycons = `(${klcons} ${key} %KEY%)`;
-                const keyforce = this.typegen.coerce(new SMTValue(keycons), this.typegen.getMIRType(kltype[1].tkey), klstore).emit();
-                const keyup = `(ite (select %HAS% ${key}) %KEY% ${keyforce})`;
-
-                const body = consv.replace(/%CTR%/g, ctrvar).replace(/%HAS%/g, hasvar).replace(/%KEY%/g, keyvar);
-                consv = `(let ((${ctrvar} ${ctrup}) (${hasvar} ${hasup}) (${keyvar} ${keyup})) ${body})`
-            }
-            const key = this.argToSMT(cpcs.args[0], oftype).emit();
-            const kl = new SMTValue(`(${klcons} ${key} bsqterm_none)`);
-            const final = consv
-                .replace(/%CTR%/g, "1")
-                .replace(/%HAS%/g, `(store ${this.typegen.generateEmptyHasArrayFor(cpcs.tkey)} ${key} true)`)
-                .replace(/%KEY%/g, this.typegen.coerce(kl, this.typegen.getMIRType(kltype[1].tkey), klstore).emit());
-
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(final));
-        }
-        else {
-            const ktype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("K") as MIRType;
-            const vtype = (this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl).terms.get("V") as MIRType;
-
-            const entrytype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "MapEntry" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey && (edecl[1].terms.get("V") as MIRType).trkey === vtype.trkey) as [string, MIREntityTypeDecl];
-            const entrykey = this.typegen.generateEntityAccessor(entrytype[1].tkey, (entrytype[1].fields.find((fd) => fd.name === "key") as MIRFieldDecl).fkey);
-            const entryvalue = this.typegen.generateEntityAccessor(entrytype[1].tkey, (entrytype[1].fields.find((fd) => fd.name === "value") as MIRFieldDecl).fkey);
-
-            const kltype = [...this.typegen.assembly.entityDecls].find((edecl) => edecl[1].ns === "NSCore" && edecl[1].name === "KeyList" && (edecl[1].terms.get("K") as MIRType).trkey === ktype.trkey) as [string, MIREntityTypeDecl];
-            const klcons = this.typegen.generateEntityConstructor(kltype[1].tkey);
-            const klstore = this.typegen.getKeyListTypeForMap(this.assembly.entityDecls.get(cpcs.tkey) as MIREntityTypeDecl);
-
-            let consv = `(${smtctype} %CTR% %HAS% %ENTRYDATA% %KEY%)`;
-            for (let i = cpcs.args.length - 1; i >= 1; --i) {
-                const arg = cpcs.args[i];
-                const entrykeyexp = `(${entrykey} ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-                const entryvalexp = `(${entryvalue} ${this.argToSMT(arg, this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-
-                const key = entrykeyexp;
-                const ctrvar = this.generateTempName();
-                const ctrup = `(ite (select %HAS% ${key}) %CTR% (+ %CTR% 1))`;
-
-                const hasvar = this.generateTempName();
-                const hasup = `(store %HAS% ${key} true)`;
-
-                const entrydatavar = this.generateTempName();
-                const entrydataup = `(store %ENTRYDATA% ${key} ${entryvalexp})`;
-
-                const keyvar = this.generateTempName();
-                const keycons = `(${klcons} ${key} %KEY%)`;
-                const keyforce = this.typegen.coerce(new SMTValue(keycons), this.typegen.getMIRType(kltype[1].tkey), klstore).emit();
-                const keyup = `(ite (select %HAS% ${key}) %KEY% ${keyforce})`;
-
-                const body = consv.replace(/%CTR%/g, ctrvar).replace(/%HAS%/g, hasvar).replace(/%ENTRYDATA%/g, entrydatavar).replace(/%KEY%/g, keyvar);
-                consv = `(let ((${ctrvar} ${ctrup}) (${hasvar} ${hasup}) (${entrydatavar} ${entrydataup})  (${keyvar} ${keyup})) ${body})`
-            }
-            const entrykeyexp0 = `(${entrykey} ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-            const entryvalexp0 = `(${entryvalue} ${this.argToSMT(cpcs.args[0], this.typegen.getMIRType(entrytype[1].tkey)).emit()})`;
-
-            const key = entrykeyexp0;
-            const kl = new SMTValue(`(${klcons} ${key} bsqterm_none)`);
-            const final = consv
-                .replace(/%CTR%/g, "1")
-                .replace(/%HAS%/g, `(store ${this.typegen.generateEmptyHasArrayFor(cpcs.tkey)} ${key} true)`)
-                .replace(/%ENTRYDATA%/g, `(store ${this.typegen.generateEmptyDataArrayFor(cpcs.tkey)} ${key} ${entryvalexp0})`)
-                .replace(/%KEY%/g, this.typegen.coerce(kl, this.typegen.getMIRType(kltype[1].tkey), klstore).emit());
-
-            return new SMTLet(this.varToSMTName(cpcs.trgt), new SMTValue(final));
-        }
-    }
-
-    generateLess(lhsinfertype: MIRType, lhs: MIRArgument, rhsinfertype: MIRType, rhs: MIRArgument, isstrict: boolean): string {
-        if (isstrict) {
-            const tt = lhsinfertype;
-            const argl = this.argToSMT(lhs, lhsinfertype).emit();
-            const argr = this.argToSMT(rhs, rhsinfertype).emit();
-
-            if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
-                return "false";
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::Bool$/)) {
-                return `(and (not ${argl}) ${argr})`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::Int$/)) {
-                return `(< ${argl} ${argr})`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::BigInt$/)) {
-                return `(< ${argl} ${argr})`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::String$/)) {
-                return `(str.< ${argl}${argr})`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::SafeString<.*>$/)) {
-                return `(str.< (bsq_safestring_value ${argl}) (bsq_safestring_value ${argr}))`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::StringOf<.*>$/)) {
-                return `(str.< (bsq_stringof_value ${argl}) (bsq_stringof_value ${argr}))`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::UUID$/)) {
-                return ` (str.< (bsq_uuid_value ${argl}) (bsq_uuid_value ${argr}))`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::LogicalTime$/)) {
-                return `(< (bsq_logicaltime_value ${argl}) (bsq_logicaltime_value ${argr}))`;
-            }
-            else if (this.typegen.typecheckIsName(tt, /^NSCore::CryptoHash$/)) {
-                return `(str.< (bsq_cryptohash ${argl}) (bsq_cryptohash ${argr}))`;
-            }
-            else if (this.typegen.typecheckEntityAndProvidesName(tt, this.typegen.enumtype)) {
-                return `(< (bsq_enum_value ${argl}) (bsq_enum_value ${argr}))`;
-            }
-            else {
-                //TODO: this should turn into a gas driven generation -- and do this for composite and simple
-                const iddecl = this.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
-                if (iddecl.attributes.includes("identifier_simple")) {
-                    return `(bsqkeyless_identitysimple MIRNominalTypeEnum_${this.typegen.mangleStringForSMT(tt.trkey)} ${argl} ${argr})`;
-                }
-                else {
-                    return `(bsqkeyless_identitycompound MIRNominalTypeEnum_${this.typegen.mangleStringForSMT(tt.trkey)} ${argl} ${argr})`;
-                }
-            }
-        }
-        else {
-            //TODO: this should turn into a gas driven generation
-            return `(bsqkeyless ${this.argToSMT(lhs, this.typegen.keyType).emit()} ${this.argToSMT(rhs, this.typegen.keyType).emit()})`;
+            xxxx;
         }
     }
 
