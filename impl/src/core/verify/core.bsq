@@ -6,6 +6,17 @@
 //The core namespace implements the primitive types used in the Bosque language
 namespace NSCore;
 
+//<summary>Special builtin methods for verifier to use.</summary>
+entity Verifier {
+    __safe static term_eq(t1: Any, t2: Any): Bool # verifier_termeq
+    __safe static term_neq(t1: Any, t2: Any): Bool # verifier_termneq
+
+    __safe static lnot(b1: Bool, b2: Bool): Bool # verifier_lnot
+    __safe static land(b1: Bool, b2: Bool): Bool # verifier_land
+    __safe static lor(b1: Bool, b2: Bool): Bool # verifier_lor
+    __safe static limplies(b1: Bool, b2: Bool): Bool # verifier_limplies
+}
+
 //<summary>Special type which all values are instances of.</summary>
 concept Any {
     method is<T>(): Bool # special_method
@@ -249,12 +260,12 @@ inline prefix operator +(a: ISOSeconds): ISOSeconds = default;
 inline prefix operator -(a: ISOSeconds): ISOSeconds = default;
 inline infix operator +(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
 inline infix operator -(a: ISOSeconds, b, ISOSeconds): ISOSeconds = default;
-__safe inline infix operator ==(a: ISOSeconds, b: ISOSeconds): Bool = default;
-__safe inline infix operator !=(a: ISOSeconds, b: ISOSeconds): Bool = default;
-__safe inline infix operator <(a: ISOSeconds, b: ISOSeconds): Bool = default;
-__safe inline infix operator >(a: ISOSeconds, b: ISOSeconds): Bool = default;
-__safe inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
-__safe inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator ==(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator !=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator <(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator >(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator <=(a: ISOSeconds, b: ISOSeconds): Bool = default;
+inline infix operator >=(a: ISOSeconds, b: ISOSeconds): Bool = default;
 
 numeric typedecl ISOMilliSeconds = Int & {
     method toSeconds(): ISOSeconds {
@@ -265,22 +276,22 @@ inline prefix operator +(a: ISOMilliSeconds): ISOMilliSeconds = default;
 inline prefix operator -(a: ISOMilliSeconds): ISOMilliSeconds = default;
 inline infix operator +(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
 inline infix operator -(a: ISOMilliSeconds, b, ISOMilliSeconds): ISOMilliSeconds = default;
-__safe inline infix operator ==(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-__safe inline infix operator !=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-__safe inline infix operator <(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-__safe inline infix operator >(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-__safe inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
-__safe inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator ==(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator !=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator <(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator >(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator <=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
+inline infix operator >=(a: ISOMilliSeconds, b: ISOMilliSeconds): Bool = default;
 
 numeric ISOTime = Nat;
 inline infix operator +(a: ISOMilliSeconds, b, ISOTime): ISOTime { return ISOTime.create(b.value() + a.value()); }
 inline infix operator +(a: ISOTime, b, ISOMilliSeconds): ISOTime { return ISOTime.create(a.value() + b.value()); }
-__safe inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
-__safe inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
-__safe inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
-__safe nline infix operator >(a: ISOTime, b: ISOTime): Bool = default;
-__safe inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
-__safe inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator ==(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator !=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator <(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator >(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator <=(a: ISOTime, b: ISOTime): Bool = default;
+inline infix operator >=(a: ISOTime, b: ISOTime): Bool = default;
 
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
@@ -292,12 +303,12 @@ numeric LogicalTime = Nat;
 inline infix operator +(a: Nat, b, LogicalTime): LogicalTime { return LogicalTime.create(b.value() + a); }
 inline infix operator +(a: LogicalTime, b, Nat): LogicalTime { return LogicalTime.create(a.value() + b); }
 inline infix operator -(a: LogicalTime, b, LogicalTime): Int # op_logic_ltdiff;
-__safe inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
-__safe inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
-__safe inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
-__safe inline infix operator >(a: LogicalTime, b: LogicalTime): Bool = default;
-__safe inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
-__safe inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator ==(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator !=(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator <(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator >(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator <=(a: LogicalTime, b: LogicalTime): Bool = default;
+inline infix operator >=(a: LogicalTime, b: LogicalTime): Bool = default;
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {

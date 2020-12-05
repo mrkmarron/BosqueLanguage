@@ -912,6 +912,7 @@ enum StatementTag {
     CheckStatement = "CheckStatement", //check(x > 0)
     ValidateStatement = "ValidateStatement", //validate exp or err -> if (!exp) return Result<INVOKE_RESULT>@error(err);
 
+    VerifierAssumeStatement = "VerifierAssumeStatement", //special for statements that we just want to assume as true (not actually check)
     DebugStatement = "DebugStatement", //print an arg or if empty attach debugger
     NakedCallStatement = "NakedCallStatement",
 
@@ -1165,6 +1166,15 @@ class ValidateStatement extends Statement {
     }
 }
 
+class VerifierAssumeStatement extends Statement {
+    readonly cond: Expression;
+
+    constructor(sinfo: SourceInfo, cond: Expression) {
+        super(StatementTag.VerifierAssumeStatement, sinfo);
+        this.cond = cond;
+    }
+}
+
 class DebugStatement extends Statement {
     readonly value: Expression | undefined;
 
@@ -1230,7 +1240,7 @@ export {
     StructuredAssignment, IgnoreTermStructuredAssignment, ConstValueStructuredAssignment, VariableDeclarationStructuredAssignment, VariableAssignmentStructuredAssignment, StructuredVariableAssignmentStatement, 
     TupleStructuredAssignment, RecordStructuredAssignment, NominalStructuredAssignment, ValueListStructuredAssignment,
     ReturnStatement, YieldStatement,
-    IfElseStatement, AbortStatement, AssertStatement, CheckStatement, ValidateStatement, DebugStatement, NakedCallStatement,
+    IfElseStatement, AbortStatement, AssertStatement, CheckStatement, ValidateStatement, DebugStatement, VerifierAssumeStatement, NakedCallStatement,
     MatchGuard, WildcardMatchGuard, TypeMatchGuard, StructureMatchGuard, MatchEntry, MatchStatement,
     BlockStatement, BodyImplementation
 };

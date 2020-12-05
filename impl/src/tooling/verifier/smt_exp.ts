@@ -14,15 +14,10 @@ class SMTMaskConstruct {
     }
 }
 
-abstract class SMTTerm {
-}
-
-class SMTType extends SMTTerm {
+class SMTType {
     readonly name: string;
     
     constructor(name: string) {
-        super();
-
         this.name = name;
     }
 
@@ -35,10 +30,7 @@ class SMTType extends SMTTerm {
     }
 }
 
-abstract class SMTExp extends SMTTerm {
-    constructor() {
-        super();
-    }
+abstract class SMTExp {
 }
 
 class SMTVar extends SMTExp {
@@ -167,10 +159,45 @@ class SMTCond extends SMTExp {
     }
 }
 
+abstract class SMTAxiom {
+    readonly terms: { vname: string, vtype: SMTType }[];
+    readonly guard: SMTExp | undefined;
+    readonly clause: SMTExp;
+
+    readonly identifier: string;
+    readonly trigger: SMTExp | undefined;
+
+    constructor(terms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
+        this.terms = terms;
+        this.guard = guard;
+        this.clause = clause;
+
+        this.identifier = identifier;
+        this.trigger = trigger;
+    }
+}
+
+class SMTForAll extends SMTAxiom {
+    constructor(terms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
+        super(terms, guard, clause, identifier, trigger);
+    }
+}
+
+class SMTForallExists extends SMTAxiom {
+    readonly eterms: { vname: string, vtype: SMTType }[];
+
+    constructor(allterms: { vname: string, vtype: SMTType }[], eterms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
+        super(allterms, guard, clause, identifier, trigger);
+
+        this.eterms = eterms;
+    }
+}
+
 export {
     VerifierLevel,
     SMTMaskConstruct,
     SMTType, SMTExp, SMTVar, SMTConst, 
     SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCallGeneralWPassThroughMask,
-    SMTLet, SMTLetMulti, SMTIf, SMTCond
+    SMTLet, SMTLetMulti, SMTIf, SMTCond,
+    SMTAxiom, SMTForAll, SMTForallExists
 };

@@ -197,7 +197,8 @@ function computeVarTypes(blocks: Map<string, MIRBasicBlock>, params: MIRFunction
                 case MIROpTag.MIRDeclareGuardFlagLocation: 
                 case MIROpTag.MIRSetConstantGuardFlag:
                 case MIROpTag.MIRVarLifetimeStart:
-                case MIROpTag.MIRVarLifetimeEnd: 
+                case MIROpTag.MIRVarLifetimeEnd:
+                case MIROpTag.MIRVerifierAssume:
                 case MIROpTag.MIRAssertCheck:
                 case MIROpTag.MIRDebug: {
                     break;

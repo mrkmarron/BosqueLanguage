@@ -479,6 +479,7 @@ enum MIROpTag {
     MIRNop = "MIRNop",
     MIRDeadFlow = "MIRDeadFlow",
     MIRAbort = "MIRAbort",
+    MIRVerifierAssume = "MIRVerifierAssume",
     MIRAssertCheck = "MIRAssertCheck",
     MIRDebug = "MIRDebug",
 
@@ -579,6 +580,8 @@ abstract class MIROp {
                 return MIRDeadFlow.jparse(jobj);
             case MIROpTag.MIRAbort:
                 return MIRAbort.jparse(jobj);
+            case MIROpTag.MIRVerifierAssume:
+                return MIRVerifierAssume.jparse(jobj);
             case MIROpTag.MIRAssertCheck:
                 return MIRAssertCheck.jparse(jobj);
             case MIROpTag.MIRDebug:
@@ -754,6 +757,32 @@ class MIRAbort extends MIROp {
         return new MIRAbort(jparsesinfo(jobj.sinfo), jobj.info);
     }
 }
+
+class MIRVerifierAssume extends MIROp {
+    arg: MIRArgument;
+
+    constructor(sinfo: SourceInfo, arg: MIRArgument) {
+        super(MIROpTag.MIRVerifierAssume, sinfo);
+
+        this.arg = arg;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([this.arg]); }
+    getModVars(): MIRRegisterArgument[] { return []; }
+
+    stringify(): string {
+        return `_assume ${this.arg.stringify()}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), arg: this.arg.jemit() };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRVerifierAssume(jparsesinfo(jobj.sinfo), MIRArgument.jparse(jobj.arg));
+    }
+}
+
 
 class MIRAssertCheck extends MIROp {
     readonly info: string;
@@ -2547,7 +2576,7 @@ export {
     MIRGuard, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard,
     MIRArgument, MIRRegisterArgument, MIRGlobalVariable, 
     MIRConstantArgument, MIRConstantNone, MIRConstantTrue, MIRConstantFalse, MIRConstantInt, MIRConstantNat, MIRConstantBigInt, MIRConstantBigNat, MIRConstantRational, MIRConstantFloat, MIRConstantDecimal, MIRConstantString, MIRConstantRegex, MIRConstantStringOf, MIRConstantDataString, MIRConstantTypedNumber,
-    MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRDebug,
+    MIROpTag, MIROp, MIRNop, MIRDeadFlow, MIRAbort, MIRAssertCheck, MIRVerifierAssume, MIRDebug,
     MIRLoadUnintVariableValue, MIRDeclareGuardFlagLocation, MIRSetConstantGuardFlag, MIRConvertValue,
     MIRLoadConst,
     MIRTupleHasIndex, MIRRecordHasProperty,

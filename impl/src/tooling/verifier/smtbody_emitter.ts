@@ -5,8 +5,8 @@
 
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
-import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask } from "./smt_exp";
+import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVerifierAssume, MIRVirtualMethodKey } from "../../compiler/mir_ops";
+import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask, SMTAxiom } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTAssembly, SMTErrorCode, SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 
@@ -842,6 +842,13 @@ class SMTBodyEmitter {
         return this.generateErrorCreate(op.sinfo, this.currentRType, op.info);
     }
 
+    processVerifierAssume(op: MIRVerifierAssume, continuation: SMTExp): SMTExp {
+        const chkval = this.argToSMT(op.arg);
+        const errorval = this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck"));
+        
+        return new SMTIf(chkval, continuation, errorval);
+    }
+
     processAssertCheck(op: MIRAssertCheck, continuation: SMTExp): SMTExp {
         const chkval = this.argToSMT(op.arg);
         const errorval = this.generateErrorCreate(op.sinfo, this.currentRType, op.info);
@@ -1292,6 +1299,12 @@ class SMTBodyEmitter {
             const varargcount = op.args.filter((arg) => !(arg instanceof MIRConstantArgument)).length;
             return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, varargcount, continuation);
         }
+        if(invk instanceof MIRInvokePrimitiveDecl && invk.implkey.startsWith("verifier_")) {
+            assert(op.guard === undefined && op.optmask === undefined);
+
+            const args = op.args.map((arg) => this.argToSMT(arg));
+            return this.generateVerifierExp(op.trgt, invk.implkey, args, continuation);
+        }
         else {
             let mask: SMTMaskConstruct | undefined = undefined;
             if (op.optmask !== undefined) {
@@ -1552,6 +1565,9 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRAbort: {
                 return this.processAbort(op as MIRAbort);
+            }
+            case MIROpTag.MIRVerifierAssume: {
+                return this.processVerifierAssume(op as MIRAssertCheck, continuation);
             }
             case MIROpTag.MIRAssertCheck: {
                 return this.processAssertCheck(op as MIRAssertCheck, continuation);
@@ -2024,7 +2040,7 @@ class SMTBodyEmitter {
         return smtexps.get("entry") as SMTExp;
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): SMTFunction | SMTFunctionUninterpreted {
+    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): { fdecl: SMTFunction | SMTFunctionUninterpreted, axioms: SMTAxiom[] } {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.currentSCC = cscc;
@@ -2040,13 +2056,156 @@ class SMTBodyEmitter {
         if (idecl instanceof MIRInvokeBodyDecl) {
             const body = this.generateBlockExps(issafe, (idecl as MIRInvokeBodyDecl).body.body);
 
-            return new SMTFunction(fname, args, idecl.takesmask ? "#maskparam#" : undefined, restype, body);
+            return { fdecl: new SMTFunction(fname, args, idecl.takesmask ? "#maskparam#" : undefined, restype, body), axioms: [] };
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            return new SMTFunctionUninterpreted(fname, args.map((arg) => arg.vtype), restype);
+            return { fdecl: new SMTFunctionUninterpreted(fname, args.map((arg) => arg.vtype), restype), axioms: this.generateAxioms(idecl as MIRInvokePrimitiveDecl) };
         }
+    }
+
+    generateVerifierExp(trgt: MIRRegisterArgument, op: string, args: SMTExp[], continuation: SMTExp): SMTExp {
+        switch(op) {
+            case "verifier_termeq": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("=", args), continuation);
+            }
+            case "verifier_termneq": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("not", [new SMTCallSimple("=", args)]), continuation);
+            }
+            case "verifier_lnot": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("not", args), continuation);
+            }
+            case "verifier_land": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("and", args), continuation);
+            }
+            case "verifier_lor": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("or", args), continuation);
+            }
+            case "verifier_limplies": {
+                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("=>", args), continuation);
+            }
+            default: {
+                assert(false);
+                return new SMTConst("[MISSING VERIFIER CASE]");
+            }
+        }
+
+    }
+
+    generateAxioms(idecl: MIRInvokePrimitiveDecl): SMTAxiom[] {
+        let axioms: SMTAxiom[] = [];
+
+        switch(idecl.implkey) {
+            case "list_size":
+            case "list_empty":
+            case "list_unsafe_get": {
+                //all done via incode _assume statements
+                break;
+            }
+            case "list_allof": {
+                xxxx;
+                break;
+            }
+            case "list_noneof": {
+                xxxx;
+                break;
+            }
+            case "list_someof": {
+                xxxx;
+                break;
+            }
+            case "list_allofnot": {
+                xxxx;
+                break;
+            }
+            case "list_noneofnot": {
+                xxxx;
+                break;
+            }
+            case "list_someofnot": {
+                xxxx;
+                break;
+            }
+            case "list_countif": {
+                assert(false, "list_countif");
+                break;
+            }
+            case "list_countifnot": {
+                assert(false, "list_countifnot");
+                break;
+            }
+            case "list_indexof": {
+                assert(false, "list_indexof");
+                break;
+            }
+            case "list_indexofnot": {
+                assert(false, "list_indexofnot");
+                break;
+            }
+            case "list_lastindexof": {
+                assert(false, "list_lastindexof");
+                break;
+            }
+            case "list_lastindexofnot": {
+                assert(false, "list_lastindexofnot");
+                break;
+            }
+            case "list_filter": {
+                xxxx;
+                break;
+            }
+            case "list_filternot": {
+                xxxx;
+                break;
+            }
+            case "list_slice": {
+                xxxx;
+                break;
+            }
+            case "list_map": {
+                xxxx;
+                break;
+            }
+            case "list_mapindex": {
+                assert(false, "list_mapindex");
+                break;
+            }
+            case "list_zip": {
+                assert(false, "list_zip");
+                break;
+            }
+            case "list_unzipt": {
+                assert(false, "list_unzipt");
+                break;
+            }
+            case "list_unzipu": {
+                assert(false, "list_unzipu");
+                break;
+            }
+            case "list_zipindex": {
+                assert(false, "list_zipindex");
+                break;
+            }
+            case "list_join": {
+                assert(false, "list_join");
+                break;
+            }
+            case "list_groupjoin": {
+                assert(false, "list_groupjoin");
+                break;
+            }
+            case "list_append": {
+                assert(false, "list_append");
+                break;
+            }
+            default: {
+                assert(false, "Unknown builtin function");
+                break;
+            }
+        }
+
+        return axioms;
     }
 }
 

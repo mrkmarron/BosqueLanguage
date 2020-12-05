@@ -148,20 +148,17 @@ function isSafeInvoke(idecl: MIRInvokeDecl): boolean {
 function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, callg: CallGInfo, doneset: Set<MIRInvokeKey>): boolean {
     if(masm.primitiveInvokeDecls.has(ikey)) {
         const pinvk = masm.primitiveInvokeDecls.get(ikey) as MIRInvokePrimitiveDecl;
-        if(isSafeInvoke(pinvk)) {
-            return true;
-        }
+        const cn = callg.invokes.get(ikey) as CallGNode;
 
-        //
-        //TODO: if this is a default operator on a user defined type we should resolve the primitive type and check if it is safe
-        //
-
-        return false;
+        return isSafeInvoke(pinvk) && [...cn.callees].every((callee) => {
+            const ceivk = (masm.primitiveInvokeDecls.get(callee) || masm.invokeDecls.get(callee)) as MIRInvokeDecl;
+            return isSafeInvoke(ceivk) || !doneset.has(callee);
+        });
     }
     else {
         const invk = masm.invokeDecls.get(ikey) as MIRInvokeBodyDecl;
         const haserrorop = [...invk.body.body].some((bb) => bb[1].ops.some((op) => {
-            return op.tag === MIROpTag.MIRAbort || op.tag === MIROpTag.MIRAssertCheck;
+            return op.tag === MIROpTag.MIRAbort || op.tag === MIROpTag.MIRAssertCheck || op.tag === MIROpTag.MIRVerifierAssume;
         }));
 
         if(haserrorop) {
