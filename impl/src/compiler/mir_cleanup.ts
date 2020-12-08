@@ -268,17 +268,17 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         }
         case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
             const cc = op as MIRConstructorPrimaryCollectionSingletons;
-            cc.args = propagateAssign_RemapArgs(cc.args, propMap);
+            cc.args = propagateAssign_RemapStructuredArgs<[MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], propagateAssign_Remap(v[1], propMap)]);
             break;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
             const cc = op as MIRConstructorPrimaryCollectionCopies;
-            cc.args = propagateAssign_RemapArgs(cc.args, propMap);
+            cc.args = propagateAssign_RemapStructuredArgs<[MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], propagateAssign_Remap(v[1], propMap)]);
             break;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
             const cc = op as MIRConstructorPrimaryCollectionMixed;
-            cc.args = propagateAssign_RemapStructuredArgs<[boolean, MIRArgument]>(cc.args, (v) => [v[0], propagateAssign_Remap(v[1], propMap)]);
+            cc.args = propagateAssign_RemapStructuredArgs<[boolean, MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], v[1], propagateAssign_Remap(v[2], propMap)]);
             break;
         }
         case MIROpTag.MIRBinKeyEq: {

@@ -1960,9 +1960,9 @@ class MIRConstructorPrimaryCollectionEmpty extends MIROp {
 class MIRConstructorPrimaryCollectionSingletons extends MIROp {
     trgt: MIRRegisterArgument;
     readonly tkey: MIRResolvedTypeKey;
-    args: MIRArgument[];
+    args: [MIRResolvedTypeKey, MIRArgument][];
 
-    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRRegisterArgument) {
+    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: [MIRResolvedTypeKey, MIRArgument][], trgt: MIRRegisterArgument) {
         super(MIROpTag.MIRConstructorPrimaryCollectionSingletons, sinfo);
 
         this.trgt = trgt;
@@ -1970,69 +1970,11 @@ class MIRConstructorPrimaryCollectionSingletons extends MIROp {
         this.args = args;
     }
 
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args.map((arg) => arg[1])]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
     stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg.stringify()).join(", ")}}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), tkey: this.tkey, args: this.args.map((arg) => arg.jemit()) };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRConstructorPrimaryCollectionSingletons(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRRegisterArgument.jparse(jobj.trgt));
-    }
-}
-
-class MIRConstructorPrimaryCollectionCopies extends MIROp {
-    trgt: MIRRegisterArgument;
-    readonly tkey: MIRResolvedTypeKey;
-    args: MIRArgument[];
-
-    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: MIRArgument[], trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRConstructorPrimaryCollectionCopies, sinfo);
-
-        this.trgt = trgt;
-        this.tkey = tkey;
-        this.args = args;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args]); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => `expand(${arg.stringify()})`).join(", ")}`;
-    }
-
-    jemit(): object {
-        return { ...this.jbemit(), trgt: this.trgt.jemit(), tkey: this.tkey, args: this.args.map((arg) => arg.jemit()) };
-    }
-
-    static jparse(jobj: any): MIROp {
-        return new MIRConstructorPrimaryCollectionCopies(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRRegisterArgument.jparse(jobj.trgt));
-    }
-}
-
-class MIRConstructorPrimaryCollectionMixed extends MIROp {
-    trgt: MIRRegisterArgument;
-    readonly tkey: MIRResolvedTypeKey;
-    args: [boolean, MIRArgument][];
-
-    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: [boolean, MIRArgument][], trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRConstructorPrimaryCollectionMixed, sinfo,);
-
-        this.trgt = trgt;
-        this.tkey = tkey;
-        this.args = args;
-    }
-
-    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.args.map((tv) => tv[1])); }
-    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
-
-    stringify(): string {
-        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg[0] ? `expand(${arg[1].stringify()})` : arg[1].stringify()).join(", ")}`;
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg[1].stringify()).join(", ")}}`;
     }
 
     jemit(): object {
@@ -2040,7 +1982,65 @@ class MIRConstructorPrimaryCollectionMixed extends MIROp {
     }
 
     static jparse(jobj: any): MIROp {
-        return new MIRConstructorPrimaryCollectionMixed(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRRegisterArgument.jparse(jobj.trgt));
+        return new MIRConstructorPrimaryCollectionSingletons(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRConstructorPrimaryCollectionCopies extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly tkey: MIRResolvedTypeKey;
+    args: [MIRResolvedTypeKey, MIRArgument][];
+
+    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: [MIRResolvedTypeKey, MIRArgument][], trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRConstructorPrimaryCollectionCopies, sinfo);
+
+        this.trgt = trgt;
+        this.tkey = tkey;
+        this.args = args;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args.map((arg) => arg[1])]); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => `expand(${arg[1].stringify()})`).join(", ")}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), tkey: this.tkey, args: this.args.map((arg) => [arg[0], arg[1].jemit()]) };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRConstructorPrimaryCollectionCopies(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => [jarg[0], MIRArgument.jparse(jarg[1])]), MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+class MIRConstructorPrimaryCollectionMixed extends MIROp {
+    trgt: MIRRegisterArgument;
+    readonly tkey: MIRResolvedTypeKey;
+    args: [boolean, MIRResolvedTypeKey, MIRArgument][];
+
+    constructor(sinfo: SourceInfo, tkey: MIRResolvedTypeKey, args: [boolean, MIRResolvedTypeKey, MIRArgument][], trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRConstructorPrimaryCollectionMixed, sinfo,);
+
+        this.trgt = trgt;
+        this.tkey = tkey;
+        this.args = args;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.args.map((tv) => tv[2])); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg[0] ? `expand(${arg[2].stringify()})` : arg[2].stringify()).join(", ")}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), tkey: this.tkey, args: this.args.map((arg) => [arg[0], arg[1], arg[2].jemit()]) };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRConstructorPrimaryCollectionMixed(jparsesinfo(jobj.sinfo), jobj.tkey, jobj.args.map((jarg: any) => [jarg[0], jarg[1], MIRArgument.jparse(jarg[2])]), MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 

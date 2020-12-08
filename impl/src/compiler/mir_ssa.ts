@@ -323,19 +323,19 @@ function assignSSA(op: MIROp, ssastate: SSAState): MIROp {
         }
         case MIROpTag.MIRConstructorPrimaryCollectionSingletons: {
             const cc = op as MIRConstructorPrimaryCollectionSingletons;
-            cc.args = processSSAUse_RemapArgs(cc.args, ssastate);
+            cc.args = processSSAUse_RemapStructuredArgs<[MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], processSSA_Use(v[1], ssastate)]);
             cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionCopies: {
             const cc = op as MIRConstructorPrimaryCollectionCopies;
-            cc.args = processSSAUse_RemapArgs(cc.args, ssastate);
+            cc.args = processSSAUse_RemapStructuredArgs<[MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], processSSA_Use(v[1], ssastate)]);
             cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }
         case MIROpTag.MIRConstructorPrimaryCollectionMixed: {
             const cc = op as MIRConstructorPrimaryCollectionMixed;
-            cc.args = processSSAUse_RemapStructuredArgs<[boolean, MIRArgument]>(cc.args, (v) => [v[0], processSSA_Use(v[1], ssastate)]);
+            cc.args = processSSAUse_RemapStructuredArgs<[boolean, MIRResolvedTypeKey, MIRArgument]>(cc.args, (v) => [v[0], v[1], processSSA_Use(v[2], ssastate)]);
             cc.trgt = convertToSSA(cc.trgt, cc.tkey, ssastate);
             return op;
         }

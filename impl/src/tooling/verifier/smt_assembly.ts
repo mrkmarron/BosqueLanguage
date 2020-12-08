@@ -3,19 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { SourceInfo } from "../../ast/parser";
-import { SMTExp, SMTType } from "./smt_exp";
+import { BSQRegex } from "../../ast/bsqregex";
+import { SMTAxiom, SMTErrorAxiom, SMTExp, SMTType } from "./smt_exp";
 
-class SMTErrorCode {
-    readonly code: string;
-    readonly srcFile: string;
-    readonly sinfo: SourceInfo;
-
-    constructor(code: string, srcFile: string, sinfo: SourceInfo) {
-        this.code = code;
-        this.srcFile = srcFile;
-        this.sinfo = sinfo; 
-    }
+type SMT2FileInfo = {
+    TYPE_TAG_DECLS: string[],
+    ABSTRACT_TYPE_TAG_DECLS: string[],
+    INDEX_TAG_DECLS: string[],
+    PROPERTY_TAG_DECLS: string[],
 };
 
 class SMTFunction {
@@ -52,17 +47,101 @@ class SMTFunctionUninterpreted {
     }
 }
 
-class SMTAssembly {
-    readonly uninterpTypeConstructors: Map<string, SMTType> = new Map<string, SMTType>();
+class SMTEntityDecl {
+    readonly smtname: string;
+    readonly typetag: string;
 
-    readonly uninterpfunctions: SMTFunctionUninterpreted[] = [];
-    readonly functions: SMTFunction[] = [];
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
+    readonly boxf: string;
+    readonly ubf: string;
+
+    readonly invfunc: string | undefined;
+}
+
+class SMTTupleDecl {
+    readonly smtname: string;
+    readonly typetag: string;
+
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
+    readonly boxf: string;
+    readonly ubf: string;
+}
+
+class SMTRecordDecl {
+    readonly smtname: string;
+    readonly typetag: string;
+
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
+    readonly boxf: string;
+    readonly ubf: string;
+}
+
+class SMTEphemeralListDecl {
+    readonly smtname: string;
+    readonly typetag: string;
+
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
+}
+
+class SMTConstantDecl {
+    readonly gkey: string;
+    readonly ctype: string;
+
+    readonly consf: string;    
+}
+
+class SMTAssembly {
+    entityDecls: SMTEntityDecl[] = [];
+    tupleDecls: SMTTupleDecl[] = [];
+    recordDecls: SMTRecordDecl[] = [];
+    ephemeralDecls: SMTEphemeralListDecl[] = [];
+
+    abstractTypes: string[] = [];
+    indexTags: string[] = [];
+    propertyTags: string[] = [];
+
+    subtypeRelation: { ttype: string, atype: string }[] = [];
+    hasIndexRelation: { ttype: string, atype: string }[] = [];
+    hasPropertyRelation: { ttype: string, atype: string }[] = [];
+
+    literalRegexs: BSQRegex[] = [];
+    validatorRegexs: Map<string, BSQRegex> = new Map<string, BSQRegex>();
+
+    constantDecls: SMTConstantDecl[] = [];
+    
+    generatedKeyLessFunctions: SMTFunction[] = [];
+
+    uninterpfunctions: SMTFunctionUninterpreted[] = [];
+    axioms: SMTAxiom[] = [];
+    errorproprs: SMTErrorAxiom[] = [];
+
+    functions: SMTFunction[] = [];
+
+    freeConstructorFunctions: SMTFunction[] = [];
 
     constructor() {
+    }
+
+    generateSMT2AssemblyInfo(): SMT2FileInfo {
+        const TYPE_TAG_DECLS = [
+            ...this.entityDecls.map((ed) => ed.typetag),
+            ...this.tupleDecls.map((ed) => ed.typetag),
+            ...this.recordDecls.map((ed) => ed.typetag)
+        ];
+
+        return {
+            TYPE_TAG_DECLS,
+            ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes,
+            INDEX_TAG_DECLS: this.indexTags,
+            PROPERTY_TAG_DECLS: this.propertyTags
+        };
     }
 }
 
 export {
-    SMTErrorCode,
-    SMTAssembly, SMTFunction, SMTFunctionUninterpreted
+    SMTEntityDecl, SMTTupleDecl, SMTRecordDecl, SMTEphemeralListDecl,
+    SMTConstantDecl,
+    SMTFunction, SMTFunctionUninterpreted,
+    SMTAssembly,
+    SMT2FileInfo
 };

@@ -8,7 +8,7 @@ import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVerifierAssume, MIRVirtualMethodKey } from "../../compiler/mir_ops";
 import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask, SMTAxiom, SMTType, SMTErrorAxiom } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
-import { SMTAssembly, SMTErrorCode, SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
+import { SMTAssembly, SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 
 import * as assert from "assert";
 
@@ -68,10 +68,7 @@ class SMTBodyEmitter {
     private generateUFConstantForType(tt: MIRType): string {
         const ctype = this.typegen.getSMTTypeFor(tt);
         const ufcname = `${ctype}@uicons_UF`;
-        if(!this.smtasm.uninterpTypeConstructors.has(ufcname)) {
-            this.smtasm.uninterpTypeConstructors.set(ufcname, ctype);
-        }
-
+        
         return ufcname;
     }
 
@@ -569,6 +566,7 @@ class SMTBodyEmitter {
             return new SMTConst(this.assembly.subtypeOf(flow, ofconcept) ? "true" : "false");
         }
         else {
+            xxxx;
             const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
             return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofconcept.trkey)}`)]);
         }
@@ -589,6 +587,7 @@ class SMTBodyEmitter {
                 return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
             else {
+                xxxx;
                 return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
         }
@@ -609,6 +608,7 @@ class SMTBodyEmitter {
                 return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
             else {
+                xxxx;
                 return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
         }
@@ -631,7 +631,7 @@ class SMTBodyEmitter {
 
     generateErrorCreate(sinfo: SourceInfo, rtype: MIRType, msg: string): SMTExp {
         if(this.currentFile === this.errorTrgtPos.file && sinfo.pos === this.errorTrgtPos.pos) {
-            return this.typegen.generateResultTypeConstructorError(rtype, new SMTConst("ErrorID_CheckTarget"));
+            return this.typegen.generateResultTypeConstructorError(rtype, new SMTConst("ErrorID_Check"));
         }
         else {
             return this.typegen.generateResultTypeConstructorError(rtype, new SMTConst("ErrorID_AssumeCheck"));
@@ -884,12 +884,14 @@ class SMTBodyEmitter {
     }
 
     processTupleHasIndex(op: MIRTupleHasIndex, continuation: SMTExp): SMTExp {
+        xxxx;
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
         const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasIndex@", [accessTypeTag, new SMTConst(`TupleIndexTag_${op.idx}`)]), continuation);
     }
 
     processRecordHasProperty(op: MIRRecordHasProperty, continuation: SMTExp): SMTExp {
+        xxxx;
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
         const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasProperty@", [accessTypeTag, new SMTConst(`RecordPropertyTag_${op.pname}`)]), continuation);
@@ -1447,19 +1449,30 @@ class SMTBodyEmitter {
     }
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
-        xxxx;
+        const oftype = this.typegen.getMIRType(op.tkey);
+        const consf = this.typegen.getSMTConstructorName(oftype);
+
+        const asrt0 = new SMTIf(new SMTCallSimple("not", [new SMTCallSimple("=", [this.varToSMTName(op.trgt), new SMTConst("0")])]), this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck")), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf.cons, []), asrt0);
     }
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
-        xxxx;
+        const oftype = this.typegen.getMIRType(op.tkey);
+        const consf = this.typegen.getSMTConstructorName(oftype);
+
+        const chksize = new SMTCallSimple("=", [this.varToSMTName(op.trgt), new SMTConst(`${op.args.length}`)]);
+        const chckgets = op.args.map((arg, n) => new SMTCallSimple("=", [this.argToSMT(arg[1]), new SMTCallSimple(`${this.typegen.getSMTTypeFor(oftype).name}@get`, [this.varToSMTName(op.trgt), new SMTConst(`${n}`)])]));
+        const allconds = new SMTCallSimple("and", [chksize, ...chckgets]);
+        const asrtconds = new SMTIf(new SMTCallSimple("not", [allconds]), this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck")), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf.cons, []), asrtconds);
     }
 
     processConstructorPrimaryCollectionCopies(op: MIRConstructorPrimaryCollectionCopies, continuation: SMTExp): SMTExp {
-        xxxx;
+        return NOT_IMPLEMENTED("processConstructorPrimaryCollectionCopies");
     }
 
     processConstructorPrimaryCollectionMixed(op: MIRConstructorPrimaryCollectionMixed, continuation: SMTExp): SMTExp {
-        xxxx;
+        return NOT_IMPLEMENTED("processConstructorPrimaryCollectionMixed");
     }
 
     processBinKeyEq(op: MIRBinKeyEq, continuation: SMTExp): SMTExp {
@@ -2041,7 +2054,22 @@ class SMTBodyEmitter {
         return smtexps.get("entry") as SMTExp;
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): { fdecl: SMTFunction | SMTFunctionUninterpreted, axioms: SMTAxiom[] } {
+    getSpecialBuiltinSMTFunctionName(idecl: MIRInvokePrimitiveDecl): string | undefined {
+        const encltype = idecl.enclosingDecl !== undefined ? this.typegen.mangle(idecl.enclosingDecl) : "[NO ENCLOSING DECL]";
+
+        switch(idecl.implkey) {
+            case "list_size":
+                return `${encltype}@size`;
+            case "list_empty":
+                return `${encltype}@empty`;
+            case "list_unsafe_get":
+                return `${encltype}@get`;
+            default:
+                return undefined;
+        }
+    }
+
+    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): { fdecl: SMTFunction | SMTFunctionUninterpreted, axioms: SMTAxiom[], errorspecs: SMTErrorAxiom[] } {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.currentSCC = cscc;
@@ -2056,13 +2084,14 @@ class SMTBodyEmitter {
         if (idecl instanceof MIRInvokeBodyDecl) {
             const body = this.generateBlockExps(issafe, (idecl as MIRInvokeBodyDecl).body.body);
 
-            return { fdecl: new SMTFunction(this.typegen.mangle(idecl.key), args, idecl.takesmask ? "#maskparam#" : undefined, restype, body), axioms: [] };
+            return { fdecl: new SMTFunction(this.typegen.mangle(idecl.key), args, idecl.takesmask ? "#maskparam#" : undefined, restype, body), axioms: [], errorspecs: [] };
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
 
-            const fname = (xxx) || this.typegen.mangle(idecl.key);
-            return { fdecl: new SMTFunctionUninterpreted(fname, args.map((arg) => arg.vtype), restype), axioms: this.generateAxioms(idecl as MIRInvokePrimitiveDecl) };
+            const fname = this.getSpecialBuiltinSMTFunctionName(idecl as MIRInvokePrimitiveDecl) || this.typegen.mangle(idecl.key);
+            const uinfo = this.generateAxioms(idecl as MIRInvokePrimitiveDecl);
+            return { fdecl: new SMTFunctionUninterpreted(fname, args.map((arg) => arg.vtype), restype), axioms: uinfo.axioms, errorspecs: uinfo.errorspecs };
         }
     }
 
@@ -2123,13 +2152,12 @@ class SMTBodyEmitter {
 
     generateIsSuccessLambdaPredicate(pc: MIRPCode, ofvalue: boolean, ...args: SMTExp[]): SMTExp {
         const call = this.generateCallGeneralLambdaPrediate(pc, ...args)
+        const rvalue = this.typegen.generateResultTypeConstructorSuccess(this.typegen.getMIRType("NSCore::Bool"), new SMTConst(ofvalue ? "true" : "false"));
 
-        const isok = this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), call);
-        const value = this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), call);
-        return new SMTCallSimple("and", [isok, ofvalue ? value : new SMTCallSimple("not", [value])]);
+        return new SMTCallSimple("=", [call, rvalue]);
     }
 
-    generateAxioms(idecl: MIRInvokePrimitiveDecl): SMTAxiom[] {
+    generateAxioms(idecl: MIRInvokePrimitiveDecl): { axioms: SMTAxiom[], errorspecs: SMTErrorAxiom[] } {
         let axioms: SMTAxiom[] = [];
         let errorspecs: SMTErrorAxiom[] = [];
 
@@ -2159,7 +2187,7 @@ class SMTBodyEmitter {
                     axioms = [
                         new SMTAxiom(fullvars, guard, pgetfalse_imples_alloffalse, "pgetfalse_imples_alloffalse", undefined),
                         new SMTAxiom(fullvars, guard, alloftrue_implies_pgettrue, "alloftrue_implies_pgettrue", undefined),
-                        new SMTAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], undefined, new SMTCallSimple("=>", [new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTCallSimple(``, [l]), new SMTConst("0")])]), allof]), "allofsizedegenerate", undefined)
+                        new SMTAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], undefined, new SMTCallSimple("=>", [new SMTCallSimple("=", [new SMTCallSimple(`${ltype.name}@size`, [l]), new SMTConst("0")]), allof]), "allofsizedegenerate", undefined)
                     ];
                 }
                 else {
@@ -2171,9 +2199,6 @@ class SMTBodyEmitter {
                     const alloferrororfalse = new SMTCallSimple("or", [this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("and", [this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("not", [this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), allof)])])])
                     const alloftrue = new SMTCallSimple("and", [this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), allof), this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), allof)]);
 
-                    const boolassumeerror = this.typegen.generateResultTypeConstructorError(this.typegen.getMIRType("NSCore::Bool"), new SMTConst("ErrorID_AssumeCheck"));
-                    const booltrgterror = this.typegen.generateResultTypeConstructorError(this.typegen.getMIRType("NSCore::Bool"), new SMTConst("ErrorID_CheckTarget"));
-
                     const pgeterror_implies_alloferror = new SMTCallSimple("=>", [pofniserror, this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof)]);
                     const pgetfalse_imples_false = new SMTCallSimple("=>", [pofnsuccessfalse, alloferrororfalse]);
                     const alloftrue_imples_true = new SMTCallSimple("=>", [alloftrue, pofnsuccesstrue]);
@@ -2181,12 +2206,13 @@ class SMTBodyEmitter {
                         new SMTAxiom(fullvars, guard, pgeterror_implies_alloferror, "pgeterror_implies_alloferror", undefined),
                         new SMTAxiom(fullvars, guard, pgetfalse_imples_false, "pgetfalse_imples_false", undefined),
                         new SMTAxiom(fullvars, guard, alloftrue_imples_true, "alloftrue_imples_true", undefined),
-                        new SMTAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], undefined, new SMTCallSimple("=>", [new SMTCallSimple("not", [new SMTCallSimple("=", [new SMTCallSimple(``, [l]), new SMTConst("0")])]), alloftrue]), "allofsizedegenerate", undefined)
+                        new SMTAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], undefined, new SMTCallSimple("=>", [new SMTCallSimple("=", [new SMTCallSimple(`${ltype.name}@size`, [l]), new SMTConst("0")]), alloftrue]), "allofsizedegenerate", undefined)
                     ];
 
-                    const error_of_type = new SMTCallSimple("=>", [new SMTCallSimple("=", [pofngeneral, booltrgterror]), new SMTCallSimple("or", [new SMTCallSimple("=", [allof, boolassumeerror]), new SMTCallSimple("=", [allof, booltrgterror])])]);
+                    const booltrgterror = this.typegen.generateResultTypeConstructorError(this.typegen.getMIRType("NSCore::Bool"), new SMTConst("ErrorID_Target"));
+                    const error_of_type = new SMTCallSimple("=", [new SMTCallSimple("=", [pofngeneral, booltrgterror]), new SMTCallSimple("=", [allof, booltrgterror])]);
                     errorspecs = [
-                        new SMTErrorAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], { vname: "@n", vtype: nattype }, guard, error_of_type, "error_of_type", undefined);
+                        new SMTErrorAxiom([{ vname: "@l", vtype: ltype }, ...lambdavars], { vname: "@n", vtype: nattype }, guard, error_of_type, "error_of_type", undefined)
                     ];
                 }
                 break;
@@ -2289,7 +2315,7 @@ class SMTBodyEmitter {
             }
         }
 
-        return axioms;
+        return { axioms: axioms, errorspecs: errorspecs };
     }
 }
 

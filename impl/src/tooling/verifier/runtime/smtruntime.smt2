@@ -230,10 +230,11 @@
 
 ;;EPHEMERAL_DECLS;;
 
+;;As a lattice where ErrorID_AssumeCheck <: ErrorID_Target (e.g. 0x1 and 0x3)
 (declare-datatypes () (
   (ErrorID
     ErrorID_AssumeCheck
-    ErrorID_CheckTarget
+    ErrorID_Target
   )
 ))
 
@@ -245,8 +246,12 @@
     ;;FLAG_RESULTS;;
 ))
 
-;;SUBTYPE_DECLS;;
+;;UF_DECLS;;
+
+;;AXIOM_DECLS;;
 
 ;;V_ACCESS;;
 
 ;;FUNCTION_DECLS;;
+
+;;FREE_CONSTRUCTOR_FUNCTIONS;;
