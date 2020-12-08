@@ -9,7 +9,6 @@ namespace NSCore;
 //<summary>Special builtin methods for verifier to use.</summary>
 entity Verifier {
     __safe static term_eq(t1: Any, t2: Any): Bool # verifier_termeq
-    __safe static term_neq(t1: Any, t2: Any): Bool # verifier_termneq
 
     __safe static lnot(b1: Bool, b2: Bool): Bool # verifier_lnot
     __safe static land(b1: Bool, b2: Bool): Bool # verifier_land

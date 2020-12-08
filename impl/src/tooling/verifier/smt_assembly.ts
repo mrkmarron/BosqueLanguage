@@ -53,7 +53,6 @@ class SMTFunctionUninterpreted {
 }
 
 class SMTAssembly {
-    readonly errorDefinitions: Map<string, SMTErrorCode> = new Map<string, SMTErrorCode>();
     readonly uninterpTypeConstructors: Map<string, SMTType> = new Map<string, SMTType>();
 
     readonly uninterpfunctions: SMTFunctionUninterpreted[] = [];

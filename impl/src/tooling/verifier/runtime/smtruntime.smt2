@@ -233,7 +233,7 @@
 (declare-datatypes () (
   (ErrorID
     ErrorID_AssumeCheck
-    ;;ERROR_ID_DECLS;;
+    ErrorID_CheckTarget
   )
 ))
 

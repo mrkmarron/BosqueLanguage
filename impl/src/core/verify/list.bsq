@@ -189,9 +189,9 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
             _assume Verifier::limplies(res, Verifier::lnot(List<T>::s_noneof[recursive?](this, p)));
             _assume Verifier::limplies(res, List<T>::s_someof[recursive?](this, p));
 
-            _assume Verifier::term_neq(res, List<T>::s_allofnot[recursive?](this, p));
+            _assume Verifier::term_eq(res, Verifier::lnot(list<T>::s_allofnot[recursive?](this, p)));
             _assume Verifier::term_eq(res, List<T>::s_noneofnot[recursive?](this, p));
-            _assume Verifier::term_neq(res, List<T>::s_someofnot[recursive?](this, p));
+            _assume Verifier::term_eq(res, Verifier::lnot(List<T>::s_someofnot[recursive?](this, p)));
 
             return res;
         }

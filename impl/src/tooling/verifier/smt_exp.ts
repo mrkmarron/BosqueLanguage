@@ -159,7 +159,7 @@ class SMTCond extends SMTExp {
     }
 }
 
-abstract class SMTAxiom {
+class SMTAxiom {
     readonly terms: { vname: string, vtype: SMTType }[];
     readonly guard: SMTExp | undefined;
     readonly clause: SMTExp;
@@ -177,19 +177,23 @@ abstract class SMTAxiom {
     }
 }
 
-class SMTForAll extends SMTAxiom {
-    constructor(terms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
-        super(terms, guard, clause, identifier, trigger);
-    }
-}
+class SMTErrorAxiom {
+    readonly terms: { vname: string, vtype: SMTType }[];
+    readonly erroridx: { vname: string, vtype: SMTType };
+    readonly guard: SMTExp | undefined;
+    readonly clause: SMTExp;
 
-class SMTForallExists extends SMTAxiom {
-    readonly eterms: { vname: string, vtype: SMTType }[];
+    readonly identifier: string;
+    readonly trigger: SMTExp | undefined;
 
-    constructor(allterms: { vname: string, vtype: SMTType }[], eterms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
-        super(allterms, guard, clause, identifier, trigger);
+    constructor(terms: { vname: string, vtype: SMTType }[], erroridx: { vname: string, vtype: SMTType }, guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
+        this.terms = terms;
+        this.erroridx = erroridx;
+        this.guard = guard;
+        this.clause = clause;
 
-        this.eterms = eterms;
+        this.identifier = identifier;
+        this.trigger = trigger;
     }
 }
 
@@ -199,5 +203,5 @@ export {
     SMTType, SMTExp, SMTVar, SMTConst, 
     SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCallGeneralWPassThroughMask,
     SMTLet, SMTLetMulti, SMTIf, SMTCond,
-    SMTAxiom, SMTForAll, SMTForallExists
+    SMTAxiom, SMTErrorAxiom
 };
