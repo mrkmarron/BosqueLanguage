@@ -52,6 +52,31 @@ class SMTBodyEmitter {
     private requiredVirtualFunctionInvokes: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }[] = [];
     private requiredVirtualOperatorInvokes: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }[] = [];
 
+    private requiredSubtypeTagChecks: {t: MIRType, oftype: MIRType}[] = [];
+    private requiredIndexTagChecks: {idx: number, oftype: MIRType}[] = [];
+    private requiredRecordTagChecks: {pname: string, oftype: MIRType}[] = [];
+
+    private processSubtypeTagCheck(t: MIRType, oftype: MIRType) {
+        const stc = this.requiredSubtypeTagChecks.find((tc) => tc.t.trkey === t.trkey && tc.oftype.trkey === oftype.trkey);
+        if (stc === undefined) {
+            this.requiredSubtypeTagChecks.push({ t: t, oftype: oftype });
+        }
+    }
+
+    private processIndexTagCheck(idx: number, oftype: MIRType) {
+        const stc = this.requiredIndexTagChecks.find((tc) => tc.idx === idx && tc.oftype.trkey === oftype.trkey);
+        if (stc === undefined) {
+            this.requiredIndexTagChecks.push({ idx: idx, oftype: oftype });
+        }
+    }
+
+    private processPropertyTagCheck(pname: string, oftype: MIRType) {
+        const stc = this.requiredRecordTagChecks.find((tc) => tc.pname === pname && tc.oftype.trkey === oftype.trkey);
+        if (stc === undefined) {
+            this.requiredRecordTagChecks.push({ pname: pname, oftype: oftype });
+        }
+    }
+
     private generateTypeCheckName(argflowtype: MIRType, oftype: MIRType): string {
         return `$SubtypeCheck_${this.typegen.mangle(argflowtype.trkey)}_oftype_${this.typegen.mangle(oftype.trkey)}`;
     }
@@ -566,9 +591,21 @@ class SMTBodyEmitter {
             return new SMTConst(this.assembly.subtypeOf(flow, ofconcept) ? "true" : "false");
         }
         else {
-            xxxx;
             const accessTypeTag = this.typegen.getSMTTypeFor(layout).isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(arg)]);
-            return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofconcept.trkey)}`)]);
+            
+            const occ = ofconcept.options[0] as MIRConceptType;
+            let tests: SMTExp[] = [];
+            for(let i = 0; i < occ.ckeys.length; ++i) {
+                this.processSubtypeTagCheck(flow, ofconcept);
+                tests.push(new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(occ.ckeys[i])}`)]));
+            }
+
+            if(tests.length === 1) {
+                return tests[0];
+            }
+            else {
+                return new SMTCallSimple("and", tests);
+            }
         }
     }
 
@@ -587,7 +624,7 @@ class SMTBodyEmitter {
                 return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
             else {
-                xxxx;
+                this.processSubtypeTagCheck(flow, oftuple);
                 return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(oftuple.trkey)}`)]);
             }
         }
@@ -608,7 +645,7 @@ class SMTBodyEmitter {
                 return new SMTCallSimple("=", [accessTypeTag, new SMTConst(`TypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
             else {
-                xxxx;
+                this.processSubtypeTagCheck(flow, ofrecord);
                 return new SMTCallSimple("SubtypeOf@", [accessTypeTag, new SMTConst(`AbstractTypeTag_${this.typegen.mangle(ofrecord.trkey)}`)]);
             }
         }
@@ -884,15 +921,17 @@ class SMTBodyEmitter {
     }
 
     processTupleHasIndex(op: MIRTupleHasIndex, continuation: SMTExp): SMTExp {
-        xxxx;
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
+
+        this.processIndexTagCheck(op.idx, this.typegen.getMIRType(op.argflowtype));
         const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasIndex@", [accessTypeTag, new SMTConst(`TupleIndexTag_${op.idx}`)]), continuation);
     }
 
     processRecordHasProperty(op: MIRRecordHasProperty, continuation: SMTExp): SMTExp {
-        xxxx;
         const argtype = this.typegen.getSMTTypeFor(this.typegen.getMIRType(op.arglayouttype));
+
+        this.processPropertyTagCheck(op.pname, this.typegen.getMIRType(op.argflowtype));
         const accessTypeTag = argtype.isGeneralTermType() ? new SMTCallSimple("GetTypeTag@BTerm", [this.argToSMT(op.arg)]) : new SMTCallSimple("GetTypeTag@BKey", [this.argToSMT(op.arg)]);
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("HasProperty@", [accessTypeTag, new SMTConst(`RecordPropertyTag_${op.pname}`)]), continuation);
     }
@@ -2196,7 +2235,7 @@ class SMTBodyEmitter {
                     const pofnsuccesstrue = this.generateIsSuccessLambdaPredicate(idecl.pcodes.get("p") as MIRPCode, true, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
                     const pofnsuccessfalse = this.generateIsSuccessLambdaPredicate(idecl.pcodes.get("p") as MIRPCode, false, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
                     const allof = new SMTCallGeneral(this.typegen.mangle(idecl.key), [l, ...lambdavars.map((lv) => lv.vname)]);
-                    const alloferrororfalse = new SMTCallSimple("or", [this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("and", [this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("not", [this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), allof)])])])
+                    const alloferrororfalse = new SMTCallSimple("or", [this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("=", [this.typegen.generateResultTypeConstructorSuccess(this.typegen.getMIRType("NSCore::Bool"), new SMTConst("false")), allof])]);
                     const alloftrue = new SMTCallSimple("and", [this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), allof), this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), allof)]);
 
                     const pgeterror_implies_alloferror = new SMTCallSimple("=>", [pofniserror, this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof)]);

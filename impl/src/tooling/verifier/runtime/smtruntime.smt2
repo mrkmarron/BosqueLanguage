@@ -59,8 +59,8 @@
 (declare-fun HasProperty@ (TypeTag, RecordPropertyTag) Bool)
 ;;RECORD_HAS_PROPERTY_DECLS;;
 
-(declare-fun TypeTagLess@ (TypeTag, TypeTag) Bool)
-;;KEY_TYPE_TAG_LESS;;
+(declare-fun TypeTagRank@ (TypeTag) Int)
+;;KEY_TYPE_TAG_RANK;;
 
 ;;
 ;;UFloat kind + UF ops for strong refutation checks
@@ -95,16 +95,12 @@
 ;; KeyType Concept datatypes
 ;;
 (declare-datatypes (
-      (bsq_keytuple_entry 0)
-      (bsq_keyrecord_entry 0)
       ;;KEY_TUPLE_DECLS;;
       ;;KEY_RECORD_DECLS;;
       ;;KEY_TYPE_DECLS;;
       (bsq_keyobject 0)
       (BKey 0)
     ) (
-    ( (bsq_keytuple_entry@empty) (bsq_keytuple_entry@cons (bsq_keytuple_entry_value bsq_keyobject)) )
-    ( (bsq_keyrecord_entry@empty) (bsq_keyrecord_entry@cons (bsq_keyrecord_entry_value bsq_keyobject)) )
     ;;KEY_TUPLE_TYPE_CONSTRUCTORS;;
     ;;KEY_RECORD_TYPE_CONSTRUCTORS;;
     ;;KEY_TYPE_CONSTRUCTORS;;
@@ -153,8 +149,6 @@
 (define-fun bsqkey_string@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
   (str.< (bsqkey_string_value k1) (bsqkey_string_value k2))
 )
-
-;;BKEY_LESS_DECLS;;
 
 ;;
 ;; Any Concept datatypes
@@ -228,7 +222,16 @@
   (let ((r (BNatNonLinear_X_UF op a b))) (ite (<= 0 r) r (- r)))
 )
 
-;;EPHEMERAL_DECLS;;
+;;
+;; Ephemeral datatypes
+;;
+(declare-datatypes (
+    (elistnull 0)
+    ;;EPHEMERAL_DECLS;;
+    ) (
+    ( (elistnull@cons) )
+    ;;EPHEMERAL_CONSTRUCTORS;;
+))
 
 ;;As a lattice where ErrorID_AssumeCheck <: ErrorID_Target (e.g. 0x1 and 0x3)
 (declare-datatypes () (
@@ -240,18 +243,18 @@
 
 (declare-datatypes (
       ;;RESULT_DECLS;;
-      ;;FLAG_RESULT_DECLS;;
     ) (
     ;;RESULTS;;
-    ;;FLAG_RESULTS;;
 ))
+
+;;GLOBAL_DECLS;;
 
 ;;UF_DECLS;;
 
 ;;AXIOM_DECLS;;
 
-;;V_ACCESS;;
-
 ;;FUNCTION_DECLS;;
+
+;;GLOBAL_DEFINITIONS;;
 
 ;;FREE_CONSTRUCTOR_FUNCTIONS;;
