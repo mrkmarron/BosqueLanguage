@@ -8,7 +8,7 @@ import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVerifierAssume, MIRVirtualMethodKey } from "../../compiler/mir_ops";
 import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask, SMTAxiom, SMTType, SMTErrorAxiom } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
-import { SMTAssembly, SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
+import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 
 import * as assert from "assert";
 
@@ -18,7 +18,6 @@ function NOT_IMPLEMENTED(msg: string): SMTExp {
 
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
-    readonly smtasm: SMTAssembly;
     readonly typegen: SMTTypeEmitter;
 
     readonly errorTrgtPos: { file: string, line: number, pos: number };
@@ -26,35 +25,37 @@ class SMTBodyEmitter {
 
     private tmpvarctr = 0;
 
-    private currentFile: string = "[No File]";
-    private currentRType: MIRType;
-    private currentSCC = new Set<string>();
+    currentFile: string = "[No File]";
+    currentRType: MIRType;
+    currentSCC = new Set<string>();
 
     private pendingMask: SMTMaskConstruct[] = [];
-    private requiredTypecheck: { inv: string, flowtype: MIRType, oftype: MIRType }[] = [];
+    requiredTypecheck: { inv: string, flowtype: MIRType, oftype: MIRType }[] = [];
+
+    maskSizes: Set<number> = new Set<number>();
 
     //!!!
     //See the methods generateLoadTupleIndexVirtual, generateLoadTupleIndexVirtual, etc for processing the entrues in these arrays
     //!!!
 
-    private requiredLoadVirtualTupleIndex: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }[] = [];
-    private requiredLoadVirtualRecordProperty: { inv: string, argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined }[] = [];
-    private requiredLoadVirtualEntityField: { inv: string, argflowtype: MIRType, field: MIRFieldDecl, resulttype: MIRType }[] = [];
+    requiredLoadVirtualTupleIndex: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }[] = [];
+    requiredLoadVirtualRecordProperty: { inv: string, argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined }[] = [];
+    requiredLoadVirtualEntityField: { inv: string, argflowtype: MIRType, field: MIRFieldDecl, resulttype: MIRType }[] = [];
     
-    private requiredProjectVirtualTupleIndex: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }[] = [];
-    private requiredProjectVirtualRecordProperty: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }[] = [];
-    private requiredProjectVirtualEntityField: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }[] = [];
+    requiredProjectVirtualTupleIndex: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }[] = [];
+    requiredProjectVirtualRecordProperty: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }[] = [];
+    requiredProjectVirtualEntityField: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }[] = [];
 
-    private requiredUpdateVirtualTuple: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
-    private requiredUpdateVirtualRecord: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
-    private requiredUpdateVirtualEntity: { inv: string, argflowtype: MIRType,  allsafe: boolean, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+    requiredUpdateVirtualTuple: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+    requiredUpdateVirtualRecord: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
+    requiredUpdateVirtualEntity: { inv: string, argflowtype: MIRType,  allsafe: boolean, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }[] = [];
 
-    private requiredVirtualFunctionInvokes: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }[] = [];
-    private requiredVirtualOperatorInvokes: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }[] = [];
+    requiredVirtualFunctionInvokes: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }[] = [];
+    requiredVirtualOperatorInvokes: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }[] = [];
 
-    private requiredSubtypeTagChecks: {t: MIRType, oftype: MIRType}[] = [];
-    private requiredIndexTagChecks: {idx: number, oftype: MIRType}[] = [];
-    private requiredRecordTagChecks: {pname: string, oftype: MIRType}[] = [];
+    requiredSubtypeTagChecks: {t: MIRType, oftype: MIRType}[] = [];
+    requiredIndexTagChecks: {idx: number, oftype: MIRType}[] = [];
+    requiredRecordTagChecks: {pname: string, oftype: MIRType}[] = [];
 
     private processSubtypeTagCheck(t: MIRType, oftype: MIRType) {
         const stc = this.requiredSubtypeTagChecks.find((tc) => tc.t.trkey === t.trkey && tc.oftype.trkey === oftype.trkey);
@@ -99,7 +100,7 @@ class SMTBodyEmitter {
 
     private generateBoolForGuard(guard: MIRGuard): SMTExp {
         if(guard instanceof MIRMaskGuard) {
-            return new SMTCallSimple(`$MaskLoad_${guard.gsize}_@${guard.gindex}`, [new SMTVar(this.typegen.mangle(guard.gmask))]);
+            return new SMTCallSimple(`$Mask_${guard.gsize}@${guard.gindex}`, [new SMTVar(this.typegen.mangle(guard.gmask))]);
         }
         else {
             return this.argToSMT((guard as MIRArgGuard).greg);
@@ -113,8 +114,8 @@ class SMTBodyEmitter {
     private generateGeneralCallValueProcessing(callerrtype: MIRType, calleertype: MIRType, gcall: SMTExp, trgt: MIRRegisterArgument, continuation: SMTExp): SMTLet {
         const cres = this.generateTempName();
         
-        const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(calleertype, cres), continuation);
-        const errpath = (callerrtype.trkey === calleertype.trkey) ? cres : this.typegen.generateResultTypeConstructorError(calleertype, this.typegen.generateResultGetError(calleertype, cres));
+        const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(calleertype, new SMTVar(cres)), continuation);
+        const errpath = (callerrtype.trkey === calleertype.trkey) ? new SMTVar(cres) : this.typegen.generateResultTypeConstructorError(calleertype, this.typegen.generateResultGetError(calleertype, new SMTVar(cres)));
 
         const icond = new SMTIf(this.typegen.generateResultIsErrorTest(calleertype, new SMTVar(cres)), errpath, okpath);
         return new SMTLet(cres, gcall, icond);
@@ -201,7 +202,7 @@ class SMTBodyEmitter {
 
             const orelse = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, new SMTConst(ufcname), false) : new SMTConst(ufcname);
 
-            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
         }
     }
 
@@ -234,7 +235,7 @@ class SMTBodyEmitter {
 
             const orelse = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, new SMTConst(ufcname), false) : new SMTConst(ufcname);
 
-            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
         }
     }
 
@@ -260,7 +261,7 @@ class SMTBodyEmitter {
         const orelse = ops[ops.length - 1].result;
         ops = ops.slice(0, ops.length - 1);
 
-        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateProjectTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }): SMTFunction {
@@ -289,7 +290,7 @@ class SMTBodyEmitter {
         const orelse = ops[ops.length - 1].result;
         ops = ops.slice(0, ops.length - 1);
             
-        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateProjectRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }): SMTFunction {
@@ -318,7 +319,7 @@ class SMTBodyEmitter {
         const orelse = ops[ops.length - 1].result;
         ops = ops.slice(0, ops.length - 1);
 
-        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateProjectEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }): SMTFunction {
@@ -347,7 +348,7 @@ class SMTBodyEmitter {
         const orelse = ops[ops.length - 1].result;
         ops = ops.slice(0, ops.length - 1);
 
-        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateUpdateTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
@@ -389,7 +390,7 @@ class SMTBodyEmitter {
                 return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
             })
         ];
-        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateUpdateRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
@@ -430,7 +431,7 @@ class SMTBodyEmitter {
                 return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
             })
         ];
-        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateUpdateEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, allsafe: boolean, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
@@ -499,7 +500,7 @@ class SMTBodyEmitter {
                 return { vname: `arg_${i}`, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(upd[1])) };
             })
         ];
-        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateVirtualFunctionInvoke(geninfo: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }): SMTFunction {
@@ -563,7 +564,7 @@ class SMTBodyEmitter {
                 return { vname: `arg_${i}`, vtype: vv };
             })
         ];
-        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(new SMTVar("arg"), ops, orelse));
+        return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
     private generateVirtualOperatorInvoke(geninfo: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }): SMTFunction {
@@ -651,9 +652,8 @@ class SMTBodyEmitter {
         }
     }
 
-    constructor(assembly: MIRAssembly, smtasm: SMTAssembly, typegen: SMTTypeEmitter, level: VerifierLevel, errorTrgtPos: { file: string, line: number, pos: number }) {
+    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, level: VerifierLevel, errorTrgtPos: { file: string, line: number, pos: number }) {
         this.assembly = assembly;
-        this.smtasm = smtasm;
         this.typegen = typegen;
 
         this.errorTrgtPos = errorTrgtPos;
@@ -901,6 +901,7 @@ class SMTBodyEmitter {
     }
 
     processDeclareGuardFlagLocation(op: MIRDeclareGuardFlagLocation) {
+        this.maskSizes.add(op.count);
         this.pendingMask = this.pendingMask.filter((pm) => pm.maskname !== op.name);
     }
 
@@ -1531,7 +1532,7 @@ class SMTBodyEmitter {
     }
 
     processAllTrue(op: MIRAllTrue, continuation: SMTExp): SMTExp {
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("and", [op.args.map((arg) => this.argToSMT(arg))]), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("and", op.args.map((arg) => this.argToSMT(arg))), continuation);
     }
 
     processIsTypeOf(op: MIRIsTypeOf, continuation: SMTExp): SMTExp {
@@ -2007,8 +2008,8 @@ class SMTBodyEmitter {
         else {
             const cres = this.generateTempName();
 
-            const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(rtype, cres), continuation);
-            const errpath = (rtype.trkey === this.currentRType.trkey) ? cres : this.typegen.generateResultTypeConstructorError(this.currentRType, this.typegen.generateResultGetError(rtype, cres));
+            const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(rtype, new SMTVar(cres)), continuation);
+            const errpath = (rtype.trkey === this.currentRType.trkey) ? new SMTVar(cres) : this.typegen.generateResultTypeConstructorError(this.currentRType, this.typegen.generateResultGetError(rtype, new SMTVar(cres)));
 
             const icond = new SMTIf(this.typegen.generateResultIsErrorTest(rtype, new SMTVar(cres)), errpath, okpath);
             return new SMTLet(cres, smte, icond);
@@ -2160,7 +2161,7 @@ class SMTBodyEmitter {
     }
 
     generateListBoundsGuard(ltype: SMTType, l: SMTVar, n: SMTVar): SMTExp {
-        return new SMTCallSimple("and", [new SMTCallSimple("<=", [new SMTConst("0"), n]), new SMTCallSimple("<", [l, `${ltype.name}@size`])]);
+        return new SMTCallSimple("and", [new SMTCallSimple("<=", [new SMTConst("0"), n]), new SMTCallSimple("<", [n, new SMTCallSimple(`${ltype.name}@size`, [l])])]);
     }
 
     createLambdaGuards(pc: MIRPCode): { vname: string, vtype: SMTType }[] {
@@ -2219,7 +2220,7 @@ class SMTBodyEmitter {
                 const psafe = this.isLambdaSafe(idecl.pcodes.get("p") as MIRPCode);
                 if (psafe) {
                     const pofn = this.generateSafeLambdaPredCall(idecl.pcodes.get("p") as MIRPCode, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
-                    const allof = new SMTCallSimple(this.typegen.mangle(idecl.key), [l, ...lambdavars.map((lv) => lv.vname)]);
+                    const allof = new SMTCallSimple(this.typegen.mangle(idecl.key), [l, ...lambdavars.map((lv) => new SMTVar(lv.vname))]);
 
                     const pgetfalse_imples_alloffalse = new SMTCallSimple("=>", [new SMTCallSimple("not", [pofn]), new SMTCallSimple("not", [allof])]);
                     const alloftrue_implies_pgettrue = new SMTCallSimple("=>", [allof, pofn]);
@@ -2234,7 +2235,7 @@ class SMTBodyEmitter {
                     const pofniserror = this.generateIsErrorLambdaPrediate(idecl.pcodes.get("p") as MIRPCode, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
                     const pofnsuccesstrue = this.generateIsSuccessLambdaPredicate(idecl.pcodes.get("p") as MIRPCode, true, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
                     const pofnsuccessfalse = this.generateIsSuccessLambdaPredicate(idecl.pcodes.get("p") as MIRPCode, false, new SMTCallSimple(`${ltype.name}@get`, [l, n]));
-                    const allof = new SMTCallGeneral(this.typegen.mangle(idecl.key), [l, ...lambdavars.map((lv) => lv.vname)]);
+                    const allof = new SMTCallGeneral(this.typegen.mangle(idecl.key), [l, ...lambdavars.map((lv) => new SMTVar(lv.vname))]);
                     const alloferrororfalse = new SMTCallSimple("or", [this.typegen.generateResultIsErrorTest(this.typegen.getMIRType("NSCore::Bool"), allof), new SMTCallSimple("=", [this.typegen.generateResultTypeConstructorSuccess(this.typegen.getMIRType("NSCore::Bool"), new SMTConst("false")), allof])]);
                     const alloftrue = new SMTCallSimple("and", [this.typegen.generateResultIsSuccessTest(this.typegen.getMIRType("NSCore::Bool"), allof), this.typegen.generateResultGetSuccess(this.typegen.getMIRType("NSCore::Bool"), allof)]);
 

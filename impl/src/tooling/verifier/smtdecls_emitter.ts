@@ -3,47 +3,35 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly, MIRInvokeDecl, MIRInvokeBodyDecl, MIREntityType, MIREphemeralListType } from "../../compiler/mir_assembly";
-import { SMTTypeEmitter } from "./smttype_emitter";
-import { SMTBodyEmitter, AxiomLevel } from "./smtbody_emitter";
-import { constructCallGraphInfo } from "../../compiler/mir_callg";
+import { MIRAssembly } from "../../compiler/mir_assembly";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
-
-type SMTCode = {
-    REGEX_DECLS: string,
-
-    NOMINAL_DECLS_FWD: string,
-    NOMINAL_CONSTRUCTORS: string,
-    NOMINAL_OBJECT_CONSTRUCTORS: string,
-
-    NOMINAL_TYPE_KIND_DECLS: string,
-    NOMINAL_TYPE_TO_DATA_KIND_ASSERTS: string,
-    SPECIAL_NAME_BLOCK_ASSERTS: string,
-
-    EPHEMERAL_DECLS: string,
-
-    EMPTY_CONTENT_ARRAY_DECLS: string,
-
-    RESULTS_FWD: string,
-    RESULTS: string,
-
-    CONCEPT_SUBTYPE_RELATION_DECLARE: string,
-    SUBTYPE_DECLS: string,
-
-    VFIELD_ACCESS: string,
-
-    FUNCTION_DECLS: string,
-    ARG_VALUES: string,
-
-    INVOKE_ACTION: string
-};
+import { SMTBodyEmitter } from "./smtbody_emitter";
+import { SMTTypeEmitter } from "./smttype_emitter";
+import { SMTAssembly, SMTEntityDecl } from "./smt_assembly";
+import { VerifierLevel } from "./smt_exp";
 
 class SMTEmitter {
-    static emit(assembly: MIRAssembly, entrypoint: MIRInvokeBodyDecl, errorcheck: boolean, isverify: boolean, axlevel?: AxiomLevel): SMTCode {
-        const typeemitter = new SMTTypeEmitter(assembly);
-        typeemitter.initializeConceptSubtypeRelation();
+    static generateSMTAssembly(assembly: MIRAssembly, level: VerifierLevel, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey): SMTAssembly {
+        let temitter = new SMTTypeEmitter(assembly);
+        let bemitter = new SMTBodyEmitter(assembly, temitter, level, errorTrgtPos);
+        let smtassembly = new SMTAssembly(level);
 
-        const bodyemitter = new SMTBodyEmitter(assembly, typeemitter, isverify, axlevel);
+        assembly.entityDecls.forEach((edcl) => {
+
+            smtassembly.entityDecls.push(new SMTEntityDecl());
+        });
+
+    tupleDecls: SMTTupleDecl[] = [];
+    recordDecls: SMTRecordDecl[] = [];
+    ephemeralDecls: SMTEphemeralListDecl[] = [];
+
+    abstractTypes: string[] = [];
+    indexTags: string[] = [];
+    propertyTags: string[] = [];
+    keytypeTags: string[] = [];
+
+
+        xxxx;
 
         let typedecls_fwd: string[] = [];
         let typedecls: string[] = [];

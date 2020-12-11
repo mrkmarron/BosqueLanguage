@@ -12,6 +12,10 @@ class SMTMaskConstruct {
     constructor(maskname: string) {
         this.maskname = maskname;
     }
+
+    emitSMT2(): string {
+        return `($Mask_${this.entries.length}@cons ${this.entries.map((mv) => mv.emitSMT2(undefined)).join(" ")})`;
+    }
 }
 
 class SMTType {
@@ -31,6 +35,7 @@ class SMTType {
 }
 
 abstract class SMTExp {
+    abstract emitSMT2(indent: string | undefined): string;
 }
 
 class SMTVar extends SMTExp {
@@ -41,6 +46,10 @@ class SMTVar extends SMTExp {
 
         this.vname = vname;
     }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.vname;
+    }
 }
 
 class SMTConst extends SMTExp {
@@ -50,6 +59,10 @@ class SMTConst extends SMTExp {
         super();
 
         this.cname = cname;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.cname;
     }
 }
 
@@ -63,6 +76,10 @@ class SMTCallSimple extends SMTExp {
         this.fname = fname;
         this.args = args;
     }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.args.length === 0 ? this.fname : `(${this.fname} ${this.args.map((arg) => arg.emitSMT2(undefined)).join(" ")})`;
+    }
 }
 
 class SMTCallGeneral extends SMTExp {
@@ -74,6 +91,10 @@ class SMTCallGeneral extends SMTExp {
 
         this.fname = fname;
         this.args = args;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.args.length === 0 ? this.fname : `(${this.fname} ${this.args.map((arg) => arg.emitSMT2(undefined)).join(" ")})`;
     }
 }
 
@@ -89,6 +110,10 @@ class SMTCallGeneralWOptMask extends SMTExp {
         this.args = args;
         this.mask = mask;
     }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.args.length === 0 ? `(${this.fname} ${this.mask.emitSMT2()})` : `(${this.fname} ${this.args.map((arg) => arg.emitSMT2(undefined)).join(" ")} ${this.mask.emitSMT2()})`;
+    }
 }
 
 class SMTCallGeneralWPassThroughMask extends SMTExp {
@@ -102,6 +127,10 @@ class SMTCallGeneralWPassThroughMask extends SMTExp {
         this.fname = fname;
         this.args = args;
         this.mask = mask;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        return this.args.length === 0 ? `(${this.fname} ${this.mask})` : `(${this.fname} ${this.args.map((arg) => arg.emitSMT2(undefined)).join(" ")} ${this.mask})`;
     }
 }
 
@@ -117,6 +146,15 @@ class SMTLet extends SMTExp {
         this.value = value;
         this.inexp = inexp;
     }
+
+    emitSMT2(indent: string | undefined): string {
+        if (indent === undefined) {
+            return `(let ((${this.vname} ${this.value.emitSMT2(undefined)})) ${this.inexp.emitSMT2(undefined)})`;
+        }
+        else {
+            return `(let ((${this.vname} ${this.value.emitSMT2(undefined)}))\n${indent + "  "}${this.inexp.emitSMT2(indent + "  ")}\n${indent})`;
+        }
+    }
 }
 
 class SMTLetMulti extends SMTExp {
@@ -128,6 +166,17 @@ class SMTLetMulti extends SMTExp {
 
         this.assigns = assigns;
         this.inexp = inexp;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        const binds = this.assigns.map((asgn) => `(${asgn.vname} ${asgn.value.emitSMT2(undefined)})`);
+
+        if (indent === undefined) {
+            return `(let (${binds.join(" ")}) ${this.inexp.emitSMT2(undefined)})`;
+        }
+        else {
+            return `(let (${binds.join(" ")})\n${indent + "  "}${this.inexp.emitSMT2(indent + "  ")}\n${indent})`;
+        }
     }
 }
 
@@ -143,19 +192,43 @@ class SMTIf extends SMTExp {
         this.tval = tval;
         this.fval = fval;
     }
+
+    emitSMT2(indent: string | undefined): string {
+        if (indent === undefined) {
+            return `(ite ${this.cond.emitSMT2(undefined)} ${this.tval.emitSMT2(undefined)} ${this.fval.emitSMT2(undefined)})`;
+        }
+        else {
+            return `(ite ${this.cond.emitSMT2(undefined)}\n${indent + "  "}${this.tval.emitSMT2(indent + "  ")}\n${indent + "  "}${this.fval.emitSMT2(indent + "  ")}\n${indent})`;
+        }
+    }
 }
 
 class SMTCond extends SMTExp {
-    readonly mvar: SMTExp;
     readonly opts: {test: SMTExp, result: SMTExp}[];
     readonly orelse: SMTExp;
 
-    constructor(mvar: SMTExp, opts: {test: SMTExp, result: SMTExp}[], orelse: SMTExp) {
+    constructor(opts: {test: SMTExp, result: SMTExp}[], orelse: SMTExp) {
         super();
 
-        this.mvar = mvar;
         this.opts = opts;
         this.orelse = orelse;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        if (indent === undefined) {
+            let iopts: string = this.orelse.emitSMT2(undefined);
+            for(let i = this.opts.length - 1; i >= 0; --i) {
+                iopts = `(ite ${this.opts[i].test.emitSMT2(undefined)} ${this.opts[i].result.emitSMT2(undefined)} ${iopts})`
+            }
+            return iopts;
+        }
+        else {
+            let iopts: string = this.orelse.emitSMT2(undefined);
+            for(let i = this.opts.length - 1; i >= 0; --i) {
+                iopts = `(ite ${this.opts[i].test.emitSMT2(undefined)}\n${indent + "  "}${this.opts[i].result.emitSMT2(indent + "  ")}\n${indent + "  "}${iopts}\n${indent})`
+            }
+            return iopts;
+        }
     }
 }
 
@@ -174,6 +247,12 @@ class SMTAxiom {
 
         this.identifier = identifier;
         this.trigger = trigger;
+    }
+
+    emitSMT2(): string {
+        const terms = this.terms.map((t) => `(${t.vname} ${t.vtype.name})`);
+        const guard = this.guard !== undefined ? this.guard.emitSMT2(undefined) : undefined;
+        return `(assert (forall (${terms.join(" ")})${guard !== undefined ? ("\n    " + guard + " =>") : ""}\n    ${this.clause.emitSMT2(undefined)}\n))`
     }
 }
 
@@ -194,6 +273,12 @@ class SMTErrorAxiom {
 
         this.identifier = identifier;
         this.trigger = trigger;
+    }
+
+    emitSMT2(): string {
+        const terms = this.terms.map((t) => `(${t.vname} ${t.vtype.name})`);
+        const guard = this.guard !== undefined ? this.guard.emitSMT2(undefined) : undefined;
+        return `(assert (forall (${terms.join(" ")}) (exists (${this.erroridx.vname} ${this.erroridx.vtype.name})${guard !== undefined ? ("\n    " + guard + " =>") : ""}\n    ${this.clause.emitSMT2(undefined)}\n)))`
     }
 }
 

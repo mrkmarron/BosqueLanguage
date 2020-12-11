@@ -25,12 +25,12 @@ type SMT2FileInfo = {
     TYPE_INFO: { decls: string[], constructors: string[], boxing: string[] }
     EPHEMERAL_DECLS: { decls: string[], constructors: string[] },
     RESULT_INFO: { decls: string[], constructors: string[] },
-    GLOBAL_DECLS
-    UF_DECLS
-    AXIOM_DECLS
-    FUNCTION_DECLS
-    GLOBAL_DEFINITIONS
-    FREE_CONSTRUCTOR_FUNCTIONS
+    MASK_INFO: { decls: string[], constructors: string[] },
+    GLOBAL_DECLS: string[],
+    UF_DECLS: string[],
+    AXIOM_DECLS: string[],
+    FUNCTION_DECLS: string[],
+    GLOBAL_DEFINITIONS: string[]
 };
 
 class SMTFunction {
@@ -49,6 +49,12 @@ class SMTFunction {
 
         this.body = body;
     }
+
+    emitSMT2(): string {
+        const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype})`);
+        const body = this.body.emitSMT2("  ");
+        return `(define-fun ${this.fname} (${args.join(" ")}${this.mask !== undefined ? this.mask : ""}) ${this.result.name}\n${body}\n)`;
+    }
 }
 
 class SMTFunctionUninterpreted {
@@ -56,14 +62,14 @@ class SMTFunctionUninterpreted {
     readonly args: SMTType[];
     readonly result: SMTType;
 
-    //
-    //TODO: we want to put in info on pcode functions and axioms here
-    //
-
     constructor(fname: string, args: SMTType[], result: SMTType) {
         this.fname = fname;
         this.args = args;
         this.result = result;
+    }
+
+    emitSMT2(): string {
+        return `(declare-fun ${this.fname} (${this.args.map((arg) => arg.name).join(" ")}) ${this.result.name})`;
     }
 }
 
@@ -79,6 +85,19 @@ class SMTEntityDecl {
     readonly ubf: string;
 
     readonly invfunc: string | undefined;
+
+    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string, invfunc: string | undefined) {
+        this.iskeytype = iskeytype;
+        this.isapitype = isapitype;
+
+        this.smtname = smtname;
+        this.typetag = typetag;
+        this.consf = consf;
+        this.boxf = boxf;
+        this.ubf = ubf;
+
+        this.invfunc = invfunc;
+    }
 }
 
 class SMTTupleDecl {
@@ -91,6 +110,17 @@ class SMTTupleDecl {
     readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
     readonly boxf: string;
     readonly ubf: string;
+
+    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
+        this.iskeytype = iskeytype;
+        this.isapitype = isapitype;
+
+        this.smtname = smtname;
+        this.typetag = typetag;
+        this.consf = consf;
+        this.boxf = boxf;
+        this.ubf = ubf;
+    }
 }
 
 class SMTRecordDecl {
@@ -103,6 +133,17 @@ class SMTRecordDecl {
     readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
     readonly boxf: string;
     readonly ubf: string;
+
+    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
+        this.iskeytype = iskeytype;
+        this.isapitype = isapitype;
+
+        this.smtname = smtname;
+        this.typetag = typetag;
+        this.consf = consf;
+        this.boxf = boxf;
+        this.ubf = ubf;
+    }
 }
 
 class SMTEphemeralListDecl {
@@ -110,13 +151,26 @@ class SMTEphemeralListDecl {
     readonly typetag: string;
 
     readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
+
+    constructor(smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }) {
+        this.smtname = smtname;
+        this.typetag = typetag;
+        this.consf = consf;
+    }
 }
 
 class SMTConstantDecl {
     readonly gkey: string;
-    readonly ctype: string;
+    readonly ctype: SMTType;
 
-    readonly consf: string;    
+    readonly consf: string;
+
+    constructor(gkey: string, ctype: SMTType, consf: string) {
+        this.gkey = gkey;
+        this.ctype = ctype;
+
+        this.consf = consf;
+    }
 }
 
 class SMTAssembly {
@@ -141,16 +195,13 @@ class SMTAssembly {
 
     constantDecls: SMTConstantDecl[] = [];
     
-    generatedKeyLessFunctions: SMTFunction[] = [];
-
     uninterpfunctions: SMTFunctionUninterpreted[] = [];
     axioms: SMTAxiom[] = [];
     errorproprs: SMTErrorAxiom[] = [];
 
-    resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[];
+    maskSizes: Set<number> = new Set<number>();
+    resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[] = [];
     functions: SMTFunction[] = [];
-
-    freeConstructorFunctions: SMTFunction[] = [];
 
     constructor(level: VerifierLevel) {
         this.level = level;
@@ -250,7 +301,7 @@ class SMTAssembly {
                 if (rt.hasFlag) {
                     return {
                         decl: `(${rt.rtname} 0)`,
-                        consf: `(${rt.rtname}@cons ($GuardResult_${rt.rtname}@result ${rt.ctype.name}) ($GuardResult_${rt.rtname}@flag Bool))`,
+                        consf: `(${rt.rtname}@cons ($GuardResult_${rt.rtname}@result ${rt.ctype.name}) ($GuardResult_${rt.rtname}@flag Bool))`
                     };
                 }
                 else {
@@ -260,6 +311,37 @@ class SMTAssembly {
                     };
                 }
             });
+
+        const maskinfo = [...this.maskSizes]
+            .sort()
+            .map((msize) => {
+                let entries: string[] = [];
+                for(let i = 0; i < msize; ++i) {
+                    entries.push(`($Mask_${msize}@${i} Bool)`);
+                }
+
+                return {
+                    decl: `($Mask_${msize} 0)`,
+                    consf: `($Mask_${msize}@cons ${entries.join(" ")})`
+                };
+            });
+
+        const gdecls = this.constantDecls
+            .sort((c1, c2) => c1.gkey.localeCompare(c2.gkey))
+            .map((c) => `(declare-const ${c.gkey} ${c.ctype.name})`);
+
+        const ufdecls = this.uninterpfunctions
+            .sort((uf1, uf2) => uf1.fname.localeCompare(uf2.fname))
+            .map((uf) => `()`);
+
+        const axioms = [
+            ...this.axioms.sort((ax1, ax2) => ax1.identifier.localeCompare(ax2.identifier)).map((ax) => ax.emitSMT2()),
+            ...this.errorproprs.sort((ep1, ep2) => ep1.identifier.localeCompare(ep2.identifier)).map((ep) => ep.emitSMT2())
+        ];
+
+        const gdefs = this.constantDecls
+            .sort((c1, c2) => c1.gkey.localeCompare(c2.gkey))
+            .map((c) => `(assert (= ${c.gkey} ${c.consf}))`);
 
         return {
             TYPE_TAG_DECLS,
@@ -279,13 +361,13 @@ class SMTAssembly {
             RECORD_INFO: { decls: termrecordinfo.map((kti) => kti.decl), constructors: termrecordinfo.map((kti) => kti.consf), boxing: termrecordinfo.map((kti) => kti.boxf) },
             TYPE_INFO: { decls: termtypeinfo.map((kti) => kti.decl), constructors: termtypeinfo.map((kti) => kti.consf), boxing: termtypeinfo.map((kti) => kti.boxf) },
             EPHEMERAL_DECLS: { decls: etypeinfo.map((kti) => kti.decl), constructors: etypeinfo.map((kti) => kti.consf) },
-            RESULT_INFO: { decls: rtypeinfo.map((kti) => kti.decl), constructors: rtypeinfo.map((kti) => kti.consf) }
-            GLOBAL_DECLS
-    UF_DECLS
-    AXIOM_DECLS
-    FUNCTION_DECLS
-    GLOBAL_DEFINITIONS
-    FREE_CONSTRUCTOR_FUNCTIONS
+            RESULT_INFO: { decls: rtypeinfo.map((kti) => kti.decl), constructors: rtypeinfo.map((kti) => kti.consf) },
+            MASK_INFO: { decls: maskinfo.map((mi) => mi.decl), constructors: maskinfo.map((mi) => mi.consf) },
+            GLOBAL_DECLS: gdecls,
+            UF_DECLS: ufdecls,
+            AXIOM_DECLS: axioms,
+            FUNCTION_DECLS: this.functions.map((f) => f.emitSMT2()),
+            GLOBAL_DEFINITIONS: gdefs
         };
     }
 }

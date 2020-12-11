@@ -243,8 +243,10 @@
 
 (declare-datatypes (
       ;;RESULT_DECLS;;
+      ;;MASK_DECLS;;
     ) (
     ;;RESULTS;;
+    ;;MASKS;;
 ))
 
 ;;GLOBAL_DECLS;;
@@ -256,5 +258,3 @@
 ;;FUNCTION_DECLS;;
 
 ;;GLOBAL_DEFINITIONS;;
-
-;;FREE_CONSTRUCTOR_FUNCTIONS;;
