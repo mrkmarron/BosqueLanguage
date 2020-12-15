@@ -566,6 +566,10 @@ abstract class MIROp {
 
     abstract stringify(): string;
 
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        return false;
+    }
+
     protected jbemit(): object {
         return { tag: this.tag, sinfo: jemitsinfo(this.sinfo) };
     }
@@ -749,6 +753,10 @@ class MIRAbort extends MIROp {
         return `abort -- ${this.info}`;
     }
 
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        return true;
+    }
+
     jemit(): object {
         return { ...this.jbemit(), info: this.info };
     }
@@ -772,6 +780,10 @@ class MIRVerifierAssume extends MIROp {
 
     stringify(): string {
         return `_assume ${this.arg.stringify()}`;
+    }
+
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        return implicitAssumesEnabled;
     }
 
     jemit(): object {
@@ -800,6 +812,10 @@ class MIRAssertCheck extends MIROp {
 
     stringify(): string {
         return `assert ${this.arg.stringify()} -- ${this.info}`;
+    }
+
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        return true;
     }
 
     jemit(): object {

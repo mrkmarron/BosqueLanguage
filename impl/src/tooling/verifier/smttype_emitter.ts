@@ -5,16 +5,20 @@
 
 import { MIRAssembly, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRRecordType, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { MIRFieldKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
-import { SMTCallSimple, SMTConst, SMTExp, SMTType } from "./smt_exp";
+import { SMTCallSimple, SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 import * as assert from "assert";
 
 class SMTTypeEmitter {
     readonly assembly: MIRAssembly;
+    readonly vopts: VerifierOptions;
+
     private mangledNameMap: Map<string, string> = new Map<string, string>();
 
-    constructor(assembly: MIRAssembly, mangledNameMap?: Map<string, string>) {
+    constructor(assembly: MIRAssembly, vopts: VerifierOptions, mangledNameMap?: Map<string, string>) {
         this.assembly = assembly;
+        this.vopts = vopts;
+
         this.mangledNameMap = mangledNameMap || new Map<string, string>();
     }
 
@@ -59,16 +63,16 @@ class SMTTypeEmitter {
             return new SMTType("Bool");
         }
         else if (this.isType(tt, "NSCore::Int")) {
-            return new SMTType("Int");
+            return new SMTType("BInt");
         }
         else if (this.isType(tt, "NSCore::Nat")) {
-            return new SMTType("Int");
+            return new SMTType("BNat");
         }
         else if (this.isType(tt, "NSCore::BigInt")) {
-            return new SMTType("Int");
+            return new SMTType("BBigInt");
         }
         else if (this.isType(tt, "NSCore::BigNat")) {
-            return new SMTType("Int");
+            return new SMTType("BBigNat");
         }
         else if (this.isType(tt, "NSCore::Float")) {
             return new SMTType("BFloat");
@@ -84,6 +88,12 @@ class SMTTypeEmitter {
         }
         else if (this.isType(tt, "NSCore::String")) {
             return new SMTType("BString");
+        }
+        else if (this.isType(tt, "NSCore::ISOTime")) {
+            return new SMTType("bsq_isotime");
+        }
+        else if (this.isType(tt, "NSCore::LogicalTime")) {
+            return new SMTType("bsq_logicaltime");
         }
         else if (this.isType(tt, "NSCore::Regex")) {
             return new SMTType("bsq_regex");
@@ -220,6 +230,14 @@ class SMTTypeEmitter {
                 objval = new SMTCallSimple("bsqkey_string@cons", [exp]);
                 typetag = "TypeTag_String";
             }
+            else if (this.isType(from, "NSCore::ISOTime")) {
+                objval = new SMTCallSimple("bsqkey_isotime@cons", [exp]);
+                typetag = "TypeTag_IsoTime";
+            }
+            else if (this.isType(from, "NSCore::LogicalTime")) {
+                objval = new SMTCallSimple("bsqkey_logicaltime@cons", [exp]);
+                typetag = "TypeTag_LogicalTime";
+            }
             else if (this.isUniqueTupleType(from)) {
                 objval = new SMTCallSimple(this.getSMTConstructorName(from).box, [exp]);
                 typetag = this.getSMTTypeTag(from);
@@ -312,6 +330,12 @@ class SMTTypeEmitter {
             }
             else if (this.isType(into, "NSCore::BigNat")) {
                 return new SMTCallSimple("bsqkey_bignat_value", [oexp]);
+            }
+            else if (this.isType(into, "NSCore::ISOTime")) {
+                return new SMTCallSimple("bsqkey_isotime_value", [oexp]);
+            }
+            else if (this.isType(into, "NSCore::LogicalTime")) {
+                return new SMTCallSimple("bsqkey_logicaltime_value", [oexp]);
             }
             else if (this.isType(into, "NSCore::String")) {
                 return new SMTCallSimple("bsqkey_string_value", [oexp]);

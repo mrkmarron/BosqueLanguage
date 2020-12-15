@@ -6,7 +6,7 @@
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRPCode, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVerifierAssume, MIRVirtualMethodKey } from "../../compiler/mir_ops";
-import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, VerifierLevel, SMTCallGeneralWPassThroughMask, SMTAxiom, SMTType, SMTErrorAxiom } from "./smt_exp";
+import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, SMTCallGeneralWPassThroughMask, SMTType, VerifierOptions } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 
@@ -19,9 +19,10 @@ function NOT_IMPLEMENTED(msg: string): SMTExp {
 class SMTBodyEmitter {
     readonly assembly: MIRAssembly;
     readonly typegen: SMTTypeEmitter;
+    readonly callsafety: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>;
 
     readonly errorTrgtPos: { file: string, line: number, pos: number };
-    readonly level: VerifierLevel;
+    readonly vopts: VerifierOptions;
 
     private tmpvarctr = 0;
 
@@ -33,6 +34,8 @@ class SMTBodyEmitter {
     requiredTypecheck: { inv: string, flowtype: MIRType, oftype: MIRType }[] = [];
 
     maskSizes: Set<number> = new Set<number>();
+
+    requiredCollectionOfConstructors: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = [];
 
     //!!!
     //See the methods generateLoadTupleIndexVirtual, generateLoadTupleIndexVirtual, etc for processing the entrues in these arrays
@@ -89,6 +92,10 @@ class SMTBodyEmitter {
         }
 
         return inv;
+    }
+
+    private generateConstructorOfSizeName(oftype: MIRResolvedTypeKey, argc: number): string {
+        return `@@cons_${this.typegen.mangle(oftype)}_k_${argc}`;
     }
 
     private generateUFConstantForType(tt: MIRType): string {
@@ -652,12 +659,13 @@ class SMTBodyEmitter {
         }
     }
 
-    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, level: VerifierLevel, errorTrgtPos: { file: string, line: number, pos: number }) {
+    constructor(assembly: MIRAssembly, typegen: SMTTypeEmitter, vopts: VerifierOptions, callsafety: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>, errorTrgtPos: { file: string, line: number, pos: number }) {
         this.assembly = assembly;
         this.typegen = typegen;
+        this.callsafety = callsafety;
 
         this.errorTrgtPos = errorTrgtPos;
-        this.level = level;
+        this.vopts = vopts;
 
         this.currentRType = typegen.getMIRType("NSCore::None");
     }
@@ -676,8 +684,7 @@ class SMTBodyEmitter {
     }
 
     isSafeInvoke(mkey: MIRInvokeKey): boolean {
-        const idecl = this.assembly.invokeDecls.get(mkey) || this.assembly.primitiveInvokeDecls.get(mkey) as MIRInvokeDecl;
-        return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe") || idecl.attributes.includes("__infer_safe");
+        return (this.callsafety.get(mkey) as { safe: boolean, trgt: boolean }).safe;
     }
 
     isSafeVirtualInvoke(vkey: MIRVirtualMethodKey, rcvrtype: MIRType): boolean {
@@ -736,19 +743,23 @@ class SMTBodyEmitter {
             return new SMTConst("false");
         }
         else if (cval instanceof MIRConstantInt) {
+            xxx;
             return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantNat) {
+            xxx;
             return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantBigInt) {
+            xxx;
             return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantBigNat) {
+            xxx;
             return new SMTConst(cval.value.slice(0, cval.value.length - 1));
         }
         else if (cval instanceof MIRConstantRational) {
-            if(this.level === "Strong") {
+            if(this.vopts.FPOpt === "UF") {
                 return new SMTCallSimple("BRationalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
@@ -759,7 +770,7 @@ class SMTBodyEmitter {
             }
         }
         else if (cval instanceof MIRConstantFloat) {
-            if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
+            if(this.vopts.FPOpt === "UF" || (cval.value.includes("e") || cval.value.includes("E"))) {
                 return new SMTCallSimple("BFloatUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
@@ -772,7 +783,7 @@ class SMTBodyEmitter {
             return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [this.constantToSMT(cval.value)]);
         }
         else if (cval instanceof MIRConstantDecimal) {
-            if(this.level === "Strong" || (cval.value.includes("e") || cval.value.includes("E"))) {
+            if(this.vopts.FPOpt === "UF" || (cval.value.includes("e") || cval.value.includes("E"))) {
                 return new SMTCallSimple("BDecimalUnary_UF", [new SMTConst("@cons"), new SMTConst("\"" + cval.value + "\"")]);
             }
             else {
@@ -781,42 +792,21 @@ class SMTBodyEmitter {
             }
         }
         else if (cval instanceof MIRConstantString) {
-            if(this.level === "Strong") {
-                let args: SMTExp[] = [];
-                for(let i = 0; i < cval.value.length; ++i) {
-                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
-                }
-                return new SMTCallSimple("seq.++", args);
-            }
-            else {
-                return new SMTConst(cval.value);
-            }
+            assert(this.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
+            
+            return new SMTConst(cval.value);
         }
         else if (cval instanceof MIRConstantStringOf) {
+            assert(this.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
+
             const sctype = this.typegen.getMIRType(cval.tskey);
-            if(this.level === "Strong") {
-                let args: SMTExp[] = [];
-                for(let i = 0; i < cval.value.length; ++i) {
-                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
-                }
-                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTCallSimple("seq.++", args)]);
-            }
-            else {
-                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
-            }
+            return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
         }
         else if (cval instanceof MIRConstantDataString) {
+            assert(this.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
+
             const sctype = this.typegen.getMIRType(cval.tskey);
-            if(this.level === "Strong") {
-                let args: SMTExp[] = [];
-                for(let i = 0; i < cval.value.length; ++i) {
-                    args.push(new SMTCallSimple("seq.unit", [new SMTConst(`(_ bv32 ${cval.value.charCodeAt(i)})`)]));
-                }
-                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTCallSimple("seq.++", args)]);
-            }
-            else {
-                return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
-            }
+            return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [new SMTConst(cval.value)]);
         }
         else {
             assert(cval instanceof MIRConstantRegex);
@@ -1339,8 +1329,7 @@ class SMTBodyEmitter {
             assert(op.guard === undefined && op.optmask === undefined);
 
             const args = op.args.map((arg) => this.argToSMT(arg));
-            const varargcount = op.args.filter((arg) => !(arg instanceof MIRConstantArgument)).length;
-            return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, varargcount, continuation);
+            return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, continuation);
         }
         if(invk instanceof MIRInvokePrimitiveDecl && invk.implkey.startsWith("verifier_")) {
             assert(op.guard === undefined && op.optmask === undefined);
@@ -1489,22 +1478,21 @@ class SMTBodyEmitter {
     }
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
-        const oftype = this.typegen.getMIRType(op.tkey);
-        const consf = this.typegen.getSMTConstructorName(oftype);
+        const consf = this.generateConstructorOfSizeName(op.tkey, 0);
+        if (this.requiredCollectionOfConstructors.find((ee) => ee.cname === consf) === undefined) {
+            this.requiredCollectionOfConstructors.push({ cname: consf, oftype: op.tkey, argc: 0 });
+        }
 
-        const asrt0 = new SMTIf(new SMTCallSimple("not", [new SMTCallSimple("=", [this.varToSMTName(op.trgt), new SMTConst("0")])]), this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck")), continuation);
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf.cons, []), asrt0);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf, []), continuation);
     }
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
-        const oftype = this.typegen.getMIRType(op.tkey);
-        const consf = this.typegen.getSMTConstructorName(oftype);
+        const consf = this.generateConstructorOfSizeName(op.tkey, op.args.length);
+        if (this.requiredCollectionOfConstructors.find((ee) => ee.cname === consf) === undefined) {
+            this.requiredCollectionOfConstructors.push({ cname: consf, oftype: op.tkey, argc: op.args.length });
+        }
 
-        const chksize = new SMTCallSimple("=", [this.varToSMTName(op.trgt), new SMTConst(`${op.args.length}`)]);
-        const chckgets = op.args.map((arg, n) => new SMTCallSimple("=", [this.argToSMT(arg[1]), new SMTCallSimple(`${this.typegen.getSMTTypeFor(oftype).name}@get`, [this.varToSMTName(op.trgt), new SMTConst(`${n}`)])]));
-        const allconds = new SMTCallSimple("and", [chksize, ...chckgets]);
-        const asrtconds = new SMTIf(new SMTCallSimple("not", [allconds]), this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck")), continuation);
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf.cons, []), asrtconds);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf, op.args.map((arg) => this.argToSMT(arg[1]))), continuation);
     }
 
     processConstructorPrimaryCollectionCopies(op: MIRConstructorPrimaryCollectionCopies, continuation: SMTExp): SMTExp {
@@ -1773,17 +1761,82 @@ class SMTBodyEmitter {
         return new SMTIf(chkzero, this.generateErrorCreate(sinfo, oftype, "Div by 0"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
     }
 
-    processGenerateResultWithPositiveCheck(sinfo: SourceInfo, op: string, args: SMTExp[], oftype: MIRType): SMTExp {
-        const vtmp = this.generateTempName();
-        const val = new SMTVar(vtmp);
+    computeLowerBoundForType(oftype: MIRType): string {
+        if(oftype.trkey === "NSCore::Nat" || oftype.trkey === "NSCore::BigNat") {
+            return "0";
+        }
+        else if (oftype.trkey === "NSCore::Int") {
+            xxxx;
+        }
+        else {
+            xxxx;
+        }
+    }
 
+    computeUpperBoundForType(oftype: MIRType): string {
+
+    }
+
+    processBVBounds(sinfo: SourceInfo, val: SMTVar, oftype: MIRType, lower: boolean, upper: boolean): SMTExp {
+        const lb = (oftype.trkey === "NSCore::Int" || oftype.trkey === "NSCore::BigInt") ?  : 0; 
+
+        if(lower && upper) {
+
+        }
         const chkbounds = new SMTCallSimple("<", [val, new SMTConst("0")]);
         const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Result is negative"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
 
-        return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
+                return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
     }
 
-    processDefaultOperatorInvokePrimitiveType(sinfo: SourceInfo, trgt: MIRRegisterArgument, op: MIRInvokeKey, args: SMTExp[], varargcount: number, continuation: SMTExp): SMTExp {
+    processGenerateResultWithBounds(sinfo: SourceInfo, op: string, args: SMTExp[], oftype: MIRType): SMTExp {
+        const vtmp = this.generateTempName();
+        const val = new SMTVar(vtmp);
+
+        const optobv = {
+            "+": "bvadd",
+            "-": "bvsub",
+            "*": "bvmul",
+            "/": "bvdiv"
+        };
+
+        if(oftype.trkey === "NSCore::Int") {
+            if(!this.vopts.OverflowEnabled) {
+                return new SMTCallSimple(optobv["+"], args);
+            }
+            else {
+
+            }
+        }
+        else if(oftype.trkey === "NSCore::Nat") {
+
+        }
+        else if(oftype.trkey === "NSCore::BigInt") {
+
+        }
+        else {
+            //BigNat
+        }
+
+        if(!this.vopts.OverflowEnabled) {
+            return new SMTCallSimple(op, args);
+        }
+        else {
+            if(this.vopts.BigMode && (oftype.trkey === "NSCore::BigInt" || oftype.trkey === "NSCore::BigN"))
+
+            if (oftype.trkey === "NSCore::Int" || oftype.trkey === "NSCore::BigInt") {
+
+            }
+            else {
+                const chkbounds = new SMTCallSimple("<", [val, new SMTConst("0")]);
+                const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Result is negative"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
+
+                return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
+            }
+        }
+    }
+
+    processDefaultOperatorInvokePrimitiveType(sinfo: SourceInfo, trgt: MIRRegisterArgument, op: MIRInvokeKey, args: SMTExp[], continuation: SMTExp): SMTExp {
         let smte: SMTExp = new SMTConst("[INVALID]");
         let erropt = false;
         let rtype = this.typegen.getMIRType("NSCore::None");
@@ -1801,142 +1854,162 @@ class SMTBodyEmitter {
                 break;
             }
             //op unary -
-            case "NSCore::-=prefix=(NSCore::Int)":
+            case "NSCore::-=prefix=(NSCore::Int)": {
+                smte = new SMTCallSimple("bvnot", args);
+                break;
+            }
             case "NSCore::-=prefix=(NSCore::BigInt)": {
-                smte = new SMTCallSimple("-", args);
+                smte = new SMTCallSimple(this.vopts.BigMode === "Int" ? "-" : "bvnot", args);
                 break;
             }
             case "NSCore::-=prefix=(NSCore::Rational)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BRationalUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             case "NSCore::-=prefix=(NSCore::Float)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BFloatUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             case "NSCore::-=prefix=(NSCore::Decimal)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BDecimalUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalUnary_UF", [new SMTConst("op_unary_negate"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             //op infix +
-            case "NSCore::+=infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::+=infix=(NSCore::Int, NSCore::Int)": {
+                rtype = this.typegen.getMIRType("NSCore::Int");
+                smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
+                erropt = true;
+            }
+            case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)": {
+                rtype = this.typegen.getMIRType("NSCore::Nat");
+                smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
+                erropt = true;
+            }
+            case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)": {
+                rtype = this.typegen.getMIRType("NSCore::BigInt");
+                smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
+                erropt = true;
+            }
             case "NSCore::+=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = new SMTCallSimple("+", args);
+                rtype = this.typegen.getMIRType("NSCore::BigNat");
+                smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
+                erropt = true;
                 break
             }
             case "NSCore::+=infix=(NSCore::Rational, NSCore::Rational)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
                 break;
             }
             case "NSCore::+=infix=(NSCore::Float, NSCore::Float)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
                 break;
             }
             case "NSCore::+=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
                 break;
             }
             //op infix -
             case "NSCore::-=infix=(NSCore::Int, NSCore::Int)": {
-                smte = new SMTCallSimple("-", args);
-                break;
+                rtype = this.typegen.getMIRType("NSCore::Int");
+                smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
+                erropt = true;
             }
             case "NSCore::-=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
-                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, rtype);
+                smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
                 erropt = true;
-                break;
             }
             case "NSCore::-=infix=(NSCore::BigInt, NSCore::BigInt)": {
-                smte = new SMTCallSimple("-", args);
-                break
+                rtype = this.typegen.getMIRType("NSCore::BigInt");
+                smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
+                erropt = true;
             }
             case "NSCore::-=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
-                smte = this.processGenerateResultWithPositiveCheck(sinfo, "-", args, rtype);
+                smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
                 erropt = true;
                 break
             }
             case "NSCore::-=infix=(NSCore::Rational, NSCore::Rational)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             case "NSCore::-=infix=(NSCore::Float, NSCore::Float)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             case "NSCore::-=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = (this.level === "Strong") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_minus"), ...args]) : new SMTCallSimple("-", args);
                 break;
             }
             //op infix *
             case "NSCore::*=infix=(NSCore::Int, NSCore::Int)": {
-                smte = varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
-                break;
+                rtype = this.typegen.getMIRType("NSCore::Int");
+                smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
+                erropt = true;
             }
             case "NSCore::*=infix=(NSCore::Nat, NSCore::Nat)": {
-                smte = varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
-                break;
+                rtype = this.typegen.getMIRType("NSCore::Nat");
+                smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
+                erropt = true;
             }
             case "NSCore::*=infix=(NSCore::BigInt, NSCore::BigInt)": {
-                smte = varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
-                break
+                rtype = this.typegen.getMIRType("NSCore::BigInt");
+                smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
+                erropt = true;
             }
             case "NSCore::*=infix=(NSCore::BigNat, NSCore::BigNat)": {
-                smte = varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
+                rtype = this.typegen.getMIRType("NSCore::BigNat");
+                smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
+                erropt = true;
                 break
             }
             case "NSCore::*=infix=(NSCore::Rational, NSCore::Rational)": {
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break;
             }
             case "NSCore::*=infix=(NSCore::Float, NSCore::Float)": {
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break;
             }
             case "NSCore::*=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
                 break;
             }
             //op infix /
             case "NSCore::/=infix=(NSCore::Int, NSCore::Int)": {
                 rtype = this.typegen.getMIRType("NSCore::Int");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
-                break;
             }
             case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
-                break;
             }
             case "NSCore::/=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BBigIntNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
-                break
             }
             case "NSCore::/=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, varargcount > 1 ? new SMTCallSimple("BBigNatNonLinear_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
                 break
             }
             case "NSCore::/=infix=(NSCore::Rational, NSCore::Rational)": {
                 rtype = this.typegen.getMIRType("NSCore::Rational");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[0], rtype, (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args));
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::Float, NSCore::Float)": {
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
                 break;
             }
             case "NSCore::/=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = (this.level === "Strong" || varargcount > 1) ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : new SMTCallSimple("/", args);
                 break;
             }
             //op infix ==

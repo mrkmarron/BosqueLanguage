@@ -294,27 +294,27 @@ class MemberMethodDecl implements OOMemberDecl {
 }
 
 enum SpecialTypeCategory {
-    GroundedTypeDecl,
-    ParsableTypeDecl,
-    ValidatorTypeDecl,
-    EnumTypeDecl,
-    TypeDeclDecl,
-    TypeDeclNumeric,
-    StringOfDecl,
-    DataStringDecl,
-    BufferDecl,
-    DataBufferDecl,
-    ResultDecl,
-    ResultOkDecl,
-    ResultErrDecl,
-    VectorTypeDecl,
-    ListTypeDecl,
-    StackTypeDecl,
-    QueueTypeDecl,
-    SetTypeDecl,
-    DynamicSetTypeDecl,
-    MapTypeDecl,
-    DynamicMapTypeDecl
+    GroundedTypeDecl = "GroundedTypeDecl",
+    ParsableTypeDecl = "ParsableTypeDecl",
+    ValidatorTypeDecl = "ValidatorTypeDecl",
+    EnumTypeDecl = "EnumTypeDecl",
+    TypeDeclDecl = "TypeDeclDecl",
+    TypeDeclNumeric = "TypeDeclNumeric",
+    StringOfDecl = "StringOfDecl",
+    DataStringDecl = "DataStringDecl",
+    BufferDecl = "BufferDecl",
+    DataBufferDecl = "DataBufferDecl",
+    ResultDecl = "ResultDecl",
+    ResultOkDecl = "ResultOkDecl",
+    ResultErrDecl = "ResultErrDecl",
+    VectorTypeDecl = "VectorTypeDecl",
+    ListTypeDecl = "ListTypeDecl",
+    StackTypeDecl = "StackTypeDecl",
+    QueueTypeDecl = "QueueTypeDecl",
+    SetTypeDecl = "SetTypeDecl",
+    DynamicSetTypeDecl = "DynamicSetTypeDecl",
+    MapTypeDecl = "MapTypeDecl",
+    DynamicMapTypeDecl = "DynamicMapTypeDecl"
 }
 
 class OOPTypeDecl {

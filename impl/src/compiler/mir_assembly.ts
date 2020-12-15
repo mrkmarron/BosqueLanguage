@@ -236,7 +236,7 @@ abstract class MIROOTypeDecl {
             return new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides);
         }
         else {
-            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides, jobj.consfunc, jobj.consfuncfields, jobj.invfunc, jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)));
+            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides, jobj.consfunc, jobj.consfuncfields, jobj.invfunc, jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.specialDecls, jobj.specialTemplateInfo);
             jobj.vcallMap.forEach((vc: any) => entity.vcallMap.set(vc[0], vc[1]));
             return entity;
         }
@@ -253,6 +253,30 @@ class MIRConceptTypeDecl extends MIROOTypeDecl {
     }
 }
 
+enum MIRSpecialTypeCategory {
+    GroundedTypeDecl = "GroundedTypeDecl",
+    ParsableTypeDecl = "ParsableTypeDecl",
+    ValidatorTypeDecl = "ValidatorTypeDecl",
+    EnumTypeDecl = "EnumTypeDecl",
+    TypeDeclDecl = "TypeDeclDecl",
+    TypeDeclNumeric = "TypeDeclNumeric",
+    StringOfDecl = "StringOfDecl",
+    DataStringDecl = "DataStringDecl",
+    BufferDecl = "BufferDecl",
+    DataBufferDecl = "DataBufferDecl",
+    ResultDecl = "ResultDecl",
+    ResultOkDecl = "ResultOkDecl",
+    ResultErrDecl = "ResultErrDecl",
+    VectorTypeDecl = "VectorTypeDecl",
+    ListTypeDecl = "ListTypeDecl",
+    StackTypeDecl = "StackTypeDecl",
+    QueueTypeDecl = "QueueTypeDecl",
+    SetTypeDecl = "SetTypeDecl",
+    DynamicSetTypeDecl = "DynamicSetTypeDecl",
+    MapTypeDecl = "MapTypeDecl",
+    DynamicMapTypeDecl = "DynamicMapTypeDecl"
+}
+
 class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly consfunc: MIRInvokeKey;
     readonly invfunc: MIRInvokeKey | undefined;
@@ -262,7 +286,10 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly fields: MIRFieldDecl[];
     readonly vcallMap: Map<MIRVirtualMethodKey, MIRInvokeKey> = new Map<string, MIRInvokeKey>();
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, consfuncfields: MIRFieldKey[], invfunc: MIRInvokeKey | undefined, fields: MIRFieldDecl[]) {
+    readonly specialDecls: Set<MIRSpecialTypeCategory>;
+    readonly specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined;
+
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, consfuncfields: MIRFieldKey[], invfunc: MIRInvokeKey | undefined, fields: MIRFieldDecl[], specialDecls: MIRSpecialTypeCategory[], specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined) {
         super(ooname, srcInfo, srcFile, tkey, attributes, ns, name, terms, provides);
 
         this.consfunc = consfunc;
@@ -271,10 +298,37 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
         this.consfuncfields = consfuncfields;
 
         this.fields = fields;
+
+        this.specialDecls = new Set<MIRSpecialTypeCategory>(specialDecls);
+        this.specialTemplateInfo = specialTemplateInfo;
     }
 
     jemit(): object {
-        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, consfunc: this.consfunc, consfuncfields: this.consfuncfields, invfunc: this.invfunc, fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap] };
+        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, consfunc: this.consfunc, consfuncfields: this.consfuncfields, invfunc: this.invfunc, fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], specialDecls: [...this.specialDecls], specialTemplateInfo: this.specialTemplateInfo };
+    }
+
+    isTypeAListEntity(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl) || this.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl);
+    }
+
+    isTypeAQueueEntity(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl);
+    }
+
+    isTypeAStackEntity(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl);
+    }
+
+    isTypeASetEntity(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl) || this.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl);
+    }
+
+    isTypeAMapEntity(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl) || this.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl);
+    }
+
+    isTypeGrounded(): boolean {
+        return this.specialDecls.has(MIRSpecialTypeCategory.GroundedTypeDecl);
     }
 }
 
@@ -813,6 +867,6 @@ class MIRAssembly {
 export {
     MIRConstantDecl, MIRFunctionParameter, MIRInvokeDecl, MIRInvokeBodyDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRFieldDecl,
     MIROOTypeDecl, MIRConceptTypeDecl, MIREntityTypeDecl,
-    MIRType, MIRTypeOption, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRLiteralType, MIREphemeralListType,
+    MIRType, MIRTypeOption, MIRSpecialTypeCategory, MIREntityType, MIRConceptType, MIRTupleTypeEntry, MIRTupleType, MIRRecordTypeEntry, MIRRecordType, MIRLiteralType, MIREphemeralListType,
     PackageConfig, MIRAssembly
 };

@@ -3,7 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-type VerifierLevel = "Weak" | "Strong";
+type VerifierOptions = {
+    ISize: number, //bits in the size 2-64
+    BigMode: "BV" | "Int",
+    BigSize: number, //bits in the size 8-1024 (assuming Mode is BV)
+    OverflowEnabled: boolean,
+    FPOpt: "Real" | "UF",
+    StringOpt: "ASCII" | "UNICODE"
+};
 
 class SMTMaskConstruct {
     readonly maskname: string;
@@ -232,61 +239,83 @@ class SMTCond extends SMTExp {
     }
 }
 
-class SMTAxiom {
-    readonly terms: { vname: string, vtype: SMTType }[];
-    readonly guard: SMTExp | undefined;
-    readonly clause: SMTExp;
+class SMTADTKindSwitch extends SMTExp {
+    readonly value: SMTExp;
+    readonly opts: { cons: string, cargs: string[], result: SMTExp }[];
 
-    readonly identifier: string;
-    readonly trigger: SMTExp | undefined;
+    constructor(value: SMTExp, opts: { cons: string, cargs: string[], result: SMTExp }[]) {
+        super();
 
-    constructor(terms: { vname: string, vtype: SMTType }[], guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
-        this.terms = terms;
-        this.guard = guard;
-        this.clause = clause;
-
-        this.identifier = identifier;
-        this.trigger = trigger;
+        this.value = value;
+        this.opts = opts;
     }
 
-    emitSMT2(): string {
-        const terms = this.terms.map((t) => `(${t.vname} ${t.vtype.name})`);
-        const guard = this.guard !== undefined ? this.guard.emitSMT2(undefined) : undefined;
-        return `(assert (forall (${terms.join(" ")})${guard !== undefined ? ("\n    " + guard + " =>") : ""}\n    ${this.clause.emitSMT2(undefined)}\n))`
+    emitSMT2(indent: string | undefined): string {
+        const matches = this.opts.map((op) => {
+            const test = op.cargs.length !== 0 ? `(${op.cons} ${op.cargs.join(" ")})` : op.cons;
+            return `(${test} ${op.result.emitSMT2(undefined)})`;
+        });
+
+        if (indent === undefined) {
+            return `(match ${this.value.emitSMT2(undefined)} (${matches.join(" ")}))`;
+        }
+        else {
+            return `(match ${this.value.emitSMT2(undefined)} (\n${indent + "  "}${matches.join("\n" + indent + "  ")})\n${indent})`;
+        }
     }
 }
 
-class SMTErrorAxiom {
+class SMTForAll extends SMTExp {
     readonly terms: { vname: string, vtype: SMTType }[];
-    readonly erroridx: { vname: string, vtype: SMTType };
-    readonly guard: SMTExp | undefined;
     readonly clause: SMTExp;
 
-    readonly identifier: string;
-    readonly trigger: SMTExp | undefined;
+    constructor(terms: { vname: string, vtype: SMTType }[], clause: SMTExp) {
+        super();
 
-    constructor(terms: { vname: string, vtype: SMTType }[], erroridx: { vname: string, vtype: SMTType }, guard: SMTExp | undefined, clause: SMTExp, identifier: string, trigger: SMTExp | undefined) {
         this.terms = terms;
-        this.erroridx = erroridx;
-        this.guard = guard;
         this.clause = clause;
-
-        this.identifier = identifier;
-        this.trigger = trigger;
     }
 
-    emitSMT2(): string {
+    emitSMT2(indent: string | undefined): string {
         const terms = this.terms.map((t) => `(${t.vname} ${t.vtype.name})`);
-        const guard = this.guard !== undefined ? this.guard.emitSMT2(undefined) : undefined;
-        return `(assert (forall (${terms.join(" ")}) (exists (${this.erroridx.vname} ${this.erroridx.vtype.name})${guard !== undefined ? ("\n    " + guard + " =>") : ""}\n    ${this.clause.emitSMT2(undefined)}\n)))`
+
+        if(indent === undefined) {
+            return `(forall (${terms.join(" ")}) ${this.clause.emitSMT2(undefined)})`;
+        }
+        else {
+            return `(forall (${terms.join(" ")})\n${indent + "  "}${this.clause.emitSMT2(indent + "  ")}\n${indent})`;
+        }
+    }
+}
+
+class SMTExists extends SMTExp {
+    readonly terms: { vname: string, vtype: SMTType }[];
+    readonly clause: SMTExp;
+
+    constructor(terms: { vname: string, vtype: SMTType }[], erroridx: { vname: string, vtype: SMTType }, clause: SMTExp) {
+        super();
+
+        this.terms = terms;
+        this.clause = clause;
+    }
+
+    emitSMT2(indent: string | undefined): string {
+        const terms = this.terms.map((t) => `(${t.vname} ${t.vtype.name})`);
+        
+        if(indent === undefined) {
+            return `(exists (${terms.join(" ")}) ${this.clause.emitSMT2(undefined)})`;
+        }
+        else {
+            return `(exists (${terms.join(" ")})\n${indent + "  "}${this.clause.emitSMT2(indent + "  ")}\n${indent})`;
+        }
     }
 }
 
 export {
-    VerifierLevel,
+    VerifierOptions,
     SMTMaskConstruct,
     SMTType, SMTExp, SMTVar, SMTConst, 
     SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCallGeneralWPassThroughMask,
-    SMTLet, SMTLetMulti, SMTIf, SMTCond,
-    SMTAxiom, SMTErrorAxiom
+    SMTLet, SMTLetMulti, SMTIf, SMTCond, SMTADTKindSwitch,
+    SMTForAll, SMTExists
 };

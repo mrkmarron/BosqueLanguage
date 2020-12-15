@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { BSQRegex } from "../../ast/bsqregex";
-import { SMTAxiom, SMTErrorAxiom, SMTExp, SMTType, VerifierLevel } from "./smt_exp";
+import { SMTAxiom, SMTErrorAxiom, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 type SMT2FileInfo = {
     TYPE_TAG_DECLS: string[],
@@ -174,7 +174,7 @@ class SMTConstantDecl {
 }
 
 class SMTAssembly {
-    readonly level: VerifierLevel;
+    readonly vopts: VerifierOptions;
     
     entityDecls: SMTEntityDecl[] = [];
     tupleDecls: SMTTupleDecl[] = [];
@@ -203,8 +203,8 @@ class SMTAssembly {
     resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[] = [];
     functions: SMTFunction[] = [];
 
-    constructor(level: VerifierLevel) {
-        this.level = level;
+    constructor(vopts: VerifierOptions) {
+        this.vopts = vopts;
     }
 
     generateSMT2AssemblyInfo(): SMT2FileInfo {

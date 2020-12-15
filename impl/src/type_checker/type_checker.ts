@@ -11,7 +11,7 @@ import { Expression, ExpressionTag, LiteralTypedStringExpression, LiteralTypedSt
 import { PCode, MIREmitter, MIRKeyGenerator } from "../compiler/mir_emitter";
 import { MIRArgument, MIRConstantNone, MIRVirtualMethodKey, MIRInvokeKey, MIRResolvedTypeKey, MIRFieldKey, MIRConstantString, MIRRegisterArgument, MIRConstantInt, MIRConstantNat, MIRConstantBigNat, MIRConstantBigInt, MIRConstantRational, MIRConstantDecimal, MIRConstantFloat, MIRGlobalKey, MIRGlobalVariable, MIRConstantTrue, MIRBody, MIRMaskGuard, MIRArgGuard, MIRStatmentGuard, MIRConstantFalse } from "../compiler/mir_ops";
 import { SourceInfo, unescapeLiteralString } from "../ast/parser";
-import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType } from "../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRConceptTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRFunctionParameter, MIRType, MIRConstantDecl, MIRPCode, MIRInvokePrimitiveDecl, MIRInvokeBodyDecl, MIREphemeralListType, MIRSpecialTypeCategory } from "../compiler/mir_assembly";
 import { BSQRegex } from "../ast/bsqregex";
 
 import * as assert from "assert";
@@ -1218,7 +1218,7 @@ class TypeChecker {
         }
         else {
             if (args.every((v) => !v[1])) {
-                this.m_emitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map((arg) => arg[2]), trgt);
+                this.m_emitter.emitConstructorPrimaryCollectionSingletons(sinfo, tkey, args.map<[MIRType, MIRArgument]>((arg) => [this.m_emitter.registerResolvedTypeReference(arg[0]), arg[2]]), trgt);
             }
             else if (args.every((v) => v[1])) {
                 if(args.length === 1 && args[0][0].isSameType(resulttype)) {
@@ -1226,11 +1226,11 @@ class TypeChecker {
                     this.m_emitter.emitRegisterStore(sinfo, args[0][2], trgt, this.m_emitter.registerResolvedTypeReference(args[0][0]), undefined);
                 }
                 else {
-                    this.m_emitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map((arg) => arg[2]), trgt);
+                    this.m_emitter.emitConstructorPrimaryCollectionCopies(sinfo, tkey, args.map<[MIRType, MIRArgument]>((arg) => [this.m_emitter.registerResolvedTypeReference(arg[0]), arg[2]]), trgt);
                 }
             }
             else {
-                this.m_emitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRArgument]>((arg) => [arg[1], arg[2]]), trgt);
+                this.m_emitter.emitConstructorPrimaryCollectionMixed(sinfo, tkey, args.map<[boolean, MIRType, MIRArgument]>((arg) => [arg[1], this.m_emitter.registerResolvedTypeReference(arg[0]), arg[2]]), trgt);
             }
         }
 
@@ -6146,7 +6146,33 @@ class TypeChecker {
                     fields.push(this.m_emitter.masm.fieldDecls.get(fkey) as MIRFieldDecl);
                 });
 
-                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, consfuncfields, hasinv ? chkkey : undefined, fields);
+                let specialTemplateInfo: { tname: string, tkind: MIRResolvedTypeKey }[] | undefined = undefined;
+                if (tdecl.specialDecls.has(SpecialTypeCategory.VectorTypeDecl) || tdecl.specialDecls.has(SpecialTypeCategory.ListTypeDecl)) {
+                    specialTemplateInfo = [{ tname: "T", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("T") as ResolvedType).trkey }];
+                }
+                else if (tdecl.specialDecls.has(SpecialTypeCategory.QueueTypeDecl) || tdecl.specialDecls.has(SpecialTypeCategory.StackTypeDecl)) {
+                    specialTemplateInfo = [{ tname: "T", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("T") as ResolvedType).trkey }];
+                }
+                else if (tdecl.specialDecls.has(SpecialTypeCategory.SetTypeDecl)) {
+                    specialTemplateInfo = [{ tname: "T", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("T") as ResolvedType).trkey }];
+                }
+                else if (tdecl.specialDecls.has(SpecialTypeCategory.MapTypeDecl)) {
+                    specialTemplateInfo = [
+                        { tname: "K", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("V") as ResolvedType).trkey },
+                        { tname: "V", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("V") as ResolvedType).trkey }
+                    ];
+                }
+                else if (tdecl.specialDecls.has(SpecialTypeCategory.ResultOkDecl) || tdecl.specialDecls.has(SpecialTypeCategory.ResultErrDecl)) {
+                    specialTemplateInfo = [
+                        { tname: "T", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("T") as ResolvedType).trkey },
+                        { tname: "E", tkind: this.m_emitter.registerResolvedTypeReference(binds.get("E") as ResolvedType).trkey }
+                    ];
+                }
+                else {
+                    ;
+                }
+
+                const mirentity = new MIREntityTypeDecl(ooname, tdecl.sourceLocation, tdecl.srcFile, tkey, tdecl.attributes, tdecl.ns, tdecl.name, terms, provides, conskey, consfuncfields, hasinv ? chkkey : undefined, fields, [...tdecl.specialDecls].map((ee) => (ee as string) as MIRSpecialTypeCategory), specialTemplateInfo);
                 this.m_emitter.masm.entityDecls.set(tkey, mirentity);
             }
             else {

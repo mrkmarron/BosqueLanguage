@@ -23,6 +23,8 @@
     TypeTag_Decimal
     TypeTag_Rational
     TypeTag_String
+    TypeTag_IsoTime
+    TypeTag_LogicalTime
     TypeTag_Regex
     ;;TYPE_TAG_DECLS;;
   )
@@ -46,10 +48,6 @@
   )
 ))
 
-;;
-;;TODO: There may be a large number of trivially "false" entries in this relation. 
-;;      We can do better by splitting it into some type aware sub-relations (e.g. a tuple is never a subtype of Object etc.).
-;;
 (declare-fun SubtypeOf@ (TypeTag, AbstractTypeTag) Bool)
 ;;SUBTYPE_DECLS;;
 
@@ -68,15 +66,22 @@
 (declare-sort UFloat)
 
 ;;
+;; Define sort aliases for Int/Nat/BigInt/BigNat/Float/Decimal/Rational/String representation options
+;;
+;;BINTEGRAL_TYPE_ALIAS;;
+;;BFLOATPOINT_TYPE_ALIAS;;
+;;STRING_TYPE_ALIAS;;
+
+;;
 ;; Primitive datatypes 
 ;;
 (declare-datatypes (
       (bsq_none 0)
       ; Bool -> Bool
-      ; Int -> Int
-      ; Nat -> Int
-      ; BigInt -> Int
-      ; BigNat -> Int
+      ; Int -> BVX as BInt
+      ; Nat -> BVX as BNat
+      ; BigInt -> 2*BVX | Int as BBigInt
+      ; BigNat -> 2*BVX | Int as BBigNat
       ; Float ->   Float | UFloat as BFloat
       ; Decimal -> Float | UFloat as BDecimal
       ; Rational -> Float | UFloat as BRational
@@ -84,12 +89,6 @@
     ) (
     ( (bsq_none@literal) )
 ))
-
-;;
-;; Define sort aliases for Float/String representation options
-;;
-;;FP_TYPE_ALIAS;;
-;;STRING_TYPE_ALIAS;;
 
 ;;
 ;; KeyType Concept datatypes
@@ -107,11 +106,13 @@
     (
       (bsqkey_none@literal) 
       (bsqkey_bool@cons (bsqkey_bool_value Bool))
-      (bsqkey_int@cons (bsqkey_int_value Int))
-      (bsqkey_nat@cons (bsqkey_nat_value Int))
-      (bsqkey_bigint@cons (bsqkey_bigint_value Int))
-      (bsqkey_bignat@cons (bsqkey_bignat_value Int))
+      (bsqkey_int@cons (bsqkey_int_value BInt))
+      (bsqkey_nat@cons (bsqkey_nat_value BNat))
+      (bsqkey_bigint@cons (bsqkey_bigint_value BBigInt))
+      (bsqkey_bignat@cons (bsqkey_bignat_value BBigNat))
       (bsqkey_string@cons (bsqkey_string_value BString))
+      (bsqkey_isotime@cons (bsqkey_isotime_value Int))
+      (bsqkey_logicaltime@cons (bsqkey_logicaltime_value Int))
       ;;KEY_TUPLE_TYPE_BOXING;;
       ;;KEY_RECORD_TYPE_BOXING;;
       ;;KEY_TYPE_BOXING;;
@@ -131,19 +132,27 @@
 )
 
 (define-fun bsqkey_int@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_int_value k1) (bsqkey_int_value k2))
+  (bvslt (bsqkey_int_value k1) (bsqkey_int_value k2))
 )
 
 (define-fun bsqkey_nat@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_nat_value k1) (bsqkey_nat_value k2))
+  (bvult (bsqkey_nat_value k1) (bsqkey_nat_value k2))
 )
 
 (define-fun bsqkey_bigint@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_bigint_value k1) (bsqkey_bigint_value k2))
+  (bvslt (bsqkey_bigint_value k1) (bsqkey_bigint_value k2))
 )
 
 (define-fun bsqkey_bignat@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_bignat_value k1) (bsqkey_bignat_value k2))
+  (bvult (bsqkey_bignat_value k1) (bsqkey_bignat_value k2))
+)
+
+(define-fun bsqkey_isotime@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
+  (< (bsqkey_isotime_value k1) (bsqkey_isotime_value k2))
+)
+
+(define-fun bsqkey_logicaltime@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
+  (< (bsqkey_logicaltime_value k1) (bsqkey_logicaltime_value k2))
 )
 
 (define-fun bsqkey_string@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
@@ -207,20 +216,6 @@
 
 (declare-fun BRationalUnary_UF (String BRational) BRational)
 (declare-fun BRationalBinary_UF (String BRational BRational) BRational)
-
-(declare-fun BIntNonLinear_UF (String Int Int) Int)
-(declare-fun BBigIntNonLinear_UF (String Int Int) Int)
-
-(declare-fun BNatNonLinear_X_UF (String Int Int) Int)
-(declare-fun BBigNatNonLinear_X_UF (String Int Int) Int)
-
-(define-fun BNatNonLinear_UF ((op String) (a Int) (b Int)) Int 
-  (let ((r (BNatNonLinear_X_UF op a b))) (ite (<= 0 r) r (- r)))
-)
-
-(define-fun BBigNatNonLinear_UF ((op String) (a Int) (b Int)) Int 
-  (let ((r (BNatNonLinear_X_UF op a b))) (ite (<= 0 r) r (- r)))
-)
 
 ;;
 ;; Ephemeral datatypes
