@@ -37,9 +37,30 @@ struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType 
 }
 
 entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
+    __safe private static s_applycheck_pred(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_applycheck_pred
+
     __safe private static s_size(l: List<T>): Nat # list_size
     __safe private static s_empty(l: List<T>): Nat # list_empty
     __assume_safe private static s_unsafe_get(l: List<T>, i: Nat): T # list_unsafe_get
+
+    __safe private static s_concat(l: List<List<T>>): List<T> # list_concat
+    __safe private static s_fill(k: Int, val: T): List<T> # list_fill
+
+    __safe private recursive? static s_allof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_allof
+    __safe private recursive? static s_noneof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_noneof
+    __safe private recursive? static s_someof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_someof
+
+    __safe private recursive? static s_allofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_allofnot
+    __safe private recursive? static s_noneofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_noneofnot
+    __safe private recursive? static s_someofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_someofnot
+
+    static concat(...ll: List<List<T>>): List<T> {
+        return List<T>::s_concat(ll);
+    }
+
+    static fill(k: Nat, val: T): List<T> {
+        return List<T>::s_fill(k, val);
+    }
 
     private static s_rangeInBounds(l: List<T>, start: Nat?, end: Nat?): Bool {
         let s, e = start ?| 0n, end ?| List<T>::s_size(l);
@@ -134,31 +155,132 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    //method {when T grounded KeyType} toSet(): Set<T> {
+    //    return List<T>::s_toset(this);
+    //}
+
+    recursive? method single(p: recursive? fn(_: T) -> Bool): T 
+        requires release List<T>::s_size(this) != 0n;
+    {
+        xxxx;
+        let idx = List<T>::s_indexof[recursive?](this, 0, List<T>::s_size(this), p);
+        let lastidx = List<T>::s_indexoflast[recursive?](this, -1, List<T>::s_size(this) - 1, p);
+
+        check lastidx == idx;
+        return List<T>::s_unsafe_get(this, idx);
+    }
+
+    recursive? method singleOrNone(p: recursive? fn(_: T) -> Bool): T? {
+        let idx = List<T>::s_indexof[recursive?](this, 0, List<T>::s_size(this), p);
+        let lastidx = List<T>::s_indexoflast[recursive?](this, -1, List<T>::s_size(this) - 1, p);
+
+        return idx == lastidx ? List<T>::s_unsafe_get(this, idx) : none;
+    }
+
+    recursive? method singleOrDefault(p: recursive? fn(_: T) -> Bool): T? {
+        let idx = List<T>::s_indexof[recursive?](this, 0, List<T>::s_size(this), p);
+        let lastidx = List<T>::s_indexoflast[recursive?](this, -1, List<T>::s_size(this) - 1, p);
+
+        return idx == lastidx ? List<T>::s_unsafe_get(this, idx) : none;
+    }
+
+    recursive? method singleTry(p: recursive? fn(_: T) -> Bool): T? {
+        let idx = List<T>::s_indexof[recursive?](this, 0, List<T>::s_size(this), p);
+        let lastidx = List<T>::s_indexoflast[recursive?](this, -1, List<T>::s_size(this) - 1, p);
+
+        return idx == lastidx ? List<T>::s_unsafe_get(this, idx) : none;
+    }
+
+    recursive? method allOf(p: recursive? fn(_: T) -> Bool): Bool {
+        const slist = List<T>::s_applycheck_pred[recursive?](this, p);
+
+        const res = List<T>::s_allof[recursive?](slist, p);
+        if(List<T>::s_empty(slist)) {
+            _assume res;
+            _assume List<T>::s_noneof[recursive?](slist, p);
+            _assume Verifier::lnot(List<T>::s_someof[recursive?](slist, p));
+
+            _assume List<T>::s_allofnot[recursive?](slist, p);
+            _assume List<T>::s_noneofnot[recursive?](slist, p);
+            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](slist, p));
+
+            return res;
+        }
+        else {
+            _assume Verifier::limplies(res, Verifier::lnot(List<T>::s_noneof[recursive?](slist, p)));
+            _assume Verifier::limplies(res, List<T>::s_someof[recursive?](slist, p));
+
+            _assume Verifier::term_eq(res, Verifier::lnot(list<T>::s_allofnot[recursive?](slist, p)));
+            _assume Verifier::term_eq(res, List<T>::s_noneofnot[recursive?](slist, p));
+            _assume Verifier::term_eq(res, Verifier::lnot(List<T>::s_someofnot[recursive?](slist, p)));
+
+            return res;
+        }
+    }
+
+    recursive? method noneOf(p: recursive? fn(_: T) -> Bool): Bool {
+        const slist = List<T>::s_applycheck_pred[recursive?](this, p);
+
+        const res = List<T>::s_noneof[recursive?](slist, p);
+
+        if(List<T>::s_empty(this)) {
+            _assume res;
+            _assume List<T>::s_allof[recursive?](this, p);
+            _assume Verifier::lnot(List<T>::s_someof[recursive?](slist, p));
+
+            _assume List<T>::s_allofnot[recursive?](this, p);
+            _assume List<T>::s_noneofnot[recursive?](this, p);
+            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](slist, p));
+
+            return res;
+        }
+        else {
+            xxxx; //TODO:
+
+            return res;
+        }
+    }
+
+    recursive? method someOf(p: recursive? fn(_: T) -> Bool): Bool {
+        let slist = List<T>::s_applycheck_pred[recursive?](this, p);
+
+        const res = List<T>::s_someof[recursive?](slist, p);
+
+        if(List<T>::s_empty(this)) {
+            _assume Verifier::lnot(res);
+            _assume List<T>::s_allof[recursive?](slist, p);
+            _assume List<T>::s_noneof[recursive?](slist, p);
+
+            _assume List<T>::s_allofnot[recursive?](slist, p);
+            _assume List<T>::s_noneofnot[recursive?](slist, p);
+            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](slist, p));
+
+            return res;
+        }
+        else {
+            xxxx; //TODO:
+
+            return res;
+        }
+    }
+
     /////////////////////////////////////////////
 
-    __safe private recursive? static s_allof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_allof
-    __safe private recursive? static s_noneof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_noneof
-    __safe private recursive? static s_anyof(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_anyof
+    private recursive? static s_countIf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_countif
+    private recursive? static s_countIfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_countifnot
 
-    __safe private recursive? static s_allofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_allofnot
-    __safe private recursive? static s_noneofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_noneofnot
-    __safe private recursive? static s_anyofnot(l: List<T>, p: recursive? fn(_: T) -> Bool): Bool # list_anyofnot
+    private recursive? static s_indexOf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_indexof
+    private recursive? static s_indexOfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_indexofnot
+    private recursive? static s_lastIndexOf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_lastindexof
+    private recursive? static s_lastIndexOfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_lastindexofnot
 
-    __safe private recursive? static s_countIf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_countif
-    __safe private recursive? static s_countIfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_countifnot
+    private recursive? static s_filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
+    private recursive? static s_filterNot(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filternot
 
-    __safe private recursive? static s_indexOf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_indexof
-    __safe private recursive? static s_indexOfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_indexofnot
-    __safe private recursive? static s_lastIndexOf(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_lastindexof
-    __safe private recursive? static s_lastIndexOfNot(l: List<T>, p: recursive? fn(_: T) -> Bool): Nat # list_lastindexofnot
+    __assume_safe private recursive? static s_slice(l: List<T>, start: Nat, end: Nat): List<T> # list_slice
 
-    __safe private recursive? static s_filter(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filter
-    __safe private recursive? static s_filterNot(l: List<T>, p: recursive? fn(_: T) -> Bool): List<T> # list_filternot
-
-    __assumesafe private recursive? static s_slice(l: List<T>, start: Nat, end: Nat): List<T> # list_slice
-
-    __safe private recursive? static s_map<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<U> # list_map
-    __safe private recursive? static s_mapIndex<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U): List<U> # list_mapindex
+    private recursive? static s_map<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<U> # list_map
+    private recursive? static s_mapIndex<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U): List<U> # list_mapindex
 
     __safe private static s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
     __safe private static s_unzipT<T, U>(l: List<#[T, U]>): List<T> # list_unzipt
@@ -166,78 +288,14 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     __safe private static s_zipIndex(l: List<T>): List<#[Nat, T]> # list_zipindex
 
-    __safe private recursive? static s_join<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> # list_join
-    __safe private recursive? static s_joinGroup<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, List<U>]> # list_groupjoin
+    private recursive? static s_join<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> # list_join
+    private recursive? static s_joinGroup<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, List<U>]> # list_groupjoin
 
     __safe private static s_append(l1: List<T>, l2: List<T>): List<T> # list_append
+
+    //////Keep going
+
     
-    recursive? method allOf(p: recursive? fn(_: T) -> Bool): Bool {
-        let res = List<T>::s_allof[recursive?](this, p);
-
-        if(List<T>::s_empty(this)) {
-            _assume res;
-            _assume List<T>::s_noneof[recursive?](this, p);
-            _assume Verifier::lnot(List<T>::s_someof[recursive?](this, p));
-
-            _assume List<T>::s_allofnot[recursive?](this, p);
-            _assume List<T>::s_noneofnot[recursive?](this, p);
-            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](this, p));
-
-            return res;
-        }
-        else {
-            _assume Verifier::limplies(res, Verifier::lnot(List<T>::s_noneof[recursive?](this, p)));
-            _assume Verifier::limplies(res, List<T>::s_someof[recursive?](this, p));
-
-            _assume Verifier::term_eq(res, Verifier::lnot(list<T>::s_allofnot[recursive?](this, p)));
-            _assume Verifier::term_eq(res, List<T>::s_noneofnot[recursive?](this, p));
-            _assume Verifier::term_eq(res, Verifier::lnot(List<T>::s_someofnot[recursive?](this, p)));
-
-            return res;
-        }
-    }
-
-    recursive? method noneOf(p: recursive? fn(_: T) -> Bool): Bool {
-        let res = List<T>::s_noneof[recursive?](this, p);
-
-        if(List<T>::s_empty(this)) {
-            _assume res;
-            _assume List<T>::s_allof[recursive?](this, p);
-            _assume Verifier::lnot(List<T>::s_someof[recursive?](this, p));
-
-            _assume List<T>::s_allofnot[recursive?](this, p);
-            _assume List<T>::s_noneofnot[recursive?](this, p);
-            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](this, p));
-
-            return res;
-        }
-        else {
-            xxxx; //TODO:
-
-            return res;
-        }
-    }
-
-    recursive? method anyOf(p: recursive? fn(_: T) -> Bool): Bool {
-        let res = List<T>::s_someof[recursive?](this, p);
-
-        if(List<T>::s_empty(this)) {
-            _assume Verifier::lnot(res);
-            _assume List<T>::s_allof[recursive?](this, p);
-            _assume List<T>::s_noneof[recursive?](this, p);
-
-            _assume List<T>::s_allofnot[recursive?](this, p);
-            _assume List<T>::s_noneofnot[recursive?](this, p);
-            _assume Verifier::lnot(List<T>::s_someofnot[recursive?](this, p));
-
-            return res;
-        }
-        else {
-            xxxx; //TODO:
-
-            return res;
-        }
-    }
 
     recursive? method map<U=?>(f: recursive? fn(_: T) -> U): List<U> {
         let res = List<T>::s_map<U>[recursive](this, f);

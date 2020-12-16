@@ -5,8 +5,6 @@
 
 type VerifierOptions = {
     ISize: number, //bits in the size 2-64
-    BigMode: "BV" | "Int",
-    BigSize: number, //bits in the size 8-1024 (assuming Mode is BV)
     OverflowEnabled: boolean,
     FPOpt: "Real" | "UF",
     StringOpt: "ASCII" | "UNICODE"

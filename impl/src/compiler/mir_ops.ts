@@ -2018,6 +2018,11 @@ class MIRConstructorPrimaryCollectionCopies extends MIROp {
     getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper([...this.args.map((arg) => arg[1])]); }
     getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
 
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        //on map we fail on duplicate keys
+        return true;
+    }
+
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => `expand(${arg[1].stringify()})`).join(", ")}`;
     }
@@ -2049,6 +2054,11 @@ class MIRConstructorPrimaryCollectionMixed extends MIROp {
 
     stringify(): string {
         return `${this.trgt.stringify()} = ${this.tkey}{${this.args.map((arg) => arg[0] ? `expand(${arg[2].stringify()})` : arg[2].stringify()).join(", ")}`;
+    }
+
+    canRaise(implicitAssumesEnabled: boolean): boolean {
+        //on map we fail on duplicate keys
+        return true;
     }
 
     jemit(): object {
