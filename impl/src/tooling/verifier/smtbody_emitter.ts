@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRPCode, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVerifierAssume, MIRVirtualMethodKey } from "../../compiler/mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
 import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, SMTCallGeneralWPassThroughMask, SMTType, VerifierOptions } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
@@ -895,13 +895,6 @@ class SMTBodyEmitter {
         return this.generateErrorCreate(op.sinfo, this.currentRType, op.info);
     }
 
-    processVerifierAssume(op: MIRVerifierAssume, continuation: SMTExp): SMTExp {
-        const chkval = this.argToSMT(op.arg);
-        const errorval = this.typegen.generateResultTypeConstructorError(this.currentRType, new SMTConst("ErrorID_AssumeCheck"));
-        
-        return new SMTIf(chkval, continuation, errorval);
-    }
-
     processAssertCheck(op: MIRAssertCheck, continuation: SMTExp): SMTExp {
         const chkval = this.argToSMT(op.arg);
         const errorval = this.generateErrorCreate(op.sinfo, this.currentRType, op.info);
@@ -1356,12 +1349,6 @@ class SMTBodyEmitter {
             const args = op.args.map((arg) => this.argToSMT(arg));
             return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, continuation);
         }
-        if(invk instanceof MIRInvokePrimitiveDecl && invk.implkey.startsWith("verifier_")) {
-            assert(op.guard === undefined && op.optmask === undefined);
-
-            const args = op.args.map((arg) => this.argToSMT(arg));
-            return this.generateVerifierExp(op.trgt, invk.implkey, args, continuation);
-        }
         else {
             let mask: SMTMaskConstruct | undefined = undefined;
             if (op.optmask !== undefined) {
@@ -1632,9 +1619,6 @@ class SMTBodyEmitter {
             }
             case MIROpTag.MIRAbort: {
                 return this.processAbort(op as MIRAbort);
-            }
-            case MIROpTag.MIRVerifierAssume: {
-                return this.processVerifierAssume(op as MIRAssertCheck, continuation);
             }
             case MIROpTag.MIRAssertCheck: {
                 return this.processAssertCheck(op as MIRAssertCheck, continuation);
@@ -2171,31 +2155,6 @@ class SMTBodyEmitter {
 
             return this.generateBuiltinFunction(idecl as MIRInvokePrimitiveDecl);
         }
-    }
-
-    generateVerifierExp(trgt: MIRRegisterArgument, op: string, args: SMTExp[], continuation: SMTExp): SMTExp {
-        switch(op) {
-            case "verifier_termeq": {
-                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("=", args), continuation);
-            }
-            case "verifier_lnot": {
-                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("not", args), continuation);
-            }
-            case "verifier_land": {
-                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("and", args), continuation);
-            }
-            case "verifier_lor": {
-                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("or", args), continuation);
-            }
-            case "verifier_limplies": {
-                return new SMTLet(this.varToSMTName(trgt).vname, new SMTCallSimple("=>", args), continuation);
-            }
-            default: {
-                assert(false);
-                return new SMTConst("[MISSING VERIFIER CASE]");
-            }
-        }
-
     }
 
     generateBuiltinFunction(idecl: MIRInvokePrimitiveDecl): SMTFunction | SMTFunctionUninterpreted | undefined {

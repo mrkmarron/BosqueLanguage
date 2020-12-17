@@ -6,16 +6,6 @@
 //The core namespace implements the primitive types used in the Bosque language
 namespace NSCore;
 
-//<summary>Special builtin methods for verifier to use.</summary>
-entity Verifier {
-    __safe static term_eq(t1: Any, t2: Any): Bool # verifier_termeq
-
-    __safe static lnot(b1: Bool, b2: Bool): Bool # verifier_lnot
-    __safe static land(b1: Bool, b2: Bool): Bool # verifier_land
-    __safe static lor(b1: Bool, b2: Bool): Bool # verifier_lor
-    __safe static limplies(b1: Bool, b2: Bool): Bool # verifier_limplies
-}
-
 //<summary>Special type which all values are instances of.</summary>
 concept Any {
     method is<T>(): Bool # special_method
