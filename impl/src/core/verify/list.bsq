@@ -43,19 +43,20 @@ entity ListOf provides Object {
     __safe private static s_rangeOfNat(start: Nat, end: Nat): List<Nat> # list_rangeofnat
 
     __safe private static s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
-    __safe private static s_unzip<T, U>(l: List<#[T, U]>): List<T>, List<U> # list_unzip
+    __safe private static s_unzipt<T, U>(l: List<#[T, U]>): List<T> # list_unzipt
+    __safe private static s_unzipu<T, U>(l: List<#[T, U]>): List<U> # list_unzipu
 
     static fill<T=?>(k: Nat, val: T): List<T> {
         return List<T>::s_fill(k, val);
     }
 
-    static rangeOfInt(start: Int, end: Int): List<Int>
+    static int(start: Int, end: Int): List<Int>
         requires release start <= end;
     {
         return ListOf::s_rangeInt(start, end);
     }
 
-    static rangeOfNat(start: Nat, end: Nat): List<Nat>
+    static nat(start: Nat, end: Nat): List<Nat>
         requires release start <= end;
     {
         return ListOf::s_rangeNat(start, end);
@@ -68,13 +69,17 @@ entity ListOf provides Object {
     }
 
     static unzip<T=?, U=?>(l: List<#[T, U]>): List<T>, List<U> {
-        return ListOf::s_unzip<T, U>(l);
+        return ListOf::s_unzipt<T, U>(l), ListOf::s_unzipu<T, U>(l);
     }
 }
 
 entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     __safe private static s_applycheck_pred(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred
+    __safe private static s_applycheck_pred_idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred_idx
     __safe private static s_applycheck_binpred<U>(l: List<T>, ol: List<T>, p: recursive? fn(_: T, _: U) -> Bool): List<T>, List<U> # list_applycheck_binpred
+
+    __safe private static s_applycheck_op<U>(l: List<T>, p: recursive? fn(_: T, _: Nat) -> U): # list_applycheck_op
+    __safe private static s_applycheck_op_idx<U>(l: List<T>, p: recursive? fn(_: T, _: Nat) -> U): # list_applycheck_op_idx
 
     __safe private static s_size(l: List<T>): Nat # list_size
     __safe private static s_empty(l: List<T>): Nat # list_empty
@@ -86,24 +91,25 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     __assume_safe private static {when T grounded KeyType} s_findIndexOfLast_KeyHelper(l: List<T>, val: T, start: Nat, end: Nat): Nat # list) # list_findindexoflast_keyhelper
 
     __assume_safe private recursive? static s_findIndexOf_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool), start: Nat, end: Nat): Nat # list_findindexof_predicatehelper
-    __assume_safe private recursive? static s_findIndexOfNot_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat # list_findindexofnot_predicatehelper
     __assume_safe private recursive? static s_findIndexOfLast_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat # list_findindexoflast_predicatehelper
-    __assume_safe private recursive? static s_findIndexOfLastNot_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat # list_findindexoflastnot_predicatehelper
+    __assume_safe private recursive? static s_findIndexOf_PredicateHelper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool), start: Nat, end: Nat): Nat # list_findindexof_predicatehelper_idx
+    __assume_safe private recursive? static s_findIndexOfLast_PredicateHelper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat # list_findindexoflast_predicatehelper_idx
 
-    __assume_safe private static {when T KeyType} s_count_KeyHelper(l: List<T>, v: T, start: Nat, end: Nat): Nat # list_countif_helper
+    __assume_safe private static {when T KeyType} s_count_KeyHelper(l: List<T>, v: T, start: Nat, end: Nat): Nat # list_count_helper
 
     __assume_safe private recursive? static s_countIf_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat # list_countif_helper
-    __assume_safe private recursive? static s_countIfNot_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat # list_countifnot_helper
-
+    __assume_safe private recursive? static s_countIf_Helper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat # list_countif_helper_idx
+    
     __assume_safe private recursive? static s_filter_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_filter_helper
-    __assume_safe private recursive? static s_filterNot_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_filternot_helper
-
+    __assume_safe private recursive? static s_filter_Helper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> # list_filter_helper_idx
+    
     __assume_safe private recursive? static s_filterToType_Helper<U>(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<U> # list_filtertotype_helper
     __assume_safe private recursive? static s_castToType_Helper<U>(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<U> # list_casttotype_helper
 
     __assume_safe private static s_slice_Helper(l: List<T>, start: Nat, end: Nat): List<U> # list_slice_helper
 
     __assume_safe private recursive? static s_map_Helper<U>(l: List<T>, f: recursive? fn(_: T) -> U, start: Nat, end: Nat): List<T> # list_map_helper
+    __assume_safe private recursive? static s_map_Helper_Idx<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U, start: Nat, end: Nat): List<T> # list_map_helper_idx
 
     __assume_safe private recursive? static s_join_Helper<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> # list_join_helper
     __assume_safe private recursive? static s_joinGroup_Helper<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, List<U>]> # list_joingroup_helper
@@ -114,57 +120,62 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
 
     private recursive? static findIndexOf_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_findIndexOf_PredicateHelper(slist, p, start, end);
-    }
-
-    private recursive? static findIndexOfNot_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
-        let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_findIndexOfNot_PredicateHelper(slist, p, start, end);
+        return List<T>::s_findIndexOf_PredicateHelper[recursive?](slist, p, start, end);
     }
 
     private recursive? static findIndexOfLast_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_findIndexOfLast_PredicateHelper(slist, p, start, end);
+        return List<T>::s_findIndexOfLast_PredicateHelper[recursive?](slist, p, start, end);
     }
 
-    private recursive? static findIndexOfLastNot_PredicateHelper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
-        let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_findIndexOfLast_PredicateHelper(slist, p, start, end);
+    private recursive? static findIndexOf_PredicateHelper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
+        let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
+        return List<T>::s_findIndexOf_PredicateHelper_Idx[recursive?](slist, p, start, end);
+    }
+
+    private recursive? static findIndexOfLast_PredicateHelper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
+        let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
+        return List<T>::s_findIndexOfLast_PredicateHelper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? static countIf_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_countIf_Helper(slist, p, start, end);
+        return List<T>::s_countIf_Helper[recursive?](slist, p, start, end);
     }
 
-    private recursive? static countIfNot_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): Nat {
-        let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_countIfNot_Helper(slist, p, start, end);
+    private recursive? static countIf_Helper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
+        let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
+        return List<T>::s_countIf_Helper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? static filter_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<T> {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_filter_Helper(slist, p, start, end);
+        return List<T>::s_filter_Helper[recursive?](slist, p, start, end);
     }
 
-    private recursive? static filterNot_Helper(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<T> {
-        let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_filterNot_Helper(slist, p, start, end);
+    private recursive? static filter_Helper_Idx(l: List<T>, p: recursive? fn(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> {
+        let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
+        return List<T>::s_filter_Helper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? static filterToType_Helper<U>(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<U> {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_filterToType_Helper(slist, p, start, end);
+        return List<T>::s_filterToType_Helper[recursive?](slist, p, start, end);
     }
 
     private recursive? static castToType_Helper<U>(l: List<T>, p: recursive? fn(_: T) -> Bool, start: Nat, end: Nat): List<U> {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_castToType_Helper(slist, p, start, end);
+        return List<T>::s_castToType_Helper[recursive?](slist, p, start, end);
     }
 
     private recursive? static map_Helper<U>(l: List<T>, f: recursive? fn(_: T) -> U, start: Nat, end: Nat): List<T> {
-        let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-        return List<T>::s_map_Helper<U>(slist, f, start, end);
+        let slist = List<T>::s_applycheck_op[recursive?](l, f, start, end);
+        return List<T>::s_map_Helper<U>[recursive?](slist, f, start, end);
+    }
+
+    private recursive? static map_Helper_Idx<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U, start: Nat, end: Nat): List<T> {
+        let slist = List<T>::s_applycheck_op_idx[recursive?](l, f, start, end);
+        return List<T>::s_map_Helper_Idx<U>[recursive?](slist, f, start, end);
     }
 
     private recursive? static join_Helper<U>(l: List<T>, ol: List<U>, p: recursive? fn(_: T, _: U) -> Bool): List<#[T, U]> {
@@ -382,7 +393,13 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     recursive? method allOf(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end) == end;
+        return List<T>::findIndexOf_PredicateHelper[recursive?](this, Predicate::not(p), start, end) == end;
+    }
+
+    recursive? method allOf(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        return List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, Predicate::not(p), start, end) == end;
     }
 
     recursive? method noneOf(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
@@ -391,28 +408,22 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end) == end;
     }
 
+    recursive? method noneOf(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        return List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end) == end;
+    }
+
     recursive? method someOf(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         return List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end) < end;
     }
 
-    recursive? method allOfNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
+    recursive? method someOf(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end) == end;
-    }
-
-    recursive? method noneOfNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        return List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end) == end;
-    }
-
-    recursive? method someOfNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        return List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end) < end;
+        return List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end) < end;
     }
 
     recursive? method countIf(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
@@ -421,10 +432,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::countIf_Helper[recursive?](this, p, start, end);
     }
 
-    recursive? method countIfNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+    recursive? method countIf(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return List<T>::countIfNot_Helper[recursive?](this, p, start, end);
+        return List<T>::countIf_Helper_Idx[recursive?](this, p, start, end);
     }
 
     method {when T grounded KeyType} contains(v: T, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
@@ -451,6 +462,14 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_unsafe_get(this, idx);
     }
 
+    recursive? method find(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
+        check idx != end;
+        return List<T>::s_unsafe_get(this, idx);
+    }
+
     recursive? method findOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
@@ -463,10 +482,34 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    recursive? method findOrNone(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return List<T>::s_unsafe_get(this, idx);
+        }
+    }
+
     recursive? method findOrDefault(d: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         let idx = List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end);
+        if(idx == end) {
+            return d;
+        }
+        else {
+            return List<T>::s_unsafe_get(this, idx);
+        }
+    }
+
+    recursive? method findOrDefault(d: T, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return d;
         }
@@ -488,42 +531,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    recursive? method findNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+    recursive? method findTry(out? res: T, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        check idx != end;
-        return List<T>::s_unsafe_get(this, idx);
-    }
-
-    recursive? method findNotOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return none;
-        }
-        else {
-            return List<T>::s_unsafe_get(this, idx);
-        }
-    }
-
-    recursive? method findNotOrDefault(d: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return d;
-        }
-        else {
-            return List<T>::s_unsafe_get(this, idx);
-        }
-    }
-
-    recursive? method findNotTry(out? res: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return false;
         }
@@ -541,6 +552,14 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_unsafe_get(this, idx);
     }
 
+    recursive? method findLast(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
+        check idx != end;
+        return List<T>::s_unsafe_get(this, idx);
+    }
+
     recursive? method findLastOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
@@ -553,10 +572,34 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    recursive? method findLastOrNone(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return List<T>::s_unsafe_get(this, idx);
+        }
+    }
+
     recursive? method findLastOrDefault(d: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         let idx = List<T>::findIndexOfLast_PredicateHelper[recursive?](this, p, start, end);
+        if(idx == end) {
+            return d;
+        }
+        else {
+            return List<T>::s_unsafe_get(this, idx);
+        }
+    }
+
+    recursive? method findLastOrDefault(d: T, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return d;
         }
@@ -578,42 +621,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    recursive? method findLastNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
+    recursive? method findLastTry(out? res: T, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        check idx != end;
-        return List<T>::s_unsafe_get(this, idx);
-    }
-
-    recursive? method findLastNotOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T?
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return none;
-        }
-        else {
-            return List<T>::s_unsafe_get(this, idx);
-        }
-    }
-
-    recursive? method findLastNotOrDefault(d: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): T
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return d;
-        }
-        else {
-            return List<T>::s_unsafe_get(this, idx);
-        }
-    }
-
-    recursive? method findLastNotTry(out? res: T, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return false;
         }
@@ -631,6 +642,14 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return idx;
     }
 
+    recursive? method findIndexOf(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
+        check idx != end;
+        return idx;
+    }
+
     recursive? method findIndexOfOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
@@ -643,10 +662,34 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    recursive? method findIndexOfOrNone(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return idx;
+        }
+    }
+
     recursive? method findIndexOfOrDefault(d: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         let idx = List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end);
+        if(idx == end) {
+            return d;
+        }
+        else {
+            return idx;
+        }
+    }
+
+    recursive? method findIndexOfOrDefault(d: Nat, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return d;
         }
@@ -668,42 +711,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    recursive? method findIndexOfNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+    recursive? method findIndexOfTry(out? res: Nat, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        check idx != end;
-        return idx;
-    }
-
-    recursive? method findIndexOfNotOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return none;
-        }
-        else {
-            return idx;
-        }
-    }
-
-    recursive? method findIndexOfNotOrDefault(d: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return d;
-        }
-        else {
-            return idx;
-        }
-    }
-
-    recursive? method findNotTry(out? res: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
+        let idx = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return false;
         }
@@ -721,6 +732,14 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return idx;
     }
 
+    recursive? method findIndexOfLast(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
+        check idx != end;
+        return idx;
+    }
+
     recursive? method findIndexOfLastOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
@@ -733,10 +752,34 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
+    recursive? method findIndexOfLastOrNone(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return idx;
+        }
+    }
+
     recursive? method findIndexOfLastOrDefault(d: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         let idx = List<T>::findIndexOfLast_PredicateHelper[recursive?](this, p, start, end);
+        if(idx == end) {
+            return d;
+        }
+        else {
+            return idx;
+        }
+    }
+
+    recursive? method findIndexOfLastOrDefault(d: Nat, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return d;
         }
@@ -758,42 +801,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         }
     }
 
-    recursive? method findIndexOfLastNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
+    recursive? method findIndexOfLastTry(out? res: Nat, p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        check idx != end;
-        return idx;
-    }
-
-    recursive? method findIndexOfLastNotOrNone(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat?
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return none;
-        }
-        else {
-            return idx;
-        }
-    }
-
-    recursive? method findIndexOfLastNotOrDefault(d: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Nat
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
-        if(idx == end) {
-            return d;
-        }
-        else {
-            return idx;
-        }
-    }
-
-    recursive? method findIndexOfLastNotTry(out? res: Nat, p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): Bool
-        requires release List<T>::s_rangeInBounds(this, start, end);
-    {
-        let idx = List<T>::findIndexOfLastNot_PredicateHelper[recursive?](this, p, start, end);
+        let idx = List<T>::findIndexOfLast_PredicateHelper_Idx[recursive?](this, p, start, end);
         if(idx == end) {
             return false;
         }
@@ -899,10 +910,10 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::filter_Helper[recursive?](this, p, start, end);
     }
 
-    recursive? method filterNot(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T>
+    recursive? method filter(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T>
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return List<T>::filterNot_Helper[recursive?](this, p, start, end);
+        return List<T>::filter_Helper_Idx[recursive?](this, p, start, end);
     }
 
     method filterToType<U>(start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<U>
@@ -938,14 +949,28 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     recursive? method takeWhile(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T> 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, Predicate::not(p), start, end);
+        return List<T>::s_slice_Helper(this, 0, lpos);
+    }
+
+    recursive? method takeWhile(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T> 
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, Predicate::not(p), start, end);
         return List<T>::s_slice_Helper(this, 0, lpos);
     }
 
     recursive? method discardWhile(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T>
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOfNot_PredicateHelper[recursive?](this, p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, Predicate::not(p), start, end);
+        return List<T>::s_slice_Helper(this, lpos, end - lpos);
+    }
+
+    recursive? method discardWhile(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T>
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, Predicate::not(p), start, end);
         return List<T>::s_slice_Helper(this, lpos, end - lpos);
     }
 
@@ -956,10 +981,24 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_slice_Helper(this, lpos, end - lpos);
     }
 
+    recursive? method takeUntil(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T>
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
+        return List<T>::s_slice_Helper(this, lpos, end - lpos);
+    }
+
     recursive? method discardUntil(p: recursive? fn(_: T) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T> 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, p, start, end);
+        return List<T>::s_slice_Helper(this, lpos, end - lpos);
+    }
+
+    recursive? method discardUntil(p: recursive? fn(_: T, _: Nat) -> Bool, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<T> 
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, p, start, end);
         return List<T>::s_slice_Helper(this, lpos, end - lpos);
     }
 
@@ -979,6 +1018,12 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
         return List<T>::s_map_Helper<U>[recursive?](this, f, start, end);
+    }
+
+    recursive? method map<U=?>(f: recursive? fn(_: T, _: Nat) -> U, start?: Nat=0, end?: Nat=List<T>::s_size(this)): List<U> 
+        requires release List<T>::s_rangeInBounds(this, start, end);
+    {
+        return List<T>::s_map_Helper_Idx<U>[recursive?](this, f, start, end);
     }
 
     //

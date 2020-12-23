@@ -43,7 +43,7 @@ class SMTBodyEmitter {
 
     requiredCollectionDestructorsPrimitive_Bool: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = []; //operations which extract bools using primitive operations (find, etc.)
     requiredCollectionDestructorsComputational_Bool: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = []; //operations which computationally extract bools using functors (allof, etc.)
-    requiredCollectionDestructors_PrimitiveNat: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = []; //operations which extract bools using primitive operations (count, indexof, etc.)
+    requiredCollectionDestructorsPrimitive_Nat: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = []; //operations which extract bools using primitive operations (count, indexof, etc.)
     requiredCollectionDestructorsComputational_Nat: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argc: number }[] = []; //operations which computationally extract bools using functors (countif, allof, etc.)
     //always implicit get operator too!!!
 
@@ -1491,8 +1491,8 @@ class SMTBodyEmitter {
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
         const consf = this.generateConstructorOfSizeName(op.tkey, 0);
-        if (this.requiredCollectionOfConstructors.find((ee) => ee.cname === consf) === undefined) {
-            this.requiredCollectionOfConstructors.push({ cname: consf, oftype: op.tkey, argc: 0 });
+        if (this.requiredCollectionConstructors_Literal.find((ee) => ee.cname === consf) === undefined) {
+            this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: 0 });
         }
 
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf, []), continuation);
@@ -1500,8 +1500,8 @@ class SMTBodyEmitter {
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
         const consf = this.generateConstructorOfSizeName(op.tkey, op.args.length);
-        if (this.requiredCollectionOfConstructors.find((ee) => ee.cname === consf) === undefined) {
-            this.requiredCollectionOfConstructors.push({ cname: consf, oftype: op.tkey, argc: op.args.length });
+        if (this.requiredCollectionConstructors_Literal.find((ee) => ee.cname === consf) === undefined) {
+            this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: op.args.length });
         }
 
         return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(consf, op.args.map((arg) => this.argToSMT(arg[1]))), continuation);
@@ -2163,6 +2163,7 @@ class SMTBodyEmitter {
         });
 
         const issafe = this.isSafeInvoke(idecl.key);
+        const encltype = this.typegen.mangle(idecl.enclosingDecl !== undefined ? idecl.enclosingDecl : "[TOP LEVEL]");
         const restype = issafe ? this.typegen.getSMTTypeFor(this.typegen.getMIRType(idecl.resultType)) : this.typegen.generateResultType(this.typegen.getMIRType(idecl.resultType));
 
         switch(idecl.implkey) {
@@ -2171,6 +2172,114 @@ class SMTBodyEmitter {
             }
             case "string_charat": {
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, restype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname)]));
+            }
+            case "list_fill": {
+                xxxx;
+            }
+            case "list_rangeofint": {
+                xxxx;
+            }
+            case "list_rangeofnat": {
+                xxxx;
+            }
+            case "list_zip": {
+                xxxx;
+            }
+            case "list_unzipt": {
+                xxxx;
+            }
+            case "list_unzipu": {
+                xxxx;
+            }
+            case "list_applycheck_pred": {
+                xxxx;
+            }
+            case "list_applycheck_pred_idx": {
+                xxxx;
+            }
+            case "list_applycheck_binpred": {
+                xxxx;
+            }
+            case "list_applycheck_op": {
+                xxxx;
+            }
+            case "list_applycheck_op_idx": {
+                xxxx;
+            }
+            case "list_size": {
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, restype, new SMTCallSimple(`${encltype}@size`, [new SMTVar(args[0].vname)]));
+            }
+            case "list_empty": {
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, restype, new SMTCallSimple("=", [new SMTConst(`(_ bv0 ${this.vopts.ISize})`), new SMTCallSimple(`${encltype}@size`, [new SMTVar(args[0].vname)])]));
+            }
+            case "list_unsafe_get": {
+                //implicit get operation is always generated
+                return undefined;
+            }
+            case "list_concat": {
+                xxxx;
+            }
+            case "list_findindexof_keyhelper": {
+                this.requiredCollectionDestructorsPrimitive_Nat.push;
+                xxxx;
+            }
+            case "list_findindexoflast_keyhelper": {
+                xxxx;
+            }
+            case "list_findindexof_predicatehelper": {
+                this.requiredCollectionDestructorsComputational_Nat.push;
+                xxxx;
+            }
+            case "list_findindexoflast_predicatehelper": {
+                xxxx;
+            }
+            case "list_findindexof_predicatehelper_idx": {
+                xxxx;
+            }
+            case "list_findindexoflast_predicatehelper_idx": {
+                xxxx;
+            }
+            case "list_count_helper": {
+                xxxx;
+            }
+            case "list_countif_helper": {
+                xxxx;
+            }
+            case "list_countif_helper_idx": {
+                xxxx;
+            }
+            case "list_filter_helper": {
+                xxxx;
+            }
+            case "list_filter_helper_idx": {
+                xxxx;
+            }
+            case "list_filtertotype_helper": {
+                xxxx;
+            }
+            case "list_casttotype_helper": {
+                xxxx;
+            }
+            case "list_slice_helper": {
+                xxxx;
+            }
+            case "list_map_helper": {
+                xxxx;
+            }
+            case "list_map_helper_idx": {
+                xxxx;
+            }
+            case "list_join_helper": {
+                xxxx;
+            }
+            case "list_joingroup_helper": {
+                xxxx;
+            }
+            case "list_append_helper": {
+                xxxx;
+            }
+            case "list_sort_helper": {
+                xxxx;
             }
             default: {
                 return undefined;

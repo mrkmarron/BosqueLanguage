@@ -39,6 +39,13 @@ concept KeyType provides Any {
     function less<T grounded KeyType>(a: T, b: T): Bool # special_method
 }
 
+//<summary>Special operators for logical operations on functors</summary>
+concept Predicate {
+    function not(p: Predicate): Predicate # special_method
+    function andOf(p1: Predicate, p2: Predicate): Predicate # special_method
+    function orOf(p1: Predicate, p2: Predicate): Predicate # special_method
+}
+
 //<summary>Type for indicating that a datatype is Plain-Old-Data.</summary>
 concept PODType provides APIType {
 }
