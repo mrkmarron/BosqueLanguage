@@ -126,11 +126,12 @@ class InvokeDecl {
     readonly preconditions: PreConditionDecl[];
     readonly postconditions: PostConditionDecl[];
 
-    readonly isLambda: boolean;
+    readonly isPCodeFn: boolean;
+    readonly isPCodePred: boolean;
     readonly captureSet: Set<string>;
     readonly body: BodyImplementation | undefined;
 
-    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isLambda: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
+    constructor(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultType: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], isPCodeFn: boolean, isPCodePred: boolean, captureSet: Set<string>, body: BodyImplementation | undefined) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
@@ -149,21 +150,22 @@ class InvokeDecl {
         this.preconditions = preconds;
         this.postconditions = postconds;
 
-        this.isLambda = isLambda;
+        this.isPCodeFn = isPCodeFn;
+        this.isPCodePred = isPCodePred;
         this.captureSet = captureSet;
         this.body = body;
     }
 
     generateSig(): TypeSignature {
-        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultType);
+        return new FunctionTypeSignature(this.recursive, [...this.params], this.optRestName, this.optRestType, this.resultType, this.isPCodePred);
     }
 
-    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, captureSet: Set<string>, body: BodyImplementation) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], undefined, params, optRestName, optRestType, resultInfo, [], [], true, captureSet, body);
+    static createPCodeInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, captureSet: Set<string>, body: BodyImplementation, isPCodeFn: boolean, isPCodePred: boolean) {
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, [], undefined, params, optRestName, optRestType, resultInfo, [], [], isPCodeFn, isPCodePred, captureSet, body);
     }
 
     static createStandardInvokeDecl(sinfo: SourceInfo, srcFile: string, attributes: string[], recursive: "yes" | "no" | "cond", terms: TemplateTermDecl[], termRestrictions: TypeConditionRestriction | undefined, params: FunctionParameter[], optRestName: string | undefined, optRestType: TypeSignature | undefined, resultInfo: TypeSignature, preconds: PreConditionDecl[], postconds: PostConditionDecl[], body: BodyImplementation | undefined) {
-        return new InvokeDecl(sinfo, srcFile, attributes, recursive, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, new Set<string>(), body);
+        return new InvokeDecl(sinfo, srcFile, attributes, recursive, terms, termRestrictions, params, optRestName, optRestType, resultInfo, preconds, postconds, false, false, new Set<string>(), body);
     }
 }
 
@@ -1560,7 +1562,11 @@ class Assembly {
             return undefined;
         }
 
-        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype);
+        if(t.isPred && rtype.idStr !== "NSCore::Bool") {
+            return undefined; //pred must have Bool result type
+        }
+
+        return ResolvedFunctionType.create(t.recursive, params, t.optRestParamName, optRestParamType, rtype, t.isPred);
     }
 
     private atomSubtypeOf_EntityConcept(t1: ResolvedEntityAtomType, t2: ResolvedConceptAtomType): boolean {
@@ -2311,6 +2317,42 @@ class Assembly {
         }
     }
 
+    //A temp workaround for static overloading (just do a hacky check on number of args in, single, pcode function)
+    tryGetMethodUniqueConcreteDeclFromType_HACK(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+        xxxx;
+        xxxx;
+        
+        const ntype = this.ensureNominalRepresentation(tt);
+        const ttopts = ntype.options.map((ttopt) => {
+            if(ttopt instanceof ResolvedEntityAtomType) {
+                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, true);
+            }
+            else {
+                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
+                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
+                });
+                return this.ensureSingleDecl_Helper<MemberMethodDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl>[]);
+            }
+        });
+
+        if(ttopts.some((topt) => topt === undefined)) {
+            return undefined;
+        }
+        else {
+            const sdecl = this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
+            if(sdecl === undefined) {
+                return undefined;
+            }
+
+            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.invoke.attributes)) {
+                return undefined;
+            }
+            else {
+                return sdecl;
+            }
+        }
+    }
+
     //Given a type find the single virtual method root decl that every possible resoltions derives from -- should exist or it is an error
     tryGetMethodUniqueRootDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
@@ -2690,6 +2732,10 @@ class Assembly {
     }
 
     private functionSubtypeOf_helper(t1: ResolvedFunctionType, t2: ResolvedFunctionType): boolean {
+        if (t2.isPred !== t1.isPred) {
+            return false; //need to have same pred spec
+        }
+
         if (t2.params.length !== t1.params.length) {
             return false; //need to have the same number of parameters
         }

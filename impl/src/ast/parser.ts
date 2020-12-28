@@ -31,6 +31,7 @@ const KeywordStrings = [
     "false",
     "field",
     "fn",
+    "pred",
     "function",
     "grounded",
     "if",
@@ -128,6 +129,7 @@ const RegexFollows = new Set<string>([
     "(",
     "(|",
     "{|",
+    "&",
     "&&",
     "!",
     "!=",
@@ -137,6 +139,7 @@ const RegexFollows = new Set<string>([
     "=>",
     "==>",
     "?",
+    "|",
     "||",
     "+",
     "<",
@@ -577,7 +580,8 @@ class ParseError extends Error {
 enum InvokableKind {
     Basic,
     Member,
-    PCode,
+    PCodeFn,
+    PCodePred,
     StaticOperator,
     DynamicOperator
 }
@@ -877,7 +881,7 @@ class Parser {
                 argtype = this.parseTypeSignature(ikind === InvokableKind.StaticOperator || ikind === InvokableKind.DynamicOperator);
             }
             else {
-                if (ikind !== InvokableKind.PCode) {
+                if (ikind !== InvokableKind.PCodeFn && ikind !== InvokableKind.PCodePred) {
                     this.raiseError(line, "Auto typing is not supported for this");
                 }
             }
@@ -931,7 +935,7 @@ class Parser {
             resultInfo = this.parseResultType(false);
         }
         else {
-            if (ikind !== InvokableKind.PCode) {
+            if (ikind !== InvokableKind.PCodeFn && ikind !== InvokableKind.PCodePred) {
                 if(!params.some((p) => p[4])) {
                     this.raiseError(line, "Cannot have void return unless one of the params is by-ref");
                 }
@@ -948,7 +952,7 @@ class Parser {
             this.ensureAndConsumeToken(";");
         }
         else {
-            if (ikind == InvokableKind.PCode) {
+            if (ikind === InvokableKind.PCodeFn || ikind === InvokableKind.PCodePred) {
                 this.ensureAndConsumeToken("=>");
             }
             else {
@@ -957,7 +961,7 @@ class Parser {
 
             const bodyid = `${srcFile}::${sinfo.pos}`;
             try {
-                this.m_penv.pushFunctionScope(new FunctionScope(argNames, resultInfo, ikind === InvokableKind.PCode));
+                this.m_penv.pushFunctionScope(new FunctionScope(argNames, resultInfo, ikind === InvokableKind.PCodeFn || ikind === InvokableKind.PCodePred));
                 body = this.parseBody(bodyid, srcFile);
                 captured = this.m_penv.getCurrentFunctionScope().getCaptureVars();
                 this.m_penv.popFunctionScope();
@@ -968,8 +972,8 @@ class Parser {
             }
         }
 
-        if (ikind === InvokableKind.PCode) {
-            return InvokeDecl.createPCodeInvokeDecl(sinfo, srcFile, attributes, isrecursive, fparams, restName, restType, resultInfo, captured, body as BodyImplementation);
+        if (ikind === InvokableKind.PCodeFn || ikind === InvokableKind.PCodePred) {
+            return InvokeDecl.createPCodeInvokeDecl(sinfo, srcFile, attributes, isrecursive, fparams, restName, restType, resultInfo, captured, body as BodyImplementation, ikind === InvokableKind.PCodeFn, ikind === InvokableKind.PCodePred);
         }
         else {
             return InvokeDecl.createStandardInvokeDecl(sinfo, srcFile, attributes, isrecursive, terms, termRestrictions, fparams, restName, restType, resultInfo, preconds, postconds, body);
@@ -1104,6 +1108,7 @@ class Parser {
                 }
             }
             case "fn":
+            case "pred":
             case "recursive?":
             case "recursive":
                 return this.parsePCodeType();
@@ -1261,7 +1266,8 @@ class Parser {
             recursive = "yes";
         }
 
-        this.ensureAndConsumeToken("fn");
+        const ispred = this.testToken("pred");
+        this.consumeToken();
 
         try {
             this.setRecover(this.scanMatchingParens("(", ")"));
@@ -1314,7 +1320,7 @@ class Parser {
             const resultInfo = this.parseResultType(true);
 
             this.clearRecover();
-            return new FunctionTypeSignature(recursive, fparams, restName, restType, resultInfo);
+            return new FunctionTypeSignature(recursive, fparams, restName, restType, resultInfo, ispred);
         }
         catch (ex) {
             this.processRecover();
@@ -1518,8 +1524,10 @@ class Parser {
 
         const isrecursive = this.testAndConsumeTokenIf("recursive");
 
-        this.ensureAndConsumeToken("fn");
-        const sig = this.parseInvokableCommon(InvokableKind.PCode, false, [], isrecursive ? "yes" : "no", [], undefined);
+        const ispred = this.testToken("pred");
+        this.consumeToken();
+
+        const sig = this.parseInvokableCommon(ispred ? InvokableKind.PCodePred : InvokableKind.PCodeFn, false, [], isrecursive ? "yes" : "no", [], undefined);
         const someAuto = sig.params.some((param) => param.type instanceof AutoTypeSignature) || (sig.optRestType !== undefined && sig.optRestType instanceof AutoTypeSignature) || (sig.resultType instanceof AutoTypeSignature);
         const allAuto = sig.params.every((param) => param.type instanceof AutoTypeSignature) && (sig.optRestType === undefined || sig.optRestType instanceof AutoTypeSignature) && (sig.resultType instanceof AutoTypeSignature);
         if (someAuto && !allAuto) {
@@ -1923,7 +1931,7 @@ class Parser {
 
             return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, istr, new TemplateArguments([]), rec, args, "std");
         }
-        else if (tk === "fn" || this.testFollows("recursive", "fn")) {
+        else if (tk === "fn" || this.testFollows("recursive", "fn") || tk === "pred" || this.testFollows("recursive", "pred")) {
             return this.parsePCodeTerm();
         }
         else if (tk === "(") {
@@ -2621,7 +2629,10 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseImpliesExpression();
 
-        if (this.testAndConsumeTokenIf("&&")) {
+        if (this.testAndConsumeTokenIf("&")) {
+            return new BinLogicExpression(sinfo, exp, "&", this.parseAndExpression());
+        }
+        else if (this.testAndConsumeTokenIf("&&")) {
             return new BinLogicExpression(sinfo, exp, "&&", this.parseAndExpression());
         }
         else {
@@ -2633,7 +2644,10 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseAndExpression();
 
-        if (this.testAndConsumeTokenIf("||")) {
+        if (this.testAndConsumeTokenIf("|")) {
+            return new BinLogicExpression(sinfo, exp, "|", this.parseOrExpression());
+        }
+        else if (this.testAndConsumeTokenIf("||")) {
             return new BinLogicExpression(sinfo, exp, "||", this.parseOrExpression());
         }
         else {
@@ -3665,7 +3679,7 @@ class Parser {
             const validator = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], "vregex", new NominalTypeSignature("NSCore", ["Regex"]), new ConstantExpressionValue(new LiteralRegexExpression(sinfo, re as BSQRegex), new Set<string>()));
             const param = new FunctionParameter("arg", new NominalTypeSignature("NSCore", ["String"]), false, undefined, undefined, undefined);
             const acceptsbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "validator_accepts");
-            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["validator_accepts", "__safe"], "no", [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", ["Bool"]), [], [], false, new Set<string>(), acceptsbody);
+            const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["validator_accepts", "__safe"], "no", [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", ["Bool"]), [], [], false, false, new Set<string>(), acceptsbody);
             const accepts = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "accepts", acceptsinvoke);
             const provides = [[new NominalTypeSignature("NSCore", ["Validator"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
             const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [SpecialTypeCategory.ValidatorTypeDecl], currentDecl.ns, tyname, [], provides, [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>().set("accepts", accepts), new Map<string, StaticOperatorDecl[]>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>(), new Map<string, EntityTypeDecl>());
@@ -4098,11 +4112,11 @@ class Parser {
 
             const cparam = new FunctionParameter("v", oftype, false, undefined, undefined, undefined);
             const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_create");
-            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_enum", "__safe"], "no", [], undefined, [cparam], undefined, undefined, simpleETypeResult, [], [], false, new Set<string>(), cbody);
+            const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_enum", "__safe"], "no", [], undefined, [cparam], undefined, undefined, simpleETypeResult, [], [], false, false, new Set<string>(), cbody);
             const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "create", createdecl);
 
             const vbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_value");
-            const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_enum_value", "__safe"], "no", [], undefined, [], undefined, undefined, oftype, [], [], false, new Set<string>(), vbody);
+            const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_enum_value", "__safe"], "no", [], undefined, [], undefined, undefined, oftype, [], [], false, false, new Set<string>(), vbody);
             const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), "value", false, valuedecl);
 
             const provides = [
@@ -4190,11 +4204,11 @@ class Parser {
 
         const cparam = new FunctionParameter("v", idval, false, undefined, undefined, undefined);
         const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "typedecl_create");
-        const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_typedecl", "__safe"], "no", [], undefined, [cparam], undefined, undefined, itype, [], [], false, new Set<string>(), cbody);
+        const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_typedecl", "__safe"], "no", [], undefined, [cparam], undefined, undefined, itype, [], [], false, false, new Set<string>(), cbody);
         const create = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "create", createdecl);
 
         const vbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "typedecl_value");
-        const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_typedecl_value", "__safe"], "no", [], undefined, [], undefined, undefined, idval, [], [], false, new Set<string>(), vbody);
+        const valuedecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["get_typedecl_value", "__safe"], "no", [], undefined, [], undefined, undefined, idval, [], [], false, false, new Set<string>(), vbody);
         const value = new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), "value", false, valuedecl);
 
         let provides = [[new NominalTypeSignature("NSCore", ["Some"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][]

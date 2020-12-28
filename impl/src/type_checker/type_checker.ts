@@ -3400,6 +3400,8 @@ class TypeChecker {
         const resolvefrom = op.specificResolve !== undefined ? this.resolveAndEnsureTypeOnly(op.sinfo, op.specificResolve, env.terms) : texp.flowtype;
         const knownimpl = this.m_assembly.tryGetMethodUniqueConcreteDeclFromType(resolvefrom, op.name);
 
+        xxxx;
+
         if (knownimpl !== undefined) {
             let eev = env;
             if (op.isBinder) {
@@ -3654,6 +3656,9 @@ class TypeChecker {
     }
 
     private checkPrefixNotOp(env: TypeEnvironment, exp: PrefixNotOp, trgt: MIRRegisterArgument, refok: boolean): TypeEnvironment[] {
+
+        xxxx;
+        
         const etreg = this.m_emitter.generateTmpRegister();
         const estates = this.checkExpressionMultiFlow(env, exp.exp, etreg, this.m_assembly.getSpecialBoolType(), {refok: refok, orok: false});
 
@@ -3735,93 +3740,101 @@ class TypeChecker {
     }
 
     private checkBinLogic(env: TypeEnvironment, exp: BinLogicExpression, trgt: MIRRegisterArgument, refok: boolean): TypeEnvironment[] {
-        const lhsreg = this.m_emitter.generateTmpRegister();
-        const lhs = this.checkExpressionMultiFlow(env, exp.lhs, lhsreg, undefined, { refok: refok, orok: false });
-
-        this.raiseErrorIf(exp.sinfo, lhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
-        const blhsreg = this.emitInlineConvertToFlow(exp.sinfo, lhsreg, ValueType.join(this.m_assembly, ...lhs.map((eev) => eev.getExpressionResult().valtype)));
-
-        if (exp.op === "||") {
-            if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.True)) {
-                this.m_emitter.emitLoadConstBool(exp.sinfo, true, trgt);
-                return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
-            }
-            else {
-                const doneblck = this.m_emitter.createNewBlock("Llogic_or_done");
-                const restblck = this.m_emitter.createNewBlock("Llogic_or_rest");
-
-                const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
-
-                this.m_emitter.emitRegisterStore(exp.sinfo, blhsreg, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
-                this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, doneblck, restblck);
-                this.m_emitter.setActiveBlock(restblck);
-
-                const rhsreg = this.m_emitter.generateTmpRegister();
-                const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.fenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
-
-                this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
-                this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
-
-                this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
-                this.m_emitter.setActiveBlock(doneblck);
-
-                const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
-                return [...fflows.tenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
-            }
+        if (exp.op === "|" || exp.op === "&") {
+            xxxx;
         }
-        else if (exp.op === "&&") {
-            if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.False)) {
-                this.m_emitter.emitLoadConstBool(exp.sinfo, false, trgt);
-                return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
-            }
-            else {
-                const doneblck = this.m_emitter.createNewBlock("Llogic_and_done");
-                const restblck = this.m_emitter.createNewBlock("Llogic_and_rest");
-
-                const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
-
-                this.m_emitter.emitRegisterStore(exp.sinfo, blhsreg, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
-                this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, restblck, doneblck);
-                this.m_emitter.setActiveBlock(restblck);
-
-                const rhsreg = this.m_emitter.generateTmpRegister();
-                const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.tenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
-
-                this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
-                this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
-
-                this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
-                this.m_emitter.setActiveBlock(doneblck);
-                const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
-                return [...fflows.fenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
-            }
+        else if (exp.op === "&") {
+            xxxx;
         }
         else {
-            if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.False)) {
-                this.m_emitter.emitLoadConstBool(exp.sinfo, false, trgt);
-                return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
+            const lhsreg = this.m_emitter.generateTmpRegister();
+            const lhs = this.checkExpressionMultiFlow(env, exp.lhs, lhsreg, undefined, { refok: refok, orok: false });
+
+            this.raiseErrorIf(exp.sinfo, lhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
+            const blhsreg = this.emitInlineConvertToFlow(exp.sinfo, lhsreg, ValueType.join(this.m_assembly, ...lhs.map((eev) => eev.getExpressionResult().valtype)));
+
+            if (exp.op === "||") {
+                if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.True)) {
+                    this.m_emitter.emitLoadConstBool(exp.sinfo, true, trgt);
+                    return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
+                }
+                else {
+                    const doneblck = this.m_emitter.createNewBlock("Llogic_or_done");
+                    const restblck = this.m_emitter.createNewBlock("Llogic_or_rest");
+
+                    const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
+
+                    this.m_emitter.emitRegisterStore(exp.sinfo, blhsreg, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
+                    this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, doneblck, restblck);
+                    this.m_emitter.setActiveBlock(restblck);
+
+                    const rhsreg = this.m_emitter.generateTmpRegister();
+                    const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.fenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
+
+                    this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
+                    this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
+
+                    this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
+                    this.m_emitter.setActiveBlock(doneblck);
+
+                    const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
+                    return [...fflows.tenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
+                }
+            }
+            else if (exp.op === "&&") {
+                if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.False)) {
+                    this.m_emitter.emitLoadConstBool(exp.sinfo, false, trgt);
+                    return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.False));
+                }
+                else {
+                    const doneblck = this.m_emitter.createNewBlock("Llogic_and_done");
+                    const restblck = this.m_emitter.createNewBlock("Llogic_and_rest");
+
+                    const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
+
+                    this.m_emitter.emitRegisterStore(exp.sinfo, blhsreg, trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
+                    this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, restblck, doneblck);
+                    this.m_emitter.setActiveBlock(restblck);
+
+                    const rhsreg = this.m_emitter.generateTmpRegister();
+                    const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.tenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
+
+                    this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
+                    this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
+
+                    this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
+                    this.m_emitter.setActiveBlock(doneblck);
+                    const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
+                    return [...fflows.fenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
+                }
             }
             else {
-                const doneblck = this.m_emitter.createNewBlock("Llogic_imply_done");
-                const restblck = this.m_emitter.createNewBlock("Llogic_imply_rest");
+                if (lhs.every((ee) => ee.getExpressionResult().truthval === FlowTypeTruthValue.False)) {
+                    this.m_emitter.emitLoadConstBool(exp.sinfo, false, trgt);
+                    return lhs.map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), FlowTypeTruthValue.True));
+                }
+                else {
+                    const doneblck = this.m_emitter.createNewBlock("Llogic_imply_done");
+                    const restblck = this.m_emitter.createNewBlock("Llogic_imply_rest");
 
-                const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
+                    const fflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, lhs);
 
-                this.m_emitter.emitPrefixNotOp(exp.sinfo, blhsreg, trgt);
-                this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, restblck, doneblck);
-                this.m_emitter.setActiveBlock(restblck);
+                    this.m_emitter.emitPrefixNotOp(exp.sinfo, blhsreg, trgt);
+                    this.m_emitter.emitBoolJump(exp.sinfo, blhsreg, restblck, doneblck);
+                    this.m_emitter.setActiveBlock(restblck);
 
-                const rhsreg = this.m_emitter.generateTmpRegister();
-                const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.tenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
+                    const rhsreg = this.m_emitter.generateTmpRegister();
+                    const rhs = this.checkExpressionMultiFlow(TypeEnvironment.join(this.m_assembly, ...fflows.tenvs), exp.rhs, rhsreg, undefined, { refok: refok, orok: false });
 
-                this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
-                this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
+                    this.raiseErrorIf(exp.sinfo, rhs.some((opt) => !this.m_assembly.subtypeOf(opt.getExpressionResult().valtype.flowtype, this.m_assembly.getSpecialBoolType())), "Type of logic op must be Bool");
+                    this.m_emitter.emitRegisterStore(exp.sinfo, this.emitInlineConvertToFlow(exp.sinfo, rhsreg, ValueType.join(this.m_assembly, ...rhs.map((eev) => eev.getExpressionResult().valtype))), trgt, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), undefined);
 
-                this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
-                this.m_emitter.setActiveBlock(doneblck);
+                    this.m_emitter.emitDirectJump(exp.sinfo, doneblck);
+                    this.m_emitter.setActiveBlock(doneblck);
 
-                const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
-                return [...fflows.fenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
+                    const oflows = TypeEnvironment.convertToBoolFlowsOnResult(this.m_assembly, rhs);
+                    return [...fflows.fenvs, ...oflows.tenvs, ...oflows.fenvs].map((eev) => eev.setBoolResultExpression(this.m_assembly.getSpecialBoolType(), eev.getExpressionResult().truthval));
+                }
             }
         }
     }
