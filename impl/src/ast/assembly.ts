@@ -334,18 +334,18 @@ class OOPTypeDecl {
 
     readonly invariants: InvariantDecl[];
 
-    readonly staticMembers: Map<string, StaticMemberDecl>;
-    readonly staticFunctions: Map<string, StaticFunctionDecl>;
-    readonly staticOperators = new Map<string, StaticOperatorDecl[]>();
-    readonly memberFields: Map<string, MemberFieldDecl>;
-    readonly memberMethods: Map<string, MemberMethodDecl>;
+    readonly staticMembers: StaticMemberDecl[];
+    readonly staticFunctions: StaticFunctionDecl[];
+    readonly staticOperators: StaticOperatorDecl[];
+    readonly memberFields: MemberFieldDecl[];
+    readonly memberMethods: MemberMethodDecl[];
 
     readonly nestedEntityDecls: Map<string, EntityTypeDecl>;
 
     constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        staticMembers: StaticMemberDecl[], staticFunctions: StaticFunctionDecl[], staticOperators: StaticOperatorDecl[],
+        memberFields: MemberFieldDecl[], memberMethods: MemberMethodDecl[],
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
         this.sourceLocation = sourceLocation;
         this.srcFile = srcFile;
@@ -400,8 +400,8 @@ class OOPTypeDecl {
 class ConceptTypeDecl extends OOPTypeDecl {
     constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        staticMembers: StaticMemberDecl[], staticFunctions: StaticFunctionDecl[], staticOperators: StaticOperatorDecl[],
+        memberFields: MemberFieldDecl[], memberMethods: MemberMethodDecl[],
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
         super(sourceLocation, srcFile, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
@@ -410,8 +410,8 @@ class ConceptTypeDecl extends OOPTypeDecl {
 class EntityTypeDecl extends OOPTypeDecl {
     constructor(sourceLocation: SourceInfo, srcFile: string, attributes: string[], specialDecls: SpecialTypeCategory[], ns: string, name: string, terms: TemplateTermDecl[], provides: [TypeSignature, TypeConditionRestriction | undefined][],
         invariants: InvariantDecl[],
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>,
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>,
+        staticMembers: StaticMemberDecl[], staticFunctions: StaticFunctionDecl[], staticOperators: StaticOperatorDecl[],
+        memberFields: MemberFieldDecl[], memberMethods: MemberMethodDecl[],
         nestedEntityDecls: Map<string, EntityTypeDecl>) {
         super(sourceLocation, srcFile, attributes, specialDecls, ns, name, terms, provides, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods, nestedEntityDecls);
     }
@@ -627,7 +627,7 @@ class Assembly {
                 return undefined;
             }
 
-            const tt = (infertype.getUniqueCallTargetType().object.memberFields.get("value") as MemberFieldDecl).declaredType;
+            const tt = (infertype.getUniqueCallTargetType().object.memberFields.find((mfd) => mfd.name === "value") as MemberFieldDecl).declaredType;
             const rtt = this.normalizeTypeOnly(tt, new Map<string, ResolvedType>());
 
             const le = this.processNumberinoExpressionIntoTypedExpression(exp, rtt);
@@ -1933,15 +1933,15 @@ class Assembly {
             });
         });
 
-        ooptype.memberFields.forEach((mf, name) => {
+        ooptype.memberFields.forEach((mf) => {
             if(mf.value === undefined) {
-                if(!declfields.req.has(name)) {
-                    declfields.req.set(name, [ooptype, mf, binds]);
+                if(!declfields.req.has(mf.name)) {
+                    declfields.req.set(mf.name, [ooptype, mf, binds]);
                 }
             }
             else {
-                if (!declfields.opt.has(name) && !OOPTypeDecl.attributeSetContains("derived", mf.attributes)) {
-                    declfields.opt.set(name, [ooptype, mf, binds]);
+                if (!declfields.opt.has(mf.name) && !OOPTypeDecl.attributeSetContains("derived", mf.attributes)) {
+                    declfields.opt.set(mf.name, [ooptype, mf, binds]);
                 }
             }
         });
@@ -1961,9 +1961,9 @@ class Assembly {
             });
         });
 
-        ooptype.memberFields.forEach((mf, name) => {
-            if (!declfields.has(name)) {
-                declfields.set(name, [ooptype, mf, binds]);
+        ooptype.memberFields.forEach((mf) => {
+            if (!declfields.has(mf.name)) {
+                declfields.set(mf.name, [ooptype, mf, binds]);
             }
         });
 
@@ -2029,31 +2029,34 @@ class Assembly {
             }
         }
 
-        if (ooptype.memberMethods.has(fname) && !(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.attributes.includes("override")) {
+        const mmdecl = ooptype.memberMethods.find((mmd) => mmd.name === fname);
+        if (mmdecl !== undefined && !mmdecl.invoke.attributes.includes("override")) {
             let newbinds = new Map<string, ResolvedType>();
             oobinds.forEach((v, k) => newbinds.set(k, v));
-            (ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
+            mmdecl.invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
 
-            return {pre: [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.preconditions, newbinds], post: [(ooptype.memberMethods.get(fname) as MemberMethodDecl).invoke.postconditions, newbinds]};
+            return {pre: [mmdecl.invoke.preconditions, newbinds], post: [mmdecl.invoke.postconditions, newbinds]};
         }
 
-        if (ooptype.staticFunctions.has(fname) && !(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.attributes.includes("override")) {
+        const sfdecl = ooptype.staticFunctions.find((sfd) => sfd.name === fname);
+        if (sfdecl !== undefined && !sfdecl.invoke.attributes.includes("override")) {
             let newbinds = new Map<string, ResolvedType>();
             oobinds.forEach((v, k) => newbinds.set(k, v));
-            (ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
+            sfdecl.invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
 
-            return {pre: [(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.preconditions, newbinds], post: [(ooptype.staticFunctions.get(fname) as StaticFunctionDecl).invoke.postconditions, newbinds]};
+            return {pre: [sfdecl.invoke.preconditions, newbinds], post: [sfdecl.invoke.postconditions, newbinds]};
         }
 
         return undefined;
     }
 
     private tryGetMemberConstDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
-        if(!ooptype.staticMembers.has(name)) {
+        const sdecl = ooptype.staticMembers.find((sm) => sm.name === name);
+        if(sdecl === undefined) {
             return undefined;
         }
 
-        return new OOMemberLookupInfo<StaticMemberDecl>(ooptype, ooptype.staticMembers.get(name) as StaticMemberDecl, binds);
+        return new OOMemberLookupInfo<StaticMemberDecl>(ooptype, sdecl, binds);
     }
 
     private tryGetMemberConstDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticMemberDecl> | undefined {
@@ -2070,11 +2073,12 @@ class Assembly {
     }
 
     private tryGetMemberFunctionDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
-        if(!ooptype.staticFunctions.has(name)) {
+        const sfdecl = ooptype.staticFunctions.find((sfd) => sfd.name === name);
+        if(sfdecl === undefined) {
             return undefined;
         }
 
-        return new OOMemberLookupInfo<StaticFunctionDecl>(ooptype, ooptype.staticFunctions.get(name) as StaticFunctionDecl, binds);
+        return new OOMemberLookupInfo<StaticFunctionDecl>(ooptype, sfdecl, binds);
     }
 
     private tryGetMemberFunctionDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticFunctionDecl> | undefined {
@@ -2091,11 +2095,12 @@ class Assembly {
     }
 
     private tryGetMemberOperatorDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
-        if(!ooptype.staticOperators.has(name)) {
+        const sodecl = ooptype.staticOperators.filter((so) => so.name === name);
+        if(sodecl.length === 0) {
             return undefined;
         }
 
-        return new OOMemberLookupInfo<StaticOperatorDecl[]>(ooptype, ooptype.staticOperators.get(name) as StaticOperatorDecl[], binds);
+        return new OOMemberLookupInfo<StaticOperatorDecl[]>(ooptype, sodecl, binds);
     }
 
     private tryGetMemberOperatorDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<StaticOperatorDecl[]> | undefined {
@@ -2112,11 +2117,12 @@ class Assembly {
     }
 
     private tryGetMemberFieldDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
-        if(!ooptype.memberFields.has(name)) {
+        const mfdecl = ooptype.memberFields.find((mf) => mf.name === name);
+        if(mfdecl === undefined) {
             return undefined;
         }
 
-        return new OOMemberLookupInfo<MemberFieldDecl>(ooptype, ooptype.memberFields.get(name) as MemberFieldDecl, binds);
+        return new OOMemberLookupInfo<MemberFieldDecl>(ooptype, mfdecl, binds);
     }
 
     private tryGetMemberFieldDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string): OOMemberLookupInfo<MemberFieldDecl> | undefined {
@@ -2132,20 +2138,16 @@ class Assembly {
         return undefined;
     }
 
-    private tryGetMemberMethodDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl> | undefined {
-        if(!ooptype.memberMethods.has(name)) {
+    private tryGetMemberMethodDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
+        const mmdecls = ooptype.memberMethods.filter((mm) => mm.name === name && (!findspecific || !OOPTypeDecl.attributeSetContains("override", mm.invoke.attributes)));
+        if(mmdecls.length === 0) {
             return undefined;
         }
 
-        const mmd = ooptype.memberMethods.get(name) as MemberMethodDecl;
-        if(!findspecific && OOPTypeDecl.attributeSetContains("override", mmd.invoke.attributes)) {
-            return undefined;
-        }
-
-        return new OOMemberLookupInfo<MemberMethodDecl>(ooptype, mmd, binds);
+        return new OOMemberLookupInfo<MemberMethodDecl[]>(ooptype, mmdecls, binds);
     }
 
-    private tryGetMemberMethodDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+    private tryGetMemberMethodDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
         const rprovides = this.resolveProvides(ooptype, binds);
         for (let i = 0; i < rprovides.length; ++i) {
             const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
@@ -2285,7 +2287,7 @@ class Assembly {
     }
 
     //Given a type find, if possible, the single static method that every possibility resolves to -- if not then this needs to be a virtual call
-    tryGetMethodUniqueConcreteDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+    tryGetMethodUniqueConcreteDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
@@ -2295,7 +2297,7 @@ class Assembly {
                 const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
                     return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
                 });
-                return this.ensureSingleDecl_Helper<MemberMethodDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl>[]);
+                return this.ensureSingleDecl_Helper<MemberMethodDecl[]>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl[]>[]);
             }
         });
 
@@ -2303,48 +2305,13 @@ class Assembly {
             return undefined;
         }
         else {
-            const sdecl = this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
+            const sdecl = this.ensureSingleDecl_Helper<MemberMethodDecl[]>(ttopts as OOMemberLookupInfo<MemberMethodDecl[]>[]);
             if(sdecl === undefined) {
                 return undefined;
             }
 
-            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.invoke.attributes)) {
-                return undefined;
-            }
-            else {
-                return sdecl;
-            }
-        }
-    }
-
-    //A temp workaround for static overloading (just do a hacky check on number of args in, single, pcode function)
-    tryGetMethodUniqueConcreteDeclFromType_HACK(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
-        xxxx;
-        xxxx;
-        
-        const ntype = this.ensureNominalRepresentation(tt);
-        const ttopts = ntype.options.map((ttopt) => {
-            if(ttopt instanceof ResolvedEntityAtomType) {
-                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, true);
-            }
-            else {
-                const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
-                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
-                });
-                return this.ensureSingleDecl_Helper<MemberMethodDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl>[]);
-            }
-        });
-
-        if(ttopts.some((topt) => topt === undefined)) {
-            return undefined;
-        }
-        else {
-            const sdecl = this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
-            if(sdecl === undefined) {
-                return undefined;
-            }
-
-            if(OOPTypeDecl.attributeSetContains("override", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sdecl.decl.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sdecl.decl.invoke.attributes)) {
+            const isoveridable = sdecl.decl.some((sd) => OOPTypeDecl.attributeSetContains("override", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sd.invoke.attributes));
+            if(isoveridable) {
                 return undefined;
             }
             else {
@@ -2354,7 +2321,7 @@ class Assembly {
     }
 
     //Given a type find the single virtual method root decl that every possible resoltions derives from -- should exist or it is an error
-    tryGetMethodUniqueRootDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl> | undefined {
+    tryGetMethodUniqueRootDeclFromType(tt: ResolvedType, fname: string): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
@@ -2364,7 +2331,7 @@ class Assembly {
                 const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
                     return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, false) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, false);
                 });
-                return this.ensureSingleDecl_Helper<MemberMethodDecl>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl>[]);
+                return this.ensureSingleDecl_Helper<MemberMethodDecl[]>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl[]>[]);
             }
         });
 
@@ -2372,7 +2339,7 @@ class Assembly {
             return undefined;
         }
         else {
-            return this.ensureSingleDecl_Helper<MemberMethodDecl>(ttopts as OOMemberLookupInfo<MemberMethodDecl>[]);
+            return this.ensureSingleDecl_Helper<MemberMethodDecl[]>(ttopts as OOMemberLookupInfo<MemberMethodDecl[]>[]);
         }
     }
 

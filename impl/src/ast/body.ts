@@ -7,6 +7,7 @@ import { SourceInfo } from "./parser";
 import { TypeSignature, TemplateTypeSignature } from "./type_signature";
 import { InvokeDecl, BuildLevel } from "./assembly";
 import { BSQRegex } from "./bsqregex";
+import { PCode } from "../compiler/mir_emitter";
 
 class InvokeArgument {
     readonly value: Expression;
@@ -145,8 +146,10 @@ enum ExpressionTag {
     ConstructorTupleExpression = "ConstructorTupleExpression",
     ConstructorRecordExpression = "ConstructorRecordExpression",
     ConstructorEphemeralValueList = "ConstructorEphemeralValueList",
+    CombinatorPCodeExpression = "CombinatorPCodeExpression",
     ConstructorPCodeExpression = "ConstructorPCodeExpression",
 
+    PCodeDirectInvokeExpression = "PCodeDirectInvokeExpression",
     PCodeInvokeExpression = "PCodeInvokeExpression",
     SpecialConstructorExpression = "SpecialConstructorExpression",
     CallNamespaceFunctionOrOperatorExpression = "CallNamespaceFunctionOrOperatorExpression",
@@ -467,6 +470,15 @@ class ConstructorEphemeralValueList extends Expression {
     }
 }
 
+class CombinatorPCodeExpression extends Expression {
+    readonly cexp: Expression;
+
+    constructor(sinfo: SourceInfo, cexp: Expression) {
+        super(ExpressionTag.CombinatorPCodeExpression, sinfo);
+        this.cexp = cexp;
+    }
+}
+
 class ConstructorPCodeExpression extends Expression {
     readonly isAuto: boolean;
     readonly invoke: InvokeDecl;
@@ -475,6 +487,20 @@ class ConstructorPCodeExpression extends Expression {
         super(ExpressionTag.ConstructorPCodeExpression, sinfo);
         this.isAuto = isAuto;
         this.invoke = invoke;
+    }
+}
+
+
+class PCodeDirectInvokeExpression extends Expression {
+    readonly pc: PCode;
+    readonly captured: string[];
+    readonly args: Expression[];
+
+    constructor(sinfo: SourceInfo, pc: PCode, captured: string[], args: Expression[]) {
+        super(ExpressionTag.PCodeDirectInvokeExpression, sinfo);
+        this.pc = pc;
+        this.captured = captured;
+        this.args = args;
     }
 }
 
@@ -1213,13 +1239,13 @@ export {
     LiteralTypedNumericConstructorExpression, LiteralTypedStringConstructorExpression,
     AccessNamespaceConstantExpression, AccessStaticFieldExpression, AccessVariableExpression,
     ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorEphemeralValueList, 
-    ConstructorPCodeExpression, SpecialConstructorExpression,
+    CombinatorPCodeExpression, ConstructorPCodeExpression, SpecialConstructorExpression,
     CallNamespaceFunctionOrOperatorExpression, CallStaticFunctionOrOperatorExpression,
     OfTypeConvertExpression,
     PostfixOpTag, PostfixOperation, PostfixOp,
     PostfixAccessFromIndex, PostfixProjectFromIndecies, PostfixAccessFromName, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames,
     PostfixIs, PostfixAs, PostfixHasIndex, PostfixHasProperty, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry,
-    PostfixInvoke, PCodeInvokeExpression,
+    PostfixInvoke, PCodeDirectInvokeExpression, PCodeInvokeExpression,
     PrefixNotOp, 
     BinKeyExpression, BinLogicExpression,
     MapEntryConstructorExpression,

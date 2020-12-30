@@ -531,6 +531,7 @@ enum MIROpTag {
     MIRBinKeyLess = "MIRBinKeyLess",
     MIRPrefixNotOp = "MIRPrefixNotOp",
     MIRAllTrue = "MIRAllTrue",
+    MIRSomeTrue = "MIRSomeTrue",
 
     MIRIsTypeOf = "MIRIsTypeOf",
 
@@ -667,6 +668,8 @@ abstract class MIROp {
                 return MIRPrefixNotOp.jparse(jobj);
             case MIROpTag.MIRAllTrue:
                 return MIRAllTrue.jparse(jobj);
+            case MIROpTag.MIRSomeTrue:
+                return MIRSomeTrue.jparse(jobj);
             case MIROpTag.MIRIsTypeOf:
                 return MIRIsTypeOf.jparse(jobj);
             case MIROpTag.MIRJump:
@@ -2143,7 +2146,7 @@ class MIRAllTrue extends MIROp {
     args: MIRArgument[];
 
     constructor(sinfo: SourceInfo, args: MIRArgument[], trgt: MIRRegisterArgument) {
-        super(MIROpTag.MIRPrefixNotOp, sinfo);
+        super(MIROpTag.MIRAllTrue, sinfo);
         
         this.trgt = trgt;
         this.args = args;
@@ -2162,6 +2165,34 @@ class MIRAllTrue extends MIROp {
 
     static jparse(jobj: any): MIROp {
         return new MIRAllTrue(jparsesinfo(jobj.sinfo), jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRRegisterArgument.jparse(jobj.trgt));
+    }
+}
+
+
+class MIRSomeTrue extends MIROp {
+    trgt: MIRRegisterArgument;
+    args: MIRArgument[];
+
+    constructor(sinfo: SourceInfo, args: MIRArgument[], trgt: MIRRegisterArgument) {
+        super(MIROpTag.MIRSomeTrue, sinfo);
+        
+        this.trgt = trgt;
+        this.args = args;
+    }
+
+    getUsedVars(): MIRRegisterArgument[] { return varsOnlyHelper(this.args); }
+    getModVars(): MIRRegisterArgument[] { return [this.trgt]; }
+
+    stringify(): string {
+        return `${this.trgt.stringify()} = ${this.args.map((arg) => arg.stringify()).join(" | ")}`;
+    }
+
+    jemit(): object {
+        return { ...this.jbemit(), trgt: this.trgt.jemit(), args: this.args.map((arg) => arg.jemit()) };
+    }
+
+    static jparse(jobj: any): MIROp {
+        return new MIRSomeTrue(jparsesinfo(jobj.sinfo), jobj.args.map((jarg: any) => MIRArgument.jparse(jarg)), MIRRegisterArgument.jparse(jobj.trgt));
     }
 }
 
@@ -2582,7 +2613,7 @@ export {
     MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator,
     MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend,
     MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed,
-    MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue,
+    MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRSomeTrue,
     MIRIsTypeOf,
     MIRJump, MIRJumpCond, MIRJumpNone,
     MIRReturnAssign, MIRReturnAssignOfCons,

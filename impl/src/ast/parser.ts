@@ -5,7 +5,7 @@
 
 import { ParserEnvironment, FunctionScope } from "./parser_env";
 import { FunctionParameter, TypeSignature, NominalTypeSignature, TemplateTypeSignature, ParseErrorTypeSignature, TupleTypeSignature, RecordTypeSignature, FunctionTypeSignature, UnionTypeSignature, AutoTypeSignature, ProjectTypeSignature, EphemeralListTypeSignature, PlusTypeSignature, AndTypeSignature, LiteralTypeSignature } from "./type_signature";
-import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, RecursiveAnnotation, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralNumberinoExpression, BinKeyExpression } from "./body";
+import { Arguments, TemplateArguments, NamedArgument, PositionalArgument, InvalidExpression, Expression, LiteralNoneExpression, LiteralBoolExpression, LiteralStringExpression, LiteralTypedStringExpression, AccessVariableExpression, AccessNamespaceConstantExpression, LiteralTypedStringConstructorExpression, CallNamespaceFunctionOrOperatorExpression, AccessStaticFieldExpression, ConstructorTupleExpression, ConstructorRecordExpression, ConstructorPrimaryExpression, ConstructorPrimaryWithFactoryExpression, PostfixOperation, PostfixAccessFromIndex, PostfixAccessFromName, PostfixProjectFromIndecies, PostfixProjectFromNames, PostfixModifyWithIndecies, PostfixModifyWithNames, PostfixInvoke, PostfixOp, PrefixNotOp, BinLogicExpression, NonecheckExpression, CoalesceExpression, SelectExpression, BlockStatement, Statement, BodyImplementation, EmptyStatement, InvalidStatement, VariableDeclarationStatement, VariableAssignmentStatement, ReturnStatement, YieldStatement, CondBranchEntry, IfElse, IfElseStatement, InvokeArgument, CallStaticFunctionOrOperatorExpression, AssertStatement, CheckStatement, DebugStatement, StructuredAssignment, TupleStructuredAssignment, RecordStructuredAssignment, VariableDeclarationStructuredAssignment, IgnoreTermStructuredAssignment, VariableAssignmentStructuredAssignment, ConstValueStructuredAssignment, StructuredVariableAssignmentStatement, MatchStatement, MatchEntry, MatchGuard, WildcardMatchGuard, StructureMatchGuard, AbortStatement, BlockStatementExpression, IfExpression, MatchExpression, RecursiveAnnotation, CombinatorPCodeExpression, ConstructorPCodeExpression, PCodeInvokeExpression, ExpOrExpression, LiteralRegexExpression, ValidateStatement, NakedCallStatement, ValueListStructuredAssignment, NominalStructuredAssignment, VariablePackDeclarationStatement, VariablePackAssignmentStatement, ConstructorEphemeralValueList, MapEntryConstructorExpression, LiteralParamerterValueExpression, SpecialConstructorExpression, TypeMatchGuard, PostfixIs, LiteralTypedNumericConstructorExpression, PostfixHasIndex, PostfixHasProperty, PostfixAs, LiteralExpressionValue, LiteralIntegralExpression, LiteralFloatPointExpression, LiteralRationalExpression, OfTypeConvertExpression, PostfixGetIndexOrNone, PostfixGetIndexTry, PostfixGetPropertyOrNone, PostfixGetPropertyTry, ConstantExpressionValue, LiteralNumberinoExpression, BinKeyExpression } from "./body";
 import { Assembly, NamespaceUsing, NamespaceDeclaration, NamespaceTypedef, StaticMemberDecl, StaticFunctionDecl, MemberFieldDecl, MemberMethodDecl, ConceptTypeDecl, EntityTypeDecl, NamespaceConstDecl, NamespaceFunctionDecl, InvokeDecl, TemplateTermDecl, PreConditionDecl, PostConditionDecl, BuildLevel, TypeConditionRestriction, InvariantDecl, TemplateTypeRestriction, SpecialTypeCategory, StaticOperatorDecl, NamespaceOperatorDecl, OOPTypeDecl, TemplateTermSpecialRestriction } from "./assembly";
 import { BSQRegex } from "./bsqregex";
 
@@ -1518,6 +1518,20 @@ class Parser {
         return new ConstructorPrimaryWithFactoryExpression(sinfo, isvalue, otype, fname, rec, targs, args);
     }
 
+    private parsePCodeCombinator(): Expression {
+        const sinfo = this.getCurrentSrcInfo();
+
+        this.ensureAndConsumeToken("pred");
+        this.ensureAndConsumeToken("of");
+        this.ensureAndConsumeToken("(");
+
+        const cexp = this.parseOrExpression();
+
+        this.ensureAndConsumeToken(")");
+
+        return new CombinatorPCodeExpression(sinfo, cexp)
+    }
+
     private parsePCodeTerm(): Expression {
         const line = this.getCurrentLine();
         const sinfo = this.getCurrentSrcInfo();
@@ -1812,6 +1826,13 @@ class Parser {
         }
     }
 
+    private checkExpressionFollowsParens(): boolean {
+        const lpos = this.scanMatchingParens("(", ")");
+        const ptok = this.peekToken(lpos);
+
+        return ptok === "::" || ptok === "@" || ptok === "#";
+    }
+
     private parsePrimaryExpression(): Expression {
         const line = this.getCurrentLine();
         const sinfo = this.getCurrentSrcInfo();
@@ -1931,10 +1952,13 @@ class Parser {
 
             return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, istr, new TemplateArguments([]), rec, args, "std");
         }
+        else if (tk === "pred" && this.testFollows("pred", "of", "(")) {
+            return this.parsePCodeCombinator();
+        }
         else if (tk === "fn" || this.testFollows("recursive", "fn") || tk === "pred" || this.testFollows("recursive", "pred")) {
             return this.parsePCodeTerm();
         }
-        else if (tk === "(") {
+        else if (tk === "(" && !this.checkExpressionFollowsParens()) {
             try {
                 this.setRecover(this.scanMatchingParens("(", ")"));
 
@@ -3682,7 +3706,7 @@ class Parser {
             const acceptsinvoke = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["validator_accepts", "__safe"], "no", [], undefined, [param], undefined, undefined, new NominalTypeSignature("NSCore", ["Bool"]), [], [], false, false, new Set<string>(), acceptsbody);
             const accepts = new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), "accepts", acceptsinvoke);
             const provides = [[new NominalTypeSignature("NSCore", ["Validator"]), undefined]] as [TypeSignature, TypeConditionRestriction | undefined][];
-            const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [SpecialTypeCategory.ValidatorTypeDecl], currentDecl.ns, tyname, [], provides, [], new Map<string, StaticMemberDecl>().set("vregex", validator), new Map<string, StaticFunctionDecl>().set("accepts", accepts), new Map<string, StaticOperatorDecl[]>(), new Map<string, MemberFieldDecl>(), new Map<string, MemberMethodDecl>(), new Map<string, EntityTypeDecl>());
+            const validatortype = new EntityTypeDecl(sinfo, this.m_penv.getCurrentFile(), [], [SpecialTypeCategory.ValidatorTypeDecl], currentDecl.ns, tyname, [], provides, [], [validator], [accepts], [], [], [], new Map<string, EntityTypeDecl>());
 
             currentDecl.objects.set(tyname, validatortype);
             this.m_penv.assembly.addObjectDecl(currentDecl.ns + "::" + tyname, currentDecl.objects.get(tyname) as EntityTypeDecl);
@@ -3720,7 +3744,7 @@ class Parser {
         return provides;
     }
 
-    private parseConstMember(staticMembers: Map<string, StaticMemberDecl>, allMemberNames: Set<string>, attributes: string[]) {
+    private parseConstMember(staticMembers: StaticMemberDecl[], allMemberNames: Set<string>, attributes: string[]) {
         const sinfo = this.getCurrentSrcInfo();
 
         //[attr] const NAME: T = exp;
@@ -3741,10 +3765,10 @@ class Parser {
         }
 
         allMemberNames.add(sname);
-        staticMembers.set(sname, new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), attributes, sname, stype, value));
+        staticMembers.push(new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), attributes, sname, stype, value));
     }
 
-    private parseStaticFunction(staticFunctions: Map<string, StaticFunctionDecl>, allMemberNames: Set<string>, attributes: string[]) {
+    private parseStaticFunction(staticFunctions: StaticFunctionDecl[], allMemberNames: Set<string>, attributes: string[]) {
         const sinfo = this.getCurrentSrcInfo();
 
         //[attr] function NAME<T where C...>(params): type [requires...] [ensures...] { ... }
@@ -3765,10 +3789,10 @@ class Parser {
         }
         allMemberNames.add(fname);
 
-        staticFunctions.set(fname, new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
+        staticFunctions.push(new StaticFunctionDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
     }
 
-    private parseStaticOperator(staticOperators: Map<string, StaticOperatorDecl[]>, allMemberNames: Set<string>, attributes: string[]) {
+    private parseStaticOperator(staticOperators: StaticOperatorDecl[], allMemberNames: Set<string>, attributes: string[]) {
         const sinfo = this.getCurrentSrcInfo();
 
         //[attr] operator NAME(params): type [requires...] [ensures...] { ... }
@@ -3793,13 +3817,10 @@ class Parser {
         }
         allMemberNames.add(fname);
 
-        if(!staticOperators.has(fname)) {
-            staticOperators.set(fname, []);
-        }
-        (staticOperators.get(fname) as StaticOperatorDecl[]).push(new StaticOperatorDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
+        staticOperators.push(new StaticOperatorDecl(sinfo, this.m_penv.getCurrentFile(), fname, sig));
     }
 
-    private parseMemberField(memberFields: Map<string, MemberFieldDecl>, allMemberNames: Set<string>, attributes: string[]) {
+    private parseMemberField(memberFields: MemberFieldDecl[], allMemberNames: Set<string>, attributes: string[]) {
         const sinfo = this.getCurrentSrcInfo();
 
         //[attr] field NAME: T = exp;
@@ -3821,10 +3842,10 @@ class Parser {
             this.raiseError(this.getCurrentLine(), "Collision between const and other names");
         }
 
-        memberFields.set(fname, new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), attributes, fname, stype, value));
+        memberFields.push(new MemberFieldDecl(sinfo, this.m_penv.getCurrentFile(), attributes, fname, stype, value));
     }
 
-    private parseMemberMethod(thisRef: "ref" | undefined, thisType: TypeSignature, memberMethods: Map<string, MemberMethodDecl>, allMemberNames: Set<string>, attributes: string[]) {
+    private parseMemberMethod(thisRef: "ref" | undefined, thisType: TypeSignature, memberMethods: MemberMethodDecl[], allMemberNames: Set<string>, attributes: string[]) {
         const sinfo = this.getCurrentSrcInfo();
 
         //[attr] [ref] method NAME<T where C...>(params): type [requires...] [ensures...] { ... }
@@ -3841,12 +3862,9 @@ class Parser {
         }
         const sig = this.parseInvokableCommon(InvokableKind.Member, Parser.attributeSetContains("abstract", attributes), attributes, recursive, terms, termRestrictions, thisRef, thisType);
 
-        if (allMemberNames.has(mname)) {
-            this.raiseError(this.getCurrentLine(), "Collision between static and other names");
-        }
         allMemberNames.add(mname);
 
-        memberMethods.set(mname, new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), mname, refrcvr, sig));
+        memberMethods.push(new MemberMethodDecl(sinfo, this.m_penv.getCurrentFile(), mname, refrcvr, sig));
     }
 
     private parseInvariantsInto(invs: InvariantDecl[]) {
@@ -3872,8 +3890,8 @@ class Parser {
 
     private parseOOPMembersCommon(thisType: TypeSignature, currentNamespace: NamespaceDeclaration, currentTypeNest: string[], currentTermNest: TemplateTermDecl[], 
         nestedEntities: Map<string, EntityTypeDecl>, invariants: InvariantDecl[], 
-        staticMembers: Map<string, StaticMemberDecl>, staticFunctions: Map<string, StaticFunctionDecl>, staticOperators: Map<string, StaticOperatorDecl[]>, 
-        memberFields: Map<string, MemberFieldDecl>, memberMethods: Map<string, MemberMethodDecl>) {
+        staticMembers: StaticMemberDecl[], staticFunctions: StaticFunctionDecl[], staticOperators: StaticOperatorDecl[], 
+        memberFields: MemberFieldDecl[], memberMethods: MemberMethodDecl[]) {
         let allMemberNames = new Set<string>();
         while (!this.testToken("}")) {
             const attributes = this.parseAttributes();
@@ -3926,11 +3944,11 @@ class Parser {
             const thisType = new NominalTypeSignature(currentDecl.ns, [cname], terms.map((term) => new TemplateTypeSignature(term.name)));
 
             const invariants: InvariantDecl[] = [];
-            const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>();
-            const staticOperators = new Map<string, StaticOperatorDecl[]>();
-            const memberFields = new Map<string, MemberFieldDecl>();
-            const memberMethods = new Map<string, MemberMethodDecl>();
+            const staticMembers: StaticMemberDecl[] = [];
+            const staticFunctions: StaticFunctionDecl[] = [];
+            const staticOperators: StaticOperatorDecl[] = [];
+            const memberFields: MemberFieldDecl[] = [];
+            const memberMethods: MemberMethodDecl[] = [];
             const nestedEntities = new Map<string, EntityTypeDecl>();
             this.parseOOPMembersCommon(thisType, currentDecl, [cname], [...terms], nestedEntities, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods);
 
@@ -3984,11 +4002,11 @@ class Parser {
             const thisType = new NominalTypeSignature(currentDecl.ns, [...currentTypeNest, ename], [...terms, ...currentTermNest].map((term) => new TemplateTypeSignature(term.name)));
 
             const invariants: InvariantDecl[] = [];
-            const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>();
-            const staticOperators = new Map<string, StaticOperatorDecl[]>();
-            const memberFields = new Map<string, MemberFieldDecl>();
-            const memberMethods = new Map<string, MemberMethodDecl>();
+            const staticMembers: StaticMemberDecl[] = [];
+            const staticFunctions: StaticFunctionDecl[] = [];
+            const staticOperators: StaticOperatorDecl[] = [];
+            const memberFields: MemberFieldDecl[] = [];
+            const memberMethods: MemberMethodDecl[] = [];
             const nestedEntities = new Map<string, EntityTypeDecl>();
             this.parseOOPMembersCommon(thisType, currentDecl, [...currentTypeNest, ename], [...currentTermNest, ...terms], nestedEntities, invariants, staticMembers, staticFunctions, staticOperators, memberFields, memberMethods);
 
@@ -4130,11 +4148,11 @@ class Parser {
             //
 
             const invariants: InvariantDecl[] = [];
-            const staticMembers = new Map<string, StaticMemberDecl>();
-            const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
-            const staticOperators = new Map<string, StaticOperatorDecl[]>();
-            const memberFields = new Map<string, MemberFieldDecl>();
-            const memberMethods = new Map<string, MemberMethodDecl>().set("value", value);
+            const staticMembers: StaticMemberDecl[] = [];
+            const staticFunctions: StaticFunctionDecl[] = [create];
+            const staticOperators: StaticOperatorDecl[] = [];
+            const memberFields: MemberFieldDecl[] = [];
+            const memberMethods: MemberMethodDecl[] = [value];
     
             if(this.testAndConsumeTokenIf("&")) {
                 this.setRecover(this.scanCodeParens());
@@ -4150,7 +4168,7 @@ class Parser {
                 this.clearRecover();
             }
 
-            if(staticMembers.size !== 0) {
+            if(staticMembers.length !== 0) {
                 this.raiseError(line, "Cannot have explicit static fields on enum");
             }
 
@@ -4165,7 +4183,7 @@ class Parser {
 
                 const enminit = new CallStaticFunctionOrOperatorExpression(sinfo, etype, `@@create_${enums[i][0]}`, new TemplateArguments([]), "no", new Arguments([parg]), "std");
                 const enm = new StaticMemberDecl(sinfo, this.m_penv.getCurrentFile(), [], enums[i][0], etype, new ConstantExpressionValue(enminit, new Set<string>()));
-                staticMembers.set(enums[i][0], enm);
+                staticMembers.push(enm);
             }
         
             if (currentDecl.checkDeclNameClash(currentDecl.ns, ename)) {
@@ -4220,11 +4238,11 @@ class Parser {
         //
 
         const invariants: InvariantDecl[] = [];
-        const staticMembers = new Map<string, StaticMemberDecl>();
-        const staticFunctions = new Map<string, StaticFunctionDecl>().set("create", create);
-        const staticOperators = new Map<string, StaticOperatorDecl[]>();
-        const memberFields = new Map<string, MemberFieldDecl>();
-        const memberMethods = new Map<string, MemberMethodDecl>().set("value", value);
+        const staticMembers: StaticMemberDecl[] = [];
+        const staticFunctions: StaticFunctionDecl[] = [create];
+        const staticOperators: StaticOperatorDecl[] = [];
+        const memberFields: MemberFieldDecl[] = [];
+        const memberMethods: MemberMethodDecl[] = [value];
 
         if(this.testAndConsumeTokenIf("&")) {
             this.setRecover(this.scanCodeParens());
