@@ -2221,14 +2221,12 @@ class SMTBodyEmitter {
                 xxxx;
             }
             case "list_findindexof_keyhelper": {
-                this.requiredCollectionDestructorsPrimitive_Nat.push;
                 xxxx;
             }
             case "list_findindexoflast_keyhelper": {
                 xxxx;
             }
             case "list_findindexof_predicatehelper": {
-                this.requiredCollectionDestructorsComputational_Nat.push;
                 xxxx;
             }
             case "list_findindexoflast_predicatehelper": {
