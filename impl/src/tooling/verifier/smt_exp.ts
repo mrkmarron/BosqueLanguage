@@ -290,7 +290,7 @@ class SMTExists extends SMTExp {
     readonly terms: { vname: string, vtype: SMTType }[];
     readonly clause: SMTExp;
 
-    constructor(terms: { vname: string, vtype: SMTType }[], erroridx: { vname: string, vtype: SMTType }, clause: SMTExp) {
+    constructor(terms: { vname: string, vtype: SMTType }[], clause: SMTExp) {
         super();
 
         this.terms = terms;

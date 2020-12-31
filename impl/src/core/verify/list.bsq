@@ -42,7 +42,7 @@ entity ListFrom provides Object {
     __safe private static s_rangeOfInt(start: Int, end: Int): List<Int> # list_rangeofint
     __safe private static s_rangeOfNat(start: Nat, end: Nat): List<Nat> # list_rangeofnat
 
-    __safe private static s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
+    /*unsafe due to get semantics assert*/ private static s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
     __safe private static s_unzipt<T, U>(l: List<#[T, U]>): List<T> # list_unzipt
     __safe private static s_unzipu<T, U>(l: List<#[T, U]>): List<U> # list_unzipu
 
