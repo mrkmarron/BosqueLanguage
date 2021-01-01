@@ -7,7 +7,8 @@ type VerifierOptions = {
     ISize: number, //bits in the size 2-64
     OverflowEnabled: boolean,
     FPOpt: "Real" | "UF",
-    StringOpt: "ASCII" | "UNICODE"
+    StringOpt: "ASCII" | "UNICODE",
+    FilterMode: "AxiomBase" | "AxiomFull"
 };
 
 class SMTMaskConstruct {
