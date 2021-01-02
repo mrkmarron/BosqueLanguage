@@ -2181,6 +2181,12 @@ class SMTBodyEmitter {
             case "string_charat": {
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname)]));
             }
+            case "isequence_size": {
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, new SMTCallSimple("ISequence@size", [new SMTVar(args[0].vname)]))
+            }
+            case "isequence_get":  {
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, new SMTCallSimple("ISequence@get", [new SMTVar(args[0].vname), new SMTVar(args[1].vname)]))
+            }
             case "list_fill": {
                 const fcons = `@@cons_${smtrestype.name}_fill`;
                 this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
@@ -2216,7 +2222,7 @@ class SMTBodyEmitter {
                 //\forall n, n \in [0, size(l)) get_axiom(res, n) = #[get(arg1, n), get(arg2, n)]
                 const eqassert = new SMTForAll([{vname: "n", vtype: smtnattype}], 
                     new SMTCallSimple("=>", [
-                        this.generateListBoundsCheckCall("n", new SMTConst(`(_ bv0 ${this.vopts.ISize})`), new SMTVar(sizevar)),
+                        this.generateListBoundsCheckCall("n", new SMTConst("BNat@zero"), new SMTVar(sizevar)),
                         new SMTCallSimple("=", [
                             new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]),
                             new SMTCallSimple(tcons, [
@@ -2307,25 +2313,54 @@ class SMTBodyEmitter {
                 assert(false, "[NOT IMPLEMENTED -- list_applycheck_op_idx]");
                 return undefined;
             }
+            case "list_hascheck": {
+                assert(false, "[NOT IMPLEMENTED -- list_hascheck]");
+                return undefined;
+            }
+            case "list_haspredcheck": {
+                //\exists n, n \in [lower, upper) /\ p(get(l, n)
+                const echeck = new SMTExists(
+                    [{ vname: "n", vtype: smtnattype }],
+                    new SMTCallSimple("and", [
+                        this.generateListBoundsCheckCall("n", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
+                        this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], "n"))
+                    ])
+                );
+
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, this.typegen.generateResultTypeConstructorSuccess(mirrestype, echeck));
+            }
+            case "list_haspredcheck_idx": {
+                assert(false, "[NOT IMPLEMENTED -- list_haspredcheck_idx]");
+                return undefined;
+            }
+            case "list_computematchidxsequence": {
+                if(this.vopts.FilterMode === "ForwardOnly") {
+                    return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTConst("ISequence@empty")));
+            }
+                else {
+                    xxxx;
+                }
+            }
+            case "list_computematchidxsequence_idx": {
+                assert(false, "[NOT IMPLEMENTED -- list_computematchidxsequence_idx]");
+                return undefined;
+            }
+            case "list_computeoftypeidxsequence": {
+                assert(false, "[NOT IMPLEMENTED -- list_computeoftypeidxsequence]");
+                return undefined;
+            }
             case "list_size": {
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, this.generateListSizeCall(args[0]));
             }
             case "list_empty": {
-                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, new SMTCallSimple("=", [new SMTConst(`(_ bv0 ${this.vopts.ISize})`), this.generateListSizeCall(args[0])]));
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, new SMTCallSimple("=", [new SMTConst("BNat@zero"), this.generateListSizeCall(args[0])]));
             }
             case "list_unsafe_get": {
-                //implicit get operation is always generated
-                return undefined;
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, this.generateListKnownSafeGetCall(args[0], args[1].vname));
             }
             case "list_concat": {
                 assert(false, "[NOT IMPLEMENTED -- list_concat]");
                 return undefined;
-            }
-            case "list_hascheck": {
-                xxxx;
-            }
-            case "list_haspredcheck": {
-                xxxx;
             }
             case "list_findindexof_keyhelper": {
                 assert(false, "[NOT IMPLEMENTED -- list_findindexof_keyhelper]");
@@ -2337,18 +2372,7 @@ class SMTBodyEmitter {
             }
             case "list_findindexof_predicatehelper": 
             case "list_findindexoflast_predicatehelper": {
-                //if(\exists n, n \in [lower, upper) /\ p(get(l, n))
-                //  let nn = pick_n(ll, lower, upper) if(p(get(l, nn))) nn else err
-                //else 
-                //  upper
-
-                const echeck = new SMTExists(
-                    [{ vname: "n", vtype: smtnattype }],
-                    new SMTCallSimple("and", [
-                        this.generateListBoundsCheckCall("n", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
-                        this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], "n"))
-                    ])
-                );
+                //let nn = pick_n(ll, lower, upper) if(p(get(l, nn))) nn else err
 
                 //
                 //TODO: also assert that this is the first/last such element (maybe?)
@@ -2359,13 +2383,7 @@ class SMTBodyEmitter {
                     new SMTIf(this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], "nn")), this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTVar("nn")), this.generateErrorAssertFact(mirrestype))
                 );
 
-                const fbody = new SMTIf(
-                    echeck,
-                    pfound,
-                    this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTVar(args[2].vname))
-                );
-
-                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
+                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, pfound);
             }
             case "list_findindexof_predicatehelper_idx": {
                 assert(false, "[NOT IMPLEMENTED -- list_findindexof_predicatehelper_idx]");
@@ -2391,76 +2409,51 @@ class SMTBodyEmitter {
                 const fcons = `@@cons_${smtrestype.name}_filter`;
                 this.requiredCollectionConstructors_Computational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
 
-                const sizevar = this.generateTempName();
-                const cvar = this.generateTempName();
-                const resvar = this.generateTempName();
+                if(this.vopts.FilterMode === "ForwardOnly") {
+                    const ressize = this.generateTempName();
+                    const cvar = this.generateTempName();
 
-                const ressize = this.generateTempName();
-
-                //
-                //TODO: Not sure if this matters but we can get a bit of an ugly pigeon-hole proof going here with the length and the intoassert
-                //      This seems like (if it happens) would lead to the prover having a very under-constrained size <-> p satisfaction relation
-                //      One option might be to put back the source-level verifier asserts and add assertions around sizes (like countIf and find not succeeding)
-                //
-
-                //\forall n, n \in [0, size(res)), \exists nn \in [lower, upper) get_axiom(res, n) = get(arg0, nn) /\ p(get_axiom(res, n))
-                const fromassert = new SMTForAll([{vname: "n", vtype: smtnattype}], 
-                    new SMTCallSimple("=>", [
-                        this.generateListBoundsCheckCall("n", new SMTConst(`(_ bv0 ${this.vopts.ISize})`), new SMTVar(ressize)),
-                        new SMTExists([{ vname: "nn", vtype: smtnattype }],
-                            new SMTCallSimple("=>", [
-                                this.generateListBoundsCheckCall("nn", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
-                                new SMTCallSimple("and", [
-                                    new SMTCallSimple("=", [
-                                        new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]),
-                                        this.generateListKnownSafeGetCall(args[0], "nn")
-                                    ]),
-                                    this.generateLambdaCallKnownSafe("p", idecl, new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]))
-                                ])
-                            ])
-                        )
-                    ])
-                );
-
-                //\forall nn, nn \in [lower, upper), p(get(l, nn)) => \exists n \in [0, size(res)) get_axiom(res, n) = get(arg0, nn)
-                let intoassert: SMTExp = new SMTConst("true");
-                if (this.vopts.FilterMode === "AxiomFull") {
-                    intoassert = new SMTForAll([{ vname: "nn", vtype: smtnattype }],
+                    //\forall n, n \in [0, size(res)), \exists nn \in [lower, upper) get_axiom(res, n) = get(arg0, nn) /\ p(get_axiom(res, n))
+                    const fromassert = new SMTForAll([{ vname: "n", vtype: smtnattype }],
                         new SMTCallSimple("=>", [
-                            new SMTCallSimple("and", [
-                                this.generateListBoundsCheckCall("nn", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
-                                this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], "nn"))
-                            ]),
-                            new SMTExists([{ vname: "n", vtype: smtnattype }],
+                            this.generateListBoundsCheckCall("n", new SMTConst("BNat@zero"), new SMTVar(ressize)),
+                            new SMTExists([{ vname: "nn", vtype: smtnattype }],
                                 new SMTCallSimple("=>", [
-                                    this.generateListBoundsCheckCall("n", new SMTConst(`(_ bv0 ${this.vopts.ISize})`), new SMTVar(ressize)),
-                                    new SMTCallSimple("=", [
-                                        new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]),
-                                        this.generateListKnownSafeGetCall(args[0], "nn")
+                                    this.generateListBoundsCheckCall("nn", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
+                                    new SMTCallSimple("and", [
+                                        new SMTCallSimple("=", [
+                                            new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]),
+                                            this.generateListKnownSafeGetCall(args[0], "nn")
+                                        ]),
+                                        this.generateLambdaCallKnownSafe("p", idecl, new SMTCallSimple(`${smtrestype.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]))
                                     ])
                                 ])
                             )
                         ])
                     );
+
+                    const resvar = this.generateTempName();
+
+                    const nsize = this.generateListSizePickCall(idecl.key, args[0], args[1].vname, args[2].vname, new SMTCallSimple("-", [new SMTVar(args[2].vname), new SMTVar(args[1].vname)]));
+                    const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
+                    const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
+
+                    const fbody = new SMTLetMulti(
+                        [{ vname: cvar, value: icons }, { vname: ressize, value: nsize }],
+                        new SMTLet(
+                            resvar, fres,
+                            new SMTIf(
+                                fromassert,
+                                this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTVar(resvar)),
+                                this.generateErrorAssertFact(mirrestype))
+                        )
+                    );
+
+                    return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
                 }
-
-                const fsize = this.generateListSizeCall(args[0]);
-                const nsize = this.generateListSizePickCall(idecl.key, args[0], args[1].vname, args[2].vname, new SMTCallSimple("-", [new SMTVar(args[2].vname), new SMTVar(args[1].vname)]));
-                const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
-
-                const fbody = new SMTLetMulti(
-                    [{vname: sizevar, value: fsize}, {vname: cvar, value: icons}, {vname: ressize, value: nsize}],
-                    new SMTLet(
-                        resvar, fres,
-                        new SMTIf(
-                            new SMTCallSimple("and", [fromassert, intoassert]), 
-                            this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTVar(resvar)), 
-                            this.generateErrorAssertFact(mirrestype))
-                    ) 
-                );
-
-                return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
+                else {
+                    xxxx;
+                }
             }
             case "list_filter_helper_idx": {
                 assert(false, "[NOT IMPLEMENTED -- list_filter_helper_idx]");
@@ -2475,7 +2468,7 @@ class SMTBodyEmitter {
                 return undefined;
             }
             case "list_slice_helper": {
-                const fcons = `@@cons_${smtrestype.name}_zip`;
+                const fcons = `@@cons_${smtrestype.name}_slice`;
                 this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
 
                 xxxx;

@@ -73,6 +73,37 @@
 ;;STRING_TYPE_ALIAS;;
 
 ;;
+;; Define min/max/0 constants for Int/Nat/BigInt/BigNat/Float/Decimal/Rational/String representation options
+;;
+;;BINTEGRAL_CONSTANTS;;
+;;BFLOATPOINT_CONSTANTS;;
+
+;;Define the ISequence datatype and operators
+(declare-sort ISequence)
+
+(declare-fun ISequence@size (ISequence) BNat)
+(declare-fun ISequence@get (ISequence BNat) BNat)
+
+(define-fun ISequence@assertSorted ((ISequence s)) Bool
+  (let ((len (ISequence@size s)))
+    (forall ((i BNat) (j BNat)
+      (=> (and (bvult i j) (bvult j len))
+          (bvult (ISequence@get s i) (ISequence@get s j)))))
+  )
+)
+
+(define-fun ISequence@assertValuesRange ((ISequence s) (BNat limit)) Bool
+  (let ((len (ISequence@size s)))
+    (forall ((i BNat))
+      (=> (bvult i len)
+          (bvult (ISequence@get s i) limit)))
+  )
+)
+
+(declare-const ISequence@empty)
+(assert (= (ISequence@size) BNat@zero)
+
+;;
 ;; Primitive datatypes 
 ;;
 (declare-datatypes (
