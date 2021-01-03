@@ -101,7 +101,7 @@
 )
 
 (declare-const ISequence@empty)
-(assert (= (ISequence@size) BNat@zero)
+(assert (= (ISequence@size ISequence@empty) BNat@zero)
 
 ;;
 ;; Primitive datatypes 
