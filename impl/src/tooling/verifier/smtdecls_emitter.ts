@@ -3,22 +3,53 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIRAssembly } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRSpecialTypeCategory } from "../../compiler/mir_assembly";
+import { markSafeCalls } from "../../compiler/mir_callg";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTAssembly, SMTEntityDecl } from "./smt_assembly";
-import { VerifierLevel } from "./smt_exp";
+import { VerifierOptions } from "./smt_exp";
 
 class SMTEmitter {
-    static generateSMTAssembly(assembly: MIRAssembly, level: VerifierLevel, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey): SMTAssembly {
-        let temitter = new SMTTypeEmitter(assembly);
-        let bemitter = new SMTBodyEmitter(assembly, temitter, level, errorTrgtPos);
-        let smtassembly = new SMTAssembly(level);
+    static generateSMTAssembly(assembly: MIRAssembly, vopts: VerifierOptions, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey): SMTAssembly {
+        const callsafety = markSafeCalls([entrypoint], assembly, errorTrgtPos);
+
+        let temitter = new SMTTypeEmitter(assembly, vopts);
+        let bemitter = new SMTBodyEmitter(assembly, temitter, vopts, callsafety, errorTrgtPos);
+        let smtassembly = new SMTAssembly(vopts);
 
         assembly.entityDecls.forEach((edcl) => {
+            if(edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
+                xxxx;
+            }
+            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
+                xxxx;
+            }
+            else {
+                //check if this is a primitive type that we are going to skip emitting for
+                xxxx;
 
-            smtassembly.entityDecls.push(new SMTEntityDecl());
+                smtassembly.entityDecls.push(new SMTEntityDecl());
+            }
         });
 
     tupleDecls: SMTTupleDecl[] = [];

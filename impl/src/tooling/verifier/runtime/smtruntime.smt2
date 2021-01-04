@@ -73,6 +73,21 @@
 ;;STRING_TYPE_ALIAS;;
 
 ;;
+;; Define uninterpreted functions for various kinds
+;;
+(declare-fun BFloatCons_UF (String) BFloat)
+(declare-fun BFloatUnary_UF (String BFloat) BFloat)
+(declare-fun BFloatBinary_UF (String BFloat BFloat) BFloat)
+
+(declare-fun BDecimalCons_UF (String) BDecimal)
+(declare-fun BDecimalUnary_UF (String BDecimal) BDecimal)
+(declare-fun BDecimalBinary_UF (String BDecimal BDecimal) BDecimal)
+
+(declare-fun BRationalCons_UF (String) BRational)
+(declare-fun BRationalUnary_UF (String BRational) BRational)
+(declare-fun BRationalBinary_UF (String BRational BRational) BRational)
+
+;;
 ;; Define min/max/0 constants for Int/Nat/BigInt/BigNat/Float/Decimal/Rational/String representation options
 ;;
 ;;BINTEGRAL_CONSTANTS;;
@@ -235,18 +250,6 @@
 (define-fun GetTypeTag@BTerm ((t BKey)) TypeTag
   (ite (is-BTerm@termcons t) (BTerm_termtype t) (BKey_type (BTerm_keyvalue t)))
 )
-
-;;
-;; Define uninterpreted functions for various kinds
-;;
-(declare-fun BFloatUnary_UF (String BFloat) BFloat)
-(declare-fun BFloatBinary_UF (String BFloat BFloat) BFloat)
-
-(declare-fun BDecimalUnary_UF (String BDecimal) BDecimal)
-(declare-fun BDecimalBinary_UF (String BDecimal BDecimal) BDecimal)
-
-(declare-fun BRationalUnary_UF (String BRational) BRational)
-(declare-fun BRationalBinary_UF (String BRational BRational) BRational)
 
 ;;
 ;; Ephemeral datatypes

@@ -145,7 +145,7 @@ function isSafeInvoke(idecl: MIRInvokeDecl): boolean {
     return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe");
 }
 
-function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, implicitAssumesEnabled: boolean, errorTrgtPos: { file: string, line: number, pos: number }, callg: CallGInfo, safeinfo: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>): { safe: boolean, trgt: boolean } {
+function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, errorTrgtPos: { file: string, line: number, pos: number }, callg: CallGInfo, safeinfo: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>): { safe: boolean, trgt: boolean } {
     if(masm.primitiveInvokeDecls.has(ikey)) {
         const pinvk = masm.primitiveInvokeDecls.get(ikey) as MIRInvokePrimitiveDecl;
         const cn = callg.invokes.get(ikey) as CallGNode;
@@ -185,7 +185,7 @@ function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, implicitAssumesEnable
     }
 }
 
-function markSafeCalls(entryPoints: MIRInvokeKey[], masm: MIRAssembly, implicitAssumesEnabled: boolean, errorTrgtPos?: { file: string, line: number, pos: number }): Map<MIRInvokeKey, { safe: boolean, trgt: boolean }> {
+function markSafeCalls(entryPoints: MIRInvokeKey[], masm: MIRAssembly, errorTrgtPos?: { file: string, line: number, pos: number }): Map<MIRInvokeKey, { safe: boolean, trgt: boolean }> {
     const cginfo = constructCallGraphInfo(entryPoints, masm);
     const rcg = [...cginfo.topologicalOrder].reverse();
 
@@ -200,7 +200,7 @@ function markSafeCalls(entryPoints: MIRInvokeKey[], masm: MIRAssembly, implicitA
 
         while (worklist.length !== 0) {
             const ikey = worklist.pop() as string;
-            const issafe = isBodySafe(ikey, masm, implicitAssumesEnabled, etrgt, cginfo, safeinfo);
+            const issafe = isBodySafe(ikey, masm, etrgt, cginfo, safeinfo);
 
             const osafe = safeinfo.get(ikey);
             if(osafe === undefined || issafe.safe !== osafe.safe || issafe.trgt !== osafe.trgt) {

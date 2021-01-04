@@ -6,7 +6,7 @@
         "noImplicitReturns": true,
         "noImplicitThis": true,
         "noUnusedLocals": true,
-        "target": "es6",
+        "target": "es2020",
         "sourceMap": true,
         "outDir": "bin"
     },

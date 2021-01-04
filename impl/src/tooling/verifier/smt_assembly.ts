@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { BSQRegex } from "../../ast/bsqregex";
-import { SMTAxiom, SMTErrorAxiom, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
+import { SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 type SMT2FileInfo = {
     TYPE_TAG_DECLS: string[],
@@ -15,7 +15,10 @@ type SMT2FileInfo = {
     TUPLE_HAS_INDEX_DECLS: string[],
     RECORD_HAS_PROPERTY_DECLS: string[],
     KEY_TYPE_TAG_RANK: string[],
-    FP_TYPE_ALIAS: string[],
+    BINTEGRAL_TYPE_ALIAS: string[],
+    BINTEGRAL_CONSTANTS: string[],
+    BFLOATPOINT_TYPE_ALIAS: string[],
+    BFLOATPOINT_CONSTANTS: string[],
     STRING_TYPE_ALIAS: string,
     KEY_TUPLE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     KEY_RECORD_INFO: { decls: string[], constructors: string[], boxing: string[] },
@@ -196,8 +199,6 @@ class SMTAssembly {
     constantDecls: SMTConstantDecl[] = [];
     
     uninterpfunctions: SMTFunctionUninterpreted[] = [];
-    axioms: SMTAxiom[] = [];
-    errorproprs: SMTErrorAxiom[] = [];
 
     maskSizes: Set<number> = new Set<number>();
     resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[] = [];
@@ -205,6 +206,21 @@ class SMTAssembly {
 
     constructor(vopts: VerifierOptions) {
         this.vopts = vopts;
+    }
+
+    computeBVMinSigned(bits: bigint): string {
+        const bbn = 1n << bits;
+        return bbn.toString();
+    }
+
+    computeBVMaxSigned(bits: bigint): string {
+        const bbn = ~(1n << bits);
+        return bbn.toString();
+    }
+
+    computeBVMaxUnSigned(bits: bigint): string {
+        const bbn = (1n << bits) | ~(1n << bits);
+        return bbn.toString();
     }
 
     generateSMT2AssemblyInfo(): SMT2FileInfo {
@@ -219,6 +235,74 @@ class SMTAssembly {
         const propertyasserts = this.hasPropertyRelation.map((hp) => hp.value ? `(assert (HasProperty@ ${hp.pnametag} ${hp.atype}))` : `(assert (not (HasProperty@ ${hp.pnametag} ${hp.atype})))`).sort();
 
         const keytypeorder: string[] = [...this.keytypeTags].sort().map((ktt, i) => `(assert (= (TypeTagRank@ ${ktt}) ${i}))`);
+
+
+        let integral_type_alias: string[] = [
+            `(define-sort BInt () (_ BitVec ${this.vopts.ISize}))`,
+            `(define-sort BNat () (_ BitVec ${this.vopts.ISize}))`,
+            (this.vopts.BigXMode === "Int" ? "(define-sort BBigInt () Int)" : `(define-sort BBigInt () (_ BitVec ${2 * this.vopts.ISize}))`),
+            (this.vopts.BigXMode === "Int" ? "(define-sort BBigNat () Int)" : `(define-sort BBigNat () (_ BitVec ${2 * this.vopts.ISize}))`)
+        ];
+        let integral_constants: string[] = [
+            `(declare-const BInt@zero BInt) (assert (= BInt@zero (_ bv0 ${this.vopts.ISize})))`,
+            `(declare-const BInt@one BInt) (assert (= BInt@one (_ bv1 ${this.vopts.ISize})))`,
+            `(declare-const BInt@min BInt) (assert (= BInt@min (_ bv${this.computeBVMinSigned(BigInt(this.vopts.ISize))} ${this.vopts.ISize})))`,
+            `(declare-const BInt@max BInt) (assert (= BInt@max (_ bv${this.computeBVMaxSigned(BigInt(this.vopts.ISize))} ${this.vopts.ISize})))`,
+
+            `(declare-const BNat@zero BNat) (assert (= BNat@zero (_ bv0 ${this.vopts.ISize})))`,
+            `(declare-const BNat@one BNat) (assert (= BNat@one (_ bv1 ${this.vopts.ISize})))`,
+            `(declare-const BNat@min BNat) (assert (= BNat@min BNat@zero))`,
+            `(declare-const BNat@max BNat) (assert (= BNat@max (_ bv${this.computeBVMaxUnSigned(BigInt(this.vopts.ISize))} ${this.vopts.ISize})))`
+        ];
+        if(this.vopts.BigXMode === "Int") {
+            integral_constants.push(`(declare-const BBigInt@zero BBigInt) (assert (= BBigInt@zero 0))`);
+            integral_constants.push(`(declare-const BBigInt@one BBigInt) (assert (= BBigInt@one 1))`);
+
+            integral_constants.push(`(declare-const BBigNat@zero BBigNat) (assert (= BBigNat@zero 0))`);
+            integral_constants.push(`(declare-const BBigNat@one BBigNat) (assert (= BBigNat@one 1))`);
+        }
+        else {
+            integral_constants.push(`(declare-const BBigInt@zero BBigInt) (assert (= BBigInt@zero (_ bv0 ${2 * this.vopts.ISize})))`);
+            integral_constants.push(`(declare-const BBigInt@one BBigInt) (assert (= BBigInt@one (_ bv1 ${2 * this.vopts.ISize})))`);
+
+            integral_constants.push(`(declare-const BBigNat@zero BBigNat) (assert (= BBigNat@zero (_ bv0 ${2 * this.vopts.ISize})))`);
+            integral_constants.push(`(declare-const BBigNat@one BBigNat) (assert (= BBigNat@one (_ bv1 ${2 * this.vopts.ISize})))`);
+        }
+
+        let float_type_alias: string[] = [];
+        let float_constants: string[] = [];
+        if(this.vopts.FPOpt === "Real") {
+            float_type_alias.push("(define-sort BFloat () Float)", "(define-sort BDecimal () Float)", "(define-sort BRational () Float)");
+
+            float_constants.push(`(declare-const BFloat@zero BFloat) (assert (= BFloat@zero 0.0))`);
+            float_constants.push(`(declare-const BFloat@one BFloat) (assert (= BFloat@one 1.0))`);
+            float_constants.push(`(declare-const BFloat@pi BFloat) (assert (= BFloat@pi 3.141592653589793))`);
+            float_constants.push(`(declare-const BFloat@e BFloat) (assert (= BFloat@e 2.718281828459045))`);
+
+            float_constants.push(`(declare-const BDecimal@zero BDecimal) (assert (= BDecimal@zero 0.0))`);
+            float_constants.push(`(declare-const BDecimal@one BDecimal) (assert (= BDecimal@one 1.0))`);
+            float_constants.push(`(declare-const BDecimal@pi BDecimal) (assert (= BDecimal@pi 3.141592653589793))`);
+            float_constants.push(`(declare-const BDecimal@e BDecimal) (assert (= BDecimal@e 2.718281828459045))`);
+
+            float_constants.push(`(declare-const BRational@zero BRational) (assert (= BRational@zero 0.0))`);
+            float_constants.push(`(declare-const BRational@one BRational) (assert (= BRational@one 1.0))`);
+        }
+        else {
+            float_type_alias.push("(define-sort BFloat () UFloat)", "(define-sort BDecimal () UFloat)", "(define-sort BRational () UFloat)");
+
+            float_constants.push(`(declare-const BFloat@zero BFloat) (assert (= BFloat@zero (BFloatCons_UF "0.0")))`);
+            float_constants.push(`(declare-const BFloat@one BFloat) (assert (= BFloat@one (BFloatCons_UF "1.0")))`);
+            float_constants.push(`(declare-const BFloat@pi BFloat) (assert (= BFloat@pi (BFloatCons_UF "3.141592653589793")))`);
+            float_constants.push(`(declare-const BFloat@e BFloat) (assert (= BFloat@e (BFloatCons_UF "2.718281828459045")))`);
+
+            float_constants.push(`(declare-const BDecimal@zero BDecimal) (assert (= BDecimal@zero (BDecimalCons_UF "0.0")))`);
+            float_constants.push(`(declare-const BDecimal@one BDecimal) (assert (= BDecimal@one (BDecimalCons_UF "1.0")))`);
+            float_constants.push(`(declare-const BDecimal@pi BDecimal) (assert (= BDecimal@pi (BDecimalCons_UF "3.141592653589793")))`);
+            float_constants.push(`(declare-const BDecimal@e BDecimal) (assert (= BDecimal@e (BDecimalCons_UF "2.718281828459045")))`);
+
+            float_constants.push(`(declare-const BRational@zero BRational) (assert (= BRational@zero (BRationalCons_UF "0/1")))`);
+            float_constants.push(`(declare-const BRational@one BRational) (assert (= BRational@one (BRationalCons_UF "1/1")))`);
+        }
 
         const keytupleinfo = this.tupleDecls
             .filter((tt) => tt.iskeytype)
@@ -352,8 +436,11 @@ class SMTAssembly {
             TUPLE_HAS_INDEX_DECLS: indexasserts,
             RECORD_HAS_PROPERTY_DECLS: propertyasserts,
             KEY_TYPE_TAG_RANK: keytypeorder,
-            FP_TYPE_ALIAS: (this.level === "Strong" ? ["(define-sort BFloat () UFloat)", "(define-sort BDecimal () UFloat)", "(define-sort BRational () UFloat)"] : ["(define-sort BFloat () Float)", "(define-sort BDecimal () Float)", "(define-sort BRational () Float)"]),
-            STRING_TYPE_ALIAS: (this.level === "Strong" ? "(define-sort BString () (Seq (_ BitVec 64)))" : "(define-sort BString () String)"),
+            BINTEGRAL_TYPE_ALIAS: integral_type_alias,
+            BINTEGRAL_CONSTANTS: integral_constants,
+            BFLOATPOINT_TYPE_ALIAS: float_type_alias,
+            BFLOATPOINT_CONSTANTS: float_constants,
+            STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 32)))" : "(define-sort BString () String)"),
             KEY_TUPLE_INFO: { decls: keytupleinfo.map((kti) => kti.decl), constructors: keytupleinfo.map((kti) => kti.consf), boxing: keytupleinfo.map((kti) => kti.boxf) },
             KEY_RECORD_INFO: { decls: keyrecordinfo.map((kti) => kti.decl), constructors: keyrecordinfo.map((kti) => kti.consf), boxing: keyrecordinfo.map((kti) => kti.boxf) },
             KEY_TYPE_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf), boxing: keytypeinfo.map((kti) => kti.boxf) },
