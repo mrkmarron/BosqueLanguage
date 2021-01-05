@@ -3199,6 +3199,11 @@ class TypeChecker {
                 return [fkey, upd[1], upd[2]] as [MIRFieldKey, ResolvedType, MIRArgument];
             });
 
+            //
+            //TODO: This is a tiny bit messy as the update calls the constructor which can call default initializers and invariant check code
+            //      This is potentially recursive but it won't show up now -- do we want to add recursive annotations here or is there a better idea??
+            //      Maybe require all default params and invariant checks be non-recursive? -- offhand I favor this option since I don't think you want these to be expensive (overly complex) anyway -- same with other default values (but not pre/post conds).
+            //
             this.m_emitter.emitEntityUpdate(op.sinfo, arg, this.m_emitter.registerResolvedTypeReference(texp.layout), this.m_emitter.registerResolvedTypeReference(texp.flowtype), updateinfo, !texp.flowtype.isUniqueRecordTargetType(), trgt);
 
             return env.setUniformResultExpression(texp.flowtype);

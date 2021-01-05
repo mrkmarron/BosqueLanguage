@@ -31,7 +31,6 @@ type SMT2FileInfo = {
     MASK_INFO: { decls: string[], constructors: string[] },
     GLOBAL_DECLS: string[],
     UF_DECLS: string[],
-    AXIOM_DECLS: string[],
     FUNCTION_DECLS: string[],
     GLOBAL_DEFINITIONS: string[]
 };
@@ -151,13 +150,11 @@ class SMTRecordDecl {
 
 class SMTEphemeralListDecl {
     readonly smtname: string;
-    readonly typetag: string;
 
     readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
 
-    constructor(smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }) {
+    constructor(smtname: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }) {
         this.smtname = smtname;
-        this.typetag = typetag;
         this.consf = consf;
     }
 }
@@ -184,6 +181,7 @@ class SMTAssembly {
     recordDecls: SMTRecordDecl[] = [];
     ephemeralDecls: SMTEphemeralListDecl[] = [];
 
+    typeTags: string[] = [];
     abstractTypes: string[] = [];
     indexTags: string[] = [];
     propertyTags: string[] = [];
@@ -224,18 +222,11 @@ class SMTAssembly {
     }
 
     generateSMT2AssemblyInfo(): SMT2FileInfo {
-        const TYPE_TAG_DECLS = [
-            ...this.entityDecls.map((ed) => ed.typetag),
-            ...this.tupleDecls.map((ed) => ed.typetag),
-            ...this.recordDecls.map((ed) => ed.typetag)
-        ].sort();
-
         const subtypeasserts = this.subtypeRelation.map((tc) => tc.value ? `(assert (SubtypeOf@ ${tc.ttype} ${tc.atype}))` : `(assert (not (SubtypeOf@ ${tc.ttype} ${tc.atype})))`).sort();
         const indexasserts = this.hasIndexRelation.map((hi) => hi.value ? `(assert (HasIndex@ ${hi.idxtag} ${hi.atype}))` : `(assert (not (HasIndex@ ${hi.idxtag} ${hi.atype})))`).sort();
         const propertyasserts = this.hasPropertyRelation.map((hp) => hp.value ? `(assert (HasProperty@ ${hp.pnametag} ${hp.atype}))` : `(assert (not (HasProperty@ ${hp.pnametag} ${hp.atype})))`).sort();
 
         const keytypeorder: string[] = [...this.keytypeTags].sort().map((ktt, i) => `(assert (= (TypeTagRank@ ${ktt}) ${i}))`);
-
 
         let integral_type_alias: string[] = [
             `(define-sort BInt () (_ BitVec ${this.vopts.ISize}))`,
@@ -416,22 +407,17 @@ class SMTAssembly {
 
         const ufdecls = this.uninterpfunctions
             .sort((uf1, uf2) => uf1.fname.localeCompare(uf2.fname))
-            .map((uf) => `()`);
-
-        const axioms = [
-            ...this.axioms.sort((ax1, ax2) => ax1.identifier.localeCompare(ax2.identifier)).map((ax) => ax.emitSMT2()),
-            ...this.errorproprs.sort((ep1, ep2) => ep1.identifier.localeCompare(ep2.identifier)).map((ep) => ep.emitSMT2())
-        ];
+            .map((uf) => `(declare-fun ${uf.fname} (${uf.args.map((arg) => arg.name)}) ${uf.result})`);
 
         const gdefs = this.constantDecls
             .sort((c1, c2) => c1.gkey.localeCompare(c2.gkey))
             .map((c) => `(assert (= ${c.gkey} ${c.consf}))`);
 
         return {
-            TYPE_TAG_DECLS,
-            ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes,
-            INDEX_TAG_DECLS: this.indexTags,
-            PROPERTY_TAG_DECLS: this.propertyTags,
+            TYPE_TAG_DECLS: this.typeTags.sort(),
+            ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes.sort(),
+            INDEX_TAG_DECLS: this.indexTags.sort(),
+            PROPERTY_TAG_DECLS: this.propertyTags.sort(),
             SUBTYPE_DECLS: subtypeasserts,
             TUPLE_HAS_INDEX_DECLS: indexasserts,
             RECORD_HAS_PROPERTY_DECLS: propertyasserts,
@@ -452,7 +438,6 @@ class SMTAssembly {
             MASK_INFO: { decls: maskinfo.map((mi) => mi.decl), constructors: maskinfo.map((mi) => mi.consf) },
             GLOBAL_DECLS: gdecls,
             UF_DECLS: ufdecls,
-            AXIOM_DECLS: axioms,
             FUNCTION_DECLS: this.functions.map((f) => f.emitSMT2()),
             GLOBAL_DEFINITIONS: gdefs
         };

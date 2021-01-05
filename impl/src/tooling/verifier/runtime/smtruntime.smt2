@@ -157,8 +157,8 @@
       (bsqkey_bigint@cons (bsqkey_bigint_value BBigInt))
       (bsqkey_bignat@cons (bsqkey_bignat_value BBigNat))
       (bsqkey_string@cons (bsqkey_string_value BString))
-      (bsqkey_isotime@cons (bsqkey_isotime_value Int))
-      (bsqkey_logicaltime@cons (bsqkey_logicaltime_value Int))
+      (bsqkey_isotime@cons (bsqkey_isotime_value BBigNat))
+      (bsqkey_logicaltime@cons (bsqkey_logicaltime_value BBigNat))
       ;;KEY_TUPLE_TYPE_BOXING;;
       ;;KEY_RECORD_TYPE_BOXING;;
       ;;KEY_TYPE_BOXING;;

@@ -187,7 +187,7 @@ class SMTBodyEmitter {
         return `$VirtualOperator_${rnames}_${this.typegen.mangle(resulttype.trkey)}`;
     }
 
-    private generateLoadTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
+    generateLoadTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, idx: number, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
         const ttuples = [...this.assembly.tupleDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -220,7 +220,7 @@ class SMTBodyEmitter {
         }
     }
 
-    private generateLoadRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
+    generateLoadRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, pname: string, resulttype: MIRType, guard: MIRGuard | undefined }): SMTFunction {
         const trecords = [...this.assembly.recordDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -253,7 +253,7 @@ class SMTBodyEmitter {
         }
     }
 
-    private generateLoadEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, field: MIRFieldDecl, resulttype: MIRType }): SMTFunction {
+    generateLoadEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, field: MIRFieldDecl, resulttype: MIRType }): SMTFunction {
         const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].tkey);
@@ -278,7 +278,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateProjectTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }): SMTFunction {
+    generateProjectTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, indecies: number[], resulttype: MIRType }): SMTFunction {
         const ttuples = [...this.assembly.tupleDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -307,7 +307,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateProjectRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }): SMTFunction {
+    generateProjectRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, properties: string[], resulttype: MIRType }): SMTFunction {
         const trecords = [...this.assembly.recordDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -336,7 +336,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateProjectEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }): SMTFunction {
+    generateProjectEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, fields: MIRFieldDecl[], resulttype: MIRType }): SMTFunction {
         const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].tkey);
@@ -365,7 +365,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateUpdateTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+    generateUpdateTupleIndexVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [number, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
         const ttuples = [...this.assembly.tupleDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -407,7 +407,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateUpdateRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+    generateUpdateRecordPropertyVirtual(geninfo: { inv: string, argflowtype: MIRType, updates: [string, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
         const trecords = [...this.assembly.recordDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].trkey);
@@ -448,7 +448,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateUpdateEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, allsafe: boolean, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
+    generateUpdateEntityFieldVirtual(geninfo: { inv: string, argflowtype: MIRType, allsafe: boolean, updates: [MIRFieldKey, MIRResolvedTypeKey][], resulttype: MIRType }): SMTFunction {
         const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].tkey);
@@ -517,7 +517,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateVirtualFunctionInvoke(geninfo: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }): SMTFunction {
+    generateVirtualFunctionInvoke(geninfo: { inv: string, allsafe: boolean, argflowtype: MIRType, vfname: MIRVirtualMethodKey, optmask: string | undefined, resulttype: MIRType }): SMTFunction {
         const tentities = [...this.assembly.entityDecls]
             .filter((tt) => {
                 const mtt = this.typegen.getMIRType(tt[1].tkey);
@@ -581,7 +581,7 @@ class SMTBodyEmitter {
         return new SMTFunction(geninfo.inv, fargs, undefined, rtype, new SMTCond(ops, orelse));
     }
 
-    private generateVirtualOperatorInvoke(geninfo: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }): SMTFunction {
+    generateVirtualOperatorInvoke(geninfo: { inv: string, argflowtype: MIRType, opname: MIRVirtualMethodKey, args: MIRResolvedTypeKey[], resulttype: MIRType }): SMTFunction {
         //const otrgts = this.assembly.virtualOperatorDecls.get(geninfo.opname) as MIRInvokeKey[];
 
         return new SMTFunction("NOT_IMPLEMENTED", [], undefined, this.typegen.getSMTTypeFor(geninfo.resulttype), NOT_IMPLEMENTED("generateVirtualOperatorInvoke"));
@@ -2131,10 +2131,14 @@ class SMTBodyEmitter {
         return smtexps.get("entry") as SMTExp;
     }
 
-    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>): SMTFunction | SMTFunctionUninterpreted | undefined {
+    generateSMTInvoke(idecl: MIRInvokeDecl, cscc: Set<string>, gas: number | undefined, gasdown: number | undefined): SMTFunction | SMTFunctionUninterpreted | undefined {
         this.currentFile = idecl.srcFile;
         this.currentRType = this.typegen.getMIRType(idecl.resultType);
         this.currentSCC = cscc;
+
+        //
+        //TODO: handle gas for recursive calls!!!
+        //
 
         const args = idecl.params.map((arg) => {
             return { vname: this.varStringToSMT(arg.name).vname, vtype: this.typegen.getSMTTypeFor(this.typegen.getMIRType(arg.type)) };

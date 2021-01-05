@@ -55,6 +55,10 @@ class SMTTypeEmitter {
         return tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType);
     }
 
+    isUniqueType(tt: MIRType): boolean {
+        return this.isUniqueTupleType(tt) || this.isUniqueRecordType(tt) || this.isUniqueEntityType(tt) || this.isUniqueEphemeralType(tt);
+    }
+
     getSMTTypeFor(tt: MIRType): SMTType {
         if (this.isType(tt, "NSCore::None")) {
             return new SMTType("bsq_none");
@@ -443,48 +447,6 @@ class SMTTypeEmitter {
             else {
                 return this.coerceFromAtomicToKey(exp, from);
             }
-        }
-    }
-
-    isSpecialReprEntity(tt: MIRType): boolean {
-        if (this.isType(tt, "NSCore::None")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Bool")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Int")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Nat")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::BigInt")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::BigNat")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Float")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Decimal")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Rational")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Complex")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::String")) {
-            return true;
-        }
-        else if (this.isType(tt, "NSCore::Regex")) {
-            return true;
-        }
-        else {
-            return false;
         }
     }
 
