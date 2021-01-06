@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { BSQRegex } from "../../ast/bsqregex";
-import { SMTExp, SMTType, VerifierOptions } from "./smt_exp";
+import { SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 type SMT2FileInfo = {
     TYPE_TAG_DECLS: string[],
@@ -32,7 +32,8 @@ type SMT2FileInfo = {
     GLOBAL_DECLS: string[],
     UF_DECLS: string[],
     FUNCTION_DECLS: string[],
-    GLOBAL_DEFINITIONS: string[]
+    GLOBAL_DEFINITIONS: string[],
+    ACTION: string[]
 };
 
 class SMTFunction {
@@ -86,9 +87,7 @@ class SMTEntityDecl {
     readonly boxf: string;
     readonly ubf: string;
 
-    readonly invfunc: string | undefined;
-
-    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string, invfunc: string | undefined) {
+    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
         this.iskeytype = iskeytype;
         this.isapitype = isapitype;
 
@@ -97,8 +96,6 @@ class SMTEntityDecl {
         this.consf = consf;
         this.boxf = boxf;
         this.ubf = ubf;
-
-        this.invfunc = invfunc;
     }
 }
 
@@ -173,6 +170,20 @@ class SMTConstantDecl {
     }
 }
 
+class SMTModelState {
+    readonly arginits: { vname: string, vtype: SMTType, vinit: SMTExp }[];
+    readonly argchk: SMTExp[] | undefined;
+    readonly checktype: SMTType;
+    readonly fcheck: SMTExp;
+
+    constructor(arginits: { vname: string, vtype: SMTType, vinit: SMTExp }[], argchk: SMTExp[] | undefined, checktype: SMTType, echeck: SMTExp) {
+        this.arginits = arginits;
+        this.argchk = argchk;
+        this.checktype = checktype;
+        this.fcheck = echeck;
+    }
+}
+
 class SMTAssembly {
     readonly vopts: VerifierOptions;
     
@@ -202,6 +213,9 @@ class SMTAssembly {
     resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[] = [];
     functions: SMTFunction[] = [];
 
+    model: SMTModelState = new SMTModelState([], undefined, new SMTType("[UNINIT]"), new SMTConst("bsq_none@literal"));
+    modes: { refute: SMTExp, generate: SMTExp, evaluate: [string, SMTExp] } = { refute: new SMTConst("bsq_none@literal"), generate: new SMTConst("bsq_none@literal"), evaluate: ["[INVALID]", new SMTConst("bsq_none@literal")] };
+
     constructor(vopts: VerifierOptions) {
         this.vopts = vopts;
     }
@@ -221,7 +235,7 @@ class SMTAssembly {
         return bbn.toString();
     }
 
-    generateSMT2AssemblyInfo(): SMT2FileInfo {
+    generateSMT2AssemblyInfo(mode: "Refute" | "Generate" | "Evaluate"): SMT2FileInfo {
         const subtypeasserts = this.subtypeRelation.map((tc) => tc.value ? `(assert (SubtypeOf@ ${tc.ttype} ${tc.atype}))` : `(assert (not (SubtypeOf@ ${tc.ttype} ${tc.atype})))`).sort();
         const indexasserts = this.hasIndexRelation.map((hi) => hi.value ? `(assert (HasIndex@ ${hi.idxtag} ${hi.atype}))` : `(assert (not (HasIndex@ ${hi.idxtag} ${hi.atype})))`).sort();
         const propertyasserts = this.hasPropertyRelation.map((hp) => hp.value ? `(assert (HasProperty@ ${hp.pnametag} ${hp.atype}))` : `(assert (not (HasProperty@ ${hp.pnametag} ${hp.atype})))`).sort();
@@ -413,6 +427,39 @@ class SMTAssembly {
             .sort((c1, c2) => c1.gkey.localeCompare(c2.gkey))
             .map((c) => `(assert (= ${c.gkey} ${c.consf}))`);
 
+        let action: string[] = [];
+        this.model.arginits.map((iarg) => {
+            action.push(`(declare-const ${iarg.vname} ${iarg.vtype.name})`);
+            action.push(`(assert (= ${iarg.vname} ${iarg.vinit}))`);
+        });
+
+        if(this.model.argchk !== undefined) {
+            action.push(...this.model.argchk.map((chk) => `(assert ${chk.emitSMT2(undefined)})`));
+        }
+
+        if(mode === "Refute") {
+            action.push(`(declare-const @smtres@ ${this.model.checktype})`);
+            action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
+
+            action.push(`(assert ${this.modes.refute.emitSMT2(undefined)}`);
+            action.push("(check-sat)");
+        }
+        else if (mode === "Generate") {
+            action.push(`(declare-const @smtres@ ${this.model.checktype})`);
+            action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
+
+            action.push(`(assert ${this.modes.generate.emitSMT2(undefined)}`);
+            action.push("(check-sat)");
+            action.push("(get-model");
+        }
+        else {
+            action.push("(check-sat)");
+            action.push("(get-model");
+
+            action.push(`(echo "evaluating ${this.modes.evaluate[0]}..."`);
+            action.push(`eval ${this.modes.evaluate[1].emitSMT2(undefined)}`);
+        }
+
         return {
             TYPE_TAG_DECLS: this.typeTags.sort(),
             ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes.sort(),
@@ -439,7 +486,8 @@ class SMTAssembly {
             GLOBAL_DECLS: gdecls,
             UF_DECLS: ufdecls,
             FUNCTION_DECLS: this.functions.map((f) => f.emitSMT2()),
-            GLOBAL_DEFINITIONS: gdefs
+            GLOBAL_DEFINITIONS: gdefs,
+            ACTION: action
         };
     }
 }
@@ -448,6 +496,6 @@ export {
     SMTEntityDecl, SMTTupleDecl, SMTRecordDecl, SMTEphemeralListDecl,
     SMTConstantDecl,
     SMTFunction, SMTFunctionUninterpreted,
-    SMTAssembly,
+    SMTAssembly, SMTModelState,
     SMT2FileInfo
 };

@@ -1763,7 +1763,6 @@ class Assembly {
     getSpecialBigIntType(): ResolvedType { return this.internSpecialObjectType(["BigInt"]); }
     getSpecialBigNatType(): ResolvedType { return this.internSpecialObjectType(["BigNat"]); }
     getSpecialRationalType(): ResolvedType { return this.internSpecialObjectType(["Rational"]); }
-    getSpecialComplexType(): ResolvedType { return this.internSpecialObjectType(["Complex"]); }
     getSpecialFloatType(): ResolvedType { return this.internSpecialObjectType(["Float"]); }
     getSpecialDecimalType(): ResolvedType { return this.internSpecialObjectType(["Decimal"]); }
     getSpecialStringType(): ResolvedType { return this.internSpecialObjectType(["String"]); }

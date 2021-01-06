@@ -44,6 +44,8 @@ class SMTBodyEmitter {
     requiredCollectionConstructors_Operational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
     requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
 
+    requiredISequenceConstructors: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
+
     //!!!
     //See the methods generateLoadTupleIndexVirtual, generateLoadTupleIndexVirtual, etc for processing the entries in these arrays
     //!!!
@@ -2170,7 +2172,7 @@ class SMTBodyEmitter {
         });
 
         const issafe = this.isSafeInvoke(idecl.key);
-        //const smtencltype = this.typegen.mangle(idecl.enclosingDecl !== undefined ? idecl.enclosingDecl : "[TOP LEVEL]");
+        const mirencltype = idecl.enclosingDecl !== undefined ? idecl.enclosingDecl : "NSCore::None";
 
         const mirbooltype = this.typegen.getMIRType("NSCore::Bool");
         const mirnattype = this.typegen.getMIRType("NSCore::Nat");
@@ -2345,7 +2347,10 @@ class SMTBodyEmitter {
                     return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTConst("ISequence@empty")));
                 }
                 else {
-                    const fcons = `@@cons_${smtrestype.name}_ISequence`;
+                    const fcons = `ISequence@@cons_${args[0].vtype.name}_using_${(idecl.pcodes.get("p") as MIRPCode).code}`;
+                    if (this.requiredISequenceConstructors.find((isc) => isc.cname === fcons) === undefined) {
+                        this.requiredISequenceConstructors.push({ cname: fcons, oftype: mirencltype, implkey: idecl.implkey });
+                    }
                     
                     const argsize = this.generateTempName();
                     const cvar = this.generateTempName();

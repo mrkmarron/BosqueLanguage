@@ -23,8 +23,6 @@
     TypeTag_Decimal
     TypeTag_Rational
     TypeTag_String
-    TypeTag_IsoTime
-    TypeTag_LogicalTime
     TypeTag_Regex
     ;;TYPE_TAG_DECLS;;
   )
@@ -157,8 +155,6 @@
       (bsqkey_bigint@cons (bsqkey_bigint_value BBigInt))
       (bsqkey_bignat@cons (bsqkey_bignat_value BBigNat))
       (bsqkey_string@cons (bsqkey_string_value BString))
-      (bsqkey_isotime@cons (bsqkey_isotime_value BBigNat))
-      (bsqkey_logicaltime@cons (bsqkey_logicaltime_value BBigNat))
       ;;KEY_TUPLE_TYPE_BOXING;;
       ;;KEY_RECORD_TYPE_BOXING;;
       ;;KEY_TYPE_BOXING;;
@@ -191,14 +187,6 @@
 
 (define-fun bsqkey_bignat@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
   (bvult (bsqkey_bignat_value k1) (bsqkey_bignat_value k2))
-)
-
-(define-fun bsqkey_isotime@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_isotime_value k1) (bsqkey_isotime_value k2))
-)
-
-(define-fun bsqkey_logicaltime@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
-  (< (bsqkey_logicaltime_value k1) (bsqkey_logicaltime_value k2))
 )
 
 (define-fun bsqkey_string@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
@@ -285,3 +273,5 @@
 ;;FUNCTION_DECLS;;
 
 ;;GLOBAL_DEFINITIONS;;
+
+;;ACTION;;

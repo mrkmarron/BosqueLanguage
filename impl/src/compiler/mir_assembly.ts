@@ -236,7 +236,7 @@ abstract class MIROOTypeDecl {
             return new MIRConceptTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides);
         }
         else {
-            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides, jobj.consfunc, jobj.consfuncfields, jobj.invfunc, jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.specialDecls, jobj.specialTemplateInfo);
+            const entity = new MIREntityTypeDecl(jobj.ooname, jparsesinfo(jobj.sinfo), jobj.file, jobj.tkey, jobj.attributes, jobj.ns, jobj.name, terms, jobj.provides, jobj.consfunc, jobj.consfuncfields, jobj.fields.map((f: any) => MIRFieldDecl.jparse(f)), jobj.specialDecls, jobj.specialTemplateInfo);
             jobj.vcallMap.forEach((vc: any) => entity.vcallMap.set(vc[0], vc[1]));
             return entity;
         }
@@ -279,7 +279,6 @@ enum MIRSpecialTypeCategory {
 
 class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly consfunc: MIRInvokeKey;
-    readonly invfunc: MIRInvokeKey | undefined;
 
     readonly consfuncfields: MIRFieldKey[];
 
@@ -289,11 +288,10 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly specialDecls: Set<MIRSpecialTypeCategory>;
     readonly specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined;
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, consfuncfields: MIRFieldKey[], invfunc: MIRInvokeKey | undefined, fields: MIRFieldDecl[], specialDecls: MIRSpecialTypeCategory[], specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, consfuncfields: MIRFieldKey[], fields: MIRFieldDecl[], specialDecls: MIRSpecialTypeCategory[], specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined) {
         super(ooname, srcInfo, srcFile, tkey, attributes, ns, name, terms, provides);
 
         this.consfunc = consfunc;
-        this.invfunc = invfunc;
 
         this.consfuncfields = consfuncfields;
 
@@ -304,7 +302,7 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     }
 
     jemit(): object {
-        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, consfunc: this.consfunc, consfuncfields: this.consfuncfields, invfunc: this.invfunc, fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], specialDecls: [...this.specialDecls], specialTemplateInfo: this.specialTemplateInfo };
+        return { isentity: true, ooname: this.ooname, tkey: this.tkey, sinfo: jemitsinfo(this.sourceLocation), file: this.srcFile, attributes: this.attributes, ns: this.ns, name: this.name, terms: [...this.terms].map((t) => [t[0], t[1].jemit()]), provides: this.provides, consfunc: this.consfunc, consfuncfields: this.consfuncfields, fields: this.fields.map((f) => f.jemit()), vcallMap: [...this.vcallMap], specialDecls: [...this.specialDecls], specialTemplateInfo: this.specialTemplateInfo };
     }
 
     isTypeAListEntity(): boolean {

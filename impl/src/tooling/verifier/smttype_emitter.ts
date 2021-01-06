@@ -87,17 +87,8 @@ class SMTTypeEmitter {
         else if (this.isType(tt, "NSCore::Rational")) {
             return new SMTType("BRational");
         }
-        else if (this.isType(tt, "NSCore::Complex")) {
-            return new SMTType("BComplex");
-        }
         else if (this.isType(tt, "NSCore::String")) {
             return new SMTType("BString");
-        }
-        else if (this.isType(tt, "NSCore::ISOTime")) {
-            return new SMTType("bsq_isotime");
-        }
-        else if (this.isType(tt, "NSCore::LogicalTime")) {
-            return new SMTType("bsq_logicaltime");
         }
         else if (this.isType(tt, "NSCore::Regex")) {
             return new SMTType("bsq_regex");
@@ -125,7 +116,7 @@ class SMTTypeEmitter {
     getSMTTypeTag(tt: MIRType): string {
         assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
             || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") 
-            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational") || this.isType(tt, "NSCore::Complex")
+            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational")
             || this.isType(tt, "NSCore::String") || this.isType(tt, "NSCore::Regex")), "Special types should be tagged in special ways");
 
 
@@ -156,9 +147,6 @@ class SMTTypeEmitter {
         else if (this.isType(tt, "NSCore::Rational")) {
             return "TypeTag_Rational";
         }
-        else if (this.isType(tt, "NSCore::Complex")) {
-            return "TypeTag_Complex";
-        }
         else if (this.isType(tt, "NSCore::String")) {
             return "TypeTag_String";
         }
@@ -180,7 +168,7 @@ class SMTTypeEmitter {
     getSMTConstructorName(tt: MIRType): { cons: string, box: string, bfield: string } {
         assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
             || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") 
-            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational") || this.isType(tt, "NSCore::Complex")
+            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational")
             || this.isType(tt, "NSCore::String") || this.isType(tt, "NSCore::Regex")), "Special types should be constructed in special ways");
 
 
@@ -234,14 +222,6 @@ class SMTTypeEmitter {
                 objval = new SMTCallSimple("bsqkey_string@cons", [exp]);
                 typetag = "TypeTag_String";
             }
-            else if (this.isType(from, "NSCore::ISOTime")) {
-                objval = new SMTCallSimple("bsqkey_isotime@cons", [exp]);
-                typetag = "TypeTag_IsoTime";
-            }
-            else if (this.isType(from, "NSCore::LogicalTime")) {
-                objval = new SMTCallSimple("bsqkey_logicaltime@cons", [exp]);
-                typetag = "TypeTag_LogicalTime";
-            }
             else if (this.isUniqueTupleType(from)) {
                 objval = new SMTCallSimple(this.getSMTConstructorName(from).box, [exp]);
                 typetag = this.getSMTTypeTag(from);
@@ -284,10 +264,6 @@ class SMTTypeEmitter {
                 else if (this.isType(from, "NSCore::Rational")) {
                     objval = new SMTCallSimple("bsq_rational@cons", [exp]);
                     typetag = "TypeTag_Rational";
-                }
-                else if (this.isType(from, "NSCore::Complex")) {
-                    objval = new SMTCallSimple("bsq_complex@cons", [exp]);
-                    typetag = "TypeTag_Complex";
                 }
                 else if (this.isType(from, "NSCore::Regex")) {
                     objval = new SMTCallSimple("bsq_regex@cons", [exp]);
@@ -335,12 +311,6 @@ class SMTTypeEmitter {
             else if (this.isType(into, "NSCore::BigNat")) {
                 return new SMTCallSimple("bsqkey_bignat_value", [oexp]);
             }
-            else if (this.isType(into, "NSCore::ISOTime")) {
-                return new SMTCallSimple("bsqkey_isotime_value", [oexp]);
-            }
-            else if (this.isType(into, "NSCore::LogicalTime")) {
-                return new SMTCallSimple("bsqkey_logicaltime_value", [oexp]);
-            }
             else if (this.isType(into, "NSCore::String")) {
                 return new SMTCallSimple("bsqkey_string_value", [oexp]);
             }
@@ -377,9 +347,6 @@ class SMTTypeEmitter {
                 }
                 else if (this.isType(into, "NSCore::Rational")) {
                     return new SMTCallSimple("bsqobject_rational_value", [oexp]);
-                }
-                else if (this.isType(into, "NSCore::Complex")) {
-                    return new SMTCallSimple("bsqobject_complex_value", [oexp]);
                 }
                 else if (this.isType(into, "NSCore::Regex")) {
                     return new SMTCallSimple("bsqobject_regex_value", [oexp]);

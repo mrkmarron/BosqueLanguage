@@ -4128,6 +4128,7 @@ class Parser {
                 return [ename, dvalue];
             })[0];
 
+            xxxx;
             const cparam = new FunctionParameter("v", oftype, false, undefined, undefined, undefined);
             const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "enum_create");
             const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_enum", "__safe"], "no", [], undefined, [cparam], undefined, undefined, simpleETypeResult, [], [], false, false, new Set<string>(), cbody);
@@ -4220,6 +4221,7 @@ class Parser {
         this.ensureAndConsumeToken("=");
         const idval = this.parseTypeSignature(false);
 
+        xxxx;
         const cparam = new FunctionParameter("v", idval, false, undefined, undefined, undefined);
         const cbody = new BodyImplementation(`${this.m_penv.getCurrentFile()}::${sinfo.pos}`, this.m_penv.getCurrentFile(), "typedecl_create");
         const createdecl = new InvokeDecl(sinfo, this.m_penv.getCurrentFile(), ["create_typedecl", "__safe"], "no", [], undefined, [cparam], undefined, undefined, itype, [], [], false, false, new Set<string>(), cbody);

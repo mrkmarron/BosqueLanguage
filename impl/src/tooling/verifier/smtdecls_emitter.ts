@@ -5,13 +5,13 @@
 
 import * as assert from "assert";
 
-import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIRInvokeDecl, MIRRecordType, MIRSpecialTypeCategory, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
+import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRRecordType, MIRSpecialTypeCategory, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { constructCallGraphInfo, markSafeCalls } from "../../compiler/mir_callg";
 import { MIRInvokeKey } from "../../compiler/mir_ops";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { SMTAssembly, SMTConstantDecl, SMTEphemeralListDecl, SMTFunction, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
-import { SMTExp, VerifierOptions } from "./smt_exp";
+import { SMTAssembly, SMTConstantDecl, SMTEphemeralListDecl, SMTFunction, SMTModelState, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
+import { SMTCallGeneral, SMTCallSimple, SMTConst, SMTExp, SMTLet, SMTVar, VerifierOptions } from "./smt_exp";
 
 const BuiltinEntityDeclNames = [
     "None",
@@ -44,7 +44,107 @@ class SMTEmitter {
         this.assembly = assembly;
     }
 
+    private generateAPITypeConstructorFunction_Primitive(tt: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        if (this.temitter.isType(tt, "NSCore::None")) {
+            return new SMTConst("bsq_none@literal");
+        }
+        else if (this.temitter.isType(tt, "NSCore::Bool")) {
+            return new SMTCallSimple("BBool@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::Int")) {
+            return new SMTCallSimple("BInt@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::Nat")) {
+            return new SMTCallSimple("BNat@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::BigInt")) {
+            return new SMTCallSimple("BBigInt@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::BigNat")) {
+            return new SMTCallSimple("BBigNat@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::Float")) {
+            return new SMTCallSimple("BFloat@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::Decimal")) {
+            return new SMTCallSimple("BDecimal@UFCons_API", [depthexp, widthexp]);
+        }
+        else if (this.temitter.isType(tt, "NSCore::Rational")) {
+            return new SMTCallSimple("BRational@UFCons_API", [depthexp, widthexp]);
+        }
+        else {
+            return new SMTCallSimple("BString@UFCons_API", [depthexp, widthexp]);
+        }
+    }
+
+    private generateAPITypeConstructorFunction_TypedNumber(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        const tdecl = this.bemitter.assembly.entityDecls.get(trgtType.trkey) as MIREntityTypeDecl;
+        
+        const mf = this.bemitter.assembly.fieldDecls.get("value") as MIRFieldDecl;
+        const cfun = tdecl.;
+    }
+
+    private generateAPITypeConstructorFunction_ValidatedString(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private generateAPITypeConstructorFunction_Tuple(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private generateAPITypeConstructorFunction_Record(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private generateAPITypeConstructorFunction_List(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private generateAPITypeConstructorFunction_Set(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private generateAPITypeConstructorFunction_Map(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
     private generateAPITypeConstructorFunction(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        xxxx;
+    }
+
+    private parseAPITypeConstructorFunction_Primitive(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+
+    }
+
+    private parseAPITypeConstructorFunction_TypedNumber(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_ValidatedString(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_Tuple(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_Record(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_List(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_Set(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPITypeConstructorFunction_Map(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        
+    }
+
+    private parseAPIType(trgtType: MIRType, arg: string): SMTExp {
         xxxx;
     }
 
@@ -115,15 +215,7 @@ class SMTEmitter {
         this.lastVInvokeIdx = this.bemitter.requiredUpdateVirtualEntity.length;
     }
 
-    static generateSMTAssembly(assembly: MIRAssembly, vopts: VerifierOptions, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey, maxgas: number): SMTAssembly {
-        const callsafety = markSafeCalls([entrypoint], assembly, errorTrgtPos);
-
-        const temitter = new SMTTypeEmitter(assembly, vopts);
-        const bemitter = new SMTBodyEmitter(assembly, temitter, vopts, callsafety, errorTrgtPos);
-        const smtassembly = new SMTAssembly(vopts);
-
-        let smtemit = new SMTEmitter(temitter, bemitter, smtassembly);
-
+    private initializeSMTAssembly(assembly: MIRAssembly, entrypoint: MIRInvokeKey, callsafety: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>, maxgas: number) {
         let doneset = new Set<MIRInvokeKey>();
         const cginfo = constructCallGraphInfo([entrypoint], assembly);
         const rcg = [...cginfo.topologicalOrder].reverse();
@@ -154,22 +246,22 @@ class SMTEmitter {
                     }
 
                     const idcl = (assembly.invokeDecls.get(ikey) || assembly.primitiveInvokeDecls.get(ikey)) as MIRInvokeDecl;
-                    const finfo = smtemit.bemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
-                    smtemit.processVirtualInvokes();
-                    smtemit.processVirtualEntityUpdates();
+                    const finfo = this.bemitter.generateSMTInvoke(idcl, currentSCC, gas, gasdown);
+                    this.processVirtualInvokes();
+                    this.processVirtualEntityUpdates();
 
                     if (finfo !== undefined) {
                         if (finfo instanceof SMTFunction) {
-                            smtemit.assembly.functions.push(finfo);
+                            this.assembly.functions.push(finfo);
                         }
                         else {
-                            smtemit.assembly.uninterpfunctions.push(finfo);
+                            this.assembly.uninterpfunctions.push(finfo);
                         }
                     }
 
-                    const rtype = smtemit.temitter.getSMTTypeFor(smtemit.temitter.getMIRType(idcl.resultType));
-                    if(smtemit.assembly.resultTypes.find((rtt) => rtt.ctype.name === rtype.name) === undefined) {
-                        smtemit.assembly.resultTypes.push(({hasFlag: false, rtname: idcl.resultType, ctype: rtype}));
+                    const rtype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(idcl.resultType));
+                    if(this.assembly.resultTypes.find((rtt) => rtt.ctype.name === rtype.name) === undefined) {
+                        this.assembly.resultTypes.push(({hasFlag: false, rtname: idcl.resultType, ctype: rtype}));
                     }
                 }
 
@@ -179,326 +271,282 @@ class SMTEmitter {
             }
         }   
 
-        smtemit.bemitter.requiredLoadVirtualTupleIndex.forEach((rvlt) => smtemit.assembly.functions.push(smtemit.bemitter.generateLoadTupleIndexVirtual(rvlt)));
-        smtemit.bemitter.requiredLoadVirtualRecordProperty.forEach((rvlr) => smtemit.assembly.functions.push(smtemit.bemitter.generateLoadRecordPropertyVirtual(rvlr)));
-        smtemit.bemitter.requiredLoadVirtualEntityField.forEach((rvle) => smtemit.assembly.functions.push(smtemit.bemitter.generateLoadEntityFieldVirtual(rvle)));
+        this.bemitter.requiredLoadVirtualTupleIndex.forEach((rvlt) => this.assembly.functions.push(this.bemitter.generateLoadTupleIndexVirtual(rvlt)));
+        this.bemitter.requiredLoadVirtualRecordProperty.forEach((rvlr) => this.assembly.functions.push(this.bemitter.generateLoadRecordPropertyVirtual(rvlr)));
+        this.bemitter.requiredLoadVirtualEntityField.forEach((rvle) => this.assembly.functions.push(this.bemitter.generateLoadEntityFieldVirtual(rvle)));
         
-        smtemit.bemitter.requiredProjectVirtualTupleIndex.forEach((rvpt) => smtemit.assembly.functions.push(smtemit.bemitter.generateProjectTupleIndexVirtual(rvpt)));
-        smtemit.bemitter.requiredProjectVirtualRecordProperty.forEach((rvpr) => smtemit.assembly.functions.push(smtemit.bemitter.generateProjectRecordPropertyVirtual(rvpr)));
-        smtemit.bemitter.requiredProjectVirtualEntityField.forEach((rvpe) => smtemit.assembly.functions.push(smtemit.bemitter.generateProjectEntityFieldVirtual(rvpe)));
+        this.bemitter.requiredProjectVirtualTupleIndex.forEach((rvpt) => this.assembly.functions.push(this.bemitter.generateProjectTupleIndexVirtual(rvpt)));
+        this.bemitter.requiredProjectVirtualRecordProperty.forEach((rvpr) => this.assembly.functions.push(this.bemitter.generateProjectRecordPropertyVirtual(rvpr)));
+        this.bemitter.requiredProjectVirtualEntityField.forEach((rvpe) => this.assembly.functions.push(this.bemitter.generateProjectEntityFieldVirtual(rvpe)));
     
-        smtemit.bemitter.requiredUpdateVirtualTuple.forEach((rvut) => smtemit.assembly.functions.push(smtemit.bemitter.generateUpdateTupleIndexVirtual(rvut)));
-        smtemit.bemitter.requiredUpdateVirtualRecord.forEach((rvur) => smtemit.assembly.functions.push(smtemit.bemitter.generateUpdateRecordPropertyVirtual(rvur)));
+        this.bemitter.requiredUpdateVirtualTuple.forEach((rvut) => this.assembly.functions.push(this.bemitter.generateUpdateTupleIndexVirtual(rvut)));
+        this.bemitter.requiredUpdateVirtualRecord.forEach((rvur) => this.assembly.functions.push(this.bemitter.generateUpdateRecordPropertyVirtual(rvur)));
+
+        const mirep = assembly.invokeDecls.get(entrypoint) as MIRInvokeDecl;
+        
+        const iargs = mirep.params.map((param, i) => {
+            const mirptype = this.temitter.getMIRType(param.type);
+
+            const vname = this.temitter.mangle(param.name);
+            const vtype = this.temitter.getSMTTypeFor(mirptype);
+            const vexp = this.generateAPITypeConstructorFunction(mirptype, new SMTConst(`(_ bv${i} ${this.assembly.vopts.ISize})`), new SMTConst("BNat@zero"));
+
+            return { vname: vname, vtype: vtype, vinit: vexp };
+        });
+
+        const restype = this.temitter.getMIRType(mirep.resultType);
+        const rtype = this.temitter.getSMTTypeFor(restype);
+        if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === rtype.name) === undefined) {
+            this.assembly.resultTypes.push(({ hasFlag: false, rtname: mirep.resultType, ctype: rtype }));
+        }
 
         assembly.entityDecls.forEach((edcl) => {
-            const mirtype = smtemit.temitter.getMIRType(edcl.tkey);
-            const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mirtype)}`;
+            const mirtype = this.temitter.getMIRType(edcl.tkey);
+            const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mirtype)}`;
 
-            smtemit.assembly.typeTags.push(ttag);
-            if(assembly.subtypeOf(mirtype, smtemit.temitter.getMIRType("NSCore::KeyType"))) {
-                smtemit.assembly.keytypeTags.push(ttag);
+            this.assembly.typeTags.push(ttag);
+            if(assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
+                this.assembly.keytypeTags.push(ttag);
             }
 
             if(edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
-                smtemit.processVectorTypeDecl(edcl);
+                this.processVectorTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
-                smtemit.processListTypeDecl(edcl);
+                this.processListTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
-                smtemit.processStackTypeDecl(edcl);
+                this.processStackTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
-                smtemit.processQueueTypeDecl(edcl);
+                this.processQueueTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
-                smtemit.processSetTypeDecl(edcl);
+                this.processSetTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
-                smtemit.processDynamicSetTypeDecl(edcl);
+                this.processDynamicSetTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
-                smtemit.processMapTypeDecl(edcl);
+                this.processMapTypeDecl(edcl);
             }
             else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
-                smtemit.processDynamicMapTypeDecl(edcl);
+                this.processDynamicMapTypeDecl(edcl);
             }
             else {
                 if(edcl.ns === "NSCore" && edcl.name === "ISequence") {
-                    smtemit.processISequenceTypeDecl(edcl);
+                    this.processISequenceTypeDecl(edcl);
                 }
                 else {
                     if(edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be[0] === edcl.name) === undefined) {
-                        smtemit.processEntityDecl(edcl);
+                        this.processEntityDecl(edcl);
                     }
                 }
             }
         });
 
-        smtemit.bemitter.requiredSubtypeTagChecks.forEach((stc) => {
+        this.bemitter.requiredSubtypeTagChecks.forEach((stc) => {
             const occ = stc.oftype.options[0] as MIRConceptType;
             for(let i = 0; i < occ.ckeys.length; ++i) {
-                const atname = `AbstractTypeTag_${smtemit.temitter.getSMTTypeFor(smtemit.temitter.getMIRType(occ.ckeys[i]))}`;
-                if(!smtemit.assembly.abstractTypes.includes(atname)) {
-                    smtemit.assembly.abstractTypes.push(atname);
+                const atname = `AbstractTypeTag_${this.temitter.getSMTTypeFor(this.temitter.getMIRType(occ.ckeys[i]))}`;
+                if(!this.assembly.abstractTypes.includes(atname)) {
+                    this.assembly.abstractTypes.push(atname);
                 }
 
                 assembly.typeMap.forEach((mtype) => {
-                    if(smtemit.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, stc.t)) {
-                        const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mtype)}`;
+                    if(this.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, stc.t)) {
+                        const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mtype)}`;
 
-                        if(smtemit.assembly.subtypeRelation.find((ee) => ee.ttype === ttag && ee.atype === atname) === undefined) {
+                        if(this.assembly.subtypeRelation.find((ee) => ee.ttype === ttag && ee.atype === atname) === undefined) {
                             const issub = assembly.subtypeOf(mtype, stc.oftype);
-                            smtemit.assembly.subtypeRelation.push({ttype: ttag, atype: atname, value: issub});
+                            this.assembly.subtypeRelation.push({ttype: ttag, atype: atname, value: issub});
                         }
                     }
                 });
             }
         });
 
-        smtemit.bemitter.requiredIndexTagChecks.forEach((itc) => {
+        this.bemitter.requiredIndexTagChecks.forEach((itc) => {
             const itag = `TupleIndexTag_${itc.idx}`;
-            if(!smtemit.assembly.indexTags.includes(itag)) {
-                smtemit.assembly.indexTags.push(itag);
+            if(!this.assembly.indexTags.includes(itag)) {
+                this.assembly.indexTags.push(itag);
             }
 
             assembly.typeMap.forEach((mtype) => {
-                if (smtemit.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, itc.oftype)) {
+                if (this.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, itc.oftype)) {
                     const ttype = mtype.options[0] as MIRTupleType;
-                    const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mtype)}`;
+                    const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mtype)}`;
 
-                    if (smtemit.assembly.hasIndexRelation.find((ee) => ee.idxtag === itag && ee.atype === ttag) === undefined) {
+                    if (this.assembly.hasIndexRelation.find((ee) => ee.idxtag === itag && ee.atype === ttag) === undefined) {
                         const hasidx = itc.idx < ttype.entries.length;
-                        smtemit.assembly.hasIndexRelation.push({ idxtag: itag, atype: ttag, value: hasidx });
+                        this.assembly.hasIndexRelation.push({ idxtag: itag, atype: ttag, value: hasidx });
                     }
                 }
             });
         });
 
-        smtemit.bemitter.requiredRecordTagChecks.forEach((rtc) => {
+        this.bemitter.requiredRecordTagChecks.forEach((rtc) => {
             const ptag = `RecordPropertyTag_${rtc.pname}`;
-            if(!smtemit.assembly.propertyTags.includes(ptag)) {
-                smtemit.assembly.propertyTags.push(ptag);
+            if(!this.assembly.propertyTags.includes(ptag)) {
+                this.assembly.propertyTags.push(ptag);
             }
 
             assembly.typeMap.forEach((mtype) => {
-                if (smtemit.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, rtc.oftype)) {
+                if (this.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, rtc.oftype)) {
                     const ttype = mtype.options[0] as MIRRecordType;
-                    const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mtype)}`;
+                    const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mtype)}`;
 
-                    if (smtemit.assembly.hasPropertyRelation.find((ee) => ee.pnametag === ptag && ee.atype === ttag) === undefined) {
+                    if (this.assembly.hasPropertyRelation.find((ee) => ee.pnametag === ptag && ee.atype === ttag) === undefined) {
                         const haspname = ttype.entries.find((entry) => entry.name === rtc.pname) !== undefined;
-                        smtemit.assembly.hasPropertyRelation.push({ pnametag: ptag, atype: ttag, value: haspname });
+                        this.assembly.hasPropertyRelation.push({ pnametag: ptag, atype: ttag, value: haspname });
                     }
                 }
             });
         });
 
         assembly.tupleDecls.forEach((ttup) => {
-            const mirtype = smtemit.temitter.getMIRType(ttup.trkey);
-            const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mirtype)}`;
-            const iskey = assembly.subtypeOf(mirtype, smtemit.temitter.getMIRType("NSCore::KeyType"));
-            const isapi = assembly.subtypeOf(mirtype, smtemit.temitter.getMIRType("NSCore::APIType"));
+            const mirtype = this.temitter.getMIRType(ttup.trkey);
+            const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mirtype)}`;
+            const iskey = assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"));
+            const isapi = assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::APIType"));
 
-            smtemit.assembly.typeTags.push(ttag);
+            this.assembly.typeTags.push(ttag);
             if(iskey) {
-                smtemit.assembly.keytypeTags.push(ttag);
+                this.assembly.keytypeTags.push(ttag);
             }
             
-            const smttype = smtemit.temitter.getSMTTypeFor(mirtype);
-            const ops = smtemit.temitter.getSMTConstructorName(mirtype);
+            const smttype = this.temitter.getSMTTypeFor(mirtype);
+            const ops = this.temitter.getSMTConstructorName(mirtype);
             const consargs = ttup.entries.map((entry, i) => {
-                return { fname: smtemit.temitter.generateTupleIndexGetFunction(ttup, i), ftype: smtemit.temitter.getSMTTypeFor(entry.type) };
+                return { fname: this.temitter.generateTupleIndexGetFunction(ttup, i), ftype: this.temitter.getSMTTypeFor(entry.type) };
             });
 
-            smtemit.assembly.tupleDecls.push(new SMTTupleDecl(iskey, isapi, smttype.name, ttag, { cname: ops.cons, cargs: consargs }, ops.box, ops.bfield));
+            this.assembly.tupleDecls.push(new SMTTupleDecl(iskey, isapi, smttype.name, ttag, { cname: ops.cons, cargs: consargs }, ops.box, ops.bfield));
         });
 
         assembly.recordDecls.forEach((trec) => {
-            const mirtype = smtemit.temitter.getMIRType(trec.trkey);
-            const ttag = `TypeTag_${smtemit.temitter.getSMTTypeFor(mirtype)}`;
-            const iskey = assembly.subtypeOf(mirtype, smtemit.temitter.getMIRType("NSCore::KeyType"));
-            const isapi = assembly.subtypeOf(mirtype, smtemit.temitter.getMIRType("NSCore::APIType"));
+            const mirtype = this.temitter.getMIRType(trec.trkey);
+            const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mirtype)}`;
+            const iskey = assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"));
+            const isapi = assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::APIType"));
 
-            smtemit.assembly.typeTags.push(ttag);
+            this.assembly.typeTags.push(ttag);
             if(iskey) {
-                smtemit.assembly.keytypeTags.push(ttag);
+                this.assembly.keytypeTags.push(ttag);
             }
             
-            const smttype = smtemit.temitter.getSMTTypeFor(mirtype);
-            const ops = smtemit.temitter.getSMTConstructorName(mirtype);
+            const smttype = this.temitter.getSMTTypeFor(mirtype);
+            const ops = this.temitter.getSMTConstructorName(mirtype);
             const consargs = trec.entries.map((entry) => {
-                return { fname: smtemit.temitter.generateRecordPropertyGetFunction(trec, entry.name), ftype: smtemit.temitter.getSMTTypeFor(entry.type) };
+                return { fname: this.temitter.generateRecordPropertyGetFunction(trec, entry.name), ftype: this.temitter.getSMTTypeFor(entry.type) };
             });
 
-            smtemit.assembly.recordDecls.push(new SMTRecordDecl(iskey, isapi, smttype.name, ttag, { cname: ops.cons, cargs: consargs }, ops.box, ops.bfield));
+            this.assembly.recordDecls.push(new SMTRecordDecl(iskey, isapi, smttype.name, ttag, { cname: ops.cons, cargs: consargs }, ops.box, ops.bfield));
         });
 
         assembly.ephemeralListDecls.forEach((ephl) => {
-            const mirtype = smtemit.temitter.getMIRType(ephl.trkey);
+            const mirtype = this.temitter.getMIRType(ephl.trkey);
             
-            const smttype = smtemit.temitter.getSMTTypeFor(mirtype);
-            const ops = smtemit.temitter.getSMTConstructorName(mirtype);
+            const smttype = this.temitter.getSMTTypeFor(mirtype);
+            const ops = this.temitter.getSMTConstructorName(mirtype);
             const consargs = ephl.entries.map((entry, i) => {
-                return { fname: smtemit.temitter.generateEphemeralListGetFunction(ephl, i), ftype: smtemit.temitter.getSMTTypeFor(entry) };
+                return { fname: this.temitter.generateEphemeralListGetFunction(ephl, i), ftype: this.temitter.getSMTTypeFor(entry) };
             });
 
-            smtemit.assembly.ephemeralDecls.push(new SMTEphemeralListDecl(smttype.name, { cname: ops.cons, cargs: consargs }));
+            this.assembly.ephemeralDecls.push(new SMTEphemeralListDecl(smttype.name, { cname: ops.cons, cargs: consargs }));
         });
 
         assembly.constantDecls.forEach((cdecl) => {
-            const smtname = smtemit.temitter.mangle(cdecl.gkey);
-            const consf = smtemit.temitter.mangle(cdecl.value);
-            const ctype = smtemit.temitter.getSMTTypeFor(smtemit.temitter.getMIRType(cdecl.declaredType));
-            smtemit.assembly.constantDecls.push(new SMTConstantDecl(smtname, ctype, consf));
+            const smtname = this.temitter.mangle(cdecl.gkey);
+            const consf = this.temitter.mangle(cdecl.value);
+            const ctype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(cdecl.declaredType));
+            this.assembly.constantDecls.push(new SMTConstantDecl(smtname, ctype, consf));
         });
 
-        smtemit.assembly.maskSizes = smtemit.bemitter.maskSizes;
+        this.assembly.maskSizes = this.bemitter.maskSizes;
+
+        const smtcall = this.temitter.mangle(mirep.key);
+        const callargs = iargs.map((arg) => new SMTVar(arg.vname));
+        const issafe = (callsafety.get(entrypoint) as {safe: boolean, trgt: boolean}).safe;
+
+        let iexp: SMTExp | undefined = undefined;
+        let argchk: SMTExp[] | undefined = undefined;
+        if(issafe) {
+            iexp = this.temitter.generateResultTypeConstructorSuccess(restype, new SMTCallSimple(smtcall, callargs));
+        }
+        else {
+            iexp = new SMTCallGeneral(smtcall, callargs);
+            if(mirep.preconditions !== undefined) {
+                argchk = mirep.preconditions.map((pc) => {
+                    const ispcsafe = (callsafety.get(pc) as {safe: boolean, trgt: boolean}).safe;
+                    if(ispcsafe) {
+                        return new SMTCallSimple(this.temitter.mangle(pc), callargs); 
+                    }
+                    else {
+                        return new SMTLet(
+                            "pcres",
+                            new SMTCallGeneral(this.temitter.mangle(pc), callargs),
+                            new SMTCallSimple("and", [
+                                this.temitter.generateResultIsSuccessTest(this.temitter.getMIRType("NSCore::Bool"), new SMTVar("pcres")),
+                                this.temitter.generateResultGetSuccess(this.temitter.getMIRType("NSCore::Bool"), new SMTVar("pcres"))
+                            ])
+                        )
+                    }
+                });
+            }
+        }
+        
+        this.assembly.model = new SMTModelState(iargs, argchk, this.temitter.generateResultType(restype), iexp);
+    }
+
+    static generateSMTAssemblyForValidate(assembly: MIRAssembly, vopts: VerifierOptions, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey, maxgas: number): SMTAssembly {
+        const callsafety = markSafeCalls([entrypoint], assembly, errorTrgtPos);
+
+        const temitter = new SMTTypeEmitter(assembly, vopts);
+        const bemitter = new SMTBodyEmitter(assembly, temitter, vopts, callsafety, errorTrgtPos);
+        const smtassembly = new SMTAssembly(vopts);
+
+        let smtemit = new SMTEmitter(temitter, bemitter, smtassembly);
+        smtemit.initializeSMTAssembly(assembly, entrypoint, callsafety, maxgas);
+
+        ////////////
+        const mirep = assembly.invokeDecls.get(entrypoint) as MIRInvokeDecl;
+        const restype = temitter.getMIRType(mirep.resultType);
+
+        const eqerrexp = new SMTCallSimple("=", [new SMTVar("@smtres@"), smtemit.temitter.generateResultTypeConstructorError(restype, new SMTConst("ErrorID_Target"))]);
+        smtemit.assembly.modes = {
+            refute: new SMTCallSimple("not", [eqerrexp]),
+            generate: eqerrexp,
+            evaluate: ["[INVALID]", new SMTConst("bsq_none")]
+        };
+
+        return smtemit.assembly;
+    }
+
+    static generateSMTAssemblyEvaluate(assembly: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string[], maxgas: number): SMTAssembly {
+        const callsafety = markSafeCalls([entrypoint], assembly, { file: "[NO TARGET]", line: -1, pos: -1 });
+
+        const temitter = new SMTTypeEmitter(assembly, vopts);
+        const bemitter = new SMTBodyEmitter(assembly, temitter, vopts, callsafety, { file: "[NO TARGET]", line: -1, pos: -1 });
+        const smtassembly = new SMTAssembly(vopts);
+
+        let smtemit = new SMTEmitter(temitter, bemitter, smtassembly);
+        smtemit.initializeSMTAssembly(assembly, entrypoint, callsafety, maxgas);
 
         ////////////
         
-        xxxx;
+        const mirep = assembly.invokeDecls.get(entrypoint) as MIRInvokeDecl;
 
-        const rrtype = typeemitter.getSMTTypeFor(typeemitter.getMIRType(entrypoint.resultType));
-
-        let argscall: string[] = [];
-        let argsdecls: string[] = [];
-        for(let i = 0; i < entrypoint.params.length; ++i) {
-            const param = entrypoint.params[i];
-            const paramtype = typeemitter.getMIRType(param.type);
-
-            argscall.push(`@${param.name}`);
-            argsdecls.push(`(declare-const @${param.name} ${typeemitter.getSMTTypeFor(paramtype)})`);
-            if(paramtype.options.length !== 1) {
-                const tcops = paramtype.options.map((opt) => {
-                    if(opt.trkey === "NSCore::None") {
-                        return `(= @${param.name} bsqkey_none)`;
-                    }
-                    else if(opt.trkey === "NSCore::Bool") {
-                        return `(is-bsqkey_bool @${param.name})`;
-                    }
-                    else if(opt.trkey === "NSCore::Int") {
-                        return `(is-bsqkey_int @${param.name})`;
-                    }
-                    else {
-                        return `(is-bsqkey_string @${param.name})`;
-                    }
-                });
-
-                argsdecls.push(`(assert (or ${tcops.join(" ")}))`);
-            }
-        }
-
-        if(entrypoint.preconditions !== undefined) {
-            const params = entrypoint.params.map((param) => `@${param.name}`);
-            argsdecls.push("(declare-const @icheck Result@Bool)")
-            if(params.length === 0) {
-                argsdecls.push(`(assert (= @icheck ${typeemitter.mangleStringForSMT(entrypoint.preconditions)}))`);
-            }
-            else {
-                argsdecls.push(`(assert (= @icheck (${typeemitter.mangleStringForSMT(entrypoint.preconditions)} ${params.join(" ")})))`);
-            }
-            argsdecls.push("(assert (and (is-result_success@Bool @icheck) (result_success_value@Bool @icheck)))")
-        }
-
-        let conceptSubtypes: string[] = [];
-        typeemitter.conceptSubtypeRelation.forEach((stv, cpt) => {
-            const nemums = stv.map((ek) => `MIRNominalTypeEnum_${typeemitter.mangleStringForSMT(ek)}`).sort();
-            if (nemums.length !== 0) {
-                const sta = `(declare-const MIRConceptSubtypeArray$${typeemitter.mangleStringForSMT(cpt)} (Array Int Bool))`;
-                let iv = "mirconceptsubtypearray_empty";
-                for (let i = 0; i < nemums.length; ++i) {
-                    iv = `(store ${iv} ${nemums[i]} true)`;
-                }
-
-                conceptSubtypes.push(sta + "\n" + `(assert (= MIRConceptSubtypeArray$${typeemitter.mangleStringForSMT(cpt)} ${iv}))`);
-            }
-        });
-
-        const typechecks = [...bodyemitter.subtypeFMap].map(tcp => tcp[1]).sort((tc1, tc2) => tc1.order - tc2.order).map((tc) => tc.decl);
-
-        let nominal_data_kinds: string[] = [];
-        let special_name_decls: string[] = [];
-        let ephdecls_fwd: string[] = [];
-        let ephdecls: string[] = [];
-        [...typeemitter.assembly.typeMap].forEach((te) => {
-            const tt = te[1];
-
-            if(typeemitter.typecheckIsName(tt, /^NSCore::None$/) || typeemitter.typecheckIsName(tt, /^NSCore::Bool$/) || typeemitter.typecheckIsName(tt, /^NSCore::Int$/) || typeemitter.typecheckIsName(tt, /^NSCore::BigInt$/) || typeemitter.typecheckIsName(tt, /^NSCore::Float64$/) 
-            || typeemitter.typecheckIsName(tt, /^NSCore::String$/) || typeemitter.typecheckIsName(tt, /^NSCore::UUID$/) || typeemitter.typecheckIsName(tt, /^NSCore::LogicalTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::CryptoHash$/) || typeemitter.typecheckIsName(tt, /^NSCore::ByteBuffer$/)
-            || typeemitter.typecheckIsName(tt, /^NSCore::ISOTime$/) || typeemitter.typecheckIsName(tt, /^NSCore::Regex$/)) {
-                        special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum_${typeemitter.mangleStringForSMT(tt.trkey)}))`);
-                    }
-            
-            if (tt.trkey === "NSCore::Tuple" || tt.trkey === "NSCore::Record") {
-                special_name_decls.push(`(assert (= MIRNominalTypeEnum_${tt.trkey.substr(8)} MIRNominalTypeEnum_${typeemitter.mangleStringForSMT(tt.trkey)}))`);
-            }
-
-            if(tt.options.length === 1 && (tt.options[0] instanceof MIREntityType)) {
-                const ndn = typeemitter.mangleStringForSMT(tt.trkey);
-                const dk = typeemitter.generateInitialDataKindFlag(tt);
-                nominal_data_kinds.push(`(assert (= (nominalDataKinds MIRNominalTypeEnum_${ndn}) ${dk.toString()}))`);
-            }
-
-            if(tt.options.length === 1 && (tt.options[0] instanceof MIREphemeralListType)) {
-                const ephdecl = typeemitter.generateSMTEphemeral(tt.options[0] as MIREphemeralListType);
-                ephdecls_fwd.push(ephdecl.fwddecl);
-                ephdecls.push(ephdecl.fulldecl);
-            }
-        });
-
-        let fulledecls = "";
-        if(ephdecls_fwd.length !== 0) {
-            fulledecls = "(declare-datatypes (\n"
-            + `  ${ephdecls_fwd.sort().join("\n  ")}`
-            + "\n) (\n"
-            + `  ${ephdecls.sort().join("\n  ")}`
-            + "\n))"
-        }
-
-        let constregexs: string[] = [];
-        bodyemitter.allConstRegexes.forEach((v, k) => {
-            constregexs.push(`;;${k} = ${v}`);
-        });
-
-        const resv = `(declare-const @smtres@ Result@${rrtype})`;
-        const call = argscall.length !== 0 ? `(${bodyemitter.invokenameToSMT(entrypoint.key)} ${argscall.join(" ")})` : bodyemitter.invokenameToSMT(entrypoint.key);
-        const cassert = `(assert (= @smtres@ ${call}))`;
-
-        const bmcchk = `(assert (not (and (is-result_error@${rrtype} @smtres@) (is-result_bmc (result_error_code@${rrtype} @smtres@)))))`
-
-        let chk = errorcheck || isverify ? `(assert (is-result_error@${rrtype} @smtres@))` : `(assert (not (is-result_error@${rrtype} @smtres@)))`;
-
-        const callinfo = resv + "\n" + cassert + "\n" + bmcchk + "\n" + chk;
-
-        return {
-            NOMINAL_DECLS_FWD: typedecls_fwd.sort().join("\n    "),
-            NOMINAL_CONSTRUCTORS: typedecls.sort().join("\n    "),
-            NOMINAL_OBJECT_CONSTRUCTORS: ocons.sort().join("\n    "),
-        
-            NOMINAL_TYPE_KIND_DECLS: [...nominaltypeinfo, ...concepttypeinfo].join("\n"),
-            NOMINAL_TYPE_TO_DATA_KIND_ASSERTS: nominal_data_kinds.sort().join("\n"),
-            SPECIAL_NAME_BLOCK_ASSERTS: special_name_decls.sort().join("\n"),
-        
-            EPHEMERAL_DECLS: fulledecls,
-        
-            EMPTY_CONTENT_ARRAY_DECLS: edecls.sort().join("\n"),
-        
-            RESULTS_FWD: resultdecls_fwd.sort().join("\n    "),
-            RESULTS: resultdecls.sort().join("\n    "),
-        
-            REGEX_DECLS: constregexs.sort().join("\n    "),
-
-            CONCEPT_SUBTYPE_RELATION_DECLARE: conceptSubtypes.sort().join("\n"),
-            SUBTYPE_DECLS: typechecks.join("\n    "),
-        
-            VFIELD_ACCESS: vfieldaccess.join("\n"),
-
-            FUNCTION_DECLS: [...udecls, ...funcdecls, ...uaxioms].join("\n"),
-            ARG_VALUES: argsdecls.join("\n"),
-        
-            INVOKE_ACTION: callinfo
+        smtemit.assembly.modes = {
+            refute: new SMTConst("false"),
+            generate: new SMTConst("false"),
+            evaluate: [
+                `${entrypoint}(${args.join(", ")})`,
+                new SMTCallSimple(temitter.mangle(entrypoint), args.map((arg, i) => smtemit.parseAPIType(smtemit.temitter.getMIRType(mirep.params[i].type), arg)))
+            ],
         };
+
+        return smtemit.assembly;
     }
 }
 

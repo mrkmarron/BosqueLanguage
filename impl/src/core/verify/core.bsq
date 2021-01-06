@@ -240,12 +240,10 @@ entity ByteBuffer provides Some, APIValue {
 }
 
 //<summary>Primitive ISOTime value.</summary>
-grounded struct entity ISOTime provides Some, KeyType, PODType, APIType {
-}
+numeric typedecl ISOTime = BigNat;
 
 //<summary>Primitive LogicalTime value.</summary>
-grounded struct entity LogicalTime provides Some, KeyType, PODType, APIType {
-}
+numeric typedecl LogicalTime = BigNat;
 
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
