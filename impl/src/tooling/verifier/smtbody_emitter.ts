@@ -765,17 +765,32 @@ class SMTBodyEmitter {
                 return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`);
             }
             else {
-                return new SMTCallSimple("bvnot", [ new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`)]);
+                return new SMTCallSimple("bvneg", [ new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`)]);
             }
         }
         else if (cval instanceof MIRConstantNat) {
             return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`);
         }
         else if (cval instanceof MIRConstantBigInt) {
-            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+            if (this.vopts.BigXMode === "Int") {
+                return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+            }
+            else {
+                if (!cval.value.startsWith("-")) {
+                    return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${2 * this.vopts.ISize})`);
+                }
+                else {
+                    return new SMTCallSimple("bvneg", [new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${2 * this.vopts.ISize})`)]);
+                }
+            }
         }
         else if (cval instanceof MIRConstantBigNat) {
-            return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+            if (this.vopts.BigXMode === "Int") {
+                return new SMTConst(cval.value.slice(0, cval.value.length - 1));
+            }
+            else {
+                return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${2 * this.vopts.ISize})`);
+            }
         }
         else if (cval instanceof MIRConstantRational) {
             if(this.vopts.FPOpt === "UF") {
@@ -797,10 +812,6 @@ class SMTBodyEmitter {
                 return new SMTConst(sv);
             }
         }
-        else if (cval instanceof MIRConstantTypedNumber) {
-            const sctype = this.typegen.getMIRType(cval.tnkey);
-            return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [this.constantToSMT(cval.value)]);
-        }
         else if (cval instanceof MIRConstantDecimal) {
             if(this.vopts.FPOpt === "UF" || (cval.value.includes("e") || cval.value.includes("E"))) {
                 return new SMTCallSimple("BDecimalCons_UF", [new SMTConst("\"" + cval.value + "\"")]);
@@ -814,6 +825,10 @@ class SMTBodyEmitter {
             assert(this.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
             
             return new SMTConst(cval.value);
+        }
+        else if (cval instanceof MIRConstantTypedNumber) {
+            const sctype = this.typegen.getMIRType(cval.tnkey);
+            return new SMTCallSimple(this.typegen.getSMTConstructorName(sctype).cons, [this.constantToSMT(cval.value)]);
         }
         else if (cval instanceof MIRConstantStringOf) {
             assert(this.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
@@ -1489,7 +1504,7 @@ class SMTBodyEmitter {
             this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: 0 });
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${consf}@gen`, [new SMTConst(`(_ bv0 ${this.vopts.ISize})`), new SMTCallSimple(consf, [])]), continuation);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${consf}@gen`, [new SMTConst("BNat@zero"), new SMTCallSimple(consf, [])]), continuation);
     }
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
@@ -1821,7 +1836,7 @@ class SMTBodyEmitter {
             }
             //op unary -
             case "NSCore::-=prefix=(NSCore::Int)": {
-                smte = new SMTCallSimple("bvnot", args);
+                smte = new SMTCallSimple("bvneg", args);
                 break;
             }
             case "NSCore::-=prefix=(NSCore::BigInt)": {

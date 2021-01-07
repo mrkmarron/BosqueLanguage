@@ -3,6 +3,8 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+import { assert } from "console";
+
 class RegexParser {
     readonly restr: string;
     pos: number;
@@ -40,6 +42,29 @@ class RegexParser {
 
             this.advance();
         }
+        else if(this.isToken("[")) {
+            this.advance();
+
+            const lb = this.token();
+            this.advance();
+
+            if(!this.isToken("-")) {
+                return "Invalid range given";
+            }
+            else {
+                this.advance();
+            }
+
+            const ub = this.token();
+            this.advance();
+
+            if(!this.isToken("]")) {
+                return "Invalid range given";
+            }
+            this.advance();
+
+            return new CharRange(lb, ub);
+        }
         else {
             res = new LiteralChar(this.token());
             this.advance();
@@ -75,20 +100,18 @@ class RegexParser {
                 }
 
                 this.advance(2);
-                let isneg = this.isToken("!");
-                if(isneg) {
-                    this.advance();
-                }
-
                 let res: RegexComponent | string = "Ill formed character class";
                 if(this.isToken("L")) {
-                    res = new CharClass(isneg ? SpecialCharKind.NotLetter : SpecialCharKind.Letter);
+                    res = new CharClass(SpecialCharKind.Letter);
                 }
                 else if(this.isToken("N")) {
-                    res = new CharClass(isneg ? SpecialCharKind.NotNumber : SpecialCharKind.Number);
+                    res = new CharClass(SpecialCharKind.Number);
                 }
                 else if(this.isToken("Z")) {
-                    res = new CharClass(isneg ? SpecialCharKind.NotWhiteSpace : SpecialCharKind.WhiteSpace);
+                    res = new CharClass(SpecialCharKind.WhiteSpace);
+                }
+                else if(this.isToken("S")) {
+                    res = new CharClass(SpecialCharKind.Symbol);
                 }
                 else {
                     res = "Ill formed character class";
@@ -225,8 +248,12 @@ class BSQRegex {
         return "[TODO]";
     }
 
-    compileToSMT(): string {
+    compileToSMT(ascii: boolean): string {
         return "[TODO]";
+    }
+
+    compileToSMTValidator(ascii: boolean): string {
+        return this.re.compileToSMT(ascii);
     }
 
     static parse(rstr: string): BSQRegex | string {
@@ -267,9 +294,7 @@ enum SpecialCharKind {
     WhiteSpace = "WhiteSpace",
     Number = "Number",
     Letter = "Letter",
-    NotWhiteSpace = "NotWhiteSpace",
-    NotNumber = "NotNumber",
-    NotLetter = "NotLetter",
+    Symbol = "Symbol"
 }
 
 abstract class RegexComponent {
@@ -281,7 +306,7 @@ abstract class RegexComponent {
 
     abstract compileToJS(): string;
     abstract compileToCPP(): string;
-    abstract compileToSMT(): string;
+    abstract compileToSMT(ascii: boolean): string;
 
     static jparse(obj: any): RegexComponent {
         if(typeof(obj) === "string") {
@@ -292,6 +317,8 @@ abstract class RegexComponent {
             switch (tag) {
                 case "CharClass":
                     return CharClass.jparse(obj);
+                case "CharRange":
+                    return CharRange.jparse(obj);
                 case "StarRepeat":
                     return StarRepeat.jparse(obj);
                 case "PlusRepeat":
@@ -341,8 +368,44 @@ class LiteralChar extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
+    compileToSMT(ascii: boolean): string  {
+        assert(ascii);
+
+        return `(str.to.re ${this.charval})`;
+    }
+}
+
+class CharRange extends RegexComponent {
+    readonly lb: string;
+    readonly ub: string;
+
+    constructor(lb: string, ub: string) {
+        super();
+
+        this.lb = lb;
+        this.ub = ub;
+    }
+
+    jemit(): any {
+        return { tag: "CharRange", lb: this.lb, ub: this.ub };
+    }
+
+    static jparse(obj: any): RegexComponent {
+        return new CharRange(obj.lb, obj.ub);
+    }
+
+    compileToJS(): string {
+        return `[${this.lb}-${this.ub}]`;
+    }
+
+    compileToCPP(): string {
         return "[TODO]";
+    }
+
+    compileToSMT(ascii: boolean): string  {
+        assert(ascii);
+
+        return `(re.range \"${this.lb}\" \"${this.ub}\")`;
     }
 }
 
@@ -367,27 +430,47 @@ class CharClass extends RegexComponent {
         switch (this.kind) {
             case SpecialCharKind.WhiteSpace:
                 return "\p{Z}";
-            case SpecialCharKind.NotWhiteSpace:
-                return "[^\p{Z}]";
             case SpecialCharKind.Number:
                 return "\p{N}";
-            case SpecialCharKind.NotNumber:
-                return "[^\p{N}]";
             case SpecialCharKind.Letter:
                 return "\p{L}";
-            case SpecialCharKind.NotLetter:
-                return "[^\p{L}]";
+            case SpecialCharKind.Symbol:
+                return "\p{S}";
             default:
                 return ".";
         }
     }
 
     compileToCPP(): string {
-        return "[TODO]";
+        switch (this.kind) {
+            case SpecialCharKind.WhiteSpace:
+                return "\p{Z}";
+            case SpecialCharKind.Number:
+                return "\p{N}";
+            case SpecialCharKind.Letter:
+                return "\p{L}";
+            case SpecialCharKind.Symbol:
+                return "\p{L}";
+            default:
+                return ".";
+        }
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        assert(ascii);
+        
+        switch (this.kind) {
+            case SpecialCharKind.WhiteSpace:
+                return "(re.union (str.to.re \" \") (str.to.re \"\\t\") (str.to.re \"\\n\") (str.to.re \"\\r\"))";
+            case SpecialCharKind.Number:
+                return "(re.range \"0\" \"9\")";
+            case SpecialCharKind.Letter:
+                return "(re.union (str.range \"A\" \"Z\") (str.range \"a\" \"z\"))";
+            case SpecialCharKind.Symbol:
+                return "(re.union (str.range \"!\" \"/\") (str.range \":\" \"@\") (str.range \"[\" \"`\") (str.range \"{\" \"~\"))";
+            default:
+                return "re.allchar";
+        }
     }
 }
 
@@ -416,8 +499,8 @@ class StarRepeat extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.* ${this.repeat.compileToSMT(ascii)})`;
     }
 }
 
@@ -446,8 +529,8 @@ class PlusRepeat extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.+ ${this.repeat.compileToSMT(ascii)})`;
     }
 }
 
@@ -480,8 +563,8 @@ class RangeRepeat extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.loop ${this.repeat.compileToSMT(ascii)} ${this.min} ${this.max})`;
     }
 }
 
@@ -510,8 +593,8 @@ class Optional extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.opt ${this.opt.compileToSMT(ascii)})`;
     }
 }
 
@@ -544,8 +627,8 @@ class Alternation extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.union ${this.opts.map((opt) => opt.compileToSMT(ascii)).join(" ")})`;
     }
 }
 
@@ -578,8 +661,8 @@ class Sequence extends RegexComponent {
         return "[TODO]";
     }
 
-    compileToSMT(): string  {
-        return "[TODO]";
+    compileToSMT(ascii: boolean): string  {
+        return `(re.concat ${this.elems.map((elem) => elem.compileToSMT(ascii)).join(" ")})`;
     }
 }
 

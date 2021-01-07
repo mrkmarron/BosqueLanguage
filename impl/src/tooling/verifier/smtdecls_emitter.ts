@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import * as assert from "assert";
+import { BSQRegex } from "../../ast/bsqregex";
 
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIRFieldDecl, MIRInvokeDecl, MIRRecordType, MIRSpecialTypeCategory, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { constructCallGraphInfo, markSafeCalls } from "../../compiler/mir_callg";
@@ -11,7 +12,7 @@ import { MIRInvokeKey } from "../../compiler/mir_ops";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTAssembly, SMTConstantDecl, SMTEphemeralListDecl, SMTFunction, SMTModelState, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
-import { SMTCallGeneral, SMTCallSimple, SMTConst, SMTExp, SMTLet, SMTVar, VerifierOptions } from "./smt_exp";
+import { SMTCallGeneral, SMTCallSimple, SMTConst, SMTExp, SMTIf, SMTLet, SMTVar, VerifierOptions } from "./smt_exp";
 
 const BuiltinEntityDeclNames = [
     "None",
@@ -24,8 +25,6 @@ const BuiltinEntityDeclNames = [
     "Float",
     "Decimal",
     "String",
-    "ISOTime", 
-    "LogicalTime",
     "Regex"
 ];
 
@@ -43,6 +42,19 @@ class SMTEmitter {
         this.bemitter = bemitter;
         this.assembly = assembly;
     }
+
+    private static readonly _s_intRe = /^(-)?(0|[1-9][0-9]*)i$/y;
+    private static readonly _s_natRe = /^(0|[1-9][0-9]*)n$/y;
+
+    private static readonly _s_floatRe = /^(-)?([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?f$/y;
+    private static readonly _s_decimalRe = /^(-)?([0-9]+\.[0-9]+)([eE][-+]?[0-9]+)?d$/y;
+
+    private static readonly _s_bigintRe = /^(-)?(0|[1-9][0-9]*)I$/y;
+    private static readonly _s_bignatRe = /^(0|[1-9][0-9]*)N$/y;
+    private static readonly _s_rationalRe = /^(-)?(0|[1-9][0-9]*)|(0|[1-9][0-9]*)\/([1-9][0-9]*)R$/y;
+
+    private static readonly _s_stringRe = /^"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"$/uy;
+    private static readonly _s_typedStringRe = /^'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'$/uy;
 
     private generateAPITypeConstructorFunction_Primitive(tt: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
         if (this.temitter.isType(tt, "NSCore::None")) {
@@ -77,58 +89,202 @@ class SMTEmitter {
         }
     }
 
-    private generateAPITypeConstructorFunction_TypedNumber(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private generateAPITypeConstructorFunction_TypedNumber(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
         const tdecl = this.bemitter.assembly.entityDecls.get(trgtType.trkey) as MIREntityTypeDecl;
+        const mf = this.bemitter.assembly.fieldDecls.get("v") as MIRFieldDecl;
+        const mftype = this.temitter.getMIRType(mf.declaredType);
         
-        const mf = this.bemitter.assembly.fieldDecls.get("value") as MIRFieldDecl;
-        const cfun = tdecl.;
+        const bcreate = this.generateAPITypeConstructorFunction_Primitive(mftype, new SMTCallSimple("bvadd", [depthexp, new SMTConst("BNat@one")]), new SMTConst("BNat@zero"));
+        return [new SMTCallSimple(this.temitter.mangle(tdecl.consfunc), [bcreate]), !this.bemitter.isSafeConstructorInvoke(trgtType)];
     }
 
     private generateAPITypeConstructorFunction_ValidatedString(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+        const sstr = new SMTCallSimple("BString@UFCons_API", [depthexp, widthexp]);
+        const svar = this.bemitter.generateTempName();
+
+        const vre = this.bemitter.assembly.validatorRegexs.get(trgtType.trkey) as BSQRegex;
+        const lre = vre.compileToSMTValidator(this.bemitter.vopts.StringOpt === "ASCII");
+
+        const accept = new SMTCallSimple("str.in.re", [new SMTConst(lre), new SMTVar(svar)]);
+        const construct = new SMTCallSimple(this.temitter.getSMTConstructorName(trgtType).cons, [new SMTVar(svar)]);
+
+        return new SMTLet(svar, sstr, 
+                new SMTIf(accept, 
+                    this.temitter.generateResultTypeConstructorSuccess(trgtType, construct), 
+                    this.bemitter.generateErrorAssertFact(trgtType))
+            );
+    }
+
+    private generateAPITypeConstructorFunction_Tuple(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
         
     }
 
-    private generateAPITypeConstructorFunction_Tuple(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private generateAPITypeConstructorFunction_Record(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
         
     }
 
-    private generateAPITypeConstructorFunction_Record(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private generateAPITypeConstructorFunction_List(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
         
     }
 
-    private generateAPITypeConstructorFunction_List(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
-        
+    private generateAPITypeConstructorFunction_Set(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
+        //
+        //TOTO: not implemented yet
+        //
+        assert(false);
+        return [new SMTConst("bsq_none@literal"), false];
     }
 
-    private generateAPITypeConstructorFunction_Set(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
-        
+    private generateAPITypeConstructorFunction_Map(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
+        //
+        //TOTO: not implemented yet
+        //
+        assert(false);
+        return [new SMTConst("bsq_none@literal"), false];
     }
 
-    private generateAPITypeConstructorFunction_Map(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
-        
-    }
-
-    private generateAPITypeConstructorFunction(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private generateAPITypeConstructorFunction(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
         xxxx;
     }
 
-    private parseAPITypeConstructorFunction_Primitive(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
-
+    private parseAPITypeConstructorFunction_Primitive(tt: MIRType, json: string): SMTExp | undefined {
+        if (this.temitter.isType(tt, "NSCore::None")) {
+            return json === "none" ? new SMTConst("bsq_none@literal") : undefined;
+        }
+        else if (this.temitter.isType(tt, "NSCore::Bool")) {
+            if(json === "true") {
+                return new SMTConst("true");
+            }
+            else if(json === "false") {
+                return new SMTConst("false");
+            }
+            else {
+                return undefined;
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::Int")) {
+            if (!SMTEmitter._s_intRe.test(json)) {
+                return undefined;
+            }
+            else {
+                if (!json.startsWith("-")) {
+                    return new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${this.bemitter.vopts.ISize})`);
+                }
+                else {
+                    return new SMTCallSimple("bvneg", [new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${this.bemitter.vopts.ISize})`)]);
+                }
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::Nat")) {
+            if (!SMTEmitter._s_natRe.test(json)) {
+                return undefined;
+            }
+            else {
+                return new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${this.bemitter.vopts.ISize})`);
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::BigInt")) {
+            if (!SMTEmitter._s_bigintRe.test(json)) {
+                return undefined;
+            }
+            else {
+                if (this.bemitter.vopts.BigXMode === "Int") {
+                    return new SMTConst(json.slice(0, json.length - 1));
+                }
+                else {
+                    if (!json.startsWith("-")) {
+                        return new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${2 * this.bemitter.vopts.ISize})`);
+                    }
+                    else {
+                        return new SMTCallSimple("bvneg", [new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${2 * this.bemitter.vopts.ISize})`)]);
+                    }
+                }
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::BigNat")) {
+            if (!SMTEmitter._s_bignatRe.test(json)) {
+                return undefined;
+            }
+            else {
+                if (this.bemitter.vopts.BigXMode === "Int") {
+                    return new SMTConst(json.slice(0, json.length - 1));
+                }
+                else {
+                    return new SMTConst(`(_ bv${json.slice(0, json.length - 1)} ${2 * this.bemitter.vopts.ISize})`);
+                }
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::Float")) {
+            if (!SMTEmitter._s_floatRe.test(json)) {
+                return undefined;
+            }
+            else {
+                const sv = json.includes(".") ? json.slice(0, json.length - 1) : (json.slice(0, json.length - 1) + ".0");
+                return new SMTConst(sv);
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::Decimal")) {
+            if (!SMTEmitter._s_decimalRe.test(json)) {
+                return undefined;
+            }
+            else {
+                const sv = json.includes(".") ? json.slice(0, json.length - 1) : (json.slice(0, json.length - 1) + ".0");
+                return new SMTConst(sv);
+            }
+        }
+        else if (this.temitter.isType(tt, "NSCore::Rational")) {
+            if (!SMTEmitter._s_rationalRe.test(json)) {
+                return undefined;
+            }
+            else {
+                const spos = json.indexOf("/");
+                const num = new SMTConst(json.slice(0, spos) + ".0");
+                const denom = new SMTConst(json.slice(spos + 1, json.length - 1) + ".0");
+                return new SMTCallSimple("/", [num, denom]);
+            }
+        }
+        else {
+            if(!SMTEmitter._s_stringRe.test(json)) {
+                return undefined;
+            }
+            else {
+                assert(this.bemitter.vopts.StringOpt === "ASCII", "We need to UNICODE!!!🦄🚀✨");
+            
+                return new SMTConst(json);
+            }
+        }
     }
 
-    private parseAPITypeConstructorFunction_TypedNumber(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private parseAPITypeConstructorFunction_TypedNumber(tt: MIRType, json: string): SMTExp | undefined {
+        const tdecl = this.bemitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+        const mf = this.bemitter.assembly.fieldDecls.get("v") as MIRFieldDecl;
+        const mftype = this.temitter.getMIRType(mf.declaredType);
+
+        const ppos = json.indexOf("_");
+        const nvs = ppos !== -1 ? json.slice(0, ppos) : json; 
+        const tts = ppos !== -1 ? json.slice(ppos + 1) : tt.trkey;
+        
+        if(tts !== tt.trkey) {
+            return undefined;
+        }
+
+        const nv = this.parseAPITypeConstructorFunction_Primitive(mftype, nvs);
+        if(nv === undefined) {
+            return undefined;
+        }
+
+        return new SMTCallSimple(this.temitter.mangle(tdecl.consfunc), [nv]);
+    }
+
+    private parseAPITypeConstructorFunction_ValidatedString(tt: MIRType, json: string): SMTExp | undefined {
         
     }
 
-    private parseAPITypeConstructorFunction_ValidatedString(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private parseAPITypeConstructorFunction_Tuple(tt: MIRType, json: any): SMTExp | undefined {
         
     }
 
-    private parseAPITypeConstructorFunction_Tuple(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
-        
-    }
-
-    private parseAPITypeConstructorFunction_Record(trgtType: MIRType, depthexp: SMTExp, widthexp: SMTExp): SMTExp {
+    private parseAPITypeConstructorFunction_Record(tt: MIRType, json: any): SMTExp | undefined {
         
     }
 
