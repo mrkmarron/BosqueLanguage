@@ -662,7 +662,7 @@ class Sequence extends RegexComponent {
     }
 
     compileToSMT(ascii: boolean): string  {
-        return `(re.concat ${this.elems.map((elem) => elem.compileToSMT(ascii)).join(" ")})`;
+        return `(re.++ ${this.elems.map((elem) => elem.compileToSMT(ascii)).join(" ")})`;
     }
 }
 
