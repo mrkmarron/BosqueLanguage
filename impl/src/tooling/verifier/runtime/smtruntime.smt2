@@ -5,7 +5,7 @@
 
 (set-option :smt.mbqi true)
 
-(set-option :timeout 10000)
+(set-option :timeout ;;TIMEOUT;;)
 
 ;;
 ;; Type Tags

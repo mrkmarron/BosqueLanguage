@@ -224,6 +224,8 @@ class SMTModelState {
 class SMTAssembly {
     readonly vopts: VerifierOptions;
     
+    allErrors: { file: string, line: number, pos: number, msg: string }[] = [];
+
     entityDecls: SMTEntityDecl[] = [];
     listDecls: SMTListDecl[] = [];
     tupleDecls: SMTTupleDecl[] = [];

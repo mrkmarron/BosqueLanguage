@@ -201,7 +201,7 @@ class SMTEmitter {
         const smtnattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
 
         const fcons = `@@cons_${smttt.name}_entrypoint`;
-        this.bemitter.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: tt.trkey, implkey: "entrypoint"});
+        this.bemitter.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: tt.trkey, argtypes: [smtnattype, smtnattype], implkey: "entrypoint"});
 
         const ressize = this.bemitter.generateTempName();
         const cvar = this.bemitter.generateTempName();
@@ -655,7 +655,7 @@ class SMTEmitter {
                 }
             });
         
-            this.bemitter.requiredCollectionConstructors_Structural
+        this.bemitter.requiredCollectionConstructors_Structural
             .sort((a, b) => a.cname.localeCompare(b.cname))
             .forEach((sc) => {
                 if(sc.implkey === "list_fill") {
@@ -674,16 +674,76 @@ class SMTEmitter {
                 }
             });
     
-            this.bemitter.requiredCollectionConstructors_Operational
+        //
+        //TODO: would be nice if we could make these macros but for now we just rely on quantifier magic
+        //
+        this.bemitter.requiredCollectionConstructors_Operational
             .sort((a, b) => a.cname.localeCompare(b.cname))
-            .forEach((sc) => {
-                xxxx;
+            .forEach((oc) => {
+                switch(oc.implkey) {
+                    case "entrypoint": {
+                        constructors.push({cname: oc.cname, cargs: [
+                            {fname: `${oc.cname}$depth`, ftype: oc.argtypes[0]},
+                            {fname: `${oc.cname}$width`, ftype: oc.argtypes[1]},
+                        ]});
+                        break;
+                    }
+                    case "list_zip": {
+                        constructors.push({cname: oc.cname, cargs: [
+                            {fname: `${oc.cname}$l`, ftype: oc.argtypes[0]},
+                            {fname: `${oc.cname}$u`, ftype: oc.argtypes[1]},
+                        ]});
+                        break;
+                    }
+                    case "list_slice_helper": {
+                        constructors.push({cname: oc.cname, cargs: [
+                            {fname: `${oc.cname}$l`, ftype: oc.argtypes[0]},
+                            {fname: `${oc.cname}$start`, ftype: oc.argtypes[1]},
+                            {fname: `${oc.cname}$end`, ftype: oc.argtypes[2]}
+                        ]});
+                        break;
+                    }
+                    case "list_append_helper": {
+                        constructors.push({cname: oc.cname, cargs: [
+                            {fname: `${oc.cname}$l`, ftype: oc.argtypes[0]},
+                            {fname: `${oc.cname}$u`, ftype: oc.argtypes[1]},
+                            {fname: `${oc.cname}$size`, ftype: oc.argtypes[2]}
+                        ]});
+                        break;
+                    }
+                    default: {
+                        assert(false);
+                    }
+                }
             });
             
-            : { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
-    requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
 
-        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, smtctype, getbody);
+        this.bemitter.requiredCollectionConstructors_Computational
+            .sort((a, b) => a.cname.localeCompare(b.cname))
+            .forEach((cc) => {
+                switch(cc.implkey) {
+                    case "list_filter_helper": {
+                        constructors.push({cname: cc.cname, cargs: [
+                            {fname: `${cc.cname}$l`, ftype: cc.argtypes[0]},
+                            {fname: `${cc.cname}$start`, ftype: cc.argtypes[1]},
+                            {fname: `${cc.cname}$end`, ftype: cc.argtypes[2]},
+                            {fname: `${cc.cname}$il`, ftype: cc.argtypes[3]}
+                        ]});
+                        break;
+                    }
+                    case "list_map_helper": {
+                        constructors.push({cname: cc.cname, cargs: [
+                            {fname: `${cc.cname}$l`, ftype: cc.argtypes[0]},
+                            {fname: `${cc.cname}$start`, ftype: cc.argtypes[1]},
+                            {fname: `${cc.cname}$end`, ftype: cc.argtypes[2]}
+                        ]});
+                        break;
+                    }
+                    default: {
+                        assert(false);
+                    }
+                }
+            });
 
         const ttag = `TypeTag_${smttype.name}`;
         const iskey = this.temitter.assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"));
@@ -692,10 +752,20 @@ class SMTEmitter {
         const consfuncs = this.temitter.getSMTConstructorName(mirtype);
         const consdecl = {
             cname: consfuncs.cons, 
-            cargs: edecl.fields.map((fd) => {
-                return { fname: this.temitter.generateEntityFieldGetFunction(edecl, fd.fkey), ftype: this.temitter.getSMTTypeFor(this.temitter.getMIRType(fd.declaredType)) };
-            })
+            cargs: [
+                { fname: `${smttype.name}@size`, ftype: nattype },
+                { fname: `${smttype.name}@uli`, ftype: new SMTType(lccftype) }
+            ]
         };
+
+        const getbody = new SMTLet("lc", new SMTCallSimple(`${smttype.name}@uli`, [new SMTVar("l")]), 
+            new SMTCond(
+                getdirectops,
+                new SMTCallSimple(get_axiom.fname, [new SMTVar("lc"), new SMTVar("n")])
+            )
+        );
+
+        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, smtctype, getbody);
 
         const smtdecl = new SMTListDecl(iskey, isapi, lccftype, constructors, get_axiom, smttype.name, ttag, consdecl, consfuncs.box, consfuncs.bfield, getdecl);
         this.assembly.listDecls.push(smtdecl);
@@ -1072,6 +1142,7 @@ class SMTEmitter {
         }
         
         this.assembly.model = new SMTModelState(iargs, argchk, this.temitter.generateResultType(restype), iexp);
+        this.assembly.allErrors = this.bemitter.allErrors;
     }
 
     static generateSMTAssemblyForValidate(assembly: MIRAssembly, vopts: VerifierOptions, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey, maxgas: number): SMTAssembly {
@@ -1098,7 +1169,7 @@ class SMTEmitter {
         return smtemit.assembly;
     }
 
-    static generateSMTAssemblyEvaluate(assembly: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string[], maxgas: number): SMTAssembly | undefined {
+    static generateSMTAssemblyEvaluate(assembly: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: any[], maxgas: number): SMTAssembly | undefined {
         const callsafety = markSafeCalls([entrypoint], assembly, { file: "[NO TARGET]", line: -1, pos: -1 });
 
         const temitter = new SMTTypeEmitter(assembly, vopts);

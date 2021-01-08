@@ -41,8 +41,8 @@ class SMTBodyEmitter {
     requiredCollectionConstructors_Structural: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
     
     //Need axioms but could be finitely grounded -- first do not call other functions (append, zip) while second does (filter, map)
-    requiredCollectionConstructors_Operational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
-    requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
+    requiredCollectionConstructors_Operational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argtypes: SMTType[], implkey: string }[] = [];
+    requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, argtypes: SMTType[], implkey: string }[] = [];
 
     requiredISequenceConstructors: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey }[] = [];
 
@@ -2234,7 +2234,7 @@ class SMTBodyEmitter {
             }
             case "list_zip": {
                 const fcons = `@@cons_${smtrestype.name}_zip`;
-                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
+                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
 
                 const sizevar = this.generateTempName();
                 const cvar = this.generateTempName();
@@ -2483,7 +2483,7 @@ class SMTBodyEmitter {
             }
             case "list_filter_helper": {
                 const fcons = `@@cons_${smtrestype.name}_filter`;
-                this.requiredCollectionConstructors_Computational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
+                this.requiredCollectionConstructors_Computational.push({cname: fcons, oftype: mirrestype.trkey, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
 
                 if(this.vopts.FilterMode === "ForwardOnly") {
                     const ressize = this.generateTempName();
@@ -2511,7 +2511,7 @@ class SMTBodyEmitter {
                     const resvar = this.generateTempName();
 
                     const nsize = this.generateListSize_1_to_Max_PickCall(idecl.key, args[0], args[1].vname, args[2].vname, new SMTCallSimple("bvsub", [new SMTVar(args[2].vname), new SMTVar(args[1].vname)]));
-                    const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
+                    const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname), new SMTVar(args[3].vname)]);
                     const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
 
                     const fbody = new SMTLetMulti(
@@ -2579,7 +2579,7 @@ class SMTBodyEmitter {
             }
             case "list_slice_helper": {
                 const fcons = `@@cons_${smtrestype.name}_slice`;
-                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
+                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
 
                 const sizevar = this.generateTempName();
                 const cvar = this.generateTempName();
@@ -2616,7 +2616,7 @@ class SMTBodyEmitter {
             }
             case "list_map_helper": {
                 const fcons = `@@cons_${smtrestype.name}_map`;
-                this.requiredCollectionConstructors_Computational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
+                this.requiredCollectionConstructors_Computational.push({cname: fcons, oftype: mirrestype.trkey, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
 
                 const ressize = this.generateTempName();
                 const cvar = this.generateTempName();
@@ -2665,7 +2665,7 @@ class SMTBodyEmitter {
             }
             case "list_append_helper": {
                 const fcons = `@@cons_${smtrestype.name}_append`;
-                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
+                this.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: mirrestype.trkey, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
 
                 const cvar = this.generateTempName();
                 const resvar = this.generateTempName();
