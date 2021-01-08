@@ -140,12 +140,14 @@
 (declare-datatypes (
       ;;KEY_TUPLE_DECLS;;
       ;;KEY_RECORD_DECLS;;
+      ;;KEY_COLLECTION_INTERNAL_INFO_DECLS;;
       ;;KEY_TYPE_DECLS;;
       (bsq_keyobject 0)
       (BKey 0)
     ) (
     ;;KEY_TUPLE_TYPE_CONSTRUCTORS;;
     ;;KEY_RECORD_TYPE_CONSTRUCTORS;;
+    ;;KEY_COLLECTION_INTERNAL_INFO_CONSTRUCTORS;;
     ;;KEY_TYPE_CONSTRUCTORS;;
     (
       (bsqkey_none@literal) 
@@ -202,6 +204,7 @@
     (bsq_record_entry 0)
     ;;TUPLE_DECLS;;
     ;;RECORD_DECLS;;
+    ;;TYPE_COLLECTION_INTERNAL_INFO_DECLS;;
     ;;TYPE_DECLS;;
     (bsq_object 0)
     (BTerm 0)
@@ -209,6 +212,7 @@
     ( (bsq_regex@cons (bsq_regex_value Int)) )
     ;;TUPLE_TYPE_CONSTRUCTORS;;
     ;;RECORD_TYPE_CONSTRUCTORS;;
+    ;;TYPE_COLLECTION_INTERNAL_INFO_CONSTRUCTORS;;
     ;;TYPE_CONSTRUCTORS;;
     (
       (bsqobject_float@cons (bsqobject_float_value BFloat))

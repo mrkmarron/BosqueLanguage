@@ -12,8 +12,8 @@ import { constructCallGraphInfo, markSafeCalls } from "../../compiler/mir_callg"
 import { MIRInvokeKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTBodyEmitter } from "./smtbody_emitter";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { SMTAssembly, SMTConstantDecl, SMTEntityDecl, SMTEphemeralListDecl, SMTFunction, SMTFunctionUninterpreted, SMTModelState, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
-import { SMTCallGeneral, SMTCallSimple, SMTConst, SMTExists, SMTExp, SMTForAll, SMTIf, SMTLet, SMTLetMulti, SMTVar, VerifierOptions } from "./smt_exp";
+import { SMTAssembly, SMTConstantDecl, SMTEntityDecl, SMTEphemeralListDecl, SMTFunction, SMTFunctionUninterpreted, SMTListDecl, SMTModelState, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
+import { SMTCallGeneral, SMTCallSimple, SMTCond, SMTConst, SMTExists, SMTExp, SMTForAll, SMTIf, SMTLet, SMTLetMulti, SMTType, SMTVar, VerifierOptions } from "./smt_exp";
 
 const BuiltinEntityDeclNames = [
     "None",
@@ -615,9 +615,90 @@ class SMTEmitter {
     }
     
     private processListTypeDecl(ldecl: MIREntityTypeDecl) {
+        const mirtype = this.temitter.getMIRType(ldecl.tkey);
+        const smttype = this.temitter.getSMTTypeFor(mirtype);
+        const mirctype = this.temitter.getMIRType(((ldecl.specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[]).find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
+        const smtctype = this.temitter.getSMTTypeFor(mirctype);
+        const nattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
 
-        return new SMTListTypeDecl();
-        xxxx;
+        const lccftype = smttype.name + "$uli";
+        const get_axiom = new SMTFunctionUninterpreted(`${smttype.name}@get_axiom`, [new SMTType(lccftype), nattype], smtctype);
+
+        const constructors: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[] = [];
+        const getdirectops: { test: SMTExp, result: SMTExp }[] = [];
+        
+        this.bemitter.requiredCollectionConstructors_Literal
+            .sort((a, b) => a.cname.localeCompare(b.cname))
+            .forEach((dc) => {
+                if(dc.argc === 0) {
+                    constructors.push({cname: dc.cname, cargs: []});
+                    getdirectops.push({test: new SMTCallSimple(`is-${dc.cname}`, [new SMTVar("lc")]), result: new SMTConst(this.bemitter.generateUFConstantForType(mirctype)) });
+                }
+                else if (dc.argc === 1) {
+                    constructors.push({cname: dc.cname, cargs: [{ fname: `${dc.cname}$arg_0`, ftype: new SMTType(lccftype) }]});
+                    getdirectops.push({test: new SMTCallSimple(`is-${dc.cname}`, [new SMTVar("lc")]), result: new SMTCallSimple(`${dc.cname}$arg_0`, [new SMTVar("lc")]) });
+                }
+                else {
+                    let cargs: { fname: string, ftype: SMTType }[] = [];
+                    for (let i = 0; i < dc.argc; ++i) {
+                        cargs.push({ fname: `${dc.cname}$arg_i`, ftype: new SMTType(lccftype) });
+                    }
+                    constructors.push({ cname: dc.cname, cargs: cargs });
+
+                    const testexp = new SMTCallSimple(`is-${dc.cname}`, [new SMTVar("lc")]);
+                    const lastop = new SMTCallSimple(`${dc.cname}$arg_${dc.argc - 1}`, [new SMTVar("lc")]);
+                    let altops: {test: SMTExp, result: SMTExp}[] = [];
+                    for (let i = 0; i < dc.argc - 1; ++i) {
+                        altops.push({test: new SMTCallSimple("=", [new SMTVar("n"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`)]), result: new SMTCallSimple(`${dc.cname}$arg_${i}`, [new SMTVar("lc")])});
+                    }
+                    getdirectops.push({test: testexp, result: new SMTCond(altops.reverse(), lastop)});
+                }
+            });
+        
+            this.bemitter.requiredCollectionConstructors_Structural
+            .sort((a, b) => a.cname.localeCompare(b.cname))
+            .forEach((sc) => {
+                if(sc.implkey === "list_fill") {
+                    constructors.push({cname: sc.cname, cargs: [{ fname: `${sc.cname}$value`, ftype: smtctype }]});
+                    getdirectops.push({test: new SMTCallSimple(`is-${sc.cname}`, [new SMTVar("lc")]), result: new SMTCallSimple(`${sc.cname}$value`, [new SMTVar("lc")]) });
+                }
+                else if (sc.implkey === "list_rangeofint") {
+                    constructors.push({cname: sc.cname, cargs: [{ fname: `${sc.cname}$lb`, ftype: smtctype }, { fname: `${sc.cname}$ub`, ftype: smtctype }]});
+                    getdirectops.push({test: new SMTCallSimple(`is-${sc.cname}`, [new SMTVar("lc")]), result: new SMTCallSimple("bvadd", [new SMTCallSimple(`${sc.cname}$lb`, [new SMTVar("lc")]), new SMTVar("n")]) });
+                }
+                else {
+                    assert(sc.implkey === "list_rangeofnat");
+
+                    constructors.push({cname: sc.cname, cargs: [{ fname: `${sc.cname}$lb`, ftype: smtctype }, { fname: `${sc.cname}$ub`, ftype: smtctype }]});
+                    getdirectops.push({test: new SMTCallSimple(`is-${sc.cname}`, [new SMTVar("lc")]), result: new SMTCallSimple("bvadd", [new SMTCallSimple(`${sc.cname}$lb`, [new SMTVar("lc")]), new SMTVar("n")]) });
+                }
+            });
+    
+            this.bemitter.requiredCollectionConstructors_Operational
+            .sort((a, b) => a.cname.localeCompare(b.cname))
+            .forEach((sc) => {
+                xxxx;
+            });
+            
+            : { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
+    requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
+
+        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, smtctype, getbody);
+
+        const ttag = `TypeTag_${smttype.name}`;
+        const iskey = this.temitter.assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"));
+        const isapi = this.temitter.assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::APIType"));
+
+        const consfuncs = this.temitter.getSMTConstructorName(mirtype);
+        const consdecl = {
+            cname: consfuncs.cons, 
+            cargs: edecl.fields.map((fd) => {
+                return { fname: this.temitter.generateEntityFieldGetFunction(edecl, fd.fkey), ftype: this.temitter.getSMTTypeFor(this.temitter.getMIRType(fd.declaredType)) };
+            })
+        };
+
+        const smtdecl = new SMTListDecl(iskey, isapi, lccftype, constructors, get_axiom, smttype.name, ttag, consdecl, consfuncs.box, consfuncs.bfield, getdecl);
+        this.assembly.listDecls.push(smtdecl);
     }
         
     private processStackTypeDecl(sdecl: MIREntityTypeDecl) {

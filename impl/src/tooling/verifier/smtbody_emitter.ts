@@ -107,7 +107,7 @@ class SMTBodyEmitter {
         return `@@cons_${this.typegen.mangle(oftype)}_k_${argc}`;
     }
 
-    private generateUFConstantForType(tt: MIRType): string {
+    generateUFConstantForType(tt: MIRType): string {
         const ctype = this.typegen.getSMTTypeFor(tt);
         const ufcname = `${ctype}@uicons_UF`;
         
@@ -2214,7 +2214,7 @@ class SMTBodyEmitter {
             case "list_fill": {
                 const fcons = `@@cons_${smtrestype.name}_fill`;
                 this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-                const fbody = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(args[0].vname), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
+                const fbody = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(args[0].vname), new SMTCallSimple(fcons, [new SMTVar(args[0].vname)])]);
 
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
             }

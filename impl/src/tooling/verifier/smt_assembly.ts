@@ -22,9 +22,11 @@ type SMT2FileInfo = {
     STRING_TYPE_ALIAS: string,
     KEY_TUPLE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     KEY_RECORD_INFO: { decls: string[], constructors: string[], boxing: string[] },
+    KEY_COLLECTION_INTERNAL_INFO: { decls: string[], constructors: string[] },
     KEY_TYPE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     TUPLE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     RECORD_INFO: { decls: string[], constructors: string[], boxing: string[] },
+    TYPE_COLLECTION_INTERNAL_INFO: { decls: string[], constructors: string[] },
     TYPE_INFO: { decls: string[], constructors: string[], boxing: string[] }
     EPHEMERAL_DECLS: { decls: string[], constructors: string[] },
     RESULT_INFO: { decls: string[], constructors: string[] },
@@ -103,25 +105,35 @@ class SMTListDecl {
     readonly iskeytype: boolean;
     readonly isapitype: boolean;
 
+    readonly smtllisttype: string; //the uninterpreted list contents kind with multiple constructors 
+    readonly listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[]; //the constructors for each list
+    readonly get_axiomdecl: SMTFunctionUninterpreted;
+
     readonly smtname: string;
     readonly typetag: string;
 
-    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[];
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] };
     readonly boxf: string;
     readonly ubf: string;
 
-    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
+    readonly get_decl: SMTFunction;
+
+    constructor(iskeytype: boolean, isapitype: boolean, smtllisttype: string, listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[], get_axiomdecl: SMTFunctionUninterpreted, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string, getdecl: SMTFunction) {
         this.iskeytype = iskeytype;
         this.isapitype = isapitype;
+
+        this.smtllisttype = smtllisttype;
+        this.listtypeconsf = listtypeconsf;
+        this.get_axiomdecl = get_axiomdecl;
 
         this.smtname = smtname;
         this.typetag = typetag;
         this.consf = consf;
         this.boxf = boxf;
         this.ubf = ubf;
-    }
 
-    xxxx;
+        this.get_decl = getdecl;
+    }
 }
 
 class SMTTupleDecl {
@@ -213,6 +225,7 @@ class SMTAssembly {
     readonly vopts: VerifierOptions;
     
     entityDecls: SMTEntityDecl[] = [];
+    listDecls: SMTListDecl[] = [];
     tupleDecls: SMTTupleDecl[] = [];
     recordDecls: SMTRecordDecl[] = [];
     ephemeralDecls: SMTEphemeralListDecl[] = [];
@@ -340,7 +353,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -351,7 +364,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -362,7 +375,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -373,7 +386,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -384,7 +397,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -395,20 +408,58 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
 
+        let collectiongetUFfuncs: string[] = [];
+        let collectiongets: string[] = [];
 
-        xxxx; //also for each of the special types like lists
+        let keycollectioninternaldecls: {decl: string, consf: string}[] = [];
+        this.listDecls.filter((et) => et.iskeytype)
+            .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
+            .forEach((kt) => {
+                const iconsopts = kt.listtypeconsf.map((cf) => `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`)
+                keycollectioninternaldecls.push({
+                    decl: `(${kt.smtllisttype} 0)`,
+                    consf: `( ${iconsopts.join(" ")} )`
+                });
+                collectiongetUFfuncs.push(kt.get_axiomdecl.emitSMT2());
+                collectiongets.push(kt.get_axiomdecl.emitSMT2());
+
+                keytypeinfo.push({
+                    decl: `(${kt.smtname} 0)`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                });
+            });
+
+        let generalcollectioninternaldecls: {decl: string, consf: string}[] = [];
+        this.listDecls.filter((et) => !et.iskeytype)
+            .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
+            .forEach((kt) => {
+                const iconsopts = kt.listtypeconsf.map((cf) => `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`)
+                generalcollectioninternaldecls.push({
+                    decl: `(${kt.smtllisttype} 0)`,
+                    consf: `( ${iconsopts.join(" ")} )`
+                });
+                collectiongetUFfuncs.push(kt.get_axiomdecl.emitSMT2());
+                collectiongets.push(kt.get_axiomdecl.emitSMT2());
+
+                return {
+                    decl: `(${kt.smtname} 0)`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                };
+            });
 
         const etypeinfo = this.ephemeralDecls
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
             .map((et) => {
                 return {
                     decl: `(${et.smtname} 0)`,
-                    consf: `(${et.consf.cname} ${et.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`
+                    consf: `( (${et.consf.cname} ${et.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`
                 };
             });
 
@@ -418,7 +469,7 @@ class SMTAssembly {
                 if (rt.hasFlag) {
                     return {
                         decl: `(${rt.rtname} 0)`,
-                        consf: `(${rt.rtname}@cons ($GuardResult_${rt.rtname}@result ${rt.ctype.name}) ($GuardResult_${rt.rtname}@flag Bool))`
+                        consf: `( (${rt.rtname}@cons ($GuardResult_${rt.rtname}@result ${rt.ctype.name}) ($GuardResult_${rt.rtname}@flag Bool)) )`
                     };
                 }
                 else {
@@ -439,7 +490,7 @@ class SMTAssembly {
 
                 return {
                     decl: `($Mask_${msize} 0)`,
-                    consf: `($Mask_${msize}@cons ${entries.join(" ")})`
+                    consf: `( ($Mask_${msize}@cons ${entries.join(" ")}) )`
                 };
             });
 
@@ -508,16 +559,18 @@ class SMTAssembly {
             STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 32)))" : "(define-sort BString () String)"),
             KEY_TUPLE_INFO: { decls: keytupleinfo.map((kti) => kti.decl), constructors: keytupleinfo.map((kti) => kti.consf), boxing: keytupleinfo.map((kti) => kti.boxf) },
             KEY_RECORD_INFO: { decls: keyrecordinfo.map((kti) => kti.decl), constructors: keyrecordinfo.map((kti) => kti.consf), boxing: keyrecordinfo.map((kti) => kti.boxf) },
+            KEY_COLLECTION_INTERNAL_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf) },
             KEY_TYPE_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf), boxing: keytypeinfo.map((kti) => kti.boxf) },
             TUPLE_INFO: { decls: termtupleinfo.map((kti) => kti.decl), constructors: termtupleinfo.map((kti) => kti.consf), boxing: termtupleinfo.map((kti) => kti.boxf) },
             RECORD_INFO: { decls: termrecordinfo.map((kti) => kti.decl), constructors: termrecordinfo.map((kti) => kti.consf), boxing: termrecordinfo.map((kti) => kti.boxf) },
+            TYPE_COLLECTION_INTERNAL_INFO: { decls: termtypeinfo.map((kti) => kti.decl), constructors: termtypeinfo.map((kti) => kti.consf) },
             TYPE_INFO: { decls: termtypeinfo.map((kti) => kti.decl), constructors: termtypeinfo.map((kti) => kti.consf), boxing: termtypeinfo.map((kti) => kti.boxf) },
             EPHEMERAL_DECLS: { decls: etypeinfo.map((kti) => kti.decl), constructors: etypeinfo.map((kti) => kti.consf) },
             RESULT_INFO: { decls: rtypeinfo.map((kti) => kti.decl), constructors: rtypeinfo.map((kti) => kti.consf) },
             MASK_INFO: { decls: maskinfo.map((mi) => mi.decl), constructors: maskinfo.map((mi) => mi.consf) },
             GLOBAL_DECLS: gdecls,
-            UF_DECLS: ufdecls,
-            FUNCTION_DECLS: this.functions.map((f) => f.emitSMT2()),
+            UF_DECLS: [...ufdecls, ...collectiongetUFfuncs],
+            FUNCTION_DECLS: [...collectiongets, ...this.functions.map((f) => f.emitSMT2())],
             GLOBAL_DEFINITIONS: gdefs,
             ACTION: action
         };
@@ -525,7 +578,7 @@ class SMTAssembly {
 }
 
 export {
-    SMTEntityDecl, SMTTupleDecl, SMTRecordDecl, SMTEphemeralListDecl,
+    SMTEntityDecl, SMTListDecl, SMTTupleDecl, SMTRecordDecl, SMTEphemeralListDecl,
     SMTConstantDecl,
     SMTFunction, SMTFunctionUninterpreted,
     SMTAssembly, SMTModelState,
