@@ -44,7 +44,7 @@ class SMTBodyEmitter {
     requiredCollectionConstructors_Operational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
     requiredCollectionConstructors_Computational: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
 
-    requiredISequenceConstructors: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey, implkey: string }[] = [];
+    requiredISequenceConstructors: { cname: MIRInvokeKey, oftype: MIRResolvedTypeKey }[] = [];
 
     //!!!
     //See the methods generateLoadTupleIndexVirtual, generateLoadTupleIndexVirtual, etc for processing the entries in these arrays
@@ -103,7 +103,7 @@ class SMTBodyEmitter {
         return inv;
     }
 
-    private generateConstructorOfSizeName(oftype: MIRResolvedTypeKey, argc: number): string {
+    generateConstructorOfSizeName(oftype: MIRResolvedTypeKey, argc: number): string {
         return `@@cons_${this.typegen.mangle(oftype)}_k_${argc}`;
     }
 
@@ -1423,20 +1423,20 @@ class SMTBodyEmitter {
     processConstructorTuple(op: MIRConstructorTuple, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg));
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args), continuation);
     }
 
     processConstructorTupleFromEphemeralList(op: MIRConstructorTupleFromEphemeralList, continuation: SMTExp): SMTExp {
         const elt = this.typegen.getMIRType(op.elistType).options[0] as MIREphemeralListType;
         const args = elt.entries.map((tt, i) => new SMTCallSimple(this.typegen.generateEphemeralListGetFunction(elt, i), [this.argToSMT(op.arg)]));
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args), continuation);
     }
 
     processConstructorRecord(op: MIRConstructorRecord, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg[1]));
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args), continuation);
     }
 
     processConstructorRecordFromEphemeralList(op: MIRConstructorRecordFromEphemeralList, continuation: SMTExp): SMTExp {
@@ -1463,7 +1463,7 @@ class SMTBodyEmitter {
             }
         }
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultTupleType)).cons, args), continuation);
     }
 
     processStructuredJoinRecord(op: MIRStructuredJoinRecord, continuation: SMTExp): SMTExp {
@@ -1480,13 +1480,13 @@ class SMTBodyEmitter {
             }
         }
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultRecordType)).cons, args), continuation);
     }
 
     processConstructorEphemeralList(op: MIRConstructorEphemeralList, continuation: SMTExp): SMTExp {
         const args = op.args.map((arg) => this.argToSMT(arg));
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultEphemeralListType)).cons, args);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultEphemeralListType)).cons, args), continuation);
     }
 
     processEphemeralListExtend(op: MIREphemeralListExtend, continuation: SMTExp): SMTExp {
@@ -1495,7 +1495,7 @@ class SMTBodyEmitter {
 
         const eargs = op.ext.map((arg) => this.argToSMT(arg));
 
-        return new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultType)).cons, [...iargs, ...eargs]);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.resultType)).cons, [...iargs, ...eargs]), continuation);
     }
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
@@ -1555,13 +1555,13 @@ class SMTBodyEmitter {
 
         if(this.assembly.subtypeOf(flow, oftype)) {
             //also handles the oftype is Any case
-            return new SMTConst("true");
+            return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst("true"), continuation);
         }
         else if(this.typegen.isType(oftype, "NSCore::None")) {
-            return this.generateNoneCheck(op.arg, layout);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateNoneCheck(op.arg, layout), continuation);
         }
         else if (this.typegen.isType(oftype, "NSCore::Some")) {
-            return this.generateSomeCheck(op.arg, layout);
+            return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateSomeCheck(op.arg, layout), continuation);
         }
         else {
             const tests = oftype.options.map((topt) => {
@@ -1569,33 +1569,33 @@ class SMTBodyEmitter {
                 assert(mtype !== undefined, "We should generate all the component types by default??");
     
                 if(topt instanceof MIREntityType) {
-                    return this.generateSubtypeCheckEntity(op.arg, layout, flow, mtype);
+                    return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateSubtypeCheckEntity(op.arg, layout, flow, mtype), continuation);
                 }
                 else if (topt instanceof MIRConceptType) {
-                    return this.generateSubtypeCheckConcept(op.arg, layout, flow, mtype);
+                    return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateSubtypeCheckConcept(op.arg, layout, flow, mtype), continuation);
                 }
                 else if (topt instanceof MIRTupleType) {
-                    return this.generateSubtypeCheckTuple(op.arg, layout, flow, mtype);
+                    return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateSubtypeCheckTuple(op.arg, layout, flow, mtype), continuation);
                 }
                 else {
                     assert(topt instanceof MIRRecordType, "All other cases should be handled previously (e.g. dynamic subtype of ephemeral or literal types is not good here)");
 
-                    return this.generateSubtypeCheckRecord(op.arg, layout, flow, mtype);
+                    return new SMTLet(this.varToSMTName(op.trgt).vname, this.generateSubtypeCheckRecord(op.arg, layout, flow, mtype), continuation);
                 }
             })
             .filter((test) => !(test instanceof SMTConst) || test.cname !== "false");
     
             if(tests.length === 0) {
-                return new SMTConst("false");
+                return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst("false"), continuation);
             }
             else if(tests.findIndex((test) => (test instanceof SMTConst) && test.cname === "true") !== -1) {
-                return new SMTConst("true");
+                return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst("true"), continuation);
             }
             else if(tests.length === 1) {
-                return tests[0];
+                return new SMTLet(this.varToSMTName(op.trgt).vname, tests[0], continuation);
             }
             else {
-                return new SMTCallSimple("or", tests);
+                return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple("or", tests), continuation);
             }
         }
     }
@@ -2364,7 +2364,7 @@ class SMTBodyEmitter {
                 else {
                     const fcons = `ISequence@@cons_${args[0].vtype.name}_using_${(idecl.pcodes.get("p") as MIRPCode).code}`;
                     if (this.requiredISequenceConstructors.find((isc) => isc.cname === fcons) === undefined) {
-                        this.requiredISequenceConstructors.push({ cname: fcons, oftype: mirencltype, implkey: idecl.implkey });
+                        this.requiredISequenceConstructors.push({ cname: fcons, oftype: mirencltype });
                     }
                     
                     const argsize = this.generateTempName();
@@ -2635,7 +2635,7 @@ class SMTBodyEmitter {
 
                 const fsize = new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]);
                 const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(args[2].vname), new SMTVar(cvar)]);
+                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
 
                 const fbody = new SMTLetMulti(
                     [{vname: ressize, value: fsize}, {vname: cvar, value: icons}],

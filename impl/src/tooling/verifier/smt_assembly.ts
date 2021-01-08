@@ -99,6 +99,31 @@ class SMTEntityDecl {
     }
 }
 
+class SMTListDecl {
+    readonly iskeytype: boolean;
+    readonly isapitype: boolean;
+
+    readonly smtname: string;
+    readonly typetag: string;
+
+    readonly consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[];
+    readonly boxf: string;
+    readonly ubf: string;
+
+    constructor(iskeytype: boolean, isapitype: boolean, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
+        this.iskeytype = iskeytype;
+        this.isapitype = isapitype;
+
+        this.smtname = smtname;
+        this.typetag = typetag;
+        this.consf = consf;
+        this.boxf = boxf;
+        this.ubf = ubf;
+    }
+
+    xxxx;
+}
+
 class SMTTupleDecl {
     readonly iskeytype: boolean;
     readonly isapitype: boolean;
@@ -171,12 +196,12 @@ class SMTConstantDecl {
 }
 
 class SMTModelState {
-    readonly arginits: { vname: string, vtype: SMTType, vinit: SMTExp }[];
+    readonly arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp }[];
     readonly argchk: SMTExp[] | undefined;
     readonly checktype: SMTType;
     readonly fcheck: SMTExp;
 
-    constructor(arginits: { vname: string, vtype: SMTType, vinit: SMTExp }[], argchk: SMTExp[] | undefined, checktype: SMTType, echeck: SMTExp) {
+    constructor(arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp }[], argchk: SMTExp[] | undefined, checktype: SMTType, echeck: SMTExp) {
         this.arginits = arginits;
         this.argchk = argchk;
         this.checktype = checktype;
@@ -375,6 +400,9 @@ class SMTAssembly {
                 };
             });
 
+
+        xxxx; //also for each of the special types like lists
+
         const etypeinfo = this.ephemeralDecls
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
             .map((et) => {
@@ -431,6 +459,10 @@ class SMTAssembly {
         this.model.arginits.map((iarg) => {
             action.push(`(declare-const ${iarg.vname} ${iarg.vtype.name})`);
             action.push(`(assert (= ${iarg.vname} ${iarg.vinit}))`);
+
+            if(iarg.vchk !== undefined) {
+                action.push(`(assert ${iarg.vchk.emitSMT2(undefined)})`);
+            }
         });
 
         if(this.model.argchk !== undefined) {
