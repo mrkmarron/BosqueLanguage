@@ -76,22 +76,26 @@ function generateMASM(files: string[], entrypoint: string): MIRAssembly {
 }
 
 function generateSMTAssemblyForEvaluate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string[], maxgas: number): SMTAssembly | undefined {
+    let res: SMTAssembly | undefined = undefined;
     try {
         const json = args.map((arg) => JSON.parse(arg));
-        return SMTEmitter.generateSMTAssemblyEvaluate(masm, vopts, entrypoint, json, maxgas);
+        res = SMTEmitter.generateSMTAssemblyEvaluate(masm, vopts, entrypoint, json, maxgas);
     } catch(e) {
         process.stdout.write(chalk.red(`SMT generate error -- ${e}\n`));
         process.exit(1);
     }
+    return res;
 }
 
 function generateSMTAssemblyForValidate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, errorTrgtPos: { file: string, line: number, pos: number }, maxgas: number): SMTAssembly | undefined {
+    let res: SMTAssembly | undefined = undefined;
     try {
-        return SMTEmitter.generateSMTAssemblyForValidate(masm, vopts, errorTrgtPos, entrypoint, maxgas);
+        res = SMTEmitter.generateSMTAssemblyForValidate(masm, vopts, errorTrgtPos, entrypoint, maxgas);
     } catch(e) {
         process.stdout.write(chalk.red(`SMT generate error -- ${e}\n`));
         process.exit(1);
     }
+    return res;
 }
 
 function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "Generate" | "Evaluate"): string {
@@ -106,10 +110,11 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "G
         }
     }
 
+    let contents = "";
     try {
         const smt_runtime = Path.join(bosque_dir, "bin/tooling/verify/runtime/smtruntime.smt2");
         const lsrc = FS.readFileSync(smt_runtime).toString();
-        const contents = lsrc
+        contents = lsrc
             .replace(";;TIMEOUT;;", `${timeout}`)
             .replace(";;TYPE_TAG_DECLS;;", joinWithIndent(sfileinfo.TYPE_TAG_DECLS, "    "))
             .replace(";;ABSTRACT_TYPE_TAG_DECLS;;", joinWithIndent(sfileinfo.ABSTRACT_TYPE_TAG_DECLS, "    "))
@@ -157,13 +162,13 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "G
             .replace(";;FUNCTION_DECLS;;", joinWithIndent(sfileinfo.FUNCTION_DECLS, ""))
             .replace(";;GLOBAL_DEFINITIONS;;", joinWithIndent(sfileinfo.GLOBAL_DEFINITIONS, ""))
             .replace(";;ACTION;;", joinWithIndent(sfileinfo.ACTION, ""));
-
-        return contents;
     }
     catch (ex) {
         process.stderr.write(chalk.red(`Error -- ${ex}\n`));
         process.exit(1);
     }
+
+    return contents;
 }
 
 function emitSMT2File(cfile: string, into: string) {

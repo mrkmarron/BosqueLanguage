@@ -1232,7 +1232,6 @@ class MIREmitter {
         emitter.registerResolvedTypeReference(assembly.getSpecialBigIntType());
         emitter.registerResolvedTypeReference(assembly.getSpecialBigNatType());
         emitter.registerResolvedTypeReference(assembly.getSpecialRationalType());
-        emitter.registerResolvedTypeReference(assembly.getSpecialComplexType());
         emitter.registerResolvedTypeReference(assembly.getSpecialFloatType());
         emitter.registerResolvedTypeReference(assembly.getSpecialDecimalType());
         emitter.registerResolvedTypeReference(assembly.getSpecialStringType());

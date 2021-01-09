@@ -23,10 +23,7 @@ function copyResourceDir(dir) {
 process.stdout.write(`Copying resources...\n`);
 
 copyResourceDir("core");
-copyResourceDir("tooling/aot/runtime");
-copyResourceDir("tooling/aot/runtime/bsqcustom");
-copyResourceDir("tooling/bmc/runtime");
-copyResourceDir("test/tests");
+copyResourceDir("tooling/verifier/runtime");
 
 if(process.platform === "linux") {
     const z3path = path.join(rootbin, "/tooling/bmc/runtime/bin/linux/z3")
