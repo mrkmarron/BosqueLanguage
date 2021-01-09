@@ -34,7 +34,7 @@ const z3path = Path.normalize(Path.join(bosque_dir, platpathsmt));
 function generateMASM(files: string[], entrypoint: string): MIRAssembly {
     let code: { relativePath: string, contents: string }[] = [];
     try {
-        const coredir = Path.join(bosque_dir, "core/verify");
+        const coredir = Path.join(bosque_dir, "bin/core/verify");
         const corefiles = FS.readdirSync(coredir);
 
         for (let i = 0; i < corefiles.length; ++i) {
