@@ -12,15 +12,15 @@ concept Any {
     method as<T>(): T # special_method
 
     method asOrNone<T>(): T? {
-        return this->is<T>() ? this->as<T>() : none;
+        return this.is<T>() ? this.as<T>() : none;
     }
 
-    method asTry<T>(ref? v: T): Bool {
-        if(!this->is<T>()) {
+    method asTry<T>(out? v: T): Bool {
+        if(!this.is<T>()) {
             return false;
         }
         else {
-            v = this->as<T>();
+            v = this.as<T>();
             return true;
         }
     }

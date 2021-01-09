@@ -240,6 +240,10 @@ class TypeChecker {
             if (terminfo.specialRestrictions.size !== 0) {
                 terminfo.specialRestrictions.forEach((srv) => {
                     switch (srv) {
+                        case TemplateTermSpecialRestriction.Literal: {
+                            this.raiseErrorIf(sinfo, termtype.options.length !== 1 || !(termtype.options[0] instanceof ResolvedLiteralAtomType), "Not a literal type");
+                            break;
+                        }
                         case TemplateTermSpecialRestriction.Validator: {
                             const isunique = termtype.isUniqueCallTargetType();
                             this.raiseErrorIf(sinfo, !isunique, "Validator types must be unique");

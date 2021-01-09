@@ -26,6 +26,7 @@ function isBuildLevelEnabled(check: BuildLevel, enabled: BuildLevel): boolean {
 }
 
 enum TemplateTermSpecialRestriction {
+    Literal,
     Parsable, //implies unique
     Validator, //implies unique
     Struct, //modifies entity constructable

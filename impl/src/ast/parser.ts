@@ -43,6 +43,7 @@ const KeywordStrings = [
     "of",
     "ok",
     "operator",
+    "parsable",
     "private",
     "provides",
     "ref",
@@ -60,6 +61,7 @@ const KeywordStrings = [
     "unique",
     "numericdef",
     "validate",
+    "validator",
     "var",
     "when",
     "where",
@@ -78,7 +80,6 @@ const SymbolStrings = [
     "{|",
     "|}",
 
-    "$",
     "#",
     "&",
     "&&",
@@ -90,6 +91,7 @@ const SymbolStrings = [
     "::",
     ",",
     ".",
+    ".$",
     "...",
     "=",
     "==",
@@ -177,6 +179,8 @@ const AttributeStrings = [
     "infix",
     "numeric",
     "dynamic",
+    "grounded",
+    "validator",
 
     "__safe",
     "__assume_safe"
@@ -305,7 +309,7 @@ class Lexer {
     }
 
     private static isTemplateName(str: string) {
-        return str.length === 1 && /^[A-Z])$/.test(str);
+        return str.length === 1 && /^[A-Z]$/.test(str);
     }
 
     //TODO: we need to make sure that someone doesn't name a local variable "_"
@@ -475,7 +479,7 @@ class Lexer {
             return false;
         }
 
-        const sym = (!/^[$]\w/.test(ms[0])) ? SymbolStrings.find((value) => ms[0].startsWith(value)) : undefined;
+        const sym = SymbolStrings.find((value) => ms[0].startsWith(value));
         if (sym !== undefined) {
             this.recordLexToken(this.m_cpos + sym.length, sym);
             return true;
@@ -492,7 +496,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_nameRe = /([$]?\w+)|(recursive\?)|(ref!)|(ref\?)/y;
+    private static readonly _s_nameRe = /(recursive\?)|(out\?)|([$]?\w+)/y;
     private tryLexName(): boolean {
         Lexer._s_nameRe.lastIndex = this.m_cpos;
         const m = Lexer._s_nameRe.exec(this.m_input);
@@ -1138,8 +1142,6 @@ class Parser {
     }
 
     private parseNominalType(): TypeSignature {
-        const line = this.getCurrentLine();
-
         let ns: string | undefined = undefined;
         if (this.testToken(TokenStrings.Namespace)) {
             ns = this.consumeTokenAndGetValue();
@@ -1149,13 +1151,15 @@ class Parser {
         const tname = this.consumeTokenAndGetValue();
         ns = this.m_penv.tryResolveNamespace(ns, tname);
         if (ns === undefined) {
-            this.raiseError(line, "Could not resolve namespace");
+            ns = "[Unresolved Error]";
         }
 
         let tnames: string[] = [tname];
         let terms: TypeSignature[] = this.parseTermList();
 
-        while (!this.testFollows("::", TokenStrings.Type)) {
+        while (this.testFollows("::", TokenStrings.Type)) {
+            this.ensureAndConsumeToken("::");
+
             this.ensureToken(TokenStrings.Type);
             const stname = this.consumeTokenAndGetValue();
             tnames.push(stname);
@@ -2217,12 +2221,12 @@ class Parser {
         while (true) {
             const sinfo = this.getCurrentSrcInfo();
 
-            if (this.testFollows(".") || this.testElvisFollows(".")) {
+            if (this.testFollows(".") || this.testElvisFollows(".") || this.testFollows(".$") || this.testElvisFollows(".$")) {
                 const isElvis = this.testAndConsumeTokenIf("?");
                 const customCheck = isElvis ? this.parseElvisCheck(sinfo) : undefined;
 
-                this.ensureAndConsumeToken(".");
-                const isBinder = this.testAndConsumeTokenIf("$");
+                const isBinder = this.testToken(".$");
+                this.consumeToken();
 
                 if (this.testToken(TokenStrings.Numberino) || this.testToken(TokenStrings.Int) || this.testToken(TokenStrings.Nat)) {
                     if(isBinder) {
@@ -3503,6 +3507,7 @@ class Parser {
         let terms: TemplateTermDecl[] = [];
         if (this.testToken("<")) {
             terms = this.parseListOf<TemplateTermDecl>("<", ">", ",", () => {
+                const isliteral = this.testAndConsumeTokenIf("literal");
                 this.ensureToken(TokenStrings.Template);
                 const templatename = this.consumeTokenAndGetValue();
 
@@ -3513,25 +3518,31 @@ class Parser {
                         isinfer = true;
                     }
                     else {
-                        //
-                        //TODO: we want to mark this as a literal only term and check it later but right now just eat it
-                        //
-                        this.consumeTokenIf("literal");
-
                         defaulttype = this.parseTypeSignature(false);
                     }
                 }
 
-                const hasconstraint = this.testAndConsumeTokenIf("where");
+                this.testAndConsumeTokenIf("where");
                 let specialConstraints = new Set<TemplateTermSpecialRestriction>();
-                while (this.testToken("parsable") || this.testToken("validator") || this.testToken("struct") || this.testToken("entity")) {
+                if(isliteral) {
+                    specialConstraints.add(TemplateTermSpecialRestriction.Literal);
+                }
+
+                while (this.testToken("parsable") || this.testToken("validator") || this.testToken("grounded") || this.testToken("struct") || this.testToken("entity")) {
                     if(this.testToken("parsable")) {
+                        this.consumeToken();
                         specialConstraints.add(TemplateTermSpecialRestriction.Parsable);
                     }
                     else if (this.testToken("validator")) {
+                        this.consumeToken();
                         specialConstraints.add(TemplateTermSpecialRestriction.Validator);
                     }
+                    else if(this.testToken("grounded")) {
+                        this.consumeToken();
+                        specialConstraints.add(TemplateTermSpecialRestriction.Grounded);
+                    }
                     else if (this.testToken("struct")) {
+                        this.consumeToken();
                         specialConstraints.add(TemplateTermSpecialRestriction.Struct);
                     }
                     else {
@@ -3539,11 +3550,12 @@ class Parser {
                             this.raiseError(this.getCurrentLine(), "Unknown template type constraint");
                         }
 
+                        this.consumeToken();
                         specialConstraints.add(TemplateTermSpecialRestriction.Entity);
                     } 
                 }
 
-                const tconstraint = this.parseTemplateConstraint(hasconstraint);
+                const tconstraint = this.parseTemplateConstraint(!this.testToken(",") && !this.testToken(">"));
                 return new TemplateTermDecl(templatename, specialConstraints, tconstraint, isinfer, defaulttype);
             })[0];
         }
@@ -4416,11 +4428,9 @@ class Parser {
                 }
                 else if (this.testToken("operator")) {
                     this.consumeToken();
-                    this.ensureToken(TokenStrings.Identifier);
-                    const fname = this.consumeTokenAndGetValue();
-
                     if (!this.testToken("+") && !this.testToken("-") && !this.testToken("*") && !this.testToken("/") &&
                         !this.testToken("==") && !this.testToken("!=") && !this.testToken("<") && !this.testToken(">") && !this.testToken("<=") && !this.testToken(">=")) {
+                        const fname = this.consumeTokenAndGetValue();
                         let nns = ns;
                         if (this.testToken(TokenStrings.Namespace)) {
                             nns = this.consumeTokenAndGetValue();
