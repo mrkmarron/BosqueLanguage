@@ -78,6 +78,7 @@ const SymbolStrings = [
     "{|",
     "|}",
 
+    "$",
     "#",
     "&",
     "&&",
@@ -245,32 +246,17 @@ class SourceInfo {
 
 function unescapeLiteralString(str: string): string {
     let rs = str
-        .replace(/\\0/ug, "\0")
-        .replace(/\\'/ug, "'")
-        .replace(/\\"/ug, "\"")
-        .replace(/\\n/ug, "\n")
-        .replace(/\\r/ug, "\r")
-        .replace(/\\t/ug, "\t");
+        .replace(/\\0/g, "\0")
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, "\"")
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\r")
+        .replace(/\\t/g, "\t");
 
-    let mm = rs.match(/\\u\{([0-9A-Fa-f])+\}/u);
-    while(mm !== null) {
-        const ccode = Number.parseInt(mm[1], 16);
-        const charstr = String.fromCodePoint(ccode);
-        rs = rs.slice(0, mm.index as number) + charstr + rs.slice(mm.index as number + mm[0].length);
-    }
-
-    return rs.replace(/\\\\/ug, "\\");
+    return rs.replace(/\\\\/g, "\\");
 }
 
 class Lexer {
-    private static findSymbolString(str: string): string | undefined {
-        if(str.startsWith("$") && !/^([$][_\p{L}])/.test(str)) {
-            return "$";
-        }
-
-        return SymbolStrings.find((value) => str.startsWith(value));
-    }
-
     private static findKeywordString(str: string): string | undefined {
         let imin = 0;
         let imax = KeywordStrings.length;
@@ -324,7 +310,7 @@ class Lexer {
 
     //TODO: we need to make sure that someone doesn't name a local variable "_"
     private static isIdentifierName(str: string) {
-        return /^([$]?([_\p{L}][_\p{L}\p{Nd}]*))$/u.test(str);
+        return /^([$]?([_a-zA-Z][_a-zA-Z0-9]*))$/.test(str);
     }
 
     private recordLexToken(epos: number, kind: string) {
@@ -338,7 +324,7 @@ class Lexer {
         this.m_cpos = epos;
     }
 
-    private static readonly _s_whitespaceRe = /\p{Z}+/uy;
+    private static readonly _s_whitespaceRe = /\s+/y;
     private tryLexWS(): boolean {
         Lexer._s_whitespaceRe.lastIndex = this.m_cpos;
         const m = Lexer._s_whitespaceRe.exec(this.m_input);
@@ -357,7 +343,7 @@ class Lexer {
         return true;
     }
 
-    private static readonly _s_commentRe = /(\/\/.*)|(\/\*[\p{L}\p{M}\p{N}\p{S}\p{Z}]*?\*\/)/uy;
+    private static readonly _s_commentRe = /(\/\/.*)|(\/\*[\s\S]*?\*\/)/y;
     private tryLexComment(): boolean {
         Lexer._s_commentRe.lastIndex = this.m_cpos;
         const m = Lexer._s_commentRe.exec(this.m_input);
@@ -448,8 +434,8 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_stringRe = /"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"/uy;
-    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'/uy;
+    private static readonly _s_stringRe = /"[^"\\\r\n]*(\\(.|\r?\n)[^"\\\r\n]*)*"/y;
+    private static readonly _s_typedStringRe = /'[^'\\\r\n]*(\\(.|\r?\n)[^'\\\r\n]*)*'/y;
     private tryLexString() {
         Lexer._s_stringRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_stringRe.exec(this.m_input);
@@ -468,7 +454,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_regexRe = /\/[^"\\\r\n]*(\\(.)[^"\\\r\n]*)*\//uy;
+    private static readonly _s_regexRe = /\/[^"\\\r\n]*(\\(.)[^"\\\r\n]*)*\//y;
     private tryLexRegex() {
         Lexer._s_regexRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_regexRe.exec(this.m_input);
@@ -481,7 +467,7 @@ class Lexer {
     }
 
     private static readonly _s_symbolRe = /[\W]+/y;
-    private static readonly _s_operatorRe = /[\p{Sm}\p{So}]/uy;
+    private static readonly _s_operatorRe = /[\W]/y;
     private tryLexSymbol() {
         Lexer._s_symbolRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_symbolRe.exec(this.m_input);
@@ -489,7 +475,7 @@ class Lexer {
             return false;
         }
 
-        const sym = Lexer.findSymbolString(ms[0]);
+        const sym = (!/^[$]\w/.test(ms[0])) ? SymbolStrings.find((value) => ms[0].startsWith(value)) : undefined;
         if (sym !== undefined) {
             this.recordLexToken(this.m_cpos + sym.length, sym);
             return true;
@@ -506,7 +492,7 @@ class Lexer {
         return false;
     }
 
-    private static readonly _s_nameRe = /([$]?[_\p{L}][_\p{L}\p{Nd}]+)|(recursive\?)|(ref!)|(ref\?)/uy;
+    private static readonly _s_nameRe = /([$]?\w+)|(recursive\?)|(ref!)|(ref\?)/y;
     private tryLexName(): boolean {
         Lexer._s_nameRe.lastIndex = this.m_cpos;
         const m = Lexer._s_nameRe.exec(this.m_input);

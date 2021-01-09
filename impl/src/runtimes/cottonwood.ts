@@ -43,7 +43,8 @@ function generateMASM(files: string[], entrypoint: string): MIRAssembly {
         }
  
         for (let i = 0; i < files.length; ++i) {
-            const file = { relativePath: files[i], contents: FS.readFileSync(files[i]).toString() };
+            const realpath = Path.resolve(files[i]);
+            const file = { relativePath: realpath, contents: FS.readFileSync(realpath).toString() };
             code.push(file);
         }
     }

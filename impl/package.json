@@ -22,16 +22,12 @@
     },
     "scripts": {
         "build": "tsc -p tsconfig.json && node ./build/resource_copy.js",
-        "test": "tsc -p tsconfig.json && node ./build/resource_copy.js && node ./bin/test/test_runner.js",
-        "make-exe": "npm run build && node ./scripts/make-exe.js && npm --force link"
+        "test": "tsc -p tsconfig.json && node ./build/resource_copy.js && node ./bin/test/test_runner.js"
     },
     "files": [
         "bin/*"
     ],
     "engines": {
         "node": ">=10.0"
-    },
-    "bin": {
-        "exegen": "./bin/runtimes/exegen/exegen.js"
     }
 }
