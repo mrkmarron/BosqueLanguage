@@ -64,10 +64,10 @@ grounded struct entity Int provides Some, KeyType, PODType, APIType {
 }
 __safe inline prefix operator +(a: Int): Int = default;
 __safe inline prefix operator -(a: Int): Int = default;
-inline infix operator *(a: Int, b, Int): Int = default;
-inline infix operator /(a: Int, b, Int): Int = default;
-inline infix operator +(a: Int, b, Int): Int = default;
-inline infix operator -(a: Int, b, Int): Int = default;
+inline infix operator *(a: Int, b: Int): Int = default;
+inline infix operator /(a: Int, b: Int): Int = default;
+inline infix operator +(a: Int, b: Int): Int = default;
+inline infix operator -(a: Int, b: Int): Int = default;
 __safe inline infix operator ==(a: Int, b: Int): Bool = default;
 __safe inline infix operator !=(a: Int, b: Int): Bool = default;
 __safe inline infix operator <(a: Int, b: Int): Bool = default;
@@ -79,10 +79,10 @@ __safe inline infix operator >=(a: Int, b: Int): Bool = default;
 grounded struct entity Nat provides Some, KeyType, PODType, APIType {
 }
 __safe inline prefix operator +(a: Nat): Nat = default;
-inline infix operator *(a: Nat, b, Nat): Nat = default;
-inline infix operator /(a: Nat, b, Nat): Nat = default;
-inline infix operator +(a: Nat, b, Nat): Nat = default;
-inline infix operator -(a: Nat, b, Nat): Nat = default;
+inline infix operator *(a: Nat, b: Nat): Nat = default;
+inline infix operator /(a: Nat, b: Nat): Nat = default;
+inline infix operator +(a: Nat, b: Nat): Nat = default;
+inline infix operator -(a: Nat, b: Nat): Nat = default;
 __safe inline infix operator ==(a: Nat, b: Nat): Bool = default;
 __safe inline infix operator !=(a: Nat, b: Nat): Bool = default;
 __safe inline infix operator <(a: Nat, b: Nat): Bool = default;
@@ -95,10 +95,10 @@ grounded struct entity BigInt provides Some, KeyType, PODType, APIType {
 }
 __safe inline prefix operator +(a: BigInt): BigInt = default;
 __safe inline prefix operator -(a: BigInt): BigInt = default;
-inline infix operator *(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator /(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator +(a: BigInt, b, BigInt): BigInt = default;
-inline infix operator -(a: BigInt, b, BigInt): BigInt = default;
+inline infix operator *(a: BigInt, b: BigInt): BigInt = default;
+inline infix operator /(a: BigInt, b: BigInt): BigInt = default;
+inline infix operator +(a: BigInt, b: BigInt): BigInt = default;
+inline infix operator -(a: BigInt, b: BigInt): BigInt = default;
 __safe inline infix operator ==(a: BigInt, b: BigInt): Bool = default;
 __safe inline infix operator !=(a: BigInt, b: BigInt): Bool = default;
 __safe inline infix operator <(a: BigInt, b: BigInt): Bool = default;
@@ -110,10 +110,10 @@ __safe inline infix operator >=(a: BigInt, b: BigInt): Bool = default;
 grounded struct entity BigNat provides Some, KeyType, PODType, APIType {
 }
 __safe inline prefix operator +(a: BigNat): BigNat = default;
-inline infix operator *(a: BigNat, b, BigNat): BigNat = default;
-inline infix operator /(a: BigNat, b, BigNat): BigNat = default;
-inline infix operator +(a: BigNat, b, BigNat): BigNat = default;
-inline infix operator -(a: BigNat, b, BigNat): BigNat = default;
+inline infix operator *(a: BigNat, b: BigNat): BigNat = default;
+inline infix operator /(a: BigNat, b: BigNat): BigNat = default;
+inline infix operator +(a: BigNat, b: BigNat): BigNat = default;
+inline infix operator -(a: BigNat, b: BigNat): BigNat = default;
 __safe inline infix operator ==(a: BigNat, b: BigNat): Bool = default;
 __safe inline infix operator !=(a: BigNat, b: BigNat): Bool = default;
 __safe inline infix operator <(a: BigNat, b: BigNat): Bool = default;
@@ -126,10 +126,10 @@ grounded struct entity Rational provides Some, PODType, APIType {
 }
 __safe inline prefix operator +(a: Rational): Rational = default;
 __safe inline prefix operator -(a: Rational): Rational = default;
-inline infix operator *(a: Rational, b, Rational): Rational = default;
-inline infix operator /(a: Rational, b, Rational): Rational = default;
-inline infix operator +(a: Rational, b, Rational): Rational = default;
-inline infix operator -(a: Rational, b, Rational): Rational = default;
+inline infix operator *(a: Rational, b: Rational): Rational = default;
+inline infix operator /(a: Rational, b: Rational): Rational = default;
+inline infix operator +(a: Rational, b: Rational): Rational = default;
+inline infix operator -(a: Rational, b: Rational): Rational = default;
 __safe inline infix operator ==(a: Rational, b: Rational): Bool = default;
 __safe inline infix operator !=(a: Rational, b: Rational): Bool = default;
 __safe inline infix operator <(a: Rational, b: Rational): Bool = default;
@@ -142,10 +142,10 @@ grounded struct entity Float provides Some, PODType, APIType {
 }
 __safe inline prefix operator +(a: Float): Float = default;
 __safe inline prefix operator -(a: Float): Float = default;
-__safe inline infix operator *(a: Float, b, Float): Float = default;
-__safe inline infix operator /(a: Float, b, Float): Float = default;
-__safe inline infix operator +(a: Float, b, Float): Float = default;
-__safe inline infix operator -(a: Float, b, Float): Float = default;
+__safe inline infix operator *(a: Float, b: Float): Float = default;
+__safe inline infix operator /(a: Float, b: Float): Float = default;
+__safe inline infix operator +(a: Float, b: Float): Float = default;
+__safe inline infix operator -(a: Float, b: Float): Float = default;
 __safe inline infix operator <(a: Float, b: Float): Bool = default;
 __safe inline infix operator >(a: Float, b: Float): Bool = default;
 
@@ -154,10 +154,10 @@ grounded struct entity Decimal provides Some, PODType, APIType {
 }
 __safe inline prefix operator +(a: Decimal): Decimal = default;
 __safe inline prefix operator -(a: Decimal): Decimal = default;
-__safe inline infix operator *(a: Decimal, b, Decimal): Decimal = default;
-__safe inline infix operator /(a: Decimal, b, Decimal): Decimal = default;
-__safe inline infix operator +(a: Decimal, b, Decimal): Decimal = default;
-__safe inline infix operator -(a: Decimal, b, Decimal): Decimal = default;
+__safe inline infix operator *(a: Decimal, b: Decimal): Decimal = default;
+__safe inline infix operator /(a: Decimal, b: Decimal): Decimal = default;
+__safe inline infix operator +(a: Decimal, b: Decimal): Decimal = default;
+__safe inline infix operator -(a: Decimal, b: Decimal): Decimal = default;
 __safe inline infix operator <(a: Decimal, b: Decimal): Bool = default;
 __safe inline infix operator >(a: Decimal, b: Decimal): Bool = default;
 
@@ -179,7 +179,7 @@ grounded entity String provides Some, KeyType, PODType, APIType {
 
 //<summary>Primitive safe string value.</summary>
 grounded struct entity StringOf<T where validator> provides Some, KeyType, PODType, APIType {
-    private str: String;
+    private field str: String;
 
     method string(): String {
         return this.str;
@@ -194,7 +194,7 @@ grounded struct entity StringOf<T where validator> provides Some, KeyType, PODTy
 
 //<summary>Primitive DataString value.</summary>
 grounded struct entity DataString<T where parsable> provides Some, APIValue {
-    private str: String;
+    private field str: String;
 
     method string(): String {
         return this.str;
@@ -209,12 +209,12 @@ grounded struct entity DataString<T where parsable> provides Some, APIValue {
 
 //<summary>An efficient buffer encoding for data.</summary>
 struct entity Buffer<T where grounded PODType | APIType> provides Some, APIValue {
-    private buf: ByteBuffer;
+    private field buf: ByteBuffer;
 }
 
 //<summary>An efficient buffer encoding for data.</summary>
 struct entity DataBuffer<T where parsable> provides Some, APIValue {
-    private buf: ByteBuffer;
+    private field buf: ByteBuffer;
 }
 
 enum BufferFormat {
@@ -236,7 +236,7 @@ enum BufferCompression {
 
 //<summary>An efficient byte buffer for data.</summary>
 entity ByteBuffer provides Some, APIValue {
-    private bytes: String; //fake data store for verifier to use
+    private field bytes: String; //fake data store for verifier to use
 }
 
 //<summary>Primitive ISOTime value.</summary>
@@ -247,12 +247,12 @@ numeric typedecl LogicalTime = BigNat;
 
 //<summary>Primitive UUID value.</summary>
 grounded struct entity UUID provides Some, KeyType, PODType, APIType {
-    private bytes: String; //fake data store for verifier to use
+    private field bytes: String; //fake data store for verifier to use
 }
 
 //<summary>Primitive hash value suitable for content addressable operations or crypto secure digests.</summary>
 grounded entity CryptoHash provides Some, KeyType, PODType, APIType {
-    private bytes: String; //fake data store for verifier to use
+    private field bytes: String; //fake data store for verifier to use
 }
 
 //<summary>Primitive regex value.</summary>
@@ -263,7 +263,7 @@ struct entity RegexMatch provides Some {
     field index: Nat;
     field length: Nat;
 
-    invariant $index >= 0 && $length >= 0;
+    invariant $index >= 0n && $length >= 0n;
 }
 
 //<summary>Static methods for Tuples.</summary>
@@ -318,8 +318,8 @@ struct concept Result<T, E=Any> provides Some {
         return this.as<Err>().info;
     }
 
-    method convert<U?, V?>(): Result<U, V> {
-        return this.isOk() ? Result<U, V>::createOk(this.value().as<U>()) ? Result<U, V>::createErr(this.error().as<V>()); 
+    method convert<U=?, V=?>(): Result<U, V> {
+        return this.isOk()? Result<U, V>::createOk(this.value().as<U>()) : Result<U, V>::createErr(this.error().as<V>()); 
     }
 }
 

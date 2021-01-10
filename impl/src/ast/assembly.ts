@@ -475,14 +475,14 @@ class NamespaceOperatorDecl {
 
     readonly invoke: InvokeDecl;
 
-    constructor(sinfo: SourceInfo, srcFile: string, ns: string, name: string, invoke: InvokeDecl, level?: number) {
+    constructor(sinfo: SourceInfo, srcFile: string, ns: string, name: string, invoke: InvokeDecl, level: number) {
         this.sourceLocation = sinfo;
         this.srcFile = srcFile;
 
         this.isPrefix = invoke.attributes.includes("prefix");
         this.isInfix = invoke.attributes.includes("infix");
         this.isDynamic = invoke.attributes.includes("dynamic");
-        this.level = level || -1;
+        this.level = level;
         this.ns = ns;
         this.name = name;
 
@@ -700,7 +700,7 @@ class Assembly {
                 return undefined;
             }
 
-            const nsdecl = this.m_namespaceMap.get("NSMain") as NamespaceDeclaration;
+            const nsdecl = this.m_namespaceMap.get("NSCore") as NamespaceDeclaration;
             if (earg instanceof LiteralIntegralExpression || earg instanceof LiteralFloatPointExpression || earg instanceof LiteralRationalExpression) {
                 if(exp.name === "+") {
                     return earg;

@@ -376,7 +376,7 @@ class Lexer {
 
     private static readonly _s_bigintRe = /(0|[1-9][0-9]*)I/y;
     private static readonly _s_bignatRe = /(0|[1-9][0-9]*)N/y;
-    private static readonly _s_rationalRe = /(0|[1-9][0-9]*)|(0|[1-9][0-9]*)\/([1-9][0-9]*)R/y;
+    private static readonly _s_rationalRe = /((0|[1-9][0-9]*)|(0|[1-9][0-9]*)\/([1-9][0-9]*))R/y;
 
     private tryLexNumber(): boolean {
         Lexer._s_rationalRe.lastIndex = this.m_cpos;
@@ -471,7 +471,7 @@ class Lexer {
     }
 
     private static readonly _s_symbolRe = /[\W]+/y;
-    private static readonly _s_operatorRe = /[\W]/y;
+    private static readonly _s_operatorRe = /%\w%/y;
     private tryLexSymbol() {
         Lexer._s_symbolRe.lastIndex = this.m_cpos;
         const ms = Lexer._s_symbolRe.exec(this.m_input);
@@ -2397,8 +2397,8 @@ class Parser {
                     const name = this.consumeTokenAndGetValue();
 
                     if (name === "as" || name === "is" || name === "isSome" || name === "isNone" 
-                        || name === "hasIndex" || "getIndexOrNone" || "getIndexTry" 
-                        || name === "hasProperty" || "getPropertyOrNone" || "getPropertyTry") {
+                        || name === "hasIndex" || name === "getIndexOrNone" || name === "getIndexTry" 
+                        || name === "hasProperty" || name === "getPropertyOrNone" || name === "getPropertyTry") {
                         ops.push(this.handleSpecialCaseMethods(sinfo, isElvis, customCheck, specificResolve, name));
                     }
                     else if (!(this.testToken("<") || this.testToken("[") || this.testToken("("))) {
@@ -2535,11 +2535,19 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parsePrefixExpression();
 
-        if(this.testToken("*") || this.testToken("/") || this.testToken(TokenStrings.Operator)) {
+        if(this.testToken("*") || this.testToken("/")) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 2);
             if(ons === undefined) {
                 this.raiseError(sinfo.line, "Could not resolve operator");
             }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(undefined, false, exp);
+            const rhs = new PositionalArgument(undefined, false, this.parseMultiplicativeExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
+        }
+        else if(this.testToken(TokenStrings.Operator) && this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 2) !== undefined) {
+            const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 2) as string;
 
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
@@ -2555,11 +2563,19 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
         const exp = this.parseMultiplicativeExpression();
 
-        if(this.testToken("+") || this.testToken("-") || this.testToken(TokenStrings.Operator)) {
+        if(this.testToken("+") || this.testToken("-")) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 3);
             if (ons === undefined) {
                 this.raiseError(sinfo.line, "Could not resolve operator");
             }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(undefined, false, exp);
+            const rhs = new PositionalArgument(undefined, false, this.parseAdditiveExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
+        }
+        else if(this.testToken(TokenStrings.Operator) && this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 3) !== undefined) {
+            const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 3) as string;
 
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
@@ -2579,13 +2595,19 @@ class Parser {
             const op = this.consumeTokenAndGetValue();
             return new BinKeyExpression(sinfo, exp, op, this.parseRelationalExpression());
         }
-        else if(this.testToken("==") || this.testToken("!=")
-            || this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")
-            || this.testToken(TokenStrings.Operator)) {
+        else if(this.testToken("==") || this.testToken("!=") || this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")) {
             const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 4);
             if (ons === undefined) {
                 this.raiseError(sinfo.line, "Could not resolve operator");
             }
+
+            const op = this.consumeTokenAndGetValue();
+            const lhs = new PositionalArgument(undefined, false, exp);
+            const rhs = new PositionalArgument(undefined, false, this.parseRelationalExpression());
+            return new CallNamespaceFunctionOrOperatorExpression(sinfo, ons as string, op, new TemplateArguments([]), "no", new Arguments([lhs, rhs]), "infix");
+        }
+        else if(this.testToken(TokenStrings.Operator) && this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 4) !== undefined) {
+            const ons = this.m_penv.tryResolveAsInfixBinaryOperator(this.peekTokenData(), 4) as string;
 
             const op = this.consumeTokenAndGetValue();
             const lhs = new PositionalArgument(undefined, false, exp);
@@ -4114,7 +4136,7 @@ class Parser {
                 oftype = this.parseTypeSignature(false);
             }
 
-            const enums = this.parseListOf<[string, ConstantExpressionValue | undefined]>("{", "}", ";", () => {
+            const enums = this.parseListOf<[string, ConstantExpressionValue | undefined]>("{", "}", ",", () => {
                 this.ensureToken(TokenStrings.Identifier);
                 const ename = this.consumeTokenAndGetValue();
                 let dvalue: ConstantExpressionValue | undefined = undefined;
@@ -4334,13 +4356,24 @@ class Parser {
                 recursive = Parser.attributeSetContains("recursive", attributes) ? "yes" : "cond";
             }
 
-            const ns = this.m_penv.assembly.getNamespace("NSMain");
+            const ns = this.m_penv.assembly.getNamespace("NSCore");
             const sig = this.parseInvokableCommon(InvokableKind.StaticOperator, false, attributes, recursive, [], undefined);
 
-            if (!currentDecl.operators.has(fname)) {
-                currentDecl.operators.set(fname, []);
+            let level = -1;
+            if(fname === "+" || fname === "-") {
+                level = attributes.includes("prefix") ? 1 : 3 ;
             }
-            (ns.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), "NSMain", fname, sig));
+            else if(fname === "*" || fname === "/") {
+                level = 2;
+            }
+            else {
+                level = 4;
+            }
+
+            if (!ns.operators.has(fname)) {
+                ns.operators.set(fname, []);
+            }
+            (ns.operators.get(fname) as NamespaceOperatorDecl[]).push(new NamespaceOperatorDecl(sinfo, this.m_penv.getCurrentFile(), "NSCore", fname, sig, level));
         }
         else {
             if(!this.testToken(TokenStrings.Identifier) && !this.testToken(TokenStrings.Operator)) {
@@ -4428,8 +4461,14 @@ class Parser {
                 }
                 else if (this.testToken("operator")) {
                     this.consumeToken();
-                    if (!this.testToken("+") && !this.testToken("-") && !this.testToken("*") && !this.testToken("/") &&
-                        !this.testToken("==") && !this.testToken("!=") && !this.testToken("<") && !this.testToken(">") && !this.testToken("<=") && !this.testToken(">=")) {
+                    if (this.testToken("+") || this.testToken("-") || this.testToken("*") || this.testToken("/")
+                        || this.testToken("==") || this.testToken("!=") || this.testToken("<") || this.testToken(">") || this.testToken("<=") || this.testToken(">=")) {
+                        const fname = this.consumeTokenAndGetValue();
+                        
+                        const nscore = this.m_penv.assembly.getNamespace("NSCore");
+                        nscore.declaredNames.add("NSCore::" + fname);
+                    }
+                    else {
                         const fname = this.consumeTokenAndGetValue();
                         let nns = ns;
                         if (this.testToken(TokenStrings.Namespace)) {
