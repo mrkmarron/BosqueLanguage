@@ -22,7 +22,6 @@ const KeywordStrings = [
     "const",
     "elif",
     "else",
-    "empty",
     "enum",
     "entity",
     "ensures",
@@ -3587,6 +3586,14 @@ class Parser {
     private parseSingleTermRestriction(): TemplateTypeRestriction {
         this.ensureToken(TokenStrings.Template);
         const templatename = this.consumeTokenAndGetValue();
+
+        //
+        //TODO: we need to actually do something with this info -- how to we want to have instantiation traits working???
+        //
+        while (this.testToken("parsable") || this.testToken("validator") || this.testToken("grounded") || this.testToken("struct") || this.testToken("entity")) {
+            this.consumeToken();
+        }
+        
         const tconstraint = this.parseTemplateConstraint(true);
 
         return new TemplateTypeRestriction(new TemplateTypeSignature(templatename), tconstraint);
