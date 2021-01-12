@@ -56,7 +56,7 @@ class SMTFunction {
     }
 
     emitSMT2(): string {
-        const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype})`);
+        const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype.name})`);
         const body = this.body.emitSMT2("  ");
         return `(define-fun ${this.fname} (${args.join(" ")}${this.mask !== undefined ? this.mask : ""}) ${this.result.name}\n${body}\n)`;
     }
@@ -232,11 +232,32 @@ class SMTAssembly {
     recordDecls: SMTRecordDecl[] = [];
     ephemeralDecls: SMTEphemeralListDecl[] = [];
 
-    typeTags: string[] = [];
+    typeTags: string[] = [
+        "TypeTag_None",
+        "TypeTag_Bool",
+        "TypeTag_Int",
+        "TypeTag_Nat",
+        "TypeTag_BigInt",
+        "TypeTag_BigNat",
+        "TypeTag_Float",
+        "TypeTag_Decimal",
+        "TypeTag_Rational",
+        "TypeTag_String",
+        "TypeTag_Regex"
+    ];
+    keytypeTags: string[] = [
+        "TypeTag_None",
+        "TypeTag_Bool",
+        "TypeTag_Int",
+        "TypeTag_Nat",
+        "TypeTag_BigInt",
+        "TypeTag_BigNat",
+        "TypeTag_String"
+    ];
+
     abstractTypes: string[] = [];
     indexTags: string[] = [];
     propertyTags: string[] = [];
-    keytypeTags: string[] = [];
 
     subtypeRelation: { ttype: string, atype: string, value: boolean }[] = [];
     hasIndexRelation: { idxtag: string, atype: string, value: boolean }[] = [];
@@ -266,7 +287,7 @@ class SMTAssembly {
     }
 
     computeBVMaxSigned(bits: bigint): string {
-        const bbn = ~(1n << bits);
+        const bbn = -(~(1n << bits));
         return bbn.toString();
     }
 
@@ -317,7 +338,7 @@ class SMTAssembly {
         let float_type_alias: string[] = [];
         let float_constants: string[] = [];
         if(this.vopts.FPOpt === "Real") {
-            float_type_alias.push("(define-sort BFloat () Float)", "(define-sort BDecimal () Float)", "(define-sort BRational () Float)");
+            float_type_alias.push("(define-sort BFloat () Real)", "(define-sort BDecimal () Real)", "(define-sort BRational () Real)");
 
             float_constants.push(`(declare-const BFloat@zero BFloat) (assert (= BFloat@zero 0.0))`);
             float_constants.push(`(declare-const BFloat@one BFloat) (assert (= BFloat@one 1.0))`);
@@ -355,7 +376,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -366,7 +387,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -377,7 +398,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -388,7 +409,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -399,7 +420,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -410,7 +431,7 @@ class SMTAssembly {
             .map((kt) => {
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -432,7 +453,7 @@ class SMTAssembly {
 
                 keytypeinfo.push({
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 });
             });
@@ -451,7 +472,7 @@ class SMTAssembly {
 
                 return {
                     decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`,
+                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (arg ${kt.smtname}))`
                 };
             });
@@ -461,7 +482,7 @@ class SMTAssembly {
             .map((et) => {
                 return {
                     decl: `(${et.smtname} 0)`,
-                    consf: `( (${et.consf.cname} ${et.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)}) )`
+                    consf: `( (${et.consf.cname} ${et.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`
                 };
             });
 
@@ -470,14 +491,14 @@ class SMTAssembly {
             .map((rt) => {
                 if (rt.hasFlag) {
                     return {
-                        decl: `(${rt.rtname} 0)`,
-                        consf: `( (${rt.rtname}@cons ($GuardResult_${rt.rtname}@result ${rt.ctype.name}) ($GuardResult_${rt.rtname}@flag Bool)) )`
+                        decl: `($GuardResult_${rt.ctype.name} 0)`,
+                        consf: `( ($GuardResult_${rt.ctype.name}@cons ($GuardResult_${rt.ctype.name}@result ${rt.ctype.name}) ($GuardResult_${rt.ctype.name}@flag Bool)) )`
                     };
                 }
                 else {
                     return {
-                        decl: `(${rt.rtname} 0)`,
-                        consf: `( (${rt.rtname}@success ($Result_${rt.rtname}@success_value ${rt.ctype.name})) (${rt.rtname}@error ($Result_${rt.rtname}@error_value ErrorID)) )`
+                        decl: `($Result_${rt.ctype.name} 0)`,
+                        consf: `( ($Result_${rt.ctype.name}@success ($Result_${rt.ctype.name}@success_value ${rt.ctype.name})) ($Result_${rt.ctype.name}@error ($Result_${rt.ctype.name}@error_value ErrorID)) )`
                     };
                 }
             });
@@ -511,7 +532,7 @@ class SMTAssembly {
         let action: string[] = [];
         this.model.arginits.map((iarg) => {
             action.push(`(declare-const ${iarg.vname} ${iarg.vtype.name})`);
-            action.push(`(assert (= ${iarg.vname} ${iarg.vinit}))`);
+            action.push(`(assert (= ${iarg.vname} ${iarg.vinit.emitSMT2(undefined)}))`);
 
             if(iarg.vchk !== undefined) {
                 action.push(`(assert ${iarg.vchk.emitSMT2(undefined)})`);
@@ -523,14 +544,14 @@ class SMTAssembly {
         }
 
         if(mode === "Refute") {
-            action.push(`(declare-const @smtres@ ${this.model.checktype})`);
+            action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
             action.push(`(assert ${this.modes.refute.emitSMT2(undefined)}`);
             action.push("(check-sat)");
         }
         else if (mode === "Generate") {
-            action.push(`(declare-const @smtres@ ${this.model.checktype})`);
+            action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
             action.push(`(assert ${this.modes.generate.emitSMT2(undefined)}`);
@@ -546,10 +567,10 @@ class SMTAssembly {
         }
 
         return {
-            TYPE_TAG_DECLS: this.typeTags.sort(),
-            ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes.sort(),
-            INDEX_TAG_DECLS: this.indexTags.sort(),
-            PROPERTY_TAG_DECLS: this.propertyTags.sort(),
+            TYPE_TAG_DECLS: this.typeTags.sort().map((tt) => `(${tt})`),
+            ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes.sort().map((tt) => `(${tt})`),
+            INDEX_TAG_DECLS: this.indexTags.sort().map((tt) => `(${tt})`),
+            PROPERTY_TAG_DECLS: this.propertyTags.sort().map((tt) => `(${tt})`),
             SUBTYPE_DECLS: subtypeasserts,
             TUPLE_HAS_INDEX_DECLS: indexasserts,
             RECORD_HAS_PROPERTY_DECLS: propertyasserts,

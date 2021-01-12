@@ -11,48 +11,49 @@
 ;; Type Tags
 ;;
 
-(declare-datatypes () (
-  (TypeTag
-    TypeTag_None
-    TypeTag_Bool
-    TypeTag_Int
-    TypeTag_Nat
-    TypeTag_BigInt
-    TypeTag_BigNat
-    TypeTag_Float
-    TypeTag_Decimal
-    TypeTag_Rational
-    TypeTag_String
-    TypeTag_Regex
-    ;;TYPE_TAG_DECLS;;
-  )
+(declare-datatypes (
+      (TypeTag 0)
+    ) (
+    ( 
+      (TypeTag_$Invalid)
+      ;;TYPE_TAG_DECLS;;
+    )
 ))
 
-(declare-datatypes () (
-  (AbstractTypeTag
-    ;;ABSTRACT_TYPE_TAG_DECLS;;
-  )
+(declare-datatypes (
+      (AbstractTypeTag 0)
+    ) (
+    ( 
+      (AbstractTypeTag_$Invalid)
+      ;;ABSTRACT_TYPE_TAG_DECLS;;
+    )
 ))
 
-(declare-datatypes () (
-  (TupleIndexTag
-    ;;INDEX_TAG_DECLS;;
-  )
+(declare-datatypes (
+      (TupleIndexTag 0)
+    ) (
+    ( 
+      (TupleIndexTag_$Invalid)
+      ;;INDEX_TAG_DECLS;;
+    )
 ))
 
-(declare-datatypes () (
-  (RecordPropertyTag
-    ;;PROPERTY_TAG_DECLS;;
-  )
+(declare-datatypes (
+      (RecordPropertyTag 0)
+    ) (
+    ( 
+      (RecordPropertyTag_$Invalid)
+      ;;RecordPropertyTag;;
+    )
 ))
 
-(declare-fun SubtypeOf@ (TypeTag, AbstractTypeTag) Bool)
+(declare-fun SubtypeOf@ (TypeTag AbstractTypeTag) Bool)
 ;;SUBTYPE_DECLS;;
 
-(declare-fun HasIndex@ (TypeTag, TupleIndexTag) Bool)
+(declare-fun HasIndex@ (TypeTag TupleIndexTag) Bool)
 ;;TUPLE_HAS_INDEX_DECLS;;
 
-(declare-fun HasProperty@ (TypeTag, RecordPropertyTag) Bool)
+(declare-fun HasProperty@ (TypeTag RecordPropertyTag) Bool)
 ;;RECORD_HAS_PROPERTY_DECLS;;
 
 (declare-fun TypeTagRank@ (TypeTag) Int)
@@ -97,7 +98,7 @@
 (declare-fun ISequence@size (ISequence) BNat)
 (declare-fun ISequence@get (ISequence BNat) BNat)
 
-(define-fun ISequence@assertSorted ((ISequence s)) Bool
+(define-fun ISequence@assertSorted ((s ISequence)) Bool
   (let ((len (ISequence@size s)))
     (forall ((i BNat) (j BNat)
       (=> (and (bvult i j) (bvult j len))
@@ -105,7 +106,7 @@
   )
 )
 
-(define-fun ISequence@assertValuesRange ((ISequence s) (BNat limit)) Bool
+(define-fun ISequence@assertValuesRange ((s ISequence) (BNat limit)) Bool
   (let ((len (ISequence@size s)))
     (forall ((i BNat))
       (=> (bvult i len)
@@ -113,8 +114,8 @@
   )
 )
 
-(declare-const ISequence@empty)
-(assert (= (ISequence@size ISequence@empty) BNat@zero)
+(declare-const ISequence@empty ISequence)
+(assert (= (ISequence@size ISequence@empty) BNat@zero))
 
 ;;
 ;; Primitive datatypes 
@@ -151,21 +152,21 @@
     ;;KEY_TYPE_CONSTRUCTORS;;
     (
       (bsqkey_none@literal) 
-      (bsqkey_bool@cons (bsqkey_bool_value Bool))
-      (bsqkey_int@cons (bsqkey_int_value BInt))
-      (bsqkey_nat@cons (bsqkey_nat_value BNat))
-      (bsqkey_bigint@cons (bsqkey_bigint_value BBigInt))
-      (bsqkey_bignat@cons (bsqkey_bignat_value BBigNat))
-      (bsqkey_string@cons (bsqkey_string_value BString))
+      (bsqkey_bool@box (bsqkey_bool_value Bool))
+      (bsqkey_int@box (bsqkey_int_value BInt))
+      (bsqkey_nat@box (bsqkey_nat_value BNat))
+      (bsqkey_bigint@box (bsqkey_bigint_value BBigInt))
+      (bsqkey_bignat@box (bsqkey_bignat_value BBigNat))
+      (bsqkey_string@box (bsqkey_string_value BString))
       ;;KEY_TUPLE_TYPE_BOXING;;
       ;;KEY_RECORD_TYPE_BOXING;;
       ;;KEY_TYPE_BOXING;;
     )
-    ( (BKey@cons (BKey_type TypeTag) (BKey_value bsq_keyobject)) )
+    ( (BKey@box (BKey_type TypeTag) (BKey_value bsq_keyobject)) )
 ))
 
 (declare-const BKey@none BKey)
-(assert (= BKey@none (BKey@cons TypeTag_None bsqkey_none@literal)))
+(assert (= BKey@none (BKey@box TypeTag_None bsqkey_none@literal)))
 
 (define-fun bsqkey_none@less ((k1 bsq_keyobject) (k2 bsq_keyobject)) Bool
   false
@@ -200,8 +201,6 @@
 ;;
 (declare-datatypes (
     (bsq_regex 0)
-    (bsq_tuple_entry 0)
-    (bsq_record_entry 0)
     ;;TUPLE_DECLS;;
     ;;RECORD_DECLS;;
     ;;TYPE_COLLECTION_INTERNAL_INFO_DECLS;;
@@ -215,22 +214,22 @@
     ;;TYPE_COLLECTION_INTERNAL_INFO_CONSTRUCTORS;;
     ;;TYPE_CONSTRUCTORS;;
     (
-      (bsqobject_float@cons (bsqobject_float_value BFloat))
-      (bsqobject_decimal@cons (bsqobject_decimal_value BDecimal))
-      (bsqobject_rational@cons (bsqobject_rational_value BRational))
-      (bsqobject_regex@cons (bsqobject_regex_value bsq_regex))
+      (bsqobject_float@box (bsqobject_float_value BFloat))
+      (bsqobject_decimal@box (bsqobject_decimal_value BDecimal))
+      (bsqobject_rational@box (bsqobject_rational_value BRational))
+      (bsqobject_regex@box (bsqobject_regex_value bsq_regex))
       ;;TUPLE_TYPE_BOXING;;
       ;;RECORD_TYPE_BOXING;;
       ;;TYPE_BOXING;;
     )
     ( 
-      (BTerm@termcons (BTerm_termtype TypeTag) (BTerm_termvalue bsq_object))
-      (BTerm@keycons (BTerm_keyvalue BKey)) 
+      (BTerm@termbox (BTerm_termtype TypeTag) (BTerm_termvalue bsq_object))
+      (BTerm@keybox (BTerm_keyvalue BKey)) 
     )
 ))
 
 (declare-const BTerm@none BTerm)
-(assert (= BTerm@none (BTerm@keycons BKey@none)))
+(assert (= BTerm@none (BTerm@keybox BKey@none)))
 
 ;;
 ;;Define utility functions
@@ -240,7 +239,7 @@
 )
 
 (define-fun GetTypeTag@BTerm ((t BKey)) TypeTag
-  (ite (is-BTerm@termcons t) (BTerm_termtype t) (BKey_type (BTerm_keyvalue t)))
+  (ite (is-BTerm@termbox t) (BTerm_termtype t) (BKey_type (BTerm_keyvalue t)))
 )
 
 ;;

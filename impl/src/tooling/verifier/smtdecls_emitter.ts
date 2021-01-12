@@ -932,11 +932,16 @@ class SMTEmitter {
 
         assembly.entityDecls.forEach((edcl) => {
             const mirtype = this.temitter.getMIRType(edcl.tkey);
-            const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mirtype).name}`;
+            const ttag = this.temitter.getSMTTypeTag(mirtype);
 
-            this.assembly.typeTags.push(ttag);
-            if(assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
-                this.assembly.keytypeTags.push(ttag);
+            if(!this.assembly.typeTags.includes(ttag)) {
+                this.assembly.typeTags.push(ttag);
+            }
+
+            if (!this.assembly.keytypeTags.includes(ttag)) {
+                if (assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
+                    this.assembly.keytypeTags.push(ttag);
+                }
             }
 
             const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(edcl.tkey));
@@ -990,7 +995,7 @@ class SMTEmitter {
 
                 assembly.typeMap.forEach((mtype) => {
                     if(this.temitter.isUniqueType(mtype) && assembly.subtypeOf(mtype, stc.t)) {
-                        const ttag = `TypeTag_${this.temitter.getSMTTypeFor(mtype).name}`;
+                        const ttag = this.temitter.getSMTTypeTag(mtype);
 
                         if(this.assembly.subtypeRelation.find((ee) => ee.ttype === ttag && ee.atype === atname) === undefined) {
                             const issub = assembly.subtypeOf(mtype, stc.oftype);

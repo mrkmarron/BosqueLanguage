@@ -114,12 +114,6 @@ class SMTTypeEmitter {
     }
 
     getSMTTypeTag(tt: MIRType): string {
-        assert(!(this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
-            || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigInt") || this.isType(tt, "NSCore::BigNat") 
-            || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational")
-            || this.isType(tt, "NSCore::String") || this.isType(tt, "NSCore::Regex")), "Special types should be tagged in special ways");
-
-
         if (this.isType(tt, "NSCore::None")) {
             return "TypeTag_None";
         }
@@ -199,27 +193,27 @@ class SMTTypeEmitter {
             let typetag = "[NOT SET]";
 
             if (this.isType(from, "NSCore::Bool")) {
-                objval = new SMTCallSimple("bsqkey_bool@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_bool@box", [exp]);
                 typetag = "TypeTag_Bool";
             }
             else if (this.isType(from, "NSCore::Int")) {
-                objval = new SMTCallSimple("bsqkey_int@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_int@box", [exp]);
                 typetag = "TypeTag_Int";
             }
             else if (this.isType(from, "NSCore::Nat")) {
-                objval = new SMTCallSimple("bsqkey_nat@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_nat@box", [exp]);
                 typetag = "TypeTag_Nat";
             }
             else if (this.isType(from, "NSCore::BigInt")) {
-                objval = new SMTCallSimple("bsqkey_bigint@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_bigint@box", [exp]);
                 typetag = "TypeTag_BigInt";
             }
             else if (this.isType(from, "NSCore::BigNat")) {
-                objval = new SMTCallSimple("bsqkey_bignat@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_bignat@box", [exp]);
                 typetag = "TypeTag_BigNat";
             }
             else if (this.isType(from, "NSCore::String")) {
-                objval = new SMTCallSimple("bsqkey_string@cons", [exp]);
+                objval = new SMTCallSimple("bsqkey_string@box", [exp]);
                 typetag = "TypeTag_String";
             }
             else if (this.isUniqueTupleType(from)) {
@@ -237,7 +231,7 @@ class SMTTypeEmitter {
                 typetag = this.getSMTTypeTag(from);
             }
 
-            return new SMTCallSimple("BKey@cons", [new SMTConst(typetag), objval as SMTExp]);
+            return new SMTCallSimple("BKey@box", [new SMTConst(typetag), objval as SMTExp]);
         }
     }
 
@@ -247,26 +241,26 @@ class SMTTypeEmitter {
         }
         else {
             if(this.assembly.subtypeOf(from, this.getMIRType("NSCore::KeyType"))) {
-                return new SMTCallSimple("BTerm@keycons", [this.coerceFromAtomicToKey(exp, from)]);
+                return new SMTCallSimple("BTerm@keybox", [this.coerceFromAtomicToKey(exp, from)]);
             }
             else {
                 let objval: SMTExp | undefined = undefined;
                 let typetag = "[NOT SET]";
 
                 if (this.isType(from, "NSCore::Float")) {
-                    objval = new SMTCallSimple("bsq_float@cons", [exp]);
+                    objval = new SMTCallSimple("bsq_float@box", [exp]);
                     typetag = "TypeTag_Float";
                 }
                 else if (this.isType(from, "NSCore::Decimal")) {
-                    objval = new SMTCallSimple("bsq_decimal@cons", [exp]);
+                    objval = new SMTCallSimple("bsq_decimal@box", [exp]);
                     typetag = "TypeTag_Decimal";
                 }
                 else if (this.isType(from, "NSCore::Rational")) {
-                    objval = new SMTCallSimple("bsq_rational@cons", [exp]);
+                    objval = new SMTCallSimple("bsq_rational@box", [exp]);
                     typetag = "TypeTag_Rational";
                 }
                 else if (this.isType(from, "NSCore::Regex")) {
-                    objval = new SMTCallSimple("bsq_regex@cons", [exp]);
+                    objval = new SMTCallSimple("bsq_regex@box", [exp]);
                     typetag = "TypeTag_Regex";
                 }
                 else if (this.isUniqueTupleType(from)) {
@@ -284,7 +278,7 @@ class SMTTypeEmitter {
                     typetag = this.getSMTTypeTag(from);
                 }
 
-                return new SMTCallSimple("BTerm@termcons", [new SMTConst(typetag), objval as SMTExp]);
+                return new SMTCallSimple("BTerm@termbox", [new SMTConst(typetag), objval as SMTExp]);
             }
         }
     }
@@ -383,7 +377,7 @@ class SMTTypeEmitter {
         }
         else if (smtinto.name === "BTerm") {
             if(smtfrom.name === "BKey") {
-                return new SMTCallSimple("BTerm@keycons", [exp]);
+                return new SMTCallSimple("BTerm@keybox", [exp]);
             }
             else {
                 return this.coerceFromAtomicToTerm(exp, from);
@@ -426,7 +420,7 @@ class SMTTypeEmitter {
     }
 
     generateEntityFieldGetFunction(tt: MIREntityTypeDecl, field: MIRFieldKey): string {
-        return `${this.mangle(tt.tkey)}@_${field}`;
+        return `${this.mangle(tt.tkey)}@_${this.mangle(field)}`;
     }
 
     generateEphemeralListGetFunction(tt: MIREphemeralListType, idx: number): string {
