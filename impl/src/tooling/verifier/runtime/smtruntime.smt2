@@ -100,13 +100,13 @@
 
 (define-fun ISequence@assertSorted ((s ISequence)) Bool
   (let ((len (ISequence@size s)))
-    (forall ((i BNat) (j BNat)
+    (forall ((i BNat) (j BNat))
       (=> (and (bvult i j) (bvult j len))
-          (bvult (ISequence@get s i) (ISequence@get s j)))))
+          (bvult (ISequence@get s i) (ISequence@get s j))))
   )
 )
 
-(define-fun ISequence@assertValuesRange ((s ISequence) (BNat limit)) Bool
+(define-fun ISequence@assertValuesRange ((s ISequence) (limit BNat)) Bool
   (let ((len (ISequence@size s)))
     (forall ((i BNat))
       (=> (bvult i len)
@@ -238,7 +238,7 @@
   (BKey_type t)
 )
 
-(define-fun GetTypeTag@BTerm ((t BKey)) TypeTag
+(define-fun GetTypeTag@BTerm ((t BTerm)) TypeTag
   (ite (is-BTerm@termbox t) (BTerm_termtype t) (BKey_type (BTerm_keyvalue t)))
 )
 

@@ -282,17 +282,17 @@ class SMTAssembly {
     }
 
     computeBVMinSigned(bits: bigint): string {
-        const bbn = 1n << bits;
+        const bbn = ((2n ** bits) / 2n);
         return bbn.toString();
     }
 
     computeBVMaxSigned(bits: bigint): string {
-        const bbn = -(~(1n << bits));
+        const bbn = ((2n ** bits) / 2n) - 1n;
         return bbn.toString();
     }
 
     computeBVMaxUnSigned(bits: bigint): string {
-        const bbn = (1n << bits) | ~(1n << bits);
+        const bbn = (2n ** bits) - 1n;
         return bbn.toString();
     }
 
@@ -377,7 +377,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -388,7 +388,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -399,7 +399,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -410,7 +410,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -421,7 +421,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -432,7 +432,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -454,7 +454,7 @@ class SMTAssembly {
                 keytypeinfo.push({
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 });
             });
 
@@ -473,7 +473,7 @@ class SMTAssembly {
                 return {
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (arg ${kt.smtname}))`
+                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
                 };
             });
 
@@ -543,18 +543,18 @@ class SMTAssembly {
             action.push(...this.model.argchk.map((chk) => `(assert ${chk.emitSMT2(undefined)})`));
         }
 
-        if(mode === "Refute") {
+        if (mode === "Refute") {
             action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
-            action.push(`(assert ${this.modes.refute.emitSMT2(undefined)}`);
+            action.push(`(assert ${this.modes.refute.emitSMT2(undefined)})`);
             action.push("(check-sat)");
         }
         else if (mode === "Generate") {
             action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
-            action.push(`(assert ${this.modes.generate.emitSMT2(undefined)}`);
+            action.push(`(assert ${this.modes.generate.emitSMT2(undefined)})`);
             action.push("(check-sat)");
             action.push("(get-model");
         }
@@ -582,11 +582,11 @@ class SMTAssembly {
             STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 32)))" : "(define-sort BString () String)"),
             KEY_TUPLE_INFO: { decls: keytupleinfo.map((kti) => kti.decl), constructors: keytupleinfo.map((kti) => kti.consf), boxing: keytupleinfo.map((kti) => kti.boxf) },
             KEY_RECORD_INFO: { decls: keyrecordinfo.map((kti) => kti.decl), constructors: keyrecordinfo.map((kti) => kti.consf), boxing: keyrecordinfo.map((kti) => kti.boxf) },
-            KEY_COLLECTION_INTERNAL_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf) },
+            KEY_COLLECTION_INTERNAL_INFO: { decls: keycollectioninternaldecls.map((kti) => kti.decl), constructors: keycollectioninternaldecls.map((kti) => kti.consf) },
             KEY_TYPE_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf), boxing: keytypeinfo.map((kti) => kti.boxf) },
             TUPLE_INFO: { decls: termtupleinfo.map((kti) => kti.decl), constructors: termtupleinfo.map((kti) => kti.consf), boxing: termtupleinfo.map((kti) => kti.boxf) },
             RECORD_INFO: { decls: termrecordinfo.map((kti) => kti.decl), constructors: termrecordinfo.map((kti) => kti.consf), boxing: termrecordinfo.map((kti) => kti.boxf) },
-            TYPE_COLLECTION_INTERNAL_INFO: { decls: termtypeinfo.map((kti) => kti.decl), constructors: termtypeinfo.map((kti) => kti.consf) },
+            TYPE_COLLECTION_INTERNAL_INFO: { decls: generalcollectioninternaldecls.map((kti) => kti.decl), constructors: generalcollectioninternaldecls.map((kti) => kti.consf) },
             TYPE_INFO: { decls: termtypeinfo.map((kti) => kti.decl), constructors: termtypeinfo.map((kti) => kti.consf), boxing: termtypeinfo.map((kti) => kti.boxf) },
             EPHEMERAL_DECLS: { decls: etypeinfo.map((kti) => kti.decl), constructors: etypeinfo.map((kti) => kti.consf) },
             RESULT_INFO: { decls: rtypeinfo.map((kti) => kti.decl), constructors: rtypeinfo.map((kti) => kti.consf) },

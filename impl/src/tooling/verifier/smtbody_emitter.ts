@@ -2012,43 +2012,103 @@ class SMTBodyEmitter {
                 break;
             }
             //op infix <
-            case "NSCore::<=infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::<=infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::<=infix=(NSCore::BigInt, NSCore::BigInt)":
-            case "NSCore::<=infix=(NSCore::BigNat, NSCore::BigNat)":
-            case "NSCore::<=infix=(NSCore::Rational, NSCore::Rational)":
-            case "NSCore::<=infix=(NSCore::Float, NSCore::Float)":
+            case "NSCore::<=infix=(NSCore::Int, NSCore::Int)": {
+                smte = new SMTCallSimple("bvslt", args);
+                break;
+            }
+            case "NSCore::<=infix=(NSCore::Nat, NSCore::Nat)": {
+                smte = new SMTCallSimple("bvult", args);
+                break;
+            }
+            case "NSCore::<=infix=(NSCore::BigInt, NSCore::BigInt)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvslt", args) : new SMTCallSimple("<", args);
+                break;
+            }
+            case "NSCore::<=infix=(NSCore::BigNat, NSCore::BigNat)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvult", args) : new SMTCallSimple("<", args);
+                break;
+            }
+            case "NSCore::<=infix=(NSCore::Rational, NSCore::Rational)": {
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_lt"), ...args]) : new SMTCallSimple("<", args);
+                break;
+            }
+            case "NSCore::<=infix=(NSCore::Float, NSCore::Float)": {
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_lt"), ...args]) : new SMTCallSimple("<", args);
+                break;
+            }
             case "NSCore::<=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = new SMTCallSimple("<", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_lt"), ...args]) : new SMTCallSimple("<", args);
                 break;
             }
             //op infix >
-            case "NSCore::>=infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::>=infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::>=infix=(NSCore::BigInt, NSCore::BigInt)":
-            case "NSCore::>=infix=(NSCore::BigNat, NSCore::BigNat)":
-            case "NSCore::>=infix=(NSCore::Rational, NSCore::Rational)":
-            case "NSCore::>=infix=(NSCore::Float, NSCore::Float)":
+            case "NSCore::>=infix=(NSCore::Int, NSCore::Int)": {
+                smte = new SMTCallSimple("bvsgt", args);
+                break;
+            }
+            case "NSCore::>=infix=(NSCore::Nat, NSCore::Nat)": {
+                smte = new SMTCallSimple("bvugt", args);
+                break;
+            }
+            case "NSCore::>=infix=(NSCore::BigInt, NSCore::BigInt)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvsgt", args) : new SMTCallSimple(">", args);
+                break;
+            }
+            case "NSCore::>=infix=(NSCore::BigNat, NSCore::BigNat)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvugt", args) : new SMTCallSimple(">", args);
+                break;
+            }
+            case "NSCore::>=infix=(NSCore::Rational, NSCore::Rational)": {
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_gt"), ...args]) : new SMTCallSimple(">", args);
+                break;
+            }
+            case "NSCore::>=infix=(NSCore::Float, NSCore::Float)": {
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BFloatBinary_UF", [new SMTConst("op_binary_gt"), ...args]) : new SMTCallSimple(">", args);
+                break;
+            }
             case "NSCore::>=infix=(NSCore::Decimal, NSCore::Decimal)": {
-                smte = new SMTCallSimple(">", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BDecimalBinary_UF", [new SMTConst("op_binary_gt"), ...args]) : new SMTCallSimple(">", args);
                 break;
             }
             //op infix <=
-            case "NSCore::<==infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::<==infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::<==infix=(NSCore::BigInt, NSCore::BigInt)":
-            case "NSCore::<==infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::<==infix=(NSCore::Int, NSCore::Int)": {
+                smte = new SMTCallSimple("bvsle", args);
+                break;
+            }
+            case "NSCore::<==infix=(NSCore::Nat, NSCore::Nat)": {
+                smte = new SMTCallSimple("bvule", args);
+                break;
+            }
+            case "NSCore::<==infix=(NSCore::BigInt, NSCore::BigInt)":  {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvsle", args) : new SMTCallSimple("<=", args);
+                break;
+            }
+            case "NSCore::<==infix=(NSCore::BigNat, NSCore::BigNat)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvule", args) : new SMTCallSimple("<=", args);
+                break;
+            }
             case "NSCore::<==infix=(NSCore::Rational, NSCore::Rational)": {
-                smte = new SMTCallSimple("<=", args);
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_lte"), ...args]) : new SMTCallSimple("<=", args);
                 break;
             }
             //op infix >=
-            case "NSCore::>==infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::>==infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::>==infix=(NSCore::BigInt, NSCore::BigInt)":
-            case "NSCore::>==infix=(NSCore::BigNat, NSCore::BigNat)":
-            case "NSCore::>==infix=(NSCore::Rational, NSCore::Rational)": {
-                smte = new SMTCallSimple(">=", args);
+            case "NSCore::>==infix=(NSCore::Int, NSCore::Int)": {
+                smte = new SMTCallSimple("bvsge", args);
+                break;
+            }
+            case "NSCore::>==infix=(NSCore::Nat, NSCore::Nat)": {
+                smte = new SMTCallSimple("bvuge", args);
+                break;
+            }
+            case "NSCore::>==infix=(NSCore::BigInt, NSCore::BigInt)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvsge", args) : new SMTCallSimple(">=", args);
+                break;
+            }
+            case "NSCore::>==infix=(NSCore::BigNat, NSCore::BigNat)": {
+                smte = (this.vopts.BigXMode === "BV") ? new SMTCallSimple("bvuge", args) : new SMTCallSimple(">=", args);
+                break;
+            }
+            case "NSCore::>==infix=(NSCore::Rational, NSCore::Rational)":{
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_gte"), ...args]) : new SMTCallSimple(">=", args);
                 break;
             }
             default: {

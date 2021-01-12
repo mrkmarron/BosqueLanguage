@@ -428,47 +428,47 @@ class SMTTypeEmitter {
     }
 
     generateResultType(ttype: MIRType): SMTType {
-        return new SMTType(`$Result_${this.mangle(ttype.trkey)}`);
+        return new SMTType(`$Result_${this.getSMTTypeFor(ttype).name}`);
     }
 
     generateResultTypeConstructorSuccess(ttype: MIRType, val: SMTExp): SMTExp {
-        return new SMTCallSimple(`$Result_${this.mangle(ttype.trkey)}@success`, [val]);
+        return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@success`, [val]);
     }
 
     generateResultTypeConstructorError(ttype: MIRType, err: SMTExp): SMTExp {
-        return new SMTCallSimple(`$Result_${this.mangle(ttype.trkey)}@error`, [err]);
+        return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@error`, [err]);
     }
 
     generateResultIsSuccessTest(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`is-$Result_${this.mangle(ttype.trkey)}@success`, [exp]);
+        return new SMTCallSimple(`is-$Result_${this.getSMTTypeFor(ttype).name}@success`, [exp]);
     }
 
     generateResultIsErrorTest(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`is-$Result_${this.mangle(ttype.trkey)}@error`, [exp]);
+        return new SMTCallSimple(`is-$Result_${this.getSMTTypeFor(ttype).name}@error`, [exp]);
     }
 
     generateResultGetSuccess(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`$Result_${this.mangle(ttype.trkey)}@success_value`, [exp]);
+        return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@success_value`, [exp]);
     }
 
     generateResultGetError(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`$Result_${this.mangle(ttype.trkey)}@error_value`, [exp]);
+        return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@error_value`, [exp]);
     }
 
     generateAccessWithSetGuardResultType(ttype: MIRType): SMTType {
-        return new SMTType(`$GuardResult_${this.mangle(ttype.trkey)}`);
+        return new SMTType(`$GuardResult_${this.getSMTTypeFor(ttype).name}`);
     }
 
     generateAccessWithSetGuardResultTypeConstructorLoad(ttype: MIRType, value: SMTExp, flag: boolean): SMTExp {
-        return new SMTCallSimple(`$GuardResult_${this.mangle(ttype.trkey)}@cons`, [value, new SMTConst(flag ? "true" : "false")]);
+        return new SMTCallSimple(`$GuardResult_${this.getSMTTypeFor(ttype).name}@cons`, [value, new SMTConst(flag ? "true" : "false")]);
     }
 
     generateAccessWithSetGuardResultGetValue(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`$GuardResult_${this.mangle(ttype.trkey)}@result`, [exp]);
+        return new SMTCallSimple(`$GuardResult_${this.getSMTTypeFor(ttype).name}@result`, [exp]);
     }
 
     generateAccessWithSetGuardResultGetFlag(ttype: MIRType, exp: SMTExp): SMTExp {
-        return new SMTCallSimple(`$GuardResult_${this.mangle(ttype.trkey)}@flag`, [exp]);
+        return new SMTCallSimple(`$GuardResult_${this.getSMTTypeFor(ttype).name}@flag`, [exp]);
     }
 }
 

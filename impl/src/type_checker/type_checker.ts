@@ -5275,7 +5275,9 @@ class TypeChecker {
                 this.m_emitter.setActiveBlock(trueblck);
 
                 const truestate = this.checkStatement(TypeEnvironment.join(this.m_assembly, ...cflow.tenvs), stmt.flow.conds[i].action);
-                this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+                if(truestate.hasNormalFlow()) {
+                    this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+                }
 
                 results.push(truestate);
                 hasfalseflow = false;
@@ -5288,7 +5290,9 @@ class TypeChecker {
                 this.m_emitter.setActiveBlock(trueblck);
                 
                 const truestate = this.checkStatement(TypeEnvironment.join(this.m_assembly, ...cflow.tenvs), stmt.flow.conds[i].action);
-                this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+                if (truestate.hasNormalFlow()) {
+                    this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+                }
                 
                 this.m_emitter.setActiveBlock(falseblck);
                 
@@ -5299,7 +5303,10 @@ class TypeChecker {
 
         if (stmt.flow.elseAction === undefined || !hasfalseflow) {
             results.push(cenv);
-            this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+
+            if(cenv.hasNormalFlow()) {
+                this.m_emitter.emitDirectJump(stmt.sinfo, doneblck);
+            }
         }
         else {
             const aenv = this.checkStatement(cenv, stmt.flow.elseAction);
@@ -5492,7 +5499,9 @@ class TypeChecker {
                 const truestate = this.checkStatement(test.tenv, stmt.flow[i].action);
 
                 results.push(truestate);
-                rblocks.push([actionlabel, test.newlive]);
+                if(truestate.hasNormalFlow()) {
+                    rblocks.push([actionlabel, test.newlive]);
+                }
 
                 this.m_emitter.setActiveBlock(nextlabel);
                 this.m_emitter.emitDeadBlock(stmt.sinfo);
@@ -5505,7 +5514,9 @@ class TypeChecker {
                 const truestate = this.checkStatement(test.tenv, stmt.flow[i].action);
 
                 results.push(truestate);
-                rblocks.push([actionlabel, test.newlive]);
+                if(truestate.hasNormalFlow()) {
+                    rblocks.push([actionlabel, test.newlive]);
+                }
 
                 this.m_emitter.setActiveBlock(nextlabel);
                 cenv = test.fenv as TypeEnvironment;
