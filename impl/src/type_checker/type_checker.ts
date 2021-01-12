@@ -1365,7 +1365,7 @@ class TypeChecker {
 
                 filledLocations[fidx] = { vtype: arg.argtype as ValueType, mustDef: true, fflagchk: false, trgt: arg.treg as MIRRegisterArgument };
                 if(flatfinfo[fidx][1].value !== undefined) {
-                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, fidx - optfirst, true);
+                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, fidx - optfirst, true);
                 }
             }
             else if (arg.expando && (arg.argtype as ValueType).flowtype.isRecordTargetType()) {
@@ -1391,7 +1391,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, field.value === undefined, `Field "${fields[fidx]}" is required and must be assigned a value in constructor`);
                         
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, ptype, etreg);
-                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst, optcount));
+                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag as string, fidx - optfirst, optcount));
                         filledLocations[fidx] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, trgt: etreg };
                     }
                 });
@@ -1419,7 +1419,7 @@ class TypeChecker {
             if (!arg.expando) {
                 filledLocations[ii] = { vtype: arg.argtype as ValueType, mustDef: true, fflagchk: false, trgt: arg.treg as MIRRegisterArgument };
                 if(flatfinfo[ii][1].value !== undefined) {
-                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, ii - optfirst, true);
+                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, ii - optfirst, true);
                 }
                 
                 ++ii;
@@ -1445,7 +1445,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, field.value === undefined, `Field "${fields[ii]}" is required and must be assigned a value in constructor`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, itype, etreg);
-                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst, optcount));
+                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag as string, ii - optfirst, optcount));
                         filledLocations[ii] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, trgt: etreg };
                     }
 
@@ -1473,12 +1473,12 @@ class TypeChecker {
 
                 const emptyreg = this.m_emitter.generateTmpRegister();
                 this.m_emitter.emitLoadUninitVariableValue(sinfo, this.m_emitter.registerResolvedTypeReference(fieldtype), emptyreg);
-                this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, i - optfirst, false);
+                this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, i - optfirst, false);
                 filledLocations[i] = { vtype: ValueType.createUniform(fieldtype), mustDef: false, fflagchk: true, trgt: emptyreg };
             }
 
             if(filledLocations[i].fflagchk) {
-                cargs.push(this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype, new MIRStatmentGuard(new MIRMaskGuard(fflag, i - optfirst, optcount), undefined)));
+                cargs.push(this.emitCheckedInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype, new MIRStatmentGuard(new MIRMaskGuard(fflag as string, i - optfirst, optcount), undefined)));
             }
             else {
                 cargs.push(this.emitInlineConvertIfNeeded(sinfo, filledLocations[i].trgt, filledLocations[i].vtype, fieldtype));
@@ -1493,7 +1493,7 @@ class TypeChecker {
         return constype;
     }
 
-    private checkArgumentsSignature(sinfo: SourceInfo, env: TypeEnvironment, name: string, sig: ResolvedFunctionType, args: ExpandedArgument[]): { args: MIRArgument[], fflag: string, refs: ["ref" | "out" | "out?", MIRRegisterArgument, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
+    private checkArgumentsSignature(sinfo: SourceInfo, env: TypeEnvironment, name: string, sig: ResolvedFunctionType, args: ExpandedArgument[]): { args: MIRArgument[], fflag: string | undefined, refs: ["ref" | "out" | "out?", MIRRegisterArgument, ResolvedType][], pcodes: PCode[], cinfo: [string, ResolvedType][] } {
         const optcount = sig.params.filter((p) => p.isOptional).length;
         const optfirst = sig.params.findIndex((p) => p.isOptional);
         const fflag = this.m_emitter.emitGuardFlagLocation(sinfo, name, optcount);
@@ -1510,7 +1510,7 @@ class TypeChecker {
 
                 filledLocations[fidx] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
                 if(sig.params[fidx].isOptional) {
-                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, fidx - optfirst, true);
+                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, fidx - optfirst, true);
                 }
             }
             else if (arg.expando && (arg.argtype as ValueType).flowtype.isRecordTargetType()) {
@@ -1536,7 +1536,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, ptype, etreg);
-                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag, fidx - optfirst, optcount));
+                        this.m_emitter.emitLoadRecordPropertySetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), pname, !(arg.argtype as ValueType).flowtype.isUniqueRecordTargetType(), ptype, etreg, new MIRMaskGuard(fflag as string, fidx - optfirst, optcount));
                         filledLocations[fidx] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
                     }
                 });
@@ -1564,7 +1564,7 @@ class TypeChecker {
             if (!arg.expando) {
                 filledLocations[ii] = { vtype: arg.argtype, mustDef: true, fflagchk: false, ref: arg.ref, pcode: arg.pcode, trgt: arg.treg };
                 if(sig.params[ii].isOptional) {
-                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, ii - optfirst, true);
+                    this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, ii - optfirst, true);
                 }
 
                 ++ii;
@@ -1590,7 +1590,7 @@ class TypeChecker {
                         this.raiseErrorIf(sinfo, !param.isOptional, `Parameter "${param.name}" is required and must be assigned a value in call`);
 
                         this.m_emitter.emitLoadUninitVariableValue(sinfo, itype, etreg);
-                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag, ii - optfirst, optcount));
+                        this.m_emitter.emitLoadTupleIndexSetGuard(sinfo, arg.treg as MIRRegisterArgument, this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).layout), this.m_emitter.registerResolvedTypeReference((arg.argtype as ValueType).flowtype), ectr, !(arg.argtype as ValueType).flowtype.isUniqueTupleTargetType(), itype, etreg, new MIRMaskGuard(fflag as string, ii - optfirst, optcount));
                         filledLocations[ii] = { vtype: ValueType.createUniform(lvtype), mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: etreg };
                     }
 
@@ -1631,7 +1631,7 @@ class TypeChecker {
 
                 const emptyreg = this.m_emitter.generateTmpRegister();
                 this.m_emitter.emitLoadUninitVariableValue(sinfo, this.m_emitter.registerResolvedTypeReference(paramtype as ResolvedType), emptyreg);
-                this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag, j - optfirst, false);
+                this.m_emitter.emitSetGuardFlagConstant(sinfo, fflag as string, j - optfirst, false);
                 filledLocations[j] = { vtype: ValueType.createUniform(paramtype as ResolvedType), mustDef: false, fflagchk: true, ref: undefined, pcode: undefined, trgt: emptyreg };
             }
 
@@ -1658,7 +1658,7 @@ class TypeChecker {
                 if (sig.params[j].refKind === undefined || sig.params[j].refKind === "ref") {
                     let narg = filledLocations[j].trgt as MIRArgument;
                     if (filledLocations[j].fflagchk) {
-                        narg = this.emitCheckedInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType, new MIRStatmentGuard(new MIRMaskGuard(fflag, j - optfirst, optcount), undefined));
+                        narg = this.emitCheckedInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType, new MIRStatmentGuard(new MIRMaskGuard(fflag as string, j - optfirst, optcount), undefined));
                     }
                     else {
                         narg = this.emitInlineConvertIfNeeded(sinfo, narg, filledLocations[j].vtype as ValueType, sig.params[j].type as ResolvedType);
@@ -2531,7 +2531,7 @@ class TypeChecker {
 
             const opkey = this.m_emitter.registerNamespaceOperatorCall(opdecl.ns, opdecl.name, opdecl, sigkeys, pcodes, cinfo);
             const refinfo = this.generateRefInfoForCallEmit(fsig as ResolvedFunctionType, refs);
-            this.m_emitter.emitInvokeFixedFunction(sinfo, opkey, cargs, "[IGNORE]", refinfo, trgt);
+            this.m_emitter.emitInvokeFixedFunction(sinfo, opkey, cargs, undefined, refinfo, trgt);
         }
         else {
             let cargs: {arglayouttype: MIRType, argflowtype: MIRType, arg: MIRArgument}[] = [];

@@ -1356,7 +1356,7 @@ class SMTBodyEmitter {
             assert(op.guard === undefined && op.optmask === undefined);
 
             const args = op.args.map((arg) => this.argToSMT(arg));
-            return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, invk.implkey, args, continuation);
+            return this.processDefaultOperatorInvokePrimitiveType(op.sinfo, op.trgt, op.mkey, args, continuation);
         }
         else {
             let mask: SMTMaskConstruct | undefined = undefined;

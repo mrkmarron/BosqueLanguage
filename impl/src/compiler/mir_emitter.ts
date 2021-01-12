@@ -240,9 +240,9 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRLoadUnintVariableValue(sinfo, trgt, oftype.trkey));
     }
 
-    emitGuardFlagLocation(sinfo: SourceInfo, name: string, count: number): string {
+    emitGuardFlagLocation(sinfo: SourceInfo, name: string, count: number): string | undefined {
         if(!this.emitEnabled || count === 0) {
-            return "[IGNORE]";
+            return undefined;
         }
 
         this.m_currentBlock.push(new MIRDeclareGuardFlagLocation(sinfo, name, count));
