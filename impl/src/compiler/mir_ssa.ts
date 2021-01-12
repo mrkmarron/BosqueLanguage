@@ -10,7 +10,6 @@ import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topolo
 import { MIRType } from "./mir_assembly";
 
 type SSAState = {
-    newtidctr: number,
     booltype: MIRResolvedTypeKey,
 
     remap: Map<string, MIRRegisterArgument>,
@@ -21,24 +20,21 @@ type SSAState = {
 function convertToSSA(reg: MIRRegisterArgument, oftype: MIRResolvedTypeKey, ssastate: SSAState): MIRRegisterArgument {
     if (!ssastate.ctrs.has(reg.nameID)) {
         ssastate.ctrs.set(reg.nameID, 0);
-
         ssastate.remap.set(reg.nameID, reg);
         ssastate.vartypes.set(reg.nameID, oftype);
 
         return reg;
     }
     else {
-        const ssaCtr = ssastate.ctrs.has(reg.nameID) ? ssastate.ctrs.get(reg.nameID) as number + 1 : 0;
+        const ssaCtr = ssastate.ctrs.get(reg.nameID) as number + 1;
         ssastate.ctrs.set(reg.nameID, ssaCtr);
 
         const vname = reg.nameID + `$${ssaCtr}`;
+        ssastate.remap.set(reg.nameID, new MIRRegisterArgument(vname, reg.nameID));
 
-        let rreg = new MIRRegisterArgument(`#tmp_${ssastate.newtidctr++}`, vname);
-        
-        ssastate.remap.set(reg.nameID, rreg);
-        ssastate.vartypes.set(rreg.nameID, oftype);
+        ssastate.vartypes.set(vname, oftype);
 
-        return rreg;
+        return ssastate.remap.get(reg.nameID) as MIRRegisterArgument;
     }
 }
 
@@ -466,7 +462,6 @@ function convertBodyToSSA(body: MIRBody, booltype: MIRType, args: Map<string, MI
 
     let remapped = new Map<string, Map<string, MIRRegisterArgument>>();
     let ssastate = {
-        newtidctr: 100000,
         booltype: booltype.trkey,
         
         remap: new Map<string, MIRRegisterArgument>(),
@@ -490,13 +485,14 @@ function convertBodyToSSA(body: MIRBody, booltype: MIRType, args: Map<string, MI
         }
         else {
             const [phis, remap] = computePhis(body.sinfo, block.label, ssastate, remapped, links, live);
+            ssastate.remap = remap;
 
             for (let i = 0; i < block.ops.length; ++i) {
                 assignSSA(block.ops[i], ssastate);
             }
 
             block.ops.unshift(...phis);
-            remapped.set(block.label, remap);
+            remapped.set(block.label, ssastate.remap);
         }
     }
 }

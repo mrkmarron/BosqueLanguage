@@ -181,6 +181,7 @@ const AttributeStrings = [
     "grounded",
     "validator",
 
+    "__primitive",
     "__safe",
     "__assume_safe"
 ];
@@ -428,7 +429,7 @@ class Lexer {
         }
 
         Lexer._s_numberinoRe.lastIndex = this.m_cpos;
-        const mnio = Lexer._s_intRe.exec(this.m_input);
+        const mnio = Lexer._s_numberinoRe.exec(this.m_input);
         if (mnio !== null) {
             this.recordLexTokenWData(this.m_cpos + mnio[0].length, TokenStrings.Numberino, mnio[0]);
             return true;
@@ -1375,7 +1376,7 @@ class Parser {
                 if (this.testFollows(TokenStrings.Identifier, "=")) {
                     const name = this.consumeTokenAndGetValue();
                     this.ensureAndConsumeToken("=");
-                    let exp = this.parseOfExpression();
+                    let exp = this.parseExpression();
 
                     if (seenNames.has(name)) {
                         this.raiseError(line, "Cannot have duplicate named argument name");
@@ -1390,7 +1391,7 @@ class Parser {
                 }
                 else {
                     const isSpread = this.testAndConsumeTokenIf("...");
-                    let exp = this.parseOfExpression();
+                    let exp = this.parseExpression();
 
                     args.push(new PositionalArgument(rref, isSpread, exp));
                 }
@@ -1891,7 +1892,7 @@ class Parser {
         else if (tk === "ok" || tk === "err") {
             this.consumeToken();
             this.ensureAndConsumeToken("(");
-            const arg = this.parseOfExpression();
+            const arg = this.parseExpression();
             this.ensureAndConsumeToken(")");
 
             return new SpecialConstructorExpression(sinfo, this.m_penv.getCurrentFunctionScope().getReturnType(), tk, arg);
@@ -1899,7 +1900,8 @@ class Parser {
         else if (tk === TokenStrings.Identifier) {
             let namestr = this.consumeTokenAndGetValue();
 
-            const isvar = this.m_penv.isVarDefinedInAnyScope(namestr) || namestr.startsWith("$");
+            const tryfunctionns = this.m_penv.tryResolveNamespace(undefined, namestr);
+            const isvar = this.m_penv.isVarDefinedInAnyScope(namestr) || tryfunctionns === undefined || namestr.startsWith("$");
             if (isvar) {
                 const istr = this.m_penv.useLocalVar(namestr);
 
@@ -1917,8 +1919,7 @@ class Parser {
                 }
             }
             else {
-                const ns = this.m_penv.tryResolveNamespace(undefined, namestr);
-                if (ns === undefined) {
+                if (tryfunctionns === undefined) {
                     this.raiseError(line, `Cannot resolve namespace for "${namestr}"`);
                 }
 
@@ -1926,7 +1927,7 @@ class Parser {
                 const rec = this.testToken("[") ? this.parseRecursiveAnnotation() : "no";
                 const args = this.parseArguments("(", ")");
 
-                return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, namestr, targs, rec, args, "std");
+                return new CallNamespaceFunctionOrOperatorExpression(sinfo, tryfunctionns as string, namestr, targs, rec, args, "std");
             }
         }
         else if (tk === TokenStrings.Operator) {
@@ -2252,7 +2253,7 @@ class Parser {
                                     this.m_penv.getCurrentFunctionScope().defineLocalVar(`$this`, `$this_#${sinfo.pos}`, true);
                                 }
 
-                                const value = this.parseOfExpression();
+                                const value = this.parseExpression();
                                 return { index: idx, value: value };
                             }
                             finally {
@@ -2303,7 +2304,7 @@ class Parser {
                                     this.m_penv.getCurrentFunctionScope().defineLocalVar(`$this`, `$this_#${sinfo.pos}`, true);
                                 }
 
-                                const value = this.parseOfExpression();
+                                const value = this.parseExpression();
                                 return { name: uname, value: value };
                             }
                             finally {
@@ -2697,7 +2698,7 @@ class Parser {
             return this.parseOrExpression();
         }
         else {
-            let lexp = this.testToken("(") ? this.parseOfExpression() : this.parseOrExpression();
+            let lexp = this.parseOrExpression();
             let leftof: TypeSignature | undefined = undefined;
             if(this.testToken("of")) {
                 leftof = this.parseTypeSignature(true);
@@ -2708,7 +2709,7 @@ class Parser {
             }
             
             if(this.testAndConsumeTokenIf("=>")) {
-                let rexp = this.testToken("(") ? this.parseOfExpression() : this.parseOrExpression();
+                let rexp = this.parseOrExpression();
                 let rightof: TypeSignature | undefined = undefined;
                 if (this.testToken("of")) {
                     rightof = this.parseTypeSignature(true);
@@ -2746,8 +2747,20 @@ class Parser {
         }
     }
 
+    private parseOfExpression(): Expression {
+        let exp = this.parseSelectExpression();
+
+        if (this.testAndConsumeTokenIf("of")) {
+            const sinfo = this.getCurrentSrcInfo();
+            const oftype = this.parseTypeSignature(true);
+            exp = new OfTypeConvertExpression(sinfo, exp, oftype);
+        }
+
+        return exp;
+    }
+
     private parseExpOrExpression(): Expression {
-        const texp = this.parseSelectExpression();
+        const texp = this.parseOfExpression();
 
         if (this.testFollows("?", "none", "?") || this.testFollows("?", "err", "?") || this.testElvisFollows("?")) {
             const ffsinfo = this.getCurrentSrcInfo();
@@ -2877,47 +2890,6 @@ class Parser {
 
     private parseExpression(): Expression {
         return this.parseExpOrExpression();
-    }
-
-    private parseOfExpression(): Expression {
-        //either E | E of T or (E of T)
-        if (this.testToken("(")) {
-            const epos = this.scanMatchingParens("(", ")");
-            if (epos !== this.m_epos && this.peekToken(epos + 1) === "of") {
-                //(E) of T
-                let exp = this.parseSelectExpression();
-                this.ensureAndConsumeToken("of");
-
-                const sinfo = this.getCurrentSrcInfo();
-                const oftype = this.parseTypeSignature(true);
-                return new OfTypeConvertExpression(sinfo, exp, oftype);
-            }
-            else {
-                //(E [of T]?)
-                this.ensureAndConsumeToken("(");
-                let exp = this.parseSelectExpression();
-
-                if (this.testAndConsumeTokenIf("of")) {
-                    const sinfo = this.getCurrentSrcInfo();
-                    const oftype = this.parseTypeSignature(true);
-                    exp = new OfTypeConvertExpression(sinfo, exp, oftype);
-                }
-                this.ensureAndConsumeToken(")");
-
-                return exp;
-            }
-        }
-        else {
-            let exp = this.parseSelectExpression();
-
-            if (this.testAndConsumeTokenIf("of")) {
-                const sinfo = this.getCurrentSrcInfo();
-                const oftype = this.parseTypeSignature(true);
-                exp = new OfTypeConvertExpression(sinfo, exp, oftype);
-            }
-
-            return exp;
-        }
     }
 
     ////
@@ -4364,7 +4336,7 @@ class Parser {
             }
 
             const ns = this.m_penv.assembly.getNamespace("NSCore");
-            const sig = this.parseInvokableCommon(InvokableKind.StaticOperator, false, attributes, recursive, [], undefined);
+            const sig = this.parseInvokableCommon(InvokableKind.StaticOperator, attributes.includes("abstract"), attributes, recursive, [], undefined);
 
             let level = -1;
             if(fname === "+" || fname === "-") {

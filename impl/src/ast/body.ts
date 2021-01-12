@@ -539,7 +539,7 @@ class CallNamespaceFunctionOrOperatorExpression extends Expression {
     readonly opkind: "prefix" | "infix" | "std";
 
     constructor(sinfo: SourceInfo, ns: string, name: string, terms: TemplateArguments, rec: RecursiveAnnotation, args: Arguments, opkind: "prefix" | "infix" | "std") {
-        super(ExpressionTag.CallStaticFunctionOrOperatorExpression, sinfo);
+        super(ExpressionTag.CallNamespaceFunctionOrOperatorExpression, sinfo);
         this.ns = ns;
         this.name = name;
         this.rec = rec;

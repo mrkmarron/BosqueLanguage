@@ -2361,7 +2361,7 @@ class Assembly {
         const rrsigs: {sig: ResolvedFunctionType, idx: number}[] = [];
         for(let i = 0; i < ppairs.length; ++i) {
             const isig = ppairs[i].sig;
-            let nomorespecific = false;
+            let nomorespecific = true;
 
             for(let j = 0; j < ppairs.length; ++j) {
                 if(i == j) {
@@ -2369,20 +2369,20 @@ class Assembly {
                 }
 
                 const jsig = ppairs[j].sig;
-                let morespecific = true;
+                let morespecific = false;
                 for(let k = 0; k < isig.params.length; ++ k) {
                     if(isig.params[k] instanceof ResolvedFunctionType) {
                         continue;
                     }
 
-                    if(!this.subtypeOf(jsig.params[k].type as ResolvedType, isig.params[k].type as ResolvedType)) {
-                        morespecific = false;
+                    if(this.subtypeOf(jsig.params[k].type as ResolvedType, isig.params[k].type as ResolvedType)) {
+                        morespecific = true;
                         break;
                     } 
                 }
 
                 if(morespecific) {
-                    nomorespecific = true;
+                    nomorespecific = false;
                     break;
                 }
             }

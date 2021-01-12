@@ -2029,33 +2029,26 @@ class TypeChecker {
         //TODO: should do int/nat/FP bounds checks more generally here
         //
 
-        const isfpnum = exp.value.includes(".");
+        if(iitype.isSameType(this.m_assembly.getSpecialIntType()) || iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
+            //TODO: should also check bounds
 
-        if(iitype.isSameType(this.m_assembly.getSpecialIntType()) || iitype.isSameType(this.m_assembly.getSpecialNatType()) || iitype.isSameType(this.m_assembly.getSpecialBigIntType()) || iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
-            this.raiseErrorIf(exp.sinfo, isfpnum, "Cannot convert fp into integral value");
+            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+            return env.setUniformResultExpression(iitype);
+        }
+        else if(iitype.isSameType(this.m_assembly.getSpecialNatType()) || iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
+            this.raiseErrorIf(exp.sinfo, exp.value.startsWith("-"), "Cannot have negative BigNat literal");
 
-            let fspec = "[INVALID]";
-            if (iitype.isSameType(this.m_assembly.getSpecialIntType())) {
-                fspec = "i";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialNatType())) {
-                fspec = "n";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
-                fspec = "I";
-            }
-            else {
-                fspec = "N";
-            }
-
-            return this.checkLiteralIntegralExpression(env, new LiteralIntegralExpression(exp.sinfo, exp.value + fspec, iitype), trgt);
+            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+            return env.setUniformResultExpression(iitype);
         }
         else if(iitype.isSameType(this.m_assembly.getSpecialFloatType()) || iitype.isSameType(this.m_assembly.getSpecialDecimalType())) {
-            const fspec = iitype.isSameType(this.m_assembly.getSpecialFloatType()) ? "f" : "d";
-            return this.checkLiteralFloatExpression(env, new LiteralFloatPointExpression(exp.sinfo, exp.value + fspec, iitype), trgt);
+            this.m_emitter.emitLoadConstFloatPoint(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+
+            return env.setUniformResultExpression(iitype);
         }
         else if(iitype.isSameType(this.m_assembly.getSpecialRationalType())) {
-            return this.checkLiteralRationalExpression(env, new LiteralRationalExpression(exp.sinfo, exp.value + "/1R", iitype), trgt);
+            this.m_emitter.emitLoadConstRational(exp.sinfo, exp.value, trgt);
+            return env.setUniformResultExpression(this.m_assembly.getSpecialRationalType());
         }
         else {
             this.raiseErrorIf(exp.sinfo, !iitype.isUniqueCallTargetType() || !iitype.getUniqueCallTargetType().object.specialDecls.has(SpecialTypeCategory.TypeDeclNumeric), "Not a valid numeric decl type");
@@ -2063,30 +2056,8 @@ class TypeChecker {
             const tt = (iitype.getUniqueCallTargetType().object.memberFields.find((mf) => mf.name === "value") as MemberFieldDecl).declaredType;
             const rtt = this.m_assembly.normalizeTypeOnly(tt, new Map<string, ResolvedType>());
 
-            let fspec = "[INVALID]";
-            if (iitype.isSameType(this.m_assembly.getSpecialIntType())) {
-                fspec = "i";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialNatType())) {
-                fspec = "n";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
-                fspec = "I";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
-                fspec = "N";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialFloatType())) {
-                fspec = "f";
-            }
-            else if (iitype.isSameType(this.m_assembly.getSpecialDecimalType())) {
-                fspec = "d";
-            }
-            else {
-                fspec = "/1R";
-            }
 
-            return this.checkTypedTypedNumericConstructor(env, new LiteralTypedNumericConstructorExpression(exp.sinfo, exp.value + fspec, rtt, iitype), trgt);
+            return this.checkTypedTypedNumericConstructor_helper(exp.sinfo, env, exp.value, iitype, rtt, trgt);
         }
     }
 
@@ -2248,55 +2219,60 @@ class TypeChecker {
         return env.setUniformResultExpression(this.getResultBinds(aoftype.parsetype).T);
     }
 
-    private checkTypedTypedNumericConstructor(env: TypeEnvironment, exp: LiteralTypedNumericConstructorExpression, trgt: MIRRegisterArgument): TypeEnvironment {
-        const tntt = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.vtype, env.terms);
+    private checkTypedTypedNumericConstructor_helper(sinfo: SourceInfo, env: TypeEnvironment, value: string, tntt: ResolvedType, ntype: ResolvedType, trgt: MIRRegisterArgument): TypeEnvironment {
         const oftype = (tntt.options[0] as ResolvedEntityAtomType).object;
         const ofbinds = (tntt.options[0] as ResolvedEntityAtomType).binds;
 
         const consf = oftype.staticFunctions.find((sf) => sf.name === "create");
-        this.raiseErrorIf(exp.sinfo, consf === undefined, "Missing static function 'create'");
+        this.raiseErrorIf(sinfo, consf === undefined, "Missing static function 'create'");
 
         let nval: MIRArgument = new MIRConstantNone();
-        const ntype = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.ntype, new Map<string, ResolvedType>());
         if(ntype.isSameType(this.m_assembly.getSpecialIntType())) {
             //TODO: should also check bounds
 
-            nval = new MIRConstantInt(exp.value);
+            nval = new MIRConstantInt(value);
         }
         else if(ntype.isSameType(this.m_assembly.getSpecialNatType())) {
-            this.raiseErrorIf(exp.sinfo, exp.value.startsWith("-"), "Cannot have negative Nat literal");
+            this.raiseErrorIf(sinfo, value.startsWith("-"), "Cannot have negative Nat literal");
             //TODO: should also check bounds
 
-            nval = new MIRConstantNat(exp.value);
+            nval = new MIRConstantNat(value);
         }
         else if(ntype.isSameType(this.m_assembly.getSpecialBigIntType())) {
-            nval = new MIRConstantBigInt(exp.value);
+            nval = new MIRConstantBigInt(value);
         }
         else if(ntype.isSameType(this.m_assembly.getSpecialBigNatType())) {
-            this.raiseErrorIf(exp.sinfo, exp.value.startsWith("-"), "Cannot have negative BigNat literal");
+            this.raiseErrorIf(sinfo, value.startsWith("-"), "Cannot have negative BigNat literal");
 
-            nval = new MIRConstantBigNat(exp.value);
+            nval = new MIRConstantBigNat(value);
         }
         else if(ntype.isSameType(this.m_assembly.getSpecialRationalType())) {
-            nval = new MIRConstantRational(exp.value);
+            nval = new MIRConstantRational(value);
         }
         else if(ntype.isSameType(this.m_assembly.getSpecialFloatType())) {
-            nval = new MIRConstantFloat(exp.value);
+            nval = new MIRConstantFloat(value);
         }
         else {
-            nval = new MIRConstantDecimal(exp.value);
+            nval = new MIRConstantDecimal(value);
         }
 
         if(oftype.invariants.length !== 0) {
             const fkey = MIRKeyGenerator.generateFunctionKey(`${oftype.ns}::${oftype.name}`, "@@invariant", ofbinds, []);
         
             const tmps = this.m_emitter.generateTmpRegister();
-            this.m_emitter.emitInvokeFixedFunction(exp.sinfo, fkey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), tmps);
-            this.m_emitter.emitAssertCheck(exp.sinfo, "Number does not satisfy requirements for type", tmps);    
+            this.m_emitter.emitInvokeFixedFunction(sinfo, fkey, [nval], undefined, this.m_emitter.registerResolvedTypeReference(this.m_assembly.getSpecialBoolType()), tmps);
+            this.m_emitter.emitAssertCheck(sinfo, "Number does not satisfy requirements for type", tmps);    
         }
         
-        this.m_emitter.emitLoadTypedNumeric(exp.sinfo, nval, this.m_emitter.registerResolvedTypeReference(tntt).trkey, trgt);
+        this.m_emitter.emitLoadTypedNumeric(sinfo, nval, this.m_emitter.registerResolvedTypeReference(tntt).trkey, trgt);
         return env.setUniformResultExpression(tntt);
+    }
+
+    private checkTypedTypedNumericConstructor(env: TypeEnvironment, exp: LiteralTypedNumericConstructorExpression, trgt: MIRRegisterArgument): TypeEnvironment {
+        const tntt = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.vtype, env.terms);
+        const ntype = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.ntype, new Map<string, ResolvedType>());
+
+        return this.checkTypedTypedNumericConstructor_helper(exp.sinfo, env, exp.value, tntt, ntype, trgt);
     }
 
     private checkAccessNamespaceConstant(env: TypeEnvironment, exp: AccessNamespaceConstantExpression, trgt: MIRRegisterArgument): TypeEnvironment {
@@ -2355,6 +2331,7 @@ class TypeChecker {
         const vinfo = env.lookupVar(exp.name) as VarInfo;
         this.raiseErrorIf(exp.sinfo, !vinfo.mustDefined, "Var may not have been assigned a value");
 
+        this.m_emitter.emitRegisterStore(exp.sinfo, new MIRRegisterArgument(exp.name), trgt, this.m_emitter.registerResolvedTypeReference(vinfo.declaredType), undefined);
         return env.setVarResultExpression(vinfo.declaredType, vinfo.flowType, exp.name);
     }
 
@@ -2669,7 +2646,7 @@ class TypeChecker {
             const isigs = opdecls.map((opd) => this.m_assembly.normalizeTypeFunction(opd.invoke.generateSig(), new Map<string, ResolvedType>()) as ResolvedFunctionType);
             const opidx = this.m_assembly.tryGetUniqueStaticOperatorResolve(rargs.types.map((vt) => vt.flowtype), isigs);
 
-            this.raiseErrorIf(exp.sinfo, opidx !== -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
+            this.raiseErrorIf(exp.sinfo, opidx === -1 || (opsintro !== undefined && opsintro.isDynamic), "Cannot resolve operator");
             const opdecl = opidx !== -1 ? opdecls[opidx] : opsintro as NamespaceOperatorDecl;
             
             return this.checkNamespaceOperatorInvoke(exp.sinfo, env, opdecl, rargs.args, rargs.types, rargs.refs, rargs.pcodes, rargs.cinfo, exp.rec, trgt, refok);
@@ -6013,7 +5990,7 @@ class TypeChecker {
         captured.forEach((cp) => {
             this.raiseErrorIf(sinfo, !allfieldstypes.get(cp.slice(1)), `Unbound variable reference in field initializer "${cp}"`);
 
-            return allfieldstypes.get(cp.slice(1)) as ResolvedType;
+            cci.set(cp, allfieldstypes.get(cp.slice(1)) as ResolvedType);
         });
 
         return cci;
@@ -6541,39 +6518,47 @@ class TypeChecker {
         let preject: [{ ikey: string, sinfo: SourceInfo, srcFile: string }[], string[]] | undefined = undefined;
         let postject: [{ ikey: string, sinfo: SourceInfo, srcFile: string }[], string[]] | undefined = undefined;
         let realbody = invoke.body;
-        if(kind === "namespace") {
-            this.raiseErrorIf(invoke.sourceLocation, invoke.preconditions.some((pre) => pre.isvalidate) && !invoke.preconditions.some((pre) => pre.isvalidate), "Cannot mix terminal and validate preconditions");
-            
-            if (invoke.preconditions.every((pre) => pre.isvalidate)) {
-                realbody = this.processGenerateSpecialPreFunction_ResultT(invoke.sourceLocation, invoke.preconditions, invoke.body as BodyImplementation);
+        if (kind === "namespace") {
+            if (invoke.preconditions.length !== 0) {
+                this.raiseErrorIf(invoke.sourceLocation, invoke.preconditions.some((pre) => pre.isvalidate) && !invoke.preconditions.some((pre) => pre.isvalidate), "Cannot mix terminal and validate preconditions");
+
+                if (invoke.preconditions.every((pre) => pre.isvalidate)) {
+                    realbody = this.processGenerateSpecialPreFunction_ResultT(invoke.sourceLocation, invoke.preconditions, invoke.body as BodyImplementation);
+                }
+                else {
+                    const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
+                    preject = [preclauses, entrycallparams.map((pp) => pp.name)];
+                }
             }
-            else {
-                const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
-                preject = [preclauses, entrycallparams.map((pp) => pp.name)];
+
+            if (invoke.postconditions.length !== 0) {
+                const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
+                postject = [postcluases, [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
             }
-            
-            const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
-            postject = [postcluases, [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
         }
         else {
             const ootype = (enclosingDecl as [MIRType, OOPTypeDecl, Map<string, ResolvedType>])[1];
             const oobinds = (enclosingDecl as [MIRType, OOPTypeDecl, Map<string, ResolvedType>])[2];
             const absconds = this.m_assembly.getAbstractPrePostConds(fname as string, ootype, oobinds, binds);
 
-            this.raiseErrorIf(invoke.sourceLocation, invoke.preconditions.some((pre) => pre.isvalidate) || (absconds !== undefined && absconds.pre[0].some((pre) => pre.isvalidate)), "Cannot use validate preconditions on non-entrypoint functions");
+            if ((absconds !== undefined && absconds.pre[0].length !== 0) || invoke.preconditions.length !== 0) {
+                this.raiseErrorIf(invoke.sourceLocation, invoke.preconditions.some((pre) => pre.isvalidate) || (absconds !== undefined && absconds.pre[0].some((pre) => pre.isvalidate)), "Cannot use validate preconditions on non-entrypoint functions");
 
-            const abspreclauses = absconds !== undefined ? this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, absconds.pre[0], absconds.pre[1], invoke.srcFile) : [];
-            const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
-            preject = [[...abspreclauses, ...preclauses], entrycallparams.map((pp) => pp.name)];
+                const abspreclauses = absconds !== undefined ? this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, absconds.pre[0], absconds.pre[1], invoke.srcFile) : [];
+                const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
+                preject = [[...abspreclauses, ...preclauses], entrycallparams.map((pp) => pp.name)];
+            }
 
-            const abspostclauses = absconds !== undefined ? this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, absconds.post[0], absconds.post[1], invoke.srcFile) : [];
-            const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
-            postject = [[...abspostclauses, ...postcluases], [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
+            if ((absconds !== undefined && absconds.post[0].length !== 0) || invoke.postconditions.length !== 0) {
+                const abspostclauses = absconds !== undefined ? this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, absconds.post[0], absconds.post[1], invoke.srcFile) : [];
+                const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
+                postject = [[...abspostclauses, ...postcluases], [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
+            }
         }
 
         const encdecl = enclosingDecl !== undefined ? enclosingDecl[0].trkey : undefined;
         if (typeof ((invoke.body as BodyImplementation).body) === "string") {
-            if ((invoke.body as BodyImplementation).body !== "default") {
+            if ((invoke.body as BodyImplementation).body !== "default" || OOPTypeDecl.attributeSetContains("__primitive", invoke.attributes)) {
                 let mpc = new Map<string, MIRPCode>();
                 fargs.forEach((v, k) => mpc.set(k, { code: MIRKeyGenerator.generatePCodeKey(v.pcode.code), cargs: [...v.captured].map((cname) => this.m_emitter.generateCapturedVarName(cname)) }));
 
@@ -6588,16 +6573,16 @@ class TypeChecker {
                 //
 
                 const env = TypeEnvironment.createInitialEnvForCall(ikey, binds, fargs, cargs, declaredResult);
-                const doptype = this.resolveAndEnsureTypeOnly(invoke.sourceLocation, params[0].type, new Map<string, ResolvedType>());
-                const dopdecl = doptype.options[0] as ResolvedEntityAtomType;
+
+                const vops = invoke.params.map((p) => {
+                    const bvar = new AccessVariableExpression(invoke.sourceLocation, p.name);
+                    const faccess = new PostfixAccessFromName(invoke.sourceLocation, false, undefined, "v");
+                    return new PositionalArgument(undefined, false, new PostfixOp(invoke.sourceLocation, bvar, [faccess]));
+                });
+                const opexp = new CallNamespaceFunctionOrOperatorExpression(invoke.sourceLocation, "NSCore", fname, new TemplateArguments([]), "no", new Arguments(vops), OOPTypeDecl.attributeSetContains("prefix", invoke.attributes) ? "prefix" : "infix");
+                const consexp = new CallStaticFunctionOrOperatorExpression(invoke.sourceLocation, invoke.resultType, "create", new TemplateArguments([]), "no", new Arguments([new PositionalArgument(undefined, false, opexp)]), "std");
                 
-                const vops = invoke.params.map((p) => new PostfixOp(invoke.sourceLocation, new AccessVariableExpression(invoke.sourceLocation, p.name), [new PostfixInvoke(invoke.sourceLocation, false, undefined, false, p.type, "value", new TemplateArguments([]), "no", new Arguments([]))]));
-                const throughtype = declaredResult.isSameType(this.m_assembly.getSpecialBoolType()) ? invoke.resultType : (dopdecl.object.memberFields.find((mf) => mf.name === "value") as MemberFieldDecl).declaredType;
-                const callthrough = new CallStaticFunctionOrOperatorExpression(invoke.sourceLocation, throughtype, fname, new TemplateArguments([]), "no", new Arguments(vops.map((op) => new PositionalArgument(undefined, false, op))), "std");
-
-                const body = declaredResult.isSameType(this.m_assembly.getSpecialBoolType()) ? callthrough : new CallStaticFunctionOrOperatorExpression(invoke.sourceLocation, invoke.resultType, "create", new TemplateArguments([]), "no", new Arguments([new PositionalArgument(undefined, false, callthrough)]), "std");
-
-                const mirbody = this.checkBodyExpression(invoke.srcFile, env, body, [], argTypes) as MIRBody;
+                const mirbody = this.checkBodyExpression(invoke.srcFile, env, consexp, [], argTypes) as MIRBody;
                 return new MIRInvokeBodyDecl(encdecl, fname, iname, ikey, invoke.attributes, recursive, invoke.sourceLocation, invoke.srcFile, params, false, resultType.trkey, undefined, undefined, mirbody);
             }
         }

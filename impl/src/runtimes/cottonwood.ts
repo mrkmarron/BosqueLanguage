@@ -113,7 +113,7 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "G
 
     let contents = "";
     try {
-        const smt_runtime = Path.join(bosque_dir, "bin/tooling/verify/runtime/smtruntime.smt2");
+        const smt_runtime = Path.join(bosque_dir, "bin/tooling/verifier/runtime/smtruntime.smt2");
         const lsrc = FS.readFileSync(smt_runtime).toString();
         contents = lsrc
             .replace(";;TIMEOUT;;", `${timeout}`)
@@ -219,7 +219,7 @@ function runSMT2File(cfile: string, mode: "Refute" | "Generate" | "Evaluate") {
 
 Commander
     .option("-l --location [location]", "Location (file.bsq@line#pos) with error of interest")
-    .option("-a --args [args]", "JSON args for evaluation")
+    .option("-a --arguments [earguments]", "JSON args for evaluation")
     .option("-e --entrypoint [entrypoint]", "Entrypoint to symbolically test", "NSMain::main")
     .option("-m --mode [mode]", "Mode to run (refute | generate | evaluate)", "refute")
     .option("-o --output [file]", "Output the model to a given file");
@@ -245,7 +245,7 @@ if (Commander.args.length === 0) {
 process.stdout.write(`Processing Bosque sources in:\n${Commander.args.join("\n")}\n...Using entrypoint ${Commander.entrypoint}...\n`);
 const massembly = generateMASM(Commander.args, Commander.entrypoint);
 
-if(Commander.location === undefined && Commander.args === undefined) {
+if(Commander.location === undefined && Commander.earguments === undefined) {
     const sasm = generateSMTAssemblyForValidate(massembly, vopts, Commander.entrypoint, {file: "[]", line: -1, pos: -1}, maxgas);
     if(sasm !== undefined) {
         process.stdout.write("Possible error lines:\n")
@@ -255,7 +255,7 @@ if(Commander.location === undefined && Commander.args === undefined) {
 }
 
 let errlocation = { file: "[]", line: -1, pos: -1 };
-if (Commander.location === undefined) {
+if (Commander.location !== undefined) {
     const errfile = Commander.location.slice(0, Commander.location.indexOf("@"));
     const errline = Commander.location.slice(Commander.location.indexOf("@") + 1, Commander.location.indexOf("#"));
     const errpos = Commander.location.slice(Commander.location.indexOf("#") + 1);
@@ -265,7 +265,7 @@ if (Commander.location === undefined) {
 setImmediate(() => {
     try {
         if (Commander.mode === "evaluate") {
-            const smtasm = generateSMTAssemblyForEvaluate(massembly, vopts, Commander.entrypoint, Commander.args || "", maxgas);
+            const smtasm = generateSMTAssemblyForEvaluate(massembly, vopts, Commander.entrypoint, Commander.earguments || "", maxgas);
             if (smtasm === undefined) {
                 process.stdout.write(chalk.red("Error -- Failed to generate SMTLIB code\n"));
                 process.exit(1);

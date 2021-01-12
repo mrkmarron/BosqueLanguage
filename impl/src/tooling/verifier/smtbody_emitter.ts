@@ -2135,13 +2135,14 @@ class SMTBodyEmitter {
                 rexp = new SMTIf(smtcond, nexp, sexp);
             }
 
-            for (let i = eblock.ops.length - 1; i >= 0; --i) {
-                const texp = this.processOp(eblock.ops[i], rexp);
+            for (let i = bb.ops.length - 1; i >= 0; --i) {
+                const texp = this.processOp(bb.ops[i], rexp);
                 if(texp !== undefined) {
                     rexp = texp;
                 }
             }
 
+            smtexps.set(bb.label, rexp);
             bb = this.getReadyBlock(blocks, smtexps);
         }
 

@@ -973,7 +973,7 @@ class SMTEmitter {
                     this.processISequenceTypeDecl(edcl);
                 }
                 else {
-                    if(edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be[0] === edcl.name) === undefined) {
+                    if(edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be === edcl.name) === undefined) {
                         this.processEntityDecl(edcl);
                     }
                 }

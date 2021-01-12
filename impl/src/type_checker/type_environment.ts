@@ -374,8 +374,6 @@ class TypeEnvironment {
     }
 
     popLocalScope(): TypeEnvironment {
-        assert(this.hasNormalFlow());
-
         let localscopy = this.locals !== undefined ? (this.locals as Map<string, VarInfo>[]).slice(0, -1) : undefined;
         return new TypeEnvironment(this.scope, this.terms, this.pcodes, this.args, localscopy, this.inferResult, this.inferYield, this.expressionResult, this.returnResult, this.yieldResult, this.frozenVars);
     }
