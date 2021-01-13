@@ -917,10 +917,10 @@ class SMTEmitter {
             const vexp = this.generateAPITypeConstructorFunction(mirptype, new SMTConst(`(_ bv${i} ${this.assembly.vopts.ISize})`), new SMTConst("BNat@zero"));
 
             if (vexp[1]) {
-                return { vname: vname, vtype: this.temitter.generateResultType(mirptype), vexp: vexp[0], vchk: this.temitter.generateResultIsSuccessTest(mirptype, new SMTVar(vname)), vinit: this.temitter.generateResultGetSuccess(mirptype, new SMTVar(vname)) };
+                return { vname: vname, vtype: this.temitter.generateResultType(mirptype), vinit: this.temitter.generateResultGetSuccess(mirptype, vexp[0]), vchk: this.temitter.generateResultIsSuccessTest(mirptype, new SMTVar(vname)) };
             }
             else {
-                return { vname: vname, vtype: vtype, vexp: vexp[0], vchk: undefined, vinit: new SMTVar(vname) };
+                return { vname: vname, vtype: vtype, vinit: vexp[0], vchk: undefined };
             }
         });
 
@@ -1168,7 +1168,7 @@ class SMTEmitter {
         smtemit.assembly.modes = {
             refute: new SMTCallSimple("not", [eqerrexp]),
             generate: eqerrexp,
-            evaluate: ["[INVALID]", new SMTConst("bsq_none")]
+            evaluate: ["[INVALID]", [], new SMTConst("bsq_none")]
         };
 
         return smtemit.assembly;
@@ -1193,13 +1193,22 @@ class SMTEmitter {
             return undefined;
         }
 
+        const parseinfo = smtemit.assembly.model.arginits.map((arg, i) => {
+            return {vname: arg.vname, value: cargs[i] as SMTExp };
+        });
+
+        const callargs = smtemit.assembly.model.arginits.map((arg) => {
+            return new SMTVar(arg.vname);
+        });
+
         smtemit.assembly.modes = {
             refute: new SMTConst("false"),
             generate: new SMTConst("false"),
             evaluate: [
                 `${entrypoint}(${args.join(", ")})`,
-                new SMTCallSimple(temitter.mangle(entrypoint), cargs as SMTExp[])
-            ],
+                parseinfo,
+                new SMTCallSimple(temitter.mangle(entrypoint), callargs)
+            ]
         };
 
         return smtemit.assembly;
