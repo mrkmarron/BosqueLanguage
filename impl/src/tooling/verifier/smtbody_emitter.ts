@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRFieldDecl, MIRInvokeBodyDecl, MIRInvokeDecl, MIRInvokePrimitiveDecl, MIRPCode, MIRRecordType, MIRRecordTypeEntry, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { SMTTypeEmitter } from "./smttype_emitter";
-import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRSomeTrue, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
+import { MIRAbort, MIRAllTrue, MIRArgGuard, MIRArgument, MIRAssertCheck, MIRBasicBlock, MIRBinKeyEq, MIRBinKeyLess, MIRConstantArgument, MIRConstantBigInt, MIRConstantBigNat, MIRConstantDataString, MIRConstantDecimal, MIRConstantFalse, MIRConstantFloat, MIRConstantInt, MIRConstantNat, MIRConstantNone, MIRConstantRational, MIRConstantRegex, MIRConstantString, MIRConstantStringOf, MIRConstantTrue, MIRConstantTypedNumber, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionEmpty, MIRConstructorPrimaryCollectionMixed, MIRConstructorPrimaryCollectionSingletons, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConvertValue, MIRDeclareGuardFlagLocation, MIREntityProjectToEphemeral, MIREntityUpdate, MIREphemeralListExtend, MIRFieldKey, MIRGlobalVariable, MIRGuard, MIRInvokeFixedFunction, MIRInvokeKey, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRIsTypeOf, MIRJump, MIRJumpCond, MIRJumpNone, MIRLoadConst, MIRLoadField, MIRLoadFromEpehmeralList, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIRMultiLoadFromEpehmeralList, MIROp, MIROpTag, MIRPhi, MIRPrefixNotOp, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRRegisterAssign, MIRResolvedTypeKey, MIRReturnAssign, MIRReturnAssignOfCons, MIRSetConstantGuardFlag, MIRSliceEpehmeralList, MIRSomeTrue, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRVirtualMethodKey } from "../../compiler/mir_ops";
 import { SMTCallSimple, SMTCallGeneral, SMTCallGeneralWOptMask, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTMaskConstruct, SMTVar, SMTCallGeneralWPassThroughMask, SMTType, VerifierOptions, SMTForAll, SMTExists } from "./smt_exp";
 import { SourceInfo } from "../../ast/parser";
 import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
@@ -2154,6 +2154,40 @@ class SMTBodyEmitter {
         });
     }
 
+    getNextBlockExp(blocks: Map<string, MIRBasicBlock>, smtexps: Map<string, SMTExp>, from: string, trgt: string): SMTExp {
+        if(trgt !== "returnassign") {
+            return smtexps.get(trgt) as SMTExp;
+        }
+        else {
+            const eblock = blocks.get("returnassign") as MIRBasicBlock;
+            let rexp: SMTExp = smtexps.get("exit") as SMTExp;
+
+            const nomrmalidx = eblock.ops.findIndex((op) => !(op instanceof MIRPhi));
+            for (let i = eblock.ops.length - 1; i >= nomrmalidx; --i) {
+                const texp = this.processOp(eblock.ops[i], rexp);
+                if(texp !== undefined) {
+                    rexp = texp;
+                }
+            }
+
+            if(nomrmalidx === 0) {
+                return rexp;
+            }
+            else {
+                const phis = eblock.ops.slice(0, nomrmalidx) as MIRPhi[];
+                
+                const assigns = phis.map((phi) => {
+                    return {
+                        vname: this.varToSMTName(phi.trgt).vname,
+                        value: this.varToSMTName(phi.src.get(from) as MIRRegisterArgument)
+                    }
+                });
+
+                return new SMTLetMulti(assigns, rexp);
+            }
+        }
+    }
+
     generateBlockExps(issafe: boolean, blocks: Map<string, MIRBasicBlock>): SMTExp {
         let smtexps = new Map<string, SMTExp>();
 
@@ -2166,22 +2200,23 @@ class SMTBodyEmitter {
             }
         }
         smtexps.set("exit", rexp);
+        smtexps.set("returnassign", new SMTConst("[DUMMY RETURN ASSIGN]"));
 
         let bb = this.getReadyBlock(blocks, smtexps);
         while(bb !== undefined) {
-            const jop = bb.ops[bb.ops.length - 1];
+           const jop = bb.ops[bb.ops.length - 1];
 
             let rexp: SMTExp = new SMTConst("[UNITIALIZED FLOW]");
             if(jop.tag === MIROpTag.MIRAbort) {
                 ; //No continuation so just leave uninit
             }
             else if (jop.tag === MIROpTag.MIRJump) {
-                rexp = smtexps.get((jop as MIRJump).trgtblock) as SMTExp;
+                rexp = this.getNextBlockExp(blocks, smtexps, bb.label, (jop as MIRJump).trgtblock);
             }
             else if (jop.tag === MIROpTag.MIRJumpCond) {
                 const smtcond = this.argToSMT((jop as MIRJumpCond).arg);
-                const texp = smtexps.get((jop as MIRJumpCond).trueblock) as SMTExp;
-                const fexp = smtexps.get((jop as MIRJumpCond).falseblock) as SMTExp;
+                const texp = this.getNextBlockExp(blocks, smtexps, bb.label, (jop as MIRJumpCond).trueblock);
+                const fexp = this.getNextBlockExp(blocks, smtexps, bb.label, (jop as MIRJumpCond).falseblock);
                 
                 rexp = new SMTIf(smtcond, texp, fexp);
             }
@@ -2189,8 +2224,8 @@ class SMTBodyEmitter {
                 assert(jop.tag === MIROpTag.MIRJumpNone);
 
                 const smtcond = this.generateNoneCheck((jop as MIRJumpNone).arg, this.typegen.getMIRType((jop as MIRJumpNone).arglayouttype));
-                const nexp = smtexps.get((jop as MIRJumpNone).noneblock) as SMTExp;
-                const sexp = smtexps.get((jop as MIRJumpNone).someblock) as SMTExp;
+                const nexp = this.getNextBlockExp(blocks, smtexps, bb.label, (jop as MIRJumpNone).noneblock);
+                const sexp = this.getNextBlockExp(blocks, smtexps, bb.label, (jop as MIRJumpNone).someblock);
                 
                 rexp = new SMTIf(smtcond, nexp, sexp);
             }

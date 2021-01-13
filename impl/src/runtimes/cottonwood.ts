@@ -76,10 +76,10 @@ function generateMASM(files: string[], entrypoint: string): MIRAssembly {
     return masm as MIRAssembly;
 }
 
-function generateSMTAssemblyForEvaluate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string[], maxgas: number): SMTAssembly | undefined {
+function generateSMTAssemblyForEvaluate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string, maxgas: number): SMTAssembly | undefined {
     let res: SMTAssembly | undefined = undefined;
     try {
-        const json = args.map((arg) => JSON.parse(arg));
+        const json = JSON.parse(args) as any[];
         res = SMTEmitter.generateSMTAssemblyEvaluate(masm, vopts, entrypoint, json, maxgas);
     } catch(e) {
         process.stdout.write(chalk.red(`SMT generate error -- ${e}\n`));
@@ -219,7 +219,7 @@ function runSMT2File(cfile: string, mode: "Refute" | "Generate" | "Evaluate") {
 
 Commander
     .option("-l --location [location]", "Location (file.bsq@line#pos) with error of interest")
-    .option("-a --arguments [earguments]", "JSON args for evaluation")
+    .option("-a --earguments [earguments]", "JSON args for evaluation")
     .option("-e --entrypoint [entrypoint]", "Entrypoint to symbolically test", "NSMain::main")
     .option("-m --mode [mode]", "Mode to run (refute | generate | evaluate)", "refute")
     .option("-o --output [file]", "Output the model to a given file");

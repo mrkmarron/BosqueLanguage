@@ -2032,22 +2032,25 @@ class TypeChecker {
         if(iitype.isSameType(this.m_assembly.getSpecialIntType()) || iitype.isSameType(this.m_assembly.getSpecialBigIntType())) {
             //TODO: should also check bounds
 
-            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+            const ispec = iitype.isSameType(this.m_assembly.getSpecialIntType()) ? "i" : "n";
+            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value + ispec, trgt);
             return env.setUniformResultExpression(iitype);
         }
         else if(iitype.isSameType(this.m_assembly.getSpecialNatType()) || iitype.isSameType(this.m_assembly.getSpecialBigNatType())) {
             this.raiseErrorIf(exp.sinfo, exp.value.startsWith("-"), "Cannot have negative BigNat literal");
 
-            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+            const ispec = iitype.isSameType(this.m_assembly.getSpecialBigIntType()) ? "I" : "N";
+            this.m_emitter.emitLoadConstIntegralValue(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value + ispec, trgt);
             return env.setUniformResultExpression(iitype);
         }
         else if(iitype.isSameType(this.m_assembly.getSpecialFloatType()) || iitype.isSameType(this.m_assembly.getSpecialDecimalType())) {
-            this.m_emitter.emitLoadConstFloatPoint(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value, trgt);
+            const fspec = iitype.isSameType(this.m_assembly.getSpecialFloatType()) ? "f" : "d";
 
+            this.m_emitter.emitLoadConstFloatPoint(exp.sinfo, this.m_emitter.registerResolvedTypeReference(iitype), exp.value + fspec, trgt);
             return env.setUniformResultExpression(iitype);
         }
         else if(iitype.isSameType(this.m_assembly.getSpecialRationalType())) {
-            this.m_emitter.emitLoadConstRational(exp.sinfo, exp.value, trgt);
+            this.m_emitter.emitLoadConstRational(exp.sinfo, exp.value + "R", trgt);
             return env.setUniformResultExpression(this.m_assembly.getSpecialRationalType());
         }
         else {
@@ -2056,8 +2059,21 @@ class TypeChecker {
             const tt = (iitype.getUniqueCallTargetType().object.memberFields.find((mf) => mf.name === "value") as MemberFieldDecl).declaredType;
             const rtt = this.m_assembly.normalizeTypeOnly(tt, new Map<string, ResolvedType>());
 
+            let vspec = "?";
+            if(rtt.isSameType(this.m_assembly.getSpecialIntType()) || rtt.isSameType(this.m_assembly.getSpecialBigIntType())) {
+                vspec = rtt.isSameType(this.m_assembly.getSpecialIntType()) ? "i" : "n";
+            }
+            else if(rtt.isSameType(this.m_assembly.getSpecialNatType()) || rtt.isSameType(this.m_assembly.getSpecialBigNatType())) {
+                vspec = rtt.isSameType(this.m_assembly.getSpecialBigIntType()) ? "I" : "N";
+            }
+            else if(rtt.isSameType(this.m_assembly.getSpecialFloatType()) || rtt.isSameType(this.m_assembly.getSpecialDecimalType())) {
+                vspec = rtt.isSameType(this.m_assembly.getSpecialFloatType()) ? "f" : "d";
+            }
+            else {
+                vspec = "R";
+            }
 
-            return this.checkTypedTypedNumericConstructor_helper(exp.sinfo, env, exp.value, iitype, rtt, trgt);
+            return this.checkTypedTypedNumericConstructor_helper(exp.sinfo, env, exp.value + vspec, iitype, rtt, trgt);
         }
     }
 

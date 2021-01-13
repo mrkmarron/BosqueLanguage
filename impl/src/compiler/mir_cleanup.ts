@@ -7,7 +7,14 @@ import * as assert from "assert";
 
 import { MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIRGuard, MIRMaskGuard, MIROp, MIROpTag, MIRRegisterArgument, MIRArgGuard, MIRLoadConst, MIRTupleHasIndex, MIRRecordHasProperty, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadField, MIRTupleProjectToEphemeral, MIRRecordProjectToEphemeral, MIREntityProjectToEphemeral, MIRTupleUpdate, MIRRecordUpdate, MIREntityUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRRegisterAssign, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRJump, MIRSomeTrue } from "./mir_ops";
 
+function getEmptyBlocks(b: MIRBody): MIRBasicBlock[] {
+    return [...b.body].filter((b) => b[0] !== "entry" && b[0] !== "exit" && b[0] !== "returnassign" && b[1].ops.length === 0).map((b) => b[1]);
+}
+
 function cleanDeadBlocks(b: MIRBody) {
+    const allempty = getEmptyBlocks(b);
+    allempty.forEach((bb) => b.body.delete(bb.label));
+
     let dblock = [...b.body].find((bb) => bb[1].ops.some((op) => op.tag === MIROpTag.MIRDeadFlow));
     while(dblock !== undefined) {
         const rblock = dblock;

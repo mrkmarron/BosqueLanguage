@@ -556,14 +556,14 @@ class SMTAssembly {
 
             action.push(`(assert ${this.modes.generate.emitSMT2(undefined)})`);
             action.push("(check-sat)");
-            action.push("(get-model");
+            action.push("(get-model)");
         }
         else {
             action.push("(check-sat)");
-            action.push("(get-model");
+            action.push("(get-model)");
 
-            action.push(`(echo "evaluating ${this.modes.evaluate[0]}..."`);
-            action.push(`eval ${this.modes.evaluate[1].emitSMT2(undefined)}`);
+            action.push(`(echo "evaluating ${this.modes.evaluate[0]}...")`);
+            action.push(`(eval ${this.modes.evaluate[1].emitSMT2(undefined)})`);
         }
 
         return {
