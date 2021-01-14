@@ -141,14 +141,12 @@
 (declare-datatypes (
       ;;KEY_TUPLE_DECLS;;
       ;;KEY_RECORD_DECLS;;
-      ;;KEY_COLLECTION_INTERNAL_INFO_DECLS;;
       ;;KEY_TYPE_DECLS;;
       (bsq_keyobject 0)
       (BKey 0)
     ) (
     ;;KEY_TUPLE_TYPE_CONSTRUCTORS;;
     ;;KEY_RECORD_TYPE_CONSTRUCTORS;;
-    ;;KEY_COLLECTION_INTERNAL_INFO_CONSTRUCTORS;;
     ;;KEY_TYPE_CONSTRUCTORS;;
     (
       (bsqkey_none@literal) 
@@ -268,6 +266,19 @@
     ;;RESULTS;;
     ;;MASKS;;
 ))
+
+;;
+;;Free constructors for entrypoint initialization
+;;
+(declare-fun BBool@UFCons_API (BNat BNat) Bool)
+(declare-fun BInt@UFCons_API (BNat BNat) BInt )
+(declare-fun BNat@UFCons_API (BNat BNat) BNat)
+(declare-fun BBigInt@UFCons_API (BNat BNat) BBigInt)
+(declare-fun BBigNat@UFCons_API (BNat BNat) BBigNat)
+(declare-fun BFloat@UFCons_API (BNat BNat) BFloat)
+(declare-fun BDecimal@UFCons_API (BNat BNat) BDecimal)
+(declare-fun BRational@UFCons_API (BNat BNat) BRational)
+(declare-fun BString@UFCons_API (BNat BNat) BString)
 
 ;;GLOBAL_DECLS;;
 

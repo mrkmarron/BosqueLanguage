@@ -22,7 +22,6 @@ type SMT2FileInfo = {
     STRING_TYPE_ALIAS: string,
     KEY_TUPLE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     KEY_RECORD_INFO: { decls: string[], constructors: string[], boxing: string[] },
-    KEY_COLLECTION_INTERNAL_INFO: { decls: string[], constructors: string[] },
     KEY_TYPE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     TUPLE_INFO: { decls: string[], constructors: string[], boxing: string[] },
     RECORD_INFO: { decls: string[], constructors: string[], boxing: string[] },
@@ -442,43 +441,23 @@ class SMTAssembly {
 
         let collectiongetUFfuncs: string[] = [];
         let collectiongets: string[] = [];
-
-        let keycollectioninternaldecls: {decl: string, consf: string}[] = [];
-        this.listDecls.filter((et) => et.iskeytype)
-            .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
-            .forEach((kt) => {
-                const iconsopts = kt.listtypeconsf.map((cf) => `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`)
-                keycollectioninternaldecls.push({
-                    decl: `(${kt.smtllisttype} 0)`,
-                    consf: `( ${iconsopts.join(" ")} )`
-                });
-                collectiongetUFfuncs.push(kt.get_axiomdecl.emitSMT2());
-                collectiongets.push(kt.get_axiomdecl.emitSMT2());
-
-                keytypeinfo.push({
-                    decl: `(${kt.smtname} 0)`,
-                    consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
-                    boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
-                });
-            });
-
         let generalcollectioninternaldecls: {decl: string, consf: string}[] = [];
-        this.listDecls.filter((et) => !et.iskeytype)
+        this.listDecls
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
             .forEach((kt) => {
-                const iconsopts = kt.listtypeconsf.map((cf) => `(${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`)})`)
+                const iconsopts = kt.listtypeconsf.map((cf) => `(${cf.cname} ${cf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")})`)
                 generalcollectioninternaldecls.push({
                     decl: `(${kt.smtllisttype} 0)`,
                     consf: `( ${iconsopts.join(" ")} )`
                 });
                 collectiongetUFfuncs.push(kt.get_axiomdecl.emitSMT2());
-                collectiongets.push(kt.get_axiomdecl.emitSMT2());
+                collectiongets.push(kt.get_decl.emitSMT2());
 
-                return {
+                termtypeinfo.push({
                     decl: `(${kt.smtname} 0)`,
                     consf: `( (${kt.consf.cname} ${kt.consf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")}) )`,
                     boxf: `(${kt.boxf} (${kt.ubf} ${kt.smtname}))`
-                };
+                });
             });
 
         const etypeinfo = this.ephemeralDecls
@@ -587,7 +566,6 @@ class SMTAssembly {
             STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 32)))" : "(define-sort BString () String)"),
             KEY_TUPLE_INFO: { decls: keytupleinfo.map((kti) => kti.decl), constructors: keytupleinfo.map((kti) => kti.consf), boxing: keytupleinfo.map((kti) => kti.boxf) },
             KEY_RECORD_INFO: { decls: keyrecordinfo.map((kti) => kti.decl), constructors: keyrecordinfo.map((kti) => kti.consf), boxing: keyrecordinfo.map((kti) => kti.boxf) },
-            KEY_COLLECTION_INTERNAL_INFO: { decls: keycollectioninternaldecls.map((kti) => kti.decl), constructors: keycollectioninternaldecls.map((kti) => kti.consf) },
             KEY_TYPE_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf), boxing: keytypeinfo.map((kti) => kti.boxf) },
             TUPLE_INFO: { decls: termtupleinfo.map((kti) => kti.decl), constructors: termtupleinfo.map((kti) => kti.consf), boxing: termtupleinfo.map((kti) => kti.boxf) },
             RECORD_INFO: { decls: termrecordinfo.map((kti) => kti.decl), constructors: termrecordinfo.map((kti) => kti.consf), boxing: termrecordinfo.map((kti) => kti.boxf) },

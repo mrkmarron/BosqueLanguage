@@ -166,11 +166,7 @@ class TypeChecker {
     }
 
     private isConstructorTypeOfValue(ctype: ResolvedType): boolean {
-        const ootd = this.m_assembly.tryGetObjectTypeForFullyResolvedName(ctype.options[0].idStr);
-        if (ootd === undefined) {
-            return false;
-        }
-
+        const ootd = (ctype.options[0] as ResolvedEntityAtomType).object;
         return OOPTypeDecl.attributeSetContains("struct", ootd.attributes);
     }
 
@@ -710,7 +706,7 @@ class TypeChecker {
 
         if (optSelfValue !== undefined) {
             if(optSelfValue[1] === undefined) {
-                eargs.push({ name: "this", argtype: optSelfValue[0], ref: undefined, expando: false, pcode: undefined, treg: optSelfValue[2] });
+                eargs.push({ name: undefined, argtype: optSelfValue[0], ref: undefined, expando: false, pcode: undefined, treg: optSelfValue[2] });
             }
             else {
                 const rvname = optSelfValue[1];
@@ -718,7 +714,7 @@ class TypeChecker {
 
                 const earg = (env.lookupVar(rvname) as VarInfo);
                 const eargval = new ValueType(earg.declaredType, earg.flowType);
-                eargs.push({ name: "this", argtype: eargval, ref: ["ref", new MIRRegisterArgument(rvname)], expando: false, pcode: undefined, treg: optSelfValue[2] });
+                eargs.push({ name: undefined, argtype: eargval, ref: ["ref", new MIRRegisterArgument(rvname)], expando: false, pcode: undefined, treg: optSelfValue[2] });
             }
         }
 
@@ -755,14 +751,14 @@ class TypeChecker {
                     this.raiseErrorIf(narg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = this.checkPCodeExpression(env, narg.value, sigbinds, param.type as ResolvedFunctionType);
-                    eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                    eargs[i + ridx] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else if (narg.value instanceof AccessVariableExpression && env.pcodes.has(narg.value.name)) {
                     this.raiseErrorIf(narg.value.sinfo, !(param.type instanceof ResolvedFunctionType), "Must have function type for function arg");
                     this.raiseErrorIf(narg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = (env.pcodes.get(narg.value.name) as { pcode: PCode, captured: string[] }).pcode;
-                    eargs[i] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                    eargs[i + ridx] = { name: narg.name, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else {
                     if (isref) {
@@ -781,11 +777,11 @@ class TypeChecker {
                         const eargval = new ValueType(earg.declaredType, earg.declaredType); //it is a ref so we need to use the declared type
                         const refv = new MIRRegisterArgument(rvname);
 
-                        eargs[i] = { name: narg.name, argtype: eargval, ref: [narg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
+                        eargs[i + ridx] = { name: narg.name, argtype: eargval, ref: [narg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
                     }
                     else {
                         const earg = this.checkExpression(env, narg.value, treg, param.type as ResolvedType).getExpressionResult();
-                        eargs[i] = { name: narg.name, argtype: earg.valtype, ref: undefined, expando: false, pcode: undefined, treg: treg };
+                        eargs[i + ridx] = { name: narg.name, argtype: earg.valtype, ref: undefined, expando: false, pcode: undefined, treg: treg };
                     }
                 }
             }
@@ -815,14 +811,14 @@ class TypeChecker {
                     this.raiseErrorIf(parg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = this.checkPCodeExpression(env, parg.value, sigbinds, oftype as ResolvedFunctionType);
-                    eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                    eargs[i + ridx] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else if (parg.value instanceof AccessVariableExpression && env.pcodes.has(parg.value.name)) {
                     this.raiseErrorIf(parg.value.sinfo, !(oftype instanceof ResolvedFunctionType), "Must have function type for function arg");
                     this.raiseErrorIf(parg.value.sinfo, isref, "Cannot use ref params on function argument");
 
                     const pcode = (env.pcodes.get(parg.value.name) as { pcode: PCode, captured: string[] }).pcode;
-                    eargs[i] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
+                    eargs[i + ridx] = { name: undefined, argtype: pcode.ftype, ref: undefined, expando: false, pcode: pcode, treg: treg };
                 }
                 else {
                     if (isref) {
@@ -843,11 +839,11 @@ class TypeChecker {
                         const eargval = new ValueType(earg.declaredType, earg.declaredType); //it is a ref so we need to use the declared type
                         const refv = new MIRRegisterArgument(rvname);
 
-                        eargs[i] = { name: undefined, argtype: eargval, ref: [parg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
+                        eargs[i + ridx] = { name: undefined, argtype: eargval, ref: [parg.ref as "ref" | "out" | "out?", refv], expando: false, pcode: undefined, treg: refreg };
                     }
                     else {
                         const earg = this.checkExpression(env, parg.value, treg, oftype as ResolvedType).getExpressionResult();
-                        eargs[i] = { name: undefined, argtype: earg.valtype, ref: undefined, expando: false, pcode: undefined, treg: treg };
+                        eargs[i + ridx] = { name: undefined, argtype: earg.valtype, ref: undefined, expando: false, pcode: undefined, treg: treg };
                     }
                 }
 
@@ -2355,7 +2351,7 @@ class TypeChecker {
         const ctype = this.resolveAndEnsureTypeOnly(exp.sinfo, exp.ctype, env.terms);
         const objtype = ResolvedType.tryGetOOTypeInfo(ctype);
         this.raiseErrorIf(exp.sinfo, objtype === undefined || !(objtype instanceof ResolvedEntityAtomType), "Invalid constructor type");
-        this.raiseErrorIf(exp.sinfo, this.isConstructorTypeOfValue(ctype) === exp.isvalue, "Mismatch in storage layout decl and call");
+        this.raiseErrorIf(exp.sinfo, this.isConstructorTypeOfValue(ctype) !== exp.isvalue, "Mismatch in storage layout decl and call");
 
         const oodecl = (objtype as ResolvedEntityAtomType).object;
         const oobinds = (objtype as ResolvedEntityAtomType).binds;
@@ -3502,12 +3498,12 @@ class TypeChecker {
             assert(knownimpl_find !== undefined);
 
             const knownimpl = new OOMemberLookupInfo<MemberMethodDecl>(knownimpl_multi.contiainingType, knownimpl_find as MemberMethodDecl, knownimpl_multi.binds);
-            const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, knownimpl.decl.invoke, op.terms.targs, knownimpl.binds, env.terms, [texp, env.getExpressionResult().expvar, arg], refok);
+            const selfvar = [texp, knownimpl.decl.refRcvr ? env.getExpressionResult().expvar : undefined, arg] as [ValueType, string | undefined, MIRRegisterArgument];
+            const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, knownimpl.decl.invoke, op.terms.targs, knownimpl.binds, env.terms, selfvar, refok);
             this.checkTemplateTypes(op.sinfo, knownimpl.decl.invoke.terms, callbinds, knownimpl.decl.invoke.termRestrictions);
 
             const rargs = this.checkArgumentsSignature(op.sinfo, eev, op.name, fsig, eargs);
             this.checkRecursion(op.sinfo, fsig, rargs.pcodes, op.rec);
-
 
             const ootype = this.m_emitter.registerResolvedTypeReference(this.resolveOOTypeFromDecls(knownimpl.contiainingType, knownimpl.binds));
             const ckey = this.m_emitter.registerMethodCall([ootype, knownimpl.contiainingType, knownimpl.binds], knownimpl.decl, op.name, callbinds, rargs.pcodes, rargs.cinfo);
@@ -3529,7 +3525,8 @@ class TypeChecker {
                     eev = this.checkDeclareSingleVariable(op.sinfo, env, `$this_#${op.sinfo.pos}`, true, texp.layout, { etype: texp, etreg: arg });
                 }
 
-                const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, knownimpl.decl.invoke, op.terms.targs, knownimpl.binds, env.terms, [texp, env.getExpressionResult().expvar, arg], refok);
+                const selfvar = [texp, knownimpl.decl.refRcvr ? env.getExpressionResult().expvar : undefined, arg] as [ValueType, string | undefined, MIRRegisterArgument];
+                const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, knownimpl.decl.invoke, op.terms.targs, knownimpl.binds, env.terms, selfvar, refok);
                 this.checkTemplateTypes(op.sinfo, knownimpl.decl.invoke.terms, callbinds, knownimpl.decl.invoke.termRestrictions);
 
                 const rargs = this.checkArgumentsSignature(op.sinfo, eev, op.name, fsig, eargs);
@@ -3558,7 +3555,9 @@ class TypeChecker {
 
                 const vinfo = vinfo_multi as OOMemberLookupInfo<MemberMethodDecl[]>;
                 const minfo = new OOMemberLookupInfo<MemberMethodDecl>(vinfo.contiainingType, vinfo.decl[0], vinfo.binds);
-                const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, minfo.decl.invoke, op.terms.targs, minfo.binds, env.terms, [texp, env.getExpressionResult().expvar, arg], refok);
+
+                const selfvar = [texp, minfo.decl.refRcvr ? env.getExpressionResult().expvar : undefined, arg] as [ValueType, string | undefined, MIRRegisterArgument];
+                const [fsig, callbinds, eargs] = this.inferAndCheckArguments(op.sinfo, eev, op.args, minfo.decl.invoke, op.terms.targs, minfo.binds, env.terms, selfvar, refok);
                 this.checkTemplateTypes(op.sinfo, minfo.decl.invoke.terms, callbinds, minfo.decl.invoke.termRestrictions);
 
                 const rargs = this.checkArgumentsSignature(op.sinfo, eev, op.name, fsig, eargs);
@@ -6120,7 +6119,7 @@ class TypeChecker {
         try {
             const clauses = exps.map((cev, i) => {
                 const iname = `$invariant::${conskey}::${i}`;
-                const ikey = `$invariant_${i}_ + ${conskey}`;
+                const ikey = `$invariant_${i}_${conskey}`;
 
                 const capturedtypes = this.getCapturedTypeInfoForFields(cev[0].exp.sinfo, cev[0].captured, allfieldstypes);
                 const fparams = [...cev[0].captured].sort().map((cp) => {
@@ -6236,7 +6235,7 @@ class TypeChecker {
             .filter((cev) => isBuildLevelEnabled(cev.level, this.m_buildLevel))
             .map((cev, i) => {
                 const iname = `$precond::${fkey}::${i}`;
-                const ikey = `$precond_${i}_ + ${fkey}`;
+                const ikey = `$precond_${i}_${fkey}`;
 
                 const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cev.exp, iname, ikey, cev.sinfo, ["precondition", "private"], invkparams, this.m_assembly.getSpecialBoolType(), binds, pcodes, pargs);
                 this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);

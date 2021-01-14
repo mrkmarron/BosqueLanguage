@@ -1100,7 +1100,7 @@ class MIREmitter {
         const okey = MIRKeyGenerator.generateOperatorSignatureKey(key, opdecl.isPrefix, opdecl.isInfix, sigkeys);
 
         if (!this.emitEnabled || this.masm.invokeDecls.has(key) || this.masm.primitiveInvokeDecls.has(key) || this.pendingOperatorProcessing.findIndex((fp) => fp[0] === okey) !== -1) {
-            return key;
+            return okey;
         }
 
         this.pendingOperatorProcessing.push([okey, opdecl.name, name, undefined, opdecl.invoke, new Map<string, ResolvedType>(), pcodes, cinfo]);
@@ -1122,11 +1122,11 @@ class MIREmitter {
         const okey = MIRKeyGenerator.generateOperatorSignatureKey(key, opdecl.isPrefix, opdecl.isInfix, sigkeys);
 
         if (!this.emitEnabled || this.masm.invokeDecls.has(key) || this.masm.primitiveInvokeDecls.has(key) || this.pendingOperatorProcessing.findIndex((sp) => sp[0] === key) !== -1) {
-            return key;
+            return okey;
         }
 
         this.pendingOperatorProcessing.push([okey, opdecl.name, name, containingType, opdecl.invoke, binds, pcodes, cinfo]);
-        return key;
+        return okey;
     }
 
     registerMethodCall(containingType: [MIRType, OOPTypeDecl, Map<string, ResolvedType>], m: MemberMethodDecl, name: string, binds: Map<string, ResolvedType>, pcodes: PCode[], cinfo: [string, ResolvedType][]): MIRInvokeKey {

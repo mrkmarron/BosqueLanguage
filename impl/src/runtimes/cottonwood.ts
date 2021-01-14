@@ -132,11 +132,9 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "G
             .replace(";;BFLOATPOINT_CONSTANTS;;", joinWithIndent(sfileinfo.BFLOATPOINT_CONSTANTS, ""))
             .replace(";;KEY_TUPLE_DECLS;;", joinWithIndent(sfileinfo.KEY_TUPLE_INFO.decls, "      "))
             .replace(";;KEY_RECORD_DECLS;;", joinWithIndent(sfileinfo.KEY_RECORD_INFO.decls, "      "))
-            .replace(";;KEY_COLLECTION_INTERNAL_INFO_DECLS;;", joinWithIndent(sfileinfo.KEY_COLLECTION_INTERNAL_INFO.decls, "      "))
             .replace(";;KEY_TYPE_DECLS;;", joinWithIndent(sfileinfo.KEY_TYPE_INFO.decls, "      "))
             .replace(";;KEY_TUPLE_TYPE_CONSTRUCTORS;;", joinWithIndent(sfileinfo.KEY_TUPLE_INFO.constructors, "    "))
             .replace(";;KEY_RECORD_TYPE_CONSTRUCTORS;;", joinWithIndent(sfileinfo.KEY_RECORD_INFO.constructors, "    "))
-            .replace(";;KEY_COLLECTION_INTERNAL_INFO_CONSTRUCTORS;;", joinWithIndent(sfileinfo.KEY_COLLECTION_INTERNAL_INFO.constructors, "    "))
             .replace(";;KEY_TYPE_CONSTRUCTORS;;", joinWithIndent(sfileinfo.KEY_TYPE_INFO.constructors, "    "))
             .replace(";;KEY_TUPLE_TYPE_BOXING;;", joinWithIndent(sfileinfo.KEY_TUPLE_INFO.boxing, "      "))
             .replace(";;KEY_RECORD_TYPE_BOXING;;", joinWithIndent(sfileinfo.KEY_RECORD_INFO.boxing, "      "))
@@ -250,6 +248,11 @@ if(Commander.location === undefined && Commander.earguments === undefined) {
     if(sasm !== undefined) {
         process.stdout.write("Possible error lines:\n")
         process.stdout.write(JSON.stringify(sasm.allErrors, undefined, 2) + "\n")
+
+        if (Commander.output) {
+            const smfc = buildSMT2file(sasm, timeout, "Evaluate");
+            emitSMT2File(smfc, Commander.output);
+        }
     }
     process.exit(0);
 }

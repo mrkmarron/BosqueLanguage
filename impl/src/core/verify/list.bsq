@@ -269,7 +269,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
         return List<T>::s_concat(ll);
     }
 
-    method size(): Int {
+    method size(): Nat {
         return List<T>::s_size(this);
     }
 

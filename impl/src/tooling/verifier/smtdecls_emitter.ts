@@ -635,13 +635,13 @@ class SMTEmitter {
                     getdirectops.push({test: new SMTCallSimple(`is-${dc.cname}`, [new SMTVar("lc")]), result: new SMTConst(this.bemitter.generateUFConstantForType(mirctype)) });
                 }
                 else if (dc.argc === 1) {
-                    constructors.push({cname: dc.cname, cargs: [{ fname: `${dc.cname}$arg_0`, ftype: new SMTType(lccftype) }]});
+                    constructors.push({cname: dc.cname, cargs: [{ fname: `${dc.cname}$arg_0`, ftype: smtctype }]});
                     getdirectops.push({test: new SMTCallSimple(`is-${dc.cname}`, [new SMTVar("lc")]), result: new SMTCallSimple(`${dc.cname}$arg_0`, [new SMTVar("lc")]) });
                 }
                 else {
                     let cargs: { fname: string, ftype: SMTType }[] = [];
                     for (let i = 0; i < dc.argc; ++i) {
-                        cargs.push({ fname: `${dc.cname}$arg_i`, ftype: new SMTType(lccftype) });
+                        cargs.push({ fname: `${dc.cname}$arg_${i}`, ftype: smtctype });
                     }
                     constructors.push({ cname: dc.cname, cargs: cargs });
 

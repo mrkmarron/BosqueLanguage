@@ -1504,7 +1504,8 @@ class SMTBodyEmitter {
             this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: 0 });
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${consf}@gen`, [new SMTConst("BNat@zero"), new SMTCallSimple(consf, [])]), continuation);
+        const llcons = this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.tkey));
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${llcons.cons}`, [new SMTConst("BNat@zero"), new SMTCallSimple(consf, [])]), continuation);
     }
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
@@ -1513,7 +1514,8 @@ class SMTBodyEmitter {
             this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: op.args.length });
         }
 
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${consf}@gen`, [new SMTConst(`(_ bv${op.args.length} ${this.vopts.ISize})`), new SMTCallSimple(consf, op.args.map((arg) => this.argToSMT(arg[1])))]), continuation);
+        const llcons = this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.tkey));
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${llcons.cons}`, [new SMTConst(`(_ bv${op.args.length} ${this.vopts.ISize})`), new SMTCallSimple(consf, op.args.map((arg) => this.argToSMT(arg[1])))]), continuation);
     }
 
     processConstructorPrimaryCollectionCopies(op: MIRConstructorPrimaryCollectionCopies, continuation: SMTExp): SMTExp {
@@ -2310,21 +2312,27 @@ class SMTBodyEmitter {
             case "list_fill": {
                 const fcons = `@@cons_${smtrestype.name}_fill`;
                 this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-                const fbody = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(args[0].vname), new SMTCallSimple(fcons, [new SMTVar(args[0].vname)])]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fbody = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(args[0].vname), new SMTCallSimple(fcons, [new SMTVar(args[0].vname)])]);
 
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
             }
             case "list_rangeofint": {
                 const fcons = `@@cons_${smtrestype.name}_int_range`;
                 this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-                const fbody = new SMTCallSimple(`${fcons}@gen`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fbody = new SMTCallSimple(`${llcons.cons}`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
 
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
             }
             case "list_rangeofnat": {
                 const fcons = `@@cons_${smtrestype.name}_nat_range`;
                 this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-                const fbody = new SMTCallSimple(`${fcons}@gen`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fbody = new SMTCallSimple(`${llcons.cons}`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
 
                 return new SMTFunction(this.typegen.mangle(idecl.key), args, undefined, chkrestype, fbody);
             }
@@ -2355,7 +2363,9 @@ class SMTBodyEmitter {
 
                 const fsize = this.generateListSizeCall(args[0]);
                 const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(sizevar), new SMTVar(cvar)]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(sizevar), new SMTVar(cvar)]);
 
                 const fbody = new SMTLetMulti(
                     [{vname: sizevar, value: fsize}, {vname: cvar, value: icons}],
@@ -2608,7 +2618,9 @@ class SMTBodyEmitter {
 
                     const nsize = this.generateListSize_1_to_Max_PickCall(idecl.key, args[0], args[1].vname, args[2].vname, new SMTCallSimple("bvsub", [new SMTVar(args[2].vname), new SMTVar(args[1].vname)]));
                     const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname), new SMTVar(args[3].vname)]);
-                    const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
+                    
+                    const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                    const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(ressize), new SMTVar(cvar)]);
 
                     const fbody = new SMTLetMulti(
                         [{ vname: cvar, value: icons }, { vname: ressize, value: nsize }],
@@ -2645,7 +2657,9 @@ class SMTBodyEmitter {
 
                     const nsize = new SMTCallSimple("ISequence@size", [new SMTVar(args[3].vname)]);
                     const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname), new SMTVar(args[3].vname)]);
-                    const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
+
+                    const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                    const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(ressize), new SMTVar(cvar)]);
 
                     const fbody = new SMTLetMulti(
                         [{ vname: cvar, value: icons }, { vname: ressize, value: nsize }],
@@ -2694,7 +2708,9 @@ class SMTBodyEmitter {
 
                 const fsize = new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]);
                 const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(sizevar), new SMTVar(cvar)]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(sizevar), new SMTVar(cvar)]);
 
                 const fbody = new SMTLetMulti(
                     [{vname: sizevar, value: fsize}, {vname: cvar, value: icons}],
@@ -2731,7 +2747,9 @@ class SMTBodyEmitter {
 
                 const fsize = new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]);
                 const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(ressize), new SMTVar(cvar)]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(ressize), new SMTVar(cvar)]);
 
                 const fbody = new SMTLetMulti(
                     [{vname: ressize, value: fsize}, {vname: cvar, value: icons}],
@@ -2788,7 +2806,9 @@ class SMTBodyEmitter {
                 );
 
                 const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
-                const fres = new SMTCallSimple(`${fcons}@gen`, [new SMTVar(args[2].vname), new SMTVar(cvar)]);
+
+                const llcons = this.typegen.getSMTConstructorName(mirrestype);
+                const fres = new SMTCallSimple(`${llcons.cons}`, [new SMTVar(args[2].vname), new SMTVar(cvar)]);
 
                 const fbody = new SMTLet(
                     cvar, icons,
