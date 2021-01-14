@@ -2030,7 +2030,7 @@ class Assembly {
         }
 
         const mmdecl = ooptype.memberMethods.find((mmd) => mmd.name === fname);
-        if (mmdecl !== undefined && !mmdecl.invoke.attributes.includes("override")) {
+        if (mmdecl !== undefined && (mmdecl.invoke.attributes.includes("abstract") || mmdecl.invoke.attributes.includes("virtual"))) {
             let newbinds = new Map<string, ResolvedType>();
             oobinds.forEach((v, k) => newbinds.set(k, v));
             mmdecl.invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));
@@ -2039,7 +2039,7 @@ class Assembly {
         }
 
         const sfdecl = ooptype.staticFunctions.find((sfd) => sfd.name === fname);
-        if (sfdecl !== undefined && !sfdecl.invoke.attributes.includes("override")) {
+        if (sfdecl !== undefined && !(sfdecl.invoke.attributes.includes("abstract") || sfdecl.invoke.attributes.includes("virtual"))) {
             let newbinds = new Map<string, ResolvedType>();
             oobinds.forEach((v, k) => newbinds.set(k, v));
             sfdecl.invoke.terms.forEach((term) => newbinds.set(term.name, callbinds.get(term.name) as ResolvedType));

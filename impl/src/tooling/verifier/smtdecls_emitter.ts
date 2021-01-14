@@ -1116,7 +1116,7 @@ class SMTEmitter {
         this.assembly.maskSizes = this.bemitter.maskSizes;
 
         const smtcall = this.temitter.mangle(mirep.key);
-        const callargs = iargs.map((arg) => arg.vinit);
+        const callargs = iargs.map((arg) => new SMTVar(arg.vname));
         const issafe = (callsafety.get(entrypoint) as {safe: boolean, trgt: boolean}).safe;
 
         let iexp: SMTExp | undefined = undefined;
@@ -1166,9 +1166,9 @@ class SMTEmitter {
 
         const eqerrexp = new SMTCallSimple("=", [new SMTVar("@smtres@"), smtemit.temitter.generateResultTypeConstructorError(restype, new SMTConst("ErrorID_Target"))]);
         smtemit.assembly.modes = {
-            refute: new SMTCallSimple("not", [eqerrexp]),
+            refute: eqerrexp,
             generate: eqerrexp,
-            evaluate: ["[INVALID]", [], new SMTConst("bsq_none")]
+            evaluate: ["[INVALID]", new SMTConst("bsq_none")]
         };
 
         return smtemit.assembly;
@@ -1193,21 +1193,12 @@ class SMTEmitter {
             return undefined;
         }
 
-        const parseinfo = smtemit.assembly.model.arginits.map((arg, i) => {
-            return {vname: arg.vname, value: cargs[i] as SMTExp };
-        });
-
-        const callargs = smtemit.assembly.model.arginits.map((arg) => {
-            return new SMTVar(arg.vname);
-        });
-
         smtemit.assembly.modes = {
             refute: new SMTConst("false"),
             generate: new SMTConst("false"),
             evaluate: [
                 `${entrypoint}(${args.join(", ")})`,
-                parseinfo,
-                new SMTCallSimple(temitter.mangle(entrypoint), callargs)
+                new SMTCallSimple(temitter.mangle(entrypoint), cargs as SMTExp[])
             ]
         };
 

@@ -275,10 +275,10 @@ class SMTAssembly {
 
     model: SMTModelState = new SMTModelState([], undefined, new SMTType("[UNINIT]"), new SMTConst("bsq_none@literal"));
 
-    modes: { refute: SMTExp, generate: SMTExp, evaluate: [string, {vname: string, value: SMTExp}[], SMTExp] } = { 
+    modes: { refute: SMTExp, generate: SMTExp, evaluate: [string, SMTExp] } = { 
         refute: new SMTConst("bsq_none@literal"), 
         generate: new SMTConst("bsq_none@literal"), 
-        evaluate: ["[INVALID]", [], new SMTConst("bsq_none@literal")] };
+        evaluate: ["[INVALID]", new SMTConst("bsq_none@literal")] };
 
     constructor(vopts: VerifierOptions) {
         this.vopts = vopts;
@@ -542,12 +542,11 @@ class SMTAssembly {
             action.push("(get-model)");
         }
         else {
-            action.push(...this.modes.evaluate[1].map((ai) => `(assert (= ${ai.vname} ${ai.value.emitSMT2(undefined)}))`));
             action.push("(check-sat)");
             action.push("(get-model)");
 
             action.push(`(echo "evaluating ${this.modes.evaluate[0]}...")`);
-            action.push(`(eval ${this.modes.evaluate[2].emitSMT2(undefined)})`);
+            action.push(`(eval ${this.modes.evaluate[1].emitSMT2(undefined)})`);
         }
 
         return {
