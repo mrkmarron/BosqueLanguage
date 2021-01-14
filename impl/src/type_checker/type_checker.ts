@@ -5942,7 +5942,7 @@ class TypeChecker {
             }
         }
 
-        let opidone: Set<string> = new Set<string>();
+        let opidone: Set<string> = new Set<string>(["%this_captured"]);
         for (let i = 0; i < optparaminfo.length; ++i) {
             const opidx = optparaminfo.findIndex((opp) => !opidone.has(opp.pname) && opp.initaction.deps.every((dep) => opidone.has(dep)));
             const opi = optparaminfo[opidx];
@@ -6076,7 +6076,7 @@ class TypeChecker {
         }
     }
 
-    private processExpressionForOptParamDefault(srcFile: string, fkey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, invoke: InvokeDecl, pcodes: Map<string, { pcode: PCode, captured: string[] }>, pargs: [string, ResolvedType][]): InitializerEvaluationAction {
+    private processExpressionForOptParamDefault(srcFile: string, fkey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, invoke: InvokeDecl, pcodes: Map<string, { pcode: PCode, captured: string[] }>, pargs: [string, ResolvedType][]): InitializerEvaluationAction {
         const ikey = MIRKeyGenerator.generateFunctionKey(fkey, `$initparam_${pname}`, new Map<string, ResolvedType>(), []); //binds and pcodes already handled in fkey so no need to repeat
         const iname = `$initparam::${fkey}::${pname}`;
         try {
@@ -6100,9 +6100,22 @@ class TypeChecker {
             }
             else {
                 const ppnames = [...cexp.captured].sort().filter((cp) => !pcodes.has(cp.slice(1)));
-                this.raiseErrorIf(cexp.exp.sinfo, ppnames.some((cp) => invoke.params.findIndex((ip) => ip.name === cp) === -1), "Unbound variable in initializer expression");
                 const fparams = ppnames.map((cp) => {
-                    return { name: cp, refKind: undefined, ptype: this.resolveAndEnsureTypeOnly(cexp.exp.sinfo, (invoke.params.find((ip) => ip.name === cp) as FunctionParameter).type, binds) };
+                    let cptype: ResolvedType | undefined = undefined;
+                    if(cp === "%this_captured") {
+                        if(enclosingDecl !== undefined) {
+                            cptype = this.resolveOOTypeFromDecls(enclosingDecl[1], enclosingDecl[2]);
+                        }
+                    }
+                    else {
+                        const cparam = invoke.params.find((ip) => ip.name === cp);
+                        if(cparam !== undefined) {
+                            cptype = this.resolveAndEnsureTypeOnly(cexp.exp.sinfo, cparam.type as TypeSignature, binds);
+                        }
+                    }
+                    
+                    this.raiseErrorIf(cexp.exp.sinfo, cptype === undefined, "Unbound variable in initializer expression");
+                    return { name: cp, refKind: undefined, ptype: cptype as ResolvedType };
                 });
 
                 const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, pcodes, pargs);
@@ -6517,7 +6530,7 @@ class TypeChecker {
                     optparaminfo.push({pname: p.name, ptype: pdecltype, maskidx: optparaminfo.length, initaction: ii});
                 }
                 else {
-                    const ii = this.processExpressionForOptParamDefault(invoke.srcFile, ikey, p.name, pdecltype, p.defaultexp, binds, invoke, fargs, pargs);
+                    const ii = this.processExpressionForOptParamDefault(invoke.srcFile, ikey, p.name, pdecltype, p.defaultexp, binds, enclosingDecl, invoke, fargs, pargs);
                     optparaminfo.push({pname: p.name, ptype: pdecltype, maskidx: optparaminfo.length, initaction: ii});
                 }
             }
@@ -6634,8 +6647,8 @@ class TypeChecker {
         let entrycallparams: {name: string, refKind: "ref" | "out" | "out?" | undefined, ptype: ResolvedType}[] = [];
         let params: MIRFunctionParameter[] = [];
 
-        pci.params.forEach((p) => {
-            const pdecltype = this.m_assembly.normalizeTypeOnly(p.type, binds);
+        pci.params.forEach((p, i) => {
+            const pdecltype = fsig.params[i].type as ResolvedType;
             if (p.refKind !== undefined) {
                 refnames.push(p.name);
 
@@ -6659,7 +6672,7 @@ class TypeChecker {
         });
 
         if (pci.optRestType !== undefined) {
-            const rtype = this.resolveAndEnsureTypeOnly(sinfo, pci.optRestType, binds);
+            const rtype = fsig.optRestParamType as ResolvedType;
             cargs.set(pci.optRestName as string, new VarInfo(rtype, true, false, true, rtype));
 
             const resttype = this.m_emitter.registerResolvedTypeReference(rtype);

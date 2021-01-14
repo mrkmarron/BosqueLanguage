@@ -2017,11 +2017,11 @@ class SMTBodyEmitter {
                 break;
             }
             //op infix !=
-            case "NSCore::===infix=(NSCore::Int, NSCore::Int)":
-            case "NSCore::===infix=(NSCore::Nat, NSCore::Nat)":
-            case "NSCore::===infix=(NSCore::BigInt, NSCore::BigInt)":
-            case "NSCore::===infix=(NSCore::BigNat, NSCore::BigNat)":
-            case "NSCore::===infix=(NSCore::Rational, NSCore::Rational)": {
+            case "NSCore::!==infix=(NSCore::Int, NSCore::Int)":
+            case "NSCore::!==infix=(NSCore::Nat, NSCore::Nat)":
+            case "NSCore::!==infix=(NSCore::BigInt, NSCore::BigInt)":
+            case "NSCore::!==infix=(NSCore::BigNat, NSCore::BigNat)":
+            case "NSCore::!==infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = new SMTCallSimple("not", [new SMTCallSimple("=", args)]);
                 break;
             }

@@ -142,6 +142,7 @@ class ParserEnvironment {
     useLocalVar(name: string): string {
         const cscope = this.getCurrentFunctionScope();
         if (cscope.isPCodeEnv() && name === "this") {
+            cscope.getCaptureVars().add("%this_captured");
             return "%this_captured";
         }
 

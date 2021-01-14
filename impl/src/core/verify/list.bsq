@@ -90,9 +90,9 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck
     private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck_idx
     
-    private recursive? function s_computeMatchIdxSequence(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_computematchidxsequence
-    private recursive? function s_computeMatchIdxSequence_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_computematchidxsequence_idx
-    private function s_computeOfTypeIdxSequence<U>(l: List<T>, start: Nat, end: Nat): Bool # list_computeoftypeidxsequence
+    private recursive? function s_computeMatchIdxSequence(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence
+    private recursive? function s_computeMatchIdxSequence_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence_idx
+    private function s_computeOfTypeIdxSequence<U>(l: List<T>, start: Nat, end: Nat): ISequence # list_computeoftypeidxsequence
     
     __safe private function s_size(l: List<T>): Nat # list_size
     __safe private function s_empty(l: List<T>): Nat # list_empty
