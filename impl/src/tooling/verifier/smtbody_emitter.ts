@@ -131,7 +131,7 @@ class SMTBodyEmitter {
         const cres = this.generateTempName();
         
         const okpath = new SMTLet(this.varToSMTName(trgt).vname, this.typegen.generateResultGetSuccess(calleertype, new SMTVar(cres)), continuation);
-        const errpath = (callerrtype.trkey === calleertype.trkey) ? new SMTVar(cres) : this.typegen.generateResultTypeConstructorError(calleertype, this.typegen.generateResultGetError(calleertype, new SMTVar(cres)));
+        const errpath = (callerrtype.trkey === calleertype.trkey) ? new SMTVar(cres) : this.typegen.generateResultTypeConstructorError(callerrtype, this.typegen.generateResultGetError(calleertype, new SMTVar(cres)));
 
         const icond = new SMTIf(this.typegen.generateResultIsErrorTest(calleertype, new SMTVar(cres)), errpath, okpath);
         return new SMTLet(cres, gcall, icond);
@@ -1861,23 +1861,26 @@ class SMTBodyEmitter {
             case "NSCore::+=infix=(NSCore::Int, NSCore::Int)": {
                 rtype = this.typegen.getMIRType("NSCore::Int");
                 smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::+=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
                 smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::+=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
                 smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::+=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
                 smte = this.processGenerateResultWithBounds(sinfo, "+", args, rtype);
-                erropt = true;
-                break
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::+=infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_plus"), ...args]) : new SMTCallSimple("+", args);
@@ -1895,17 +1898,20 @@ class SMTBodyEmitter {
             case "NSCore::-=infix=(NSCore::Int, NSCore::Int)": {
                 rtype = this.typegen.getMIRType("NSCore::Int");
                 smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::-=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
                 smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
                 erropt = true;
+                break;
             }
             case "NSCore::-=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
                 smte = this.processGenerateResultWithBounds(sinfo, "-", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::-=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
@@ -1929,23 +1935,26 @@ class SMTBodyEmitter {
             case "NSCore::*=infix=(NSCore::Int, NSCore::Int)": {
                 rtype = this.typegen.getMIRType("NSCore::Int");
                 smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::*=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
                 smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::*=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
                 smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
-                erropt = true;
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::*=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
                 smte = this.processGenerateResultWithBounds(sinfo, "*", args, rtype);
-                erropt = true;
-                break
+                erropt = this.vopts.OverflowEnabled;
+                break;
             }
             case "NSCore::*=infix=(NSCore::Rational, NSCore::Rational)": {
                 smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_mult"), ...args]) : new SMTCallSimple("*", args);
@@ -1964,16 +1973,19 @@ class SMTBodyEmitter {
                 rtype = this.typegen.getMIRType("NSCore::Int");
                 smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("bvsrem", args));
                 erropt = true;
+                break;
             }
             case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
                 smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("bvurem", args));
                 erropt = true;
+                break;
             }
             case "NSCore::/=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
                 smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple(this.vopts.BigXMode === "BV" ? "bvsrem" : "/", args));
                 erropt = true;
+                break;
             }
             case "NSCore::/=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
