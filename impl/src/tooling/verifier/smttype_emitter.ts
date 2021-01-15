@@ -93,6 +93,9 @@ class SMTTypeEmitter {
         else if (this.isType(tt, "NSCore::Regex")) {
             return new SMTType("bsq_regex");
         }
+        else if (this.isType(tt, "NSCore::ISequence")) {
+            return new SMTType("ISequence");
+        }
         else if(this.isUniqueTupleType(tt)) {
             return new SMTType(this.mangle(tt.trkey));
         }

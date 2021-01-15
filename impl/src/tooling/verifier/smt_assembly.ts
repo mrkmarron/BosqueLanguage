@@ -506,7 +506,7 @@ class SMTAssembly {
 
         const ufdecls = this.uninterpfunctions
             .sort((uf1, uf2) => uf1.fname.localeCompare(uf2.fname))
-            .map((uf) => `(declare-fun ${uf.fname} (${uf.args.map((arg) => arg.name)}) ${uf.result})`);
+            .map((uf) => uf.emitSMT2());
 
         const gdefs = this.constantDecls
             .sort((c1, c2) => c1.gkey.localeCompare(c2.gkey))

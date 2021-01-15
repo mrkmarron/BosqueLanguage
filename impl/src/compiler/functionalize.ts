@@ -62,7 +62,7 @@ function updateJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv) {
     if (jop.trgtblock === fenv.jlabel) {
         const tc = generateTailCall(bb.label, fenv);
         bb.ops[bb.ops.length - 1] = tc;
-        bb.ops.push(new MIRJump(sinfo_undef, "exit")); 
+        bb.ops.push(new MIRJump(sinfo_undef, "returnassign")); 
         
         fenv.setResultPhiEntry(bb.label, tc.trgt);
     }
@@ -75,7 +75,7 @@ function updateCondJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
         const tjop = bb.ops[bb.ops.length - 1] as MIRJumpCond;
 
         const tc = generateTailCall(bb.label, fenv);
-        const ntb = new MIRBasicBlock(bb.label + "tbb", [tc, new MIRJump(sinfo_undef, "exit")]);
+        const ntb = new MIRBasicBlock(bb.label + "tbb", [tc, new MIRJump(sinfo_undef, "returnassign")]);
         bb.ops[bb.ops.length - 1] = new MIRJumpCond(tjop.sinfo, tjop.arg, ntb.label, tjop.falseblock);
 
         nbb.push(ntb);
@@ -86,7 +86,7 @@ function updateCondJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
         const fjop = bb.ops[bb.ops.length - 1] as MIRJumpCond;
 
         const tc = generateTailCall(bb.label, fenv);
-        const ntb = new MIRBasicBlock(bb.label + "fbb", [tc, new MIRJump(sinfo_undef, "exit")]);
+        const ntb = new MIRBasicBlock(bb.label + "fbb", [tc, new MIRJump(sinfo_undef, "returnassign")]);
         bb.ops[bb.ops.length - 1] = new MIRJumpCond(fjop.sinfo, fjop.arg, fjop.trueblock, ntb.label);
 
         nbb.push(ntb);
@@ -101,7 +101,7 @@ function updateNoneJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
         const tjop = bb.ops[bb.ops.length - 1] as MIRJumpNone;
 
         const tc = generateTailCall(bb.label, fenv);
-        const ntb = new MIRBasicBlock(bb.label + "tbb", [tc, new MIRJump(sinfo_undef, "exit")]);
+        const ntb = new MIRBasicBlock(bb.label + "tbb", [tc, new MIRJump(sinfo_undef, "returnassign")]);
         bb.ops[bb.ops.length - 1] = new MIRJumpNone(tjop.sinfo, tjop.arg, tjop.arglayouttype, ntb.label, tjop.someblock);
 
         nbb.push(ntb);
@@ -112,7 +112,7 @@ function updateNoneJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
         const fjop = bb.ops[bb.ops.length - 1] as MIRJumpNone;
 
         const tc = generateTailCall(bb.label, fenv);
-        const ntb = new MIRBasicBlock(bb.label + "fbb", [tc, new MIRJump(sinfo_undef, "exit")]);
+        const ntb = new MIRBasicBlock(bb.label + "fbb", [tc, new MIRJump(sinfo_undef, "returnassign")]);
         bb.ops[bb.ops.length - 1] = new MIRJumpNone(fjop.sinfo, fjop.arg, fjop.arglayouttype, fjop.noneblock, ntb.label);
 
         nbb.push(ntb);
@@ -122,6 +122,7 @@ function updateNoneJumpOp(bb: MIRBasicBlock, fenv: FunctionalizeEnv, nbb: MIRBas
 
 function replaceJumpsWithCalls(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv): MIRBasicBlock[] {
     let nbb: MIRBasicBlock[] = [];
+
     bbl
         .filter((bb) => bb.ops.length !== 0)
         .forEach((bb) => {
@@ -146,22 +147,27 @@ function replaceJumpsWithCalls(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv): MI
 }
 
 function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels: string[]) {
-    const exit = bbl.find((bb) => bb.label === "exit") as MIRBasicBlock;
+    const rassgn = bbl.find((bb) => bb.label === "returnassign") as MIRBasicBlock;
 
-    if(exit.ops.length === 0 || !(exit.ops[0] instanceof MIRPhi)) {
+    if(!(rassgn.ops[0] instanceof MIRPhi)) {
         const phi = new MIRPhi(sinfo_undef, new Map<string, MIRRegisterArgument>(fenv.rphimap), fenv.rtype, new MIRRegisterArgument("$$return"));
-        exit.ops = [phi, ...exit.ops];
+        rassgn.ops = [phi, ...rassgn.ops];
     }
     else {
-        const phi = exit.ops[0] as MIRPhi;
-        deadlabels.forEach((dl) => {
-            if(phi.src.has(dl)) {
-                phi.src.delete(dl);
+        rassgn.ops.forEach((op) => {
+            if (op instanceof MIRPhi) {
+                deadlabels.forEach((dl) => {
+                    if (op.src.has(dl)) {
+                        op.src.delete(dl);
+                    }
+                });
+
+                fenv.rphimap.forEach((v, lbl) => op.src.set(lbl, v));
             }
         });
-
-        fenv.rphimap.forEach((v, lbl) => phi.src.set(lbl, v));
     }
+
+    rassgn.ops.push(new MIRJump(new SourceInfo(-1, -1, -1, -1), "exit"));
 }
 
 function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFunctionParameter[], rtype: MIRType): NBodyInfo | undefined {
@@ -184,7 +190,7 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
     const phivargs = phis.map((op) => op.trgt.nameID);
     const phivkill = new Set(([] as string[]).concat(...phis.map((op) => [...op.src].map((src) => src[1].nameID))));
 
-    const rblocks = [...bo.slice(0, jidx), new MIRBasicBlock("exit", [])];
+    let rblocks = [...bo.slice(0, jidx)];
     const fblocks = [new MIRBasicBlock("entry", bo[jidx].ops.slice(phis.length)), ...bo.slice(jidx + 1)];
 
     const jvars = [...(lv.get(bo[jidx].label) as BlockLiveSet).liveEntry].filter((lvn) => !phivkill.has(lvn[0])).sort((a, b) => a[0].localeCompare(b[0]));
@@ -196,6 +202,7 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
 
     let fenv = new FunctionalizeEnv(rtype.trkey, ninvid, jvars.map((lvn) => lvn[1]), phis, jlabel);
     const nbb = replaceJumpsWithCalls(rblocks, fenv);
+    rblocks.push(new MIRBasicBlock("returnassign", []), new MIRBasicBlock("exit", []));
     rebuildExitPhi(rblocks, fenv, bo.slice(jidx).map((bb) => bb.label));
 
     b.body = new Map<string, MIRBasicBlock>();

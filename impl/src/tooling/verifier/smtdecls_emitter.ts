@@ -607,6 +607,11 @@ class SMTEmitter {
 
             this.assembly.uninterpfunctions.push(ufcons);
         });
+
+        const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(idecl.tkey));
+        if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
+            this.assembly.resultTypes.push(({ hasFlag: false, rtname: idecl.tkey, ctype: restype }));
+        }
     }
 
     private processVectorTypeDecl(vdecl: MIREntityTypeDecl) {
@@ -651,7 +656,7 @@ class SMTEmitter {
                     for (let i = 0; i < dc.argc - 1; ++i) {
                         altops.push({test: new SMTCallSimple("=", [new SMTVar("n"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`)]), result: new SMTCallSimple(`${dc.cname}$arg_${i}`, [new SMTVar("lc")])});
                     }
-                    getdirectops.push({test: testexp, result: new SMTCond(altops.reverse(), lastop)});
+                    getdirectops.push({test: testexp, result: new SMTCond(altops, lastop)});
                 }
             });
         
@@ -931,54 +936,54 @@ class SMTEmitter {
         }
 
         assembly.entityDecls.forEach((edcl) => {
-            const mirtype = this.temitter.getMIRType(edcl.tkey);
-            const ttag = this.temitter.getSMTTypeTag(mirtype);
-
-            if(!this.assembly.typeTags.includes(ttag)) {
-                this.assembly.typeTags.push(ttag);
-            }
-
-            if (!this.assembly.keytypeTags.includes(ttag)) {
-                if (assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
-                    this.assembly.keytypeTags.push(ttag);
-                }
-            }
-
-            const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(edcl.tkey));
-            if(this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
-                this.assembly.resultTypes.push(({hasFlag: false, rtname: edcl.tkey, ctype: restype}));
-            }
-
-            if(edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
-                this.processVectorTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
-                this.processListTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
-                this.processStackTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
-                this.processQueueTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
-                this.processSetTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
-                this.processDynamicSetTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
-                this.processMapTypeDecl(edcl);
-            }
-            else if(edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
-                this.processDynamicMapTypeDecl(edcl);
+            if(edcl.ns === "NSCore" && edcl.name === "ISequence") {
+                this.processISequenceTypeDecl(edcl);
             }
             else {
-                if(edcl.ns === "NSCore" && edcl.name === "ISequence") {
-                    this.processISequenceTypeDecl(edcl);
+                const mirtype = this.temitter.getMIRType(edcl.tkey);
+                const ttag = this.temitter.getSMTTypeTag(mirtype);
+
+                if (!this.assembly.typeTags.includes(ttag)) {
+                    this.assembly.typeTags.push(ttag);
+                }
+
+                if (!this.assembly.keytypeTags.includes(ttag)) {
+                    if (assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
+                        this.assembly.keytypeTags.push(ttag);
+                    }
+                }
+
+                const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(edcl.tkey));
+                if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
+                    this.assembly.resultTypes.push(({ hasFlag: false, rtname: edcl.tkey, ctype: restype }));
+                }
+
+                if (edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
+                    this.processVectorTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
+                    this.processListTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
+                    this.processStackTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
+                    this.processQueueTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
+                    this.processSetTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
+                    this.processDynamicSetTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
+                    this.processMapTypeDecl(edcl);
+                }
+                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
+                    this.processDynamicMapTypeDecl(edcl);
                 }
                 else {
-                    if(edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be === edcl.name) === undefined) {
+                    if (edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be === edcl.name) === undefined) {
                         this.processEntityDecl(edcl);
                     }
                 }
@@ -1146,6 +1151,11 @@ class SMTEmitter {
             }
         }
         
+        this.bemitter.requiredUFConsts.forEach((ctype) => {
+            const ufcc = new SMTFunctionUninterpreted(`${ctype.name}@uicons_UF`, [], ctype);
+            this.assembly.uninterpfunctions.push(ufcc);
+        });
+
         this.assembly.model = new SMTModelState(iargs, argchk, this.temitter.generateResultType(restype), iexp);
         this.assembly.allErrors = this.bemitter.allErrors;
     }
