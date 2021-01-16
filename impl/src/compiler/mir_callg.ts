@@ -150,7 +150,7 @@ function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, errorTrgtPos: { file:
         const pinvk = masm.primitiveInvokeDecls.get(ikey) as MIRInvokePrimitiveDecl;
         const cn = callg.invokes.get(ikey) as CallGNode;
 
-        if (isSafeInvoke(pinvk) && [...cn.callees].every((callee) => !safeinfo.has(callee) || isSafeInvoke((masm.primitiveInvokeDecls.get(callee) || masm.invokeDecls.get(callee)) as MIRInvokeDecl))) {
+        if (isSafeInvoke(pinvk)) {
             return { safe: true, trgt: false };
         }
         else {

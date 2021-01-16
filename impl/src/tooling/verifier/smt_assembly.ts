@@ -41,11 +41,12 @@ class SMTFunction {
     readonly fname: string;
     readonly args: { vname: string, vtype: SMTType }[];
     readonly mask: string | undefined;
+    readonly masksize: number;
     readonly result: SMTType;
 
     readonly body: SMTExp;
 
-    constructor(fname: string, args: { vname: string, vtype: SMTType }[], mask: string | undefined, result: SMTType, body: SMTExp) {
+    constructor(fname: string, args: { vname: string, vtype: SMTType }[], maskname: string | undefined, masksize: number, result: SMTType, body: SMTExp) {
         this.fname = fname;
         this.args = args;
         this.mask = mask;
@@ -57,7 +58,8 @@ class SMTFunction {
     emitSMT2(): string {
         const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype.name})`);
         const body = this.body.emitSMT2("  ");
-        return `(define-fun ${this.fname} (${args.join(" ")}${this.mask !== undefined ? this.mask : ""}) ${this.result.name}\n${body}\n)`;
+        xxxx;
+        return `(define-fun ${this.fname} (${args.join(" ")}${this.mask !== undefined ? (" " + this.mask) : ""}) ${this.result.name}\n${body}\n)`;
     }
 }
 

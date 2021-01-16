@@ -207,7 +207,7 @@ class SMTBodyEmitter {
         const ufcname = this.generateUFConstantForType(geninfo.resulttype);
         if(ttuples.length === 0) {
             const rbody = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, new SMTConst(ufcname), false) : new SMTConst(ufcname);
-            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, rbody);
+            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, 0, rtype, rbody);
         }
         else {
             const ops = ttuples.map((tt) => {
@@ -224,7 +224,7 @@ class SMTBodyEmitter {
 
             const orelse = geninfo.guard !== undefined ? this.typegen.generateAccessWithSetGuardResultTypeConstructorLoad(geninfo.resulttype, new SMTConst(ufcname), false) : new SMTConst(ufcname);
 
-            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, rtype, new SMTCond(ops, orelse));
+            return new SMTFunction(geninfo.inv, [{ vname: "arg", vtype: this.typegen.getSMTTypeFor(geninfo.argflowtype) }], undefined, 0, rtype, new SMTCond(ops, orelse));
         }
     }
 
@@ -2288,7 +2288,7 @@ class SMTBodyEmitter {
         if (idecl instanceof MIRInvokeBodyDecl) {
             const body = this.generateBlockExps(issafe, (idecl as MIRInvokeBodyDecl).body.body);
 
-            return new SMTFunction(this.typegen.mangle(idecl.key), args, idecl.takesmask ? "#maskparam#" : undefined, restype, body);
+            return new SMTFunction(this.typegen.mangle(idecl.key), args, idecl.masksize !== 0 ? this.typegen.mangle("#maskparam#") : undefined, idecl.masksize, restype, body);
         }
         else {
             assert(idecl instanceof MIRInvokePrimitiveDecl);
@@ -2510,9 +2510,9 @@ class SMTBodyEmitter {
                     //sorted constraint
                     const assertsorted = new SMTCallSimple("ISequence@assertSorted", [new SMTVar(cvar)]);
 
-                    //\forall j (j \in [lower, upper), p(get(arg0, j))) IIF (\exists n \in [0, size(res)), get(res, n) = j)
+                    //\forall j (j \in [lower, upper) /\ p(get(arg0, j))) => (\exists n \in [0, size(res)) /\ get(res, n) = j)
                     const fromassert = new SMTForAll([{ vname: "j", vtype: smtnattype }],
-                        new SMTCallSimple("=", [
+                        new SMTCallSimple("=>", [
                             new SMTCallSimple("and", [
                                 this.generateListBoundsCheckCallBoth("j", new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
                                 this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], new SMTVar("j")))
@@ -2529,12 +2529,26 @@ class SMTBodyEmitter {
                         ])
                     );
 
+                    //\forall n (n \in [0, size(res)), get(res, n) = j) => j \in [lower, upper) /\ p(get(arg0, j)))
+                    const toassert = new SMTForAll([{ vname: "n", vtype: smtnattype }],
+                        new SMTCallSimple("=>", [
+                            this.generateListBoundsCheckCallUpper("n", new SMTCallSimple("ISequence@size", [new SMTVar(cvar)])),
+                            new SMTCallSimple("and", [
+                                this.generateListBoundsCheckCallBothOnExp(new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")]), new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
+                                this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")])))
+                            ]),
+                        ])
+                    );
+
                     const icons = new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname), new SMTVar(args[2].vname)]);
         
-                    const fbody = new SMTLet(
-                        cvar, icons,
+                    const fbody = new SMTLetMulti(
+                        [
+                            { vname: argsize, value: this.generateListSizeCall({ vname: args[0].vname, vtype: args[0].vtype }) },
+                            { vname: cvar, value: icons }
+                        ],
                         new SMTIf(
-                            new SMTCallSimple("and", [assertsize, assertrange, assertsorted, fromassert]),
+                            new SMTCallSimple("and", [assertsize, assertrange, assertsorted, fromassert, toassert]),
                             this.typegen.generateResultTypeConstructorSuccess(mirrestype, new SMTVar(cvar)),
                             this.generateErrorAssertFact(mirrestype))
                     );
@@ -2872,6 +2886,13 @@ class SMTBodyEmitter {
         return new SMTCallSimple("and", [
             new SMTCallSimple("bvule", [lower, new SMTVar(nidx)]),
             new SMTCallSimple("bvult", [new SMTVar(nidx), upper])
+        ]);
+    }
+
+    private generateListBoundsCheckCallBothOnExp(nidx: SMTExp, lower: SMTExp, upper: SMTExp): SMTExp {
+        return new SMTCallSimple("and", [
+            new SMTCallSimple("bvule", [lower, nidx]),
+            new SMTCallSimple("bvult", [nidx, upper])
         ]);
     }
 

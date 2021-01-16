@@ -86,9 +86,9 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     private function s_applycheck_op<U>(l: List<T>, p: recursive? pred(_: T, _: Nat) -> U): List<T> # list_applycheck_op
     private function s_applycheck_op_idx<U>(l: List<T>, p: recursive? pred(_: T, _: Nat) -> U): List<T> # list_applycheck_op_idx
 
-    private function {when T grounded KeyType} s_hasCheck(l: List<T>, val: T, start: Nat, end: Nat): Bool # list_hascheck
-    private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck
-    private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck_idx
+    __assume_safe private function {when T grounded KeyType} s_hasCheck(l: List<T>, val: T, start: Nat, end: Nat): Bool # list_hascheck
+    __assume_safe private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck
+    __assume_safe private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck_idx
     
     private recursive? function s_computeMatchIdxSequence(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence
     private recursive? function s_computeMatchIdxSequence_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence_idx
@@ -258,7 +258,7 @@ entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType 
     }
 
     private function s_rangeInBounds(l: List<T>, start: Nat, end: Nat): Bool {
-        return start <= end && end <= List<T>::s_size(l); 
+        return start <= end & end <= List<T>::s_size(l); 
     }
 
     ////

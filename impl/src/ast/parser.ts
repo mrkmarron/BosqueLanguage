@@ -2063,7 +2063,7 @@ class Parser {
 
                 let done = false;
                 [done, exp] = this.processPrefixOnLiteralExpressionsIfNeeded(exp, op);
-                if (done) {
+                if (!done) {
                     break;
                 }
 
@@ -2528,7 +2528,7 @@ class Parser {
             ops.push(this.consumeTokenAndGetValue() as "!" | "+" | "-");
         }
 
-        return this.prefixStackApplicationHandler(sinfo, ops);
+        return this.prefixStackApplicationHandler(sinfo, ops.reverse());
     }
 
     private parseMultiplicativeExpression(): Expression {

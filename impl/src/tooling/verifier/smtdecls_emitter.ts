@@ -770,7 +770,7 @@ class SMTEmitter {
             )
         );
 
-        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, smtctype, getbody);
+        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, 0, smtctype, getbody);
 
         const smtdecl = new SMTListDecl(iskey, isapi, lccftype, constructors, get_axiom, smttype.name, ttag, consdecl, consfuncs.box, consfuncs.bfield, getdecl);
         this.assembly.listDecls.push(smtdecl);
