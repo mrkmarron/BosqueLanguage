@@ -6315,19 +6315,23 @@ class TypeChecker {
                 return this.m_emitter.registerResolvedTypeReference(ptype).trkey;
             });
 
-            const conskey = MIRKeyGenerator.generateFunctionKey(tkey, "@@cons", new Map<string, ResolvedType>(), []);
-            const consenvargs = new Map<string, VarInfo>();
-            const ccfields = this.m_assembly.getAllOOFieldsConstructors(tdecl, binds);
-            [...ccfields.req, ...ccfields.opt].forEach((ff) => {
-                const fdi = ff[1];
-                const ftype = this.resolveAndEnsureTypeOnly(fdi[1].sourceLocation, fdi[1].declaredType, fdi[2]);
-                consenvargs.set(`$${fdi[1].name}`, new VarInfo(ftype, fdi[1].value === undefined, false, true, ftype));
-            });
-            const consfuncfields = [...ccfields.req, ...ccfields.opt].map((ccf) => MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(ccf[1][0], ccf[1][2]), ccf[1][1].name));
+            let conskey: MIRInvokeKey | undefined = undefined;
+            let consfuncfields: MIRFieldKey[] = [];
+            if (!OOPTypeDecl.attributeSetContains("__internal", tdecl.attributes)) {
+                conskey = MIRKeyGenerator.generateFunctionKey(tkey, "@@cons", new Map<string, ResolvedType>(), []);
+                const consenvargs = new Map<string, VarInfo>();
+                const ccfields = this.m_assembly.getAllOOFieldsConstructors(tdecl, binds);
+                [...ccfields.req, ...ccfields.opt].forEach((ff) => {
+                    const fdi = ff[1];
+                    const ftype = this.resolveAndEnsureTypeOnly(fdi[1].sourceLocation, fdi[1].declaredType, fdi[2]);
+                    consenvargs.set(`$${fdi[1].name}`, new VarInfo(ftype, fdi[1].value === undefined, false, true, ftype));
+                });
+                consfuncfields = [...ccfields.req, ...ccfields.opt].map((ccf) => MIRKeyGenerator.generateFieldKey(this.resolveOOTypeFromDecls(ccf[1][0], ccf[1][2]), ccf[1][1].name));
 
-            if (tdecl instanceof EntityTypeDecl) {
-                const consenv = TypeEnvironment.createInitialEnvForCall(conskey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), consenvargs, undefined);
-                this.generateConstructor(consenv, conskey, tdecl, binds);
+                if (tdecl instanceof EntityTypeDecl) {
+                    const consenv = TypeEnvironment.createInitialEnvForCall(conskey, binds, new Map<string, { pcode: PCode, captured: string[] }>(), consenvargs, undefined);
+                    this.generateConstructor(consenv, conskey, tdecl, binds);
+                }
             }
 
             //

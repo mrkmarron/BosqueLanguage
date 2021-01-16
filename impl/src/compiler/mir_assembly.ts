@@ -278,8 +278,7 @@ enum MIRSpecialTypeCategory {
 }
 
 class MIREntityTypeDecl extends MIROOTypeDecl {
-    readonly consfunc: MIRInvokeKey;
-
+    readonly consfunc: MIRInvokeKey | undefined;
     readonly consfuncfields: MIRFieldKey[];
 
     readonly fields: MIRFieldDecl[];
@@ -288,7 +287,7 @@ class MIREntityTypeDecl extends MIROOTypeDecl {
     readonly specialDecls: Set<MIRSpecialTypeCategory>;
     readonly specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined;
 
-    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey, consfuncfields: MIRFieldKey[], fields: MIRFieldDecl[], specialDecls: MIRSpecialTypeCategory[], specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined) {
+    constructor(ooname: string, srcInfo: SourceInfo, srcFile: string, tkey: MIRResolvedTypeKey, attributes: string[], ns: string, name: string, terms: Map<string, MIRType>, provides: MIRResolvedTypeKey[], consfunc: MIRInvokeKey | undefined, consfuncfields: MIRFieldKey[], fields: MIRFieldDecl[], specialDecls: MIRSpecialTypeCategory[], specialTemplateInfo: {tname: string, tkind: MIRResolvedTypeKey}[] | undefined) {
         super(ooname, srcInfo, srcFile, tkey, attributes, ns, name, terms, provides);
 
         this.consfunc = consfunc;

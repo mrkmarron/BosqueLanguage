@@ -40,7 +40,7 @@ type SMT2FileInfo = {
 class SMTFunction {
     readonly fname: string;
     readonly args: { vname: string, vtype: SMTType }[];
-    readonly mask: string | undefined;
+    readonly maskname: string | undefined;
     readonly masksize: number;
     readonly result: SMTType;
 
@@ -49,17 +49,31 @@ class SMTFunction {
     constructor(fname: string, args: { vname: string, vtype: SMTType }[], maskname: string | undefined, masksize: number, result: SMTType, body: SMTExp) {
         this.fname = fname;
         this.args = args;
-        this.mask = mask;
+        this.maskname = maskname;
+        this.masksize = masksize;
         this.result = result;
 
         this.body = body;
     }
 
+    static create(fname: string, args: { vname: string, vtype: SMTType }[], result: SMTType, body: SMTExp): SMTFunction {
+        return new SMTFunction(fname, args, undefined, 0, result, body);
+    }
+
+    static createWithMask(fname: string, args: { vname: string, vtype: SMTType }[], maskname: string, masksize: number, result: SMTType, body: SMTExp): SMTFunction {
+        return new SMTFunction(fname, args, maskname, masksize, result, body);
+    }
+
     emitSMT2(): string {
         const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype.name})`);
         const body = this.body.emitSMT2("  ");
-        xxxx;
-        return `(define-fun ${this.fname} (${args.join(" ")}${this.mask !== undefined ? (" " + this.mask) : ""}) ${this.result.name}\n${body}\n)`;
+
+        if(this.maskname === undefined) {
+            return `(define-fun ${this.fname} (${args.join(" ")}) ${this.result.name}\n${body}\n)`;
+        }
+        else {
+            return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize}) ${this.result.name}\n${body}\n)`;
+        }
     }
 }
 

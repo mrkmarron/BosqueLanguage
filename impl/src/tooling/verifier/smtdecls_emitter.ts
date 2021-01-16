@@ -107,7 +107,7 @@ class SMTEmitter {
         const mftype = this.temitter.getMIRType(mf.declaredType);
         
         const bcreate = this.generateAPITypeConstructorFunction_Primitive(mftype, new SMTCallSimple("bvadd", [depthexp, new SMTConst("BNat@one")]), new SMTConst("BNat@zero"));
-        return [new SMTCallSimple(this.temitter.mangle(tdecl.consfunc), [bcreate[0]]), !this.bemitter.isSafeConstructorInvoke(tt)];
+        return [new SMTCallSimple(this.temitter.mangle(tdecl.consfunc as MIRInvokeKey), [bcreate[0]]), !this.bemitter.isSafeConstructorInvoke(tt)];
     }
 
     private generateAPITypeConstructorFunction_ValidatedString(tt: MIRType, depthexp: SMTExp, widthexp: SMTExp): [SMTExp, boolean] {
@@ -456,7 +456,7 @@ class SMTEmitter {
             return undefined;
         }
 
-        return new SMTCallSimple(this.temitter.mangle(tdecl.consfunc), [nv]);
+        return new SMTCallSimple(this.temitter.mangle(tdecl.consfunc as MIRInvokeKey), [nv]);
     }
 
     private parseAPITypeConstructorFunction_ValidatedString(tt: MIRType, json: string): SMTExp | undefined {
@@ -770,7 +770,7 @@ class SMTEmitter {
             )
         );
 
-        const getdecl = new SMTFunction(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], undefined, 0, smtctype, getbody);
+        const getdecl = SMTFunction.create(`${smttype.name}@get`, [{vname: "l", vtype: smttype}, {vname: "n", vtype: nattype}], smtctype, getbody);
 
         const smtdecl = new SMTListDecl(iskey, isapi, lccftype, constructors, get_axiom, smttype.name, ttag, consdecl, consfuncs.box, consfuncs.bfield, getdecl);
         this.assembly.listDecls.push(smtdecl);

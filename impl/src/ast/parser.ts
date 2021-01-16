@@ -181,6 +181,7 @@ const AttributeStrings = [
     "grounded",
     "validator",
 
+    "__internal",
     "__primitive",
     "__safe",
     "__assume_safe"
