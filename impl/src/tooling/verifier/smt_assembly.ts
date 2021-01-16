@@ -72,7 +72,7 @@ class SMTFunction {
             return `(define-fun ${this.fname} (${args.join(" ")}) ${this.result.name}\n${body}\n)`;
         }
         else {
-            return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize}) ${this.result.name}\n${body}\n)`;
+            return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize})) ${this.result.name}\n${body}\n)`;
         }
     }
 }

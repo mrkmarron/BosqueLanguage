@@ -920,7 +920,7 @@ class SMTBodyEmitter {
     processLoadUnintVariableValue(op: MIRLoadUnintVariableValue, continuation: SMTExp): SMTExp {
         const ufcname = this.generateUFConstantForType(this.typegen.getMIRType(op.oftype));
 
-        return new SMTConst(ufcname);
+        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTConst(ufcname), continuation);
     }
 
     processDeclareGuardFlagLocation(op: MIRDeclareGuardFlagLocation) {

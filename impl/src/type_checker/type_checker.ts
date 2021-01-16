@@ -5942,7 +5942,7 @@ class TypeChecker {
             }
         }
 
-        let opidone: Set<string> = new Set<string>(["%this_captured"]);
+        let opidone: Set<string> = new Set<string>(["this"]);
         for (let i = 0; i < optparaminfo.length; ++i) {
             const opidx = optparaminfo.findIndex((opp) => !opidone.has(opp.pname) && opp.initaction.deps.every((dep) => opidone.has(dep)));
             const opi = optparaminfo[opidx];
@@ -6102,18 +6102,18 @@ class TypeChecker {
                 const ppnames = [...cexp.captured].sort().filter((cp) => !pcodes.has(cp.slice(1)));
                 const fparams = ppnames.map((cp) => {
                     let cptype: ResolvedType | undefined = undefined;
-                    if(cp === "%this_captured") {
-                        if(enclosingDecl !== undefined) {
+                    if (cp === "%this_captured") {
+                        if (enclosingDecl !== undefined) {
                             cptype = this.resolveOOTypeFromDecls(enclosingDecl[1], enclosingDecl[2]);
                         }
                     }
                     else {
                         const cparam = invoke.params.find((ip) => ip.name === cp);
-                        if(cparam !== undefined) {
+                        if (cparam !== undefined) {
                             cptype = this.resolveAndEnsureTypeOnly(cexp.exp.sinfo, cparam.type as TypeSignature, binds);
                         }
                     }
-                    
+
                     this.raiseErrorIf(cexp.exp.sinfo, cptype === undefined, "Unbound variable in initializer expression");
                     return { name: cp, refKind: undefined, ptype: cptype as ResolvedType };
                 });
@@ -6121,7 +6121,7 @@ class TypeChecker {
                 const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, pcodes, pargs);
                 this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
-                return new InitializerEvaluationCallAction(ikey, [...cexp.captured].sort().map((cp) => new MIRRegisterArgument(cp)));
+                return new InitializerEvaluationCallAction(ikey, [...cexp.captured].sort().map((cp) => new MIRRegisterArgument(cp !== "%this_captured" ? cp : "this")));
             }
         }
         catch (ex) {

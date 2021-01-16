@@ -6,12 +6,12 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-entity ISequence {
+__internal entity ISequence {
     __safe function size(s: ISequence): Nat # isequence_size
     __assume_safe function get(s: ISequence, n: Nat): Nat # isequence_get
 }
 
-struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
+__internal struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     __assume_safe private function s_unsafe_get(l: Vector<T, K>, i: Nat): T # vector_unsafe_get
 
     method size(): Nat {
@@ -41,7 +41,7 @@ struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType 
     }
 }
 
-entity ListFrom provides Object {
+concept ListFrom provides Object {
     __safe private function s_fill<T>(k: Int, val: T): List<T> # list_fill
 
     __safe private function s_rangeOfInt(start: Int, end: Int): List<Int> # list_rangeofint
@@ -78,7 +78,7 @@ entity ListFrom provides Object {
     }
 }
 
-entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
+__internal entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     private function s_applycheck_pred(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred
     private function s_applycheck_pred_idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred_idx
     private function s_applycheck_binpred<U>(l: List<T>, ol: List<T>, p: recursive? pred(_: T, _: U) -> Bool): List<T>, List<U> # list_applycheck_binpred
