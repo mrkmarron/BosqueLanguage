@@ -625,6 +625,13 @@ class SMTEmitter {
         const mirctype = this.temitter.getMIRType(((ldecl.specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[]).find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
         const smtctype = this.temitter.getSMTTypeFor(mirctype);
         const nattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
+        const stringtype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::String"));
+
+        const pickindex = new SMTFunctionUninterpreted(`${smttype.name}@pick_index`, [stringtype, smttype, nattype, nattype], nattype);
+        this.assembly.uninterpfunctions.push(pickindex);
+
+        const picksize = new SMTFunctionUninterpreted(`${smttype.name}@pick_size`, [stringtype, smttype, nattype, nattype], nattype);
+        this.assembly.uninterpfunctions.push(picksize);
 
         const lccftype = smttype.name + "$uli";
         const get_axiom = new SMTFunctionUninterpreted(`${smttype.name}@get_axiom`, [new SMTType(lccftype), nattype], smtctype);

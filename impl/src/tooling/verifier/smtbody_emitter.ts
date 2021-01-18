@@ -935,7 +935,7 @@ class SMTBodyEmitter {
 
     processConvertValue(op: MIRConvertValue, continuation: SMTExp): SMTExp {
         const conv = this.typegen.coerce(this.argToSMT(op.src), this.typegen.getMIRType(op.srctypelayout), this.typegen.getMIRType(op.intotype));
-        const call = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), conv, this.generateAltForGuardStmt(op.guard.altvalue, this.typegen.getMIRType(op.intotype))) : conv;
+        const call = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), this.generateAltForGuardStmt(op.guard.altvalue, this.typegen.getMIRType(op.intotype)), conv) : conv;
 
         return new SMTLet(this.varToSMTName(op.trgt).vname, call, continuation);
     }
@@ -1373,7 +1373,7 @@ class SMTBodyEmitter {
 
             const args = op.args.map((arg) => this.argToSMT(arg));
             const call = mask !== undefined ? new SMTCallGeneralWOptMask(this.typegen.mangle(op.mkey), args, mask) : new SMTCallGeneral(this.typegen.mangle(op.mkey), args);
-            const gcall = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), call, this.generateAltForGuardStmt(op.guard.altvalue, rtype)) : call;
+            const gcall = op.guard !== undefined ? new SMTIf(this.generateBoolForGuard(op.guard.guard), this.generateAltForGuardStmt(op.guard.altvalue, rtype), call) : call;
                 
             if (this.isSafeInvoke(op.mkey)) {
                 return new SMTLet(this.varToSMTName(op.trgt).vname, gcall, continuation);
@@ -1613,7 +1613,7 @@ class SMTBodyEmitter {
             return new SMTLet(this.varToSMTName(op.trgt).vname, this.argToSMT(op.src), continuation);
         }
         else {
-            const cassign = new SMTIf(this.generateBoolForGuard(op.guard.guard), this.argToSMT(op.src), this.generateAltForGuardStmt(op.guard.altvalue, this.typegen.getMIRType(op.layouttype)));
+            const cassign = new SMTIf(this.generateBoolForGuard(op.guard.guard), this.generateAltForGuardStmt(op.guard.altvalue, this.typegen.getMIRType(op.layouttype)), this.argToSMT(op.src));
             return new SMTLet(this.varToSMTName(op.trgt).vname, cassign, continuation);
         }
     }
@@ -1767,7 +1767,7 @@ class SMTBodyEmitter {
                 return this.processAllTrue(op as MIRAllTrue, continuation);
             }
             case MIROpTag.MIRSomeTrue: {
-                return this.processAllTrue(op as MIRSomeTrue, continuation);
+                return this.processSomeTrue(op as MIRSomeTrue, continuation);
             }
             case MIROpTag.MIRIsTypeOf: {
                 return this.processIsTypeOf(op as MIRIsTypeOf, continuation);
@@ -2523,7 +2523,7 @@ class SMTBodyEmitter {
                                 this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], new SMTVar("j")))
                             ]),
                             new SMTExists([{ vname: "n", vtype: smtnattype }],
-                                new SMTCallSimple("=>", [
+                                new SMTCallSimple("and", [
                                     this.generateListBoundsCheckCallUpper("n", new SMTCallSimple("ISequence@size", [new SMTVar(cvar)])),
                                     new SMTCallSimple("=", [
                                         new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")]),
@@ -2534,14 +2534,11 @@ class SMTBodyEmitter {
                         ])
                     );
 
-                    //\forall n (n \in [0, size(res)), get(res, n) = j) => j \in [lower, upper) /\ p(get(arg0, j)))
+                    //\forall n (n \in [0, size(res)), get(res, n) = j) => p(get(arg0, j))) --- j \in [lower, upper) is checked by the ISequence@assertValuesRange action
                     const toassert = new SMTForAll([{ vname: "n", vtype: smtnattype }],
                         new SMTCallSimple("=>", [
                             this.generateListBoundsCheckCallUpper("n", new SMTCallSimple("ISequence@size", [new SMTVar(cvar)])),
-                            new SMTCallSimple("and", [
-                                this.generateListBoundsCheckCallBothOnExp(new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")]), new SMTVar(args[1].vname), new SMTVar(args[2].vname)),
-                                this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")])))
-                            ]),
+                            this.generateLambdaCallKnownSafe("p", idecl, this.generateListKnownSafeGetCall(args[0], new SMTCallSimple("ISequence@get", [new SMTVar(cvar), new SMTVar("n")])))
                         ])
                     );
 
@@ -2891,13 +2888,6 @@ class SMTBodyEmitter {
         return new SMTCallSimple("and", [
             new SMTCallSimple("bvule", [lower, new SMTVar(nidx)]),
             new SMTCallSimple("bvult", [new SMTVar(nidx), upper])
-        ]);
-    }
-
-    private generateListBoundsCheckCallBothOnExp(nidx: SMTExp, lower: SMTExp, upper: SMTExp): SMTExp {
-        return new SMTCallSimple("and", [
-            new SMTCallSimple("bvule", [lower, nidx]),
-            new SMTCallSimple("bvult", [nidx, upper])
         ]);
     }
 

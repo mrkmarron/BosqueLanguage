@@ -95,7 +95,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private function s_computeOfTypeIdxSequence<U>(l: List<T>, start: Nat, end: Nat): ISequence # list_computeoftypeidxsequence
     
     __safe private function s_size(l: List<T>): Nat # list_size
-    __safe private function s_empty(l: List<T>): Nat # list_empty
+    __safe private function s_empty(l: List<T>): Bool # list_empty
     __assume_safe private function s_unsafe_get(l: List<T>, i: Nat): T # list_unsafe_get
 
     private function s_concat(l: List<List<T>>): List<T> # list_concat
