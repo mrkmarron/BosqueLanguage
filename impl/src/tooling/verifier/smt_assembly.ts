@@ -223,12 +223,12 @@ class SMTConstantDecl {
 }
 
 class SMTModelState {
-    readonly arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp }[];
+    readonly arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp, callexp: SMTExp }[];
     readonly argchk: SMTExp[] | undefined;
     readonly checktype: SMTType;
     readonly fcheck: SMTExp;
 
-    constructor(arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp }[], argchk: SMTExp[] | undefined, checktype: SMTType, echeck: SMTExp) {
+    constructor(arginits: { vname: string, vtype: SMTType, vchk: SMTExp | undefined, vinit: SMTExp, callexp: SMTExp }[], argchk: SMTExp[] | undefined, checktype: SMTType, echeck: SMTExp) {
         this.arginits = arginits;
         this.argchk = argchk;
         this.checktype = checktype;
@@ -291,10 +291,10 @@ class SMTAssembly {
 
     model: SMTModelState = new SMTModelState([], undefined, new SMTType("[UNINIT]"), new SMTConst("bsq_none@literal"));
 
-    modes: { refute: SMTExp, generate: SMTExp, evaluate: [string, SMTExp] } = { 
+    modes: { refute: SMTExp, generate: SMTExp } = { 
         refute: new SMTConst("bsq_none@literal"), 
-        generate: new SMTConst("bsq_none@literal"), 
-        evaluate: ["[INVALID]", new SMTConst("bsq_none@literal")] };
+        generate: new SMTConst("bsq_none@literal")
+    };
 
     constructor(vopts: VerifierOptions) {
         this.vopts = vopts;
@@ -315,7 +315,7 @@ class SMTAssembly {
         return bbn.toString();
     }
 
-    generateSMT2AssemblyInfo(mode: "Refute" | "Generate" | "Evaluate"): SMT2FileInfo {
+    generateSMT2AssemblyInfo(mode: "Refute" | "Generate"): SMT2FileInfo {
         const subtypeasserts = this.subtypeRelation.map((tc) => tc.value ? `(assert (SubtypeOf@ ${tc.ttype} ${tc.atype}))` : `(assert (not (SubtypeOf@ ${tc.ttype} ${tc.atype})))`).sort();
         const indexasserts = this.hasIndexRelation.map((hi) => hi.value ? `(assert (HasIndex@ ${hi.idxtag} ${hi.atype}))` : `(assert (not (HasIndex@ ${hi.idxtag} ${hi.atype})))`).sort();
         const propertyasserts = this.hasPropertyRelation.map((hp) => hp.value ? `(assert (HasProperty@ ${hp.pnametag} ${hp.atype}))` : `(assert (not (HasProperty@ ${hp.pnametag} ${hp.atype})))`).sort();
@@ -549,20 +549,13 @@ class SMTAssembly {
             action.push(`(assert ${this.modes.refute.emitSMT2(undefined)})`);
             action.push("(check-sat)");
         }
-        else if (mode === "Generate") {
+        else {
             action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
             action.push(`(assert ${this.modes.generate.emitSMT2(undefined)})`);
             action.push("(check-sat)");
             action.push("(get-model)");
-        }
-        else {
-            action.push("(check-sat)");
-            action.push("(get-model)");
-
-            action.push(`(echo "evaluating ${this.modes.evaluate[0]}...")`);
-            action.push(`(eval ${this.modes.evaluate[1].emitSMT2(undefined)})`);
         }
 
         return {

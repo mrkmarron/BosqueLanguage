@@ -76,18 +76,6 @@ function generateMASM(files: string[], entrypoint: string): MIRAssembly {
     return masm as MIRAssembly;
 }
 
-function generateSMTAssemblyForEvaluate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, args: string, maxgas: number): SMTAssembly | undefined {
-    let res: SMTAssembly | undefined = undefined;
-    try {
-        const json = JSON.parse(args) as any[];
-        res = SMTEmitter.generateSMTAssemblyEvaluate(masm, vopts, entrypoint, json, maxgas);
-    } catch(e) {
-        process.stdout.write(chalk.red(`SMT generate error -- ${e}\n`));
-        process.exit(1);
-    }
-    return res;
-}
-
 function generateSMTAssemblyForValidate(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, errorTrgtPos: { file: string, line: number, pos: number }, maxgas: number): SMTAssembly | undefined {
     let res: SMTAssembly | undefined = undefined;
     try {
@@ -99,7 +87,7 @@ function generateSMTAssemblyForValidate(masm: MIRAssembly, vopts: VerifierOption
     return res;
 }
 
-function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "Generate" | "Evaluate"): string {
+function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "Generate"): string {
     const sfileinfo = smtasm.generateSMT2AssemblyInfo(mode);
 
     function joinWithIndent(data: string[], indent: string): string {
@@ -180,7 +168,7 @@ function emitSMT2File(cfile: string, into: string) {
     }
 }
 
-function runSMT2File(cfile: string, mode: "Refute" | "Generate" | "Evaluate") {
+function runSMT2File(cfile: string, mode: "Refute" | "Generate") {
     try {
         process.stdout.write(`Running z3 on SMT encoding...\n`);
         const res = execSync(`${z3path} -smt2 -in`, { input: cfile }).toString().trim();
@@ -197,11 +185,8 @@ function runSMT2File(cfile: string, mode: "Refute" | "Generate" | "Evaluate") {
                 process.stdout.write("Solver timeout :(\n");
             }
         }
-        else if(mode === "Generate") {
-            process.stdout.write(`Emitting raw SMTLIB model...\n`);
-            process.stdout.write(res + "\n\n");
-        }
         else {
+            process.stdout.write(`Emitting raw SMTLIB model...\n`);
             process.stdout.write(res + "\n\n");
         }
     }
@@ -217,9 +202,8 @@ function runSMT2File(cfile: string, mode: "Refute" | "Generate" | "Evaluate") {
 
 Commander
     .option("-l --location [location]", "Location (file.bsq@line#pos) with error of interest")
-    .option("-a --earguments [earguments]", "JSON args for evaluation")
     .option("-e --entrypoint [entrypoint]", "Entrypoint to symbolically test", "NSMain::main")
-    .option("-m --mode [mode]", "Mode to run (refute | generate | evaluate)", "refute")
+    .option("-m --mode [mode]", "Mode to run (refute | generate)", "refute")
     .option("-o --output [file]", "Output the model to a given file");
 
 Commander.parse(process.argv);
@@ -243,14 +227,14 @@ if (Commander.args.length === 0) {
 process.stdout.write(`Processing Bosque sources in:\n${Commander.args.join("\n")}\n...Using entrypoint ${Commander.entrypoint}...\n`);
 const massembly = generateMASM(Commander.args, Commander.entrypoint);
 
-if(Commander.location === undefined && Commander.earguments === undefined) {
+if(Commander.location === undefined) {
     const sasm = generateSMTAssemblyForValidate(massembly, vopts, Commander.entrypoint, {file: "[]", line: -1, pos: -1}, maxgas);
     if(sasm !== undefined) {
         process.stdout.write("Possible error lines:\n")
         process.stdout.write(JSON.stringify(sasm.allErrors, undefined, 2) + "\n")
 
         if (Commander.output) {
-            const smfc = buildSMT2file(sasm, timeout, "Evaluate");
+            const smfc = buildSMT2file(sasm, timeout, "Refute");
             emitSMT2File(smfc, Commander.output);
         }
     }
@@ -267,34 +251,18 @@ if (Commander.location !== undefined) {
 
 setImmediate(() => {
     try {
-        if (Commander.mode === "evaluate") {
-            const smtasm = generateSMTAssemblyForEvaluate(massembly, vopts, Commander.entrypoint, Commander.earguments || "", maxgas);
-            if (smtasm === undefined) {
-                process.stdout.write(chalk.red("Error -- Failed to generate SMTLIB code\n"));
-                process.exit(1);
-            }
-
-            const smfc = buildSMT2file(smtasm as SMTAssembly, timeout, "Evaluate");
-            if (Commander.output) {
-                emitSMT2File(smfc, Commander.output);
-            }
-
-            runSMT2File(smfc, "Evaluate");
+        const smtasm = generateSMTAssemblyForValidate(massembly, vopts, Commander.entrypoint, errlocation, maxgas);
+        if (smtasm === undefined) {
+            process.stdout.write(chalk.red("Error -- Failed to generate SMTLIB code\n"));
+            process.exit(1);
         }
-        else {
-            const smtasm = generateSMTAssemblyForValidate(massembly, vopts, Commander.entrypoint, errlocation, maxgas);
-            if (smtasm === undefined) {
-                process.stdout.write(chalk.red("Error -- Failed to generate SMTLIB code\n"));
-                process.exit(1);
-            }
 
-            const smfc = buildSMT2file(smtasm as SMTAssembly, timeout, Commander.mode === "refute" ? "Refute" : "Generate");
-            if (Commander.output) {
-                emitSMT2File(smfc, Commander.output);
-            }
-
-            runSMT2File(smfc, Commander.mode === "refute" ? "Refute" : "Generate");
+        const smfc = buildSMT2file(smtasm as SMTAssembly, timeout, Commander.mode === "refute" ? "Refute" : "Generate");
+        if (Commander.output) {
+            emitSMT2File(smfc, Commander.output);
         }
+
+        runSMT2File(smfc, Commander.mode === "refute" ? "Refute" : "Generate");
     }
     catch (ex) {
         process.stderr.write(chalk.red(`Error -- ${ex}\n`));

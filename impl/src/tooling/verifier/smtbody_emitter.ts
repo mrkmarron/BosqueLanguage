@@ -1803,7 +1803,13 @@ class SMTBodyEmitter {
                 const chkbounds = new SMTCallSimple("bvult", args);
                 const bop = new SMTIf(chkbounds, this.generateErrorCreate(sinfo, oftype, "Unsigned subtract underflow"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
 
-                return new SMTLet(vtmp, new SMTCallSimple(op, args), bop);
+                if(oftype.trkey === "NSCore::Nat") {
+                    return new SMTLet(vtmp, new SMTCallSimple("bvsub", args), bop);
+                }
+                else {
+                    const subop = this.vopts.BigXMode === "Int" ? new SMTCallSimple(op, args) : new SMTCallSimple("bvsub", args);
+                    return new SMTLet(vtmp, subop, bop);
+                }
             }
             else {
                 if(this.vopts.BigXMode === "Int" && (oftype.trkey === "NSCore::BigInt" || oftype.trkey === "NSCore::BigNat")) {
