@@ -203,7 +203,7 @@ function runSMT2File(cfile: string, mode: "Refute" | "Generate") {
 Commander
     .option("-l --location [location]", "Location (file.bsq@line#pos) with error of interest")
     .option("-e --entrypoint [entrypoint]", "Entrypoint to symbolically test", "NSMain::main")
-    .option("-m --mode [mode]", "Mode to run (refute | generate)", "refute")
+    .option("-m --mode [mode]", "Mode to run (errorlocs | refute | generate)", "refute")
     .option("-o --output [file]", "Output the model to a given file");
 
 Commander.parse(process.argv);
@@ -224,10 +224,15 @@ if (Commander.args.length === 0) {
     process.exit(1);
 }
 
+if(Commander.mode !== "errorlocs" && Commander.mode !== "refute" && Commander.mode !== "generate") {
+    process.stdout.write(chalk.red("Error -- Valid modes are \"errorlocs\", \"refute\", and \"generate\"\n"));
+    process.exit(1);
+}
+
 process.stdout.write(`Processing Bosque sources in:\n${Commander.args.join("\n")}\n...Using entrypoint ${Commander.entrypoint}...\n`);
 const massembly = generateMASM(Commander.args, Commander.entrypoint);
 
-if(Commander.location === undefined) {
+if(Commander.mode === "errorlocs" || Commander.location === undefined) {
     const sasm = generateSMTAssemblyForValidate(massembly, vopts, Commander.entrypoint, {file: "[]", line: -1, pos: -1}, maxgas);
     if(sasm !== undefined) {
         process.stdout.write("Possible error lines:\n")

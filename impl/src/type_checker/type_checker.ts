@@ -2342,8 +2342,13 @@ class TypeChecker {
 
         const vinfo = env.lookupVar(exp.name) as VarInfo;
         this.raiseErrorIf(exp.sinfo, !vinfo.mustDefined, "Var may not have been assigned a value");
+        if(vinfo.isCaptured) {
+            this.m_emitter.emitRegisterStore(exp.sinfo, new MIRRegisterArgument(this.m_emitter.generateCapturedVarName(exp.name)), trgt, this.m_emitter.registerResolvedTypeReference(vinfo.declaredType), undefined);    
+        }
+        else {
+            this.m_emitter.emitRegisterStore(exp.sinfo, new MIRRegisterArgument(exp.name), trgt, this.m_emitter.registerResolvedTypeReference(vinfo.declaredType), undefined);    
+        }
 
-        this.m_emitter.emitRegisterStore(exp.sinfo, new MIRRegisterArgument(exp.name), trgt, this.m_emitter.registerResolvedTypeReference(vinfo.declaredType), undefined);
         return env.setVarResultExpression(vinfo.declaredType, vinfo.flowType, exp.name);
     }
 
@@ -6076,7 +6081,7 @@ class TypeChecker {
         }
     }
 
-    private processExpressionForOptParamDefault(srcFile: string, fkey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, invoke: InvokeDecl, pcodes: Map<string, { pcode: PCode, captured: string[] }>, pargs: [string, ResolvedType][]): InitializerEvaluationAction {
+    private processExpressionForOptParamDefault(srcFile: string, fkey: MIRInvokeKey, pname: string, ptype: ResolvedType, cexp: ConstantExpressionValue, binds: Map<string, ResolvedType>, enclosingDecl: [MIRType, OOPTypeDecl, Map<string, ResolvedType>] | undefined, invoke: InvokeDecl): InitializerEvaluationAction {
         const ikey = MIRKeyGenerator.generateFunctionKey(fkey, `$initparam_${pname}`, new Map<string, ResolvedType>(), []); //binds and pcodes already handled in fkey so no need to repeat
         const iname = `$initparam::${fkey}::${pname}`;
         try {
@@ -6099,7 +6104,7 @@ class TypeChecker {
                 }
             }
             else {
-                const ppnames = [...cexp.captured].sort().filter((cp) => !pcodes.has(cp.slice(1)));
+                const ppnames = [...cexp.captured].sort();
                 const fparams = ppnames.map((cp) => {
                     let cptype: ResolvedType | undefined = undefined;
                     if (cp === "%this_captured") {
@@ -6118,7 +6123,7 @@ class TypeChecker {
                     return { name: cp, refKind: undefined, ptype: cptype as ResolvedType };
                 });
 
-                const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, pcodes, pargs);
+                const idecl = this.processInvokeInfo_ExpressionGeneral(srcFile, cexp.exp, iname, ikey, cexp.exp.sinfo, ["dynamic_initializer", "private"], fparams, ptype, binds, new Map<string, { pcode: PCode, captured: string[] }>(), []);
                 this.m_emitter.masm.invokeDecls.set(ikey, idecl as MIRInvokeBodyDecl);
 
                 return new InitializerEvaluationCallAction(ikey, [...cexp.captured].sort().map((cp) => new MIRRegisterArgument(cp !== "%this_captured" ? cp : "this")));
@@ -6517,12 +6522,15 @@ class TypeChecker {
             params.push(new MIRFunctionParameter(invoke.optRestName as string, resttype.trkey));
         }
 
+        let prepostcapturednames: string[] = [];
         for (let i = 0; i < pargs.length; ++i) {
             cargs.set(pargs[i][0], new VarInfo(pargs[i][1], true, true, true, pargs[i][1]));
 
             const ctype = this.m_emitter.registerResolvedTypeReference(pargs[i][1]);
             argTypes.set(this.m_emitter.generateCapturedVarName(pargs[i][0]), ctype);
             params.push(new MIRFunctionParameter(this.m_emitter.generateCapturedVarName(pargs[i][0]), ctype.trkey));
+
+            prepostcapturednames.push(this.m_emitter.generateCapturedVarName(pargs[i][0]));
         }
 
         let optparaminfo: {pname: string, ptype: ResolvedType, maskidx: number, initaction: InitializerEvaluationAction}[] = [];
@@ -6534,7 +6542,7 @@ class TypeChecker {
                     optparaminfo.push({pname: p.name, ptype: pdecltype, maskidx: optparaminfo.length, initaction: ii});
                 }
                 else {
-                    const ii = this.processExpressionForOptParamDefault(invoke.srcFile, ikey, p.name, pdecltype, p.defaultexp, binds, enclosingDecl, invoke, fargs, pargs);
+                    const ii = this.processExpressionForOptParamDefault(invoke.srcFile, ikey, p.name, pdecltype, p.defaultexp, binds, enclosingDecl, invoke);
                     optparaminfo.push({pname: p.name, ptype: pdecltype, maskidx: optparaminfo.length, initaction: ii});
                 }
             }
@@ -6544,7 +6552,7 @@ class TypeChecker {
         const resultType = this.generateExpandedReturnSig(invoke.sourceLocation, declaredResult, entrycallparams);
 
         let rprs: { name: string, refKind: "ref" | "out" | "out?" | undefined, ptype: ResolvedType }[] = [];
-        if (resultType.options.length === 1 && !(resultType.options[0] instanceof ResolvedEphemeralListType)) {
+        if (resultType.options.every((opt) => !(opt instanceof ResolvedEphemeralListType))) {
             rprs.push({ name: "$return", refKind: undefined, ptype: declaredResult });
         }
         else {
@@ -6574,13 +6582,13 @@ class TypeChecker {
                 }
                 else {
                     const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
-                    preject = [preclauses, entrycallparams.map((pp) => pp.name)];
+                    preject = [preclauses, [...entrycallparams.map((pp) => pp.name), ...prepostcapturednames]];
                 }
             }
 
             if (invoke.postconditions.length !== 0) {
                 const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
-                postject = [postcluases, [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
+                postject = [postcluases, [...[...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name), ...prepostcapturednames]];
             }
         }
         else {
@@ -6593,13 +6601,13 @@ class TypeChecker {
 
                 const abspreclauses = absconds !== undefined ? this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, absconds.pre[0], absconds.pre[1], invoke.srcFile) : [];
                 const preclauses = this.processGenerateSpecialPreFunction_FailFast(ikey, entrycallparams, fargs, pargs, invoke.preconditions, binds, invoke.srcFile);
-                preject = [[...abspreclauses, ...preclauses], entrycallparams.map((pp) => pp.name)];
+                preject = [[...abspreclauses, ...preclauses], [...entrycallparams.map((pp) => pp.name), ...prepostcapturednames]];
             }
 
             if ((absconds !== undefined && absconds.post[0].length !== 0) || invoke.postconditions.length !== 0) {
                 const abspostclauses = absconds !== undefined ? this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, absconds.post[0], absconds.post[1], invoke.srcFile) : [];
                 const postcluases = this.processGenerateSpecialPostFunction(ikey, [...entrycallparams, ...rprs, ...rreforig], fargs, pargs, invoke.postconditions, binds, invoke.srcFile);
-                postject = [[...abspostclauses, ...postcluases], [...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name)];
+                postject = [[...abspostclauses, ...postcluases], [...[...entrycallparams, ...rprs, ...rreforig].map((pp) => pp.name), ...prepostcapturednames]];
             }
         }
 

@@ -1789,8 +1789,8 @@ class SMTBodyEmitter {
         }
     }
 
-    processGenerateResultWithZeroArgCheck(sinfo: SourceInfo, not0arg: SMTExp, oftype: MIRType, val: SMTExp): SMTExp {
-        const chkzero = new SMTCallSimple("==", [new SMTConst("0"), not0arg]);
+    processGenerateResultWithZeroArgCheck(sinfo: SourceInfo, zero: SMTConst, not0arg: SMTExp, oftype: MIRType, val: SMTExp): SMTExp {
+        const chkzero = new SMTCallSimple("=", [zero, not0arg]);
         return new SMTIf(chkzero, this.generateErrorCreate(sinfo, oftype, "Div by 0"), this.typegen.generateResultTypeConstructorSuccess(oftype, val));
     }
 
@@ -1983,31 +1983,31 @@ class SMTBodyEmitter {
             //op infix /
             case "NSCore::/=infix=(NSCore::Int, NSCore::Int)": {
                 rtype = this.typegen.getMIRType("NSCore::Int");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("bvsrem", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, new SMTConst("BInt@zero"), args[1], rtype, new SMTCallSimple("bvsrem", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::Nat, NSCore::Nat)": {
                 rtype = this.typegen.getMIRType("NSCore::Nat");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("bvurem", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, new SMTConst("BNat@zero"), args[1], rtype, new SMTCallSimple("bvurem", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::BigInt, NSCore::BigInt)": {
                 rtype = this.typegen.getMIRType("NSCore::BigInt");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple(this.vopts.BigXMode === "BV" ? "bvsrem" : "/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, new SMTConst("BBigInt@zero"), args[1], rtype, new SMTCallSimple(this.vopts.BigXMode === "BV" ? "bvsrem" : "/", args));
                 erropt = true;
                 break;
             }
             case "NSCore::/=infix=(NSCore::BigNat, NSCore::BigNat)": {
                 rtype = this.typegen.getMIRType("NSCore::BigNat");
-                smte = this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple(this.vopts.BigXMode === "BV" ? "bvurem" : "/", args));
+                smte = this.processGenerateResultWithZeroArgCheck(sinfo, new SMTConst("BBigNat@zero"), args[1], rtype, new SMTCallSimple(this.vopts.BigXMode === "BV" ? "bvurem" : "/", args));
                 erropt = true;
                 break
             }
             case "NSCore::/=infix=(NSCore::Rational, NSCore::Rational)": {
                 rtype = this.typegen.getMIRType("NSCore::Rational");
-                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : this.processGenerateResultWithZeroArgCheck(sinfo, args[1], rtype, new SMTCallSimple("/", args));
+                smte = (this.vopts.FPOpt === "UF") ? new SMTCallSimple("BRationalBinary_UF", [new SMTConst("op_binary_div"), ...args]) : this.processGenerateResultWithZeroArgCheck(sinfo, new SMTConst("BRational@zero"), args[1], rtype, new SMTCallSimple("/", args));
                 erropt = true;
                 break;
             }

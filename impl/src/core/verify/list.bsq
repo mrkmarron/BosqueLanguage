@@ -441,13 +441,13 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     recursive? method allOf(p: recursive? pred(_: T) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return !List<T>::s_hasPredCheck[recursive?](this, !p, start, end);
+        return !List<T>::s_hasPredCheck[recursive?](this, pred !p, start, end);
     }
 
     recursive? method allOf(p: recursive? pred(_: T, _: Nat) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): Bool
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return !List<T>::s_hasPredCheck[recursive?](this, !p, start, end);
+        return !List<T>::s_hasPredCheck[recursive?](this, pred !p, start, end);
     }
 
     recursive? method noneOf(p: recursive? pred(_: T) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): Bool
@@ -997,28 +997,28 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     recursive? method takeWhile(p: recursive? pred(_: T) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<T> 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, !p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, pred !p, start, end);
         return List<T>::s_slice_Helper(this, 0n, lpos);
     }
 
     recursive? method takeWhile(p: recursive? pred(_: T, _: Nat) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<T> 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, !p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, pred !p, start, end);
         return List<T>::s_slice_Helper(this, 0n, lpos);
     }
 
     recursive? method discardWhile(p: recursive? pred(_: T) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<T>
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, !p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper[recursive?](this, pred !p, start, end);
         return List<T>::s_slice_Helper(this, lpos, end - lpos);
     }
 
     recursive? method discardWhile(p: recursive? pred(_: T, _: Nat) -> Bool, start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<T>
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, !p, start, end);
+        let lpos = List<T>::findIndexOf_PredicateHelper_Idx[recursive?](this, pred !p, start, end);
         return List<T>::s_slice_Helper(this, lpos, end - lpos);
     }
 

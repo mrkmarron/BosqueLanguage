@@ -1513,14 +1513,35 @@ class Parser {
         const sinfo = this.getCurrentSrcInfo();
 
         this.ensureAndConsumeToken("pred");
-        this.ensureAndConsumeToken("of");
-        this.ensureAndConsumeToken("(");
+        if(this.testAndConsumeTokenIf("!")) {
+            const cexp = this.parseOrExpression();
+            return new CombinatorPCodeExpression(sinfo, new PrefixNotOp(sinfo, cexp));
+        }
+        else {
+            const op = this.consumeTokenAndGetValue();
+            const cops = this.parseListOf("(", ")", ",", () => {
+                return this.parseOrExpression();
+            });
 
-        const cexp = this.parseOrExpression();
+            if(cops[0].length === 0) {
+                this.raiseError(sinfo.line, "Missing operators to combine");
+            }
 
-        this.ensureAndConsumeToken(")");
+            if(cops[0].length === 1) {
+                return cops[0][0];
+            }
+            else {
+                const opc = cops[0].length;
+                let ble = new BinLogicExpression(sinfo, cops[0][opc - 1], op, cops[0][opc - 2]);
 
-        return new CombinatorPCodeExpression(sinfo, cexp)
+                for(let i = opc - 3; i >= 0; --i) {
+                    ble = new BinLogicExpression(sinfo, cops[0][opc - i], op, ble);
+                }
+
+                return new CombinatorPCodeExpression(sinfo, ble);
+            }
+
+        }
     }
 
     private parsePCodeTerm(): Expression {
@@ -1943,7 +1964,7 @@ class Parser {
 
             return new CallNamespaceFunctionOrOperatorExpression(sinfo, ns as string, istr, new TemplateArguments([]), rec, args, "std");
         }
-        else if (tk === "pred" && this.testFollows("pred", "of", "(")) {
+        else if (tk === "pred" && (this.testFollows("pred", "!") || this.testFollows("pred", "&") || this.testFollows("pred", "|") || this.testFollows("pred", "&&") || this.testFollows("pred", "||"))) {
             return this.parsePCodeCombinator();
         }
         else if (tk === "fn" || this.testFollows("recursive", "fn") || tk === "pred" || this.testFollows("recursive", "pred")) {
