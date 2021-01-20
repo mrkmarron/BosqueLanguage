@@ -2857,19 +2857,21 @@ class TypeChecker {
         }
     }
 
-    private checkPCodeDirectInvokeExpression(env: TypeEnvironment, exp: PCodeDirectInvokeExpression, trgt: MIRRegisterArgument): TypeEnvironment[] {
+    private checkPCodeDirectInvokeExpression(env: TypeEnvironment, exp: PCodeDirectInvokeExpression, trgt: MIRRegisterArgument, refok: boolean): TypeEnvironment[] {
         const pcode = exp.pc;
         const captured = exp.captured;
+        refok = refok && exp.isrefok;
 
-        const cargs = [
-            ...(exp.args.map((arg) => new PositionalArgument(undefined, false, arg))), 
-            ...captured.map((cv) => new PositionalArgument(undefined, false, new AccessVariableExpression(exp.sinfo, cv)))
-        ];
-        const eargs = this.checkArgumentsEvaluationWSig(exp.sinfo, env, pcode.ftype, new Map<string, ResolvedType>(), new Arguments(cargs), undefined, false);
+        const callargs = [...(exp.args.map((arg) => new PositionalArgument(undefined, false, arg)))];
+        const eargs = this.checkArgumentsEvaluationWSig(exp.sinfo, env, pcode.ftype, new Map<string, ResolvedType>(), new Arguments(callargs), undefined, refok);
 
-        //A little strange since we don't expand captured args on the signature yet and don't expand/rest/etc -- slice them off for the checking
-        const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs.slice(0, exp.args.length));
-        const cargsext = eargs.slice(exp.args.length).map((ea) => ea.treg as MIRRegisterArgument);
+        const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs);
+        const cargsext = captured.map((carg) => {
+            const rreg = this.m_emitter.generateTmpRegister();
+            this.checkAccessVariable(env, new AccessVariableExpression(exp.sinfo, carg), rreg);
+
+            return rreg;
+        });
 
         const refinfo = this.generateRefInfoForCallEmit((pcode as PCode).ftype, margs.refs);
         this.m_emitter.emitInvokeFixedFunction(exp.sinfo, MIRKeyGenerator.generatePCodeKey((pcode as PCode).code), [...margs.args, ...cargsext], undefined, refinfo, trgt);   
@@ -2883,12 +2885,16 @@ class TypeChecker {
         const pcode = (pco as { pcode: PCode, captured: string[] }).pcode;
         const captured = (pco as { pcode: PCode, captured: string[] }).captured;
 
-        const cargs = [...exp.args.argList, ...captured.map((cv) => new PositionalArgument(undefined, false, new AccessVariableExpression(exp.sinfo, cv)))];
-        const eargs = this.checkArgumentsEvaluationWSig(exp.sinfo, env, pcode.ftype, new Map<string, ResolvedType>(), new Arguments(cargs), undefined, refok);
+        const callargs = [...exp.args.argList];
+        const eargs = this.checkArgumentsEvaluationWSig(exp.sinfo, env, pcode.ftype, new Map<string, ResolvedType>(), new Arguments(callargs), undefined, refok);
 
-        //A little strange since we don't expand captured args on the signature yet and don't expand/rest/etc -- slice them off for the checking
-        const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs.slice(0, exp.args.argList.length));
-        const cargsext = eargs.slice(exp.args.argList.length).map((ea) => ea.treg as MIRRegisterArgument);
+        const margs = this.checkArgumentsSignature(exp.sinfo, env, "pcode", pcode.ftype, eargs);
+        const cargsext = captured.map((carg) => {
+            const rreg = this.m_emitter.generateTmpRegister();
+            this.checkAccessVariable(env, new AccessVariableExpression(exp.sinfo, carg), rreg);
+
+            return rreg;
+        });
 
         this.checkRecursion(exp.sinfo, pcode.ftype, margs.pcodes, exp.rec);
 
@@ -3838,7 +3844,7 @@ class TypeChecker {
             args.push(new AccessVariableExpression(exp.sinfo, subpc.code.optRestName));
         }
 
-        const nbody = new PrefixNotOp(exp.sinfo, new PCodeDirectInvokeExpression(exp.sinfo, subpc, [...subpc.captured].sort((a, b) => a[0].localeCompare(b[0])).map((cc) => cc[0]), args))
+        const nbody = new PrefixNotOp(exp.sinfo, new PCodeDirectInvokeExpression(exp.sinfo, subpc, [...subpc.captured].sort((a, b) => a[0].localeCompare(b[0])).map((cc) => cc[0]), args, true))
         const bodyid = `${this.m_file}::${exp.sinfo.pos}`;
         const body = new BodyImplementation(bodyid, this.m_file, nbody);
         const ninvoke = new InvokeDecl(exp.sinfo, this.m_file, [], subpc.code.recursive, [], undefined, subpc.code.params, subpc.code.optRestName, subpc.code.optRestType, this.m_assembly.getSpecialBoolType(), [], [], false, true, subpc.code.captureSet, body);
@@ -4614,7 +4620,7 @@ class TypeChecker {
                 let res: TypeEnvironment[] = [];
 
                 if (exp.tag === ExpressionTag.PCodeDirectInvokeExpression) {
-                    res = this.checkPCodeDirectInvokeExpression(env, exp as PCodeDirectInvokeExpression, trgt);
+                    res = this.checkPCodeDirectInvokeExpression(env, exp as PCodeDirectInvokeExpression, trgt, (extraok && extraok.refok) || false);
                 }
                 else if (exp.tag === ExpressionTag.PCodeInvokeExpression) {
                     res = this.checkPCodeInvokeExpression(env, exp as PCodeInvokeExpression, trgt, (extraok && extraok.refok) || false);

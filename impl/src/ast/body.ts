@@ -495,12 +495,14 @@ class PCodeDirectInvokeExpression extends Expression {
     readonly pc: PCode;
     readonly captured: string[];
     readonly args: Expression[];
+    readonly isrefok: boolean;
 
-    constructor(sinfo: SourceInfo, pc: PCode, captured: string[], args: Expression[]) {
+    constructor(sinfo: SourceInfo, pc: PCode, captured: string[], args: Expression[], isrefok: boolean) {
         super(ExpressionTag.PCodeDirectInvokeExpression, sinfo);
         this.pc = pc;
         this.captured = captured;
         this.args = args;
+        this.isrefok = isrefok;
     }
 }
 

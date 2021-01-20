@@ -262,6 +262,11 @@ setImmediate(() => {
             process.exit(1);
         }
 
+        if(smtasm.allErrors.findIndex((ee) => ee.file === errlocation.file && ee.pos === errlocation.pos) === -1) {
+            process.stdout.write(chalk.red("Error -- No error associated with given location\n"));
+            process.exit(1);
+        }
+
         const smfc = buildSMT2file(smtasm as SMTAssembly, timeout, Commander.mode === "refute" ? "Refute" : "Generate");
         if (Commander.output) {
             emitSMT2File(smfc, Commander.output);
