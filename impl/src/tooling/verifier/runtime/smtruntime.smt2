@@ -270,15 +270,15 @@
 ;;
 ;;Free constructors for entrypoint initialization
 ;;
-(declare-fun BBool@UFCons_API (BNat BNat) Bool)
-(declare-fun BInt@UFCons_API (BNat BNat) BInt )
-(declare-fun BNat@UFCons_API (BNat BNat) BNat)
-(declare-fun BBigInt@UFCons_API (BNat BNat) BBigInt)
-(declare-fun BBigNat@UFCons_API (BNat BNat) BBigNat)
-(declare-fun BFloat@UFCons_API (BNat BNat) BFloat)
-(declare-fun BDecimal@UFCons_API (BNat BNat) BDecimal)
-(declare-fun BRational@UFCons_API (BNat BNat) BRational)
-(declare-fun BString@UFCons_API (BNat BNat) BString)
+(declare-fun BBool@UFCons_API ((Seq BNat)) Bool)
+(declare-fun BInt@UFCons_API ((Seq BNat)) BInt )
+(declare-fun BNat@UFCons_API ((Seq BNat)) BNat)
+(declare-fun BBigInt@UFCons_API ((Seq BNat)) BBigInt)
+(declare-fun BBigNat@UFCons_API ((Seq BNat)) BBigNat)
+(declare-fun BFloat@UFCons_API ((Seq BNat)) BFloat)
+(declare-fun BDecimal@UFCons_API ((Seq BNat)) BDecimal)
+(declare-fun BRational@UFCons_API ((Seq BNat)) BRational)
+(declare-fun BString@UFCons_API ((Seq BNat)) BString)
 
 ;;GLOBAL_DECLS;;
 
