@@ -315,7 +315,7 @@ class SMTAssembly {
         return bbn.toString();
     }
 
-    generateSMT2AssemblyInfo(mode: "Refute" | "Generate"): SMT2FileInfo {
+    generateSMT2AssemblyInfo(mode: "Refute" | "Reach" | "Generate"): SMT2FileInfo {
         const subtypeasserts = this.subtypeRelation.map((tc) => tc.value ? `(assert (SubtypeOf@ ${tc.ttype} ${tc.atype}))` : `(assert (not (SubtypeOf@ ${tc.ttype} ${tc.atype})))`).sort();
         const indexasserts = this.hasIndexRelation.map((hi) => hi.value ? `(assert (HasIndex@ ${hi.idxtag} ${hi.atype}))` : `(assert (not (HasIndex@ ${hi.idxtag} ${hi.atype})))`).sort();
         const propertyasserts = this.hasPropertyRelation.map((hp) => hp.value ? `(assert (HasProperty@ ${hp.pnametag} ${hp.atype}))` : `(assert (not (HasProperty@ ${hp.pnametag} ${hp.atype})))`).sort();
@@ -547,6 +547,13 @@ class SMTAssembly {
             action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
 
             action.push(`(assert ${this.modes.refute.emitSMT2(undefined)})`);
+            action.push("(check-sat)");
+        }
+        else if (mode === "Reach") {
+            action.push(`(declare-const @smtres@ ${this.model.checktype.name})`);
+            action.push(`(assert (= @smtres@ ${this.model.fcheck.emitSMT2(undefined)}))`);
+
+            action.push(`(assert ${this.modes.generate.emitSMT2(undefined)})`);
             action.push("(check-sat)");
         }
         else {
