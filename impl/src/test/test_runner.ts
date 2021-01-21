@@ -5,35 +5,12 @@
 
 import * as FS from "fs";
 import * as Path from "path";
-import { execSync } from "child_process";
 
 import chalk from "chalk";
 
-let platpathcpp: string | undefined = undefined;
-let platpathsmt: string | undefined = undefined;
-let platexe: string | undefined = undefined;
-if (process.platform === "win32") {
-    platpathcpp = "clang.exe";
-    platpathsmt = "bin/win/z3.exe";
-    platexe = "doit.exe";
-}
-else if (process.platform === "linux") {
-    platpathcpp = "clang++";
-    platpathsmt = "bin/linux/z3";
-    platexe = "doit.out";
-}
-else {
-    platpathcpp = "clang++";
-    platpathsmt = "bin/macos/z3";
-    platexe = "doit.out";
-}
+let g_active_tests = 0;
 
-const testxml = `<?xml version="1.0" encoding="UTF-8"?>
-<testsuites>
-  TSLIST
-</testsuites>`;
-
-abstract class TestInfo {
+abstract class IndividualTestInfo {
     readonly name: string;
     readonly expected: string | null;
 

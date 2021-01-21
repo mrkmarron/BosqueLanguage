@@ -3,18 +3,14 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import * as FS from "fs"
 import * as Path from "path";
-import { execSync } from "child_process";
-
-import * as Commander from "commander";
+import { exec, ExecException } from "child_process";
 
 import { MIRAssembly, PackageConfig } from "../compiler/mir_assembly";
 import { MIREmitter } from "../compiler/mir_emitter";
 import { SMTAssembly } from "../tooling/verifier/smt_assembly";
 import { SMTEmitter } from "../tooling/verifier/smtdecls_emitter";
 import { VerifierOptions } from "../tooling/verifier/smt_exp";
-import { MIRInvokeKey } from "../compiler/mir_ops";
 
 let platpathsmt: string | undefined = undefined;
 if (process.platform === "win32") {
@@ -28,55 +24,17 @@ else {
 }
 
 const bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
+const smtlib_path = Path.join(bosque_dir, "bin/core/verify");
 const z3path = Path.normalize(Path.join(bosque_dir, platpathsmt));
 
-function generateMASM(files: string[]): MIRAssembly {
-    let code: { relativePath: string, contents: string }[] = [];
-    try {
-        const coredir = Path.join(bosque_dir, "bin/core/verify");
-        const corefiles = FS.readdirSync(coredir);
+function generateMASM(corefiles: {relativePath: string, contents: string}[], testsrc: string): MIRAssembly | undefined {
+    const code: { relativePath: string, contents: string }[] = [...corefiles, { relativePath: "test.bsq", contents: testsrc }];
+    const { masm } = MIREmitter.generateMASM(new PackageConfig(), "debug", {namespace: "NSMain", names: ["main"]}, true, code);
 
-        for (let i = 0; i < corefiles.length; ++i) {
-            const cfpath = Path.join(coredir, corefiles[i]);
-            code.push({ relativePath: cfpath, contents: FS.readFileSync(cfpath).toString() });
-        }
- 
-        xxxx;
-        for (let i = 0; i < files.length; ++i) {
-            const realpath = Path.resolve(files[i]);
-            const file = { relativePath: realpath, contents: FS.readFileSync(realpath).toString() };
-            code.push(file);
-        }
-    }
-    catch (ex) {
-        process.stdout.write(`Read failed with exception -- ${ex}\n`);
-        process.exit(1);
-    }
-
-    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", {namespace: "NSMain", names: ["main"]}, true, code);
-    if (errors.length !== 0) {
-        for (let i = 0; i < errors.length; ++i) {
-            process.stdout.write(`Parse error -- ${errors[i]}\n`);
-        }
-
-        process.exit(1);
-    }
-
-    return masm as MIRAssembly;
+    return masm;
 }
 
-function generateSMTAssemblyTest(masm: MIRAssembly, vopts: VerifierOptions, entrypoint: MIRInvokeKey, errorTrgtPos: { file: string, line: number, pos: number }, maxgas: number): SMTAssembly | undefined {
-    let res: SMTAssembly | undefined = undefined;
-    try {
-        res = SMTEmitter.generateSMTAssemblyForValidate(masm, vopts, errorTrgtPos, entrypoint, maxgas);
-    } catch(e) {
-        process.stdout.write(`SMT generate error -- ${e}\n`);
-        process.exit(1);
-    }
-    return res;
-}
-
-function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "Reach"): string {
+function buildSMT2file(smtasm: SMTAssembly, smtruntime: string, timeout: number, mode: "Refute" | "Reach"): string {
     const sfileinfo = smtasm.generateSMT2AssemblyInfo(mode);
 
     function joinWithIndent(data: string[], indent: string): string {
@@ -88,11 +46,7 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "R
         }
     }
 
-    let contents = "";
-    try {
-        const smt_runtime = Path.join(bosque_dir, "bin/tooling/verifier/runtime/smtruntime.smt2");
-        const lsrc = FS.readFileSync(smt_runtime).toString();
-        contents = lsrc
+    return smtruntime
             .replace(";;TIMEOUT;;", `${timeout}`)
             .replace(";;TYPE_TAG_DECLS;;", joinWithIndent(sfileinfo.TYPE_TAG_DECLS, "      "))
             .replace(";;ABSTRACT_TYPE_TAG_DECLS;;", joinWithIndent(sfileinfo.ABSTRACT_TYPE_TAG_DECLS, "      "))
@@ -138,48 +92,45 @@ function buildSMT2file(smtasm: SMTAssembly, timeout: number, mode: "Refute" | "R
             .replace(";;FUNCTION_DECLS;;", joinWithIndent(sfileinfo.FUNCTION_DECLS, "\n"))
             .replace(";;GLOBAL_DEFINITIONS;;", joinWithIndent(sfileinfo.GLOBAL_DEFINITIONS, ""))
             .replace(";;ACTION;;", joinWithIndent(sfileinfo.ACTION, ""));
-    }
-    catch (ex) {
-        process.stderr.write(`Error -- ${ex}\n`);
-        process.exit(1);
-    }
-
-    return contents;
 }
 
-function runSMT2File(cfile: string, mode: "Refute" | "Reach") {
-    const res = execSync(`${z3path} -smt2 -in`, { input: cfile }).toString().trim();
+function runSMT2File(cfile: string, mode: "Refute" | "Reach", cb: (result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) => undefined) {
+    const res = exec(`${z3path} -smt2 -in`, (err: ExecException | null, stdout: string, stderr: string) => {
+        if (err) {
+            cb("error", stderr);
+        }
+        else {
+            const res = stdout.trim();
 
-    if (mode === "Refute") {
-        if (res === "unsat") {
-            process.exit(0);
+            if (mode === "Refute") {
+                if (res === "unsat") {
+                    cb("pass");
+                }
+                else if (res === "sat") {
+                    cb("fail");
+                }
+                else {
+                    cb("unknown/timeout", stderr);
+                }
+            }
+            else {
+                if (res === "sat") {
+                    cb("pass");
+                }
+                else if (res === "unsat") {
+                    cb("fail");
+                }
+                else {
+                    cb("unknown/timeout", stderr);
+                }
+            }
         }
-        else if (res === "sat") {
-            process.exit(2);
-        }
-        else {
-            process.exit(3);
-        }
-    }
-    else {
-        if (res === "sat") {
-            process.exit(0);
-        }
-        else if (res === "unsat") {
-            process.exit(2);
-        }
-        else {
-            process.exit(3);
-        }
-    }
+    });
+
+    res.stdin.setDefaultEncoding('utf-8');
+    res.stdin.write(cfile);
+    res.stdin.end();
 }
-
-
-Commander
-    .option("-l --location [location]", "Location (line) with error of interest")
-    .option("-m --mode [mode]", "Mode to run (refute | reach)", "refute")
-
-Commander.parse(process.argv);
 
 const maxgas = 0;
 const timeout = 10000;
@@ -192,33 +143,27 @@ const vopts = {
     FilterMode: "General"
 } as VerifierOptions;
 
-const massembly = generateMASM(Commander.args);
-const sasm = generateSMTAssemblyTest(massembly, vopts, Commander.entrypoint, {file: "[]", line: -1, pos: -1}, maxgas);
-if(sasm === undefined) {
-    process.stdout.write("Error -- Failed to generate SMTLIB code\n");
-    process.exit(1);
+function enqueueSMTTest(mode: "Refute" | "Reach", corefiles: {relativePath: string, contents: string}[], smtruntime: string, testsrc: string, trgtline: number, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) => undefined) {
+    const massembly = generateMASM(corefiles, testsrc);
+    if(massembly === undefined) {
+        cb("error", "Failed to generate assembly");
+        return;
+    }
+
+    const sasm = SMTEmitter.generateSMTAssemblyForValidate(massembly as MIRAssembly, vopts, { file: "[]", line: -1, pos: -1 }, "NSMain::main", maxgas);
+    const errlocation = sasm.allErrors.find((ee) => ee.file === "test.bsq" && ee.line === trgtline);
+    if(errlocation === undefined) {
+        cb("error", "Invalid trgt line");
+    }
+    else {
+        const smtasm = SMTEmitter.generateSMTAssemblyForValidate(massembly, vopts, errlocation, "NSMain::main", maxgas);
+        const smfc = buildSMT2file(smtasm, smtruntime, timeout, mode);
+
+        runSMT2File(smfc, mode, cb);
+    }
 }
 
-let errlocation = sasm.allErrors.find((ee) => ee.file === "Test" && ee.line === Commander.location);
-
-setImmediate(() => {
-    try {
-        if(errlocation === undefined) {
-            process.stdout.write("Error -- Invalid location");
-            process.exit(1);
-        }
-        
-        const smtasm = generateSMTAssemblyTest(massembly, vopts, Commander.entrypoint, errlocation, maxgas);
-        if (smtasm === undefined) {
-            process.stdout.write("Error -- Failed to generate SMTLIB code\n");
-            process.exit(1);
-        }
-
-        const smfc = buildSMT2file(smtasm as SMTAssembly, timeout, Commander.mode);
-
-        runSMT2File(smfc, Commander.mode);
-    }
-    catch (ex) {
-        process.stderr.write(`Error -- ${ex}\n`);
-    }
-});
+export {
+    smtlib_path,
+    enqueueSMTTest
+};
