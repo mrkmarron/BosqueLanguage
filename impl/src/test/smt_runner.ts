@@ -25,6 +25,7 @@ else {
 
 const bosque_dir: string = Path.normalize(Path.join(__dirname, "../../"));
 const smtlib_path = Path.join(bosque_dir, "bin/core/verify");
+const smtruntime_path = Path.join(bosque_dir, "bin/tooling/verifier/runtime/smtruntime.smt2");
 const z3path = Path.normalize(Path.join(bosque_dir, platpathsmt));
 
 function generateMASM(corefiles: {relativePath: string, contents: string}[], testsrc: string): MIRAssembly | undefined {
@@ -94,34 +95,34 @@ function buildSMT2file(smtasm: SMTAssembly, smtruntime: string, timeout: number,
             .replace(";;ACTION;;", joinWithIndent(sfileinfo.ACTION, ""));
 }
 
-function runSMT2File(cfile: string, mode: "Refute" | "Reach", cb: (result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) => undefined) {
+function runSMT2File(cfile: string, mode: "Refute" | "Reach", start: Date, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) => void) {
     const res = exec(`${z3path} -smt2 -in`, (err: ExecException | null, stdout: string, stderr: string) => {
         if (err) {
-            cb("error", stderr);
+            cb("error", start, new Date(), stderr);
         }
         else {
             const res = stdout.trim();
 
             if (mode === "Refute") {
                 if (res === "unsat") {
-                    cb("pass");
+                    cb("pass", start, new Date());
                 }
                 else if (res === "sat") {
-                    cb("fail");
+                    cb("fail", start, new Date());
                 }
                 else {
-                    cb("unknown/timeout", stderr);
+                    cb("unknown/timeout", start, new Date(), stderr);
                 }
             }
             else {
                 if (res === "sat") {
-                    cb("pass");
+                    cb("pass", start, new Date());
                 }
                 else if (res === "unsat") {
-                    cb("fail");
+                    cb("fail", start, new Date());
                 }
                 else {
-                    cb("unknown/timeout", stderr);
+                    cb("unknown/timeout", start, new Date(), stderr);
                 }
             }
         }
@@ -143,27 +144,29 @@ const vopts = {
     FilterMode: "General"
 } as VerifierOptions;
 
-function enqueueSMTTest(mode: "Refute" | "Reach", corefiles: {relativePath: string, contents: string}[], smtruntime: string, testsrc: string, trgtline: number, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) => undefined) {
+function enqueueSMTTest(mode: "Refute" | "Reach", corefiles: {relativePath: string, contents: string}[], smtruntime: string, testsrc: string, trgtline: number, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) => void) {
+    const start = new Date();
     const massembly = generateMASM(corefiles, testsrc);
     if(massembly === undefined) {
-        cb("error", "Failed to generate assembly");
+        cb("error", start, new Date(), "Failed to generate assembly");
         return;
     }
 
     const sasm = SMTEmitter.generateSMTAssemblyForValidate(massembly as MIRAssembly, vopts, { file: "[]", line: -1, pos: -1 }, "NSMain::main", maxgas);
     const errlocation = sasm.allErrors.find((ee) => ee.file === "test.bsq" && ee.line === trgtline);
     if(errlocation === undefined) {
-        cb("error", "Invalid trgt line");
+        cb("error", start, new Date(), "Invalid trgt line");
     }
     else {
         const smtasm = SMTEmitter.generateSMTAssemblyForValidate(massembly, vopts, errlocation, "NSMain::main", maxgas);
         const smfc = buildSMT2file(smtasm, smtruntime, timeout, mode);
 
-        runSMT2File(smfc, mode, cb);
+        runSMT2File(smfc, mode, start, cb);
     }
 }
 
 export {
     smtlib_path,
+    smtruntime_path,
     enqueueSMTTest
 };
