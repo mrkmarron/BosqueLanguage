@@ -1,0 +1,20 @@
+{
+    "suite": "readme",
+    "tests": [
+        {
+            "test": "add",
+            "src": null,
+            "sig": "function main(x: Nat, y: Nat): Bool",
+            "code": "function add2(x: Nat, y: Nat): Nat { return x + y; }",
+            "refutes": [
+                "add2(x, y) >= 0",
+                "add2(x, y) >= x",
+                "add2(x, y) >= y"
+            ],
+            "reachables": [
+                "add2(1, 2) == 3",
+                "add2(x, y) == 3"
+            ]
+        }
+    ]
+}

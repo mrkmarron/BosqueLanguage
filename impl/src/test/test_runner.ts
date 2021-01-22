@@ -3,96 +3,281 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
+import * as assert from "assert";
 import * as FS from "fs";
 import * as Path from "path";
 
 import chalk from "chalk";
 
-let g_active_tests = 0;
+const testroot = Path.normalize(Path.join(__dirname, "tests"));
 
 abstract class IndividualTestInfo {
     readonly name: string;
-    readonly expected: string | null;
+    readonly fullname: string;
 
-    constructor(name: string, expected: string | null) {
+    readonly code: string;
+
+    readonly extraSrc: string | undefined;
+
+    constructor(name: string, fullname: string, code: string, extraSrc: string | undefined) {
         this.name = name;
-        this.expected = expected;
+        this.fullname = fullname;
+        this.code = code;
+        this.extraSrc = extraSrc;
+    }
+
+    generateTestPlan(restriction: string, tests: IndividualTestInfo[]) {
+        if(restriction === "*" || this.fullname.startsWith(restriction)) {
+            tests.push(this);
+        }
     }
 }
 
-class CompileTestInfo extends TestInfo {
-    constructor(name: string, expected: string | undefined) {
-        super(`${name}@compile`, expected || "");
+class IndividualRefuteTestInfo extends IndividualTestInfo {
+    readonly line: number;
+
+    private static ctemplate = 
+"namespace NSMain;\
+\
+%%SIG%% {\
+    assert %%ACTION%%;\
+    return true;\
+}\
+\
+%%CODE%%\
+";
+
+    constructor(name: string, fullname: string, code: string, line: number, extraSrc: string | undefined) {
+        super(name, fullname, code, extraSrc);
+
+        this.line = line;
+    }
+
+    static create(name: string, fullname: string, sig: string, action: string, code: string, extraSrc: string | undefined): IndividualRefuteTestInfo {
+        const rcode = IndividualRefuteTestInfo.ctemplate
+            .replace("%%SIG%%", sig)
+            .replace("%%ACTION%%", action)
+            .replace("%%CODE%%", code);
+
+        return new IndividualRefuteTestInfo(name, fullname, rcode, 4, extraSrc);
     }
 }
 
-class ExecuteTestInfo extends TestInfo {
-    readonly entrypoint: string;
-    readonly args: string[];
+class IndividualReachableTestInfo extends IndividualTestInfo {
+    readonly line: number;
 
-    constructor(name: string, entry: string, expected: string | null, ctr: number, args: string[] | undefined) {
-        super(`${name}@aot--${entry}#${ctr}`, expected);
-        this.entrypoint = entry;
-        this.args = args || [];
+    private static ctemplate = 
+"namespace NSMain;\
+\
+%%SIG%% {\
+    assert !(%%ACTION%%);\
+    return true;\
+}\
+\
+%%CODE%%\
+";
+
+    constructor(name: string, fullname: string, code: string, line: number, extraSrc: string | undefined) {
+        super(name, fullname, code, extraSrc);
+
+        this.line = line;
+    }
+
+    static create(name: string, fullname: string, sig: string, action: string, code: string, extraSrc: string | undefined): IndividualReachableTestInfo {
+        const rcode = IndividualReachableTestInfo.ctemplate
+            .replace("%%SIG%%", sig)
+            .replace("%%ACTION%%", action)
+            .replace("%%CODE%%", code);
+
+        return new IndividualReachableTestInfo(name, fullname, rcode, 4, extraSrc);
     }
 }
 
-class SymbolicCheckTestInfo extends TestInfo {
-    readonly entrypoint: string;
-
-    constructor(name: string, entry: string, error: boolean | undefined) {
-        super(`${name}@symbolic_test--${entry}`, (error === true) ? "sat" : "unsat");
-        this.entrypoint = entry;
-    }
-}
-
-class SymbolicExecTestInfo extends TestInfo {
-    readonly entrypoint: string;
-    
-    constructor(name: string, entry: string, expected: string | null) {
-        super(`${name}@symbolic_exec--${entry}`, expected);
-        this.entrypoint = entry;
-    }
-}
-
-class FileTestInfo {
-    readonly src: string;
-    readonly compiler_tests: CompileTestInfo[];
-    readonly aot_tests: ExecuteTestInfo[];
-    readonly symbolic_tests: SymbolicCheckTestInfo[];
-    readonly symbolic_execs: SymbolicExecTestInfo[];
-
-    constructor(src: string, compiler_tests: CompileTestInfo[], aot_tests: ExecuteTestInfo[], symbolic_tests: SymbolicCheckTestInfo[], symbolic_execs: SymbolicExecTestInfo[]) {
-        this.src = src;
-        this.compiler_tests = compiler_tests;
-        this.aot_tests = aot_tests;
-        this.symbolic_tests = symbolic_tests;
-        this.symbolic_execs = symbolic_execs;
-    }
-}
-
-type TestSet = {
-    readonly src: string;
-    readonly xmlid: string;
-    readonly tests: FileTestInfo;
+type APITestGroupJSON = {
+    test: string,
+    src: string | null,
+    sig: string,
+    code: string,
+    refutes: string[],
+    reachables: string[]
 };
 
-const scratchroot = Path.normalize(Path.join(__dirname, "../scratch/"));
+class APITestGroup {
+    readonly groupname: string;
+    readonly tests: IndividualTestInfo[];
 
-const cppscratch = Path.normalize(Path.join(scratchroot, "cpp/"));
-const cppexe = Path.normalize(Path.join(cppscratch, platexe));
+    constructor(groupname: string, tests: IndividualTestInfo[]) {
+        this.groupname = groupname;
+        this.tests = tests;
+    }
 
-const smtscratch = Path.normalize(Path.join(scratchroot, "smt/"));
+    static create(scopename: string, spec: APITestGroupJSON): APITestGroup {
+        const groupname = `${scopename}.${spec.test}`;
+        const refutes = spec.refutes.map((tt, i) => IndividualRefuteTestInfo.create(`${i}`, `${groupname}.refute#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
+        const reachables = spec.reachables.map((tt, i) => IndividualReachableTestInfo.create(`${i}`, `${groupname}.reach#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
 
-const clangpath = platpathcpp;
-const z3path = Path.normalize(Path.join(__dirname, "../tooling/bmc/runtime", platpathsmt));
+        return new APITestGroup(groupname, [...refutes, ...reachables]);
+    }
+
+    generateTestPlan(restriction: string, tests: IndividualTestInfo[]) {
+        this.tests.forEach((tt) => tt.generateTestPlan(restriction, tests));
+    }
+}
+
+type CategoryTestGroupJSON = {
+    suite: string,
+    tests: APITestGroupJSON[]
+};
+
+class CategoryTestGroup {
+    readonly categoryname: string;
+    readonly apitests: APITestGroup[];
+
+    constructor(categoryname: string, apitests: APITestGroup[]) {
+        this.categoryname = categoryname;
+        this.apitests = apitests;
+    }
+
+    static create(scopename: string, spec: CategoryTestGroupJSON) {
+        const categoryname = `${scopename}.${spec.suite}`;
+        const apitests = spec.tests.map((tt) => APITestGroup.create(categoryname, tt));
+
+        return new CategoryTestGroup(categoryname, apitests);
+    }
+
+    generateTestPlan(restriction: string, tests: IndividualTestInfo[]) {
+        this.apitests.forEach((tt) => tt.generateTestPlan(restriction, tests));
+    }
+}
+
+class TestFolder {
+    readonly path: string;
+    readonly testname: string;
+
+    readonly tests: CategoryTestGroup[];
+
+    constructor(path: string, testname: string, tests: CategoryTestGroup[]) {
+        this.path = path;
+        this.testname = testname;
+        this.tests = tests;
+    }
+
+    generateTestPlan(restriction: string, tests: IndividualTestInfo[]) {
+        this.tests.forEach((tt) => tt.generateTestPlan(restriction, tests));
+    }
+}
+
+class TestSuite {
+    readonly tests: TestFolder[];
+
+    constructor(tests: TestFolder[]) {
+        this.tests = tests;
+    }
+
+    generateTestPlan(restriction: string): TestPlan {
+        let tests: IndividualTestInfo[] = [];
+        this.tests.forEach((tt) => tt.generateTestPlan(restriction, tests));
+
+        return new TestPlan(this, tests);
+    }
+}
+
+class TestPlan {
+    readonly suite: TestSuite;
+    readonly tests: IndividualTestInfo[];
+
+    constructor(suite: TestSuite, tests: IndividualTestInfo[]) {
+        this.suite = suite;
+        this.tests = tests;
+    }
+}
+
+class TestRunResults {
+    readonly suite: TestSuite;
+
+    passed: Map<string, IndividualTestInfo> = new Map<string, IndividualTestInfo>();
+    failed: Map<string, IndividualTestInfo> = new Map<string, IndividualTestInfo>();
+    errors: Map<string, IndividualTestInfo> = new Map<string, IndividualTestInfo>();
+
+    constructor(suite: TestSuite) {
+        this.suite = suite;
+    }
+
+    getOverallResults(): {total: number, passed: number, failed: number, errors: number} {
+        return {
+            total: this.suite.tests.length,
+            passed: this.passed.size,
+            failed: this.failed.size,
+            errors: this.errors.size
+        }
+    }
+}
+
+function loadTestSuite(): TestSuite {
+    const tdirs = FS.readdirSync(testroot);
+
+    let tfa: TestFolder[] = [];
+    for(let i = 0; i < tdirs.length; ++i) {
+        const dpath = Path.join(testroot, tdirs[i]);
+        const tfiles = FS.readdirSync(dpath).filter((fp) => fp.endsWith(".json"));
+
+        let ctgs: CategoryTestGroup[] = [];
+        for (let j = 0; j < tfiles.length; ++j) {
+            const fcontents = JSON.parse(FS.readFileSync(tfiles[j], "utf8")) as CategoryTestGroupJSON;
+            ctgs.push(CategoryTestGroup.create(`${tdirs[i]}.${Path.basename(tfiles[j])}`, fcontents));
+        }
+
+        tfa.push(new TestFolder(dpath, tdirs[i], ctgs));
+    }
+
+    return new TestSuite(tfa);
+}
 
 class TestRunner {
-    tests: TestSet[];
+    readonly suite: TestSuite;
+    readonly plan: TestPlan;
 
-    constructor() {
-        this.tests = [];
+    pending: IndividualTestInfo[];
+    queued: string[];
+    results: TestRunResults;
+
+    private testCompleteAction(test: IndividualTestInfo, result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) {
+        const qidx = this.queued.findIndex((vv) => vv === test.fullname);
+        assert(qidx !== -1);
+
+        this.queued.splice(qidx, 1);
+
+        if (result === "pass") {
+            this.results.passed.set(test.fullname, test);
+        }
+        else if (result === "fail") {
+            xxxx;
+        }
+        else {
+            xxxx;
+        }
     }
+
+    private generateTestResultCallback(test: IndividualTestInfo) {
+        return (result: "pass" | "fail" | "unknown/timeout" | "error", info?: string) => {
+            this.testCompleteAction(test, result, info);
+        };
+    }
+
+    private checkAndEnqueueTests() {
+        xxxx;
+    }
+
+    constructor(suite: TestSuite, plan: TestPlan) {
+        this.suite = suite;
+        this.plan = plan;
+
+        this.pending = [...this.plan.tests];
+        this.queued = [];
+        this.results = new TestRunResults(suite);
+    }
+
+    xxxx;
 
     loadTestSet(testdir: string) {
         const testpath = Path.normalize(Path.join(__dirname, "tests", testdir, "test.json"));
