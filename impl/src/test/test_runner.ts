@@ -40,14 +40,14 @@ class IndividualRefuteTestInfo extends IndividualTestInfo {
     readonly line: number;
 
     private static ctemplate = 
-"namespace NSMain;\
-\
-%%SIG%% {\
-    assert %%ACTION%%;\
-    return true;\
-}\
-\
-%%CODE%%\
+"namespace NSMain;\n\
+\n\
+%%SIG%% {\n\
+    assert %%ACTION%%;\n\
+    return true;\n\
+}\n\
+\n\
+%%CODE%%\n\
 ";
 
     constructor(name: string, fullname: string, code: string, line: number, extraSrc: string | undefined) {
@@ -70,14 +70,14 @@ class IndividualReachableTestInfo extends IndividualTestInfo {
     readonly line: number;
 
     private static ctemplate = 
-"namespace NSMain;\
-\
-%%SIG%% {\
-    assert !(%%ACTION%%);\
-    return true;\
-}\
-\
-%%CODE%%\
+"namespace NSMain;\n\
+\n\
+%%SIG%% {\n\
+    assert !(%%ACTION%%);\n\
+    return true;\n\
+}\n\
+\n\
+%%CODE%%\n\
 ";
 
     constructor(name: string, fullname: string, code: string, line: number, extraSrc: string | undefined) {
@@ -116,8 +116,8 @@ class APITestGroup {
 
     static create(scopename: string, spec: APITestGroupJSON): APITestGroup {
         const groupname = `${scopename}.${spec.test}`;
-        const refutes = spec.refutes.map((tt, i) => IndividualRefuteTestInfo.create(`${i}`, `${groupname}.refute#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
-        const reachables = spec.reachables.map((tt, i) => IndividualReachableTestInfo.create(`${i}`, `${groupname}.reach#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
+        const refutes = spec.refutes.map((tt, i) => IndividualRefuteTestInfo.create(`refute#${i}`, `${groupname}.refute#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
+        const reachables = spec.reachables.map((tt, i) => IndividualReachableTestInfo.create(`reach#${i}`, `${groupname}.reach#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
 
         return new APITestGroup(groupname, [...refutes, ...reachables]);
     }
@@ -228,7 +228,7 @@ class TestRunResults {
 
     getOverallResults(): {total: number, elapsed: number, passed: number, failed: number, errors: number} {
         return {
-            total: this.suite.tests.length,
+            total: this.passed.length + this.failed.length + this.errors.length,
             elapsed: (this.end.getTime() - this.start.getTime()) / 1000,
             passed: this.passed.length,
             failed: this.failed.length,
@@ -247,8 +247,9 @@ function loadTestSuite(): TestSuite {
 
         let ctgs: CategoryTestGroup[] = [];
         for (let j = 0; j < tfiles.length; ++j) {
-            const fcontents = JSON.parse(FS.readFileSync(tfiles[j], "utf8")) as CategoryTestGroupJSON;
-            ctgs.push(CategoryTestGroup.create(`${tdirs[i]}.${Path.basename(tfiles[j])}`, fcontents));
+            const fpath = Path.join(dpath, tfiles[j]);
+            const fcontents = JSON.parse(FS.readFileSync(fpath, "utf8")) as CategoryTestGroupJSON;
+            ctgs.push(CategoryTestGroup.create(`${tdirs[i]}.${tfiles[j].replace(".json", "")}`, fcontents));
         }
 
         tfa.push(new TestFolder(dpath, tdirs[i], ctgs));
@@ -317,15 +318,15 @@ class TestRunner {
 
         if (result === "pass") {
             this.results.passed.push(new TestResult(test, start, end, "pass", undefined));
-            this.inccb(test.fullname + ":" + chalk.green("pass") + "\n");
+            this.inccb(test.fullname + ": " + chalk.green("pass") + "\n");
         }
         else if (result === "fail") {
             this.results.failed.push(new TestResult(test, start, end, "fail", info));
-            this.inccb(test.fullname + ":" + chalk.red("fail") + "\n");
+            this.inccb(test.fullname + ": " + chalk.red("fail") + "\n");
         }
         else {
             this.results.failed.push(new TestResult(test, start, end, "error", info));
-            this.inccb(test.fullname + ":" + chalk.magenta("error") + "\n");
+            this.inccb(test.fullname + ": " + chalk.magenta("error") + "\n");
         }
     }
 
@@ -342,7 +343,7 @@ class TestRunner {
     }
 
     private checkAndEnqueueTests() {
-        while(this.pending.length < this.maxpar && this.ppos < this.pending.length) {
+        while(this.queued.length < this.maxpar && this.ppos < this.pending.length) {
             const tt = this.pending[this.ppos++];
 
             if((tt instanceof IndividualRefuteTestInfo) || (tt instanceof IndividualReachableTestInfo)) {
@@ -354,6 +355,7 @@ class TestRunner {
                 }
 
                 const handler = this.generateTestResultCallback(tt);
+                this.queued.push(tt.fullname);
                 enqueueSMTTest(mode, this.smt_assets.corefiles, this.smt_assets.runtime, tt.code, tt.line, handler);
             }
             else {
@@ -390,7 +392,7 @@ class TestRunner {
 
 Commander
     .option("-m --parallel [parallel]", "Number of parallel tests to run simultaniously", 4)
-    .option("-r --restriction [spec]", "Limit the test run to a specific set of tests")
+    .option("-r --restriction [spec]", "Limit the test run to a specific set of tests", "*")
     //
     //TODO: maybe want to run only SMT or only compiler tests too
     //

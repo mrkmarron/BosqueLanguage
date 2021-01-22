@@ -23,5 +23,6 @@ process.stdout.write(`Copying resources...\n`);
 
 copyResourceDir("core");
 copyResourceDir("tooling/verifier/runtime");
+copyResourceDir("test/tests");
 
 process.stdout.write(`done!\n`);
