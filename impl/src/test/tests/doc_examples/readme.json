@@ -15,6 +15,22 @@
                 "add2(1, 2) == 3n",
                 "add2(x, y) == 3n"
             ]
+        },
+        {
+            "test": "allPositive",
+            "src": null,
+            "sig": "function main(x: Int): Bool",
+            "code": "function allPositive(...args: List<Int>): Bool { return args.allOf(fn(x) => x >= 0i); }",
+            "refutes": [
+                "allPositive()",
+                "allPositive(1, 4, 3)",
+                "!allPositive(0, -3)",
+                "x >= 0i && allPositive(0, x)"
+            ],
+            "reachables": [
+                "allPositive(0, x)",
+                "!allPositive(0, x)"
+            ]
         }
     ]
 }

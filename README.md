@@ -55,7 +55,7 @@ Detailed Documentation, Tutorials, and Technical Information:
 **Add 2 numbers:**
 
 ```none
-function add2(x: Int, y: Int): Int {
+function add2(x: Nat, y: Nat): Nat {
     return x + y;
 }
 
@@ -68,7 +68,7 @@ add2(y=2, 5)   //7
 
 ```none
 function allPositive(...args: List<Int>): Bool {
-    return args.allOf(fn(x) => x >= 0);
+    return args.allOf(fn(x) => x >= 0i);
 }
 
 allPositive(1, 3, 4) //true

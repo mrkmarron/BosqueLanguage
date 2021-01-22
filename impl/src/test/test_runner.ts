@@ -326,7 +326,8 @@ class TestRunner {
         }
         else {
             this.results.failed.push(new TestResult(test, start, end, "error", info));
-            this.inccb(test.fullname + ": " + chalk.magenta("error") + "\n");
+            const errinfo = info !== undefined ? ` with ${info.slice(0, 160)}${info.length > 160 ? "..." : ""}` : "";
+            this.inccb(test.fullname + ": " + chalk.magenta("error") + errinfo + "\n");
         }
     }
 

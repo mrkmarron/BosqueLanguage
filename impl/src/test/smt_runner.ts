@@ -28,11 +28,11 @@ const smtlib_path = Path.join(bosque_dir, "bin/core/verify");
 const smtruntime_path = Path.join(bosque_dir, "bin/tooling/verifier/runtime/smtruntime.smt2");
 const z3path = Path.normalize(Path.join(bosque_dir, platpathsmt));
 
-function generateMASM(corefiles: {relativePath: string, contents: string}[], testsrc: string): MIRAssembly | undefined {
+function generateMASM(corefiles: {relativePath: string, contents: string}[], testsrc: string): [MIRAssembly | undefined, string[]] {
     const code: { relativePath: string, contents: string }[] = [...corefiles, { relativePath: "test.bsq", contents: testsrc }];
-    const { masm } = MIREmitter.generateMASM(new PackageConfig(), "debug", {namespace: "NSMain", names: ["main"]}, true, code);
+    const { masm, errors } = MIREmitter.generateMASM(new PackageConfig(), "debug", {namespace: "NSMain", names: ["main"]}, true, code);
 
-    return masm;
+    return [masm, errors];
 }
 
 function buildSMT2file(smtasm: SMTAssembly, smtruntime: string, timeout: number, mode: "Refute" | "Reach"): string {
@@ -147,18 +147,18 @@ const vopts = {
 function enqueueSMTTest(mode: "Refute" | "Reach", corefiles: {relativePath: string, contents: string}[], smtruntime: string, testsrc: string, trgtline: number, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) => void) {
     const start = new Date();
     const massembly = generateMASM(corefiles, testsrc);
-    if(massembly === undefined) {
-        cb("error", start, new Date(), "Failed to generate assembly");
+    if(massembly[0] === undefined) {
+        cb("error", start, new Date(), "Failed to generate assembly -- " + JSON.stringify(massembly[1]));
         return;
     }
 
-    const sasm = SMTEmitter.generateSMTAssemblyForValidate(massembly as MIRAssembly, vopts, { file: "[]", line: -1, pos: -1 }, "NSMain::main", maxgas);
+    const sasm = SMTEmitter.generateSMTAssemblyForValidate(massembly[0], vopts, { file: "[]", line: -1, pos: -1 }, "NSMain::main", maxgas);
     const errlocation = sasm.allErrors.find((ee) => ee.file === "test.bsq" && ee.line === trgtline);
     if(errlocation === undefined) {
         cb("error", start, new Date(), "Invalid trgt line");
     }
     else {
-        const smtasm = SMTEmitter.generateSMTAssemblyForValidate(massembly, vopts, errlocation, "NSMain::main", maxgas);
+        const smtasm = SMTEmitter.generateSMTAssemblyForValidate(massembly[0], vopts, errlocation, "NSMain::main", maxgas);
         const smfc = buildSMT2file(smtasm, smtruntime, timeout, mode);
 
         runSMT2File(smfc, mode, start, cb);
