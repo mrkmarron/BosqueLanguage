@@ -1603,6 +1603,11 @@ class TypeChecker {
             }
         }
 
+        while (filledLocations[ii] !== undefined) {
+            this.raiseErrorIf(sinfo, !filledLocations[ii].mustDef, `We have an potentially ambigious binding of an optional parameter "${sig.params[ii].name}"`);
+            ii++;
+        }
+
         while (apos < args.length && (args[apos].name !== undefined || (args[apos].expando && (args[apos].argtype as ValueType).flowtype.isRecordTargetType()))) {
             apos++;
         }

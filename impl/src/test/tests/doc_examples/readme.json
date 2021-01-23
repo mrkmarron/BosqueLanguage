@@ -9,11 +9,16 @@
             "refutes": [
                 "add2(x, y) >= 0n",
                 "add2(x, 0) == x",
-                "add2(0, y) == y"
+                "add2(0, y) == y",
+                "add2(2, 3) == 5n",
+                "add2(x=2, y=3) == 5n",
+                "add2(y=2, 5) == 7n"
             ],
             "reachables": [
                 "add2(1, 2) == 3n",
-                "add2(x, y) == 3n"
+                "add2(x, y) == 3n",
+                "add2(x=x, 1) == 3n",
+                "add2(y=y, 1) == 3n"
             ]
         },
         {
@@ -25,7 +30,7 @@
                 "allPositive()",
                 "allPositive(1, 4, 3)",
                 "!allPositive(0, -3)",
-                "x >= 0i && allPositive(0, x)"
+                "x < 0i || allPositive(0, x)"
             ],
             "reachables": [
                 "allPositive(0, x)",
