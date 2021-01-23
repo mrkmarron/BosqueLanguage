@@ -1654,6 +1654,9 @@ class Parser {
                 if(exp instanceof LiteralIntegralExpression) {
                     return [true, exp];
                 }
+                else if(exp instanceof LiteralNumberinoExpression) {
+                    return [true, exp];
+                }
                 else if(exp instanceof LiteralRationalExpression) {
                     return [true, exp];
                 }
@@ -1667,6 +1670,9 @@ class Parser {
             else {
                 if(exp instanceof LiteralIntegralExpression) {
                     return [true, new LiteralIntegralExpression(exp.sinfo, exp.value.startsWith("-") ? exp.value.slice(1) : ("-" + exp.value), exp.itype)];
+                }
+                else if(exp instanceof LiteralNumberinoExpression) {
+                    return [true, new LiteralNumberinoExpression(exp.sinfo, exp.value.startsWith("-") ? exp.value.slice(1) : ("-" + exp.value))];
                 }
                 else if(exp instanceof LiteralRationalExpression) {
                     return [true, new LiteralRationalExpression(exp.sinfo, exp.value.startsWith("-") ? exp.value.slice(1) : ("-" + exp.value), exp.rtype)];

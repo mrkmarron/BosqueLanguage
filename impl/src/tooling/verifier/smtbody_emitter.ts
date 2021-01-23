@@ -771,7 +771,7 @@ class SMTBodyEmitter {
                 return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`);
             }
             else {
-                return new SMTCallSimple("bvneg", [ new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${this.vopts.ISize})`)]);
+                return new SMTCallSimple("bvneg", [ new SMTConst(`(_ bv${cval.value.slice(1, cval.value.length - 1)} ${this.vopts.ISize})`)]);
             }
         }
         else if (cval instanceof MIRConstantNat) {
@@ -786,7 +786,7 @@ class SMTBodyEmitter {
                     return new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${2 * this.vopts.ISize})`);
                 }
                 else {
-                    return new SMTCallSimple("bvneg", [new SMTConst(`(_ bv${cval.value.slice(0, cval.value.length - 1)} ${2 * this.vopts.ISize})`)]);
+                    return new SMTCallSimple("bvneg", [new SMTConst(`(_ bv${cval.value.slice(1, cval.value.length - 1)} ${2 * this.vopts.ISize})`)]);
                 }
             }
         }
