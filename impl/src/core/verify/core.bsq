@@ -276,7 +276,7 @@ struct entity RegexMatch provides Some {
     field index: Nat;
     field length: Nat;
 
-    invariant $index >= 0n && $length >= 0n;
+    invariant $index >= 0n & $length >= 0n;
 }
 
 //<summary>Static methods for Tuples.</summary>

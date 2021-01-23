@@ -1844,9 +1844,9 @@ class Parser {
         }
     }
 
-    private checkExpressionFollowsParens(): boolean {
+    private checkTypeBasedExpressionFollowsParens(): boolean {
         const lpos = this.scanMatchingParens("(", ")");
-        const ptok = this.peekToken(lpos);
+        const ptok = this.peekToken(lpos - this.m_cpos);
 
         return ptok === "::" || ptok === "@" || ptok === "#";
     }
@@ -1976,7 +1976,7 @@ class Parser {
         else if (tk === "fn" || this.testFollows("recursive", "fn") || tk === "pred" || this.testFollows("recursive", "pred")) {
             return this.parsePCodeTerm();
         }
-        else if (tk === "(" && !this.checkExpressionFollowsParens()) {
+        else if (tk === "(" && !this.checkTypeBasedExpressionFollowsParens()) {
             try {
                 this.setRecover(this.scanMatchingParens("(", ")"));
 

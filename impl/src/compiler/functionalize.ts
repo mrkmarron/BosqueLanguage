@@ -170,6 +170,27 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
     rassgn.ops.push(new MIRJump(new SourceInfo(-1, -1, -1, -1), "exit"));
 }
 
+function computeBodySplits(jidx: number, bo: MIRBasicBlock[], struct: Map<string, FlowLink>): { rblocks: MIRBasicBlock[], continuationblocks: MIRBasicBlock[] } {
+    let continuationblocks: MIRBasicBlock[] = [bo[jidx]];
+
+    let rbb = bo.find((bb) => {
+        let preds = (struct.get(bb.label) as FlowLink).preds;
+        return rblocks.some((obb) => preds.has(obb.label));
+    });
+    while(rbb !== undefined) {
+        continuationblocks.push(rbb);
+
+        rbb = bo.find((bb) => {
+            let preds = (struct.get(bb.label) as FlowLink).preds;
+            return rblocks.some((obb) => preds.has(obb.label));
+        });
+    }
+
+    const rblocks: MIRBasicBlock[] = bo.filter((bb) => continuationblocks.find((rbb) => rbb.label === bb.label) === undefined);
+
+    return { rblocks: rblocks, continuationblocks: continuationblocks.slice(1) };
+}
+
 function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFunctionParameter[], rtype: MIRType): NBodyInfo | undefined {
     const links = computeBlockLinks(b.body);
     const bo = topologicalOrder(b.body);
@@ -183,7 +204,7 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
         return undefined;
     }
 
-    const jidx = (bo.length - 1) - [...bo].reverse().findIndex((bb) => (links.get(bb.label) as FlowLink).preds.size > 1);
+    const jidx = (bo.length - 1) - [...bo].reverse().findIndex((bb) => bb.label !== "returnassign" && (links.get(bb.label) as FlowLink).preds.size > 1);
     const jlabel = bo[jidx].label;
 
     const phis = bo[jidx].ops.filter((op) => op instanceof MIRPhi) as MIRPhi[];
@@ -191,6 +212,8 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
     const phivkill = new Set(([] as string[]).concat(...phis.map((op) => [...op.src].map((src) => src[1].nameID))));
 
     let rblocks = [...bo.slice(0, jidx)];
+    
+    //let {rblocks, continuationblocks} = computeBodySplits(jidx, bo, links);
     const fblocks = [new MIRBasicBlock("entry", bo[jidx].ops.slice(phis.length)), ...bo.slice(jidx + 1)];
 
     const jvars = [...(lv.get(bo[jidx].label) as BlockLiveSet).liveEntry].filter((lvn) => !phivkill.has(lvn[0])).sort((a, b) => a[0].localeCompare(b[0]));
