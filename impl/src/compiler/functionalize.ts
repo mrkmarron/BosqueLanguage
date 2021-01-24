@@ -161,8 +161,6 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
                         op.src.delete(dl);
                     }
                 });
-
-                fenv.rphimap.forEach((v, lbl) => op.src.set(lbl, v));
             }
         });
     }
@@ -170,20 +168,47 @@ function rebuildExitPhi(bbl: MIRBasicBlock[], fenv: FunctionalizeEnv, deadlabels
     rassgn.ops.push(new MIRJump(new SourceInfo(-1, -1, -1, -1), "exit"));
 }
 
+function cleanContinuationPhi(bbl: MIRBasicBlock[], jlabel: string, deadlabels: string[]) {
+    const rassgn = bbl.find((bb) => bb.label === "returnassign") as MIRBasicBlock;
+    if(!(rassgn.ops[0] instanceof MIRPhi)) {
+        return;
+    }
+
+    rassgn.ops.forEach((op) => {
+        if (op instanceof MIRPhi) {
+            deadlabels.forEach((dl) => {
+                if (op.src.has(dl)) {
+                    op.src.delete(dl);
+                }
+            });
+
+            if(op.src.has(jlabel)) {
+                op.src.set("entry", op.src.get(jlabel) as MIRRegisterArgument);
+                op.src.delete(jlabel);
+            }
+        }
+    });
+}
+
 function computeBodySplits(jidx: number, bo: MIRBasicBlock[], struct: Map<string, FlowLink>): { rblocks: MIRBasicBlock[], continuationblocks: MIRBasicBlock[] } {
     let continuationblocks: MIRBasicBlock[] = [bo[jidx]];
 
-    let rbb = bo.find((bb) => {
-        let preds = (struct.get(bb.label) as FlowLink).preds;
-        return rblocks.some((obb) => preds.has(obb.label));
-    });
+    const getRBB = (cblocks: MIRBasicBlock[]) => {
+        return bo.find((bb) => {
+            if(cblocks.find((obb) => obb.label === bb.label) !== undefined) {
+                return false;
+            }
+
+            let preds = (struct.get(bb.label) as FlowLink).preds;
+            return cblocks.some((obb) => preds.has(obb.label));
+        });
+    }
+
+    let rbb = getRBB(continuationblocks);
     while(rbb !== undefined) {
         continuationblocks.push(rbb);
 
-        rbb = bo.find((bb) => {
-            let preds = (struct.get(bb.label) as FlowLink).preds;
-            return rblocks.some((obb) => preds.has(obb.label));
-        });
+        rbb = getRBB(continuationblocks);
     }
 
     const rblocks: MIRBasicBlock[] = bo.filter((bb) => continuationblocks.find((rbb) => rbb.label === bb.label) === undefined);
@@ -210,11 +235,10 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
     const phis = bo[jidx].ops.filter((op) => op instanceof MIRPhi) as MIRPhi[];
     const phivargs = phis.map((op) => op.trgt.nameID);
     const phivkill = new Set(([] as string[]).concat(...phis.map((op) => [...op.src].map((src) => src[1].nameID))));
-
-    let rblocks = [...bo.slice(0, jidx)];
     
-    //let {rblocks, continuationblocks} = computeBodySplits(jidx, bo, links);
-    const fblocks = [new MIRBasicBlock("entry", bo[jidx].ops.slice(phis.length)), ...bo.slice(jidx + 1)];
+    let {rblocks, continuationblocks} = computeBodySplits(jidx, bo, links);
+    const fblocks = [new MIRBasicBlock("entry", bo[jidx].ops.slice(phis.length)), ...continuationblocks];
+    cleanContinuationPhi(fblocks, bo[jidx].label, rblocks.map((cb) => cb.label));
 
     const jvars = [...(lv.get(bo[jidx].label) as BlockLiveSet).liveEntry].filter((lvn) => !phivkill.has(lvn[0])).sort((a, b) => a[0].localeCompare(b[0]));
     const oparams = jvars.map((lvn) => new MIRFunctionParameter(lvn[0], (vtypes.get(lvn[0]) as MIRType).trkey));
@@ -226,7 +250,7 @@ function processBody(invid: string, masm: MIRAssembly, b: MIRBody, params: MIRFu
     let fenv = new FunctionalizeEnv(rtype.trkey, ninvid, jvars.map((lvn) => lvn[1]), phis, jlabel);
     const nbb = replaceJumpsWithCalls(rblocks, fenv);
     rblocks.push(new MIRBasicBlock("returnassign", []), new MIRBasicBlock("exit", []));
-    rebuildExitPhi(rblocks, fenv, bo.slice(jidx).map((bb) => bb.label));
+    rebuildExitPhi(rblocks, fenv, fblocks.map((bb) => bb.label));
 
     b.body = new Map<string, MIRBasicBlock>();
     [...rblocks, ...nbb].forEach((bb) => b.body.set(bb.label, bb));

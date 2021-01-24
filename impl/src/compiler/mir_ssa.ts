@@ -7,7 +7,7 @@ import * as assert from "assert";
 import { MIRArgGuard, MIRArgument, MIRAssertCheck, MIRConvertValue, MIRDebug, MIREntityProjectToEphemeral, MIREntityUpdate, MIRGuard, MIRLoadConst, MIRLoadField, MIRLoadRecordProperty, MIRLoadRecordPropertySetGuard, MIRLoadTupleIndex, MIRLoadTupleIndexSetGuard, MIRLoadUnintVariableValue, MIRMaskGuard, MIROp, MIROpTag, MIRRecordHasProperty, MIRRecordProjectToEphemeral, MIRRecordUpdate, MIRRegisterArgument, MIRTupleHasIndex, MIRTupleProjectToEphemeral, MIRTupleUpdate, MIRResolvedTypeKey, MIRLoadFromEpehmeralList, MIRMultiLoadFromEpehmeralList, MIRSliceEpehmeralList, MIRInvokeFixedFunction, MIRInvokeVirtualFunction, MIRInvokeVirtualOperator, MIRConstructorTuple, MIRConstructorTupleFromEphemeralList, MIRConstructorRecord, MIRConstructorRecordFromEphemeralList, MIRStructuredAppendTuple, MIRStructuredJoinRecord, MIRConstructorEphemeralList, MIRConstructorPrimaryCollectionEmpty, MIREphemeralListExtend, MIRConstructorPrimaryCollectionSingletons, MIRConstructorPrimaryCollectionCopies, MIRConstructorPrimaryCollectionMixed, MIRBinKeyEq, MIRBinKeyLess, MIRPrefixNotOp, MIRAllTrue, MIRIsTypeOf, MIRJumpCond, MIRJumpNone, MIRReturnAssign, MIRReturnAssignOfCons, MIRPhi, MIRBody, MIRBasicBlock, MIRStatmentGuard, MIRRegisterAssign, MIRSomeTrue } from "./mir_ops";
 import { SourceInfo } from "../ast/parser";
 import { FlowLink, BlockLiveSet, computeBlockLinks, computeBlockLiveVars, topologicalOrder } from "./mir_info";
-import { MIRType } from "./mir_assembly";
+import { MIRAssembly, MIRType } from "./mir_assembly";
 
 type SSAState = {
     booltype: MIRResolvedTypeKey,
@@ -497,4 +497,15 @@ function convertBodyToSSA(body: MIRBody, booltype: MIRType, args: Map<string, MI
     }
 }
 
-export { convertBodyToSSA };
+function ssaConvertInvokes(masm: MIRAssembly) {
+    masm.invokeDecls.forEach((inv) => {
+        let args = new Map<string, MIRType>();
+        inv.params.forEach((p) => {
+            args.set(p.name, masm.typeMap.get(p.type) as MIRType);
+        });
+        
+        convertBodyToSSA(inv.body, masm.typeMap.get("NSCore::Bool") as MIRType, args);
+    });
+}
+
+export { ssaConvertInvokes };

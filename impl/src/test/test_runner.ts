@@ -357,7 +357,12 @@ class TestRunner {
 
                 const handler = this.generateTestResultCallback(tt);
                 this.queued.push(tt.fullname);
-                enqueueSMTTest(mode, this.smt_assets.corefiles, this.smt_assets.runtime, tt.code, tt.line, handler);
+                try {
+                    enqueueSMTTest(mode, this.smt_assets.corefiles, this.smt_assets.runtime, tt.code, tt.line, handler);
+                }
+                catch (ex) {
+                    handler("error", new Date(), new Date(), `${ex}`);
+                }
             }
             else {
                 assert(false);

@@ -11,7 +11,7 @@ import { MIRAssembly, MIRConceptType, MIREntityType, MIREphemeralListType, MIRLi
 
 import { TypeChecker } from "../type_checker/type_checker";
 import { simplifyBody } from "./mir_cleanup";
-import { convertBodyToSSA } from "./mir_ssa";
+import { ssaConvertInvokes } from "./mir_ssa";
 import { functionalizeInvokes } from "./functionalize";
 import { BSQRegex } from "../ast/bsqregex";
 import { ConstantExpressionValue, LiteralExpressionValue } from "../ast/body";
@@ -830,14 +830,13 @@ class MIREmitter {
         this.m_currentBlock.push(new MIRVarLifetimeEnd(sinfo, name));
     }
 
-    getBody(file: string, sinfo: SourceInfo, args: Map<string, MIRType>): MIRBody | undefined {
+    getBody(file: string, sinfo: SourceInfo): MIRBody | undefined {
         if(!this.emitEnabled) {
             return undefined;
         }
 
         let ibody = new MIRBody(file, sinfo, this.m_blockMap);
         simplifyBody(ibody);
-        convertBodyToSSA(ibody, this.registerResolvedTypeReference(this.assembly.getSpecialBoolType()), args);
 
         return ibody;
     }
@@ -1328,6 +1327,7 @@ class MIREmitter {
 
                 if (functionalize) {
                     functionalizeInvokes(masm);
+                    ssaConvertInvokes(masm);
                 }
             }
         }
