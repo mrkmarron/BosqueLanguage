@@ -77,11 +77,11 @@ allPositive(1, 3, 4) //true
 **Tuples and Records:**
 
 ```none
-function doit(tup: [Int, Bool], rec: {f: String, g: Int}): Int {
+function doit(tup: #[Int, Bool], rec: #{f: String, g: Int}): Int {
     return tup.0 + rec.g;
 }
 
-doit([1, false], {f="ok", g=3}) //4
+doit(#[1, false], #{f="ok", g=3}) //4
 ```
 
 **Sign (with optional argument):**

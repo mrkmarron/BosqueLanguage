@@ -63,6 +63,21 @@
                 "sign(x) == 1i",
                 "sign(x) == 0i"
             ]
+        },
+        {
+            "test": "recordtuple",
+            "src": null,
+            "sig": "function main(x: Int): Bool",
+            "code": "function doit(tup: #[Int, Bool], rec: #{f: String, g: Int}): Int { return tup.0 + rec.g; }",
+            "refutes": [
+                "doit(#[1i, true], #{f=\"yes\", g=0i}) == 1i",
+                "doit(#[0, true], #{f=\"yes\", g=1}) == 1i",
+                "(x > 4i) | (doit(#[x, true], #{f=\"yes\", g=x}) == 2i * x)"
+            ],
+            "reachables": [
+                "doit(#[x, true], #{f=\"yes\", g=x}) == x",
+                "x < 4i & doit(#[x, true], #{f=\"yes\", g=x + 1i}) == 5i"
+            ]
         }
     ]
 }
