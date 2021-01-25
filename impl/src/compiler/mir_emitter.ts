@@ -1326,7 +1326,7 @@ class MIREmitter {
                 checker.processRegexInfo();
 
                 if (functionalize) {
-                    functionalizeInvokes(masm);
+                    functionalizeInvokes(emitter, masm);
                     ssaConvertInvokes(masm);
                 }
             }

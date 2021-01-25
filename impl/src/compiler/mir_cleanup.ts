@@ -368,7 +368,9 @@ function propagateAssignForOp(op: MIROp, propMap: Map<string, MIRArgument>) {
         }
         case MIROpTag.MIRRegisterAssign: {
             const regop = op as MIRRegisterAssign;
-            propagateAssign_Bind(regop.trgt, regop.src, propMap);
+            if(regop.guard === undefined) {
+                propagateAssign_Bind(regop.trgt, regop.src, propMap);
+            }
             break;
         }
         default: {

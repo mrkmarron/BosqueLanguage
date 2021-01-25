@@ -3910,7 +3910,7 @@ class TypeChecker {
             ];
         }
         else if(action === "lhssomekey" || action === "rhssomekey") {
-            if (exp.op === "==") {
+            if (exp.op === "===") {
                 this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, trgt);
             }
             else {
@@ -3927,7 +3927,7 @@ class TypeChecker {
             ];
         }
         else {
-            if (exp.op === "==") {
+            if (exp.op === "===") {
                 this.m_emitter.emitBinKeyEq(exp.sinfo, this.m_emitter.registerResolvedTypeReference(olhs.layout), this.m_emitter.registerResolvedTypeReference(olhs.flowtype), lhsreg, this.m_emitter.registerResolvedTypeReference(orhs.layout), this.m_emitter.registerResolvedTypeReference(orhs.flowtype), rhsreg, trgt);
             }
             else {
