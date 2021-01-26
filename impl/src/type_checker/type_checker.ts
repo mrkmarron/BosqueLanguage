@@ -413,8 +413,8 @@ class TypeChecker {
             return "err";
         }
 
-        const simplelhsopts = lhs.options.filter((opt) => opt.idStr == "NSCore::None");
-        const simplerhsopts = rhs.options.filter((opt) => opt.idStr == "NSCore::None");
+        const simplelhsopts = lhs.options.filter((opt) => opt.idStr !== "NSCore::None");
+        const simplerhsopts = rhs.options.filter((opt) => opt.idStr !== "NSCore::None");
 
         if(simplelhsopts.length === 0 && simplerhsopts.length === 0) {
             return "truealways";
@@ -6331,7 +6331,7 @@ class TypeChecker {
             let conskey: MIRInvokeKey | undefined = undefined;
             let consfuncfields: MIRFieldKey[] = [];
             if (!OOPTypeDecl.attributeSetContains("__internal", tdecl.attributes)) {
-                conskey = MIRKeyGenerator.generateFunctionKey(tkey, "@@cons", new Map<string, ResolvedType>(), []);
+                conskey = MIRKeyGenerator.generateFunctionKey(tkey, "@@constructor", new Map<string, ResolvedType>(), []);
                 const consenvargs = new Map<string, VarInfo>();
                 const ccfields = this.m_assembly.getAllOOFieldsConstructors(tdecl, binds);
                 [...ccfields.req, ...ccfields.opt].forEach((ff) => {

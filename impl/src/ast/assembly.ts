@@ -2138,8 +2138,15 @@ class Assembly {
         return undefined;
     }
 
-    private tryGetMemberMethodDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
-        const mmdecls = ooptype.memberMethods.filter((mm) => mm.name === name && (!findspecific || !OOPTypeDecl.attributeSetContains("override", mm.invoke.attributes)));
+    private tryGetMemberMethodDecl(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, skipoverride: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
+        const mmdecls = ooptype.memberMethods.filter((mm) => {
+            if(skipoverride && OOPTypeDecl.attributeSetContains("override", mm.invoke.attributes)) {
+                return false;
+            }
+
+            return mm.name === name;
+        });
+
         if(mmdecls.length === 0) {
             return undefined;
         }
@@ -2147,11 +2154,11 @@ class Assembly {
         return new OOMemberLookupInfo<MemberMethodDecl[]>(ooptype, mmdecls, binds);
     }
 
-    private tryGetMemberMethodDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, findspecific: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
+    private tryGetMemberMethodDeclParent(ooptype: OOPTypeDecl, binds: Map<string, ResolvedType>, name: string, skipoverride: boolean): OOMemberLookupInfo<MemberMethodDecl[]> | undefined {
         const rprovides = this.resolveProvides(ooptype, binds);
         for (let i = 0; i < rprovides.length; ++i) {
             const tt = (this.normalizeTypeOnly(rprovides[i], binds).options[0] as ResolvedConceptAtomType).conceptTypes[0];
-            const res = this.tryGetMemberMethodDecl(tt.concept, tt.binds, name, findspecific) || this.tryGetMemberMethodDeclParent(tt.concept, tt.binds, name, findspecific);
+            const res = this.tryGetMemberMethodDecl(tt.concept, tt.binds, name, skipoverride) || this.tryGetMemberMethodDeclParent(tt.concept, tt.binds, name, skipoverride);
             if (res !== undefined) {
                 return res;
             }
@@ -2291,11 +2298,11 @@ class Assembly {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
-                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, true);
+                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, false) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, false);
             }
             else {
                 const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
-                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
+                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, false) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, false);
                 });
                 return this.ensureSingleDecl_Helper<MemberMethodDecl[]>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl[]>[]);
             }
@@ -2310,12 +2317,23 @@ class Assembly {
                 return undefined;
             }
 
-            const isoveridable = sdecl.decl.some((sd) => OOPTypeDecl.attributeSetContains("override", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sd.invoke.attributes));
-            if(isoveridable) {
-                return undefined;
+            if(tt.isUniqueCallTargetType()) {
+                const isundef = sdecl.decl.some((sd) => OOPTypeDecl.attributeSetContains("abstract", sd.invoke.attributes));
+                if (isundef) {
+                    return undefined;
+                }
+                else {
+                    return sdecl;
+                }
             }
             else {
-                return sdecl;
+                const isoveridable = sdecl.decl.some((sd) => OOPTypeDecl.attributeSetContains("override", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("virtual", sd.invoke.attributes) || OOPTypeDecl.attributeSetContains("abstract", sd.invoke.attributes));
+                if (isoveridable) {
+                    return undefined;
+                }
+                else {
+                    return sdecl;
+                }
             }
         }
     }
@@ -2325,11 +2343,11 @@ class Assembly {
         const ntype = this.ensureNominalRepresentation(tt);
         const ttopts = ntype.options.map((ttopt) => {
             if(ttopt instanceof ResolvedEntityAtomType) {
-                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, false) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, false);
+                return this.tryGetMemberMethodDecl(ttopt.object, ttopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ttopt.object, ttopt.binds, fname, true);
             }
             else {
                 const copts = (ttopt as ResolvedConceptAtomType).conceptTypes.map((ccopt) => {
-                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, false) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, false);
+                    return this.tryGetMemberMethodDecl(ccopt.concept, ccopt.binds, fname, true) || this.tryGetMemberMethodDeclParent(ccopt.concept, ccopt.binds, fname, true);
                 });
                 return this.ensureSingleDecl_Helper<MemberMethodDecl[]>(copts.filter((ccopt) => ccopt !== undefined) as OOMemberLookupInfo<MemberMethodDecl[]>[]);
             }

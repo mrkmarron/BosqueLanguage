@@ -305,13 +305,17 @@ function loadSMTTestAssets(suite: TestSuite): SMTTestAssets {
 
     let extras = new Map<string, string>();
     for(let i = 0; i < suite.tests.length; ++i) {
-        const tt = suite.tests[i];
-        if((tt instanceof IndividualRefuteTestInfo) || (tt instanceof IndividualReachableTestInfo)) {
-            if(tt.extraSrc !== undefined) {
-                const cc = Path.join(testroot, tt.extraSrc);
-                const contents = FS.readFileSync(cc, "utf8");
+        const tf = suite.tests[i];
+        for (let j = 0; j < tf.tests.length; ++j) {
+            const ctg = tf.tests[j];
+            for (let k = 0; k < ctg.apitests.length; ++k) {
+                const stg = ctg.apitests[k];
+                stg.tests.filter((iti) => iti.extraSrc !== undefined).forEach((iti) => {
+                    const cc = Path.join(testroot, iti.extraSrc as string);
+                    const contents = FS.readFileSync(cc, "utf8");
 
-                extras.set(tt.extraSrc, contents);
+                    extras.set(iti.extraSrc as string, contents);
+                });
             }
         }
     }
@@ -338,13 +342,8 @@ class TestRunner {
     done: (results: TestRunResults) => void = (r: TestRunResults) => {;};
 
     smt_assets: SMTTestAssets;
-
-    private testCompleteAction(test: IndividualTestInfo, result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) {
-        const qidx = this.queued.findIndex((vv) => vv === test.fullname);
-        assert(qidx !== -1);
-
-        this.queued.splice(qidx, 1);
-
+    
+    private testCompleteActionProcess(test: IndividualTestInfo, result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) {
         if (result === "pass") {
             this.results.passed.push(new TestResult(test, start, end, "pass", undefined));
             this.inccb(test.fullname + ": " + chalk.green("pass") + "\n");
@@ -360,9 +359,22 @@ class TestRunner {
         }
     }
 
+    private testCompleteActionQueued(test: IndividualTestInfo, result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) {
+        const qidx = this.queued.findIndex((vv) => vv === test.fullname);
+        assert(qidx !== -1);
+
+        this.queued.splice(qidx, 1);
+
+        this.testCompleteActionProcess(test, result, start, end, info);
+    }
+
+    private testCompleteActionInline(test: IndividualTestInfo, result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) {
+        this.testCompleteActionProcess(test, result, start, end, info);
+    }
+
     private generateTestResultCallback(test: IndividualTestInfo) {
         return (result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) => {
-            this.testCompleteAction(test, result, start, end, info);
+            this.testCompleteActionQueued(test, result, start, end, info);
 
             this.checkAndEnqueueTests();
 
@@ -383,7 +395,7 @@ class TestRunner {
                 }
 
                 const tinfo = runCompilerTest(this.smt_assets.corefiles, code);
-                this.testCompleteAction(tt, tinfo.result, tinfo.start, tinfo.end, tinfo.info);
+                this.testCompleteActionInline(tt, tinfo.result, tinfo.start, tinfo.end, tinfo.info);
             }
             else if ((tt instanceof IndividualRefuteTestInfo) || (tt instanceof IndividualReachableTestInfo)) {
                 const mode = tt instanceof IndividualRefuteTestInfo ? "Refute" : "Reach";
@@ -396,7 +408,7 @@ class TestRunner {
                 const handler = this.generateTestResultCallback(tt);
                 this.queued.push(tt.fullname);
                 try {
-                    enqueueSMTTest(mode, this.smt_assets.corefiles, this.smt_assets.runtime, tt.code, tt.line, handler);
+                    enqueueSMTTest(mode, this.smt_assets.corefiles, this.smt_assets.runtime, code, tt.line, handler);
                 }
                 catch (ex) {
                     handler("error", new Date(), new Date(), `${ex}`);

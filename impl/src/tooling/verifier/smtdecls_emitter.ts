@@ -582,7 +582,9 @@ class SMTEmitter {
 
     private initializeSMTAssembly(assembly: MIRAssembly, entrypoint: MIRInvokeKey, callsafety: Map<MIRInvokeKey, { safe: boolean, trgt: boolean }>, maxgas: number) {
         let doneset = new Set<MIRInvokeKey>();
-        const cginfo = constructCallGraphInfo([entrypoint], assembly);
+
+        const cinits = [...assembly.constantDecls].map((cdecl) => cdecl[1].value);
+        const cginfo = constructCallGraphInfo([entrypoint, ...cinits], assembly);
         const rcg = [...cginfo.topologicalOrder].reverse();
 
         for (let i = 0; i < rcg.length; ++i) {
@@ -896,7 +898,8 @@ class SMTEmitter {
     }
 
     static generateSMTAssemblyForValidate(assembly: MIRAssembly, vopts: VerifierOptions, errorTrgtPos: { file: string, line: number, pos: number }, entrypoint: MIRInvokeKey, maxgas: number): SMTAssembly {
-        const callsafety = markSafeCalls([entrypoint], assembly, errorTrgtPos);
+        const cinits = [...assembly.constantDecls].map((cdecl) => cdecl[1].value);
+        const callsafety = markSafeCalls([entrypoint, ...cinits], assembly, errorTrgtPos);
 
         const temitter = new SMTTypeEmitter(assembly, vopts);
         const bemitter = new SMTBodyEmitter(assembly, temitter, vopts, callsafety, errorTrgtPos);

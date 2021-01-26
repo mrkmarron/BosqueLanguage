@@ -173,8 +173,17 @@ function isBodySafe(ikey: MIRInvokeKey, masm: MIRAssembly, errorTrgtPos: { file:
         }
         else {
             const cn = callg.invokes.get(ikey) as CallGNode;
+            const allcalleesafe = [...cn.callees].every((callee) => {
+                if(isSafeInvoke((masm.primitiveInvokeDecls.get(callee) || masm.invokeDecls.get(callee)) as MIRInvokeDecl)) {
+                    return true;
+                }
+                else {
+                    const sii = safeinfo.get(callee);
+                    return sii !== undefined && sii.safe;
+                }
+            });
             
-            if (!haserrorop && [...cn.callees].every((callee) => safeinfo.has(callee) || isSafeInvoke((masm.primitiveInvokeDecls.get(callee) || masm.invokeDecls.get(callee)) as MIRInvokeDecl))) {
+            if (!haserrorop && allcalleesafe) {
                 return { safe: true, trgt: false };
             }
             else {

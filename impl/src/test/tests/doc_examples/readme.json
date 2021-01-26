@@ -100,16 +100,16 @@
             ]
         },
         {
-            "test": "sign",
+            "test": "invariants",
             "src": "doc_examples/data_invariants.txt",
             "sig": "function main(x: String): Bool",
-            "code": "}",
+            "code": "",
             "typechk": [
                 "NamedGreeting@{}.sayHello() === \"[type error]\""
             ],
             "refutes": [
                 "GenericGreeting@{}.sayHello() === \"hello world\"",
-                "GenericGreeting::instance.sayHello()  === \"hello world\"",
+                "GenericGreeting::instance.sayHello() === \"hello world\"",
                 "NamedGreeting@{name=\"bob\"}.sayHello() === \"hello bob\""
             ],
             "reachables": [

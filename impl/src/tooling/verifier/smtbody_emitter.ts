@@ -708,7 +708,14 @@ class SMTBodyEmitter {
     }
 
     isSafeInvoke(mkey: MIRInvokeKey): boolean {
-        return (this.callsafety.get(mkey) as { safe: boolean, trgt: boolean }).safe;
+        const idecl = (this.assembly.invokeDecls.get(mkey) || this.assembly.primitiveInvokeDecls.get(mkey)) as MIRInvokeDecl;
+        if(idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe")) {
+            return true;
+        }
+        else {
+            const csi = this.callsafety.get(mkey);
+            return csi !== undefined && csi.safe;
+        }
     }
 
     isSafeVirtualInvoke(vkey: MIRVirtualMethodKey, rcvrtype: MIRType): boolean {
@@ -724,8 +731,7 @@ class SMTBodyEmitter {
 
     isSafeConstructorInvoke(oftype: MIRType): boolean {
         const cname = `${oftype.trkey}@@constructor`
-        const idecl = this.assembly.invokeDecls.get(cname) as MIRInvokeDecl;
-        return idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe");
+        return this.isSafeInvoke(cname);
     }
 
     isSafeVirtualConstructorInvoke(oftypes: MIRType): boolean {
