@@ -11,6 +11,7 @@ import * as Commander from "commander";
 import chalk from "chalk";
 
 import { enqueueSMTTest, smtlib_path, smtruntime_path } from "./smt_runner";
+import { runCompilerTest } from "./compile_runner";
 
 const testroot = Path.normalize(Path.join(__dirname, "tests"));
 
@@ -33,6 +34,32 @@ abstract class IndividualTestInfo {
         if(restriction === "*" || this.fullname.startsWith(restriction)) {
             tests.push(this);
         }
+    }
+}
+
+class IndividualCompileWarnTest extends IndividualTestInfo {
+    private static ctemplate = 
+"namespace NSMain;\n\
+\n\
+%%SIG%% {\n\
+    assert %%ACTION%%;\n\
+    return true;\n\
+}\n\
+\n\
+%%CODE%%\n\
+";
+
+    constructor(name: string, fullname: string, code: string, extraSrc: string | undefined) {
+        super(name, fullname, code, extraSrc);
+    }
+
+    static create(name: string, fullname: string, sig: string, action: string, code: string, extraSrc: string | undefined): IndividualCompileWarnTest {
+        const rcode = IndividualCompileWarnTest.ctemplate
+            .replace("%%SIG%%", sig)
+            .replace("%%ACTION%%", action)
+            .replace("%%CODE%%", code);
+
+        return new IndividualCompileWarnTest(name, fullname, rcode, extraSrc);
     }
 }
 
@@ -101,6 +128,7 @@ type APITestGroupJSON = {
     src: string | null,
     sig: string,
     code: string,
+    typechk: string[],
     refutes: string[],
     reachables: string[]
 };
@@ -116,10 +144,11 @@ class APITestGroup {
 
     static create(scopename: string, spec: APITestGroupJSON): APITestGroup {
         const groupname = `${scopename}.${spec.test}`;
+        const compiles = spec.typechk.map((tt, i) => IndividualCompileWarnTest.create(`compiler#${i}`, `${groupname}.compiler#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
         const refutes = spec.refutes.map((tt, i) => IndividualRefuteTestInfo.create(`refute#${i}`, `${groupname}.refute#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
         const reachables = spec.reachables.map((tt, i) => IndividualReachableTestInfo.create(`reach#${i}`, `${groupname}.reach#${i}`, spec.sig, tt, spec.code, spec.src || undefined));
 
-        return new APITestGroup(groupname, [...refutes, ...reachables]);
+        return new APITestGroup(groupname, [...compiles, ...refutes, ...reachables]);
     }
 
     generateTestPlan(restriction: string, tests: IndividualTestInfo[]) {
@@ -347,7 +376,16 @@ class TestRunner {
         while(this.queued.length < this.maxpar && this.ppos < this.pending.length) {
             const tt = this.pending[this.ppos++];
 
-            if((tt instanceof IndividualRefuteTestInfo) || (tt instanceof IndividualReachableTestInfo)) {
+            if (tt instanceof IndividualCompileWarnTest) {
+                let code = tt.code;
+                if(tt.extraSrc !== undefined) {
+                    code = code + "\n\n" + this.smt_assets.extras.get(tt.extraSrc) as string;
+                }
+
+                const tinfo = runCompilerTest(this.smt_assets.corefiles, code);
+                this.testCompleteAction(tt, tinfo.result, tinfo.start, tinfo.end, tinfo.info);
+            }
+            else if ((tt instanceof IndividualRefuteTestInfo) || (tt instanceof IndividualReachableTestInfo)) {
                 const mode = tt instanceof IndividualRefuteTestInfo ? "Refute" : "Reach";
 
                 let code = tt.code;

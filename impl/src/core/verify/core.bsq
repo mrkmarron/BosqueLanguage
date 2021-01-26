@@ -179,6 +179,19 @@ __internal grounded entity String provides Some, KeyType, PODType, APIType {
     __safe private function s_length(s: String): Nat # string_count
     __assume_safe private function s_unsafe_charat(s: String, idx: Nat): String # string_charat
     
+    __assume_safe private function s_contains(s: String, val: String, start: Nat, end: Nat): Bool # string_contains
+    __assume_safe private function s_indexof(s: String, val: String, start: Nat, end: Nat): Bool # string_indexof
+
+    __assume_safe private function s_startswith(s: String, val: String): Bool # string_startswith
+    __assume_safe private function s_endswith(s: String, val: String): Bool # string_endswith
+
+    __assume_safe private function s_substring(s: String, start: Nat, end: Nat): Bool # string_substring
+    __assume_safe private function s_append(s1: String, s2: String): Bool # string_index
+
+    private function s_rangeInBounds(s: String, start: Nat, end: Nat): Bool {
+        return start <= end & end <= String::s_length(s); 
+    }
+
     method length(): Nat {
         return String::s_length(this);
     }
@@ -187,6 +200,116 @@ __internal grounded entity String provides Some, KeyType, PODType, APIType {
         requires release 0n <= idx && idx < String::s_length(this);
     {
         return String::s_unsafe_charat(this, idx);
+    }
+
+    method contains(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Bool
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        return String::s_contains(this, s, start, end);
+    }
+
+    method indexOf(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Nat
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        check idx != end;
+
+        return idx;
+    }
+
+    method indexOfOrNone(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Nat?
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return idx;
+        }
+    }
+
+    method indexOfTry(out? res: Nat, s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Bool
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        if(idx == end) {
+            return false;
+        } 
+        else {
+            res = idx;
+            return true;
+        }
+    }
+
+    method indexOfLast(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Nat
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        check idx != end;
+
+        return idx;
+    }
+
+    method indexOfLastOrNone(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Nat?
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        if(idx == end) {
+            return none;
+        }
+        else {
+            return idx;
+        }
+    }
+
+    method indexOfLastTry(out? res: Nat, s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Bool
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        let idx = String::s_indexof(this, s, start, end);
+        if(idx == end) {
+            return false;
+        } 
+        else {
+            res = idx;
+            return true;
+        }
+    }
+
+    method startsWith(s: String): Bool {
+        return String::s_startswith(this, s);
+    }
+
+    method endsWith(s: String): Bool {
+        return String::s_endswith(this, s);
+    }
+
+    method matches(s: String, start?: Nat=0n, end?: Nat=String::s_length(this)): Bool
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        return String::s_substring(this, start, end) === s;
+    }
+
+    method matchesStart(s: String, start?: Nat=0n): Bool
+        requires release start <= String::s_length(this);
+    {
+        return String::s_startswith(String::s_substring(start, String::s_length(this)), s);
+    }
+
+    method matchesEnd(s: String, end?: Nat=String::s_length(this)): Bool
+        requires release end <= String::s_length(this);
+    {
+        return String::s_endswith(String::s_substring(this, 0, end), s);
+    }
+
+    method substring(start?: Nat=0, end?: Nat=String::s_length(this)): String 
+        requires release String::s_rangeInBounds(this, start, end);
+    {
+        return String::s_substring(this, start, end);
+    }
+
+    method append(s1: String, s2: String): String {
+        return String::s_append(s1, s2);
     }
 }
 

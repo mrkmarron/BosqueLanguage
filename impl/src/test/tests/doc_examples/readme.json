@@ -6,6 +6,10 @@
             "src": null,
             "sig": "function main(x: Nat, y: Nat): Bool",
             "code": "function add2(x: Nat, y: Nat): Nat { return x + y; }",
+            "typechk": [
+                "add2(x, 0i) == x",
+                "add2(x, 0f) == x"
+            ],
             "refutes": [
                 "add2(x, y) >= 0n",
                 "add2(x, 0) == x",
@@ -26,6 +30,8 @@
             "src": null,
             "sig": "function main(x: Int): Bool",
             "code": "function allPositive(...args: List<Int>): Bool { return args.allOf(fn(x) => x >= 0i); }",
+            "typechk": [
+            ],
             "refutes": [
                 "allPositive()",
                 "allPositive(1, 4, 3)",
@@ -42,6 +48,8 @@
             "src": null,
             "sig": "function main(x: Int): Bool",
             "code": "function allPositive(v: Int, ...args: List<Int>): Bool { return args.allOf(fn(x) => x >= v); }",
+            "typechk": [
+            ],
             "refutes": [
                 "allPositive(0i)"
             ],
@@ -54,6 +62,10 @@
             "src": null,
             "sig": "function main(x: Int): Bool",
             "code": "function sign(x?: Int=0i): Int { var y: Int; if(x == 0i) { y = 0i; } else { y = (x > 0i) ? 1i : -1i; } return y; }",
+            "typechk": [
+                "sign() == 0n",
+                "sign(3n) == 0i"
+            ],
             "refutes": [
                 "sign() == 0i",
                 "sign(4i) == 1i",
@@ -69,6 +81,14 @@
             "src": null,
             "sig": "function main(x: Int): Bool",
             "code": "function doit(tup: #[Int, Bool], rec: #{f: String, g: Int}): Int { return tup.0 + rec.g; }",
+            "typechk": [
+                "doit(#[1n], #{f=\"yes\", g=0i}) == 1i",
+                "doit(#[1n, true], #{g=0i}) == 1i",
+                "doit(#[1n, true], #{f=\"yes\", g=0i}) == 1i",
+                "doit(#[1i, true], #{f=true, g=0i}) == 1i",
+                "doit(@[1i, true], #{f=\"yes\", g=0i}) == 0i",
+                "doit(#[1i, true], @{f=\"yes\", g=0i}) == 0i"
+            ],
             "refutes": [
                 "doit(#[1i, true], #{f=\"yes\", g=0i}) == 1i",
                 "doit(#[0, true], #{f=\"yes\", g=1}) == 1i",
@@ -77,6 +97,23 @@
             "reachables": [
                 "doit(#[x, true], #{f=\"yes\", g=x}) == x",
                 "x < 4i & doit(#[x, true], #{f=\"yes\", g=x + 1i}) == 5i"
+            ]
+        },
+        {
+            "test": "sign",
+            "src": "doc_examples/data_invariants.txt",
+            "sig": "function main(x: String): Bool",
+            "code": "}",
+            "typechk": [
+                "NamedGreeting@{}.sayHello() === \"[type error]\""
+            ],
+            "refutes": [
+                "GenericGreeting@{}.sayHello() === \"hello world\"",
+                "GenericGreeting::instance.sayHello()  === \"hello world\"",
+                "NamedGreeting@{name=\"bob\"}.sayHello() === \"hello bob\""
+            ],
+            "reachables": [
+                "NamedGreeting@{name=x}.sayHello() === \"hello bob\""
             ]
         }
     ]

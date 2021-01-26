@@ -84,10 +84,10 @@ function doit(tup: #[Int, Bool], rec: #{f: String, g: Int}): Int {
 doit(#[1, false], #{f="ok", g=3}) //4
 ```
 
-**Sign (with optional argument):**
+**Sign (with default argument):**
 
 ```none
-function sign(x?: Int): Int {
+function sign(x?: Int=0): Int {
     var y: Int;
 
     if(x == none || x == 0) {
@@ -263,6 +263,8 @@ getSays("dog", "woof") //Ok<String, ErrData>@{value="The dog says woof"}
 getSays("", "woof") //Err<String, ErrData>@{error={ msg="Invalid animal" }}
 getSays("dog", "") //Err<String, ErrData>@{error={ msg="Invalid catchPhrase" }}
 ```
+
+**Numeric Types**
 
 **API Types**
 
