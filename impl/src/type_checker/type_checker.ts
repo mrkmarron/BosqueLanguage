@@ -1341,7 +1341,7 @@ class TypeChecker {
     private checkArgumentsEntityConstructor(sinfo: SourceInfo, oftype: ResolvedEntityAtomType, args: ExpandedArgument[], trgt: MIRRegisterArgument): ResolvedType {
         const fieldInfo = this.m_assembly.getAllOOFieldsConstructors(oftype.object, oftype.binds);
         const flatfinfo = [...fieldInfo.req, ...fieldInfo.opt].map((ff) => ff[1]);
-        const fields = flatfinfo.map((ff) => ff[0].name);
+        const fields = flatfinfo.map((ff) => ff[1].name);
 
         const optcount = flatfinfo.filter((fi) => fi[1].value !== undefined).length;
         const optfirst = flatfinfo.findIndex((fi) => fi[1].value !== undefined);

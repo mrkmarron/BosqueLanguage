@@ -1,5 +1,5 @@
 concept WithName {
-    invariant $name != "";
+    invariant $name !== "";
 
     field name: String;
 }
@@ -22,6 +22,6 @@ entity GenericGreeting provides Greeting {
 
 entity NamedGreeting provides WithName, Greeting {
     override method sayHello(): String {
-        return String::append("hello ", this.name);
+        return "hello ".append(this.name);
     }
 }

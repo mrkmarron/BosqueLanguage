@@ -2336,7 +2336,31 @@ class SMTBodyEmitter {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.len", [new SMTVar(args[0].vname)]));
             }
             case "string_charat": {
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname)]));
+                const ival = new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)]);
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname), ival]));
+            }
+            case "string_contains": {
+                NOT_IMPLEMENTED("string_contains");
+                return (undefined as any as SMTFunction);
+            }
+            case "string_indexof": {
+                NOT_IMPLEMENTED("string_contains");
+                return (undefined as any as SMTFunction);
+            }
+            case "string_startswith": {
+                NOT_IMPLEMENTED("string_contains");
+                return (undefined as any as SMTFunction);
+            }
+            case "string_endswith": {
+                NOT_IMPLEMENTED("string_contains");
+                return (undefined as any as SMTFunction);
+            } 
+            case "string_substring": {
+                NOT_IMPLEMENTED("string_contains");
+                return (undefined as any as SMTFunction);
+            }
+            case "string_append": {
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.++", [new SMTVar(args[0].vname), new SMTVar(args[1].vname)]));
             }
             case "isequence_size": {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("ISequence@size", [new SMTVar(args[0].vname)]))
