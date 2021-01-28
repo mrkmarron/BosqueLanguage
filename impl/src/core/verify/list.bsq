@@ -6,11 +6,6 @@
 //The core namespace implements the primitive concepts used in the bosque core language
 namespace NSCore;
 
-__internal entity ISequence {
-    __safe function size(s: ISequence): Nat # isequence_size
-    __assume_safe function get(s: ISequence, n: Nat): Nat # isequence_get
-}
-
 __internal struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
     __assume_safe private function s_unsafe_get(l: Vector<T, K>, i: Nat): T # vector_unsafe_get
 
@@ -47,9 +42,9 @@ concept ListFrom provides Object {
     __safe private function s_rangeOfInt(start: Int, end: Int): List<Int> # list_rangeofint
     __safe private function s_rangeOfNat(start: Nat, end: Nat): List<Nat> # list_rangeofnat
 
-    private function s_zip<T, U>(l1: List<T>, l2: List<U>): List<#[T, U]> # list_zip
-    private function s_unzipt<T, U>(l: List<#[T, U]>): List<T> # list_unzipt
-    private function s_unzipu<T, U>(l: List<#[T, U]>): List<U> # list_unzipu
+    __safe private function s_zip<T, U>(l1: List<T>, l2: List<U>, size: Nat): List<#[T, U]> # list_zip
+    __safe private function s_unzipt<T, U>(l: List<#[T, U]>, size: Nat): List<T> # list_unzipt
+    __safe private function s_unzipu<T, U>(l: List<#[T, U]>, size: Nat): List<U> # list_unzipu
 
     function fill<T=?>(k: Nat, val: T): List<T> {
         return List<T>::s_fill(k, val);
@@ -79,26 +74,16 @@ concept ListFrom provides Object {
 }
 
 __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
-    private function s_applycheck_pred(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred
-    private function s_applycheck_pred_idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> # list_applycheck_pred_idx
-    private function s_applycheck_binpred<U>(l: List<T>, ol: List<T>, p: recursive? pred(_: T, _: U) -> Bool): List<T>, List<U> # list_applycheck_binpred
-
-    private function s_applycheck_op<U>(l: List<T>, p: recursive? pred(_: T, _: Nat) -> U): List<T> # list_applycheck_op
-    private function s_applycheck_op_idx<U>(l: List<T>, p: recursive? pred(_: T, _: Nat) -> U): List<T> # list_applycheck_op_idx
-
     __assume_safe private function {when T grounded KeyType} s_hasCheck(l: List<T>, val: T, start: Nat, end: Nat): Bool # list_hascheck
-    __assume_safe private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck
-    __assume_safe private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck_idx
-    
-    private recursive? function s_computeMatchIdxSequence(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence
-    private recursive? function s_computeMatchIdxSequence_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): ISequence # list_computematchidxsequence_idx
-    private function s_computeOfTypeIdxSequence<U>(l: List<T>, start: Nat, end: Nat): ISequence # list_computeoftypeidxsequence
+    private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck
+    private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Bool # list_haspredcheck_idx
     
     __safe private function s_size(l: List<T>): Nat # list_size
     __safe private function s_empty(l: List<T>): Bool # list_empty
     __assume_safe private function s_unsafe_get(l: List<T>, i: Nat): T # list_unsafe_get
 
-    private function s_concat(l: List<List<T>>): List<T> # list_concat
+    __assume_safe private function s_concat2(l1: List<T>, l2: List<T>, size: Nat): List<T> # list_concat2
+    __assume_safe private function s_concat3(l1: List<T>, l2: List<T>, l3: List<T>, size: Nat): List<T> # list_concat3
 
     private function {when T grounded KeyType} s_findIndexOf_KeyHelper(l: List<T>, val: T, start: Nat, end: Nat): Nat # list_findindexof_keyhelper
     private function {when T grounded KeyType} s_findIndexOfLast_KeyHelper(l: List<T>, val: T, start: Nat, end: Nat): Nat # list_findindexoflast_keyhelper
@@ -110,11 +95,11 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private function {when T KeyType} s_count_KeyHelper(l: List<T>, v: T, start: Nat, end: Nat): Nat # list_count_helper
 
-    private recursive? function s_countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat, s: ISequence): Nat # list_countif_helper
-    private recursive? function s_countIf_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat, s: ISequence): Nat # list_countif_helper_idx
+    private recursive? function s_countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Nat # list_countif_helper
+    private recursive? function s_countIf_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat # list_countif_helper_idx
     
-    private recursive? function s_filter_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat, s: ISequence): List<T> # list_filter_helper
-    private recursive? function s_filter_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat, s: ISequence): List<T> # list_filter_helper_idx
+    private recursive? function s_filter_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): List<T> # list_filter_helper
+    private recursive? function s_filter_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> # list_filter_helper_idx
     
     private function s_filterToType_Helper<U>(l: List<T>, start: Nat, end: Nat): List<U> # list_filtertotype_helper
     private function s_castToType_Helper<U>(l: List<T>, start: Nat, end: Nat): List<U> # list_casttotype_helper
@@ -133,99 +118,46 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private recursive? function findIndexOf_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck(slist, p, start, end)) {
-            return end;
-        }
-        else {
-            return List<T>::s_findIndexOf_PredicateHelper[recursive?](slist, p, start, end);
-        }
+        return List<T>::s_findIndexOf_PredicateHelper[recursive?](slist, p, start, end);
     }
 
     private recursive? function findIndexOfLast_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck(slist, p, start, end)) {
-            return end;
-        }
-        else {
-            return List<T>::s_findIndexOfLast_PredicateHelper[recursive?](slist, p, start, end);
-        }
+        return List<T>::s_findIndexOfLast_PredicateHelper[recursive?](slist, p, start, end);
     }
 
     private recursive? function findIndexOf_PredicateHelper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck_Idx(slist, p, start, end)) {
-            return end;
-        }
-        else {
-            return List<T>::s_findIndexOf_PredicateHelper_Idx[recursive?](slist, p, start, end);
-        }
+        return List<T>::s_findIndexOf_PredicateHelper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? function findIndexOfLast_PredicateHelper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck_Idx(slist, p, start, end)) {
-            return end;
-        }
-        else {
-            return List<T>::s_findIndexOfLast_PredicateHelper_Idx[recursive?](slist, p, start, end);
-        }
+        return List<T>::s_findIndexOfLast_PredicateHelper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? function countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck(slist, p, start, end)) {
-            return 0n;
-        }
-        else {
-            let mseq = List<T>::s_computeMatchIdxSequence[recursive?](slist, p, start, end);
-            return List<T>::s_countIf_Helper[recursive?](slist, p, start, end, mseq);
-        }
+        return List<T>::s_countIf_Helper[recursive?](slist, p, start, end);
     }
 
     private recursive? function countIf_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): Nat {
         let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck_Idx(slist, p, start, end)) {
-            return 0n;
-        }
-        else {
-            let mseq = List<T>::s_computeMatchIdxSequence[recursive?](slist, p, start, end);
-            return List<T>::s_countIf_Helper_Idx[recursive?](slist, p, start, end, mseq);
-        }
+        return List<T>::s_countIf_Helper_Idx[recursive?](slist, p, start, end);
     }
 
     private recursive? function filter_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool, start: Nat, end: Nat): List<T> {
         let slist = List<T>::s_applycheck_pred[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck(slist, p, start, end)) {
-            return List<T>@{};
-        }
-        else {
-            let mseq = List<T>::s_computeMatchIdxSequence[recursive?](slist, p, start, end);
-            return List<T>::s_filter_Helper[recursive?](slist, p, start, end, mseq);
-        }
+        return List<T>::s_filter_Helper[recursive?](slist, p, start, end);
     }
 
     private recursive? function filter_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool, start: Nat, end: Nat): List<T> {
         let slist = List<T>::s_applycheck_pred_idx[recursive?](l, p, start, end);
-
-        if(!List<T>::s_hasPredCheck_Idx(slist, p, start, end)) {
-            return List<T>@{};
-        }
-        else {
-            let mseq = List<T>::s_computeMatchIdxSequence_Idx[recursive?](slist, p, start, end);
-            return List<T>::s_filter_Helper_Idx[recursive?](slist, p, start, end, mseq);
-        }
+        return List<T>::s_filter_Helper_Idx[recursive?](slist, p, start, end);
     }
 
     private function filterToType_Helper<U>(l: List<T>, start: Nat, end: Nat): List<U> {
-        let mseq = List<T>::s_computeOfTypeIdxSequence<U>(l, start, end);
-        return List<T>::s_filterToType_Helper<U>(l, start, end, mseq);
+        return List<T>::s_filterToType_Helper<U>(l, start, end);
     }
 
     private function castToType_Helper<U>(l: List<T>, start: Nat, end: Nat): List<U> {
@@ -265,8 +197,13 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     //Public interface
     ////
 
-    function concat(...ll: List<List<T>>): List<T> {
-        return List<T>::s_concat(ll);
+    //TODO: when overloading is working better then make this a single concat with overloads
+    function concat2(l1: List<T>, l2: List<T>): List<T> {
+        return List<T>::s_concat2(l1, l2);
+    }
+
+    function concat3(l1: List<T>, l2: List<T>, l3: List<T>): List<T> {
+        return List<T>::s_concat3(l1, l2, l3);
     }
 
     method size(): Nat {

@@ -8,8 +8,7 @@ type VerifierOptions = {
     BigXMode: "BV" | "Int", //are bignums handled as Int or just large BV
     OverflowEnabled: boolean,
     FPOpt: "Real" | "UF",
-    StringOpt: "ASCII" | "UNICODE",
-    FilterMode: "General" | "ForwardOnly"
+    StringOpt: "ASCII" | "UNICODE"
 };
 
 class SMTMaskConstruct {

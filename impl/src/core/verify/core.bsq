@@ -379,8 +379,8 @@ entity ByteBuffer provides Some, APIValue {
     private field bytes: String; //fake data store for verifier to use
 }
 
-//<summary>Primitive ISOTime value.</summary>
-numeric typedecl ISOTime = BigNat;
+//<summary>Primitive ClockTime value.</summary>
+numeric typedecl ClockTime = BigNat;
 
 //<summary>Primitive LogicalTime value.</summary>
 numeric typedecl LogicalTime = BigNat;
