@@ -442,6 +442,10 @@ class SMTTypeEmitter {
         return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@error`, [err]);
     }
 
+    generateErrorResultAssert(rtype: MIRType): SMTExp {
+        return this.generateResultTypeConstructorError(rtype, new SMTConst("ErrorID_AssumeCheck"));
+    }
+
     generateResultIsSuccessTest(ttype: MIRType, exp: SMTExp): SMTExp {
         return new SMTCallSimple(`is-$Result_${this.getSMTTypeFor(ttype).name}@success`, [exp]);
     }

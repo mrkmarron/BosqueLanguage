@@ -694,10 +694,6 @@ class SMTBodyEmitter {
         }
     }
 
-    generateErrorAssertFact(rtype: MIRType): SMTExp {
-        return this.typegen.generateResultTypeConstructorError(rtype, new SMTConst("ErrorID_AssumeCheck"));
-    }
-
     isSafeInvoke(mkey: MIRInvokeKey): boolean {
         const idecl = (this.assembly.invokeDecls.get(mkey) || this.assembly.primitiveInvokeDecls.get(mkey)) as MIRInvokeDecl;
         if(idecl.attributes.includes("__safe") || idecl.attributes.includes("__assume_safe")) {
@@ -1502,23 +1498,13 @@ class SMTBodyEmitter {
     }
 
     processConstructorPrimaryCollectionEmpty(op: MIRConstructorPrimaryCollectionEmpty, continuation: SMTExp): SMTExp {
-        const consf = this.generateConstructorOfSizeName(op.tkey, 0);
-        if (this.requiredCollectionConstructors_Literal.find((ee) => ee.cname === consf) === undefined) {
-            this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: 0 });
-        }
-
-        const llcons = this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.tkey));
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${llcons.cons}`, [new SMTConst("BNat@zero"), new SMTCallSimple(consf, [])]), continuation);
+        const consexp = this.lopsManager.processLiteralK_0(this.typegen.getMIRType(op.tkey));
+        return new SMTLet(this.varToSMTName(op.trgt).vname, consexp, continuation);
     }
 
     processConstructorPrimaryCollectionSingletons(op: MIRConstructorPrimaryCollectionSingletons, continuation: SMTExp): SMTExp {
-        const consf = this.generateConstructorOfSizeName(op.tkey, op.args.length);
-        if (this.requiredCollectionConstructors_Literal.find((ee) => ee.cname === consf) === undefined) {
-            this.requiredCollectionConstructors_Literal.push({ cname: consf, oftype: op.tkey, argc: op.args.length });
-        }
-
-        const llcons = this.typegen.getSMTConstructorName(this.typegen.getMIRType(op.tkey));
-        return new SMTLet(this.varToSMTName(op.trgt).vname, new SMTCallSimple(`${llcons.cons}`, [new SMTConst(`(_ bv${op.args.length} ${this.vopts.ISize})`), new SMTCallSimple(consf, op.args.map((arg) => this.argToSMT(arg[1])))]), continuation);
+        const consexp = this.lopsManager.processLiteralK_Pos(this.typegen.getMIRType(op.tkey), op.args.length, op.args.map((arg) => this.argToSMT(arg[1]))));
+        return new SMTLet(this.varToSMTName(op.trgt).vname, consexp, continuation);
     }
 
     processConstructorPrimaryCollectionCopies(op: MIRConstructorPrimaryCollectionCopies, continuation: SMTExp): SMTExp {
@@ -2358,21 +2344,13 @@ class SMTBodyEmitter {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_rangeofint": {
-                const fcons = `@@cons_${smtrestype.name}_int_range`;
-                this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-
-                const llcons = this.typegen.getSMTConstructorName(mirrestype);
-                const fbody = new SMTCallSimple(`${llcons.cons}`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
-
+                const [low, high, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processRangeOfIntOperation(mirrestype, low, high, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_rangeofnat": {
-                const fcons = `@@cons_${smtrestype.name}_nat_range`;
-                this.requiredCollectionConstructors_Structural.push({cname: fcons, oftype: mirrestype.trkey, implkey: idecl.implkey});
-
-                const llcons = this.typegen.getSMTConstructorName(mirrestype);
-                const fbody = new SMTCallSimple(`${llcons.cons}`, [new SMTCallSimple("bvsub", [new SMTVar(args[1].vname), new SMTVar(args[0].vname)]), new SMTCallSimple(fcons, [new SMTVar(args[0].vname), new SMTVar(args[1].vname)])]);
-
+                const [low, high, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processRangeOfNatOperation(mirrestype, low, high, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_zip": {
@@ -2392,10 +2370,7 @@ class SMTBodyEmitter {
                 return undefined;
             }
             case "list_haspredcheck": {
-                const fget = `@@haspredcheck_${smtencltype.name}_using_${this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code)}`;
-                this.requiredCollectionDestructors_Computational.push({cname: fget, oftype: mirencltype, argtypes: args.map((arg) => arg.vtype), implkey: idecl.implkey});
-
-                const fbody = new SMTCallGeneral(fget, args.map((arg) => new SMTVar(arg.vname)));
+                const fbody = this.lopsManager.processHasPredCheck(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_haspredcheck_idx": {
@@ -2409,14 +2384,14 @@ class SMTBodyEmitter {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("=", [new SMTConst("BNat@zero"), this.lopsManager.generateListSizeCall(args[0])]));
             }
             case "list_unsafe_get": {
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, this.generateListKnownSafeGetCall(args[0], new SMTVar(args[1].vname)));
+                const [l, n] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processGet(mirrestype, l, n);
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-
             case "list_concat2": {
-                xxxx;
-            }
-            case "list_concat3": {
-                xxxx;
+                const [l1, l2, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processConcat2(mirrestype, l1, l2, count);
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_findindexof_keyhelper": {
                 assert(false, "[NOT IMPLEMENTED -- list_findindexof_keyhelper]");
