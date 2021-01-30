@@ -83,7 +83,7 @@ class SMTEmitter {
                 new SMTIf(
                     new SMTCallSimple("<=", [new SMTCallSimple("str.len", [new SMTVar(tstr)]), new SMTConst(`${this.bemitter.vopts.ISize}`)]),
                     this.temitter.generateResultTypeConstructorSuccess(tt, new SMTVar(tstr)),
-                    this.bemitter.generateErrorAssertFact(tt)
+                    this.temitter.generateErrorResultAssert(tt)
                 )
             );
 
@@ -115,7 +115,7 @@ class SMTEmitter {
             new SMTLet(svar, sstr,
                 new SMTIf(new SMTCallSimple("and", [lenok, accept]),
                     this.temitter.generateResultTypeConstructorSuccess(tt, construct),
-                    this.bemitter.generateErrorAssertFact(tt)
+                    this.temitter.generateErrorResultAssert(tt)
                 )
             ),
             true
@@ -146,7 +146,7 @@ class SMTEmitter {
                     new SMTIf(
                         new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
                         new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
-                        this.bemitter.generateErrorAssertFact(tt)
+                        this.temitter.generateErrorResultAssert(tt)
                     )
                 ),
                 true
@@ -178,7 +178,7 @@ class SMTEmitter {
                     new SMTIf(
                         new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
                         new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
-                        this.bemitter.generateErrorAssertFact(tt)
+                        this.temitter.generateErrorResultAssert(tt)
                     )
                 ),
                 true
@@ -321,24 +321,6 @@ class SMTEmitter {
         }
         else {
             return [new SMTConst("bsq_none@literal"), false];
-        }
-    }
-
-    private processISequenceTypeDecl(idecl: MIREntityTypeDecl) {
-        this.bemitter.requiredISequenceConstructors.forEach((isq) => {
-            const isqtype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(idecl.tkey));
-            const nattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
-            const ltype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(isq.oftype));
-
-            const argtypes = [ltype, nattype, nattype];
-            const ufcons = new SMTFunctionUninterpreted(isq.cname, argtypes, isqtype);
-
-            this.assembly.uninterpfunctions.push(ufcons);
-        });
-
-        const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(idecl.tkey));
-        if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
-            this.assembly.resultTypes.push(({ hasFlag: false, rtname: idecl.tkey, ctype: restype }));
         }
     }
 
@@ -673,56 +655,51 @@ class SMTEmitter {
         }
 
         assembly.entityDecls.forEach((edcl) => {
-            if(edcl.ns === "NSCore" && edcl.name === "ISequence") {
-                this.processISequenceTypeDecl(edcl);
+            const mirtype = this.temitter.getMIRType(edcl.tkey);
+            const ttag = this.temitter.getSMTTypeTag(mirtype);
+
+            if (!this.assembly.typeTags.includes(ttag)) {
+                this.assembly.typeTags.push(ttag);
+            }
+
+            if (!this.assembly.keytypeTags.includes(ttag)) {
+                if (assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
+                    this.assembly.keytypeTags.push(ttag);
+                }
+            }
+
+            const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(edcl.tkey));
+            if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
+                this.assembly.resultTypes.push(({ hasFlag: false, rtname: edcl.tkey, ctype: restype }));
+            }
+
+            if (edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
+                this.processVectorTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
+                this.processListTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
+                this.processStackTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
+                this.processQueueTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
+                this.processSetTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
+                this.processDynamicSetTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
+                this.processMapTypeDecl(edcl);
+            }
+            else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
+                this.processDynamicMapTypeDecl(edcl);
             }
             else {
-                const mirtype = this.temitter.getMIRType(edcl.tkey);
-                const ttag = this.temitter.getSMTTypeTag(mirtype);
-
-                if (!this.assembly.typeTags.includes(ttag)) {
-                    this.assembly.typeTags.push(ttag);
-                }
-
-                if (!this.assembly.keytypeTags.includes(ttag)) {
-                    if (assembly.subtypeOf(mirtype, this.temitter.getMIRType("NSCore::KeyType"))) {
-                        this.assembly.keytypeTags.push(ttag);
-                    }
-                }
-
-                const restype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(edcl.tkey));
-                if (this.assembly.resultTypes.find((rtt) => rtt.ctype.name === restype.name) === undefined) {
-                    this.assembly.resultTypes.push(({ hasFlag: false, rtname: edcl.tkey, ctype: restype }));
-                }
-
-                if (edcl.specialDecls.has(MIRSpecialTypeCategory.VectorTypeDecl)) {
-                    this.processVectorTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
-                    this.processListTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.StackTypeDecl)) {
-                    this.processStackTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.QueueTypeDecl)) {
-                    this.processQueueTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
-                    this.processSetTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicSetTypeDecl)) {
-                    this.processDynamicSetTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
-                    this.processMapTypeDecl(edcl);
-                }
-                else if (edcl.specialDecls.has(MIRSpecialTypeCategory.DynamicMapTypeDecl)) {
-                    this.processDynamicMapTypeDecl(edcl);
-                }
-                else {
-                    if (edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be === edcl.name) === undefined) {
-                        this.processEntityDecl(edcl);
-                    }
+                if (edcl.ns !== "NSCore" || BuiltinEntityDeclNames.find((be) => be === edcl.name) === undefined) {
+                    this.processEntityDecl(edcl);
                 }
             }
         });

@@ -461,7 +461,7 @@ class SMTTypeEmitter {
     generateResultGetError(ttype: MIRType, exp: SMTExp): SMTExp {
         return new SMTCallSimple(`$Result_${this.getSMTTypeFor(ttype).name}@error_value`, [exp]);
     }
-
+    
     generateAccessWithSetGuardResultType(ttype: MIRType): SMTType {
         return new SMTType(`$GuardResult_${this.getSMTTypeFor(ttype).name}`);
     }

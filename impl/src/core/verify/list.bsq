@@ -99,7 +99,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private function s_filterToType_Helper<U>(l: List<T>): List<U> # list_filtertotype_helper
     private function s_castToType_Helper<U>(l: List<T>): List<U> # list_casttotype_helper
 
-    private function s_slice_Helper(l: List<T>, start: Nat, end: Nat): List<U> # list_slice_helper
+    private function s_slice_Helper(l: List<T>, start: Nat, end: Nat, count: Nat): List<U> # list_slice_helper
 
     private recursive? function s_map_Helper<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<T> # list_map_helper
     private recursive? function s_map_Helper_Idx<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U): List<T> # list_map_helper_idx
@@ -726,7 +726,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     method slice(start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<T> 
         requires release List<T>::s_rangeInBounds(this, start, end);
     {
-        return List<T>::s_slice_Helper(this, s, e);
+        return List<T>::s_slice_Helper(this, s, e, e - s);
     }
 
     method removeFirst(k: Nat): List<T> 
