@@ -260,9 +260,11 @@
 ))
 
 (declare-datatypes (
+      (ISequence@Result 0)
       ;;RESULT_DECLS;;
       ;;MASK_DECLS;;
     ) (
+    ( (ISequence@Result_error) (ISequence@Result_ok (ISequence@Result_ok_isq ISequence)))
     ;;RESULTS;;
     ;;MASKS;;
 ))

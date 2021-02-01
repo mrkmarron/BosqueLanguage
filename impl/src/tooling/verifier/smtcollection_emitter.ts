@@ -3,7 +3,7 @@
 // Licensed under the MIT license. See LICENSE.txt file in the project root for full license information.
 //-------------------------------------------------------------------------------------------------------
 
-import { MIREntityTypeDecl, MIRType } from "../../compiler/mir_assembly";
+import { MIREntityTypeDecl, MIRPCode, MIRType } from "../../compiler/mir_assembly";
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
@@ -34,6 +34,8 @@ class RequiredListDestructors {
     //always get
 
     safeapply: Set<string> = new Set<string>();
+    isequence: Set<string> = new Set<string>();
+
     haspredcheck: Set<string> = new Set<string>();
     findIndexOf: Set<string> = new Set<string>();
     findLastIndexOf: Set<string> = new Set<string>();
@@ -293,6 +295,27 @@ class ListOpsManager {
         }
     }
 
+    emitExtractISequence(ltype: SMTType, code: string): SMTFunction {
+        
+
+        const rtype = this.temitter.getSMTTypeFor(ctype);
+
+        let tsops: {test: SMTExp, result: SMTExp }[] = [];
+
+        //if(is-type concat2) => get base list and use new start/end
+
+        //if(is-type fill) => get base list and use new start/end
+    
+        //if(!hasPred) => empty
+
+        //default construct
+        const ffunc = new SMTIf(emptyaction.test, emptyaction.result,
+            new SMTCallSimple(this.generateConsCallName_Direct(ltype, opname), [start, end])
+        );
+
+        xxxx;
+    }
+
     ////////
     //Slice
     emitConstructorSlice_Slice(ltype: SMTType, ll: SMTExp, start: SMTExp, end: SMTExp): SMTExp {
@@ -486,31 +509,90 @@ class ListOpsManager {
 
     ////////
     //Filter
-    emitConstructorFilter(ltype: SMTType, ctype: MIRType, code: string, count: SMTExp): SMTConstructorGenCode {
+    emitConstructorFilter_Concat(mtype: MIRType, ltype: SMTType, ll: SMTExp, code: string, pc: MIRPCode, issafe: boolean): SMTExp {
+        const l1v = this.generateTempName();
+        const l2v = this.generateTempName();
+        const l1vs = this.generateTempName();
+        const l2vs = this.generateTempName();
+
+        return new SMTLetMulti([
+            { vname: l1v, value: this.generateGetULIFieldFor(ltype, "concat2", "l1", ll) },
+            { vname: l2v, value: this.generateGetULIFieldFor(ltype, "concat2", "l2", ll) },
+        ],
+            new SMTLetMulti([
+                { vname: l1vs, value: this.generateListSizeCall(new SMTVar(l1v), ltype) },
+                { vname: l2vs, value: this.generateListSizeCall(new SMTVar(l2v), ltype) },
+            ],
+            xxxx
+                new SMTCond([
+                    //if(end <= lv1.size) => slice(lv1, start, end, count)
+                    { test: new SMTCallSimple("bvule", [end, new SMTVar(l1vs)]), result: new SMTCallSimple(this.generateConsCallName(ltype, "slice"), [new SMTVar(l1v), start, end]) },
+                    //if(lv1.size <= start) => slice(lv2, start - lv1.size, end - lv1.size, count)
+                    { test: new SMTCallSimple("bvule", [new SMTVar(l1vs), start]), result: new SMTCallSimple(this.generateConsCallName(ltype, "slice"), [new SMTVar(l2v), new SMTCallSimple("bvsub", [start, new SMTVar(l1vs)]), new SMTCallSimple("bvsub", [end, new SMTVar(l1vs)])]) }
+                ],
+                    //concat(slice(lv1, start, lv1.size), slice(lv2, 0, end - lv1.size)) 
+                    new SMTCallSimple(this.generateConsCallName_Direct(ltype, "concat2"), [
+                        this.generateSafePropConsCall(mtype, new SMTCallSimple("bvsub", [new SMTVar(l1vs), start]), this.generateConsCallName(ltype, "slice"), [new SMTVar(l1v), start, new SMTVar(l1vs)]),
+                        this.generateSafePropConsCall(mtype, new SMTCallSimple("bvsub", [end, new SMTVar(l1vs)]), this.generateConsCallName(ltype, "slice"), [new SMTVar(l2v), new SMTConst("BNat@zero"), new SMTCallSimple("bvsub", [end, new SMTVar(l1vs)])])
+                    ])
+                )
+            )
+        );
+    }
+
+    emitConstructorFilter(ltype: SMTType, mtype: MIRType, sl: SMTExp, code: string, pc: MIRPCode, issafe: boolean): SMTConstructorGenCode {
+        const ll = this.generateTempName();
+        const llsize = this.generateTempName();
+        const llv = new SMTVar(ll);
+        const llvsize = new SMTVar(llsize);
+
+        const isq = this.generateTempName();
+        const isqv = new SMTVar(isq);
+
         //if(count == 0) => empty
-        const emptyaction = { test: new SMTCallSimple("=", [count, new SMTConst("BNat@zero")]), result: new SMTCallSimple(this.generateConsCallName_Direct(ltype, "empty"), []) };
+        const emptytest = new SMTCallSimple("=", [llvsize, new SMTConst("BNat@zero")]);
 
-        const checksafe = xxxx;
+        const checksafe = new SMTCallSimple("not", [new SMTCallSimple(this.generateDesCallNameUsing(ltype, "safeapply", this.temitter.mangle(code)), [llv, llvsize])]);
 
-        const rtype = this.temitter.getSMTTypeFor(ctype);
+        const haspred = new SMTCallSimple("=", [new SMTCallGeneral(this.generateDesCallNameUsing(ltype, "haspred", this.temitter.mangle(code)), [llv]), this.temitter.generateResultTypeConstructorSuccess(this.temitter.getMIRType("NSCore::Bool"), new SMTConst("true"))]);
+
+        const emptyresult = new SMTCallSimple(this.generateConsCallName_Direct(ltype, "empty"), []);
 
         let tsops: {test: SMTExp, result: SMTExp }[] = [];
 
-        //if(is-type concat2) => get base list and use new start/end
+        //
+        //Filter on literals seems hard (like forcing a bunch of enumeration -- so leaving alone for now)
+        //
 
-        //if(is-type fill) => get base list and use new start/end
-    
-        //if(!hasPred) => empty
+        //if(is-type fill) => check fill value -- return empty or identity
+        tsops.push({ test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "fill")}`, [llv]), result: new SMTIf(this.generateLambdaCallKnownSafe(pc, this.temitter.getMIRType("NSCore::Bool"), issafe, [this.generateGetULIFieldFor(ltype, "fill", "v", llv)]), llv, emptyresult) });
+
+        //if(is-type concat2) => return concat of filter(l1), filter(l2)
+        tsops.push({ test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "fill")}`, [llv]), result: this.emitConstructorFilter_Concat(mtype, ltype, llv, code, pc, issafe) });
 
         //default construct
-        const ffunc = new SMTIf(emptyaction.test, emptyaction.result,
-            new SMTCallSimple(this.generateConsCallName_Direct(ltype, opname), [start, end])
+        const ffunc = new SMTLetMulti([{ vname: ll, value: this.generateListContentsCall(sl, ltype) }, { vname: llsize, value: this.generateListSizeCall(sl, ltype) }],
+            new SMTIf(emptytest, emptyresult,
+                new SMTIf(checksafe, this.temitter.generateErrorResultAssert(mtype),
+                    new SMTIf(haspred, emptyresult,
+                        new SMTCond(
+                            tsops,
+                            new SMTLet(isq, new SMTCallGeneral(this.generateConsCallNameUsing(ltype, "isequence", code), [llv, llvsize]),
+                                new SMTIf(new SMTCallSimple("is-ISequence@Result_error", [isqv]),
+                                    this.temitter.generateErrorResultAssert(mtype),
+                                    new SMTCallSimple(this.generateConsCallNameUsing_Direct(ltype, "filter", code), [new SMTCallSimple("ISequence@size", [isqv]), isqv])
+                                )
+                            )
+                        )
+                    )
+                )
+            )
         );
 
         return {
-            cons: { cname: this.generateConsCallName_Direct(ltype, opname), cargs: [{ fname: this.generateULIFieldFor(ltype, opname, "start"), ftype: rtype }, { fname: this.generateULIFieldFor(ltype, opname, "end"), ftype: rtype }] },
+            cons: { cname: this.generateConsCallNameUsing_Direct(ltype, "filter", code), cargs: [{ fname: this.generateULIFieldUsingFor(ltype, "filter", code, "l"), ftype: ltype }] },
             ulitype: this.generateULITypeFor(ltype),
-            if: [new SMTFunction(this.generateConsCallName(ltype, opname), [{ vname: "start", vtype: rtype }, { vname: "end", vtype: rtype }, { vname: "count", vtype: this.nattype }], undefined, 0, ltype, ffunc)],
+            if: [new SMTFunction(this.generateConsCallNameUsing(ltype, "filter", code), [{ vname: "l", vtype: ltype }, { vname: "count", vtype: this.nattype }], undefined, 0, ltype, ffunc)],
             uf: []
         };
     }
@@ -581,6 +663,18 @@ class ListOpsManager {
             new SMTCallSimple("bvule", [lower, new SMTVar(nidx)]),
             new SMTCallSimple("bvult", [new SMTVar(nidx), upper])
         ]);
+    }
+
+    generateLambdaCallKnownSafe(pc: MIRPCode, rtype: MIRType, issafe: boolean, args: SMTExp[]): SMTExp {
+        const cargs = pc.cargs.map((ca) => new SMTVar(this.temitter.mangle(ca)));
+        const call = new SMTCallGeneral(this.temitter.mangle(pc.code), [...args, ...cargs]);
+
+        if(issafe) {
+            return call;
+        }
+        else {
+            return this.temitter.generateResultGetSuccess(rtype, call);
+        }
     }
 }
 
