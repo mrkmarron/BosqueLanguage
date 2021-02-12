@@ -399,22 +399,57 @@ class ListOpsManager {
         //if(is-type slice) => get base list and use new start/end
         tsops.push({
             test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "slice")}`, [llv]), 
-            result: this.emitConstructorSlice_Slice(ltype, llv, start, end)
+            result: this.emitConstructorSlice_Slice(mtype, ltype, lcons, count, llv, start, end)
         });
 
         //if(is-type concat) => check exclude l1 or l2 otherwise concat(slice(l1), slice(l2))
-        tsops.push({test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "concat2")}`, [llv]), result: this.emitConstructorSlice_Concat(mtype, ltype, llv, start, end)});
+        tsops.push({
+            test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "concat2")}`, [llv]), 
+            result: this.emitConstructorSlice_Concat(mtype, ltype, lcons, count, llv, start, end)
+        });
         
         //if(is-type fill) => fill with new index
-        tsops.push({ test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "fill")}`, [llv]), result: new SMTCallSimple(this.generateConsCallName_Direct(ltype, "fill"), [count, this.generateGetULIFieldFor(ltype, "fill", "v", llv)]) });
+        tsops.push({ 
+            test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "fill")}`, [llv]), 
+            result: this.temitter.generateResultTypeConstructorSuccess(mtype, 
+                new SMTCallSimple(lcons, [
+                    count,
+                    new SMTCallSimple(this.generateConsCallName_Direct(ltype, "fill"), [
+                        this.generateGetULIFieldFor(ltype, "fill", "v", llv)
+                    ])
+                ])
+            )
+        });
 
         //if(is-natrange) => range with new bounds
         if (this.rangenat && ctype.trkey === "NSCore::Nat") {
-            tsops.push({ test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "rangeOfNat")}`, [llv]), result: new SMTCallSimple(this.generateConsCallName_Direct(ltype, "rangeOfNat"), [new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfNat", "start", llv), start]), new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfNat", "start", llv), end]), count]) });
+            tsops.push({ 
+                test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "rangeOfNat")}`, [llv]), 
+                result: this.temitter.generateResultTypeConstructorSuccess(mtype, 
+                    new SMTCallSimple(lcons, [
+                        count,
+                        new SMTCallSimple(this.generateConsCallName_Direct(ltype, "rangeOfNat"), [
+                            new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfNat", "start", llv), start]),
+                            new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfNat", "start", llv), end])
+                        ])
+                    ])
+                ) 
+            });
         }
         //if(is-intrange) => range with new bounds
         if (this.rangeint && ctype.trkey === "NSCore::Int") {
-            tsops.push({ test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "rangeOfInt")}`, [llv]), result: new SMTCallSimple(this.generateConsCallName_Direct(ltype, "rangeOfNat"), [new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfInt", "start", llv), start]), new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfInt", "start", llv), end]), count]) });
+            tsops.push({ 
+                test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "rangeOfInt")}`, [llv]), 
+                result: this.temitter.generateResultTypeConstructorSuccess(mtype, 
+                    new SMTCallSimple(lcons, [
+                        count,
+                        new SMTCallSimple(this.generateConsCallName_Direct(ltype, "rangeOfInt"), [
+                            new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfInt", "start", llv), start]), 
+                            new SMTCallSimple("bvadd", [this.generateGetULIFieldFor(ltype, "rangeOfInt", "start", llv), end])
+                        ])
+                    ])
+                ) 
+            });
         }
 
         //default construct
@@ -423,7 +458,12 @@ class ListOpsManager {
                 new SMTIf(sameaction.test, sameaction.result,
                     new SMTCond(
                         tsops,
-                        new SMTCallSimple(this.generateConsCallName_Direct(ltype, "slice"), [sl, start, end])
+                        this.temitter.generateResultTypeConstructorSuccess(mtype, 
+                            new SMTCallSimple(lcons, [
+                                count,
+                                new SMTCallSimple(this.generateConsCallName_Direct(ltype, "slice"), [sl, start, end])
+                            ])
+                        )
                     )
                 )
             )
@@ -446,7 +486,11 @@ class ListOpsManager {
         const ll2v = new SMTVar(ll2name);
         
         //if(count == 0) => empty
-        const emptyaction = { test: new SMTCallSimple("=", [count, new SMTConst("BNat@zero")]), result: new SMTCallSimple(this.generateConsCallName_Direct(ltype, "empty"), []) };
+        const emptyaction = { 
+            test: new SMTCallSimple("=", [count, new SMTConst("BNat@zero")]), 
+            result: xxxx new SMTCallSimple(this.generateConsCallName_Direct(ltype, "empty"), []) 
+        };
+        
         //if(l1.size == 0) => l2
         const l1emptyaction = { test: new SMTCallSimple("=", [this.generateListSizeCall(l1, ltype)]), result: ll2v };
         //if(l2.size == 0) => l1
