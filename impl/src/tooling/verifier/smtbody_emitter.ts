@@ -2427,7 +2427,9 @@ class SMTBodyEmitter {
                 return undefined;
             }
             case "list_filter_helper": {
-                const fbody = this.lopsManager.processFilter(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const code = this.typegen.mangle(pcode.code);
+                const fbody = this.lopsManager.processFilter(this.typegen.getMIRType(encltypekey), code, pcode, new SMTVar(args[0].vname));
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_filter_helper_idx": {
@@ -2448,7 +2450,9 @@ class SMTBodyEmitter {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_map_helper": {
-                const fbody = this.lopsManager.processmap(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("f") as MIRPCode).code), new SMTVar(args[0].vname), new SMTVar(args[1].vname));
+                const pcode = idecl.pcodes.get("f") as MIRPCode;
+                const code = this.typegen.mangle(pcode.code);
+                const fbody = this.lopsManager.processMap(this.typegen.getMIRType(encltypekey), code, pcode, new SMTVar(args[0].vname));
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_map_helper_idx": {

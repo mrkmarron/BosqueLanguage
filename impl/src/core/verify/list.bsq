@@ -7,7 +7,7 @@
 namespace NSCore;
 
 __internal struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T>, PODType when T PODType, APIType when T APIType {
-    __assume_safe private function s_unsafe_get(l: Vector<T, K>, i: Nat): T # vector_unsafe_get
+    private function s_unsafe_get(l: Vector<T, K>, i: Nat): T # vector_unsafe_get
 
     method size(): Nat {
         return literal(K);
@@ -37,12 +37,12 @@ __internal struct entity Vector<T, literal K=Nat> provides Object, Expandoable<T
 }
 
 concept ListFrom provides Object {
-    private function s_rangeOfInt(start: Int, end: Int): List<Int> # list_rangeofint
-    private function s_rangeOfNat(start: Nat, end: Nat): List<Nat> # list_rangeofnat
+    __assume_safe private function s_rangeOfInt(start: Int, end: Int): List<Int> # list_rangeofint
+    __assume_safe private function s_rangeOfNat(start: Nat, end: Nat): List<Nat> # list_rangeofnat
 
-    private function s_zip<T, U>(l1: List<T>, l2: List<U>, size: Nat): List<#[T, U]> # list_zip
-    private function s_unzipt<T, U>(l: List<#[T, U]>, size: Nat): List<T> # list_unzipt
-    private function s_unzipu<T, U>(l: List<#[T, U]>, size: Nat): List<U> # list_unzipu
+    __assume_safe private function s_zip<T, U>(l1: List<T>, l2: List<U>, size: Nat): List<#[T, U]> # list_zip
+    __assume_safe private function s_unzipt<T, U>(l: List<#[T, U]>, size: Nat): List<T> # list_unzipt
+    __assume_safe private function s_unzipu<T, U>(l: List<#[T, U]>, size: Nat): List<U> # list_unzipu
 
     function ints(start: Int, end: Int): List<Int>
         requires release start <= end;
@@ -72,13 +72,13 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool): Bool # list_haspredcheck
     private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Bool # list_haspredcheck_idx
     
-    private function s_size(l: List<T>): Nat # list_size
-    private function s_empty(l: List<T>): Bool # list_empty
+    __safe private function s_size(l: List<T>): Nat # list_size
+    __safe private function s_empty(l: List<T>): Bool # list_empty
     private function s_unsafe_get(l: List<T>, i: Nat): T # list_unsafe_get
 
-    private function s_fill<T>(k: Int, val: T): List<T> # list_fill
+    __safe private function s_fill<T>(k: Nat, val: T): List<T> # list_fill
 
-    private function s_concat2_Helper(l1: List<T>, l2: List<T>, size: Nat): List<T> # list_concat2
+    __safe private function s_concat2_Helper(l1: List<T>, l2: List<T>, size: Nat): List<T> # list_concat2
 
     private function {when T grounded KeyType} s_findIndexOf_KeyHelper(l: List<T>, val: T): Nat # list_findindexof_keyhelper
     private function {when T grounded KeyType} s_findIndexOfLast_KeyHelper(l: List<T>, val: T): Nat # list_findindexoflast_keyhelper
@@ -99,7 +99,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private function s_filterToType_Helper<U>(l: List<T>): List<U> # list_filtertotype_helper
     private function s_castToType_Helper<U>(l: List<T>): List<U> # list_casttotype_helper
 
-    private function s_slice_Helper(l: List<T>, start: Nat, end: Nat, count: Nat): List<U> # list_slice_helper
+    __safe private function s_slice_Helper(l: List<T>, start: Nat, end: Nat, count: Nat): List<U> # list_slice_helper
 
     private recursive? function s_map_Helper<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<T> # list_map_helper
     private recursive? function s_map_Helper_Idx<U>(l: List<T>, f: recursive? fn(_: T, _: Nat) -> U): List<T> # list_map_helper_idx
