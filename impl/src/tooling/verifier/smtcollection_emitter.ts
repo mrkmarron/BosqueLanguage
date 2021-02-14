@@ -10,7 +10,6 @@ import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
 import { SMTCallGeneral, SMTCallSimple, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTType, SMTVar, VerifierOptions } from "./smt_exp";
 
 class RequiredListConstructors {
-    //always error
     //always empty
     //always slice
     //always concat2
@@ -760,9 +759,35 @@ class ListOpsManager {
         };
     }
 
+    ////////
+    //Get
+    emitDestructorGet(ltype: SMTType, mtype: MIRType, ctype: MIRType, sl: SMTVar, consopts: RequiredListConstructors): SMTDestructorGenCode {
+        const ll = this.generateTempName();
+        const llv = new SMTVar(ll);
+        let tsops: { test: SMTExp, result: SMTExp }[] = [];
+
+        //always slice
+        tsops.push({
+            test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "concat2")}`, [llv]),
+            value: xxx
+        })
+
+        //always concat2
+        tsops.push();
+
+        havoc: boolean = false;
+
+        fill: boolean = false;
+        literalk: Set < number > = new Set<number>();
+        filter: Map < string, MIRPCode > = new Map<string, MIRPCode>();
+        map: Map < string, MIRPCode > = new Map<string, MIRPCode>();
+
+
+    }
+
     //always get
 
-    safeapply: Set<string> = new Set<string>();
+    errorapply: Set<string> = new Set<string>();
     isequence: Set<string> = new Set<string>();
 
     haspredcheck: Set<string> = new Set<string>();
