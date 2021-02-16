@@ -7,7 +7,7 @@ import { MIREntityTypeDecl, MIRPCode, MIRType } from "../../compiler/mir_assembl
 import { MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTFunction, SMTFunctionUninterpreted } from "./smt_assembly";
-import { SMTCallGeneral, SMTCallSimple, SMTCond, SMTConst, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTType, SMTVar, VerifierOptions } from "./smt_exp";
+import { SMTCallGeneral, SMTCallSimple, SMTCond, SMTConst, SMTExists, SMTExp, SMTIf, SMTLet, SMTLetMulti, SMTType, SMTVar, VerifierOptions } from "./smt_exp";
 
 class RequiredListConstructors {
     //always empty
@@ -32,7 +32,7 @@ type SMTConstructorGenCode = {
 class RequiredListDestructors {
     //always get
 
-    errorapply: Map<string, MIRPCode> = new Map<string, MIRPCode>();
+    errorapply: Map<string, [MIRPCode, MIRType]> = new Map<string, [MIRPCode, MIRType]>();
     isequence: Map<string, MIRPCode> = new Map<string, MIRPCode>();
 
     haspredcheck: Map<string, MIRPCode> = new Map<string, MIRPCode>();
@@ -162,6 +162,8 @@ class ListOpsManager {
 
         xxxx;
         ops.dops.findIndexOf.add(op);
+        ops.dops.errorapply.set(code, [pc, ltype]);
+        ops.dops.haspredcheck.set();
         return new SMTCallGeneral(op, [l]);
     }
 
@@ -171,6 +173,8 @@ class ListOpsManager {
 
         xxxx;
         ops.dops.findLastIndexOf.add(op);
+        ops.dops.errorapply.set(code, [pc, ltype]);
+        ops.dops.haspredcheck.set();
         return new SMTCallGeneral(op, [l]);
     }
 
@@ -180,6 +184,9 @@ class ListOpsManager {
 
         xxxx;
         ops.dops.countIf.add(op);
+        ops.dops.errorapply.set(code, [pc, ltype]);
+        ops.dops.haspredcheck.set(code, pc);
+        ops.dops.isequence.set(code, pc);
         return new SMTCallGeneral(op, [l]);
     }
 
@@ -187,7 +194,7 @@ class ListOpsManager {
         const ops = this.ensureOpsFor(ltype);
 
         ops.consops.filter.set(code, pc);
-        ops.dops.errorapply.set(code, pc);
+        ops.dops.errorapply.set(code, [pc, ltype]);
         ops.dops.haspredcheck.set(code, pc);
         ops.dops.isequence.set(code, pc);
         return new SMTCallGeneral(this.generateConsCallNameUsing(this.temitter.getSMTTypeFor(ltype), "filter", code), [l]);
@@ -202,7 +209,7 @@ class ListOpsManager {
         const ops = this.ensureOpsFor(ltype);
 
         ops.consops.map.set(code, pc);
-        ops.dops.errorapply.set(code, pc);
+        ops.dops.errorapply.set(code, [pc, ltype]);
         return new SMTCallGeneral(this.generateConsCallNameUsing(this.temitter.getSMTTypeFor(ltype), "map", code), [l]);
     }
 
@@ -639,7 +646,7 @@ class ListOpsManager {
             )
         );
 
-        const generror = new SMTCallSimple(this.generateDesCallNameUsing(ltype, "errorapply", this.temitter.mangle(code)), [sl]);
+        const generror = new SMTCallSimple(this.generateDesCallNameUsing(ltype, "errorapply_internal", this.temitter.mangle(code)), [sl]);
         const checkedop = issafe
             ? safeapplyop
             : new SMTLet(llerr, generror,
@@ -728,7 +735,7 @@ class ListOpsManager {
             ])
         );
 
-        const generror = new SMTCallSimple(this.generateDesCallNameUsing(ltype, "errorapply", this.temitter.mangle(code)), [sl]);
+        const generror = new SMTCallSimple(this.generateDesCallNameUsing(ltype, "errorapply_internal", this.temitter.mangle(code)), [sl]);
         const checkedop = issafe
             ? safeapplyop
             : new SMTLet(llerr, generror,
@@ -884,8 +891,8 @@ class ListOpsManager {
             })
         });
 
-        const ffunc = new SMTLetMulti([{ vname: ll, value: this.generateListContentsCall(sl, ltype) }, { vname: llsize, value: this.generateListSizeCall(sl, ltype) }],
-            new SMTCond(emptytest, emptyresult, checkedop)
+        const ffunc = new SMTLetMulti([{ vname: ll, value: this.generateListContentsCall(sl, ltype) }],
+            new SMTCond(tsops, this.temitter.generateErrorResultAssert(ctype))
         );
 
         return {
@@ -895,12 +902,109 @@ class ListOpsManager {
     }
 
     ////////
-    //Error Apply
+    //ErrorApply
+    emitDestructorErrorApply_K(ltype: SMTType, ctype: MIRType, ll: SMTVar, n: SMTVar, k: number): SMTExp {
+        if (k === 1) {
+            return this.temitter.generateResultGetSuccess(ctype, this.generateGetULIFieldFor(ltype, `_${k}`, `idx${0}`, ll));
+        }
+        else {
+            let kops: { test: SMTExp, result: SMTExp }[] = [];
 
-    errorapply: Set<string> = new Set<string>();
-    isequence: Set<string> = new Set<string>();
+            for (let i = 0; i < k - 1; ++i) {
+                kops.push({
+                    test: new SMTCallSimple("=", [n, new SMTConst(`${i}`)]),
+                    result: this.temitter.generateResultGetSuccess(ctype, this.generateGetULIFieldFor(ltype, `_${k}`, `idx${i}`, ll))
+                });
+            }
+            
+            const klast = this.temitter.generateResultGetSuccess(ctype, this.generateGetULIFieldFor(ltype, `_${k}`, `idx${k - 1}`, ll))
+            return new SMTCond(
+                kops,
+                klast
+            );
+        }
+    }
 
-    haspredcheck: Set<string> = new Set<string>();
+    emitDestructorErrorApply(ltype: SMTType, mtype: MIRType, ctype: MIRType, sl: SMTVar, code: string, pcode: MIRPCode, ispcsafe: boolean, restype: MIRType, consopts: RequiredListConstructors): SMTDestructorGenCode {
+        const errop = this.generateDesCallNameUsing(ltype, "errorapply_internal", code);
+
+        const ll = this.generateTempName();
+        const llv = new SMTVar(ll);
+        const llsize = this.generateTempName();
+        const llsizev = new SMTVar(llsize);
+
+        let tsops: { test: SMTExp, result: SMTExp }[] = [];
+
+        if(consopts.fill) {
+            xxx;
+            tsops.push({
+                test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "fill")}`, [llv]),
+                result: this.temitter.generateResultGetSuccess(ctype, this.generateGetULIFieldFor(ltype, "fill", "v", llv))
+            });
+        }
+
+        consopts.literalk.forEach((k) => {
+            if (k !== 0) {
+                tsops.push({
+                    test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, `_${k}`)}`, [llv]),
+                    result: this.emitDestructorErrorApply_K(ltype, ctype, llv, n, k)
+                })
+            }
+        });
+        
+        const ten = this.generateTempName();
+        const tenv = new SMTVar(ten);
+        const gen = this.generateTempName();
+        const genv = new SMTVar(gen);
+
+        const tecase = new SMTExists([{vname: ten, vtype: this.nattype}],
+            new SMTCallSimple("and", [
+                new SMTCallSimple("bvult", [tenv, llsizev]),
+                new SMTCallSimple("=", [this.generateLambdaCallGeneral(pcode, restype, [xxx get]), this.temitter.generateResultTypeConstructorError(restype, new SMTConst("ErrorID_Target"))])
+            ])
+        );
+
+        const gecase = new SMTExists([{vname: gen, vtype: this.nattype}],
+            new SMTCallSimple("and", [
+                new SMTCallSimple("bvult", [genv, llsizev]),
+                new SMTCallSimple("=", [this.generateLambdaCallGeneral(pcode, restype, [xxx get]), this.temitter.generateErrorResultAssert(restype)])
+            ])
+        );
+
+        const ffunc = new SMTLetMulti([{ vname: ll, value: this.generateListContentsCall(sl, ltype) }],
+            new SMTCond(tsops, this.temitter.generateErrorResultAssert(ctype))
+        );
+
+        return {
+            if: [new SMTFunction(this.generateConsCallName(ltype, "get"), [{ vname: "l", vtype: ltype }, { vname: "n", vtype: this.nattype}], undefined, 0, this.temitter.generateResultType(ctype), ffunc)],
+            uf: []
+        };
+    }
+
+    ////////
+    //ISequence
+    emitDestructorISequence(ltype: SMTType, mtype: MIRType, ctype: MIRType, sl: SMTVar, n: SMTVar, consopts: RequiredListConstructors): SMTDestructorGenCode {
+        const getop = this.generateDesCallName(ltype, "errorapply_internal");
+
+        const ll = this.generateTempName();
+        const llv = new SMTVar(ll);
+        let tsops: { test: SMTExp, result: SMTExp }[] = [];
+
+        xxxx;
+    }
+
+    ////////
+    //HasPredCheck
+    emitDestructorHasPredCheck(ltype: SMTType, mtype: MIRType, ctype: MIRType, sl: SMTVar, n: SMTVar, consopts: RequiredListConstructors): SMTDestructorGenCode {
+        const getop = this.generateDesCallName(ltype, "errorapply_internal");
+
+        const ll = this.generateTempName();
+        const llv = new SMTVar(ll);
+        let tsops: { test: SMTExp, result: SMTExp }[] = [];
+
+        xxxx;
+    }
+
     findIndexOf: Set<string> = new Set<string>();
     findLastIndexOf: Set<string> = new Set<string>();
     countIf: Set<string> = new Set<string>();
@@ -922,18 +1026,6 @@ class ListOpsManager {
         return new SMTCallSimple(`${llcons.cons}`, [count, new SMTCallGeneral(ullcons, args)]);
     }
 
-    generateListBoundsCheckCallUpper(nidx: string, upper: SMTExp): SMTExp {
-        //lower bound is assumed to be 0
-        return new SMTCallSimple("bvult", [new SMTVar(nidx), upper]);
-    }
-
-    generateListBoundsCheckCallBoth(nidx: string, lower: SMTExp, upper: SMTExp): SMTExp {
-        return new SMTCallSimple("and", [
-            new SMTCallSimple("bvule", [lower, new SMTVar(nidx)]),
-            new SMTCallSimple("bvult", [new SMTVar(nidx), upper])
-        ]);
-    }
-
     generateLambdaCallKnownSafe(pc: MIRPCode, rtype: MIRType, issafe: boolean, args: SMTExp[]): SMTExp {
         const cargs = pc.cargs.map((ca) => new SMTVar(this.temitter.mangle(ca)));
         const call = new SMTCallGeneral(this.temitter.mangle(pc.code), [...args, ...cargs]);
@@ -944,6 +1036,11 @@ class ListOpsManager {
         else {
             return this.temitter.generateResultGetSuccess(rtype, call);
         }
+    }
+
+    generateLambdaCallGeneral(pc: MIRPCode, rtype: MIRType, args: SMTExp[]): SMTExp {
+        const cargs = pc.cargs.map((ca) => new SMTVar(this.temitter.mangle(ca)));
+        return new SMTCallGeneral(this.temitter.mangle(pc.code), [...args, ...cargs]);
     }
 }
 

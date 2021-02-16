@@ -251,7 +251,6 @@
     ;;EPHEMERAL_CONSTRUCTORS;;
 ))
 
-;;As a lattice where ErrorID_AssumeCheck <: ErrorID_Target (e.g. 0x1 and 0x3)
 (declare-datatypes () (
   (ErrorID
     ErrorID_AssumeCheck
