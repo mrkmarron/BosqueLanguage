@@ -2444,7 +2444,7 @@ class SMTBodyEmitter {
                 assert(false, "[NOT IMPLEMENTED -- list_casttotype_helper]");
                 return undefined;
             }
-            case "list_slice_helper": {
+            case "list_slice_constructor": {
                 const [l1, start, end, count] = args.map((arg) => new SMTVar(arg.vname));
                 const fbody = this.lopsManager.processSlice(mirrestype, l1, start, end, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);

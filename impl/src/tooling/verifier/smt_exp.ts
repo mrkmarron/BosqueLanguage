@@ -8,7 +8,10 @@ type VerifierOptions = {
     BigXMode: "BV" | "Int", //are bignums handled as Int or just large BV
     OverflowEnabled: boolean,
     FPOpt: "Real" | "UF",
-    StringOpt: "ASCII" | "UNICODE"
+    StringOpt: "ASCII" | "UNICODE",
+
+    SimpleQuantifierMode: boolean, //Set to true for a simplified version of Filter/Count that does not enforce subset/order properties but has simpler quantifiers
+    SpecializeSmallModelGen: boolean //Set to true if we want to generate special case enumerative "small" values to try and avoid quantifiers
 };
 
 class SMTMaskConstruct {
