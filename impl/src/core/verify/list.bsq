@@ -156,7 +156,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
             }
             else {
                 let isq = List<T>::s_computeISequence[recursive?](sl, p);
-                return List<T>::s_filter_Constructor[recursive?](sl, isq, ISequence::s_size(isq), p);
+                return List<T>::s_filter_Constructor[recursive?](sl, isq, p);
             }
         }
     }
