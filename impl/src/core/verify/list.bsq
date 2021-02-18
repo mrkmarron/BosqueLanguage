@@ -89,16 +89,51 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     //
 
     //Internal calls only -- assume non-empty
-    private recursive? function s_safeCheck(l: List<T>, p: recursive? pred(_: T) -> Bool): List<T> # list_safecheck
-    private recursive? function s_safeCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): List<T> # list_safecheck_idx
+    private recursive? function s_safeCheck_Core(l: List<T>, count: Nat, p: recursive? pred(_: T) -> Bool): List<T> # list_safecheck
+    private recursive? function s_safeCheck_Idx_Core(l: List<T>, count: Nat, p: recursive? pred(_: T, _: Nat) -> Bool): List<T> # list_safecheck_idx
+
+    private recursive? function s_safeCheck(l: List<T>, p: recursive? pred(_: T) -> Bool): List<T> {
+        //TODO: here special case for small model
+        return List<T>::s_safeCheck_Core(l, List<T>::s_size(l), p);
+    }
+
+    private recursive? function s_safeCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): List<T> {
+        //TODO: here special case for small model
+        return List<T>::s_safeCheck_Idx_Core(l, List<T>::s_size(l), p);
+    }
 
     //Internal calls only -- assume non-empty, safe, and exists at least one satisfying
     private recursive? function s_computeISequence(l: List<T>, p: recursive? pred(_: T) -> Bool): List<T> # list_computeisequence
     private recursive? function s_computeISequence_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): List<T> # list_computeisequence_idx
 
     private function {when T grounded KeyType} s_hasCheck(l: List<T>, val: T): Bool # list_hascheck
-    private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool): Bool # list_haspredcheck
-    private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Bool # list_haspredcheck_idx
+
+    private recursive? function s_hasPredCheck_Core(l: List<T>, count: Nat, p: recursive? pred(_: T) -> Bool): Bool # list_haspredcheck
+    private recursive? function s_hasPredCheck_Idx_Core(l: List<T>, count: Nat, p: recursive? pred(_: T, _: Nat) -> Bool): Bool # list_haspredcheck_idx
+
+    private recursive? function s_hasPredCheck(l: List<T>, p: recursive? pred(_: T) -> Bool): Bool {
+        if(List<T>::s_empty(l)) {
+            return false;
+        }
+        else {
+            let sl = List<T>::s_safeCheck[recursive?](l, p);
+        
+            //TODO: here special case for small model
+            return List<T>::s_hasPredCheck_Core(sl, List<T>::s_size(sl), p);
+        }
+    }
+
+    private recursive? function s_hasPredCheck_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Bool {
+        if(List<T>::s_empty(l)) {
+            return false;
+        }
+        else {
+            let sl = List<T>::s_safeCheck[recursive?](l, p);
+
+            //TODO: here special case for small model
+            return List<T>::s_hasPredCheck_Idx_Core(sl, List<T>::s_size(sl), p);
+        }
+    }
     
     __safe private function s_size(l: List<T>): Nat # list_size
     __safe private function s_empty(l: List<T>): Bool # list_empty
@@ -122,6 +157,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
             return l1;
         }
         else {
+            //TODO: here special case for small model
             return List<T>::s_concat2_Constructor(l1, l2, l1size + l2size);
         }
     }
@@ -136,10 +172,33 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private function {when T KeyType} s_count_KeyHelper(l: List<T>, v: T): Nat # list_count_helper
 
-    private recursive? function s_countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat # list_countif_helper
+    private recursive? function s_countIf_Core(l: List<T>, isq: ISequence, count: Nat, p: recursive? pred(_: T) -> Bool): Nat # list_countif_helper
+
+    private recursive? function s_countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat {
+        if(List<T>::s_empty(l)) {
+            return 0;
+        }
+        else {
+            let sl = List<T>::s_safeCheck[recursive?](l, p);
+            let count = List<T>::s_size(sl);
+
+            if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, p)) {
+                return 0;
+            }
+            else if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, pred !p)) {
+                return count;
+            }
+            else {
+                //TODO: here special case for small model
+                let isq = List<T>::s_computeISequence[recursive?](sl, p);
+                return List<T>::s_countIf_Core[recursive?](sl, isq, count, p);
+            }
+        }
+    }
+
     private recursive? function s_countIf_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Nat # list_countif_helper_idx
     
-    __safe private recursive? function s_filter_Constructor(l: List<T>, isq: ISequence, count: Nat, p: recursive? pred(_: T) -> Bool): List<T> # list_filter_constructor
+    private recursive? function s_filter_Constructor(l: List<T>, isq: ISequence, count: Nat, p: recursive? pred(_: T) -> Bool): List<T> # list_filter_constructor
 
     private recursive? function s_filter_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool): List<T> {
         if(List<T>::s_empty(l)) {
@@ -147,16 +206,18 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         }
         else {
             let sl = List<T>::s_safeCheck[recursive?](l, p);
+            let count = List<T>::s_size(sl);
 
-            if(!List<T>::s_hasCheck[recursive?](sl, p)) {
+            if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, p)) {
                 return List<T>@{};
             }
-            else if(!List<T>::s_hasCheck[recursive?](sl, pred !p)) {
+            else if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, pred !p)) {
                 return sl;
             }
             else {
+                //TODO: here special case for small model
                 let isq = List<T>::s_computeISequence[recursive?](sl, p);
-                return List<T>::s_filter_Constructor[recursive?](sl, isq, p);
+                return List<T>::s_filter_Constructor[recursive?](sl, isq, count, p);
             }
         }
     }
@@ -179,6 +240,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
                 return l;
             }
             else {
+                //TODO: here special case for small model
                 return List<T>::s_slice_Constructor(l, start, end, count);
             }    
         }
@@ -193,6 +255,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         else {
             let sl = List<T>::s_safeCheck[recursive?](l, f);
 
+            //TODO: here special case for small model
             return List<T>::s_map_Constructor[recursive?](sl, List<T>::s_size(sl) f);
         }
     }
