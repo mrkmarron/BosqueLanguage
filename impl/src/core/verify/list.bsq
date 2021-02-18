@@ -165,8 +165,46 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private function {when T grounded KeyType} s_findIndexOf_KeyHelper(l: List<T>, val: T): Nat # list_findindexof_keyhelper
     private function {when T grounded KeyType} s_findIndexOfLast_KeyHelper(l: List<T>, val: T): Nat # list_findindexoflast_keyhelper
 
-    private recursive? function s_findIndexOf_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat # list_findindexof_predicatehelper
-    private recursive? function s_findIndexOfLast_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat # list_findindexoflast_predicatehelper
+    private recursive? function s_findIndexOf_PredicateCore(l: List<T>, count: Nat, p: recursive? pred(_: T) -> Bool): Nat # list_findindexof_predicatehelper
+
+    private recursive? function s_findIndexOf_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat {
+        if(List<T>::s_empty(l)) {
+            return 0;
+        }
+        else {
+            let sl = List<T>::s_safeCheck[recursive?](l, p);
+            let count = List<T>::s_size(sl);
+
+            if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, p)) {
+                return count;
+            }
+            else {
+                //TODO: here special case for small model
+                return List<T>::s_findIndexOf_PredicateCore[recursive?](sl, count, p);
+            }
+        }
+    }
+
+    private recursive? function s_findIndexOfLast_PredicateHelper(l: List<T>, count: Nat, p: recursive? pred(_: T) -> Bool): Nat # list_findindexoflast_predicatehelper
+
+    private recursive? function s_findIndexOfLast_PredicateHelper(l: List<T>, count: Nat, p: recursive? pred(_: T) -> Bool): Nat {
+        if(List<T>::s_empty(l)) {
+            return 0;
+        }
+        else {
+            let sl = List<T>::s_safeCheck[recursive?](l, p);
+            let count = List<T>::s_size(sl);
+
+            if(!List<T>::s_hasPredCheck_Core[recursive?](sl, count, p)) {
+                return count;
+            }
+            else {
+                //TODO: here special case for small model
+                return List<T>::s_findIndexOfLast_PredicateCore[recursive?](sl, count, p);
+            }
+        }
+    }
+
     private recursive? function s_findIndexOf_PredicateHelper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Nat # list_findindexof_predicatehelper_idx
     private recursive? function s_findIndexOfLast_PredicateHelper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Nat # list_findindexoflast_predicatehelper_idx
 

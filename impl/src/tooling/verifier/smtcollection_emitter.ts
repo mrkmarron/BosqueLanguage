@@ -613,10 +613,7 @@ class ListOpsManager {
                             new SMTLet("@nn", this.generateListIndexPickCall_Kth(this.generateConsCallNameUsing(ltype, "skolem_list_index", code), new SMTVar("@olist"), n, capturedfieldlets.map((cfl) => new SMTVar(cfl.vname))),
                                 new SMTIf(new SMTCallSimple("bvult", [new SMTVar("@nn"), new SMTVar("@osize")]),
                                     new SMTLet("@getnn", new SMTCallGeneral(getop, [new SMTVar("@olist"), new SMTVar("@nn")]),
-                                        new SMTIf(new SMTCallSimple("and", [
-                                            this.temitter.generateResultIsSuccessTest(ctype, new SMTVar("@getnn")),
-                                            this.generateLambdaCallKnownSafe(code, this.temitter.getMIRType("NSCore::Bool"), [this.temitter.generateResultGetSuccess(ctype, new SMTVar("@getnn"))], capturedfieldlets.map((cfl) => new SMTVar(cfl.vname))),
-                                        ]),
+                                        new SMTIf(this.generateLambdaCallKnownSafe(code, this.temitter.getMIRType("NSCore::Bool"), [this.temitter.generateResultGetSuccess(ctype, new SMTVar("@getnn"))], capturedfieldlets.map((cfl) => new SMTVar(cfl.vname))),
                                             new SMTVar("@getnn"),
                                             this.temitter.generateErrorResultAssert(ctype)
                                         )
@@ -748,24 +745,35 @@ class ListOpsManager {
     ////////
     //SafeCheck
     emitSafeCheck(ltype: SMTType, mtype: MIRType, ctype: MIRType, restype: MIRType, sl: SMTVar, count: SMTVar, code: string, pcode: MIRPCode): SMTDestructorGenCode {
-        if(this.safecalls.has(code)) {
+        const getop = this.generateDesCallName(ltype, "get");
+        const getcall = new SMTCallGeneral(getop, [sl, new SMTVar("@n")]);
+
+        const lambdainfo = this.temitter.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl;
+        const capturedargs = lambdainfo.params.slice(1).map((p) => new SMTVar(p.name));
+
+        const eecase = new SMTExists([{ vname: "@n", vtype: this.nattype }],
+            new SMTCallSimple("and", [
+                new SMTCallSimple("bvult", [new SMTVar("@n"), count]),
+                this.temitter.generateResultIsErrorTest(ctype, getcall)
+            ])
+        );
+
+        if (this.safecalls.has(code)) {
+            const ffunc = new SMTIf(
+                eecase,
+                this.temitter.generateErrorResultAssert(mtype),
+                this.temitter.generateResultTypeConstructorSuccess(mtype, sl)
+            );
+
             return {
-                if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "safeCheck", code), [{ vname: "l", vtype: ltype }, { vname: "count", vtype: this.nattype}], undefined, 0, this.temitter.generateResultType(mtype), sl)],
+                if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "safeCheck", code), [{ vname: "l", vtype: ltype }, { vname: "count", vtype: this.nattype}], undefined, 0, this.temitter.generateResultType(mtype), ffunc)],
                 uf: []
             };
         }
         else {
-            const getop = this.generateDesCallName(ltype, "get");
-            const getcall = new SMTCallGeneral(getop, [sl, new SMTVar("@n")]);
-            const getsafe = this.temitter.generateResultIsSuccessTest(ctype, getcall);
-
-            const lambdainfo = this.temitter.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl;
-            const capturedargs = lambdainfo.params.slice(1).map((p) => new SMTVar(p.name));
-
             const tecase = new SMTExists([{ vname: "@n", vtype: this.nattype }],
                 new SMTCallSimple("and", [
                     new SMTCallSimple("bvult", [new SMTVar("@n"), count]),
-                    getsafe,
                     new SMTCallSimple("=", [
                         this.generateLambdaCallGeneral(code, restype, [this.temitter.generateResultGetSuccess(ctype, getcall)], capturedargs), 
                         this.temitter.generateResultTypeConstructorError(restype, new SMTConst("ErrorID_Target"))
@@ -776,7 +784,6 @@ class ListOpsManager {
             const gecase = new SMTExists([{ vname: "@n", vtype: this.nattype }],
                 new SMTCallSimple("and", [
                     new SMTCallSimple("bvult", [new SMTVar("@n"), count]),
-                    getsafe,
                     new SMTCallSimple("=", [
                         this.generateLambdaCallGeneral(code, restype, [this.temitter.generateResultGetSuccess(ctype, getcall)], capturedargs), 
                         this.temitter.generateErrorResultAssert(restype)
@@ -785,6 +792,7 @@ class ListOpsManager {
             );
 
             const ffunc = new SMTCond([
+                { test: eecase, result: this.temitter.generateErrorResultAssert(mtype) },
                 { test: tecase, result: this.temitter.generateResultTypeConstructorError(mtype, new SMTConst("ErrorID_Target")) },
                 { test: gecase, result: this.temitter.generateErrorResultAssert(mtype) }
             ],
@@ -815,7 +823,6 @@ class ListOpsManager {
     emitDestructorHasPredCheck(ltype: SMTType, ctype: MIRType, sl: SMTVar, count: SMTVar, code: string, pcode: MIRPCode): SMTDestructorGenCode {
         const getop = this.generateDesCallName(ltype, "get");
         const getcall = new SMTCallGeneral(getop, [sl, new SMTVar("@n")]);
-        const getsafe = this.temitter.generateResultIsSuccessTest(ctype, getcall);
 
         const lambdainfo = this.temitter.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl;
         const capturedargs = lambdainfo.params.slice(1).map((p) => new SMTVar(p.name));
@@ -824,7 +831,6 @@ class ListOpsManager {
             new SMTExists([{ vname: "@n", vtype: this.nattype }],
                 new SMTCallSimple("and", [
                     new SMTCallSimple("bvult", [new SMTVar("@n"), count]),
-                    getsafe,
                     this.generateLambdaCallKnownSafe(code, this.temitter.getMIRType("NSCore::Bool"), [this.temitter.generateResultGetSuccess(ctype, getcall)], capturedargs)
                 ])
             )
@@ -838,7 +844,36 @@ class ListOpsManager {
 
     ////////
     //FindIndexOf
-    findIndexOf: Set<string> = new Set<string>();
+    emitDestructorFindIndexOf(ltype: SMTType, ctype: MIRType, code: string, pcode: MIRPCode, sl: SMTVar, osize: SMTVar): SMTDestructorGenCode {
+        const [nn, suf] = this.emitDestructorFindIndexOf_Shared(ltype, ctype, code, pcode, sl, osize, new SMTConst("BNat@zero"));
+
+        let ffunc: SMTExp = new SMTConst("[UNDEFINED]");
+        if (this.vopts.SimpleQuantifierMode) {
+            ffunc = nn
+        }
+        else {
+            const getop = this.generateDesCallName(ltype, "get");
+
+            const lambdainfo = this.temitter.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl;
+            const capturedargs = lambdainfo.params.slice(1).map((p) => new SMTVar(p.name));
+
+            ffunc = new SMTIf(
+                new SMTForAll([{ vname: "@j", vtype: this.nattype }],
+                    new SMTCallSimple("=>", [
+                        new SMTCallSimple("bvult", [new SMTVar("@j"), this.temitter.generateResultGetSuccess(this.temitter.getMIRType("NSCore::Nat"), nn)]),
+                        this.generateLambdaCallKnownSafe(code, this.temitter.getMIRType("NSCore::Bool"), [this.temitter.generateResultGetSuccess(ctype, new SMTCallGeneral(getop, [sl, new SMTVar("@j")]))], capturedargs)
+                    ])
+                ),
+                nn,
+                this.temitter.generateErrorResultAssert(this.temitter.getMIRType("NSCore::Nat"))
+            );
+        }
+
+        return {
+            if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "findIndexOf", code), [{ vname: "l", vtype: ltype }, { vname: "count", vtype: this.nattype}], undefined, 0, this.nattype, ffunc)],
+            uf: [suf]
+        };
+    }
 
     ////////
     //FindLastIndexOf
@@ -862,9 +897,35 @@ class ListOpsManager {
         }
 
         return {
-            if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "countIf", code), [{ vname: "l", vtype: ltype }, { vname: "isq", vtype: new SMTType("ISequence") }, { vname: "count", vtype: this.nattype}], undefined, 0, this.booltype, ffunc)],
+            if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "countIf", code), [{ vname: "l", vtype: ltype }, { vname: "isq", vtype: new SMTType("ISequence") }, { vname: "count", vtype: this.nattype}], undefined, 0, this.nattype, ffunc)],
             uf: [new SMTFunctionUninterpreted(this.generateDesCallNameUsing(ltype, "skolem_list_size", code), ufpickargs, this.nattype)]
         };
+    }
+
+    private emitDestructorFindIndexOf_Shared(ltype: SMTType, ctype: MIRType, code: string, pcode: MIRPCode, sl: SMTVar, osize: SMTVar, k: SMTExp): [SMTExp, SMTFunctionUninterpreted] {
+        const getop = this.generateDesCallName(ltype, "get");
+
+        const lambdainfo = this.temitter.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl;
+        const ufpickargs = [ltype, this.nattype, ...lambdainfo.params.slice(1).map((p) => this.temitter.getSMTTypeFor(this.temitter.getMIRType(p.type)))];
+        const capturedargs = lambdainfo.params.slice(1).map((p) => new SMTVar(p.name));
+
+        const findidx =
+            new SMTLet("@nn", this.generateListIndexPickCall_Kth(this.generateConsCallNameUsing(ltype, "skolem_list_index", code), sl, k, capturedargs),
+                new SMTIf(new SMTCallSimple("bvult", [new SMTVar("@nn"), osize]),
+                    new SMTLet("@getnn", new SMTCallGeneral(getop, [sl, new SMTVar("@nn")]),
+                        new SMTIf(this.generateLambdaCallKnownSafe(code, this.temitter.getMIRType("NSCore::Bool"), [this.temitter.generateResultGetSuccess(ctype, new SMTVar("@getnn"))], capturedargs),
+                            this.temitter.generateResultTypeConstructorSuccess(this.temitter.getMIRType("NSCore::Nat"), new SMTVar("@nn")),
+                            this.temitter.generateErrorResultAssert(this.temitter.getMIRType("NSCore::Nat"))
+                        )
+                    ),
+                    this.temitter.generateErrorResultAssert(this.temitter.getMIRType("NSCore::Nat"))
+                )
+            );
+
+        return [
+            findidx,
+            new SMTFunctionUninterpreted(this.generateConsCallNameUsing(ltype, "skolem_list_index", code), ufpickargs, this.nattype)
+        ];
     }
 
     private generateListSize_1_to_Max_PickCall(ctxname: string, sl: SMTVar, osize: SMTVar, cargs: SMTExp[]): SMTExp {
@@ -879,7 +940,7 @@ class ListOpsManager {
         );
     }
 
-    private generateListIndexPickCall_Kth(ctxname: string, sl: SMTVar, k: SMTVar, capturedargs: SMTVar[]): SMTExp {
+    private generateListIndexPickCall_Kth(ctxname: string, sl: SMTVar, k: SMTExp, capturedargs: SMTVar[]): SMTExp {
         return new SMTCallSimple(ctxname, [sl, k, ...capturedargs]);
     }
 
