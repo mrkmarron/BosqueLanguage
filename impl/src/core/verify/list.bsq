@@ -97,8 +97,24 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
             return true;
         }
         else {
-            //TODO: here special case for small model
-            return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
+#if SMALL_MODEL
+            let count = List<T>::s_size(l);
+
+            if(l == 1) {
+                return List<T>::safePred(List<T>::s_unsafe_get(0), p);
+            }
+            elif(l == 2) {
+                return List<T>::safePred(List<T>::s_unsafe_get(0), p) & List<T>::safePred(List<T>::s_unsafe_get(1), p);
+            }
+            elif(l == 3) {
+                return List<T>::safePred(List<T>::s_unsafe_get(0), p) & List<T>::safePred(List<T>::s_unsafe_get(1), p) & List<T>::safePred(List<T>::s_unsafe_get(2), p);
+            }
+            else {
+                return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
+            }
+#else
+        return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
+#end
         }
     }
 
@@ -174,7 +190,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     __safe private function s_fill<T>(k: Nat, val: T): List<T> # list_fill
 
-    __safe private function s_concat2_Constructor(l1: List<T>, l2: List<T>, count: Nat): List<T> # list_concat2_constructor
+    __safe private function s_concat2_Constructor(l1: List<T>, l2: List<T>, count: Nat): List<T> # list_concat2
 
     private function s_concat2_Helper(l1: List<T>, l2: List<T>): List<T> {
         let l1size = List<T>::s_size(l1);
@@ -183,10 +199,10 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         if(l1size == 0 & l2size == 0) {
             return List<T>@{};
         }
-        else if(l1size == 0) {
+        elif(l1size == 0) {
             return l2;
         }
-        else if(l2size == 0) {
+        elif(l2size == 0) {
             return l1;
         }
         else {
@@ -271,7 +287,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private recursive? function s_countIf_Helper_Idx(l: List<T>, p: recursive? pred(_: T, _: Nat) -> Bool): Nat # list_countif_helper_idx
     
-    private recursive? function s_filter_Constructor(l: List<T>, isq: ISequence, count: Nat, p: recursive? pred(_: T) -> Bool): List<T> # list_filter_constructor
+    private recursive? function s_filter_Constructor(l: List<T>, isq: ISequence, count: Nat, p: recursive? pred(_: T) -> Bool): List<T> # list_filter_helper
 
     private recursive? function s_filter_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool): List<T> {
         if(List<T>::s_empty(l)) {
@@ -302,7 +318,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     private function s_filterToType_Helper<U>(l: List<T>): List<U> # list_filtertotype_helper
     private function s_castToType_Helper<U>(l: List<T>): List<U> # list_casttotype_helper
 
-    __safe private function s_slice_Constructor(l: List<T>, start: Nat, end: Nat, count: Nat): List<U> # list_slice_constructor
+    __safe private function s_slice_Constructor(l: List<T>, start: Nat, end: Nat, count: Nat): List<U> # list_slice
 
     private function s_slice_Helper(l: List<T>, start: Nat, end: Nat): List<U> {
         if(start == end) {
@@ -321,7 +337,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         }
     }
 
-    private recursive? function s_map_Constructor<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<T> # list_map_constructor
+    private recursive? function s_map_Constructor<U>(l: List<T>, count: Nat, f: recursive? fn(_: T) -> U): List<T> # list_map
 
     private recursive? function s_map_Helper<U>(l: List<T>, f: recursive? fn(_: T) -> U): List<T> {
         if(List<T>::s_empty(l)) {
@@ -331,7 +347,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
             let sl = List<T>::s_safeCheckFn[recursive?](l, f);
 
             //TODO: here special case for small model
-            return List<T>::s_map_Constructor[recursive?](sl, List<T>::s_size(sl) f);
+            return List<T>::s_map_Constructor[recursive?](sl, List<T>::s_size(sl), f);
         }
     }
 

@@ -43,10 +43,6 @@ class SMTEmitter {
         this.assembly = assembly;
     }
 
-    private static generatePathExtension(path: SMTExp, step: SMTExp): SMTExp {
-        return new SMTCallSimple("seq.++", [path, new SMTCallSimple("seq.unit", [step])]);
-    }
-
     private generateAPITypeConstructorFunction_Primitive(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
         if (this.temitter.isType(tt, "NSCore::None")) {
             return [new SMTConst("bsq_none@literal"), false];

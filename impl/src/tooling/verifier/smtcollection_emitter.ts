@@ -19,7 +19,7 @@ class RequiredListConstructors {
     fill: boolean = false;
     literalk: Set<number> = new Set<number>();
     filter: Map<string, MIRPCode> = new Map<string, MIRPCode>();
-    map: Map<string, [MIRPCode, SMTType]> = new Map<string, [MIRPCode, SMTType]>();
+    map: Map<string, [MIRPCode, MIRType, MIRType]> = new Map<string, [MIRPCode, MIRType, MIRType]>();
 }
 
 type SMTConstructorGenCode = {
@@ -128,13 +128,6 @@ class ListOpsManager {
         return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), opname), values);
     }
 
-    processFillOperation(ltype: MIRType, count: SMTExp, value: SMTExp): SMTExp {
-        const ops = this.ensureOpsFor(ltype);
-        ops.consops.fill = true;
-
-        return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "fill"), [value, count]);
-    }
-
     processRangeOfIntOperation(ltype: MIRType, start: SMTExp, end: SMTExp, count: SMTExp): SMTExp {
         this.ensureOpsFor(ltype);
         this.rangeint = true;
@@ -149,13 +142,36 @@ class ListOpsManager {
         return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "rangeOfNat"),  [start, end, count]);
     }
 
-    processHasPredCheck(ltype: MIRType, code: string, l: SMTExp): SMTExp {
+    processSafePredCheck(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
+        const ops = this.ensureOpsFor(ltype);
+        const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "safeCheckPred", code);
+
+        ops.dops.safecheckpred.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
+    }
+
+    processSafeFnCheck(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
+        const ops = this.ensureOpsFor(ltype);
+        const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "safeCheckFn", code);
+
+        ops.dops.safecheckfn.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
+    }
+
+    processISequence(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
+        const ops = this.ensureOpsFor(ltype);
+        const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "isequence", code);
+
+        ops.dops.isequence.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
+    }
+
+    processHasPredCheck(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
         const ops = this.ensureOpsFor(ltype);
         const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "hasPredCheck", code);
 
-        xxxx;
-        ops.dops.haspredcheck.add(op);
-        return new SMTCallGeneral(op, [l]);
+        ops.dops.haspredcheck.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
     }
 
     processGet(ltype: MIRType, l: SMTExp, n: SMTExp): SMTExp {
@@ -163,66 +179,71 @@ class ListOpsManager {
         const op = this.generateDesCallName(this.temitter.getSMTTypeFor(ltype), "get");
         //get always registered
 
-        xxxx;
-        return new SMTCallGeneral(op, [l, n]);
+        return new SMTCallSimple(op, [l, n]);
+    }
+
+    processFillOperation(ltype: MIRType, count: SMTExp, value: SMTExp): SMTExp {
+        const ops = this.ensureOpsFor(ltype);
+        const op = this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "fill");
+        ops.consops.fill = true;
+
+        return new SMTCallSimple(op, [count, value]);
     }
 
     processConcat2(ltype: MIRType, l1: SMTExp, l2: SMTExp, count: SMTExp): SMTExp {
         this.ensureOpsFor(ltype);
-        return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "concat2"), [l1, l2, count]);
+        const op = this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "concat2");
+        //concat always registered
+
+        return new SMTCallSimple(op, [l1, l2, count]);
     }
 
-    processFindIndexOf(ltype: MIRType, code: string, l: SMTExp): SMTExp {
+    processFindIndexOf(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
         const ops = this.ensureOpsFor(ltype);
         const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "findIndexOf", code);
 
-        xxxx;
-        ops.dops.findIndexOf.add(op);
-        ops.dops.errorapply.set(code, [pc, ltype]);
-        ops.dops.haspredcheck.set();
-        return new SMTCallGeneral(op, [l]);
+        ops.dops.findIndexOf.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
     }
 
-    processFindLastIndexOf(ltype: MIRType, code: string, l: SMTExp): SMTExp {
+    processFindLastIndexOf(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
         const ops = this.ensureOpsFor(ltype);
         const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "findLastIndexOf", code);
 
-        xxxx;
-        ops.dops.findLastIndexOf.add(op);
-        ops.dops.errorapply.set(code, [pc, ltype]);
-        ops.dops.haspredcheck.set();
-        return new SMTCallGeneral(op, [l]);
+        ops.dops.findLastIndexOf.set(code, pcode);
+        return new SMTCallGeneral(op, [l, count]);
     }
 
-    processCountIf(ltype: MIRType, code: string, l: SMTExp): SMTExp {
+    processCountIf(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, isq: SMTExp, count: SMTExp): SMTExp {
         const ops = this.ensureOpsFor(ltype);
         const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "countIf", code);
 
-        xxxx;
-        ops.dops.countIf.add(op);
-        ops.dops.errorapply.set(code, [pc, ltype]);
-        ops.dops.haspredcheck.set(code, pc);
-        ops.dops.isequence.set(code, pc);
-        return new SMTCallGeneral(op, [l]);
+        ops.dops.countIf.set(code, pcode);
+        return new SMTCallGeneral(op, [l, isq, count]);
     }
 
-    processFilter(ltype: MIRType, code: string, l: SMTVar, isq: SMTVar, count: SMTVar): SMTExp {
+    processFilter(ltype: MIRType, code: string, pcode: MIRPCode, l: SMTVar, isq: SMTVar, count: SMTVar): SMTExp {
         const ops = this.ensureOpsFor(ltype);
+        const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "filter", code);
 
-        ops.consops.filter.set(code);
-        return new SMTCallGeneral(this.generateConsCallNameUsing(this.temitter.getSMTTypeFor(ltype), "filter", code), [l, isq, count]);
+        ops.consops.filter.set(code, pcode);
+        return new SMTCallGeneral(op, [l, isq, count]);
     }
 
     processSlice(ltype: MIRType, l1: SMTExp, start: SMTExp, end: SMTExp, count: SMTExp): SMTExp {
         this.ensureOpsFor(ltype);
-        return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "slice"), [l1, start, end, count]);
+        const op = this.generateDesCallName(this.temitter.getSMTTypeFor(ltype), "slice");
+        //slice always registered 
+
+        return new SMTCallSimple(op, [l1, start, end, count]);
     }
 
-    processMap(ltype: MIRType, code: string, l: SMTExp): SMTExp {
+    processMap(ltype: MIRType, intotype: MIRType, code: string, pcode: MIRPCode, l: SMTExp, count: SMTExp): SMTExp {
         const ops = this.ensureOpsFor(ltype);
+        const op = this.generateDesCallNameUsing(this.temitter.getSMTTypeFor(ltype), "map", code);
 
-        ops.consops.map.add(code);
-        return new SMTCallGeneral(this.generateConsCallNameUsing(this.temitter.getSMTTypeFor(ltype), "map", code), [l]);
+        ops.consops.map.set(code, [pcode, ltype, intotype]);
+        return new SMTCallGeneral(op, [l, count]);
     }
 
     generateConsCallName(ltype: SMTType, opname: string): string {
@@ -350,35 +371,40 @@ class ListOpsManager {
                     {
                         test: new SMTCallSimple("=", [sizev, new SMTConst(`(_ BV1 ${this.vopts.ISize})`)]),
                         result: new SMTLetMulti([
-                            { vname: "@val0", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) }
+                            { vname: "@val0", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV0 ${this.vopts.ISize})`)) }
                         ],
                             new SMTIf(this.temitter.generateResultIsErrorTest(ctype, new SMTVar("@val0")),
                                 this.temitter.generateErrorResultAssert(mtype),
-                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_1"), [new SMTVar("@val0")]))
+                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_1"), [
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val0"))
+                                ]))
                             )
                         )
                     },
                     {
                         test: new SMTCallSimple("=", [sizev, new SMTConst(`(_ BV2 ${this.vopts.ISize})`)]),
                         result: new SMTLetMulti([
-                            { vname: "@val0", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) },
-                            { vname: "@val1", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) }
+                            { vname: "@val0", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV0 ${this.vopts.ISize})`)) },
+                            { vname: "@val1", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV1 ${this.vopts.ISize})`)) }
                         ],
                             new SMTIf(new SMTCallSimple("or", [
                                 this.temitter.generateResultIsErrorTest(ctype, new SMTVar("@val0")),
                                 this.temitter.generateResultIsErrorTest(ctype, new SMTVar("@val1"))
                             ]),
                                 this.temitter.generateErrorResultAssert(mtype),
-                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_2"), [new SMTVar("@val0"), new SMTVar("@val1")]))
+                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_2"), [
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val0")), 
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val1"))
+                                ]))
                             )
                         )
                     },
                     {
                         test: new SMTCallSimple("=", [sizev, new SMTConst(`(_ BV3 ${this.vopts.ISize})`)]),
                         result: new SMTLetMulti([
-                            { vname: "@val0", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) },
-                            { vname: "@val1", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) },
-                            { vname: "@val2", value: new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []) }
+                            { vname: "@val0", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV0 ${this.vopts.ISize})`)) },
+                            { vname: "@val1", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV1 ${this.vopts.ISize})`)) },
+                            { vname: "@val2", value: this.temitter.generateHavocConstructorCall(ctype, path, new SMTConst(`(_ BV2 ${this.vopts.ISize})`)) }
                         ],
                             new SMTIf(new SMTCallSimple("or", [
                                 this.temitter.generateResultIsErrorTest(ctype, new SMTVar("@val0")),
@@ -386,7 +412,11 @@ class ListOpsManager {
                                 this.temitter.generateResultIsErrorTest(ctype, new SMTVar("@val2"))
                             ]),
                                 this.temitter.generateErrorResultAssert(mtype),
-                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_3"), [new SMTVar("@val0"), new SMTVar("@val1"), new SMTVar("@val2")]))
+                                this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(this.generateConsCallName(ltype, "_3"), [
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val0")), 
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val1")), 
+                                    this.temitter.generateResultTypeConstructorSuccess(ctype, new SMTVar("@val2"))
+                                ]))
                             )
                         )
                     }
@@ -394,7 +424,7 @@ class ListOpsManager {
                 new SMTIf(new SMTForAll([{ vname: "@n", vtype: this.nattype }],
                     new SMTCallSimple("=>", [
                         new SMTCallSimple("bvult", [new SMTVar("@n"), sizev]),
-                        this.temitter.generateResultIsSuccessTest(ctype, new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []))
+                        this.temitter.generateResultIsSuccessTest(ctype, this.temitter.generateHavocConstructorCall(ctype, path, new SMTVar("@n")))
                     ])
                     ),
                         this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(lcons, [sizev, new SMTCallSimple(this.generateConsCallName_Direct(ltype, "havoc"), [path])])),
@@ -411,7 +441,7 @@ class ListOpsManager {
                 new SMTIf(new SMTForAll([{ vname: "@n", vtype: this.nattype }],
                     new SMTCallSimple("=>", [
                         new SMTCallSimple("bvult", [new SMTVar("@n"), sizev]),
-                        this.temitter.generateResultIsSuccessTest(ctype, new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC]", []))
+                        this.temitter.generateResultIsSuccessTest(ctype, this.temitter.generateHavocConstructorCall(ctype, path, new SMTVar("@n")))
                     ])
                 ),
                     this.temitter.generateResultTypeConstructorSuccess(mtype, new SMTCallSimple(lcons, [sizev, new SMTCallSimple(this.generateConsCallName_Direct(ltype, "havoc"), [path])])),
@@ -690,7 +720,7 @@ class ListOpsManager {
         if(consopts.havoc) {
             tsops.push({
                 test: new SMTCallSimple(`is-${this.generateConsCallName_Direct(ltype, "havoc")}`, [llv]),
-                result: this.temitter.generateResultGetSuccess(ctype, new SMTCallGeneral("[PLACEHOLDER GENERATE API HAVOC -- get path field as arg]", []))
+                result: this.temitter.generateResultGetSuccess(ctype, this.temitter.generateHavocConstructorCall(ctype, this.generateGetULIFieldFor(ltype, "havoc", "path", llv), n))
             }); 
         }
 
@@ -736,7 +766,7 @@ class ListOpsManager {
         consopts.map.forEach((omi, code) => {
             tsops.push({
                 test: new SMTCallSimple(`is-${this.generateConsCallNameUsing_Direct(ltype, "map", code)}`, [llv]),
-                result: this.emitDestructorGet_Map(ltype, ctype, omi[1], llv, n, code, omi[0])
+                result: this.emitDestructorGet_Map(ltype, ctype, this.temitter.getSMTTypeFor(omi[1]), llv, n, code, omi[0])
             })
         });
 
@@ -852,7 +882,7 @@ class ListOpsManager {
 
     ////////
     //ISequence
-    emitDestructorISequence(ltype: SMTType, mtype: MIRType, ctype: MIRType, sl: SMTVar, count: SMTVar, code: string, pcode: MIRPCode): SMTDestructorGenCode {
+    emitDestructorISequence(ltype: SMTType, sl: SMTVar, count: SMTVar, code: string, pcode: MIRPCode): SMTDestructorGenCode {
         if (this.vopts.SimpleQuantifierMode) {
             return {
                 if: [new SMTFunction(this.generateDesCallNameUsing(ltype, "isequence", code), [{ vname: "l", vtype: ltype }, { vname: "count", vtype: this.nattype }], undefined, 0, new SMTType(`$Result_ISequence`), new SMTCallSimple("$Result_ISequence@success", [new SMTConst("ISequence@empty")]))],

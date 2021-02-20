@@ -389,6 +389,15 @@ class SMTAssembly {
             float_constants.push(`(declare-const BRational@one BRational) (assert (= BRational@one (BRationalCons_UF "1/1")))`);
         }
 
+        if(this.vopts.StringOpt === "ASCII") {
+            integral_constants.push(`(declare-const BString@empty BString) (assert (= BString@empty ""))`);
+            integral_constants.push(`(assert (forall ((tstr BString)) (<= (str.len tstr) ${this.vopts.ISize})))`);
+        }
+        else {
+            integral_constants.push(`(declare-const BString@empty BString) (assert (= BString@empty (as seq.empty (Seq (_ BitVec 16))))))`);
+            integral_constants.push(`(assert (forall ((tstr BString)) (<= (seq.len tstr) ${this.vopts.ISize})))`);
+        }
+
         const keytupleinfo = this.tupleDecls
             .filter((tt) => tt.iskeytype)
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
@@ -578,7 +587,7 @@ class SMTAssembly {
             BINTEGRAL_CONSTANTS: integral_constants,
             BFLOATPOINT_TYPE_ALIAS: float_type_alias,
             BFLOATPOINT_CONSTANTS: float_constants,
-            STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 32)))" : "(define-sort BString () String)"),
+            STRING_TYPE_ALIAS: (this.vopts.StringOpt === "UNICODE" ? "(define-sort BString () (Seq (_ BitVec 16)))" : "(define-sort BString () String)"),
             KEY_TUPLE_INFO: { decls: keytupleinfo.map((kti) => kti.decl), constructors: keytupleinfo.map((kti) => kti.consf), boxing: keytupleinfo.map((kti) => kti.boxf) },
             KEY_RECORD_INFO: { decls: keyrecordinfo.map((kti) => kti.decl), constructors: keyrecordinfo.map((kti) => kti.consf), boxing: keyrecordinfo.map((kti) => kti.boxf) },
             KEY_TYPE_INFO: { decls: keytypeinfo.map((kti) => kti.decl), constructors: keytypeinfo.map((kti) => kti.consf), boxing: keytypeinfo.map((kti) => kti.boxf) },

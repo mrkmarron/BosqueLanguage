@@ -5,7 +5,7 @@
 
 import { MIRAssembly, MIREntityType, MIREntityTypeDecl, MIREphemeralListType, MIRRecordType, MIRTupleType, MIRType } from "../../compiler/mir_assembly";
 import { MIRFieldKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
-import { SMTCallSimple, SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
+import { SMTCallGeneral, SMTCallSimple, SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 import * as assert from "assert";
 
@@ -477,6 +477,59 @@ class SMTTypeEmitter {
     generateAccessWithSetGuardResultGetFlag(ttype: MIRType, exp: SMTExp): SMTExp {
         return new SMTCallSimple(`$GuardResult_${this.getSMTTypeFor(ttype).name}@flag`, [exp]);
     }
+
+    private havocTypeInfoGen(tt: MIRType): [string, boolean] {
+        if (this.isType(tt, "NSCore::None")) {
+            return ["BNone@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Bool")) {
+            return ["BBool@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Int")) {
+            return ["BInt@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Nat")) {
+            return ["BNat@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::BigInt")) {
+            return ["BBigInt@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::BigNat")) {
+            return ["BBigNat@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Float")) {
+            return ["BFloat@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Decimal")) {
+            return ["BDecimal@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::Rational")) {
+            return ["BRational@UFCons_API", false];
+        }
+        else if (this.isType(tt, "NSCore::String")) {
+            return ["BString@UFCons_API", false];
+        }
+        else {
+            return [`@@cons_${this.getSMTTypeFor(tt).name}_entrypoint`, true];
+        }
+    }
+
+    isKnownSafeHavocConstructorType(tt: MIRType): boolean {
+        return !this.havocTypeInfoGen(tt)[1];
+    }
+
+    generateHavocConstructorName(tt: MIRType): string {
+        return this.havocTypeInfoGen(tt)[0];
+    }
+
+    generateHavocConstructorPathExtend(path: SMTExp, step: SMTExp): SMTExp {
+        return new SMTCallSimple("seq.++", [path, new SMTCallSimple("seq.unit", [step])]);
+    }
+
+    generateHavocConstructorCall(tt: MIRType, path: SMTExp, step: SMTExp): SMTExp {
+        return new SMTCallGeneral(this.generateHavocConstructorName(tt), [this.generateHavocConstructorPathExtend(path, step)]);
+    }
+
 }
 
 export {

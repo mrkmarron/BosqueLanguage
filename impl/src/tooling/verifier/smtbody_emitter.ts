@@ -674,7 +674,14 @@ class SMTBodyEmitter {
 
         this.currentRType = typegen.getMIRType("NSCore::None");
 
-        this.lopsManager = new ListOpsManager(vopts, typegen);
+        const safecalls = new Set<MIRInvokeKey>();
+        callsafety.forEach((pv, inv) => {
+            if(pv.safe) {
+                safecalls.add(inv);
+            }
+        });
+
+        this.lopsManager = new ListOpsManager(vopts, typegen, safecalls);
     }
 
     generateTempName(): string {
@@ -2306,30 +2313,29 @@ class SMTBodyEmitter {
 
         switch(idecl.implkey) {
             case "string_count": {
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.len", [new SMTVar(args[0].vname)]));
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("nat2bv", [new SMTCallSimple("str.len", [new SMTVar(args[0].vname)])]));
             }
             case "string_charat": {
-                const ival = new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)]);
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname), ival]));
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname), new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)])]));
             }
             case "string_contains": {
                 NOT_IMPLEMENTED("string_contains");
                 return (undefined as any as SMTFunction);
             }
             case "string_indexof": {
-                NOT_IMPLEMENTED("string_contains");
+                NOT_IMPLEMENTED("string_indexof");
                 return (undefined as any as SMTFunction);
             }
             case "string_startswith": {
-                NOT_IMPLEMENTED("string_contains");
+                NOT_IMPLEMENTED("string_startswith");
                 return (undefined as any as SMTFunction);
             }
             case "string_endswith": {
-                NOT_IMPLEMENTED("string_contains");
+                NOT_IMPLEMENTED("string_endswith");
                 return (undefined as any as SMTFunction);
             } 
             case "string_substring": {
-                NOT_IMPLEMENTED("string_contains");
+                NOT_IMPLEMENTED("string_substring");
                 return (undefined as any as SMTFunction);
             }
             case "string_append": {
@@ -2350,29 +2356,29 @@ class SMTBodyEmitter {
                 const fbody = this.lopsManager.processRangeOfNatOperation(mirrestype, low, high, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_zip": {
-                assert(false, "[NOT IMPLEMENTED -- list_zip]");
-                return undefined;
-            }
-            case "list_unzipt": {
-                assert(false, "[NOT IMPLEMENTED -- list_unzipt]");
-                return undefined;
-            }
-            case "list_unzipu": {
-                assert(false, "[NOT IMPLEMENTED -- list_unzipu]");
-                return undefined;
-            }
-            case "list_hascheck": {
-                assert(false, "[NOT IMPLEMENTED -- list_hascheck]");
-                return undefined;
-            }
-            case "list_haspredcheck": {
-                const fbody = this.lopsManager.processHasPredCheck(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
+            case "list_safecheckpred": {
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processSafePredCheck(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_haspredcheck_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_haspredcheck_idx]");
-                return undefined;
+            case "list_safecheckfn": {
+                const pcode = idecl.pcodes.get("f") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processSafeFnCheck(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
+            }
+            case "list_computeisequence": {
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processISequence(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
+            }
+            case "list_haspredcheck": {
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processHasPredCheck(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_size": {
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, this.lopsManager.generateListSizeCall(new SMTVar(args[0].vname), args[0].vtype));
@@ -2385,93 +2391,53 @@ class SMTBodyEmitter {
                 const fbody = this.lopsManager.processGet(mirrestype, l, n);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
+            case "list_fill": {
+                const [n, v] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processFillOperation(this.typegen.getMIRType(encltypekey), n, v);
+                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
+            }
             case "list_concat2": {
                 const [l1, l2, count] = args.map((arg) => new SMTVar(arg.vname));
                 const fbody = this.lopsManager.processConcat2(mirrestype, l1, l2, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_findindexof_keyhelper": {
-                assert(false, "[NOT IMPLEMENTED -- list_findindexof_keyhelper]");
-                return undefined;
-            }
-            case "list_findindexoflast_keyhelper": {
-                assert(false, "[NOT IMPLEMENTED -- list_findindexoflast_keyhelper]");
-                return undefined;
-            }
-            case "list_findindexof_predicatehelper":  {
-                const fbody = this.lopsManager.processFindIndexOf(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
+            case "list_findindexof_predicatehelper": {
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processFindIndexOf(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_findindexoflast_predicatehelper": {
-                const fbody = this.lopsManager.processFindLastIndexOf(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processFindLastIndexOf(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
-            }
-            case "list_findindexof_predicatehelper_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_findindexof_predicatehelper_idx]");
-                return undefined;
-            }
-            case "list_findindexoflast_predicatehelper_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_findindexoflast_predicatehelper_idx]");
-                return undefined;
-            }
-            case "list_count_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_count_helper]");
-                return undefined;
             }
             case "list_countif_helper": {
-                const fbody = this.lopsManager.processCountIf(this.typegen.getMIRType(encltypekey), this.typegen.mangle((idecl.pcodes.get("p") as MIRPCode).code), new SMTVar(args[0].vname));
+                const pcode = idecl.pcodes.get("p") as MIRPCode;
+                const [l, isq, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processCountIf(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, isq, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
-            }
-            case "list_countif_helper_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_countif_helper_idx]");
-                return undefined;
             }
             case "list_filter_helper": {
                 const pcode = idecl.pcodes.get("p") as MIRPCode;
-                const code = this.typegen.mangle(pcode.code);
-                const fbody = this.lopsManager.processFilter(this.typegen.getMIRType(encltypekey), code, pcode, new SMTVar(args[0].vname));
+                const [l, isq, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processFilter(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, isq, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_filter_helper_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_filter_helper_idx]");
-                return undefined;
-            }
-            case "list_filtertotype_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_filtertotype_helper]");
-                return undefined;
-            }
-            case "list_casttotype_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_casttotype_helper]");
-                return undefined;
-            }
-            case "list_slice_constructor": {
+            case "list_slice": {
                 const [l1, start, end, count] = args.map((arg) => new SMTVar(arg.vname));
                 const fbody = this.lopsManager.processSlice(mirrestype, l1, start, end, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_map_helper": {
+            case "list_map": {
                 const pcode = idecl.pcodes.get("f") as MIRPCode;
-                const code = this.typegen.mangle(pcode.code);
-                const fbody = this.lopsManager.processMap(this.typegen.getMIRType(encltypekey), code, pcode, new SMTVar(args[0].vname));
+                const [l, count] = args.map((arg) => new SMTVar(arg.vname));
+                const fbody = this.lopsManager.processMap(this.typegen.getMIRType(encltypekey), mirrestype, pcode.code, pcode, l, count);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
-            case "list_map_helper_idx": {
-                assert(false, "[NOT IMPLEMENTED -- list_map_helper_idx]");
-                return undefined;
-            }
-            case "list_join_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_join_helper]");
-                return undefined;
-            }
-            case "list_joingroup_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_joingroup_helper]");
-                return undefined;
-            }
-            case "list_sort_helper": {
-                assert(false, "[NOT IMPLEMENTED -- list_sort_helper]");
-                return undefined;
-            }
             default: {
+                assert(false, `[NOT IMPLEMENTED -- ${idecl.implkey}]`);
                 return undefined;
             }
         }

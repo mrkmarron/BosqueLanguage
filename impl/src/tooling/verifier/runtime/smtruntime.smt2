@@ -269,6 +269,7 @@
 ;;
 ;;Free constructors for entrypoint initialization
 ;;
+(declare-fun BNone@UFCons_API ((Seq BNat)) bsq_none)
 (declare-fun BBool@UFCons_API ((Seq BNat)) Bool)
 (declare-fun BInt@UFCons_API ((Seq BNat)) BInt )
 (declare-fun BNat@UFCons_API ((Seq BNat)) BNat)
@@ -278,6 +279,8 @@
 (declare-fun BDecimal@UFCons_API ((Seq BNat)) BDecimal)
 (declare-fun BRational@UFCons_API ((Seq BNat)) BRational)
 (declare-fun BString@UFCons_API ((Seq BNat)) BString)
+
+(declare-fun ListSize@UFCons_API ((Seq BNat)) BNat)
 
 ;;GLOBAL_DECLS;;
 
