@@ -2313,10 +2313,20 @@ class SMTBodyEmitter {
 
         switch(idecl.implkey) {
             case "string_count": {
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("nat2bv", [new SMTCallSimple("str.len", [new SMTVar(args[0].vname)])]));
+                if (this.vopts.StringOpt === "ASCII") {
+                    return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("nat2bv", [new SMTCallSimple("str.len", [new SMTVar(args[0].vname)])]));
+                }
+                else {
+                    return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("nat2bv", [new SMTCallSimple("seq.len", [new SMTVar(args[0].vname)])]));
+                }
             }
             case "string_charat": {
-                return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname), new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)])]));
+                if (this.vopts.StringOpt === "ASCII") {
+                    return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("str.at", [new SMTVar(args[0].vname), new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)])]));
+                }
+                else {
+                    return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("seq.at", [new SMTVar(args[0].vname), new SMTCallSimple("bv2nat", [new SMTVar(args[1].vname)])]));
+                }
             }
             case "string_contains": {
                 NOT_IMPLEMENTED("string_contains");
@@ -2364,8 +2374,9 @@ class SMTBodyEmitter {
             }
             case "list_safecheckfn": {
                 const pcode = idecl.pcodes.get("f") as MIRPCode;
+                const pcrtype = this.typegen.getMIRType((this.assembly.invokeDecls.get(pcode.code) as MIRInvokeBodyDecl).resultType);
                 const [l, count] = args.map((arg) => new SMTVar(arg.vname));
-                const fbody = this.lopsManager.processSafeFnCheck(this.typegen.getMIRType(encltypekey), pcode.code, pcode, l, count); 
+                const fbody = this.lopsManager.processSafeFnCheck(this.typegen.getMIRType(encltypekey), pcrtype, pcode.code, pcode, l, count); 
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_computeisequence": {

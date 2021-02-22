@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { BSQRegex } from "../../ast/bsqregex";
-import { SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
+import { SMTConst, SMTExp, SMTForAll, SMTType, VerifierOptions } from "./smt_exp";
 
 type SMT2FileInfo = {
     TYPE_TAG_DECLS: string[],
@@ -75,6 +75,17 @@ class SMTFunction {
             return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize})) ${this.result.name}\n${body}\n)`;
         }
     }
+
+    emitSMT2_DeclOnly(): string {
+        const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype.name})`);
+
+        if(this.maskname === undefined) {
+            return `(define-fun ${this.fname} (${args.join(" ")}) ${this.result.name})`;
+        }
+        else {
+            return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize})) ${this.result.name})`;
+        }
+    }
 }
 
 class SMTFunctionUninterpreted {
@@ -90,6 +101,24 @@ class SMTFunctionUninterpreted {
 
     emitSMT2(): string {
         return `(declare-fun ${this.fname} (${this.args.map((arg) => arg.name).join(" ")}) ${this.result.name})`;
+    }
+
+    static areDuplicates(f1: SMTFunctionUninterpreted, f2: SMTFunctionUninterpreted): boolean {
+        if (f1.fname !== f2.fname || f1.args.length !== f2.args.length) {
+            return false;
+        }
+
+        if (f1.result.name !== f2.result.name) {
+            return false;
+        }
+
+        for (let i = 0; i < f1.args.length; ++i) {
+            if (f1.args[i].name !== f2.args[i].name) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -122,7 +151,6 @@ class SMTListDecl {
 
     readonly smtllisttype: string; //the uninterpreted list contents kind with multiple constructors 
     readonly listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[]; //the constructors for each list
-    readonly get_axiomdecl: SMTFunctionUninterpreted;
 
     readonly smtname: string;
     readonly typetag: string;
@@ -131,24 +159,18 @@ class SMTListDecl {
     readonly boxf: string;
     readonly ubf: string;
 
-    readonly get_decl: SMTFunction;
-
-    constructor(iskeytype: boolean, isapitype: boolean, smtllisttype: string, listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[], get_axiomdecl: SMTFunctionUninterpreted, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string, getdecl: SMTFunction) {
-        xxxx;
+    constructor(iskeytype: boolean, isapitype: boolean, smtllisttype: string, listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[], smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string) {
         this.iskeytype = iskeytype;
         this.isapitype = isapitype;
 
         this.smtllisttype = smtllisttype;
         this.listtypeconsf = listtypeconsf;
-        this.get_axiomdecl = get_axiomdecl;
 
         this.smtname = smtname;
         this.typetag = typetag;
         this.consf = consf;
         this.boxf = boxf;
         this.ubf = ubf;
-
-        this.get_decl = getdecl;
     }
 }
 
@@ -237,6 +259,20 @@ class SMTModelState {
     }
 }
 
+
+type SMTCallGNode = {
+    invoke: string,
+    callees: Set<string>,
+    callers: Set<string>
+};
+
+type SMTCallGInfo = {
+    invokes: Map<string, SMTCallGNode>,
+    topologicalOrder: SMTCallGNode[],
+    roots: SMTCallGNode[],
+    recursive: (Set<string>)[]
+};
+
 class SMTAssembly {
     readonly vopts: VerifierOptions;
     
@@ -290,6 +326,7 @@ class SMTAssembly {
     resultTypes: { hasFlag: boolean, rtname: string, ctype: SMTType }[] = [];
     functions: SMTFunction[] = [];
 
+    entrypoint: string;
     model: SMTModelState = new SMTModelState([], undefined, new SMTType("[UNINIT]"), new SMTConst("bsq_none@literal"));
 
     modes: { refute: SMTExp, generate: SMTExp } = { 
@@ -297,8 +334,82 @@ class SMTAssembly {
         generate: new SMTConst("bsq_none@literal")
     };
 
-    constructor(vopts: VerifierOptions) {
+    constructor(vopts: VerifierOptions, entrypoint: string) {
         this.vopts = vopts;
+        this.entrypoint = entrypoint;
+    }
+
+    private static sccVisit(cn: SMTCallGNode, scc: Set<string>, marked: Set<string>, invokes: Map<string, SMTCallGNode>) {
+        if (marked.has(cn.invoke)) {
+            return;
+        }
+
+        scc.add(cn.invoke);
+        marked.add(cn.invoke);
+        cn.callers.forEach((pred) => SMTAssembly.sccVisit(invokes.get(pred) as SMTCallGNode, scc, marked, invokes));
+    }
+
+    private static topoVisit(cn: SMTCallGNode, pending: SMTCallGNode[], tordered: SMTCallGNode[], invokes: Map<string, SMTCallGNode>) {
+        if (pending.findIndex((vn) => vn.invoke === cn.invoke) !== -1 || tordered.findIndex((vn) => vn.invoke === cn.invoke) !== -1) {
+            return;
+        }
+
+        pending.push(cn);
+
+        cn.callees.forEach((succ) => (invokes.get(succ) as SMTCallGNode).callers.add(cn.invoke));
+        cn.callees.forEach((succ) => SMTAssembly.topoVisit(invokes.get(succ) as SMTCallGNode, pending, tordered, invokes));
+
+        tordered.push(cn);
+    }
+
+    private static processBodyInfo(bkey: string, binfo: SMTExp, invokes: Set<string>): SMTCallGNode {
+        let cn = { invoke: bkey, callees: new Set<string>(), callers: new Set<string>() };
+
+        let ac = new Set<string>();
+        binfo.computeCallees(ac);
+
+        ac.forEach((cc) => {
+            if(invokes.has(cc)) {
+                cn.callees.add(cc);
+            }
+        });
+        return cn;
+    }
+
+    private static constructCallGraphInfo(entryPoints: string[], assembly: SMTAssembly): SMTCallGInfo {
+        let invokes = new Map<string, SMTCallGNode>();
+
+        const okinv = new Set<string>(...assembly.functions.map((f) => f.fname));
+        assembly.functions.forEach((smtfun) => {
+            invokes.set(smtfun.fname, SMTAssembly.processBodyInfo(smtfun.fname, smtfun.body, okinv));
+        });
+
+        let roots: SMTCallGNode[] = [];
+        let tordered: SMTCallGNode[] = [];
+        entryPoints.forEach((ivk) => {
+            roots.push(invokes.get(ivk) as SMTCallGNode);
+            SMTAssembly.topoVisit(invokes.get(ivk) as SMTCallGNode, [], tordered, invokes);
+        });
+
+        assembly.constantDecls.forEach((cdecl) => {
+            roots.push(invokes.get(cdecl.consf) as SMTCallGNode);
+            SMTAssembly.topoVisit(invokes.get(cdecl.consf) as SMTCallGNode, [], tordered, invokes);
+        });
+
+        tordered = tordered.reverse();
+
+        let marked = new Set<string>();
+        let recursive: (Set<string>)[] = [];
+        for (let i = 0; i < tordered.length; ++i) {
+            let scc = new Set<string>();
+            SMTAssembly.sccVisit(tordered[i], scc, marked, invokes);
+
+            if (scc.size > 1 || tordered[i].callees.has(tordered[i].invoke)) {
+                recursive.push(scc);
+            }
+        }
+
+        return { invokes: invokes, topologicalOrder: tordered, roots: roots, recursive: recursive };
     }
 
     computeBVMinSigned(bits: bigint): string {
@@ -465,11 +576,8 @@ class SMTAssembly {
                 };
             });
 
-        let collectiongetUFfuncs: string[] = [];
-        let collectiongets: string[] = [];
         let generalcollectioninternaldecls: {decl: string, consf: string}[] = [];
         this.listDecls
-        xxxx
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
             .forEach((kt) => {
                 const iconsopts = kt.listtypeconsf.map((cf) => `(${cf.cname} ${cf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")})`)
@@ -477,8 +585,6 @@ class SMTAssembly {
                     decl: `(${kt.smtllisttype} 0)`,
                     consf: `( ${iconsopts.join(" ")} )`
                 });
-                collectiongetUFfuncs.push(kt.get_axiomdecl.emitSMT2());
-                collectiongets.push(kt.get_decl.emitSMT2());
 
                 termtypeinfo.push({
                     decl: `(${kt.smtname} 0)`,
@@ -576,6 +682,44 @@ class SMTAssembly {
             action.push("(get-model)");
         }
 
+        let foutput: string[] = [];
+        let doneset: Set<string> = new Set<string>();
+        const cginfo = SMTAssembly.constructCallGraphInfo([this.entrypoint], this);
+        const rcg = [...cginfo.topologicalOrder].reverse();
+
+        for (let i = 0; i < rcg.length; ++i) {
+            const cn = rcg[i];
+            if(doneset.has(cn.invoke)) {
+                continue;
+            }
+
+            const rf = this.functions.find((f) => f.fname === cn.invoke) as SMTFunction;
+            const cscc = cginfo.recursive.find((scc) => scc.has(cn.invoke));
+            if(cscc === undefined) {
+                doneset.add(cn.invoke);
+                foutput.push(rf.emitSMT2());
+            }
+            else {
+                let worklist = [...cscc].sort();
+
+                let decls: string[] = [];
+                let impls: string[] = [];
+                while(worklist.length !== 0) {
+                    const cf = worklist.pop() as string;
+                    const crf = this.functions.find((f) => f.fname === cf) as SMTFunction;
+
+                    decls.push(crf.emitSMT2_DeclOnly());
+                    impls.push(crf.body.emitSMT2("  "));
+                }
+
+                if(cscc !== undefined) {
+                    cscc.forEach((v) => doneset.add(v));
+                }
+
+                foutput.push(`(define-funs-rec (\n  ${decls.join("\n  ")}\n) (\n${impls.join("\n")}))`)
+            }
+        }   
+
         return {
             TYPE_TAG_DECLS: this.typeTags.sort().map((tt) => `(${tt})`),
             ABSTRACT_TYPE_TAG_DECLS: this.abstractTypes.sort().map((tt) => `(${tt})`),
@@ -601,8 +745,8 @@ class SMTAssembly {
             RESULT_INFO: { decls: rtypeinfo.map((kti) => kti.decl), constructors: rtypeinfo.map((kti) => kti.consf) },
             MASK_INFO: { decls: maskinfo.map((mi) => mi.decl), constructors: maskinfo.map((mi) => mi.consf) },
             GLOBAL_DECLS: gdecls,
-            UF_DECLS: [...ufdecls, ...collectiongetUFfuncs],
-            FUNCTION_DECLS: [...collectiongets, ...this.functions.map((f) => f.emitSMT2())],
+            UF_DECLS: ufdecls,
+            FUNCTION_DECLS: foutput,
             GLOBAL_DEFINITIONS: gdefs,
             ACTION: action
         };

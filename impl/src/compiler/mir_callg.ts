@@ -121,8 +121,8 @@ function constructCallGraphInfo(entryPoints: MIRInvokeKey[], assembly: MIRAssemb
     });
 
     assembly.constantDecls.forEach((cdecl: MIRConstantDecl) => {
-        const civk = assembly.invokeDecls.get(cdecl.value) as MIRInvokeBodyDecl;
-        invokes.set(cdecl.value, processBodyInfo(cdecl.value, [civk.body], assembly));
+        roots.push(invokes.get(cdecl.value) as CallGNode);
+        topoVisit(invokes.get(cdecl.value) as CallGNode, [], tordered, invokes);
     });
 
     tordered = tordered.reverse();

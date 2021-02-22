@@ -506,12 +506,15 @@ class SMTTypeEmitter {
         else if (this.isType(tt, "NSCore::Rational")) {
             return ["BRational@UFCons_API", false];
         }
-        else if (this.isType(tt, "NSCore::String")) {
-            return ["BString@UFCons_API", false];
-        }
         else {
             return [`@@cons_${this.getSMTTypeFor(tt).name}_entrypoint`, true];
         }
+    }
+
+    isPrimitiveHavocConstructorType(tt: MIRType): boolean {
+        return (this.isType(tt, "NSCore::None") || this.isType(tt, "NSCore::Bool") 
+        || this.isType(tt, "NSCore::Int") || this.isType(tt, "NSCore::Nat") || this.isType(tt, "NSCore::BigNat") || this.isType(tt, "NSCore::BigInt")
+        || this.isType(tt, "NSCore::Float") || this.isType(tt, "NSCore::Decimal") || this.isType(tt, "NSCore::Rational"));
     }
 
     isKnownSafeHavocConstructorType(tt: MIRType): boolean {
