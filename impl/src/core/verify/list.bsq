@@ -97,24 +97,8 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
             return true;
         }
         else {
-#if SMALL_MODEL
-            let count = List<T>::s_size(l);
-
-            if(l == 1) {
-                return List<T>::safePred(List<T>::s_unsafe_get(0), p);
-            }
-            elif(l == 2) {
-                return List<T>::safePred(List<T>::s_unsafe_get(0), p) & List<T>::safePred(List<T>::s_unsafe_get(1), p);
-            }
-            elif(l == 3) {
-                return List<T>::safePred(List<T>::s_unsafe_get(0), p) & List<T>::safePred(List<T>::s_unsafe_get(1), p) & List<T>::safePred(List<T>::s_unsafe_get(2), p);
-            }
-            else {
-                return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
-            }
-#else
-        return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
-#end
+            //TODO: here special case for small model
+            return List<T>::s_safeCheckPred_Core(l, List<T>::s_size(l), p);
         }
     }
 

@@ -102,6 +102,19 @@ class ListOpsManager {
         return this.ops.get(encltype.trkey) as ListOpsInfo;
     }
 
+    registerHavoc(ltype: MIRType): string {
+        const ops = this.ensureOpsFor(ltype);
+
+        ops.consops.havoc = true;
+        if (this.vopts.SpecializeSmallModelGen) {
+            ops.consops.literalk.add(1);
+            ops.consops.literalk.add(2);
+            ops.consops.literalk.add(3);
+        }
+
+        return this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "havoc");
+    }
+
     processHavoc(ltype: MIRType, path: SMTVar): SMTExp {
         const ops = this.ensureOpsFor(ltype);
 
@@ -112,7 +125,7 @@ class ListOpsManager {
             ops.consops.literalk.add(3);
         }
 
-        return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "havoc"), [path])
+        return new SMTCallSimple(this.generateConsCallName(this.temitter.getSMTTypeFor(ltype), "havoc"), [path]);
     }
 
     processLiteralK_0(ltype: MIRType): SMTExp {
@@ -478,15 +491,15 @@ class ListOpsManager {
 
     ////////
     //RangeNat/Int
-    emitConstructorRange(mtype: MIRType, ltype: SMTType, ctype: MIRType, start: SMTVar, end: SMTVar): SMTConstructorGenCode {
+    emitConstructorRange(mtype: MIRType, ltype: SMTType, ctype: MIRType): SMTConstructorGenCode {
         const lcons = this.temitter.getSMTConstructorName(mtype).cons;
 
         const opname = ctype.trkey === "NSCore::Nat" ? "rangeOfNat" : "rangeOfInt";
         const rtype = this.temitter.getSMTTypeFor(ctype);
         
         const ffunc = new SMTCallSimple(lcons, [
-            new SMTCallSimple("bvsub", [end, start]),
-            new SMTCallSimple(this.generateConsCallName_Direct(ltype, opname), [start, end])
+            new SMTCallSimple("bvsub", [new SMTVar("end"), new SMTVar("start")]),
+            new SMTCallSimple(this.generateConsCallName_Direct(ltype, opname), [new SMTVar("start"), new SMTVar("end")])
         ]);
 
         return {
@@ -1122,5 +1135,5 @@ class ListOpsManager {
 }
 
 export {
-    ListOpsManager
+    ListOpsManager, ListOpsInfo
 };

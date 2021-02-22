@@ -134,6 +134,7 @@ class SMTListDecl {
     readonly get_decl: SMTFunction;
 
     constructor(iskeytype: boolean, isapitype: boolean, smtllisttype: string, listtypeconsf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[], get_axiomdecl: SMTFunctionUninterpreted, smtname: string, typetag: string, consf: { cname: string, cargs: { fname: string, ftype: SMTType }[] }, boxf: string, ubf: string, getdecl: SMTFunction) {
+        xxxx;
         this.iskeytype = iskeytype;
         this.isapitype = isapitype;
 
@@ -468,6 +469,7 @@ class SMTAssembly {
         let collectiongets: string[] = [];
         let generalcollectioninternaldecls: {decl: string, consf: string}[] = [];
         this.listDecls
+        xxxx
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))
             .forEach((kt) => {
                 const iconsopts = kt.listtypeconsf.map((cf) => `(${cf.cname} ${cf.cargs.map((ke) => `(${ke.fname} ${ke.ftype.name})`).join(" ")})`)

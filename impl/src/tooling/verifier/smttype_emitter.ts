@@ -527,7 +527,12 @@ class SMTTypeEmitter {
     }
 
     generateHavocConstructorCall(tt: MIRType, path: SMTExp, step: SMTExp): SMTExp {
-        return new SMTCallGeneral(this.generateHavocConstructorName(tt), [this.generateHavocConstructorPathExtend(path, step)]);
+        if(this.isKnownSafeHavocConstructorType(tt)) {
+            return this.generateResultTypeConstructorSuccess(tt, new SMTCallSimple(this.generateHavocConstructorName(tt), [this.generateHavocConstructorPathExtend(path, step)]));
+        }
+        else {
+            return new SMTCallGeneral(this.generateHavocConstructorName(tt), [this.generateHavocConstructorPathExtend(path, step)]);
+        }
     }
 
 }

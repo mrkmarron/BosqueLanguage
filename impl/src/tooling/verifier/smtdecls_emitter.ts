@@ -10,6 +10,7 @@ import { MIRAssembly, MIRConceptType, MIREntityType, MIREntityTypeDecl, MIRField
 import { constructCallGraphInfo, markSafeCalls } from "../../compiler/mir_callg";
 import { MIRInvokeKey, MIRResolvedTypeKey } from "../../compiler/mir_ops";
 import { SMTBodyEmitter } from "./smtbody_emitter";
+import { ListOpsInfo } from "./smtcollection_emitter";
 import { SMTTypeEmitter } from "./smttype_emitter";
 import { SMTAssembly, SMTConstantDecl, SMTEntityDecl, SMTEphemeralListDecl, SMTFunction, SMTFunctionUninterpreted, SMTListDecl, SMTModelState, SMTRecordDecl, SMTTupleDecl } from "./smt_assembly";
 import { SMTCallGeneral, SMTCallSimple, SMTCond, SMTConst, SMTExists, SMTExp, SMTForAll, SMTIf, SMTLet, SMTLetMulti, SMTType, SMTVar, VerifierOptions } from "./smt_exp";
@@ -43,220 +44,92 @@ class SMTEmitter {
         this.assembly = assembly;
     }
 
-    private generateAPITypeConstructorFunction_Primitive(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
-        if (this.temitter.isType(tt, "NSCore::None")) {
-            return [new SMTConst("bsq_none@literal"), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Bool")) {
-            return [new SMTCallSimple("BBool@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Int")) {
-            return [new SMTCallSimple("BInt@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Nat")) {
-            return [new SMTCallSimple("BNat@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::BigInt")) {
-            return [new SMTCallSimple("BBigInt@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::BigNat")) {
-            return [new SMTCallSimple("BBigNat@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Float")) {
-            return [new SMTCallSimple("BFloat@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Decimal")) {
-            return [new SMTCallSimple("BDecimal@UFCons_API", [path]), false];
-        }
-        else if (this.temitter.isType(tt, "NSCore::Rational")) {
-            return [new SMTCallSimple("BRational@UFCons_API", [path]), false];
+    private generateAPITypeConstructorFunction_TypedNumber(tt: MIRType): SMTFunction {
+        const tdecl = this.bemitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
+        const mf = tdecl.fields.find((ff) => ff.fname == "v") as MIRFieldDecl;
+        const mftype = this.temitter.getMIRType(mf.declaredType);
+
+        const bcreate = this.temitter.generateHavocConstructorCall(mftype, new SMTVar("path"), new SMTConst("BNat@zero"));
+        if (!this.bemitter.isSafeConstructorInvoke(tt)) {
+            return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), bcreate);
         }
         else {
-            const sstr = new SMTCallSimple("BString@UFCons_API", [path]);
-            const tstr = this.bemitter.generateTempName();
-
-            const chksize = new SMTLet(tstr, sstr, 
-                new SMTIf(
-                    new SMTCallSimple("<=", [new SMTCallSimple("str.len", [new SMTVar(tstr)]), new SMTConst(`${this.bemitter.vopts.ISize}`)]),
-                    this.temitter.generateResultTypeConstructorSuccess(tt, new SMTVar(tstr)),
-                    this.temitter.generateErrorResultAssert(tt)
-                )
-            );
-
-            return [chksize, true];
+            return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), this.temitter.generateResultTypeConstructorSuccess(tt, bcreate));
         }
     }
 
-    private generateAPITypeConstructorFunction_TypedNumber(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
-        const tdecl = this.bemitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
-        const mf = this.bemitter.assembly.fieldDecls.get("v") as MIRFieldDecl;
-        const mftype = this.temitter.getMIRType(mf.declaredType);
-        
-        const bcreate = this.generateAPITypeConstructorFunction_Primitive(mftype, path);
-        return [new SMTCallSimple(this.temitter.mangle(tdecl.consfunc as MIRInvokeKey), [bcreate[0]]), !this.bemitter.isSafeConstructorInvoke(tt)];
-    }
-
-    private generateAPITypeConstructorFunction_ValidatedString(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
-        const sstr = new SMTCallSimple("BString@UFCons_API", [path]);
-        const svar = this.bemitter.generateTempName();
+    private generateAPITypeConstructorFunction_ValidatedString(tt: MIRType): SMTFunction {
+        const bcreate = this.temitter.generateHavocConstructorCall(this.temitter.getMIRType("NSCore::String"), new SMTVar("path"), new SMTConst("BNat@zero"));
 
         const vre = this.bemitter.assembly.validatorRegexs.get(tt.trkey) as BSQRegex;
         const lre = vre.compileToSMTValidator(this.bemitter.vopts.StringOpt === "ASCII");
 
-        const lenok = new SMTCallSimple("<=", [new SMTCallSimple("str.len", [new SMTVar(svar)]), new SMTConst(`${this.bemitter.vopts.ISize}`)]);
-        const accept = new SMTCallSimple("str.in.re", [new SMTConst(lre), new SMTVar(svar)]);
-        const construct = new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, [new SMTVar(svar)]);
+        const accept = new SMTCallSimple("str.in.re", [new SMTConst(lre), this.temitter.generateResultTypeConstructorSuccess(this.temitter.getMIRType("NSCore::String"), new SMTVar("str"))]);
+        const construct = new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, [this.temitter.generateResultTypeConstructorSuccess(this.temitter.getMIRType("NSCore::String"), new SMTVar("str"))]);
 
-        return [
-            new SMTLet(svar, sstr,
-                new SMTIf(new SMTCallSimple("and", [lenok, accept]),
-                    this.temitter.generateResultTypeConstructorSuccess(tt, construct),
-                    this.temitter.generateErrorResultAssert(tt)
-                )
-            ),
-            true
-        ];
+        const fbody = new SMTLet("str", bcreate,
+            new SMTIf(new SMTCallSimple("and", [this.temitter.generateResultIsSuccessTest(this.temitter.getMIRType("NSCore::String"), new SMTVar("str")), accept]),
+                this.temitter.generateResultTypeConstructorSuccess(tt, construct),
+                this.temitter.generateErrorResultAssert(tt)
+            )
+        );
+
+        return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody);
     }
 
-    private generateAPITypeConstructorFunction_Tuple(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
+    private generateAPITypeConstructorFunction_Tuple(tt: MIRType): SMTFunction {
         const ttuple = tt.options[0] as MIRTupleType;
 
         const ctors = ttuple.entries.map((ee, i) => {
-            const epath = SMTEmitter.generatePathExtension(path, new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
-            const cc = this.generateAPITypeConstructorFunction(ee.type, epath);
+            const cc = this.temitter.generateHavocConstructorCall(ee.type, new SMTVar("path"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
             const ccvar = this.bemitter.generateTempName();
-            const chkfun = cc[1] ? this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar)) : undefined;
-            const access = cc[1] ? this.temitter.generateResultGetSuccess(ee.type, new SMTVar(ccvar)) : new SMTVar(ccvar);
+            const chkfun = this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar));
+            const access = this.temitter.generateResultGetSuccess(ee.type, new SMTVar(ccvar));
 
             return { ccvar: ccvar, cc: cc, chk: chkfun, access: access };
         });
 
-        const anyerror = ctors.some((ctor) => ctor.chk !== undefined);
-        if(!anyerror) {
-            return [new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)), false];
-        }
-        else {
-            return [
-                new SMTLetMulti(
-                    ctors.map((ctor) => { return { vname: ctor.ccvar, value: ctor.cc[0] }; }),
-                    new SMTIf(
-                        new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
-                        new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
-                        this.temitter.generateErrorResultAssert(tt)
-                    )
-                ),
-                true
-            ];
-        }
+        const fbody = new SMTLetMulti(
+            ctors.map((ctor) => { return { vname: ctor.ccvar, value: ctor.cc }; }),
+            new SMTIf(
+                new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
+                new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
+                this.temitter.generateErrorResultAssert(tt)
+            )
+        );
+
+        return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody);
     }
 
-    private generateAPITypeConstructorFunction_Record(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
+    private generateAPITypeConstructorFunction_Record(tt: MIRType): SMTFunction {
         const trecord = tt.options[0] as MIRRecordType;
 
         const ctors = trecord.entries.map((ee, i) => {
-            const epath = SMTEmitter.generatePathExtension(path, new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
-            const cc = this.generateAPITypeConstructorFunction(ee.type, epath);
+            const cc = this.temitter.generateHavocConstructorCall(ee.type, new SMTVar("path"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
             const ccvar = this.bemitter.generateTempName();
-            const chkfun = cc[1] ? this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar)) : undefined;
-            const access = cc[1] ? this.temitter.generateResultGetSuccess(ee.type, new SMTVar(ccvar)) : new SMTVar(ccvar);
+            const chkfun = this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar));
+            const access = this.temitter.generateResultGetSuccess(ee.type, new SMTVar(ccvar));
 
             return { pname: ee.name, ccvar: ccvar, cc: cc, chk: chkfun, access: access };
         });
 
-        const anyerror = ctors.some((ctor) => ctor.chk !== undefined);
-        if(!anyerror) {
-            return [new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)), false];
-        }
-        else {
-            return [
-                new SMTLetMulti(
-                    ctors.map((ctor) => { return { vname: ctor.ccvar, value: ctor.cc[0] }; }),
-                    new SMTIf(
-                        new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
-                        new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
-                        this.temitter.generateErrorResultAssert(tt)
-                    )
-                ),
-                true
-            ];
-        }
-    }
-
-    private generateAPITypeConstructorFunction_List(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
-        const smttt = this.temitter.getSMTTypeFor(tt);
-        const stypeinfo = (this.temitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl).specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[];
-        const ctype = this.temitter.getMIRType((stypeinfo.find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
-        const smtnattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
-
-        const fcons = `@@cons_${smttt.name}_entrypoint`;
-        this.bemitter.requiredCollectionConstructors_Operational.push({cname: fcons, oftype: tt.trkey, argtypes: [new SMTType("(Seq BNat)")], implkey: "entrypoint"});
-
-        const ressize = this.bemitter.generateTempName();
-        const cvar = this.bemitter.generateTempName();
-        const resvar = this.bemitter.generateTempName();
-
-        const dwexp = this.generateAPITypeConstructorFunction(ctype, SMTEmitter.generatePathExtension(path, new SMTVar("n")));
-        const rwexp = dwexp[1] ? this.temitter.generateResultGetSuccess(ctype, dwexp[0]) : dwexp[0];
-
-        //\forall n, n \in [0, size(l)) get_axiom(res, n) = gen(path ++ n)
-        const eqassert = new SMTForAll([{vname: "n", vtype: smtnattype}], 
-            new SMTCallSimple("=>", [
-                new SMTCallSimple("bvult", [new SMTVar("n"), new SMTVar(ressize)]),
-                new SMTCallSimple("=", [
-                    new SMTCallSimple(`${smttt.name}@get_axiom`, [new SMTVar(cvar), new SMTVar("n")]),
-                    rwexp
-                ])
-            ])
-        );
-
-        const lconsf = this.temitter.getSMTConstructorName(tt); 
-
-        const fsize = new SMTCallSimple("BNat@UFCons_API", [path]);
-        const icons = new SMTCallSimple(fcons, [path]);
-        const fres = new SMTCallSimple(lconsf.cons, [new SMTVar(ressize), new SMTVar(cvar)]);
-
-        const crrlistexp = new SMTLet(
-            resvar, fres,
+        const fbody = new SMTLetMulti(
+            ctors.map((ctor) => { return { vname: ctor.ccvar, value: ctor.cc }; }),
             new SMTIf(
-                eqassert,
-                this.temitter.generateResultTypeConstructorSuccess(tt, new SMTVar(resvar)),
-                this.bemitter.generateErrorAssertFact(tt)
+                new SMTCallSimple("and", ctors.filter((ctor) => ctor.chk !== undefined).map((ctor) => ctor.chk as SMTExp)),
+                new SMTCallSimple(this.temitter.getSMTConstructorName(tt).cons, ctors.map((ctor) => ctor.access)),
+                this.temitter.generateErrorResultAssert(tt)
             )
         );
 
-        if (dwexp[1]) {
-            const echeck = new SMTExists(
-                [{ vname: "nn", vtype: smtnattype }],
-                new SMTCallSimple("and", [
-                    new SMTCallSimple("bvult", [new SMTVar("nn"), new SMTVar(ressize)]),
-                    this.temitter.generateResultIsErrorTest(ctype, this.generateAPITypeConstructorFunction(ctype, SMTEmitter.generatePathExtension(path, new SMTVar("nn")))[0])
-                ])
-            );
+        return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody);
+    }
 
-            return [
-                new SMTLet(
-                    ressize, fsize,
-                    new SMTIf(
-                        echeck,
-                        this.bemitter.generateErrorAssertFact(tt),
-                        new SMTLet(
-                            cvar, icons,
-                            crrlistexp
-                        )
-                    )
-                ),
-                true
-            ];
-        }
-        else {
-            return [
-                new SMTLetMulti(
-                    [{ vname: ressize, value: fsize }, { vname: cvar, value: icons }],
-                    crrlistexp
-                ),
-                true
-            ]
-        }
+    private generateAPITypeConstructorFunction_List(tt: MIRType): SMTFunction {
+        const invop = this.bemitter.lopsManager.registerHavoc(tt);
+        const fbody = new SMTCallGeneral(invop, [new SMTVar("path")]);
+
+        return SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody);
     }
 
     private generateAPITypeConstructorFunction_Set(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
@@ -275,63 +148,36 @@ class SMTEmitter {
         return [new SMTConst("bsq_none@literal"), false];
     }
 
-    private generateAPITypeConstructorFunction(tt: MIRType, path: SMTExp): [SMTExp, boolean] {
-        if(tt.options.length !== 1) {
-            return [new SMTConst("bsq_none@literal"), false];
-        }
-
-        if (this.temitter.isType(tt, "NSCore::None") || this.temitter.isType(tt, "NSCore::Bool")
-            || this.temitter.isType(tt, "NSCore::Int") || this.temitter.isType(tt, "NSCore::Nat") || this.temitter.isType(tt, "NSCore::BigInt") || this.temitter.isType(tt, "NSCore::BigNat")
-            || this.temitter.isType(tt, "NSCore::Float") || this.temitter.isType(tt, "NSCore::Decimal") || this.temitter.isType(tt, "NSCore::Rational")
-            || this.temitter.isType(tt, "NSCore::String")) {
-            return this.generateAPITypeConstructorFunction_Primitive(tt, path);
-        }
-        else if (this.temitter.isUniqueTupleType(tt)) {
-            return this.generateAPITypeConstructorFunction_Tuple(tt, path);
-        }
-        else if (this.temitter.isUniqueRecordType(tt)) {
-            return this.generateAPITypeConstructorFunction_Record(tt, path);
-        }
-        else if (this.temitter.isUniqueEntityType(tt)) {
-            const etype = tt.options[0] as MIREntityType;
-            const edecl = this.temitter.assembly.entityDecls.get(etype.trkey) as MIREntityTypeDecl;
-
-            if(edecl.specialDecls.has(MIRSpecialTypeCategory.TypeDeclNumeric)) {
-                return this.generateAPITypeConstructorFunction_TypedNumber(tt, path);
-            }
-            else if (edecl.specialDecls.has(MIRSpecialTypeCategory.StringOfDecl)) {
-                return this.generateAPITypeConstructorFunction_ValidatedString(tt, path);
-            }
-            else if (edecl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
-                return this.generateAPITypeConstructorFunction_List(tt, path);
-            }
-            else if (edecl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
-                return this.generateAPITypeConstructorFunction_Set(tt, path);
-            }
-            else if( edecl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
-                return this.generateAPITypeConstructorFunction_Map(tt, path);
-            }
-            else {
-                return [new SMTConst("bsq_none@literal"), false];
-            }
-        }
-        else {
-            return [new SMTConst("bsq_none@literal"), false];
-        }
-    }
-
     private processVectorTypeDecl(vdecl: MIREntityTypeDecl) {
         //NOT IMPLEMENTED YET
         assert(false);
     }
     
     private processListTypeDecl(ldecl: MIREntityTypeDecl) {
-        const mirtype = this.temitter.getMIRType(ldecl.tkey);
-        const smttype = this.temitter.getSMTTypeFor(mirtype);
-        const mirctype = this.temitter.getMIRType(((ldecl.specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[]).find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
-        const smtctype = this.temitter.getSMTTypeFor(mirctype);
+        const mtype = this.temitter.getMIRType(ldecl.tkey);
+        const ltype = this.temitter.getSMTTypeFor(mtype);
+        const ctype = this.temitter.getMIRType(((ldecl.specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[]).find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
         const nattype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::Nat"));
         const stringtype = this.temitter.getSMTTypeFor(this.temitter.getMIRType("NSCore::String"));
+
+        const linfo = this.bemitter.lopsManager.ops.get(ldecl.tkey) as ListOpsInfo;
+        const constructors: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[] = [];
+
+        if(this.bemitter.lopsManager.rangenat && ctype.trkey == this.temitter.getMIRType("NSCore::Nat").trkey) {
+            const cv = this.bemitter.lopsManager.emitConstructorRange(mtype, ltype, ctype);
+
+            this.assembly.functions.push(...cv.if);
+            cv.if.forEach((ifunc) => this.assembly.functions.push(ifunc));
+            cv.uf.forEach
+        }
+
+        if(this.bemitter.lopsManager.rangeint && ctype.trkey == this.temitter.getMIRType("NSCore::Int").trkey) {
+            xxxx;
+        }
+
+        linfo.consops.xxx;
+
+        linfo.dops.xxx;
 
         const pickindex = new SMTFunctionUninterpreted(`${smttype.name}@pick_index`, [stringtype, smttype, nattype, nattype], nattype);
         this.assembly.uninterpfunctions.push(pickindex);
@@ -342,7 +188,7 @@ class SMTEmitter {
         const lccftype = smttype.name + "$uli";
         const get_axiom = new SMTFunctionUninterpreted(`${smttype.name}@get_axiom`, [new SMTType(lccftype), nattype], smtctype);
 
-        const constructors: { cname: string, cargs: { fname: string, ftype: SMTType }[] }[] = [];
+        
         const getdirectops: { test: SMTExp, result: SMTExp }[] = [];
         
         this.bemitter.requiredCollectionConstructors_Literal
