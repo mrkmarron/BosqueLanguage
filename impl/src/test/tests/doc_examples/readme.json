@@ -29,7 +29,7 @@
             "test": "allPositive",
             "src": null,
             "sig": "function main(x: Int): Bool",
-            "code": "function allPositive(...args: List<Int>): Bool { return args.allOf(fn(x) => x >= 0i); }",
+            "code": "function allPositive(...args: List<Int>): Bool { return args.allOf(pred(x) => x >= 0i); }",
             "typechk": [
             ],
             "refutes": [
@@ -47,7 +47,7 @@
             "test": "allPositiveCapture",
             "src": null,
             "sig": "function main(x: Int): Bool",
-            "code": "function allPositive(v: Int, ...args: List<Int>): Bool { return args.allOf(fn(x) => x >= v); }",
+            "code": "function allPositive(v: Int, ...args: List<Int>): Bool { return args.allOf(pred(x) => x >= v); }",
             "typechk": [
             ],
             "refutes": [

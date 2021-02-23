@@ -327,6 +327,7 @@ class SMTAssembly {
     functions: SMTFunction[] = [];
 
     entrypoint: string;
+    havocfuncs: Set<string> = new Set<string>();
     model: SMTModelState = new SMTModelState([], undefined, new SMTType("[UNINIT]"), new SMTConst("bsq_none@literal"));
 
     modes: { refute: SMTExp, generate: SMTExp } = { 
@@ -675,7 +676,7 @@ class SMTAssembly {
 
         let foutput: string[] = [];
         let doneset: Set<string> = new Set<string>();
-        const cginfo = SMTAssembly.constructCallGraphInfo([this.entrypoint], this);
+        const cginfo = SMTAssembly.constructCallGraphInfo([this.entrypoint, ...this.havocfuncs], this);
         const rcg = [...cginfo.topologicalOrder].reverse();
 
         for (let i = 0; i < rcg.length; ++i) {

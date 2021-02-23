@@ -2402,7 +2402,7 @@ class SMTBodyEmitter {
             }
             case "list_unsafe_get": {
                 const [l, n] = args.map((arg) => new SMTVar(arg.vname));
-                const fbody = this.lopsManager.processGet(mirrestype, l, n);
+                const fbody = this.lopsManager.processGet(this.typegen.getMIRType(encltypekey), l, n);
                 return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, fbody);
             }
             case "list_fill": {

@@ -180,13 +180,13 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         let l1size = List<T>::s_size(l1);
         let l2size = List<T>::s_size(l2);
 
-        if(l1size == 0 & l2size == 0) {
+        if(l1size == 0n & l2size == 0n) {
             return List<T>@{};
         }
-        elif(l1size == 0) {
+        elif(l1size == 0n) {
             return l2;
         }
-        elif(l2size == 0) {
+        elif(l2size == 0n) {
             return l1;
         }
         else {
@@ -202,7 +202,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private recursive? function s_findIndexOf_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat {
         if(List<T>::s_empty(l)) {
-            return 0;
+            return 0n;
         }
         else {
             let sl = List<T>::s_safeCheckPred[recursive?](l, p);
@@ -222,7 +222,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private recursive? function s_findIndexOfLast_PredicateHelper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat {
         if(List<T>::s_empty(l)) {
-            return 0;
+            return 0n;
         }
         else {
             let sl = List<T>::s_safeCheckPred[recursive?](l, p);
@@ -247,7 +247,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
 
     private recursive? function s_countIf_Helper(l: List<T>, p: recursive? pred(_: T) -> Bool): Nat {
         if(List<T>::s_empty(l)) {
-            return 0;
+            return 0n;
         }
         else {
             let sl = List<T>::s_safeCheckPred[recursive?](l, p);
@@ -264,7 +264,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
                 }
             }
             else {
-                return 0;
+                return 0n;
             }
         }
     }
@@ -351,7 +351,7 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
     ////
 
     function fill(k: Nat, val: T): List<T> {
-        if(k == 0) {
+        if(k == 0n) {
             return List<T>@{};
         }
         else {
@@ -951,11 +951,11 @@ __internal entity List<T> provides Object, Expandoable<T>, PODType when T PODTyp
         return List<T>::s_filter_Helper_Idx[recursive?](this, p);
     }
 
-    method filterToType<U>(start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<U> {
+    method filterToType<U>(): List<U> {
         return List<T>::s_filterToTypetype_Helper<U>(this);
     }
 
-    method castToType<U>(start?: Nat=0n, end?: Nat=List<T>::s_size(this)): List<U> {
+    method castToType<U>(): List<U> {
         return List<T>::s_castToType_Helper<U>(this);
     }
 

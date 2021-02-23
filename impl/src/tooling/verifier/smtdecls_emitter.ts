@@ -46,13 +46,14 @@ class SMTEmitter {
         this.assembly = assembly;
     }
 
-    private generateAPITypeConstructorFunction_TypedNumber(tt: MIRType) {
+    private generateAPITypeConstructorFunction_TypedNumber(tt: MIRType, havocfuncs: Set<String>) {
         const tdecl = this.bemitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
         const mf = tdecl.fields.find((ff) => ff.fname == "v") as MIRFieldDecl;
         const mftype = this.temitter.getMIRType(mf.declaredType);
 
-        this.walkAndGenerateHavocType(mftype);
+        this.walkAndGenerateHavocType(mftype, havocfuncs);
         const bcreate = this.temitter.generateHavocConstructorCall(mftype, new SMTVar("path"), new SMTConst("BNat@zero"));
+        havocfuncs.add(this.temitter.generateHavocConstructorName(tt));
         if (!this.bemitter.isSafeConstructorInvoke(tt)) {
             this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), bcreate));
         }
@@ -61,7 +62,7 @@ class SMTEmitter {
         }
     }
 
-    private generateAPITypeConstructorFunction_String() {
+    private generateAPITypeConstructorFunction_String(havocfuncs: Set<String>) {
         const bcreate = new SMTCallSimple("BString@UFCons_API", [new SMTVar("path")]);
 
         let fbody: SMTExp = new SMTConst("[UNDEFINED]");
@@ -82,11 +83,12 @@ class SMTEmitter {
             );
         }
 
+        havocfuncs.add(this.temitter.generateHavocConstructorName(this.temitter.getMIRType("NSCore::String")));
         this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(this.temitter.getMIRType("NSCore::String")), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(this.temitter.getMIRType("NSCore::String")), fbody));
     }
 
-    private generateAPITypeConstructorFunction_ValidatedString(tt: MIRType) {
-        this.walkAndGenerateHavocType(this.temitter.getMIRType("NSCore::String"));
+    private generateAPITypeConstructorFunction_ValidatedString(tt: MIRType, havocfuncs: Set<String>) {
+        this.walkAndGenerateHavocType(this.temitter.getMIRType("NSCore::String"), havocfuncs);
         const bcreate = this.temitter.generateHavocConstructorCall(this.temitter.getMIRType("NSCore::String"), new SMTVar("path"), new SMTConst("BNat@zero"));
 
         const vre = this.bemitter.assembly.validatorRegexs.get(tt.trkey) as BSQRegex;
@@ -102,14 +104,15 @@ class SMTEmitter {
             )
         );
 
+        havocfuncs.add(this.temitter.generateHavocConstructorName(tt));
         this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody));
     }
 
-    private generateAPITypeConstructorFunction_Tuple(tt: MIRType) {
+    private generateAPITypeConstructorFunction_Tuple(tt: MIRType, havocfuncs: Set<String>) {
         const ttuple = tt.options[0] as MIRTupleType;
 
         const ctors = ttuple.entries.map((ee, i) => {
-            this.walkAndGenerateHavocType(ee.type);
+            this.walkAndGenerateHavocType(ee.type, havocfuncs);
             const cc = this.temitter.generateHavocConstructorCall(ee.type, new SMTVar("path"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
             const ccvar = this.bemitter.generateTempName();
             const chkfun = this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar));
@@ -127,14 +130,15 @@ class SMTEmitter {
             )
         );
 
+        havocfuncs.add(this.temitter.generateHavocConstructorName(tt));
         this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody));
     }
 
-    private generateAPITypeConstructorFunction_Record(tt: MIRType) {
+    private generateAPITypeConstructorFunction_Record(tt: MIRType, havocfuncs: Set<String>) {
         const trecord = tt.options[0] as MIRRecordType;
 
         const ctors = trecord.entries.map((ee, i) => {
-            this.walkAndGenerateHavocType(ee.type);
+            this.walkAndGenerateHavocType(ee.type, havocfuncs);
             const cc = this.temitter.generateHavocConstructorCall(ee.type, new SMTVar("path"), new SMTConst(`(_ bv${i} ${this.bemitter.vopts.ISize})`));
             const ccvar = this.bemitter.generateTempName();
             const chkfun = this.temitter.generateResultIsSuccessTest(tt, new SMTVar(ccvar));
@@ -152,30 +156,31 @@ class SMTEmitter {
             )
         );
 
+        havocfuncs.add(this.temitter.generateHavocConstructorName(tt));
         this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody));
     }
 
-    private generateAPITypeConstructorFunction_List(tt: MIRType) {
+    private generateAPITypeConstructorFunction_List(tt: MIRType, havocfuncs: Set<String>) {
         const ldecl = this.temitter.assembly.entityDecls.get(tt.trkey) as MIREntityTypeDecl;
         const ctype = this.temitter.getMIRType(((ldecl.specialTemplateInfo as { tname: string, tkind: MIRResolvedTypeKey }[]).find((tke) => tke.tname === "T") as { tname: string, tkind: MIRResolvedTypeKey }).tkind);
         
-        this.walkAndGenerateHavocType(ctype);
-
+        this.walkAndGenerateHavocType(ctype, havocfuncs);
 
         const invop = this.bemitter.lopsManager.registerHavoc(tt);
         const fbody = new SMTCallGeneral(invop, [new SMTVar("path")]);
 
+        havocfuncs.add(this.temitter.generateHavocConstructorName(tt));
         this.assembly.functions.push(SMTFunction.create(this.temitter.generateHavocConstructorName(tt), [{ vname: "path", vtype: new SMTType("(Seq BNat)") }], this.temitter.generateResultType(tt), fbody));
     }
 
-    private generateAPITypeConstructorFunction_Set(tt: MIRType) {
+    private generateAPITypeConstructorFunction_Set(tt: MIRType, havocfuncs: Set<String>) {
         //
         //TODO: not implemented yet
         //
         assert(false);
     }
 
-    private generateAPITypeConstructorFunction_Map(tt: MIRType) {
+    private generateAPITypeConstructorFunction_Map(tt: MIRType, havocfuncs: Set<String>) {
         //
         //TODO: not implemented yet
         //
@@ -391,39 +396,39 @@ class SMTEmitter {
         this.lastVInvokeIdx = this.bemitter.requiredUpdateVirtualEntity.length;
     }
 
-    private walkAndGenerateHavocType(tt: MIRType) {
+    private walkAndGenerateHavocType(tt: MIRType, havocfuncs: Set<String>) {
         assert(tt.options.length === 1)
 
         if (this.temitter.isKnownSafeHavocConstructorType(tt)) {
             //Don't need to do anything
         }
         else if (this.temitter.isUniqueTupleType(tt)) {
-            this.generateAPITypeConstructorFunction_Tuple(tt);
+            this.generateAPITypeConstructorFunction_Tuple(tt, havocfuncs);
         }
         else if (this.temitter.isUniqueRecordType(tt)) {
-            this.generateAPITypeConstructorFunction_Record(tt);
+            this.generateAPITypeConstructorFunction_Record(tt, havocfuncs);
         }
         else if (this.temitter.isUniqueEntityType(tt)) {
             const etype = tt.options[0] as MIREntityType;
             const edecl = this.temitter.assembly.entityDecls.get(etype.trkey) as MIREntityTypeDecl;
 
             if (edecl.specialDecls.has(MIRSpecialTypeCategory.TypeDeclNumeric)) {
-                this.generateAPITypeConstructorFunction_TypedNumber(tt);
+                this.generateAPITypeConstructorFunction_TypedNumber(tt, havocfuncs);
             }
             else if (this.temitter.isType(tt, "NSCore::String")) {
-                this.generateAPITypeConstructorFunction_String();
+                this.generateAPITypeConstructorFunction_String(havocfuncs);
             }
             else if (edecl.specialDecls.has(MIRSpecialTypeCategory.StringOfDecl)) {
-                this.generateAPITypeConstructorFunction_ValidatedString(tt);
+                this.generateAPITypeConstructorFunction_ValidatedString(tt, havocfuncs);
             }
             else if (edecl.specialDecls.has(MIRSpecialTypeCategory.ListTypeDecl)) {
-                this.generateAPITypeConstructorFunction_List(tt);
+                this.generateAPITypeConstructorFunction_List(tt, havocfuncs);
             }
             else if (edecl.specialDecls.has(MIRSpecialTypeCategory.SetTypeDecl)) {
-                this.generateAPITypeConstructorFunction_Set(tt);
+                this.generateAPITypeConstructorFunction_Set(tt, havocfuncs);
             }
             else if (edecl.specialDecls.has(MIRSpecialTypeCategory.MapTypeDecl)) {
-                this.generateAPITypeConstructorFunction_Map(tt);
+                this.generateAPITypeConstructorFunction_Map(tt, havocfuncs);
             }
             else {
                 //Don't need to do anything
@@ -517,7 +522,7 @@ class SMTEmitter {
             const mirptype = this.temitter.getMIRType(param.type);
             const vname = this.temitter.mangle(param.name);
 
-            this.walkAndGenerateHavocType(mirptype);
+            this.walkAndGenerateHavocType(mirptype, this.assembly.havocfuncs);
             const vexp = this.temitter.generateHavocConstructorCall(mirptype, new SMTCallSimple("seq.unit", [new SMTConst("BNat@zero")]), new SMTConst(`(_ bv${i} ${this.assembly.vopts.ISize})`));
             
             
