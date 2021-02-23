@@ -102,6 +102,7 @@ class SMTCallSimple extends SMTExp {
 
     computeCallees(callees: Set<string>): void {
         callees.add(this.fname);
+        this.args.forEach((arg) => arg.computeCallees(callees));
     }
 }
 
@@ -122,6 +123,7 @@ class SMTCallGeneral extends SMTExp {
 
     computeCallees(callees: Set<string>): void {
         callees.add(this.fname);
+        this.args.forEach((arg) => arg.computeCallees(callees));
     }
 }
 
@@ -144,6 +146,9 @@ class SMTCallGeneralWOptMask extends SMTExp {
 
     computeCallees(callees: Set<string>): void {
         callees.add(this.fname);
+        this.args.forEach((arg) => arg.computeCallees(callees));
+
+        this.mask.entries.forEach((mentry) => mentry.computeCallees(callees));
     }
 }
 
@@ -166,6 +171,7 @@ class SMTCallGeneralWPassThroughMask extends SMTExp {
 
     computeCallees(callees: Set<string>): void {
         callees.add(this.fname);
+        this.args.forEach((arg) => arg.computeCallees(callees));
     }
 }
 

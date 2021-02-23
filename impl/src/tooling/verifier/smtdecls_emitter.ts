@@ -492,7 +492,7 @@ class SMTEmitter {
             }
         }
 
-        ["NSCore__None", "NSCore::Bool", "NSCore::Int", "NSCore::Nat", "NSCore::BigInt", "NSCore::BigNat", "NSCore::Float", "NSCore::Decimal", "NSCore::Rational", "NSCore::String", "NSCore::Regex"]
+        ["NSCore::None", "NSCore::Bool", "NSCore::Int", "NSCore::Nat", "NSCore::BigInt", "NSCore::BigNat", "NSCore::Float", "NSCore::Decimal", "NSCore::Rational", "NSCore::String", "NSCore::Regex"]
             .forEach((ptype) => {
                 const rtype = this.temitter.getSMTTypeFor(this.temitter.getMIRType(ptype));
                 if(this.assembly.resultTypes.find((rtt) => rtt.ctype.name === rtype.name) === undefined) {

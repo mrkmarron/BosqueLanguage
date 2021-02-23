@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------------------------------------------
 
 import { BSQRegex } from "../../ast/bsqregex";
-import { SMTConst, SMTExp, SMTForAll, SMTType, VerifierOptions } from "./smt_exp";
+import { SMTConst, SMTExp, SMTType, VerifierOptions } from "./smt_exp";
 
 type SMT2FileInfo = {
     TYPE_TAG_DECLS: string[],
@@ -80,10 +80,10 @@ class SMTFunction {
         const args = this.args.map((arg) => `(${arg.vname} ${arg.vtype.name})`);
 
         if(this.maskname === undefined) {
-            return `(define-fun ${this.fname} (${args.join(" ")}) ${this.result.name})`;
+            return `(${this.fname} (${args.join(" ")}) ${this.result.name})`;
         }
         else {
-            return `(define-fun ${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize})) ${this.result.name})`;
+            return `(${this.fname} (${args.join(" ")} (${this.maskname} $Mask_${this.masksize})) ${this.result.name})`;
         }
     }
 }
@@ -379,7 +379,7 @@ class SMTAssembly {
     private static constructCallGraphInfo(entryPoints: string[], assembly: SMTAssembly): SMTCallGInfo {
         let invokes = new Map<string, SMTCallGNode>();
 
-        const okinv = new Set<string>(...assembly.functions.map((f) => f.fname));
+        const okinv = new Set<string>(assembly.functions.map((f) => f.fname));
         assembly.functions.forEach((smtfun) => {
             invokes.set(smtfun.fname, SMTAssembly.processBodyInfo(smtfun.fname, smtfun.body, okinv));
         });
@@ -500,16 +500,7 @@ class SMTAssembly {
             float_constants.push(`(declare-const BRational@zero BRational) (assert (= BRational@zero (BRationalCons_UF "0/1")))`);
             float_constants.push(`(declare-const BRational@one BRational) (assert (= BRational@one (BRationalCons_UF "1/1")))`);
         }
-
-        if(this.vopts.StringOpt === "ASCII") {
-            integral_constants.push(`(declare-const BString@empty BString) (assert (= BString@empty ""))`);
-            integral_constants.push(`(assert (forall ((tstr BString)) (<= (str.len tstr) ${this.vopts.ISize})))`);
-        }
-        else {
-            integral_constants.push(`(declare-const BString@empty BString) (assert (= BString@empty (as seq.empty (Seq (_ BitVec 16))))))`);
-            integral_constants.push(`(assert (forall ((tstr BString)) (<= (seq.len tstr) ${this.vopts.ISize})))`);
-        }
-
+        
         const keytupleinfo = this.tupleDecls
             .filter((tt) => tt.iskeytype)
             .sort((t1, t2) => t1.smtname.localeCompare(t2.smtname))

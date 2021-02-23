@@ -206,7 +206,8 @@ const vopts = {
     OverflowEnabled: false,
     FPOpt: "Real",
     StringOpt: "ASCII",
-    FilterMode: "General"
+    SimpleQuantifierMode: false,
+    SpecializeSmallModelGen: false
 } as VerifierOptions;
 
 if (Commander.args.length === 0) {

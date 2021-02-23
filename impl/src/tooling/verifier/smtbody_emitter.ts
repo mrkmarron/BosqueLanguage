@@ -2312,6 +2312,9 @@ class SMTBodyEmitter {
         const chkrestype = issafe ? smtrestype : this.typegen.generateResultType(mirrestype);
 
         switch(idecl.implkey) {
+            case "default": {
+                return undefined;
+            }
             case "string_count": {
                 if (this.vopts.StringOpt === "ASCII") {
                     return SMTFunction.create(this.typegen.mangle(idecl.key), args, chkrestype, new SMTCallSimple("nat2bv", [new SMTCallSimple("str.len", [new SMTVar(args[0].vname)])]));

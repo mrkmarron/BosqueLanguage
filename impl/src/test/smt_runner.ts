@@ -141,7 +141,8 @@ const vopts = {
     OverflowEnabled: false,
     FPOpt: "Real",
     StringOpt: "ASCII",
-    FilterMode: "General"
+    SimpleQuantifierMode: false,
+    SpecializeSmallModelGen: false
 } as VerifierOptions;
 
 function enqueueSMTTest(mode: "Refute" | "Reach", corefiles: {relativePath: string, contents: string}[], smtruntime: string, testsrc: string, trgtline: number, cb: (result: "pass" | "fail" | "unknown/timeout" | "error", start: Date, end: Date, info?: string) => void) {
