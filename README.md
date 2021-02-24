@@ -5,6 +5,9 @@
 [![Build Status](https://dev.azure.com/bosquepl/BosqueDevOps/_apis/build/status/Microsoft.BosqueLanguage?branchName=master)](https://dev.azure.com/bosquepl/BosqueDevOps/_build/latest?definitionId=1&branchName=master)
 
 
+[![nodeci Actions Status](https://github.com/mrkmarron/BosqueLanguage/workflows/nodeci/badge.svg?branch=gc)](https://github.com/mrkmarron/BosqueLanguage/actions) 
+
+
 ## The Bosque Project
 The Bosque Programming Language project is a ground up language & tooling co-design effort focused on is investigating the theoretical and the practical implications of:
 
