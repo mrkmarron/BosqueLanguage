@@ -10,6 +10,8 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      working-directory: ./impl
 
     steps:
     - uses: actions/checkout@v2
