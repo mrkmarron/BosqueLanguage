@@ -10,15 +10,17 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    env:
-      working-directory: ./impl
 
     steps:
     - uses: actions/checkout@v2
-    - name: Use Node.js
+    - name: Setup
       uses: actions/setup-node@v1
       with:
         node-version: '14.x'
-    - run: npm install
-    - run: npm test
+    - name: Install
+        working-directory: ./impl
+        run: npm install
+    - name: Run Tests
+        working-directory: ./impl
+        run: npm test
     
