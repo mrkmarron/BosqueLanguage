@@ -5,7 +5,7 @@
 [![Build Status](https://dev.azure.com/bosquepl/BosqueDevOps/_apis/build/status/Microsoft.BosqueLanguage?branchName=master)](https://dev.azure.com/bosquepl/BosqueDevOps/_build/latest?definitionId=1&branchName=master)
 
 
-[![nodeci](https://github.com/mrkmarron/BosqueLanguage/actions/workflows/nodeci/badge.svg?branch=gc)](https://github.com/mrkmarron/BosqueLanguage/actions) 
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/mrkmarron/BosqueLanguage/nodeci?branch=gc)](https://github.com/mrkmarron/BosqueLanguage/actions) 
 
 
 ## The Bosque Project
