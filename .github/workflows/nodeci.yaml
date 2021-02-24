@@ -18,9 +18,9 @@ jobs:
       with:
         node-version: '14.x'
     - name: Install
-        working-directory: ./impl
-        run: npm install
+      working-directory: ./impl
+      run: npm install
     - name: Run Tests
-        working-directory: ./impl
-        run: npm test
+      working-directory: ./impl
+      run: npm test
     
